@@ -936,8 +936,8 @@ def listing_is_available(listing_id: str) -> tuple[bool, str]:
 
 def listing_unavailable_text() -> str:
     return (
-        "这套房源已经租出去了 🏃\n"
-        "不过我们有类似的选择，告诉我你的预算，马上给你找 ↓"
+        "这套刚好已经租出去了 🏃\n"
+        "不过别急，我们还有类似区域和价位的房源，告诉我你的预算，马上帮你找 ↓"
     )
 
 
@@ -1052,11 +1052,14 @@ def listing_landing_text(listing_id: str) -> str:
         details.append(size_text)
     detail_line = f"\n📌 {' · '.join(details)}" if details else ""
     if variant == "b":
-        next_step = "如果您已经比较满意，直接约视频看房或实地看房会更快。"
+        # 对应频道 B 款（实拍决策型）：强调快速行动
+        next_step = "实拍帖里所见即入住所得。如果看着合适，直接约视频代看或实地看房是最快的路。"
     elif variant == "c":
-        next_step = "如果您更在意费用、通勤或入住细节，建议直接点中文顾问逐项确认。"
+        # 对应频道 C 款（费用对齐型）：强调透明成本 + 顾问核实
+        next_step = "押付、水电、物业等费用顾问都可以帮您逐项核实，点下方「咨询顾问」最直接。"
     else:
-        next_step = "这套房我先帮您接住了，下面的按钮直接就是下一步。"
+        # 对应频道 A 款（信息决策型）：下一步按钮最短路径
+        next_step = "这套房我先帮您接住了，下面的按钮直接就是下一步，不用重新解释是哪套。"
     return (
         "💎 <b>侨联地产</b>\n"
         "您在金边的自己人\n\n"
@@ -1064,9 +1067,8 @@ def listing_landing_text(listing_id: str) -> str:
         f"🏠 <b>{he(area)}｜{he(layout)}</b>\n"
         f"💰 {he(price_text)}"
         f"{he(detail_line)}\n\n"
-        "帖里会尽量标清<b>隐性成本</b>（水电按表或包、物业、网络等）。\n\n"
-        f"{he(next_step)}\n"
-        "不用重新解释是哪套房，顾问会按当前房源继续跟。"
+        "帖里尽量标清<b>隐性成本</b>（水电按表或包月、物业费、网络等），方便您提前心里有数。\n\n"
+        f"{he(next_step)}"
     )
 
 
