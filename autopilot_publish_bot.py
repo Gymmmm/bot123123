@@ -1766,6 +1766,7 @@ def register_autopilot_features(
     application.add_handler(CommandHandler("tpl", cmd_tpl), group=grp_cmd)
     application.add_handler(CommandHandler("tpl_use", cmd_tpl_use), group=grp_cmd)
     application.add_handler(CommandHandler("tpl_test", cmd_tpl_test), group=grp_cmd)
+    application.add_handler(CommandHandler("new", cmd_intake), group=grp_cmd)
     application.add_handler(CommandHandler("intake", cmd_intake), group=grp_cmd)
     application.add_handler(CommandHandler("wxin", cmd_intake), group=grp_cmd)
     application.add_handler(CommandHandler("intake_done", cmd_intake_done), group=grp_cmd)

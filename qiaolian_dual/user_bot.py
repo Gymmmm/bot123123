@@ -2372,17 +2372,18 @@ async def handle_main_message(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def handle_find_area(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     area = detect_area((update.effective_message.text or "").strip())
     current = context.user_data.get("search_pref") or {}
+    goal = current.get("goal") or "any"
     context.user_data["search_pref"] = {
         "area": area,
         "source": current.get("source", "user_search"),
-        "goal": current.get("goal", ""),
+        "goal": goal,
         "touch_payload": current.get("touch_payload") or {},
     }
     await render_panel(
         update,
         text=find_area_budget_hint_text(),
         parse_mode=ParseMode.HTML,
-        reply_markup=main_keyboard(),
+        reply_markup=find_budget_keyboard(goal),
         context=context,
         prefer_edit_anchor=True,
     )
@@ -4067,6 +4068,12 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
     logger.exception("user_bot handler error: %s", context.error)
 
 
+_MAIN_CB_PATTERN = (
+    r"^(home|hub:|resume:|unavail:|findmode:|findtype:|findarea:|findbudget:|findback:area"
+    r"|roompick:|appointment_menu:|service:|service_request:|service_slot:|pref:|profile:|contract:)"
+)
+
+
 def build_application() -> Application:
     app = Application.builder().token(USER_BOT_TOKEN).build()
     conv_handler = ConversationHandler(
@@ -4085,25 +4092,16 @@ def build_application() -> Application:
         ],
         states={
             MAIN: [
-                CallbackQueryHandler(
-                    handle_ui_callback,
-                    pattern="^(home|hub:|resume:|unavail:|findmode:|findtype:|findarea:|findbudget:|findback:area|roompick:|appointment_menu:|service:|service_request:|service_slot:|pref:|profile:|contract:)",
-                ),
+                CallbackQueryHandler(handle_ui_callback, pattern=_MAIN_CB_PATTERN),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_main_message),
             ],
             FIND_AREA: [
-                CallbackQueryHandler(
-                    handle_ui_callback,
-                    pattern="^(home|hub:|resume:|unavail:|findmode:|findtype:|findarea:|findbudget:|findback:area|roompick:|appointment_menu:|service:|service_request:|service_slot:|pref:|profile:|contract:)",
-                ),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_main_message),
+                CallbackQueryHandler(handle_ui_callback, pattern=_MAIN_CB_PATTERN),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_find_area),
             ],
             FIND_BUDGET: [
-                CallbackQueryHandler(
-                    handle_ui_callback,
-                    pattern="^(home|hub:|resume:|unavail:|findmode:|findtype:|findarea:|findbudget:|findback:area|roompick:|appointment_menu:|service:|service_request:|service_slot:|pref:|profile:|contract:)",
-                ),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_main_message),
+                CallbackQueryHandler(handle_ui_callback, pattern=_MAIN_CB_PATTERN),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_find_budget),
             ],
             APPT_MODE: [CallbackQueryHandler(appoint_flow_cb, pattern="^(apmode:|home)")],
             APPT_FOCUS: [CallbackQueryHandler(appoint_flow_cb, pattern="^(apfocus:|home)")],
