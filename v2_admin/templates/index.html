@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}房源列表 · 侨联发布后台{% endblock %}
+
+{% block content %}
+<div class="container">
+
+  <div class="sec-label">ALL LISTINGS · 全部房源</div>
+
+  <!-- 状态筛选 -->
+  <div class="filter-tabs">
+    <a href="/" class="filter-tab {% if not status_filter %}active{% endif %}">全部</a>
+    <a href="/?status=draft"     class="filter-tab {% if status_filter=='draft'     %}active{% endif %}">⬜ 草稿</a>
+    <a href="/?status=published" class="filter-tab {% if status_filter=='published' %}active{% endif %}">🟢 已发布</a>
+    <a href="/?status=rented"    class="filter-tab {% if status_filter=='rented'    %}active{% endif %}">🔵 已租出</a>
+    <a href="/?status=offline"   class="filter-tab {% if status_filter=='offline'   %}active{% endif %}">🔴 已下架</a>
+  </div>
+
+  {% if listings %}
+  <div class="card">
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>房源信息</th>
+          <th>状态</th>
+          <th>价格</th>
+          <th>创建时间</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for l in listings %}
+        <tr>
+          <td style="font-family:monospace;font-size:11px;color:var(--text-muted)">{{ l.listing_id }}</td>
+          <td>
+            <div style="font-weight:600;font-size:13px">{{ l.area }} · {{ l.project }}</div>
+            <div style="font-size:11px;color:var(--text-dim);margin-top:2px">{{ l.type }} · {{ l.layout }}{% if l.size %} · {{ l.size }}{% endif %}</div>
+            {% if l._post %}
+              <div style="font-size:10px;font-family:monospace;color:var(--text-muted);margin-top:3px">
+                📨 btn_msg={{ l._post.button_message_id }} · {{ l._post.published_at[:16] if l._post.published_at }}
+              </div>
+            {% endif %}
+          </td>
+          <td>
+            <span class="badge {{ l._status_label[1] }}">{{ l._status_label[0] }}</span>
+          </td>
+          <td style="font-weight:600;color:var(--gold)">{{ l.price }}/月</td>
+          <td style="font-size:11px;color:var(--text-muted);font-family:monospace">{{ l.created_at[:16] if l.created_at }}</td>
+          <td>
+            <div style="display:flex;flex-wrap:wrap;gap:5px">
+              <a href="/edit/{{ l.listing_id }}" class="btn btn-sm">✏️ 编辑</a>
+
+              {% if l.status == 'draft' %}
+                <form method="post" action="/publish/{{ l.listing_id }}" style="display:inline">
+                  <button class="btn btn-sm btn-primary">📤 发布</button>
+                </form>
+                <form method="post" action="/delete/{{ l.listing_id }}" style="display:inline"
+                      onsubmit="return confirm('确认删除草稿？')">
+                  <button class="btn btn-sm btn-danger">🗑 删除</button>
+                </form>
+
+              {% elif l.status == 'published' %}
+                <form method="post" action="/repub/{{ l.listing_id }}" style="display:inline"
+                      onsubmit="return confirm('将删除旧帖并重发，确认？')">
+                  <button class="btn btn-sm btn-blue">🔄 重发</button>
+                </form>
+                <button class="btn btn-sm btn-green" onclick="openPriceModal('{{ l.listing_id }}','{{ l.price }}')">💰 改价</button>
+                <form method="post" action="/rented/{{ l.listing_id }}" style="display:inline"
+                      onsubmit="return confirm('标记已租出？')">
+                  <button class="btn btn-sm btn-blue">✅ 已租</button>
+                </form>
+                <form method="post" action="/offline/{{ l.listing_id }}" style="display:inline"
+                      onsubmit="return confirm('确认下架？')">
+                  <button class="btn btn-sm btn-danger">🔴 下架</button>
+                </form>
+
+              {% elif l.status == 'offline' %}
+                <form method="post" action="/publish/{{ l.listing_id }}" style="display:inline">
+                  <button class="btn btn-sm btn-primary">📤 重新发布</button>
+                </form>
+
+              {% elif l.status == 'rented' %}
+                <span style="font-size:11px;color:var(--text-muted)">已完结</span>
+              {% endif %}
+
+            </div>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div style="text-align:center;padding:60px 20px;color:var(--text-muted)">
+      <div style="font-size:40px;margin-bottom:12px;opacity:.3">🏠</div>
+      <div>还没有房源，点右上角「＋ 新建房源」开始</div>
+    </div>
+  {% endif %}
+
+</div>
+
+<!-- 改价弹窗 -->
+<div class="modal-overlay" id="priceModal">
+  <div class="modal">
+    <h3>💰 修改价格</h3>
+    <form method="post" id="priceForm" action="">
+      <div class="form-group">
+        <label>新价格（含单位，如 $700）</label>
+        <input type="text" name="new_price" id="newPriceInput" placeholder="$700" required>
+      </div>
+      <div class="modal-btns">
+        <button type="button" class="btn" onclick="closePriceModal()">取消</button>
+        <button type="submit" class="btn btn-primary">确认改价</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openPriceModal(lid, currentPrice) {
+  document.getElementById('priceForm').action = '/price/' + lid;
+  document.getElementById('newPriceInput').value = currentPrice;
+  document.getElementById('priceModal').classList.add('open');
+}
+function closePriceModal() {
+  document.getElementById('priceModal').classList.remove('open');
+}
+document.getElementById('priceModal').addEventListener('click', function(e) {
+  if (e.target === this) closePriceModal();
+});
+</script>
+{% endblock %}

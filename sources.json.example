@@ -1,0 +1,10 @@
+[
+  {
+    "is_enabled": true,
+    "source_name": "zufang555",
+    "source_type": "telegram_channel",
+    "entity_id": "zufang555",
+    "source_db_id": 1,
+    "comment": "entity_id 可为 @用户名（不要带@）或数字 id，如 -1001234567890"
+  }
+]

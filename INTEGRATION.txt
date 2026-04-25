@@ -1,0 +1,170 @@
+侨联「采集 → 解析 → 封面 → 人工预览 / 定时发帖」上线清单
+====================================================
+环境变量模板：仓库内 `.env.example`；服务器副本 `/opt/qiaolian_dual_bots/env.example`（与现网 `.env` 分离，勿覆盖）。
+
+单点上线（本机 vs 服务器，只留一套在跑）
+----------------------------------------
+**现网唯一运行环境：服务器** `/opt/qiaolian_dual_bots`（systemd：`qiaolian-publisher-bot`、`qiaolian-user-bot`、`qiaolian-collector`、`qiaolian-admin-web`；`qiaolianbot` crontab：流水线）。
+
+**Mac 本机仓库**：只做改代码、git、必要时 **短时调试**。禁止与现网并行：
+  - 短时一键起**用户 Bot**：`python3 run_integrated_stack.py`（默认；勿长期当生产 supervisor）。要带发布再加 `--with-publisher`。
+  - 不要长期开启 **`collector_bot.py` / `run_pipeline_autopilot.py`** 的 LaunchAgent；发布侧只保留服务器上的 `qiaolian-publisher-bot`。
+  - 本机已停用时执行：`bash scripts/disable_macos_launchd.sh`
+  - 若必须本机连真网测试：使用 **另一套测试 Bot Token + 测试频道 + 单独 DB 路径**，勿复制现网 `.env` 整文件上线双开。
+
+标准流程（流程化运营，非「发一次就算过」）
+--------------------------------------------
+这是正规业务链路，每条房源应依次经过下列状态；禁止把「能发出去」当成唯一验收标准。
+
+  A. 采集入库
+     source_posts.parse_status = pending
+     · 运行 **`collector_bot.py`**（Telethon）：单条消息或 **整组相册** → 下载到
+       **`media/collector_downloads/`**，`raw_images_json` + **`media_assets`**（同序）；
+       `cover_generator` / `meihua` 优先读 **media_assets**。
+
+  B. 定时流水线（cron / LaunchAgent：run_pipeline_autopilot.py）
+     pending 源帖 → AI 解析 → drafts.review_status = pending
+     → 缺封面则生成封面 → 仍 pending（此时可走预览池）
+
+  C. 人工闸门（推荐生产默认）
+     AUTO_APPROVE=false：
+     · 管理员私聊发布 Bot：/pending 看图 + 文案
+     · 满意则点「加入队列」→ review_status = ready
+     · 不满意：丢弃或改备注后再跑流水线/重做封面
+     AUTO_APPROVE=true：
+     · 跳过 C，pending 且已有封面 直接批量变 ready（全无人值守，适合已信任源）
+
+  D. 定时出频道（常驻：qiaolian-publisher-bot）
+     按 PUBLISH_SLOTS 从 ready 取 1 条 → meihua_publisher 发帖
+     → drafts.review_status = published（终态，同一 draft 不会重复发）
+
+  E. 运维例外（非标准验收路径）
+     /send DRF_xxx、scripts/publish_ready_batch.py = 应急插队，不计入「流程化默认」。
+
+日常自检（不发帖）：
+  python3 scripts/check_workflow.py
+
+一、与现网关系（务必读）
+------------------------
+- **唯一 .env**：`/opt/qiaolian_dual_bots/.env`（`v2/.env`、`v2_admin/.env` 为指向它的符号链接）。测试/切换多款 Bot 只改这一份里的各 `*_TOKEN`，不要复制多份环境文件。
+- **推荐：统一管理员 Bot（单 Token）**：`qiaolian-publisher-bot` 进程内已合并 **v2 向导 + autopilot**（`/pending`、`/send`、`/slots`、定时 ready、每日广播等）。`autopilot_publish_bot.py` 现在只是 v2 的兼容 helper，不再单独作为服务运行。
+- meihua_publisher **不发 long poll**，可与 v2 同 Token 并存（仅 HTTP 发频道）。
+- 旧 `run_publisher_bot.py` / `qiaolian_dual/publisher_bot.py` 已移除，不再作为任何现网入口。
+- run_pipeline.py（旧）已移除：统一只保留 `run_pipeline_autopilot.py`。
+- run_pipeline_autopilot.py：**只**解析 + 封面 +（可选）AUTO_APPROVE；发帖靠 v2 / meihua 流程。
+
+二、一次性：数据库
+------------------
+cd /opt/qiaolian_dual_bots
+sqlite3 data/qiaolian_dual_bot.db < migration_autopilot.sql
+# 若提示 duplicate column name，说明列已有，可忽略该行后手工执行剩余 SQL。
+
+三、依赖
+--------
+/opt/qiaolian_dual_bots/.venv/bin/pip install -r requirements-autopilot.txt
+
+三附、.env 与 Session（meihua / publish / 采集 共用说明）
+------------------------------------------------------
+- **整站只认一份** `/opt/qiaolian_dual_bots/.env`（v2 目录里是符号链接指向它）。
+- **meihua_publisher / 各 Bot**：只用 **HTTP Bot Token**（如 `PUBLISHER_BOT_TOKEN`、`USER_BOT_TOKEN`），**没有** Telethon `.session` 文件。
+- **collector_bot（采集）**：仓库根目录 **`collector_bot.py`**（与 `db.py` 同库 `DB_PATH`）。
+  - 配置：复制 **`sources.json.example` → `sources.json`**（已 .gitignore），填写 `entity_id`（频道/群）。
+  - 凭证：`.env` 的 **`TG_API_ID` / `TG_API_HASH`**；可选 **`TELETHON_SESSION_PATH`**（默认 `telethon_sessions/qiaolian_collector`）。
+  - 首次登录：终端执行 **`python3 collector_bot.py`** 交互完成验证码；再 **`launchctl bootstrap … com.qiaolian.collector`**（见 `scripts/install_macos_launchd.sh`）。
+  - 已有现网 session（如 **meihuabot**）：把 **`meihuabot.session`**（及同目录 **`meihuabot.session-journal`** 若有）拷到仓库 **`telethon_sessions/`**，`.env` 设 **`COLLECTOR_SESSION_NAME=meihuabot`**（或 **`TELETHON_SESSION_PATH`** 指向服务器上的基名路径）。**`TG_API_ID` / `TG_API_HASH` 必须与创建该 session 的应用一致**（不是 Bot Token）。
+  - 相册多图（如 9～11 张）走 **`events.Album`**，合并为一条 `source_posts`，并写入 **`media_assets`**（`owner_type=source_post`），与封面/发帖链路一致。
+  - 旧服务器若仍用 `v2/qiaolian_crawler_session`：把 **`TELETHON_SESSION_PATH`** 指到该基名即可。
+- **TG_API_ID / TG_API_HASH** 与采集 session 必须来自**同一套** my.telegram.org 应用；与 Bot Token 无关，但都放在同一 `.env` 即可。
+
+从旧服务器「拿过来用」时：
+1. 把旧机的 `.env` **合并进** 现网 `.env`（至少对齐 `TG_API_ID`、`TG_API_HASH`、`PUBLISHER_BOT_TOKEN`、`USER_BOT_TOKEN`、`CHANNEL_ID`、`DB_PATH` 等；勿把整文件覆盖丢新变量）。
+2. 上传旧 Telethon session：**`xxx.session`**，若有则连同 **`xxx.session-journal`**，放到例如 `/opt/qiaolian_dual_bots/v2/`，再在 `.env` 增加一行（路径写**不带 .session 后缀**）：
+   `TELETHON_SESSION_PATH=/opt/qiaolian_dual_bots/v2/你的旧基名`
+   不设则继续用默认 `v2/qiaolian_crawler_session`。
+3. 属主建议：`chown qiaolianbot:qiaolianbot` 上述文件。
+
+四、cron（推荐：仅 autopilot 流水线，直发关闭）
+----------------------------------------------
+# 用 qiaolianbot 用户 crontab（与 DB、systemd 一致）；勿在 crontab 里写 API Key。
+sudo crontab -u qiaolianbot -e
+# 追加：
+*/5 * * * * cd /opt/qiaolian_dual_bots && /opt/qiaolian_dual_bots/.venv/bin/python run_pipeline_autopilot.py >> logs/pipeline_autopilot.log 2>&1
+
+# media/ 目录需属主 qiaolianbot，否则封面写入 Permission denied：
+sudo chown -R qiaolianbot:qiaolianbot /opt/qiaolian_dual_bots/media
+
+可选 .env：
+  AUTO_APPROVE=false          # true = 有封面自动变 ready（全无人值守）
+  MAX_COVERS_PER_RUN=30
+
+五、systemd：只跑 qiaolian-publisher-bot（已含 autopilot 能力）
+----------------------------------------------------------------------
+sudo systemctl enable --now qiaolian-publisher-bot.service
+sudo systemctl restart qiaolian-publisher-bot.service
+
+# `autopilot_publish_bot.py` 仅保留为兼容 helper，调试时可手动运行，但不要再配置独立 service。
+
+六、管理员命令（私聊 autopilot 所用 Bot）
+------------------------------------------
+/start — 命令总览
+/pending /stats /pause /resume
+/slots — 查看或设置房源定时槽（金边时区），例：/slots 09:00,12:00,18:30
+/send DRF_xxx — 立即发一条（不等定时）
+/daily /daily_on /daily_off /daily_time /daily_text — 每日固定一条到频道
+/tpl /tpl_use 1 — 每日广播内置模版
+/post_menu — 发频道置顶菜单帖（品牌故事｜预约想住｜咨询）并尝试置顶
+/pin_text — 下一条消息设为置顶帖 HTML，再执行 /post_menu
+
+用户 Bot 深链：`start=brand | about | want_home | ask`，房源帖仍兼容 `consult_ / appoint_ / fav_ / more_` 旧短链。
+
+七、.env 必填摘要
+----------------
+OPENROUTER_API_KEY
+PUBLISHER_BOT_TOKEN
+PUBLISHER_BOT_USERNAME（可选，人类可读，如 meihua666bot；与发帖 Token 对应）
+CHANNEL_ID
+ADMIN_IDS
+DB_PATH（或默认 data/qiaolian_dual_bot.db）
+USER_BOT_USERNAME（频道帖按钮深链用户名；必须与当前生产用户 Bot 一致）
+  · 频道按钮会按该用户名生成 deep link；用户 Bot 同时兼容新旧 payload
+
+可选：AUTOPILOT_BOT_TOKEN、PUBLISH_SLOTS、AUTOPILOT_TIMEZONE=Asia/Phnom_Penh
+
+八、无人值守（采集 → 解析 → 封面 → 定时发帖，无需手点 Telegram）
+----------------------------------------------------------------------
+链路（与「个人在 Bot 里发」无关）：
+  1) 采集进程（Telethon 等）只负责往 source_posts 插行 parse_status=pending
+  2) 定时任务跑 run_pipeline_autopilot.py：
+       AI 解析 → drafts pending → 生成封面 → 若 AUTO_APPROVE=true 则 pending+有封面 批量变 ready
+  3) 常驻进程 qiaolian-publisher-bot：按 PUBLISH_SLOTS（金边时区）从 ready 取一条，
+       调 meihua_publisher 发频道；发完 draft → published
+
+.env 要点：
+  AUTO_APPROVE=true
+  PIPELINE_REQUIRE_OPENROUTER=false   # 未接模型时用 ai_parser 占位；生产接 OpenRouter 后改 true 并填 OPENROUTER_API_KEY
+  PUBLISHER_BOT_TOKEN / CHANNEL_ID / ADMIN_IDS / DB_PATH
+
+首次或旧库缺表：
+  python3 scripts/bootstrap_db.py
+  若仍报 drafts 缺字段：QL_REBUILD_DB=1 python3 scripts/bootstrap_db.py（会先备份 .db）
+
+Linux 服务器（与文档前文一致）：
+  */5 * * * * cd /opt/qiaolian_dual_bots && .venv/bin/python run_pipeline_autopilot.py >> logs/pipeline_autopilot.log 2>&1
+  systemd 只跑一个带 long poll 的发布 Bot（当前是 v2）
+
+macOS（本机 Mac mini）LaunchAgents：
+  bash scripts/install_macos_launchd.sh
+  → com.qiaolian.pipeline 每 300 秒跑一轮流水线
+  → com.qiaolian.publisher 常驻发帖调度（须保证全局仅一个进程占用该 Bot Token）
+
+注意：同一 PUBLISHER_BOT_TOKEN 不能两个进程同时 getUpdates；勿与另一台「发布 Bot」双开。
+
+常态 vs 偶发：
+  - 常态（流程化）：采集 → 流水线 →（可选预览）→ ready → 槽位 dequeue；用 check_workflow 看各池子数量。
+  - 偶发（非流程验收）：管理员 /send 或 scripts/publish_ready_batch.py 插队发 ready，仅应急。
+
+广告 / 趣味入口分配（不影响转化）
+====================================
+- 频道帖：仅 2 个 Bot 深链（预约看房 / 问这套），不放外链、不放娱乐。
+- 用户 Bot：承接后再给「轻趣味」——例如一句随机顾问人设、或「今日汇率/金边贴士」折叠在二级回复里。
+- 发布助手 Bot：无菜单、无广告，仅管理员可见。

@@ -9,3 +9,12 @@ data/*.json
 *.session
 qiaolian*.db
 test_qiaolian_dual_bot.db
+.cache/
+.config/
+.local/
+.venv_broken*/
+snap/
+plans/
+data/
+media/
+reports/

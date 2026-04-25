@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>模板12-别墅高级风（黑金）</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: #050607;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei",
+          "Noto Sans CJK SC", sans-serif;
+        color: #fff;
+      }
+      .poster {
+        position: relative;
+        width: 1600px;
+        height: 1200px;
+        overflow: hidden;
+        border-radius: 24px;
+        background: #0a0a0c;
+      }
+      .bg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center 24%;
+      }
+      .veil {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, rgba(8, 9, 12, 0.22) 0%, rgba(8, 9, 12, 0.4) 100%);
+      }
+      .left-pane {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 50%;
+        background: linear-gradient(
+          90deg,
+          rgba(7, 8, 10, 0.48) 0%,
+          rgba(7, 8, 10, 0.35) 42%,
+          rgba(7, 8, 10, 0.12) 76%,
+          rgba(7, 8, 10, 0.02) 100%
+        );
+        backdrop-filter: blur(4px) saturate(108%);
+        border-right: 1px solid rgba(231, 211, 170, 0.12);
+      }
+      .left-glow {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 50%;
+        pointer-events: none;
+        background: linear-gradient(
+          90deg,
+          rgba(255, 255, 255, 0.07) 0%,
+          rgba(255, 255, 255, 0.04) 44%,
+          rgba(255, 255, 255, 0.01) 76%,
+          rgba(255, 255, 255, 0) 100%
+        );
+      }
+      .top-line {
+        position: absolute;
+        left: 34px;
+        right: 34px;
+        top: 24px;
+        height: 1px;
+        background: linear-gradient(90deg, rgba(195, 172, 128, 0.03), rgba(195, 172, 128, 0.55), rgba(195, 172, 128, 0.03));
+      }
+
+      .brand {
+        position: absolute;
+        left: 56px;
+        top: 44px;
+      }
+      .brand .cn {
+        font-size: 44px;
+        line-height: 1;
+        font-weight: 780;
+        letter-spacing: 1px;
+        color: #d5c09a;
+      }
+      .brand .en {
+        margin-top: 10px;
+        font-size: 15px;
+        line-height: 1;
+        color: rgba(212, 201, 176, 0.7);
+        letter-spacing: 1.5px;
+      }
+
+      .title {
+        position: absolute;
+        left: 56px;
+        top: 206px;
+        width: 700px;
+        font-size: 56px;
+        line-height: 1.15;
+        font-weight: 650;
+        letter-spacing: 0.5px;
+        font-family: "Songti SC", "STSong", "Noto Serif CJK SC", serif;
+        color: rgba(226, 233, 242, 0.84);
+        text-shadow: 0 14px 24px rgba(0, 0, 0, 0.42);
+      }
+
+      .pill {
+        position: absolute;
+        left: 56px;
+        top: 390px;
+        border-radius: 18px;
+        padding: 7px 18px;
+        font-size: 26px;
+        font-weight: 650;
+        color: rgba(34, 35, 39, 0.92);
+        background: rgba(218, 210, 194, 0.82);
+      }
+
+      .meta {
+        position: absolute;
+        left: 56px;
+        top: 474px;
+        width: 700px;
+        border-radius: 18px;
+        background: rgba(8, 10, 14, 0.54);
+        border: 1px solid rgba(194, 171, 131, 0.24);
+        backdrop-filter: blur(6px);
+        box-shadow: 0 12px 26px rgba(0, 0, 0, 0.2);
+        padding: 16px 22px 14px;
+      }
+      .meta .line {
+        font-size: 24px;
+        line-height: 1.58;
+        font-weight: 560;
+        letter-spacing: 0.3px;
+        color: rgba(214, 223, 236, 0.8);
+      }
+      .meta .line strong {
+        color: #cab58d;
+        font-weight: 620;
+      }
+
+      .price {
+        position: absolute;
+        right: 34px;
+        top: 86px;
+        min-width: 420px;
+        border-radius: 26px;
+        background: rgba(8, 9, 12, 0.84);
+        border: 1px solid rgba(192, 172, 136, 0.35);
+        box-shadow: 0 14px 28px rgba(0, 0, 0, 0.34);
+        text-align: center;
+        padding: 14px 22px 12px;
+      }
+      .price .label {
+        font-size: 26px;
+        font-weight: 620;
+        color: rgba(215, 202, 176, 0.74);
+      }
+      .price .value {
+        margin-top: 4px;
+        font-size: 82px;
+        line-height: 1;
+        font-weight: 780;
+        color: #d4bc8d;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="poster">
+      <img class="bg" src="{{BG_SRC}}" alt="" />
+      <div class="veil"></div>
+      <div class="left-pane"></div>
+      <div class="left-glow"></div>
+      <div class="top-line"></div>
+
+      <div class="brand">
+        <div class="cn">侨联地产</div>
+        <div class="en">QIAO LIAN PROPERTY</div>
+      </div>
+
+      <div class="title">{{PROJECT}}</div>
+      <div class="pill" id="pill-layout">{{LAYOUT}}</div>
+
+      <div class="meta" id="meta-box">
+        <div class="line" id="row-area"><strong>📍</strong> <span id="t3">{{AREA}}</span></div>
+        <div class="line" id="row-meta"><strong>📐</strong> <span id="t4">{{SIZE}}</span>　<strong>🏢</strong> <span id="t5">{{FLOOR}}</span></div>
+        <div class="line" id="row-hi"><strong>✨</strong> <span id="t7">{{H1}}</span> / <span id="t8">{{H2}}</span> / <span id="t9">{{H3}}</span></div>
+      </div>
+
+      <div class="price">
+        <div class="label">租金</div>
+        <div class="value">{{PRICE_LINE}}</div>
+      </div>
+    </div>
+    <script>
+      function txt(id){const el=document.getElementById(id);return (el?String(el.textContent||''):'').trim();}
+      function bad(v){const s=String(v||'').trim();const low=s.toLowerCase();return !s||s==='-'||s==='—'||s==='--'||low==='n/a'||low==='na'||s.includes('可咨询')||s==='金边';}
+      function hide(id){const el=document.getElementById(id);if(el)el.style.display='none';}
+
+      const area=txt('t3'),size=txt('t4'),floor=txt('t5');
+      if(bad(area)) hide('row-area');
+      if(bad(size)&&bad(floor)){
+        hide('row-meta');
+      }else if(bad(size)){
+        const el=document.getElementById('row-meta');
+        if(el) el.innerHTML='<strong>🏢</strong> '+floor;
+      }else if(bad(floor)){
+        const el=document.getElementById('row-meta');
+        if(el) el.innerHTML='<strong>📐</strong> '+size;
+      }
+
+      const hs=[txt('t7'),txt('t8'),txt('t9')].filter(v=>!bad(v));
+      if(!hs.length){
+        hide('row-hi');
+      }else{
+        const el=document.getElementById('row-hi');
+        if(el) el.innerHTML='<strong>✨</strong> '+hs.join(' / ');
+      }
+
+      const rows=['row-area','row-meta','row-hi'];
+      if(rows.every(id=>{const el=document.getElementById(id);return !el||el.style.display==='none';}))
+        hide('meta-box');
+
+      // LAYOUT为空或缺值时隐藏户型pill
+      if(bad(txt('pill-layout'))) hide('pill-layout');
+    </script>
+  </body>
+</html>

@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>侨联地产 · 图片处理工具</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0c0c0c; --bg2:#141414; --bg3:#1a1a1a; --bg4:#222;
+  --gold:#c9a84c; --gold2:#e8c97a; --goldbg:rgba(201,168,76,.1);
+  --line:#272727; --line2:#333;
+  --t1:#ebebeb; --t2:#999; --t3:#555;
+  --green:#52c47a; --red:#e06060;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--t1);font-family:'Noto Sans SC',sans-serif;min-height:100vh;font-size:14px}
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-thumb{background:var(--line2);border-radius:3px}
+
+.hdr{height:52px;background:var(--bg2);border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 20px;gap:10px;position:sticky;top:0;z-index:99}
+.hdr-logo{width:30px;height:30px;border-radius:7px;background:linear-gradient(135deg,var(--gold),var(--gold2));display:grid;place-items:center;font-size:15px;flex-shrink:0}
+.hdr-t{font-size:13px;font-weight:700;color:var(--gold);letter-spacing:1px}
+.hdr-s{font-size:10px;color:var(--t3);font-family:monospace;margin-top:1px}
+.hdr-badge{margin-left:auto;background:var(--goldbg);border:1px solid rgba(201,168,76,.3);border-radius:20px;padding:3px 10px;font-size:10px;color:var(--gold);font-family:monospace}
+
+.layout{display:grid;grid-template-columns:300px 1fr;height:calc(100vh - 52px)}
+
+/* FORM */
+.form{background:var(--bg2);border-right:1px solid var(--line);overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px}
+.sec{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.sec-hdr{background:var(--bg3);padding:8px 12px;display:flex;align-items:center;gap:7px;border-bottom:1px solid var(--line)}
+.sec-lbl{font-size:10px;color:var(--gold);font-family:monospace;letter-spacing:2px}
+.sec-body{padding:12px;display:flex;flex-direction:column;gap:9px}
+.fg{display:flex;flex-direction:column;gap:4px}
+.fg label{font-size:10px;color:var(--t3);font-family:monospace}
+.fg input,.fg select{background:var(--bg3);border:1px solid var(--line2);border-radius:6px;padding:7px 10px;color:var(--t1);font-size:13px;font-family:'Noto Sans SC',sans-serif;outline:none;width:100%;transition:border-color .15s}
+.fg input:focus,.fg select:focus{border-color:var(--gold)}
+.fg select option{background:var(--bg3)}
+.r2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+.tip{background:var(--goldbg);border:1px solid rgba(201,168,76,.2);border-radius:6px;padding:8px 12px;font-size:11px;color:var(--gold);line-height:1.7}
+
+.proc-btn{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#000;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;font-family:'Noto Sans SC',sans-serif;cursor:pointer;letter-spacing:1px;transition:opacity .15s;margin-top:4px}
+.proc-btn:hover{opacity:.88}
+.proc-btn:disabled{opacity:.4;cursor:not-allowed}
+
+.dl-all{background:var(--bg3);border:1px solid var(--gold);border-radius:8px;padding:11px;font-size:13px;font-weight:600;color:var(--gold);font-family:'Noto Sans SC',sans-serif;cursor:pointer;transition:all .15s;text-align:center}
+.dl-all:hover{background:var(--gold);color:#000}
+
+/* OUTPUT */
+.out{overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px}
+
+/* upload grid */
+.upload-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.upload-slot{border:2px dashed var(--line2);border-radius:10px;aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;position:relative;overflow:hidden;transition:all .2s;background:var(--bg3)}
+.upload-slot:hover{border-color:var(--gold);background:var(--goldbg)}
+.upload-slot.cover{aspect-ratio:16/9;grid-column:span 2}
+.upload-slot.has-img{border-color:rgba(201,168,76,.5)}
+.upload-slot img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:8px}
+.upload-slot input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.slot-label{position:absolute;top:8px;left:8px;background:rgba(0,0,0,.6);border-radius:4px;padding:2px 8px;font-size:10px;color:#fff;font-family:monospace;z-index:2}
+.slot-ico{font-size:24px;opacity:.3;margin-bottom:6px}
+.slot-txt{font-size:11px;color:var(--t3)}
+.slot-hint{font-size:10px;color:var(--t3);margin-top:3px;font-family:monospace}
+
+/* result grid */
+.result-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.result-item{background:var(--bg2);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.result-item.cover{grid-column:span 2}
+.result-hdr{padding:8px 12px;background:var(--bg3);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+.result-lbl{font-size:10px;color:var(--gold);font-family:monospace;letter-spacing:1px}
+.dl-btn{background:var(--goldbg);border:1px solid rgba(201,168,76,.4);border-radius:4px;padding:3px 10px;color:var(--gold);font-size:10px;font-family:monospace;cursor:pointer;transition:all .15s}
+.dl-btn:hover{background:var(--gold);color:#000}
+.result-canvas{padding:10px;display:flex;justify-content:center}
+.result-canvas canvas{max-width:100%;border-radius:6px;box-shadow:0 4px 20px rgba(0,0,0,.5)}
+
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--t3);gap:10px;text-align:center;min-height:300px}
+.empty .ico{font-size:40px;opacity:.15}
+.empty p{font-size:12px;line-height:1.8}
+
+/* progress */
+.progress{background:var(--bg3);border:1px solid var(--line);border-radius:8px;padding:14px;text-align:center;font-size:13px;color:var(--t2);display:none}
+.progress.show{display:block}
+
+@media(max-width:700px){.layout{grid-template-columns:1fr;height:auto}}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-logo">🖼</div>
+  <div>
+    <div class="hdr-t">侨联地产 · 图片批量处理</div>
+    <div class="hdr-s">封面16:9 · 小图1:1 · 自动加logo · 一键导出</div>
+  </div>
+  <div class="hdr-badge">IMG</div>
+</div>
+
+<div class="layout">
+
+<!-- FORM -->
+<div class="form">
+
+  <div class="tip">
+    💡 <b>图1</b> 自动裁成 16:9 横版封面<br>
+    <b>图2/3/4</b> 自动裁成 1:1 正方形<br>
+    全部自动加侨联logo水印
+  </div>
+
+  <!-- 房源信息（封面用） -->
+  <div class="sec">
+    <div class="sec-hdr"><span>🏠</span><span class="sec-lbl">封面信息栏</span></div>
+    <div class="sec-body">
+      <div class="fg"><label>楼盘名称</label><input id="project" placeholder="太子·幸福广场" value="太子·幸福广场"></div>
+      <div class="fg"><label>户型</label><input id="layout" placeholder="2房2厅2卫" value="2房2厅2卫"></div>
+      <div class="r2">
+        <div class="fg"><label>面积</label><input id="sqm" placeholder="85㎡" value="85㎡"></div>
+        <div class="fg"><label>楼层</label><input id="floor" placeholder="10楼" value="10楼"></div>
+      </div>
+      <div class="fg"><label>区域</label><input id="district" placeholder="BKK1" value="BKK1"></div>
+      <div class="fg"><label>月租</label><input id="price" placeholder="$850/月" value="$850/月"></div>
+      <div class="fg">
+        <label>配套标签（最多3个，用·分隔）</label>
+        <input id="tags" placeholder="拎包入住·泳池健身房·含物业" value="拎包入住·泳池健身房·含物业">
+      </div>
+    </div>
+  </div>
+
+  <!-- 封面风格 -->
+  <div class="sec">
+    <div class="sec-hdr"><span>✦</span><span class="sec-lbl">封面风格</span></div>
+    <div class="sec-body">
+      <div class="fg">
+        <label>信息栏样式</label>
+        <select id="coverStyle">
+          <option value="white">白底信息栏（对标你们图1）</option>
+          <option value="dark">深色信息栏</option>
+          <option value="gold">金色品牌栏</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>logo位置</label>
+        <select id="logoPos">
+          <option value="tl">左上角</option>
+          <option value="tr">右上角</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- 小图logo -->
+  <div class="sec">
+    <div class="sec-hdr"><span>🔖</span><span class="sec-lbl">小图水印</span></div>
+    <div class="sec-body">
+      <div class="fg">
+        <label>水印样式</label>
+        <select id="wmStyle">
+          <option value="box">方形logo框（左上）</option>
+          <option value="corner">右下角小标</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- 输出尺寸 -->
+  <div class="sec">
+    <div class="sec-hdr"><span>📐</span><span class="sec-lbl">输出尺寸</span></div>
+    <div class="sec-body">
+      <div class="fg">
+        <label>封面图宽度</label>
+        <select id="coverW">
+          <option value="1280" selected>1280px（推荐）</option>
+          <option value="1920">1920px（高清）</option>
+          <option value="1080">1080px</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>小图尺寸</label>
+        <select id="thumbSize">
+          <option value="1080" selected>1080×1080px（推荐）</option>
+          <option value="800">800×800px</option>
+          <option value="720">720×720px</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <button class="proc-btn" id="procBtn" onclick="processAll()" disabled>✦ 开始处理</button>
+  <button class="dl-all" id="dlAllBtn" onclick="downloadAll()" style="display:none">⬇ 一键下载全部 4 张</button>
+
+</div><!-- /form -->
+
+<!-- OUTPUT -->
+<div class="out" id="outPanel">
+
+  <!-- upload area -->
+  <div class="upload-grid" id="uploadGrid">
+    <div class="upload-slot cover" id="slot0">
+      <input type="file" accept="image/*" onchange="handleUpload(this,0)">
+      <div class="slot-label">封面图 · 图1</div>
+      <div class="slot-ico">📷</div>
+      <div class="slot-txt">点击上传封面照片</div>
+      <div class="slot-hint">裁成 16:9 横版</div>
+    </div>
+    <div class="upload-slot" id="slot1">
+      <input type="file" accept="image/*" onchange="handleUpload(this,1)">
+      <div class="slot-label">图2</div>
+      <div class="slot-ico">📷</div>
+      <div class="slot-txt">上传图片</div>
+      <div class="slot-hint">裁成 1:1</div>
+    </div>
+    <div class="upload-slot" id="slot2">
+      <input type="file" accept="image/*" onchange="handleUpload(this,2)">
+      <div class="slot-label">图3</div>
+      <div class="slot-ico">📷</div>
+      <div class="slot-txt">上传图片</div>
+      <div class="slot-hint">裁成 1:1</div>
+    </div>
+    <div class="upload-slot" id="slot3">
+      <input type="file" accept="image/*" onchange="handleUpload(this,3)">
+      <div class="slot-label">图4</div>
+      <div class="slot-ico">📷</div>
+      <div class="slot-txt">上传图片</div>
+      <div class="slot-hint">裁成 1:1</div>
+    </div>
+  </div>
+
+  <div class="progress" id="progress">处理中...</div>
+
+  <div id="resultArea" style="display:none">
+    <div class="result-grid">
+      <div class="result-item cover" id="res0">
+        <div class="result-hdr">
+          <span class="result-lbl">封面图 · 16:9</span>
+          <button class="dl-btn" onclick="dlOne(0)">⬇ 下载</button>
+        </div>
+        <div class="result-canvas"><canvas id="cvs0"></canvas></div>
+      </div>
+      <div class="result-item" id="res1">
+        <div class="result-hdr">
+          <span class="result-lbl">图2 · 1:1</span>
+          <button class="dl-btn" onclick="dlOne(1)">⬇ 下载</button>
+        </div>
+        <div class="result-canvas"><canvas id="cvs1"></canvas></div>
+      </div>
+      <div class="result-item" id="res2">
+        <div class="result-hdr">
+          <span class="result-lbl">图3 · 1:1</span>
+          <button class="dl-btn" onclick="dlOne(2)">⬇ 下载</button>
+        </div>
+        <div class="result-canvas"><canvas id="cvs2"></canvas></div>
+      </div>
+      <div class="result-item" id="res3">
+        <div class="result-hdr">
+          <span class="result-lbl">图4 · 1:1</span>
+          <button class="dl-btn" onclick="dlOne(3)">⬇ 下载</button>
+        </div>
+        <div class="result-canvas"><canvas id="cvs3"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+const imgs = [null,null,null,null];
+const canvases = [];
+
+function g(id){return document.getElementById(id).value.trim()}
+
+function handleUpload(input, idx) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const im = new Image();
+    im.onload = () => {
+      imgs[idx] = im;
+      const slot = document.getElementById('slot'+idx);
+      // show preview
+      let existImg = slot.querySelector('img.preview');
+      if (!existImg) {
+        existImg = document.createElement('img');
+        existImg.className = 'preview';
+        existImg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:8px;';
+        slot.appendChild(existImg);
+      }
+      existImg.src = e.target.result;
+      slot.classList.add('has-img');
+      checkReady();
+    };
+    im.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function checkReady() {
+  const ready = imgs.filter(Boolean).length >= 1;
+  document.getElementById('procBtn').disabled = !ready;
+}
+
+async function processAll() {
+  document.getElementById('progress').classList.add('show');
+  document.getElementById('resultArea').style.display = 'none';
+
+  await new Promise(r => setTimeout(r, 50));
+
+  const coverW = parseInt(g('coverW'));
+  const coverH = Math.round(coverW * 9/16);
+  const thumbSz = parseInt(g('thumbSize'));
+
+  for (let i = 0; i < 4; i++) {
+    if (!imgs[i]) continue;
+    const cvs = document.getElementById('cvs'+i);
+    if (i === 0) {
+      cvs.width = coverW; cvs.height = coverH;
+      drawCover(cvs, imgs[0], coverW, coverH);
+    } else {
+      cvs.width = thumbSz; cvs.height = thumbSz;
+      drawThumb(cvs, imgs[i], thumbSz);
+    }
+  }
+
+  document.getElementById('progress').classList.remove('show');
+  document.getElementById('resultArea').style.display = 'block';
+  document.getElementById('dlAllBtn').style.display = 'block';
+}
+
+function cropCenter(ctx, img, cw, ch) {
+  const imgR = img.width / img.height;
+  const canR = cw / ch;
+  let sx=0,sy=0,sw=img.width,sh=img.height;
+  if (imgR > canR) { sw = img.height * canR; sx = (img.width - sw)/2; }
+  else { sh = img.width / canR; sy = (img.height - sh)/2; }
+  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, cw, ch);
+}
+
+function drawCover(cvs, img, W, H) {
+  const ctx = cvs.getContext('2d');
+  cropCenter(ctx, img, W, H);
+
+  const style   = g('coverStyle');
+  const project = g('project');
+  const layout  = g('layout');
+  const sqm     = g('sqm');
+  const floor   = g('floor');
+  const district= g('district');
+  const price   = g('price');
+  const tags    = g('tags').split('·').map(t=>t.trim()).filter(Boolean).slice(0,3);
+
+  const INFO_H = Math.round(H * 0.29);
+  const INFO_Y = H - INFO_H;
+  const PAD    = Math.round(W * 0.035);
+
+  if (style === 'white') {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, INFO_Y, W, INFO_H);
+
+    // title
+    const tSize = Math.round(W * 0.032);
+    ctx.font = `700 ${tSize}px 'Noto Sans SC',sans-serif`;
+    ctx.fillStyle = '#111';
+    ctx.fillText(`${project}　·　${layout}`, PAD, INFO_Y + INFO_H*0.3);
+
+    // meta
+    const mSize = Math.round(W * 0.02);
+    ctx.font = `400 ${mSize}px 'Noto Sans SC',sans-serif`;
+    ctx.fillStyle = '#888';
+    ctx.fillText(`${district}  |  ${sqm}  |  ${floor}`, PAD, INFO_Y + INFO_H*0.52);
+
+    // price
+    const pSize = Math.round(W * 0.04);
+    ctx.font = `900 ${pSize}px 'Noto Sans SC',sans-serif`;
+    ctx.fillStyle = '#1a3a6e';
+    const pw = ctx.measureText(price).width;
+    ctx.fillText(price, W - PAD - pw, INFO_Y + INFO_H*0.5);
+
+    // tags
+    drawTagPills(ctx, tags, PAD, INFO_Y + INFO_H*0.82, '#f0f0f0', '#ccc', '#555', Math.round(W*0.018));
+
+  } else if (style === 'dark') {
+    const gr = ctx.createLinearGradient(0, INFO_Y, 0, H);
+    gr.addColorStop(0,'rgba(8,12,22,0.9)');
+    gr.addColorStop(1,'rgba(8,12,22,0.97)');
+    ctx.fillStyle = gr;
+    ctx.fillRect(0, INFO_Y, W, INFO_H);
+
+    const tSize = Math.round(W * 0.032);
+    ctx.font = `700 ${tSize}px 'Noto Sans SC',sans-serif`;
+    ctx.fillStyle = '#fff';
+    ctx.fillText(`${project}　·　${layout}`, PAD, INFO_Y + INFO_H*0.3);
+
+    const mSize = Math.round(W * 0.02);
+    ctx.font = `400 ${mSize}px 'Noto Sans SC',sans-serif`;
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.fillText(`${district}  |  ${sqm}  |  ${floor}`, PAD, INFO_Y + INFO_H*0.52);
+
+    const pSize = Math.round(W * 0.04);
+    ctx.font = `900 ${pSize}px 'Noto Sans SC',sans-serif`;
+    ctx.fillStyle = '#e8c97a';
+    const pw = ctx.measureText(price).width;
+    ctx.fillText(price, W - PAD - pw, INFO_Y + INFO_H*0.5);
+
+    drawTagPills(ctx, tags, PAD, INFO_Y + INFO_H*0.82, 'rgba(255,255,255,0.1)', 'rgba(255,255,255,0.25)', '#bbb', Math.round(W*0.018));
+
+  } else if (style === 'gold') {
+    const gr = ctx.createLinearGradient(0, INFO_Y, W, H);
+    gr.addColorStop(0,'#162240');
+    gr.addColorStop(1,'#0a1020');
+    ctx.fillStyle = gr;
+    ctx.fillRect(0, INFO_Y, W, INFO_H);
+    ctx.fillStyle = '#c9a84c';
+    ctx.fillRect(0, INFO_Y, W, 3);
+
+    const tSize = Math.round(W * 0.032);
+    ctx.font = `700 ${tSize}px 'Noto Sans SC',sans-serif`;
+    ctx.fillStyle = '#fff';
+    ctx.fillText(`${project}　·　${layout}`, PAD, INFO_Y + INFO_H*0.3);
+
+    const mSize = Math.round(W * 0.02);
+    ctx.font = `400 ${mSize}px 'Noto Sans SC',sans-serif`;
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.fillText(`${district}  |  ${sqm}  |  ${floor}`, PAD, INFO_Y + INFO_H*0.52);
+
+    const pSize = Math.round(W * 0.04);
+    ctx.font = `900 ${pSize}px 'Noto Sans SC',sans-serif`;
+    ctx.fillStyle = '#e8c97a';
+    const pw = ctx.measureText(price).width;
+    ctx.fillText(price, W - PAD - pw, INFO_Y + INFO_H*0.5);
+
+    drawTagPills(ctx, tags, PAD, INFO_Y + INFO_H*0.82, 'rgba(201,168,76,0.15)', 'rgba(201,168,76,0.4)', '#c9a84c', Math.round(W*0.018));
+  }
+
+  // logo
+  const logoPos = g('logoPos');
+  const LW = Math.round(W * 0.15);
+  const LH = Math.round(H * 0.1);
+  const LP = Math.round(W * 0.02);
+  const lx = logoPos === 'tl' ? LP : W - LW - LP;
+  drawLogo(ctx, lx, LP, LW, LH);
+}
+
+function drawThumb(cvs, img, S) {
+  const ctx = cvs.getContext('2d');
+  cropCenter(ctx, img, S, S);
+
+  const wmStyle = g('wmStyle');
+
+  if (wmStyle === 'box') {
+    const LW = Math.round(S * 0.22);
+    const LH = Math.round(S * 0.1);
+    const LP = Math.round(S * 0.03);
+    drawLogo(ctx, LP, LP, LW, LH);
+  } else {
+    // corner watermark
+    const fSize = Math.round(S * 0.028);
+    ctx.font = `600 ${fSize}px 'Noto Sans SC',sans-serif`;
+    const txt = '侨联地产';
+    const tw = ctx.measureText(txt).width;
+    const px = S - tw - S*0.03;
+    const py = S - S*0.03;
+
+    // shadow bg
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    roundRect(ctx, px - S*0.015, py - fSize - S*0.008, tw + S*0.03, fSize + S*0.02, 4);
+    ctx.fill();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(txt, px, py - S*0.005);
+  }
+}
+
+function drawLogo(ctx, x, y, w, h) {
+  // bg box
+  ctx.fillStyle = '#1a2a4a';
+  roundRect(ctx, x, y, w, h, 7);
+  ctx.fill();
+
+  // icon
+  const iSize = h * 0.46;
+  ctx.font = `${iSize}px sans-serif`;
+  ctx.fillStyle = '#fff';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('⌂', x + w*0.07, y + h*0.42);
+  ctx.textBaseline = 'alphabetic';
+
+  // name
+  const nSize = h * 0.3;
+  ctx.font = `700 ${nSize}px 'Noto Sans SC',sans-serif`;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText('侨联地产', x + w*0.28, y + h*0.48);
+
+  // sub
+  const sSize = h * 0.17;
+  ctx.font = `400 ${sSize}px 'Noto Sans SC',sans-serif`;
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.fillText('QIAO LIAN PROPERTY', x + w*0.28, y + h*0.73);
+}
+
+function drawTagPills(ctx, tags, startX, y, bgCol, borderCol, textCol, fSize) {
+  if (!tags.length) return;
+  let x = startX;
+  const pH = fSize + fSize*0.9;
+  const pPad = fSize * 0.75;
+
+  tags.forEach(tag => {
+    ctx.font = `400 ${fSize}px 'Noto Sans SC',sans-serif`;
+    const tw = ctx.measureText(tag).width;
+    const pw = tw + pPad*2;
+
+    ctx.fillStyle = bgCol;
+    roundRect(ctx, x, y - pH*0.75, pw, pH, 5);
+    ctx.fill();
+
+    ctx.strokeStyle = borderCol;
+    ctx.lineWidth = 1;
+    roundRect(ctx, x, y - pH*0.75, pw, pH, 5);
+    ctx.stroke();
+
+    ctx.fillStyle = textCol;
+    ctx.fillText(tag, x + pPad, y + fSize*0.08);
+
+    x += pw + 7;
+  });
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y);
+  ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);
+  ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h);
+  ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r);
+  ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
+}
+
+function dlOne(idx) {
+  const cvs = document.getElementById('cvs'+idx);
+  const project = g('project').replace(/[·\s·]/g,'-');
+  const names = ['封面图-16x9','图2-1x1','图3-1x1','图4-1x1'];
+  const a = document.createElement('a');
+  a.download = `侨联-${project}-${names[idx]}.png`;
+  a.href = cvs.toDataURL('image/png');
+  a.click();
+}
+
+function downloadAll() {
+  for (let i = 0; i < 4; i++) {
+    if (imgs[i]) setTimeout(() => dlOne(i), i * 300);
+  }
+}
+
+// live re-render on setting change
+document.querySelectorAll('select,input').forEach(el => {
+  el.addEventListener('change', () => {
+    if (imgs.some(Boolean) && document.getElementById('resultArea').style.display !== 'none') {
+      processAll();
+    }
+  });
+  el.addEventListener('input', () => {
+    if (imgs.some(Boolean) && document.getElementById('resultArea').style.display !== 'none') {
+      clearTimeout(el._t);
+      el._t = setTimeout(processAll, 600);
+    }
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+[Unit]
+Description=侨联地产 · 频道发布后台 (Channel Publisher Admin)
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/qiaolian/channel_publisher
+EnvironmentFile=/home/ubuntu/qiaolian/channel_publisher/.env
+ExecStart=/home/ubuntu/qiaolian/venv/bin/python -m waitress \
+    --host=127.0.0.1 \
+    --port=5005 \
+    --threads=4 \
+    admin_server:app
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=qiaolian-publisher
+
+[Install]
+WantedBy=multi-user.target

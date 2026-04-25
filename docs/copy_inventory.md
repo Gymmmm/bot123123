@@ -1,0 +1,724 @@
+# Copy Inventory
+
+> 说明：同一文案在不同文件里可能重复出现，本清单按“可见文本”收录，方便后续统一改稿。
+
+## 1. Bot Greeting Messages
+
+- `👋 您好！欢迎使用侨联地产服务 Bot。`
+  - source: `qiaolian_dual/user_bot.py:L367-L370`
+- `🏠 <b>{BRAND_NAME} · 金边租房管家</b>`
+  - source: `qiaolian_dual/messages.py:L51-L56`
+- `💎 <b>{BRAND_NAME} 顾问服务</b>`
+  - source: `qiaolian_dual/messages.py:L59-L66`
+- `💌 <b>{BRAND_NAME} · 您在金边的自己人</b>`
+  - source: `qiaolian_dual/messages.py:L78-L84`
+- `🏢 侨联地产 · 统一管理员 Bot（@meihua666）`
+  - source: `v2/qiaolian_publisher_v2/messages.py:L2-L5`
+- `👋 欢迎来到侨联地产官方频道！`
+  - source: `post_pinned.py:L20-L23`
+
+## 2. Bot Conversation Messages
+
+### 用户 Bot
+
+- `💬 <b>咨询房源</b>\n编号：<code>{...}</code>\n\n请直接发一条消息说明问题，顾问会人工回复。`
+  - source: `qiaolian_dual/user_bot.py:L270-L275`
+- `📅 <b>预约看房</b>\n编号：<code>{...}</code>\n\n请回复：意向日期、上午或下午、线下或视频看房。\n也可留下方便联系的方式。`
+  - source: `qiaolian_dual/user_bot.py:L311-L319`
+- `❤️ <b>收藏意向</b>\n已收到。需要锁房或视频带看请直接留言。`
+  - source: `qiaolian_dual/user_bot.py:L320-L325`
+- `🏠 <b>同区域更多</b>\n区域：<b>{...}</b>\n\n请发预算（USD/月）与户型，顾问按实拍房源推荐。`
+  - source: `qiaolian_dual/user_bot.py:L326-L333`
+- `<b>📖 品牌故事</b>\n\n侨联地产扎根金边，坚持实拍真房源；中文顾问全程陪同，减少信息差。`
+  - source: `qiaolian_dual/user_bot.py:L334-L340`
+- `<b>🏢 介绍侨联</b>\n\n<b>{BRAND_NAME}</b> · QIAO LIAN PROPERTY\n金边租赁 · 实拍房源 · 中文服务。\n需求梳理 → 实地/视频带看 → 合同与押金说明。`
+  - source: `qiaolian_dual/user_bot.py:L342-L350`
+- `<b>🏠 预约想住</b>\n\n请发：预算（USD/月）、意向区域、户型、入住时间。\n顾问按实拍列表为您匹配。`
+  - source: `qiaolian_dual/user_bot.py:L351-L358`
+- `<b>💬 咨询</b>\n\n请直接说明您的问题，顾问会人工回复。`
+  - source: `qiaolian_dual/user_bot.py:L359-L364`
+- `📅 目前还没有预约记录。点频道里的“预约看房”，我们就会帮您跟进。`
+  - source: `qiaolian_dual/user_bot.py:L207-L210`
+- `📅 您最近的预约：`
+  - source: `qiaolian_dual/user_bot.py:L211-L217`
+- `📍 请发意向区域，例如：BKK1、森速、万景岗、俄罗斯市场。也可以直接回“ 不限 ”。`
+  - source: `qiaolian_dual/user_bot.py:L410-L416`
+- `💬 请直接发您的问题、预算或想看的房源编号，我会帮您记录给顾问。`
+  - source: `qiaolian_dual/user_bot.py:L422-L429`
+- `🏠 已返回首页。`
+  - source: `qiaolian_dual/user_bot.py:L431-L434`
+- `✅ 已记录您的咨询，顾问会按这条需求继续跟进。`
+  - source: `qiaolian_dual/user_bot.py:L436-L459`
+- `✅ 已收到想住需求，我们会按预算和区域帮您匹配。`
+  - source: `qiaolian_dual/user_bot.py:L461-L481`
+- `可以直接点菜单，也可以直接发：预算、区域、户型、入住时间。`
+  - source: `qiaolian_dual/user_bot.py:L483-L487`
+- `💵 请发预算范围，例如：600-900、1000 左右，也可以顺便带上户型，如 2房。`
+  - source: `qiaolian_dual/user_bot.py:L498-L502`
+- `✅ 已记录需求。先给您 3 条最近匹配：`
+  - source: `qiaolian_dual/user_bot.py:L535-L543`
+- `✅ 已记录需求。当前先没有现成匹配结果，顾问会按实拍房源继续帮您筛。`
+  - source: `qiaolian_dual/user_bot.py:L543-L548`
+- `📅 请选择预约日期：`
+  - source: `qiaolian_dual/user_bot.py:L557-L575`
+- `🕒 已选日期：{date}\n请选择时间段：`
+  - source: `qiaolian_dual/user_bot.py:L586-L602`
+- `✅ <b>预约信息确认</b>`
+  - source: `qiaolian_dual/user_bot.py:L612-L619`
+- `确认提交预约吗？`
+  - source: `qiaolian_dual/user_bot.py:L613-L617`
+- `🔔 <b>新预约提醒</b>`
+  - source: `qiaolian_dual/user_bot.py:L666-L676`
+- `🎉 预约已提交！我们会尽快联系您确认。`
+  - source: `qiaolian_dual/user_bot.py:L680-L685`
+- `🏠 已返回首页`
+  - source: `qiaolian_dual/user_bot.py:L687-L691`
+- `❌ 已取消当前操作。`
+  - source: `qiaolian_dual/user_bot.py:L696-L700`
+
+### 通用文案
+
+- `🏠 <b>{title}</b>`
+  - source: `qiaolian_dual/messages.py:L10-L16`
+- `💰 ${price}/月`
+  - source: `qiaolian_dual/messages.py:L10-L16`
+- `📍 {area} · {community}`
+  - source: `qiaolian_dual/messages.py:L10-L16`
+- `🛏 {layout}`
+  - source: `qiaolian_dual/messages.py:L12-L16`
+- `📐 {size_sqm}㎡`
+  - source: `qiaolian_dual/messages.py:L13-L16`
+- `✨ {tags}`
+  - source: `qiaolian_dual/messages.py:L14-L16`
+- `编号：<code>{listing_id}</code>`
+  - source: `qiaolian_dual/messages.py:L22-L30`
+- `💰 月租：<b>${price}</b>`
+  - source: `qiaolian_dual/messages.py:L27-L30`
+- `🛏 户型：{layout}`
+  - source: `qiaolian_dual/messages.py:L31-L34`
+- `📐 面积：{size_sqm}㎡`
+  - source: `qiaolian_dual/messages.py:L32-L35`
+- `🔑 押金：{deposit_rule}`
+  - source: `qiaolian_dual/messages.py:L33-L36`
+- `📅 可入住：{available_date}`
+  - source: `qiaolian_dual/messages.py:L37-L40`
+- `✨ 标签：{tags}`
+  - source: `qiaolian_dual/messages.py:L40-L43`
+- `亮点`
+  - source: `qiaolian_dual/messages.py:L42-L45`
+- `费用说明`
+  - source: `qiaolian_dual/messages.py:L43-L46`
+- `顾问提醒`
+  - source: `qiaolian_dual/messages.py:L45-L47`
+- `💬 看中这套，点下面按钮继续。`
+  - source: `qiaolian_dual/messages.py:L46-L47`
+- `您需要什么帮助？`
+  - source: `qiaolian_dual/messages.py:L51-L56`
+- `找房、预约、入住、续租，都可以先从这里开始。`
+  - source: `qiaolian_dual/messages.py:L51-L56`
+- `您可以直接联系顾问，也可以先把需求留给我，我会先记录再通知人工。`
+  - source: `qiaolian_dual/messages.py:L59-L66`
+- `Telegram：{ADVISOR_TG}`
+  - source: `qiaolian_dual/messages.py:L61-L66`
+- `微信：{ADVISOR_WECHAT}`
+  - source: `qiaolian_dual/messages.py:L62-L66`
+- `电话：{ADVISOR_PHONE}`
+  - source: `qiaolian_dual/messages.py:L63-L66`
+- `频道：{CHANNEL_URL}`
+  - source: `qiaolian_dual/messages.py:L64-L66`
+- `我们会在带看和签约前，把押金、起租时间、水电网、物业等关键信息提前讲清楚。`
+  - source: `qiaolian_dual/messages.py:L70-L76`
+- `入住前建议做照片/视频留档，退租时更好对照，减少扯皮。`
+  - source: `qiaolian_dual/messages.py:L70-L76`
+- `我们希望做的不只是发房源，而是把找房、看房、入住、售后都接住。`
+  - source: `qiaolian_dual/messages.py:L78-L84`
+- `房源会尽量讲清楚优缺点，帮助您更快做决定。`
+  - source: `qiaolian_dual/messages.py:L78-L84`
+
+## 3. Channel Listing Template
+
+- `🏠 {area} {room_type}`
+  - source: `meihua_publisher.py:L619-L622`
+- `💰 租金：{price}`
+  - source: `meihua_publisher.py:L621-L624`
+- `📍 区域：{area}`
+  - source: `meihua_publisher.py:L624-L627`
+- `📐 户型：{room_type}`
+  - source: `meihua_publisher.py:L625-L627`
+- `🪑 配置：{furniture}`
+  - source: `meihua_publisher.py:L626-L628`
+- `———`
+  - source: `meihua_publisher.py:L629-L630`
+- `👍 优点`
+  - source: `meihua_publisher.py:L631-L633`
+- `• {advantage1}`
+  - source: `meihua_publisher.py:L631-L633`
+- `• {advantage2}`
+  - source: `meihua_publisher.py:L631-L633`
+- `⚠️ 注意`
+  - source: `meihua_publisher.py:L635-L637`
+- `• {note1}`
+  - source: `meihua_publisher.py:L635-L637`
+- `• {note2}`
+  - source: `meihua_publisher.py:L635-L637`
+- `📹 实拍图片`
+  - source: `meihua_publisher.py:L638-L640`
+- `咨询房源`
+  - source: `meihua_publisher.py:L641-L642`
+- `👉 @QiaolianHouseBot`
+  - source: `meihua_publisher.py:L641-L642`
+- `#... #... #...`
+  - source: `meihua_publisher.py:L643-L645`
+
+- `🏠【侨联实拍】{project}｜{layout_title}`
+  - source: `v2/qiaolian_publisher_v2/formatters.py:L169-L175`
+- `📍位置：{project}`
+  - source: `v2/qiaolian_publisher_v2/formatters.py:L171-L175`
+- `💰租金：<b>${price}/月</b>`
+  - source: `v2/qiaolian_publisher_v2/formatters.py:L172-L175`
+- `🛏户型：{layout}｜约{size}`
+  - source: `v2/qiaolian_publisher_v2/formatters.py:L173-L175`
+- `🏢楼层：{floor}`
+  - source: `v2/qiaolian_publisher_v2/formatters.py:L176-L177`
+- `🧾付款：{deposit}`
+  - source: `v2/qiaolian_publisher_v2/formatters.py:L178-L182`
+- `📅入住：{avail}`
+  - source: `v2/qiaolian_publisher_v2/formatters.py:L179-L182`
+- `🎥看房方式：实地 / 视频代看都可以`
+  - source: `v2/qiaolian_publisher_v2/formatters.py:L181-L183`
+- `✅ 优点优势`
+  - source: `v2/qiaolian_publisher_v2/formatters.py:L183-L188`
+- `⚠️ 提前说清楚`
+  - source: `v2/qiaolian_publisher_v2/formatters.py:L188-L192`
+- `💬 侨联说`
+  - source: `v2/qiaolian_publisher_v2/formatters.py:L192-L195`
+- `💎 侨联地产｜您在金边的自己人`
+  - source: `v2/qiaolian_publisher_v2/formatters.py:L195-L198`
+- `#金边租房 #... #实拍房源 #...`
+  - source: `v2/qiaolian_publisher_v2/formatters.py:L161-L167`
+- `📋 发布预览（频道先发长文，再发封面图+按钮）`
+  - source: `v2/qiaolian_publisher_v2/formatters.py:L206-L208`
+
+- `🏠【侨联实拍】{project} · {layout}`
+  - source: `v2_admin/publisher.py:L37-L43`
+- `💰 <b>租金：{price}</b>`
+  - source: `v2_admin/publisher.py:L39-L45`
+- `📍 区域：{area}`
+  - source: `v2_admin/publisher.py:L50-L53`
+- `✨ <b>房源亮点</b>`
+  - source: `v2_admin/publisher.py:L67-L68`
+- `💬 <b>顾问说</b>`
+  - source: `v2_admin/publisher.py:L90-L93`
+- `⚠️ <b>提前说清楚</b>`
+  - source: `v2_admin/publisher.py:L93-L96`
+- `💵 费用说明`
+  - source: `v2_admin/publisher.py:L97-L99`
+- `👇 点击按钮联系侨联顾问`
+  - source: `v2_admin/publisher.py:L97-L99`
+- `🔴 <b>此房源已下架</b>`
+  - source: `v2_admin/publisher.py:L243-L247`
+- `✅ <b>此房源已租出，感谢信任侨联</b>`
+  - source: `v2_admin/publisher.py:L258-L262`
+
+## 4. Button Labels
+
+### 用户 Bot
+
+- `🔍 找房`
+  - source: `qiaolian_dual/user_bot.py:L58-L62`
+- `📅 我的预约`
+  - source: `qiaolian_dual/user_bot.py:L58-L62`
+- `💬 联系顾问`
+  - source: `qiaolian_dual/user_bot.py:L58-L62`
+- `🏠 返回首页`
+  - source: `qiaolian_dual/user_bot.py:L58-L62`
+- `🏢 线下看房`
+  - source: `qiaolian_dual/user_bot.py:L388-L395`
+- `📹 视频看房`
+  - source: `qiaolian_dual/user_bot.py:L388-L395`
+- `🔙 返回上一步`
+  - source: `qiaolian_dual/user_bot.py:L569-L624`
+- `🏠 首页`
+  - source: `qiaolian_dual/user_bot.py:L569-L624`
+- `✅ 确认提交`
+  - source: `qiaolian_dual/user_bot.py:L621-L624`
+- `❌ 取消`
+  - source: `qiaolian_dual/user_bot.py:L621-L624`
+- `🏠 返回首页`
+  - source: `qiaolian_dual/user_bot.py:L683-L699`
+
+### 发布 Bot / 管理端
+
+- `➕ 新建房源`
+  - source: `v2/qiaolian_publisher_v2/keyboards.py:L9-L16`
+- `🧪 检查频道权限`
+  - source: `v2/qiaolian_publisher_v2/keyboards.py:L12-L15`
+- `❌ 取消当前流程`
+  - source: `v2/qiaolian_publisher_v2/keyboards.py:L13-L15`
+- `🏢 公寓`
+  - source: `v2/qiaolian_publisher_v2/keyboards.py:L19-L31`
+- `🏡 别墅`
+  - source: `v2/qiaolian_publisher_v2/keyboards.py:L19-L31`
+- `🏪 商铺`
+  - source: `v2/qiaolian_publisher_v2/keyboards.py:L25-L31`
+- `💼 办公室`
+  - source: `v2/qiaolian_publisher_v2/keyboards.py:L25-L31`
+- `⏭ 跳过`
+  - source: `v2/qiaolian_publisher_v2/keyboards.py:L44-L48`
+- `✅ 立即发布`
+  - source: `v2/qiaolian_publisher_v2/keyboards.py:L51-L60`
+- `✏️ 修改字段`
+  - source: `v2/qiaolian_publisher_v2/keyboards.py:L55-L60`
+- `标题`
+  - source: `v2/qiaolian_publisher_v2/keyboards.py:L63-L80`
+- `价格`
+  - source: `v2/qiaolian_publisher_v2/keyboards.py:L63-L80`
+- `区域`
+  - source: `v2/qiaolian_publisher_v2/keyboards.py:L70-L80`
+- `亮点`
+  - source: `v2/qiaolian_publisher_v2/keyboards.py:L70-L80`
+- `费用`
+  - source: `v2/qiaolian_publisher_v2/keyboards.py:L74-L80`
+- `缺点/提醒`
+  - source: `v2/qiaolian_publisher_v2/keyboards.py:L75-L80`
+- `⬅️ 返回预览`
+  - source: `v2/qiaolian_publisher_v2/keyboards.py:L78-L80`
+- `💬 立即咨询`
+  - source: `v2/qiaolian_publisher_v2/keyboards.py:L83-L95`
+- `📅 预约看房`
+  - source: `v2/qiaolian_publisher_v2/keyboards.py:L88-L95`
+- `❤️ 收藏房源`
+  - source: `v2/qiaolian_publisher_v2/keyboards.py:L92-L95`
+- `🏠 同区域更多`
+  - source: `v2/qiaolian_publisher_v2/keyboards.py:L93-L95`
+
+- `立即咨询`
+  - source: `meihua_publisher.py:L956-L982`
+- `预约看房`
+  - source: `meihua_publisher.py:L956-L982`
+- `更多房源`
+  - source: `meihua_publisher.py:L956-L982`
+- `联系侨联地产`
+  - source: `meihua_publisher.py:L979-L982`
+
+- `📖 品牌故事`
+  - source: `autopilot_publish_bot.py:L232-L253`
+- `🏢 介绍侨联`
+  - source: `autopilot_publish_bot.py:L232-L253`
+- `🏠 预约想住`
+  - source: `autopilot_publish_bot.py:L232-L253`
+- `💬 咨询`
+  - source: `autopilot_publish_bot.py:L232-L253`
+- `进入 {BRAND_NAME} 频道`
+  - source: `autopilot_publish_bot.py:L248-L253`
+
+- `💬 立即咨询`
+  - source: `v2_admin/publisher.py:L109-L115`
+- `📅 预约看房`
+  - source: `v2_admin/publisher.py:L109-L115`
+- `❤️ 收藏房源`
+  - source: `v2_admin/publisher.py:L114-L115`
+- `🏠 同区域更多`
+  - source: `v2_admin/publisher.py:L114-L115`
+- `💬 联系侨联顾问`
+  - source: `v2_admin/publisher.py:L121-L123`
+- `🏠 更多房源`
+  - source: `v2_admin/publisher.py:L121-L123`
+- `🏠 查看在租房源`
+  - source: `v2_admin/publisher.py:L270-L270`
+
+### 管理后台 HTML
+
+- `✏️ 编辑`
+  - source: `v2_admin/templates/index.html:L51-L52`
+- `📤 发布`
+  - source: `v2_admin/templates/index.html:L53-L56`
+- `🗑 删除`
+  - source: `v2_admin/templates/index.html:L57-L60`
+- `🔄 重发`
+  - source: `v2_admin/templates/index.html:L62-L66`
+- `💰 改价`
+  - source: `v2_admin/templates/index.html:L67-L68`
+- `✅ 已租`
+  - source: `v2_admin/templates/index.html:L68-L71`
+- `🔴 下架`
+  - source: `v2_admin/templates/index.html:L72-L75`
+- `📤 重新发布`
+  - source: `v2_admin/templates/index.html:L77-L80`
+- `取消`
+  - source: `v2_admin/templates/index.html:L111-L114`
+- `确认改价`
+  - source: `v2_admin/templates/index.html:L111-L114`
+- `💾 保存房源`
+  - source: `v2_admin/templates/listing_form.html:L171-L175`
+- `取消`
+  - source: `v2_admin/templates/listing_form.html:L171-L175`
+- `💬 立即咨询`
+  - source: `v2_admin/templates/listing_form.html:L193-L198`
+- `📅 预约看房`
+  - source: `v2_admin/templates/listing_form.html:L194-L198`
+- `❤️ 收藏房源`
+  - source: `v2_admin/templates/listing_form.html:L195-L198`
+- `🏠 同区域更多`
+  - source: `v2_admin/templates/listing_form.html:L196-L198`
+
+## 5. Booking Flow Prompts
+
+- `请回复：意向日期、上午或下午、线下或视频看房。也可留下方便联系的方式。`
+  - source: `qiaolian_dual/user_bot.py:L311-L319`
+- `请发：预算（USD/月）、意向区域、户型、入住时间。`
+  - source: `qiaolian_dual/user_bot.py:L351-L358`
+- `请发意向区域，例如：BKK1、森速、万景岗、俄罗斯市场。也可以直接回“ 不限 ”。`
+  - source: `qiaolian_dual/user_bot.py:L410-L416`
+- `请直接发您的问题、预算或想看的房源编号，我会帮您记录给顾问。`
+  - source: `qiaolian_dual/user_bot.py:L422-L429`
+- `请发预算范围，例如：600-900、1000 左右，也可以顺便带上户型，如 2房。`
+  - source: `qiaolian_dual/user_bot.py:L498-L500`
+- `请选择您的看房方式：`
+  - source: `qiaolian_dual/user_bot.py:L387-L401`
+- `请选择预约日期：`
+  - source: `qiaolian_dual/user_bot.py:L557-L575`
+- `请选择时间段：`
+  - source: `qiaolian_dual/user_bot.py:L586-L602`
+- `确认提交预约吗？`
+  - source: `qiaolian_dual/user_bot.py:L613-L617`
+- `请直接留言描述问题，顾问会按这套房源继续跟进。`
+  - source: `qiaolian_dual/user_bot.py:L270-L275`
+- `请发预算（USD/月）与户型，顾问按实拍房源推荐。`
+  - source: `qiaolian_dual/user_bot.py:L326-L333`
+- `请直接说明您的问题，顾问会人工回复。`
+  - source: `qiaolian_dual/user_bot.py:L359-L364`
+- `请发：预算、区域、户型、入住时间。`
+  - source: `qiaolian_dual/user_bot.py:L340-L344`
+- `请直接说明租房或区域问题，人工回复。`
+  - source: `v2/qiaolian_publisher_v2/bot.py:L359-L364`
+- `请发：预算（USD/月）、意向区域、户型、入住时间。`
+  - source: `v2/qiaolian_publisher_v2/bot.py:L351-L358`
+- `请输入标题，例如：The Peak 一居室 / 钻石岛河景两房`
+  - source: `v2/qiaolian_publisher_v2/messages.py:L24-L25`
+- `请输入价格，例如：650 或 $650`
+  - source: `v2/qiaolian_publisher_v2/messages.py:L25-L26`
+- `请输入小区/楼盘名称，没有可回复 -`
+  - source: `v2/qiaolian_publisher_v2/messages.py:L26-L27`
+- `请输入户型，例如：1房1厅1卫。没有可点跳过。`
+  - source: `v2/qiaolian_publisher_v2/messages.py:L27-L28`
+- `请输入面积，例如：52㎡。没有可点跳过。`
+  - source: `v2/qiaolian_publisher_v2/messages.py:L28-L29`
+- `请输入标签，多个用逗号分隔，例如：拎包入住,泳池,健身房。没有可点跳过。`
+  - source: `v2/qiaolian_publisher_v2/messages.py:L29-L30`
+- `请输入亮点，例如：河景、高楼层、家具全。没有可点跳过。`
+  - source: `v2/qiaolian_publisher_v2/messages.py:L30-L31`
+- `请输入费用说明，例如：押1付1，水电网自理。没有可点跳过。`
+  - source: `v2/qiaolian_publisher_v2/messages.py:L31-L32`
+- `请输入顾问提醒/缺点，例如：晚上会稍微热闹，没有可点跳过。`
+  - source: `v2/qiaolian_publisher_v2/messages.py:L32-L33`
+- `请输入押金规则，例如：押1付1。没有可点跳过。`
+  - source: `v2/qiaolian_publisher_v2/messages.py:L33-L34`
+- `请输入可入住时间，例如：随时入住 / 5月1日。没有可点跳过。`
+  - source: `v2/qiaolian_publisher_v2/messages.py:L34-L35`
+
+## 6. Fallback / Error Messages
+
+- `📅 目前还没有预约记录。点频道里的“预约看房”，我们就会帮您跟进。`
+  - source: `qiaolian_dual/user_bot.py:L207-L210`
+- `可以直接点菜单，也可以直接发：预算、区域、户型、入住时间。`
+  - source: `qiaolian_dual/user_bot.py:L483-L487`
+- `✅ 已记录需求。当前先没有现成匹配结果，顾问会按实拍房源继续帮您筛。`
+  - source: `qiaolian_dual/user_bot.py:L543-L548`
+- `❌ 已取消当前操作。`
+  - source: `qiaolian_dual/user_bot.py:L696-L700`
+- `❌ CHANNEL_ID 未配置`
+  - source: `v2/qiaolian_publisher_v2/bot.py:L379-L383`
+- `已取消当前发布流程。`
+  - source: `v2/qiaolian_publisher_v2/bot.py:L436-L441`
+- `已跳过媒体。`
+  - source: `v2/qiaolian_publisher_v2/bot.py:L443-L452`
+- `请发送图片或视频，或者输入 /skipmedia 跳过。`
+  - source: `v2/qiaolian_publisher_v2/bot.py:L575-L585`
+- `❌ CHANNEL_ID 未配置，无法发频道。`
+  - source: `v2/qiaolian_publisher_v2/bot.py:L667-L668`
+- `❌ 发布失败：{e}`
+  - source: `v2/qiaolian_publisher_v2/bot.py:L790-L793`
+- `⚠️ 预览生成失败：{e}`
+  - source: `v2/qiaolian_publisher_v2/bot.py:L815-L821`
+- `草稿已不存在。`
+  - source: `autopilot_publish_bot.py:L622-L622`
+- `❌ 发布失败`
+  - source: `autopilot_publish_bot.py:L636-L640`
+- `🗑 已丢弃`
+  - source: `autopilot_publish_bot.py:L651-L662`
+- `🖼 封面已重算`
+  - source: `autopilot_publish_bot.py:L673-L673`
+- `⚠️ 封面失败`
+  - source: `autopilot_publish_bot.py:L673-L673`
+- `用法：/send DRF_xxx`
+  - source: `autopilot_publish_bot.py:L386-L386`
+- `用法：/daily_time 08:00`
+  - source: `autopilot_publish_bot.py:L437-L437`
+- `编号不存在，先 /tpl 查看。`
+  - source: `autopilot_publish_bot.py:L480-L488`
+- `请直接回复一句「修正说明」（将写入备注）。`
+  - source: `autopilot_publish_bot.py:L680-L680`
+- `PUBLISHER_BOT_TOKEN 未配置`
+  - source: `post_pinned.py:L58-L60`
+- `置顶失败（可能需要管理员权限）`
+  - source: `post_pinned.py:L76-L84`
+- `房源不存在`
+  - source: `v2_admin/admin_server.py:L129-L170`
+- `未找到已发布帖子`
+  - source: `v2_admin/admin_server.py:L233-L260`
+- `请输入新价格`
+  - source: `v2_admin/admin_server.py:L276-L281`
+- `只能删除草稿状态的房源`
+  - source: `v2_admin/admin_server.py:L289-L297`
+- `确认删除草稿？`
+  - source: `v2_admin/templates/index.html:L57-L60`
+- `标记已租出？`
+  - source: `v2_admin/templates/index.html:L68-L71`
+- `确认下架？`
+  - source: `v2_admin/templates/index.html:L72-L75`
+- `还没有房源，点右上角「＋ 新建房源」开始`
+  - source: `v2_admin/templates/index.html:L94-L97`
+- `确认删除这张图片？`
+  - source: `v2_admin/templates/listing_form.html:L269-L279`
+- `未配置 CHANNEL_ID。使用 /tpl_test here 仅在当前聊天预览各模版。`
+  - source: `autopilot_publish_bot.py:L499-L499`
+
+## 7. Admin Interface Text
+
+- `手搓发帖：点「新建房源」或发 /new，按向导填完预览后发布。`
+  - source: `v2/qiaolian_publisher_v2/messages.py:L2-L6`
+- `采集流水线：草稿在库里后可用调度命令（管理员）：`
+  - source: `v2/qiaolian_publisher_v2/messages.py:L5-L14`
+- `/pending — 预览 pending+封面`
+  - source: `v2/qiaolian_publisher_v2/messages.py:L6-L14`
+- `/send DRF_xxx — 立即发一条`
+  - source: `v2/qiaolian_publisher_v2/messages.py:L7-L14`
+- `/slots — 查看或改定时槽（金边时区）`
+  - source: `v2/qiaolian_publisher_v2/messages.py:L8-L14`
+- `/pause /resume — 暂停或恢复定时 ready 发帖`
+  - source: `v2/qiaolian_publisher_v2/messages.py:L9-L14`
+- `/stats — 统计`
+  - source: `v2/qiaolian_publisher_v2/messages.py:L10-L14`
+- `/post_menu — 频道置顶四键`
+  - source: `v2/qiaolian_publisher_v2/messages.py:L11-L14`
+- `/daily、/tpl — 每日固定广播`
+  - source: `v2/qiaolian_publisher_v2/messages.py:L12-L14`
+- `/help — 调度说明`
+  - source: `v2/qiaolian_publisher_v2/messages.py:L13-L14`
+- `发帖引擎仍是后台 meihua_publisher，本 Bot 负责录入与触发。`
+  - source: `v2/qiaolian_publisher_v2/messages.py:L14-L15`
+- `➕ 新建房源\n先发 1 张封面图或 1 个视频。也可以直接输入 /skipmedia 跳过媒体，先发纯文字帖。`
+  - source: `v2/qiaolian_publisher_v2/messages.py:L17-L22`
+- `BASIC · 基本信息`
+  - source: `v2_admin/templates/listing_form.html:L32-L40`
+- `PRICE & LAYOUT · 价格户型`
+  - source: `v2_admin/templates/listing_form.html:L66-L95`
+- `TAGS & HIGHLIGHTS · 标签亮点`
+  - source: `v2_admin/templates/listing_form.html:L99-L118`
+- `ADVISOR · 顾问详情（频道按钮消息内容）`
+  - source: `v2_admin/templates/listing_form.html:L121-L140`
+- `IMAGES · 房源图片（3-5 张，第一张为封面）`
+  - source: `v2_admin/templates/listing_form.html:L142-L169`
+- `PREVIEW · 频道预览`
+  - source: `v2_admin/templates/listing_form.html:L180-L198`
+- `第一张图 Caption`
+  - source: `v2_admin/templates/listing_form.html:L182-L187`
+- `按钮消息 + 引流按钮`
+  - source: `v2_admin/templates/listing_form.html:L189-L198`
+- `ALL LISTINGS · 全部房源`
+  - source: `v2_admin/templates/index.html:L4-L8`
+- `房源列表 · 侨联发布后台`
+  - source: `v2_admin/templates/index.html:L1-L3`
+- `侨联地产 · 频道发布后台`
+  - source: `v2_admin/templates/base.html:L1-L6`
+- `CHANNEL PUBLISHER · 频道发布后台`
+  - source: `v2_admin/templates/base.html:L186-L194`
+- `侨联地产`
+  - source: `v2_admin/templates/base.html:L186-L194`
+- `房源列表`
+  - source: `v2_admin/templates/base.html:L192-L195`
+- `＋ 新建房源`
+  - source: `v2_admin/templates/base.html:L192-L195`
+- `✅ 房源 {lid} 已保存为草稿`
+  - source: `v2_admin/admin_server.py:L109-L121`
+- `✅ 房源 {lid} 已更新`
+  - source: `v2_admin/admin_server.py:L136-L161`
+- `🟢 房源 {lid} 已发布到频道`
+  - source: `v2_admin/admin_server.py:L166-L191`
+- `🔄 房源 {lid} 已重发`
+  - source: `v2_admin/admin_server.py:L196-L221`
+- `🔴 房源 {lid} 已下架`
+  - source: `v2_admin/admin_server.py:L226-L246`
+- `🔵 房源 {lid} 已标记为已租出`
+  - source: `v2_admin/admin_server.py:L251-L271`
+- `💰 房源 {lid} 价格已更新为 {new_price}（帖子未变动，如需同步请重发）`
+  - source: `v2_admin/admin_server.py:L276-L284`
+- `🗑 草稿 {lid} 已删除`
+  - source: `v2_admin/admin_server.py:L287-L303`
+- `侨联发布后台启动，访问 http://0.0.0.0:{port}`
+  - source: `v2_admin/admin_server.py:L336-L340`
+- `正在生成 4 款封面并发送到频道...`
+  - source: `v2/qiaolian_publisher_v2/bot.py:L401-L425`
+- `🎨 封面模板测试：{name}`
+  - source: `v2/qiaolian_publisher_v2/bot.py:L413-L419`
+- `风格代码：{style}`
+  - source: `v2/qiaolian_publisher_v2/bot.py:L413-L419`
+- `✅ 4 款封面测试已发送到频道，请查看对比效果。`
+  - source: `v2/qiaolian_publisher_v2/bot.py:L423-L425`
+- `📋 发布预览（频道先发长文，再发封面图+按钮）`
+  - source: `v2/qiaolian_publisher_v2/formatters.py:L206-L208`
+- `经典蓝卡`
+  - source: `v2/qiaolian_publisher_v2/bot.py:L394-L399`
+- `极简白条`
+  - source: `v2/qiaolian_publisher_v2/bot.py:L394-L399`
+- `右侧价签`
+  - source: `v2/qiaolian_publisher_v2/bot.py:L394-L399`
+- `竖版视频(9:16)`
+  - source: `v2/qiaolian_publisher_v2/bot.py:L394-L399`
+- `主菜单与功能总览`
+  - source: `v2/qiaolian_publisher_v2/bot.py:L849-L866`
+- `手搓发帖：图/视频→填表→发频道`
+  - source: `v2/qiaolian_publisher_v2/bot.py:L849-L866`
+- `拉取库里待预览草稿（带按钮）`
+  - source: `v2/qiaolian_publisher_v2/bot.py:L849-L866`
+- `立刻发帖：/send DRF_xxx`
+  - source: `v2/qiaolian_publisher_v2/bot.py:L849-L866`
+- `定时发帖时刻：/slots 或 /slots 9:00,12:00`
+  - source: `v2/qiaolian_publisher_v2/bot.py:L849-L866`
+- `草稿数量统计与定时器是否在跑`
+  - source: `v2/qiaolian_publisher_v2/bot.py:L849-L866`
+- `暂停：到点不再从 ready 发帖`
+  - source: `v2/qiaolian_publisher_v2/bot.py:L849-L866`
+- `恢复：按 slots 定时发 ready`
+  - source: `v2/qiaolian_publisher_v2/bot.py:L849-L866`
+- `频道发置顶帖（四按钮）并尝试置顶`
+  - source: `v2/qiaolian_publisher_v2/bot.py:L859-L859`
+- `每日固定广播：/daily 看状态与说明`
+  - source: `v2/qiaolian_publisher_v2/bot.py:L860-L860`
+- `先执行：下一条消息=置顶帖 HTML`
+  - source: `v2/qiaolian_publisher_v2/bot.py:L861-L861`
+- `每日广播文案模版列表`
+  - source: `v2/qiaolian_publisher_v2/bot.py:L862-L863`
+- `测各模版：/tpl_test 发频道，here 仅私聊`
+  - source: `v2/qiaolian_publisher_v2/bot.py:L863-L864`
+- `测试4款封面模板（纯设计背景，无需原图）`
+  - source: `v2/qiaolian_publisher_v2/bot.py:L864-L865`
+- `所有命令与参数详解`
+  - source: `v2/qiaolian_publisher_v2/bot.py:L865-L866`
+- `退出当前发帖向导`
+  - source: `v2/qiaolian_publisher_v2/bot.py:L866-L866`
+- `🚪 退出当前发帖向导`
+  - source: `autopilot_publish_bot.py:L297-L299`
+- `每日广播模版`
+  - source: `autopilot_publish_bot.py:L470-L470`
+- `频道置顶菜单`
+  - source: `autopilot_publish_bot.py:L296-L298`
+- `简短说明`
+  - source: `autopilot_publish_bot.py:L299-L299`
+
+## 8. Cover Image Text
+
+### `cover_generator.py`
+
+- `侨联地产`
+  - source: `cover_generator.py:L339-L339`
+- `💰 ${price}/月`
+  - source: `cover_generator.py:L381-L383`
+- `侨联地产 · 实拍房源`
+  - source: `cover_generator.py:L399-L403`
+- `面积 | 楼层 | 区域`
+  - source: `cover_generator.py:L366-L370`
+- `价格待确认`
+  - source: `cover_generator.py:L443-L451`
+- `金边 · 整租`
+  - source: `cover_generator.py:L453-L455`
+- `可咨询确认`
+  - source: `meihua_publisher.py:L556-L563`
+- `侨联地产`
+  - source: `cover_generator.py:L473-L476`
+- `价格 / 区域 · 房型`
+  - source: `cover_generator.py:L478-L490`
+- `可选一句亮点`
+  - source: `cover_generator.py:L478-L490`
+
+### `v2_admin/house_cover_v2.py`
+
+- `侨联地产`
+  - source: `v2_admin/house_cover_v2.py:L160-L160`
+- `$680/月`
+  - source: `v2_admin/house_cover_v2.py:L171-L175`
+- `$1200/月`
+  - source: `v2_admin/house_cover_v2.py:L269-L273`
+- `$480/月`
+  - source: `v2_admin/house_cover_v2.py:L313-L319`
+- `$900/月`
+  - source: `v2_admin/house_cover_v2.py:L358-L363`
+- `BKK1`
+  - source: `v2_admin/house_cover_v2.py:L169-L174`
+- `钻石岛`
+  - source: `v2_admin/house_cover_v2.py:L267-L274`
+- `太子幸福`
+  - source: `v2_admin/house_cover_v2.py:L313-L319`
+- `富力城`
+  - source: `v2_admin/house_cover_v2.py:L358-L363`
+- `单间`
+  - source: `v2_admin/house_cover_v2.py:L313-L319`
+- `1房1卫`
+  - source: `v2_admin/house_cover_v2.py:L358-L363`
+- `2房2卫`
+  - source: `v2_admin/house_cover_v2.py:L267-L274`
+- `高层景观`
+  - source: `v2_admin/house_cover_v2.py:L275-L280`
+- `家具齐全`
+  - source: `v2_admin/house_cover_v2.py:L275-L280`
+- `拎包入住`
+  - source: `v2_admin/house_cover_v2.py:L275-L280`
+- `采光好`
+  - source: `v2_admin/house_cover_v2.py:L323-L326`
+- `近商场`
+  - source: `v2_admin/house_cover_v2.py:L323-L326`
+- `安静`
+  - source: `v2_admin/house_cover_v2.py:L323-L326`
+- `经典蓝卡`
+  - source: `v2_admin/house_cover_v2.py:L166-L200`
+- `极简白条`
+  - source: `v2_admin/house_cover_v2.py:L264-L305`
+- `右侧价签`
+  - source: `v2_admin/house_cover_v2.py:L310-L349`
+- `竖版视频`
+  - source: `v2_admin/house_cover_v2.py:L355-L393`
+
+## 9. Channel CTA Prompts
+
+- `👇 <b>喜欢这套就直接点下面按钮</b>`
+  - source: `v2/qiaolian_publisher_v2/formatters.py:L79-L80`
+- `咨询房源\n👉 @QiaolianHouseBot`
+  - source: `meihua_publisher.py:L61-L64`
+- `🏠 租房   🏡 买房   ▶ 视频看房`
+  - source: `meihua_publisher.py:L55-L56`
+- `金边华人租房 / 买房 / 视频看房`
+  - source: `meihua_publisher.py:L55-L56`
+- `品牌故事`
+  - source: `autopilot_publish_bot.py:L233-L244`
+- `介绍侨联`
+  - source: `autopilot_publish_bot.py:L233-L244`
+- `预约想住`
+  - source: `autopilot_publish_bot.py:L233-L244`
+- `咨询`
+  - source: `autopilot_publish_bot.py:L233-L244`
+- `下方四个按钮：品牌故事、介绍侨联、预约想住、咨询`
+  - source: `autopilot_publish_bot.py:L263-L267`
+- `进入 {BRAND_NAME} 频道`
+  - source: `autopilot_publish_bot.py:L248-L253`
+- `点击按钮联系侨联顾问`
+  - source: `v2_admin/publisher.py:L97-L99`
+- `频道置顶四键`
+  - source: `v2/qiaolian_publisher_v2/messages.py:L11-L14`
+- `频道发置顶菜单帖（四按钮）并尝试置顶`
+  - source: `v2/qiaolian_publisher_v2/bot.py:L859-L860`
+- `品牌故事、介绍侨联、预约想住、咨询`
+  - source: `autopilot_publish_bot.py:L263-L267`
+- `@QiaolianHouseBot`
+  - source: `meihua_publisher.py:L63-L64`
+

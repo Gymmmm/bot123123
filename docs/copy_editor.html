@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>侨联地产 · 文案编辑页</title>
+  <style>
+    :root{
+      --bg:#0b1020;
+      --panel:#111a31;
+      --panel2:#16213d;
+      --line:#253456;
+      --text:#eaf0ff;
+      --muted:#95a5c6;
+      --accent:#f0c66b;
+      --accent2:#6cc2ff;
+      --danger:#ff7d7d;
+      --ok:#79d39b;
+      --code:#0f1730;
+      --editor:#0c1327;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;background:
+      radial-gradient(circle at top left, rgba(108,194,255,.15), transparent 28%),
+      radial-gradient(circle at top right, rgba(240,198,107,.12), transparent 22%),
+      var(--bg);
+      color:var(--text);
+      font-family: -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    }
+    a{color:var(--accent2);text-decoration:none}
+    .wrap{max-width:1600px;margin:0 auto;padding:24px}
+    .topbar{
+      display:flex;align-items:center;justify-content:space-between;gap:16px;
+      padding:18px 20px;border:1px solid var(--line);border-radius:18px;background:rgba(17,26,49,.9);
+      position:sticky;top:14px;backdrop-filter: blur(10px); z-index:20;
+    }
+    .brand{display:flex;flex-direction:column;gap:4px}
+    .brand h1{margin:0;font-size:20px;letter-spacing:.5px}
+    .brand p{margin:0;color:var(--muted);font-size:12px}
+    .actions{display:flex;gap:8px;flex-wrap:wrap}
+    .btn{
+      border:1px solid var(--line);background:linear-gradient(180deg, rgba(22,33,61,.95), rgba(14,20,38,.95));
+      color:var(--text);padding:10px 14px;border-radius:12px;font-size:13px;cursor:pointer;
+    }
+    .btn.primary{background:linear-gradient(135deg,#d7ab49,#f1d78a);color:#1a1300;border-color:transparent;font-weight:700}
+    .btn:hover{border-color:var(--accent)}
+    .grid{display:grid;grid-template-columns:360px 1fr;gap:18px;margin-top:18px}
+    .panel{background:rgba(17,26,49,.88);border:1px solid var(--line);border-radius:18px;overflow:hidden}
+    .panel .hd{padding:16px 18px;border-bottom:1px solid var(--line);background:rgba(22,33,61,.75);font-size:14px;font-weight:700}
+    .panel .bd{padding:16px 18px}
+    .tree{display:flex;flex-direction:column;gap:12px}
+    .tree-node{
+      border:1px solid var(--line);border-radius:14px;padding:12px 12px;background:rgba(12,19,39,.75)
+    }
+    .tree-node .t{font-weight:700;margin-bottom:6px}
+    .tree-node .s{font-size:12px;color:var(--muted);line-height:1.6}
+    .arrow{margin:2px 0 2px 18px;color:var(--accent2);font-size:18px}
+    .legend{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+    .tag{font-size:12px;padding:5px 9px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--muted)}
+    .tag.ok{color:var(--ok);border-color:rgba(121,211,155,.35)}
+    .tag.warn{color:var(--accent);border-color:rgba(240,198,107,.35)}
+    .tag.info{color:var(--accent2);border-color:rgba(108,194,255,.35)}
+    .batch-nav{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+    .batch-btn{
+      border:1px solid var(--line);background:rgba(15,23,48,.9);color:var(--text);
+      border-radius:999px;padding:8px 12px;font-size:12px;cursor:pointer;
+    }
+    .batch-btn.active{background:linear-gradient(135deg,#d7ab49,#f1d78a);color:#201700;border-color:transparent;font-weight:700}
+    .batch-meta{margin-top:10px;font-size:12px;line-height:1.7;color:var(--muted)}
+    .cats{display:grid;grid-template-columns:1fr;gap:14px}
+    .cat{border:1px solid var(--line);border-radius:16px;background:rgba(12,19,39,.7);overflow:hidden}
+    .cat-hd{padding:12px 14px;background:rgba(22,33,61,.7);display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .cat-hd strong{font-size:14px}
+    .cat-hd span{font-size:12px;color:var(--muted)}
+    .item{border-top:1px solid rgba(37,52,86,.8);padding:14px}
+    .item:first-of-type{border-top:none}
+    .item-grid{display:grid;grid-template-columns:1fr 280px;gap:12px}
+    .item-name{font-size:14px;font-weight:700;margin-bottom:6px}
+    .source{font-size:12px;color:var(--accent2);margin-bottom:10px}
+    .item textarea{
+      width:100%;min-height:88px;resize:vertical;border:1px solid var(--line);border-radius:12px;
+      background:linear-gradient(180deg, rgba(15,23,48,.95), rgba(10,15,32,.95));
+      color:var(--text);padding:12px 13px;font-size:13px;line-height:1.7;outline:none;
+    }
+    .item textarea:focus{border-color:var(--accent)}
+    .mini{
+      display:flex;flex-direction:column;gap:8px
+    }
+    .mini .box{
+      border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:rgba(15,23,48,.8);
+      font-size:12px;line-height:1.65;color:var(--muted)
+    }
+    .mini .box b{color:var(--text)}
+    .export{
+      display:grid;grid-template-columns:1fr 1fr;gap:12px
+    }
+    .export textarea{min-height:180px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
+    .footer{
+      margin-top:18px;color:var(--muted);font-size:12px;line-height:1.8;
+      border-top:1px solid var(--line);padding-top:14px
+    }
+    @media (max-width: 1200px){
+      .grid{grid-template-columns:1fr}
+      .item-grid,.export{grid-template-columns:1fr}
+      .topbar{position:static}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <h1>侨联地产 · 流程树文案编辑页</h1>
+        <p>左边看流程，右边改文案。复制后可直接回填到对应源码文件。</p>
+      </div>
+      <div class="actions">
+        <button class="btn primary" onclick="copyMarkdown()">复制 Markdown 预览</button>
+        <button class="btn" onclick="copyJSON()">复制 JSON 数据</button>
+        <button class="btn" onclick="resetAll()">恢复初始文案</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <section class="panel">
+        <div class="hd">流程树</div>
+        <div class="bd">
+          <div class="tree">
+            <div class="tree-node">
+              <div class="t">频道</div>
+              <div class="s">封面图、频道主帖、CTA 按钮、置顶说明</div>
+            </div>
+            <div class="arrow">↓</div>
+            <div class="tree-node">
+              <div class="t">Bot A · 用户留资</div>
+              <div class="s">咨询、预约、收藏、同区域更多、找房、顾问联系</div>
+            </div>
+            <div class="arrow">↓</div>
+            <div class="tree-node">
+              <div class="t">人类顾问</div>
+              <div class="s">转人工、跟进询价、视频看房、约看确认、补充信息</div>
+            </div>
+            <div class="arrow">↓</div>
+            <div class="tree-node">
+              <div class="t">入住后服务</div>
+              <div class="s">维修、续租、退租、押金、搬入、租客沟通</div>
+            </div>
+            <div class="legend">
+              <span class="tag ok">可直接改稿</span>
+              <span class="tag info">支持导出</span>
+              <span class="tag warn">不影响运行</span>
+            </div>
+          </div>
+          <div class="batch-nav" id="batchNav"></div>
+          <div class="batch-meta" id="batchMeta"></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="hd">文案清单</div>
+        <div class="bd">
+          <div class="cats" id="categories"></div>
+
+          <div class="panel" style="margin-top:14px">
+            <div class="hd">导出区</div>
+            <div class="bd export">
+              <div>
+                <div class="item-name">Markdown 预览</div>
+                <textarea id="markdownOut" readonly></textarea>
+              </div>
+              <div>
+                <div class="item-name">JSON 数据</div>
+                <textarea id="jsonOut" readonly></textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="footer">
+      说明：这个页面是静态文案工作台，不连接后端，不修改运行逻辑。修改后可把内容复制回源码或交给营销直接审稿。
+    </div>
+  </div>
+
+  <div id="toast" style="
+    position:fixed;left:50%;bottom:22px;transform:translateX(-50%);
+    background:rgba(17,26,49,.92);border:1px solid var(--line);color:var(--text);
+    padding:10px 14px;border-radius:12px;font-size:13px;backdrop-filter: blur(10px);
+    box-shadow: 0 10px 30px rgba(0,0,0,.35);
+    opacity:0;pointer-events:none;transition:opacity .18s ease;
+    z-index:9999;
+  "></div>
+
+  <script>
+    const inventory = [
+      {
+        key: "greeting",
+        title: "1. Bot Greeting Messages",
+        note: "欢迎语 / 入口介绍 / 频道置顶说明",
+        items: [
+          { text: "👋 您好！欢迎使用侨联地产服务 Bot。", source: "qiaolian_dual/user_bot.py:L367-L370" },
+          { text: "🏠 <b>{BRAND_NAME} · 金边租房管家</b>", source: "qiaolian_dual/messages.py:L51-L56" },
+          { text: "💎 <b>{BRAND_NAME} 顾问服务</b>", source: "qiaolian_dual/messages.py:L59-L66" },
+          { text: "💌 <b>{BRAND_NAME} · 您在金边的自己人</b>", source: "qiaolian_dual/messages.py:L78-L84" },
+          { text: "🏢 侨联地产 · 统一管理员 Bot（@meihua666）", source: "v2/qiaolian_publisher_v2/messages.py:L2-L5" },
+          { text: "👋 欢迎来到侨联地产官方频道！", source: "post_pinned.py:L20-L23" },
+        ],
+      },
+      {
+        key: "conversation",
+        title: "2. Bot Conversation Messages",
+        note: "日常对话、承接深链、引导提问",
+        items: [
+          { text: "💬 <b>咨询房源</b>\\n编号：<code>{...}</code>\\n\\n请直接发一条消息说明问题，顾问会人工回复。", source: "qiaolian_dual/user_bot.py:L270-L275" },
+          { text: "📅 <b>预约看房</b>\\n编号：<code>{...}</code>\\n\\n请回复：意向日期、上午或下午、线下或视频看房。\\n也可留下方便联系的方式。", source: "qiaolian_dual/user_bot.py:L311-L319" },
+          { text: "❤️ <b>收藏意向</b>\\n已收到。需要锁房或视频带看请直接留言。", source: "qiaolian_dual/user_bot.py:L320-L325" },
+          { text: "🏠 <b>同区域更多</b>\\n区域：<b>{...}</b>\\n\\n请发预算（USD/月）与户型，顾问按实拍房源推荐。", source: "qiaolian_dual/user_bot.py:L326-L333" },
+          { text: "<b>📖 品牌故事</b>\\n\\n侨联地产扎根金边，坚持实拍真房源；中文顾问全程陪同，减少信息差。", source: "qiaolian_dual/user_bot.py:L334-L340" },
+          { text: "<b>🏢 介绍侨联</b>\\n\\n<b>{BRAND_NAME}</b> · QIAO LIAN PROPERTY\\n金边租赁 · 实拍房源 · 中文服务。\\n需求梳理 → 实地/视频带看 → 合同与押金说明。", source: "qiaolian_dual/user_bot.py:L342-L350" },
+          { text: "<b>🏠 预约想住</b>\\n\\n请发：预算（USD/月）、意向区域、户型、入住时间。\\n顾问按实拍列表为您匹配。", source: "qiaolian_dual/user_bot.py:L351-L358" },
+          { text: "<b>💬 咨询</b>\\n\\n请直接说明您的问题，顾问会人工回复。", source: "qiaolian_dual/user_bot.py:L359-L364" },
+          { text: "📅 目前还没有预约记录。点频道里的“预约看房”，我们就会帮您跟进。", source: "qiaolian_dual/user_bot.py:L207-L210" },
+          { text: "📅 您最近的预约：", source: "qiaolian_dual/user_bot.py:L211-L217" },
+          { text: "📍 请发意向区域，例如：BKK1、森速、万景岗、俄罗斯市场。也可以直接回“ 不限 ”。", source: "qiaolian_dual/user_bot.py:L410-L416" },
+          { text: "💬 请直接发您的问题、预算或想看的房源编号，我会帮您记录给顾问。", source: "qiaolian_dual/user_bot.py:L422-L429" },
+          { text: "🏠 已返回首页。", source: "qiaolian_dual/user_bot.py:L431-L434" },
+          { text: "✅ 已记录您的咨询，顾问会按这条需求继续跟进。", source: "qiaolian_dual/user_bot.py:L436-L459" },
+          { text: "✅ 已收到想住需求，我们会按预算和区域帮您匹配。", source: "qiaolian_dual/user_bot.py:L461-L481" },
+          { text: "可以直接点菜单，也可以直接发：预算、区域、户型、入住时间。", source: "qiaolian_dual/user_bot.py:L483-L487" },
+          { text: "💵 请发预算范围，例如：600-900、1000 左右，也可以顺便带上户型，如 2房。", source: "qiaolian_dual/user_bot.py:L498-L502" },
+          { text: "✅ 已记录需求。先给您 3 条最近匹配：", source: "qiaolian_dual/user_bot.py:L535-L543" },
+          { text: "✅ 已记录需求。当前先没有现成匹配结果，顾问会按实拍房源继续帮您筛。", source: "qiaolian_dual/user_bot.py:L543-L548" },
+          { text: "📅 请选择预约日期：", source: "qiaolian_dual/user_bot.py:L557-L575" },
+          { text: "🕒 已选日期：{date}\\n请选择时间段：", source: "qiaolian_dual/user_bot.py:L586-L602" },
+          { text: "✅ <b>预约信息确认</b>", source: "qiaolian_dual/user_bot.py:L612-L619" },
+          { text: "确认提交预约吗？", source: "qiaolian_dual/user_bot.py:L613-L617" },
+          { text: "🔔 <b>新预约提醒</b>", source: "qiaolian_dual/user_bot.py:L666-L676" },
+          { text: "🎉 预约已提交！我们会尽快联系您确认。", source: "qiaolian_dual/user_bot.py:L680-L685" },
+          { text: "🏠 已返回首页", source: "qiaolian_dual/user_bot.py:L687-L691" },
+          { text: "❌ 已取消当前操作。", source: "qiaolian_dual/user_bot.py:L696-L700" },
+        ],
+      },
+      {
+        key: "listing",
+        title: "3. Channel Listing Template",
+        note: "频道主帖 / 发布正文 / 预览正文",
+        items: [
+          { text: "🏠 {area} {room_type}", source: "meihua_publisher.py:L619-L622" },
+          { text: "💰 租金：{price}", source: "meihua_publisher.py:L621-L624" },
+          { text: "📍 区域：{area}", source: "meihua_publisher.py:L624-L627" },
+          { text: "📐 户型：{room_type}", source: "meihua_publisher.py:L625-L627" },
+          { text: "🪑 配置：{furniture}", source: "meihua_publisher.py:L626-L628" },
+          { text: "———", source: "meihua_publisher.py:L629-L630" },
+          { text: "👍 优点", source: "meihua_publisher.py:L631-L633" },
+          { text: "• {advantage1}", source: "meihua_publisher.py:L631-L633" },
+          { text: "• {advantage2}", source: "meihua_publisher.py:L631-L633" },
+          { text: "⚠️ 注意", source: "meihua_publisher.py:L635-L637" },
+          { text: "• {note1}", source: "meihua_publisher.py:L635-L637" },
+          { text: "• {note2}", source: "meihua_publisher.py:L635-L637" },
+          { text: "📹 实拍图片", source: "meihua_publisher.py:L638-L640" },
+          { text: "咨询房源", source: "meihua_publisher.py:L641-L642" },
+          { text: "👉 @QiaolianHouseBot", source: "meihua_publisher.py:L641-L642" },
+          { text: "#... #... #...", source: "meihua_publisher.py:L643-L645" },
+          { text: "🏠【侨联实拍】{project}｜{layout_title}", source: "v2/qiaolian_publisher_v2/formatters.py:L169-L175" },
+          { text: "📍位置：{project}", source: "v2/qiaolian_publisher_v2/formatters.py:L171-L175" },
+          { text: "💰租金：<b>${price}/月</b>", source: "v2/qiaolian_publisher_v2/formatters.py:L172-L175" },
+          { text: "🛏户型：{layout}｜约{size}", source: "v2/qiaolian_publisher_v2/formatters.py:L173-L175" },
+          { text: "🏢楼层：{floor}", source: "v2/qiaolian_publisher_v2/formatters.py:L176-L177" },
+          { text: "🧾付款：{deposit}", source: "v2/qiaolian_publisher_v2/formatters.py:L178-L182" },
+          { text: "📅入住：{avail}", source: "v2/qiaolian_publisher_v2/formatters.py:L179-L182" },
+          { text: "🎥看房方式：实地 / 视频代看都可以", source: "v2/qiaolian_publisher_v2/formatters.py:L181-L183" },
+          { text: "✅ 优点优势", source: "v2/qiaolian_publisher_v2/formatters.py:L183-L188" },
+          { text: "⚠️ 提前说清楚", source: "v2/qiaolian_publisher_v2/formatters.py:L188-L192" },
+          { text: "💬 侨联说", source: "v2/qiaolian_publisher_v2/formatters.py:L192-L195" },
+          { text: "💎 侨联地产｜您在金边的自己人", source: "v2/qiaolian_publisher_v2/formatters.py:L195-L198" },
+          { text: "#金边租房 #... #实拍房源 #...", source: "v2/qiaolian_publisher_v2/formatters.py:L161-L167" },
+          { text: "📋 发布预览（频道先发长文，再发封面图+按钮）", source: "v2/qiaolian_publisher_v2/formatters.py:L206-L208" },
+        ],
+      },
+      {
+        key: "buttons",
+        title: "4. Button Labels",
+        note: "回复键盘 / Inline 键盘 / 管理后台按钮",
+        items: [
+          { text: "🔍 找房", source: "qiaolian_dual/user_bot.py:L58-L62" },
+          { text: "📅 我的预约", source: "qiaolian_dual/user_bot.py:L58-L62" },
+          { text: "💬 联系顾问", source: "qiaolian_dual/user_bot.py:L58-L62" },
+          { text: "🏠 返回首页", source: "qiaolian_dual/user_bot.py:L58-L62" },
+          { text: "🏢 线下看房", source: "qiaolian_dual/user_bot.py:L388-L395" },
+          { text: "📹 视频看房", source: "qiaolian_dual/user_bot.py:L388-L395" },
+          { text: "🔙 返回上一步", source: "qiaolian_dual/user_bot.py:L569-L624" },
+          { text: "🏠 首页", source: "qiaolian_dual/user_bot.py:L569-L624" },
+          { text: "✅ 确认提交", source: "qiaolian_dual/user_bot.py:L621-L624" },
+          { text: "❌ 取消", source: "qiaolian_dual/user_bot.py:L621-L624" },
+          { text: "➕ 新建房源", source: "v2/qiaolian_publisher_v2/keyboards.py:L9-L16" },
+          { text: "🧪 检查频道权限", source: "v2/qiaolian_publisher_v2/keyboards.py:L12-L15" },
+          { text: "❌ 取消当前流程", source: "v2/qiaolian_publisher_v2/keyboards.py:L13-L15" },
+          { text: "🏢 公寓", source: "v2/qiaolian_publisher_v2/keyboards.py:L19-L31" },
+          { text: "🏡 别墅", source: "v2/qiaolian_publisher_v2/keyboards.py:L19-L31" },
+          { text: "🏪 商铺", source: "v2/qiaolian_publisher_v2/keyboards.py:L25-L31" },
+          { text: "💼 办公室", source: "v2/qiaolian_publisher_v2/keyboards.py:L25-L31" },
+          { text: "⏭ 跳过", source: "v2/qiaolian_publisher_v2/keyboards.py:L44-L48" },
+          { text: "✅ 立即发布", source: "v2/qiaolian_publisher_v2/keyboards.py:L51-L60" },
+          { text: "✏️ 修改字段", source: "v2/qiaolian_publisher_v2/keyboards.py:L55-L60" },
+          { text: "标题", source: "v2/qiaolian_publisher_v2/keyboards.py:L63-L80" },
+          { text: "价格", source: "v2/qiaolian_publisher_v2/keyboards.py:L63-L80" },
+          { text: "区域", source: "v2/qiaolian_publisher_v2/keyboards.py:L70-L80" },
+          { text: "亮点", source: "v2/qiaolian_publisher_v2/keyboards.py:L70-L80" },
+          { text: "费用", source: "v2/qiaolian_publisher_v2/keyboards.py:L74-L80" },
+          { text: "缺点/提醒", source: "v2/qiaolian_publisher_v2/keyboards.py:L75-L80" },
+          { text: "⬅️ 返回预览", source: "v2/qiaolian_publisher_v2/keyboards.py:L78-L80" },
+          { text: "💬 立即咨询", source: "v2/qiaolian_publisher_v2/keyboards.py:L83-L95" },
+          { text: "📅 预约看房", source: "v2/qiaolian_publisher_v2/keyboards.py:L88-L95" },
+          { text: "❤️ 收藏房源", source: "v2/qiaolian_publisher_v2/keyboards.py:L92-L95" },
+          { text: "🏠 同区域更多", source: "v2/qiaolian_publisher_v2/keyboards.py:L93-L95" },
+          { text: "立即咨询", source: "meihua_publisher.py:L956-L982" },
+          { text: "预约看房", source: "meihua_publisher.py:L956-L982" },
+          { text: "更多房源", source: "meihua_publisher.py:L956-L982" },
+          { text: "联系侨联地产", source: "meihua_publisher.py:L979-L982" },
+        ],
+      },
+      {
+        key: "booking",
+        title: "5. Booking Flow Prompts",
+        note: "预约 / 咨询 / 找房流程中的引导语",
+        items: [
+          { text: "请回复：意向日期、上午或下午、线下或视频看房。也可留下方便联系的方式。", source: "qiaolian_dual/user_bot.py:L311-L319" },
+          { text: "请发：预算（USD/月）、意向区域、户型、入住时间。", source: "qiaolian_dual/user_bot.py:L351-L358" },
+          { text: "请发意向区域，例如：BKK1、森速、万景岗、俄罗斯市场。也可以直接回“ 不限 ”。", source: "qiaolian_dual/user_bot.py:L410-L416" },
+          { text: "请直接发您的问题、预算或想看的房源编号，我会帮您记录给顾问。", source: "qiaolian_dual/user_bot.py:L422-L429" },
+          { text: "请发预算范围，例如：600-900、1000 左右，也可以顺便带上户型，如 2房。", source: "qiaolian_dual/user_bot.py:L498-L500" },
+          { text: "请选择您的看房方式：", source: "qiaolian_dual/user_bot.py:L387-L401" },
+          { text: "请选择预约日期：", source: "qiaolian_dual/user_bot.py:L557-L575" },
+          { text: "请选择时间段：", source: "qiaolian_dual/user_bot.py:L586-L602" },
+          { text: "确认提交预约吗？", source: "qiaolian_dual/user_bot.py:L613-L617" },
+          { text: "请直接留言描述问题，顾问会按这套房源继续跟进。", source: "qiaolian_dual/user_bot.py:L270-L275" },
+          { text: "请发预算（USD/月）与户型，顾问按实拍房源推荐。", source: "qiaolian_dual/user_bot.py:L326-L333" },
+          { text: "请直接说明您的问题，顾问会人工回复。", source: "qiaolian_dual/user_bot.py:L359-L364" },
+          { text: "请发：预算、区域、户型、入住时间。", source: "qiaolian_dual/user_bot.py:L340-L344" },
+          { text: "请直接说明租房或区域问题，人工回复。", source: "v2/qiaolian_publisher_v2/bot.py:L359-L364" },
+          { text: "请发：预算（USD/月）、意向区域、户型、入住时间。", source: "v2/qiaolian_publisher_v2/bot.py:L351-L358" },
+          { text: "请输入标题，例如：The Peak 一居室 / 钻石岛河景两房", source: "v2/qiaolian_publisher_v2/messages.py:L24-L25" },
+          { text: "请输入价格，例如：650 或 $650", source: "v2/qiaolian_publisher_v2/messages.py:L25-L26" },
+          { text: "请输入小区/楼盘名称，没有可回复 -", source: "v2/qiaolian_publisher_v2/messages.py:L26-L27" },
+          { text: "请输入户型，例如：1房1厅1卫。没有可点跳过。", source: "v2/qiaolian_publisher_v2/messages.py:L27-L28" },
+          { text: "请输入面积，例如：52㎡。没有可点跳过。", source: "v2/qiaolian_publisher_v2/messages.py:L28-L29" },
+          { text: "请输入标签，多个用逗号分隔，例如：拎包入住,泳池,健身房。没有可点跳过。", source: "v2/qiaolian_publisher_v2/messages.py:L29-L30" },
+          { text: "请输入亮点，例如：河景、高楼层、家具全。没有可点跳过。", source: "v2/qiaolian_publisher_v2/messages.py:L30-L31" },
+          { text: "请输入费用说明，例如：押1付1，水电网自理。没有可点跳过。", source: "v2/qiaolian_publisher_v2/messages.py:L31-L32" },
+          { text: "请输入顾问提醒/缺点，例如：晚上会稍微热闹，没有可点跳过。", source: "v2/qiaolian_publisher_v2/messages.py:L32-L33" },
+          { text: "请输入押金规则，例如：押1付1。没有可点跳过。", source: "v2/qiaolian_publisher_v2/messages.py:L33-L34" },
+          { text: "请输入可入住时间，例如：随时入住 / 5月1日。没有可点跳过。", source: "v2/qiaolian_publisher_v2/messages.py:L34-L35" },
+        ],
+      },
+      {
+        key: "fallback",
+        title: "6. Fallback / Error Messages",
+        note: "异常、空状态、失败提示、确认对话",
+        items: [
+          { text: "📅 目前还没有预约记录。点频道里的“预约看房”，我们就会帮您跟进。", source: "qiaolian_dual/user_bot.py:L207-L210" },
+          { text: "可以直接点菜单，也可以直接发：预算、区域、户型、入住时间。", source: "qiaolian_dual/user_bot.py:L483-L487" },
+          { text: "✅ 已记录需求。当前先没有现成匹配结果，顾问会按实拍房源继续帮您筛。", source: "qiaolian_dual/user_bot.py:L543-L548" },
+          { text: "❌ 已取消当前操作。", source: "qiaolian_dual/user_bot.py:L696-L700" },
+          { text: "❌ CHANNEL_ID 未配置", source: "v2/qiaolian_publisher_v2/bot.py:L379-L383" },
+          { text: "已取消当前发布流程。", source: "v2/qiaolian_publisher_v2/bot.py:L436-L441" },
+          { text: "已跳过媒体。", source: "v2/qiaolian_publisher_v2/bot.py:L443-L452" },
+          { text: "请发送图片或视频，或者输入 /skipmedia 跳过。", source: "v2/qiaolian_publisher_v2/bot.py:L575-L585" },
+          { text: "❌ CHANNEL_ID 未配置，无法发频道。", source: "v2/qiaolian_publisher_v2/bot.py:L667-L668" },
+          { text: "❌ 发布失败：{e}", source: "v2/qiaolian_publisher_v2/bot.py:L790-L793" },
+          { text: "⚠️ 预览生成失败：{e}", source: "v2/qiaolian_publisher_v2/bot.py:L815-L821" },
+          { text: "草稿已不存在。", source: "autopilot_publish_bot.py:L622-L622" },
+          { text: "❌ 发布失败", source: "autopilot_publish_bot.py:L636-L640" },
+          { text: "🗑 已丢弃", source: "autopilot_publish_bot.py:L651-L662" },
+          { text: "🖼 封面已重算", source: "autopilot_publish_bot.py:L673-L673" },
+          { text: "⚠️ 封面失败", source: "autopilot_publish_bot.py:L673-L673" },
+          { text: "用法：/send DRF_xxx", source: "autopilot_publish_bot.py:L386-L386" },
+          { text: "用法：/daily_time 08:00", source: "autopilot_publish_bot.py:L437-L437" },
+          { text: "编号不存在，先 /tpl 查看。", source: "autopilot_publish_bot.py:L480-L488" },
+          { text: "请直接回复一句「修正说明」（将写入备注）。", source: "autopilot_publish_bot.py:L680-L680" },
+          { text: "PUBLISHER_BOT_TOKEN 未配置", source: "post_pinned.py:L58-L60" },
+          { text: "置顶失败（可能需要管理员权限）", source: "post_pinned.py:L76-L84" },
+          { text: "房源不存在", source: "v2_admin/admin_server.py:L129-L170" },
+          { text: "未找到已发布帖子", source: "v2_admin/admin_server.py:L233-L260" },
+          { text: "请输入新价格", source: "v2_admin/admin_server.py:L276-L281" },
+          { text: "只能删除草稿状态的房源", source: "v2_admin/admin_server.py:L289-L297" },
+          { text: "确认删除草稿？", source: "v2_admin/templates/index.html:L57-L60" },
+          { text: "标记已租出？", source: "v2_admin/templates/index.html:L68-L71" },
+          { text: "确认下架？", source: "v2_admin/templates/index.html:L72-L75" },
+          { text: "还没有房源，点右上角「＋ 新建房源」开始", source: "v2_admin/templates/index.html:L94-L97" },
+          { text: "确认删除这张图片？", source: "v2_admin/templates/listing_form.html:L269-L279" },
+          { text: "未配置 CHANNEL_ID。使用 /tpl_test here 仅在当前聊天预览各模版。", source: "autopilot_publish_bot.py:L499-L499" },
+        ],
+      },
+      {
+        key: "admin",
+        title: "7. Admin Interface Text",
+        note: "后台页面、菜单、命令说明、提示词",
+        items: [
+          { text: "手搓发帖：点「新建房源」或发 /new，按向导填完预览后发布。", source: "v2/qiaolian_publisher_v2/messages.py:L2-L6" },
+          { text: "采集流水线：草稿在库里后可用调度命令（管理员）：", source: "v2/qiaolian_publisher_v2/messages.py:L5-L14" },
+          { text: "/pending — 预览 pending+封面", source: "v2/qiaolian_publisher_v2/messages.py:L6-L14" },
+          { text: "/send DRF_xxx — 立即发一条", source: "v2/qiaolian_publisher_v2/messages.py:L7-L14" },
+          { text: "/slots — 查看或改定时槽（金边时区）", source: "v2/qiaolian_publisher_v2/messages.py:L8-L14" },
+          { text: "/pause /resume — 暂停或恢复定时 ready 发帖", source: "v2/qiaolian_publisher_v2/messages.py:L9-L14" },
+          { text: "/stats — 统计", source: "v2/qiaolian_publisher_v2/messages.py:L10-L14" },
+          { text: "/post_menu — 频道置顶四键", source: "v2/qiaolian_publisher_v2/messages.py:L11-L14" },
+          { text: "/daily、/tpl — 每日固定广播", source: "v2/qiaolian_publisher_v2/messages.py:L12-L14" },
+          { text: "/help — 调度说明", source: "v2/qiaolian_publisher_v2/messages.py:L13-L14" },
+          { text: "发帖引擎仍是后台 meihua_publisher，本 Bot 负责录入与触发。", source: "v2/qiaolian_publisher_v2/messages.py:L14-L15" },
+          { text: "➕ 新建房源\\n先发 1 张封面图或 1 个视频。也可以直接输入 /skipmedia 跳过媒体，先发纯文字帖。", source: "v2/qiaolian_publisher_v2/messages.py:L17-L22" },
+          { text: "BASIC · 基本信息", source: "v2_admin/templates/listing_form.html:L32-L40" },
+          { text: "PRICE & LAYOUT · 价格户型", source: "v2_admin/templates/listing_form.html:L66-L95" },
+          { text: "TAGS & HIGHLIGHTS · 标签亮点", source: "v2_admin/templates/listing_form.html:L99-L118" },
+          { text: "ADVISOR · 顾问详情（频道按钮消息内容）", source: "v2_admin/templates/listing_form.html:L121-L140" },
+          { text: "IMAGES · 房源图片（3-5 张，第一张为封面）", source: "v2_admin/templates/listing_form.html:L142-L169" },
+          { text: "PREVIEW · 频道预览", source: "v2_admin/templates/listing_form.html:L180-L198" },
+          { text: "第一张图 Caption", source: "v2_admin/templates/listing_form.html:L182-L187" },
+          { text: "按钮消息 + 引流按钮", source: "v2_admin/templates/listing_form.html:L189-L198" },
+          { text: "ALL LISTINGS · 全部房源", source: "v2_admin/templates/index.html:L4-L8" },
+          { text: "房源列表 · 侨联发布后台", source: "v2_admin/templates/index.html:L1-L3" },
+          { text: "侨联地产 · 频道发布后台", source: "v2_admin/templates/base.html:L1-L6" },
+          { text: "CHANNEL PUBLISHER · 频道发布后台", source: "v2_admin/templates/base.html:L186-L194" },
+          { text: "侨联地产", source: "v2_admin/templates/base.html:L186-L194" },
+          { text: "房源列表", source: "v2_admin/templates/base.html:L192-L195" },
+          { text: "＋ 新建房源", source: "v2_admin/templates/base.html:L192-L195" },
+          { text: "✅ 房源 {lid} 已保存为草稿", source: "v2_admin/admin_server.py:L109-L121" },
+          { text: "✅ 房源 {lid} 已更新", source: "v2_admin/admin_server.py:L136-L161" },
+          { text: "🟢 房源 {lid} 已发布到频道", source: "v2_admin/admin_server.py:L166-L191" },
+          { text: "🔄 房源 {lid} 已重发", source: "v2_admin/admin_server.py:L196-L221" },
+          { text: "🔴 房源 {lid} 已下架", source: "v2_admin/admin_server.py:L226-L246" },
+          { text: "🔵 房源 {lid} 已标记为已租出", source: "v2_admin/admin_server.py:L251-L271" },
+          { text: "💰 房源 {lid} 价格已更新为 {new_price}（帖子未变动，如需同步请重发）", source: "v2_admin/admin_server.py:L276-L284" },
+          { text: "🗑 草稿 {lid} 已删除", source: "v2_admin/admin_server.py:L287-L303" },
+          { text: "侨联发布后台启动，访问 http://0.0.0.0:{port}", source: "v2_admin/admin_server.py:L336-L340" },
+          { text: "正在生成 4 款封面并发送到频道...", source: "v2/qiaolian_publisher_v2/bot.py:L401-L425" },
+          { text: "🎨 封面模板测试：{name}", source: "v2/qiaolian_publisher_v2/bot.py:L413-L419" },
+          { text: "风格代码：{style}", source: "v2/qiaolian_publisher_v2/bot.py:L413-L419" },
+          { text: "✅ 4 款封面测试已发送到频道，请查看对比效果。", source: "v2/qiaolian_publisher_v2/bot.py:L423-L425" },
+          { text: "📋 发布预览（频道先发长文，再发封面图+按钮）", source: "v2/qiaolian_publisher_v2/formatters.py:L206-L208" },
+          { text: "经典蓝卡", source: "v2/qiaolian_publisher_v2/bot.py:L394-L399" },
+          { text: "极简白条", source: "v2/qiaolian_publisher_v2/bot.py:L394-L399" },
+          { text: "右侧价签", source: "v2/qiaolian_publisher_v2/bot.py:L394-L399" },
+          { text: "竖版视频(9:16)", source: "v2/qiaolian_publisher_v2/bot.py:L394-L399" },
+          { text: "主菜单与功能总览", source: "v2/qiaolian_publisher_v2/bot.py:L849-L866" },
+          { text: "手搓发帖：图/视频→填表→发频道", source: "v2/qiaolian_publisher_v2/bot.py:L849-L866" },
+          { text: "拉取库里待预览草稿（带按钮）", source: "v2/qiaolian_publisher_v2/bot.py:L849-L866" },
+          { text: "立刻发帖：/send DRF_xxx", source: "v2/qiaolian_publisher_v2/bot.py:L849-L866" },
+          { text: "定时发帖时刻：/slots 或 /slots 9:00,12:00", source: "v2/qiaolian_publisher_v2/bot.py:L849-L866" },
+          { text: "草稿数量统计与定时器是否在跑", source: "v2/qiaolian_publisher_v2/bot.py:L849-L866" },
+          { text: "暂停：到点不再从 ready 发帖", source: "v2/qiaolian_publisher_v2/bot.py:L849-L866" },
+          { text: "恢复：按 slots 定时发 ready", source: "v2/qiaolian_publisher_v2/bot.py:L849-L866" },
+          { text: "频道发置顶帖（四按钮）并尝试置顶", source: "v2/qiaolian_publisher_v2/bot.py:L859-L860" },
+          { text: "每日固定广播：/daily 看状态与说明", source: "v2/qiaolian_publisher_v2/bot.py:L860-L860" },
+          { text: "先执行：下一条消息=置顶帖 HTML", source: "v2/qiaolian_publisher_v2/bot.py:L861-L861" },
+          { text: "每日广播文案模版列表", source: "v2/qiaolian_publisher_v2/bot.py:L862-L863" },
+          { text: "测各模版：/tpl_test 发频道，here 仅私聊", source: "v2/qiaolian_publisher_v2/bot.py:L863-L864" },
+          { text: "测试4款封面模板（纯设计背景，无需原图）", source: "v2/qiaolian_publisher_v2/bot.py:L864-L865" },
+          { text: "所有命令与参数详解", source: "v2/qiaolian_publisher_v2/bot.py:L865-L866" },
+          { text: "退出当前发帖向导", source: "v2/qiaolian_publisher_v2/bot.py:L866-L866" },
+          { text: "🚪 退出当前发帖向导", source: "autopilot_publish_bot.py:L297-L299" },
+          { text: "每日广播模版", source: "autopilot_publish_bot.py:L470-L470" },
+          { text: "频道置顶菜单", source: "autopilot_publish_bot.py:L296-L298" },
+          { text: "简短说明", source: "autopilot_publish_bot.py:L299-L299" },
+        ],
+      },
+      {
+        key: "cover",
+        title: "8. Cover Image Text",
+        note: "封面图、品牌条、信息卡、样式名",
+        items: [
+          { text: "侨联地产", source: "cover_generator.py:L339-L339" },
+          { text: "💰 ${price}/月", source: "cover_generator.py:L381-L383" },
+          { text: "侨联地产 · 实拍房源", source: "cover_generator.py:L399-L403" },
+          { text: "面积 | 楼层 | 区域", source: "cover_generator.py:L366-L370" },
+          { text: "价格待确认", source: "cover_generator.py:L443-L451" },
+          { text: "金边 · 整租", source: "cover_generator.py:L453-L455" },
+          { text: "可咨询确认", source: "meihua_publisher.py:L556-L563" },
+          { text: "侨联地产", source: "cover_generator.py:L473-L476" },
+          { text: "价格 / 区域 · 房型", source: "cover_generator.py:L478-L490" },
+          { text: "可选一句亮点", source: "cover_generator.py:L478-L490" },
+          { text: "侨联地产", source: "v2_admin/house_cover_v2.py:L160-L160" },
+          { text: "$680/月", source: "v2_admin/house_cover_v2.py:L171-L175" },
+          { text: "$1200/月", source: "v2_admin/house_cover_v2.py:L269-L273" },
+          { text: "$480/月", source: "v2_admin/house_cover_v2.py:L313-L319" },
+          { text: "$900/月", source: "v2_admin/house_cover_v2.py:L358-L363" },
+          { text: "BKK1", source: "v2_admin/house_cover_v2.py:L169-L174" },
+          { text: "钻石岛", source: "v2_admin/house_cover_v2.py:L267-L274" },
+          { text: "太子幸福", source: "v2_admin/house_cover_v2.py:L313-L319" },
+          { text: "富力城", source: "v2_admin/house_cover_v2.py:L358-L363" },
+          { text: "单间", source: "v2_admin/house_cover_v2.py:L313-L319" },
+          { text: "1房1卫", source: "v2_admin/house_cover_v2.py:L358-L363" },
+          { text: "2房2卫", source: "v2_admin/house_cover_v2.py:L267-L274" },
+          { text: "高层景观", source: "v2_admin/house_cover_v2.py:L275-L280" },
+          { text: "家具齐全", source: "v2_admin/house_cover_v2.py:L275-L280" },
+          { text: "拎包入住", source: "v2_admin/house_cover_v2.py:L275-L280" },
+          { text: "采光好", source: "v2_admin/house_cover_v2.py:L323-L326" },
+          { text: "近商场", source: "v2_admin/house_cover_v2.py:L323-L326" },
+          { text: "安静", source: "v2_admin/house_cover_v2.py:L323-L326" },
+          { text: "经典蓝卡", source: "v2_admin/house_cover_v2.py:L166-L200" },
+          { text: "极简白条", source: "v2_admin/house_cover_v2.py:L264-L305" },
+          { text: "右侧价签", source: "v2_admin/house_cover_v2.py:L310-L349" },
+          { text: "竖版视频", source: "v2_admin/house_cover_v2.py:L355-L393" },
+        ],
+      },
+      {
+        key: "cta",
+        title: "9. Channel CTA Prompts",
+        note: "频道按钮、引流提示、置顶菜单入口",
+        items: [
+          { text: "👇 <b>喜欢这套就直接点下面按钮</b>", source: "v2/qiaolian_publisher_v2/formatters.py:L79-L80" },
+          { text: "咨询房源\\n👉 @QiaolianHouseBot", source: "meihua_publisher.py:L61-L64" },
+          { text: "🏠 租房   🏡 买房   ▶ 视频看房", source: "meihua_publisher.py:L55-L56" },
+          { text: "金边华人租房 / 买房 / 视频看房", source: "meihua_publisher.py:L55-L56" },
+          { text: "品牌故事", source: "autopilot_publish_bot.py:L233-L244" },
+          { text: "介绍侨联", source: "autopilot_publish_bot.py:L233-L244" },
+          { text: "预约想住", source: "autopilot_publish_bot.py:L233-L244" },
+          { text: "咨询", source: "autopilot_publish_bot.py:L233-L244" },
+          { text: "下方四个按钮：品牌故事、介绍侨联、预约想住、咨询", source: "autopilot_publish_bot.py:L263-L267" },
+          { text: "进入 {BRAND_NAME} 频道", source: "autopilot_publish_bot.py:L248-L253" },
+          { text: "点击按钮联系侨联顾问", source: "v2_admin/publisher.py:L97-L99" },
+          { text: "频道置顶四键", source: "v2/qiaolian_publisher_v2/messages.py:L11-L14" },
+          { text: "频道发置顶菜单帖（四按钮）并尝试置顶", source: "v2/qiaolian_publisher_v2/bot.py:L859-L860" },
+          { text: "品牌故事、介绍侨联、预约想住、咨询", source: "autopilot_publish_bot.py:L263-L267" },
+          { text: "@QiaolianHouseBot", source: "meihua_publisher.py:L63-L64" },
+        ],
+      },
+    ];
+
+    const batches = [
+      {
+        key: "bot_a",
+        title: "第一批 · Bot A 留资",
+        note: "欢迎语、咨询、预约、找房、fallback",
+        cats: ["greeting", "conversation", "booking", "fallback"],
+      },
+      {
+        key: "channel",
+        title: "第二批 · 频道发布",
+        note: "主帖模板、按钮、CTA、封面图文案",
+        cats: ["listing", "buttons", "cover", "cta"],
+      },
+      {
+        key: "admin",
+        title: "第三批 · 后台与运维",
+        note: "管理后台、发布向导、系统提示",
+        cats: ["admin"],
+      },
+    ];
+
+    const state = structuredClone(inventory);
+    let currentBatch = batches[0].key;
+
+    function escapeHtml(s) {
+      return String(s)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function getBatch() {
+      return batches.find((b) => b.key === currentBatch) || batches[0];
+    }
+
+    function getVisibleCats() {
+      const batch = getBatch();
+      const wanted = new Set(batch.cats);
+      return state.filter((cat) => wanted.has(cat.key));
+    }
+
+    function renderBatchNav() {
+      const root = document.getElementById("batchNav");
+      const meta = document.getElementById("batchMeta");
+      if (!root || !meta) return;
+      root.innerHTML = "";
+      batches.forEach((batch) => {
+        const btn = document.createElement("button");
+        btn.className = `batch-btn${batch.key === currentBatch ? " active" : ""}`;
+        btn.textContent = batch.title;
+        btn.title = batch.note;
+        btn.onclick = () => {
+          currentBatch = batch.key;
+          render();
+        };
+        root.appendChild(btn);
+      });
+      const batch = getBatch();
+      const visible = getVisibleCats();
+      meta.innerHTML = `<b>${escapeHtml(batch.title)}</b><br/>${escapeHtml(batch.note)} · 当前显示 ${visible.length} 个分类，修改后导出也只包含这一批。`;
+    }
+
+    function render() {
+      const root = document.getElementById("categories");
+      root.innerHTML = "";
+      renderBatchNav();
+      for (const cat of getVisibleCats()) {
+        const el = document.createElement("div");
+        el.className = "cat";
+        el.innerHTML = `
+          <div class="cat-hd">
+            <div>
+              <strong>${escapeHtml(cat.title)}</strong><br/>
+              <span>${escapeHtml(cat.note)}</span>
+            </div>
+            <div class="tag info">${cat.items.length} 条</div>
+          </div>
+        `;
+        cat.items.forEach((item, idx) => {
+          const itemEl = document.createElement("div");
+          itemEl.className = "item";
+          itemEl.innerHTML = `
+            <div class="item-grid">
+              <div>
+                <div class="item-name">${escapeHtml(item.text)}</div>
+                <div class="source">source: ${escapeHtml(item.source)}</div>
+                <textarea data-cat="${cat.key}" data-idx="${idx}">${escapeHtml(item.text)}</textarea>
+              </div>
+              <div class="mini">
+                <div class="box"><b>分类</b><br/>${escapeHtml(cat.title)}</div>
+                <div class="box"><b>来源</b><br/>${escapeHtml(item.source)}</div>
+              </div>
+            </div>
+          `;
+          el.appendChild(itemEl);
+        });
+        root.appendChild(el);
+      }
+
+      document.querySelectorAll("textarea[data-cat]").forEach((ta) => {
+        ta.addEventListener("input", (ev) => {
+          const cat = state.find((c) => c.key === ev.target.dataset.cat);
+          if (!cat) return;
+          const item = cat.items[Number(ev.target.dataset.idx)];
+          if (!item) return;
+          item.text = ev.target.value;
+          updateExports();
+        });
+      });
+      updateExports();
+    }
+
+    function updateExports() {
+      const batch = getBatch();
+      const visible = getVisibleCats();
+      const md = [
+        "# Copy Inventory",
+        "",
+        `> 当前批次：${batch.title}`,
+        `> ${batch.note}`,
+        "",
+        "> 说明：同一文案在不同文件里可能重复出现，本清单按“可见文本”收录，方便后续统一改稿。",
+        "",
+      ];
+      for (const cat of visible) {
+        md.push(`## ${cat.title}`, "");
+        for (const item of cat.items) {
+          md.push(`- \`${item.text.replaceAll("`", "\\`")}\``, `  - source: \`${item.source}\``);
+        }
+        md.push("");
+      }
+      document.getElementById("markdownOut").value = md.join("\n").trim() + "\n";
+      document.getElementById("jsonOut").value = JSON.stringify(
+        {
+          batch: { key: batch.key, title: batch.title, note: batch.note },
+          categories: visible,
+        },
+        null,
+        2
+      );
+    }
+
+    let toastTimer = null;
+    function toast(msg, type = "ok") {
+      const el = document.getElementById("toast");
+      if (!el) return;
+      el.textContent = msg;
+      el.style.borderColor =
+        type === "err" ? "rgba(255,125,125,.45)" :
+        type === "warn" ? "rgba(240,198,107,.45)" :
+        "rgba(121,211,155,.45)";
+      el.style.opacity = "1";
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { el.style.opacity = "0"; }, 1400);
+    }
+
+    async function copyText(text) {
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+          return true;
+        }
+      } catch (_) {}
+
+      // Fallback for file:// and older browsers
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.top = "-1000px";
+        ta.style.left = "-1000px";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        ta.setSelectionRange(0, ta.value.length);
+        const ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+        return ok;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    async function copyMarkdown() {
+      const ok = await copyText(document.getElementById("markdownOut").value);
+      toast(ok ? "Markdown 已复制" : "复制失败：请手动全选复制", ok ? "ok" : "err");
+    }
+    async function copyJSON() {
+      const ok = await copyText(document.getElementById("jsonOut").value);
+      toast(ok ? "JSON 已复制" : "复制失败：请手动全选复制", ok ? "ok" : "err");
+    }
+    function resetAll() {
+      location.reload();
+    }
+
+    render();
+  </script>
+</body>
+</html>

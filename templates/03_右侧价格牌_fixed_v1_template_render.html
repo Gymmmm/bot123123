@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>模板3-右侧价格牌</title>
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 1600px;
+        height: 1200px;
+        overflow: hidden;
+        background: #0b2048;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+        color: #fff;
+      }
+      .poster {
+        position: relative;
+        width: 1600px;
+        height: 1200px;
+        overflow: hidden;
+        border-radius: 24px;
+        background: #0b2048;
+      }
+      .bg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      .leftShade {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 62%;
+        background: linear-gradient(
+          90deg,
+          rgba(5, 12, 26, 0.94) 0%,
+          rgba(7, 16, 32, 0.84) 24%,
+          rgba(9, 20, 40, 0.6) 50%,
+          rgba(10, 22, 42, 0.2) 76%,
+          rgba(10, 22, 42, 0) 100%
+        );
+      }
+      .brand {
+        position: absolute;
+        left: 34px;
+        top: 34px;
+        background: rgba(10, 22, 42, 0.42);
+        backdrop-filter: blur(4px);
+        border: 1px solid rgba(203, 219, 243, 0.25);
+        border-radius: 14px;
+        padding: 10px 14px;
+        text-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+      }
+      .brand .cn {
+        font-size: 58px;
+        font-weight: 820;
+      }
+      .brand .en {
+        font-size: 20px;
+        opacity: 0.9;
+      }
+      .main {
+        position: absolute;
+        left: 34px;
+        top: 310px;
+        width: 700px;
+      }
+      .ref {
+        display: inline-block;
+        font-size: 34px;
+        font-weight: 800;
+        color: rgba(230, 241, 255, 0.95);
+        background: rgba(8, 18, 36, 0.44);
+        border: 1px solid rgba(185, 205, 236, 0.35);
+        border-radius: 12px;
+        padding: 6px 12px;
+        margin-bottom: 12px;
+      }
+      .title {
+        font-size: 84px;
+        font-weight: 900;
+        line-height: 1.06;
+        text-shadow: 0 4px 14px rgba(0, 0, 0, 0.34);
+        max-height: 186px;
+        overflow: hidden;
+      }
+      .sub {
+        display: inline-block;
+        background: rgba(255, 255, 255, 0.95);
+        color: #1147b2;
+        font-size: 52px;
+        font-weight: 900;
+        border-radius: 999px;
+        padding: 14px 28px;
+        margin-top: 18px;
+      }
+      .info {
+        margin-top: 28px;
+        font-size: 32px;
+        font-weight: 700;
+        line-height: 1.75;
+      }
+      .info .row {
+        display: block;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .pricebox {
+        position: absolute;
+        right: 36px;
+        bottom: 120px;
+        background: rgba(255, 248, 240, 0.97);
+        color: #1147b2;
+        border-radius: 28px;
+        padding: 22px 34px 26px;
+        min-width: 360px;
+        text-align: center;
+        box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+      }
+      .pricebox .label {
+        font-size: 26px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        opacity: 0.75;
+        margin-bottom: 4px;
+      }
+      .pricebox .price {
+        font-size: 86px;
+        font-weight: 900;
+        line-height: 1;
+        letter-spacing: -0.02em;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="poster">
+      <img id="bg" class="bg" src="{{BG_SRC}}" alt="" />
+      <div class="leftShade"></div>
+      <div class="brand">
+        <div class="cn">侨联地产</div>
+        <div class="en">QIAO LIAN PROPERTY</div>
+      </div>
+      <div class="main">
+        <div class="ref" id="ref-line">{{REF}} 编号</div>
+        <div class="title"><span id="t1">{{PROJECT}}</span></div>
+        <div class="sub" id="t2">{{LAYOUT}}</div>
+        <div class="info">
+          <div class="row" id="row-area">📍 <span id="t3">{{AREA}}</span></div>
+          <div class="row" id="row-meta">📐 <span id="t4">{{SIZE}}</span> ｜ 🏢 <span id="t5">{{FLOOR}}</span></div>
+          <div class="row" id="row-hi">✨ <span id="t7">{{H1}}</span> / <span id="t8">{{H2}}</span> / <span id="t9">{{H3}}</span></div>
+        </div>
+      </div>
+      <div class="pricebox">
+        <div class="label">租金</div>
+        <div class="price" id="t6">{{PRICE_LINE}}</div>
+      </div>
+    </div>
+    <script>
+      function txt(id){const el=document.getElementById(id);return (el?String(el.textContent||''):'').trim();}
+      function bad(v){const s=String(v||'').trim();const low=s.toLowerCase();return !s||s==='-'||s==='—'||s==='--'||low==='n/a'||low==='na'||s.includes('可咨询')||s==='金边';}
+      function hide(id){const el=document.getElementById(id);if(el)el.style.display='none';}
+
+      const area=txt('t3');
+      const size=txt('t4');
+      const floor=txt('t5');
+      if (bad(area)) hide('row-area');
+
+      if (bad(size) && bad(floor)) {
+        hide('row-meta');
+      } else if (bad(size)) {
+        const el=document.getElementById('row-meta');
+        if(el) el.textContent='🏢 '+floor;
+      } else if (bad(floor)) {
+        const el=document.getElementById('row-meta');
+        if(el) el.textContent='📐 '+size;
+      }
+
+      const hs=[txt('t7'),txt('t8'),txt('t9')].filter(v=>!bad(v));
+      if(!hs.length){
+        hide('row-hi');
+      }else{
+        const el=document.getElementById('row-hi');
+        if(el) el.textContent='✨ '+hs.join(' / ');
+      }
+
+      const refText = txt('ref-line');
+      if (!refText || refText.includes('QC0000')) hide('ref-line');
+    </script>
+  </body>
+</html>

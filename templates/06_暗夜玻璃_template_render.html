@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>模板6-暗夜玻璃（导出渲染）</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: #020617;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei",
+          "Noto Sans CJK SC", "Noto Sans CJK JP", sans-serif;
+      }
+      .poster {
+        position: relative;
+        width: 1600px;
+        height: 1200px;
+        overflow: hidden;
+        border-radius: 24px;
+        background: #020617;
+      }
+      .bg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      .overlay {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(110deg, rgba(2, 6, 23, 0.84) 0%, rgba(2, 6, 23, 0.25) 55%, rgba(2, 6, 23, 0.7) 100%);
+      }
+      .brand {
+        position: absolute;
+        left: 46px;
+        top: 42px;
+        color: #dbeafe;
+      }
+      .brand-inner {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 12px;
+      }
+      .logo {
+        width: 68px;
+        height: 68px;
+        flex: 0 0 68px;
+      }
+      .brand-text {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .brand .cn {
+        font-size: 54px;
+        font-weight: 800;
+      }
+      .brand .en {
+        font-size: 20px;
+        letter-spacing: 1px;
+        opacity: 0.9;
+      }
+      .left {
+        position: absolute;
+        left: 52px;
+        top: 220px;
+        width: 900px;
+        color: #f8fafc;
+      }
+      .title {
+        font-size: 98px;
+        font-weight: 900;
+        line-height: 1.06;
+        text-shadow: 0 12px 30px rgba(2, 6, 23, 0.45);
+        max-height: 220px;
+        overflow: hidden;
+      }
+      .layout {
+        margin-top: 16px;
+        display: inline-block;
+        font-size: 54px;
+        font-weight: 900;
+        color: #082f7a;
+        background: rgba(255, 255, 255, 0.94);
+        border-radius: 999px;
+        padding: 10px 24px;
+      }
+      .meta {
+        margin-top: 24px;
+        font-size: 34px;
+        font-weight: 700;
+        line-height: 1.8;
+      }
+      .chips {
+        margin-top: 28px;
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .chip {
+        background: rgba(15, 23, 42, 0.62);
+        border: 1px solid rgba(191, 219, 254, 0.35);
+        border-radius: 14px;
+        color: #eff6ff;
+        padding: 10px 16px;
+        font-size: 24px;
+        font-weight: 700;
+      }
+      .price {
+        position: absolute;
+        right: 56px;
+        bottom: 70px;
+        color: #fff;
+        background: linear-gradient(135deg, rgba(17, 71, 178, 0.95), rgba(8, 47, 122, 0.92));
+        border-radius: 24px;
+        min-width: 360px;
+        text-align: center;
+        padding: 18px 20px 24px;
+        box-shadow: 0 14px 36px rgba(2, 6, 23, 0.45);
+      }
+      .price .label {
+        font-size: 28px;
+        opacity: 0.92;
+      }
+      .price .value {
+        margin-top: 6px;
+        font-size: 88px;
+        font-weight: 900;
+        line-height: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="poster">
+      <img class="bg" src="{{BG_SRC}}" alt="" />
+      <div class="overlay"></div>
+
+      <div class="brand">
+        <div class="brand-inner">
+          <svg class="logo" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M14 62L60 30L106 62" stroke="white" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M24 58V88H44V68H76V88H96V58" stroke="white" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M16 92C33 84 49 81 60 81C71 81 87 84 104 92" stroke="white" stroke-width="8" stroke-linecap="round" />
+          </svg>
+          <div class="brand-text">
+            <div class="cn">侨联地产</div>
+            <div class="en">QIAO LIAN PROPERTY</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="left">
+        <div class="title" id="t1">{{PROJECT}}</div>
+        <div class="layout" id="t2">{{LAYOUT}}</div>
+        <div class="meta">
+          <div id="row-area">📍 <span id="t3">{{AREA}}</span></div>
+          <div id="row-meta">📐 <span id="t4">{{SIZE}}</span> ｜ 🏢 <span id="t5">{{FLOOR}}</span></div>
+        </div>
+        <div class="chips" id="chips-row">
+          <div class="chip" id="chip1">{{H1}}</div>
+          <div class="chip" id="chip2">{{H2}}</div>
+          <div class="chip" id="chip3">{{H3}}</div>
+        </div>
+      </div>
+
+      <div class="price">
+        <div class="label">租金</div>
+        <div class="value">{{PRICE_LINE}}</div>
+      </div>
+    </div>
+    <script>
+      function txt(id){const el=document.getElementById(id);return (el?String(el.textContent||''):'').trim();}
+      function bad(v){const s=String(v||'').trim();const low=s.toLowerCase();return !s||s==='-'||s==='—'||s==='--'||low==='n/a'||low==='na'||s.includes('可咨询')||s==='金边';}
+      function hide(id){const el=document.getElementById(id);if(el)el.style.display='none';}
+
+      if(bad(txt('t1'))) hide('t1');
+      if(bad(txt('t2'))) hide('t2');
+
+      const area=txt('t3'),size=txt('t4'),floor=txt('t5');
+      if(bad(area)) hide('row-area');
+      if(bad(size)&&bad(floor)){
+        hide('row-meta');
+      }else if(bad(size)){
+        const el=document.getElementById('row-meta');
+        if(el) el.textContent='🏢 '+floor;
+      }else if(bad(floor)){
+        const el=document.getElementById('row-meta');
+        if(el) el.textContent='📐 '+size;
+      }
+
+      const hs=[txt('chip1'),txt('chip2'),txt('chip3')].filter(v=>!bad(v));
+      if(!hs.length){
+        hide('chips-row');
+      }else{
+        ['chip1','chip2','chip3'].forEach(id=>{if(bad(txt(id)))hide(id);});
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>侨联地产封面模板-同款</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #0f172a;
+    color: #fff;
+    padding: 20px;
+  }
+  .wrap {
+    max-width: 1500px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 20px;
+  }
+  .panel, .preview-wrap {
+    background: #111827;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 18px;
+    padding: 18px;
+  }
+  .panel {
+    position: sticky;
+    top: 20px;
+    height: fit-content;
+  }
+  h2 { font-size: 20px; margin-bottom: 14px; }
+  .field { margin-bottom: 12px; }
+  .field label {
+    display: block;
+    font-size: 13px;
+    color: #cbd5e1;
+    margin-bottom: 6px;
+  }
+  .field input {
+    width: 100%;
+    border: none;
+    outline: none;
+    border-radius: 10px;
+    background: #1f2937;
+    color: #fff;
+    padding: 12px;
+    font-size: 14px;
+  }
+  .dropzone {
+    border: 2px dashed rgba(255,255,255,.18);
+    border-radius: 14px;
+    padding: 18px;
+    text-align: center;
+    background: rgba(255,255,255,.03);
+    cursor: pointer;
+    transition: .2s;
+    margin-bottom: 12px;
+  }
+  .dropzone.dragover {
+    border-color: #60a5fa;
+    background: rgba(96,165,250,.08);
+  }
+  button {
+    width: 100%;
+    height: 44px;
+    border: none;
+    border-radius: 10px;
+    background: linear-gradient(135deg,#1d4ed8,#2563eb);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 8px;
+  }
+  .tips {
+    font-size: 12px;
+    line-height: 1.7;
+    color: #94a3b8;
+    margin-top: 10px;
+  }
+  .preview-wrap h3 {
+    font-size: 18px;
+    margin-bottom: 14px;
+  }
+  .poster-stage {
+    width: 100%;
+    overflow: auto;
+    border-radius: 14px;
+    background: #0b1220;
+    padding: 16px;
+  }
+  .poster {
+    position: relative;
+    width: 1600px;
+    height: 1200px;
+    background: #0b2048;
+    overflow: hidden;
+    border-radius: 24px;
+    transform: scale(.55);
+    transform-origin: top left;
+    box-shadow: 0 20px 60px rgba(0,0,0,.35);
+  }
+  .bg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .top-brand {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 540px;
+    height: 190px;
+    background: linear-gradient(135deg, rgba(10,47,122,.95), rgba(17,71,178,.78));
+    padding: 34px 34px 24px;
+  }
+  .brand-inner {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+  .logo {
+    width: 96px;
+    height: 96px;
+    flex: 0 0 96px;
+  }
+  .brand-cn {
+    font-size: 72px;
+    font-weight: 800;
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+  .brand-en {
+    font-size: 24px;
+    color: rgba(255,255,255,.92);
+    letter-spacing: 1.2px;
+  }
+  .bottom-card {
+    position: absolute;
+    left: 36px;
+    bottom: 34px;
+    width: 860px;
+    background: linear-gradient(135deg, rgba(17,71,178,.92), rgba(21,61,145,.86));
+    border-radius: 28px;
+    overflow: hidden;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 18px 36px rgba(0,0,0,.22);
+  }
+  .project-row {
+    padding: 26px 30px 12px;
+    font-size: 68px;
+    line-height: 1.08;
+    font-weight: 900;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .project-row .home-icon {
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+  }
+  .meta-row {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    padding: 10px 30px 18px;
+    font-weight: 800;
+  }
+  .meta-left {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    font-size: 38px;
+    color: #fff;
+    flex: 1;
+  }
+  .meta-left .sep {
+    opacity: .55;
+  }
+  .price {
+    font-size: 70px;
+    color: #f6c948;
+    font-weight: 900;
+    white-space: nowrap;
+  }
+  .price small {
+    font-size: 38px;
+    color: #fff;
+    margin-left: 4px;
+    font-weight: 800;
+  }
+  .highlights {
+    padding: 18px 30px 24px;
+    display: flex;
+    align-items: center;
+    gap: 26px;
+    border-top: 1px solid rgba(255,255,255,.08);
+    font-size: 28px;
+    font-weight: 700;
+    color: #fff;
+    white-space: nowrap;
+  }
+  .highlights .item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .highlights .icon {
+    font-size: 28px;
+    opacity: .95;
+  }
+  .preview-note {
+    margin-top: 12px;
+    font-size: 12px;
+    color: #94a3b8;
+  }
+  @media (max-width: 1100px) {
+    .wrap { grid-template-columns: 1fr; }
+    .panel { position: static; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="panel">
+    <h2>同款封面模板</h2>
+    <div class="field">
+      <label>项目名</label>
+      <input id="project" value="富力城">
+    </div>
+    <div class="field">
+      <label>户型</label>
+      <input id="layout" value="1房1卫">
+    </div>
+    <div class="field">
+      <label>面积</label>
+      <input id="size" value="45㎡">
+    </div>
+    <div class="field">
+      <label>楼层</label>
+      <input id="floor" value="8楼">
+    </div>
+    <div class="field">
+      <label>价格</label>
+      <input id="price" value="$680">
+    </div>
+    <div class="field">
+      <label>卖点1</label>
+      <input id="h1" value="家具基本全新">
+    </div>
+    <div class="field">
+      <label>卖点2</label>
+      <input id="h2" value="小区泳池">
+    </div>
+    <div class="field">
+      <label>卖点3</label>
+      <input id="h3" value="健身房">
+    </div>
+    <div class="dropzone" id="dropzone">
+      点击或拖拽上传背景图
+    </div>
+    <input id="fileInput" type="file" accept="image/*" style="display:none;">
+    <button id="updateBtn">更新预览</button>
+    <div class="tips">
+      这是你发的同款版式：<br>
+      左上品牌块 + 左下信息卡。<br>
+      图再大也会自动铺满，再压模板。
+    </div>
+  </div>
+
+  <div class="preview-wrap">
+    <h3>封面预览</h3>
+    <div class="poster-stage">
+      <div class="poster" id="poster">
+        <img class="bg" id="bgImage" src="https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?q=80&w=1800&auto=format&fit=crop" alt="背景图">
+        <div class="top-brand">
+          <div class="brand-inner">
+            <svg class="logo" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M14 62L60 30L106 62" stroke="white" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M24 58V88H44V68H76V88H96V58" stroke="white" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M16 92C33 84 49 81 60 81C71 81 87 84 104 92" stroke="white" stroke-width="8" stroke-linecap="round"/>
+            </svg>
+            <div>
+              <div class="brand-cn">侨联地产</div>
+              <div class="brand-en">QIAO LIAN PROPERTY</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bottom-card">
+          <div class="project-row">
+            <svg class="home-icon" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 3L3 10V21H9V14H15V21H21V10L12 3Z"/>
+            </svg>
+            <span id="projectText">富力城</span>
+            <span>·</span>
+            <span id="layoutText">1房1卫</span>
+          </div>
+
+          <div class="meta-row">
+            <div class="meta-left">
+              <span>🏠 <span id="sizeText">45㎡</span></span>
+              <span class="sep">|</span>
+              <span id="floorText">8楼</span>
+            </div>
+            <div class="price"><span id="priceText">$680</span><small>/月</small></div>
+          </div>
+
+          <div class="highlights">
+            <div class="item"><span class="icon">🛋️</span><span id="h1Text">家具基本全新</span></div>
+            <div class="item"><span class="icon">🏊</span><span id="h2Text">小区泳池</span></div>
+            <div class="item"><span class="icon">🏋️</span><span id="h3Text">健身房</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="preview-note">尺寸：1600×1200。风格同款，不改版式。</div>
+  </div>
+</div>
+
+<script>
+  const fileInput = document.getElementById("fileInput");
+  const dropzone = document.getElementById("dropzone");
+  const bgImage = document.getElementById("bgImage");
+
+  dropzone.addEventListener("click", () => fileInput.click());
+
+  dropzone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    dropzone.classList.add("dragover");
+  });
+
+  dropzone.addEventListener("dragleave", () => {
+    dropzone.classList.remove("dragover");
+  });
+
+  dropzone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dropzone.classList.remove("dragover");
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      bgImage.src = URL.createObjectURL(e.dataTransfer.files[0]);
+    }
+  });
+
+  fileInput.addEventListener("change", (e) => {
+    if (e.target.files && e.target.files[0]) {
+      bgImage.src = URL.createObjectURL(e.target.files[0]);
+    }
+  });
+
+  document.getElementById("updateBtn").addEventListener("click", () => {
+    document.getElementById("projectText").textContent = document.getElementById("project").value || "";
+    document.getElementById("layoutText").textContent = document.getElementById("layout").value || "";
+    document.getElementById("sizeText").textContent = document.getElementById("size").value || "";
+    document.getElementById("floorText").textContent = document.getElementById("floor").value || "";
+    document.getElementById("priceText").textContent = document.getElementById("price").value || "";
+    ["h1","h2","h3"].forEach(k => {
+      const val = (document.getElementById(k).value || "").trim();
+      const span = document.getElementById(k + "Text");
+      const item = span && span.closest(".item");
+      if (span) span.textContent = val;
+      if (item) item.style.display = val ? "" : "none";
+    });
+  });
+</script>
+</body>
+</html>

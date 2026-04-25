@@ -1,0 +1,281 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} · 侨联发布后台{% endblock %}
+
+{% block extra_head %}
+<style>
+.preview-box {
+  background: #1a1a1a; border: 1px solid var(--border); border-radius: 8px;
+  padding: 14px 16px; font-size: 13px; line-height: 1.85;
+  white-space: pre-wrap; color: var(--text); font-family: 'PingFang SC', sans-serif;
+  min-height: 120px;
+}
+.tg-btn-row {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px;
+}
+.tg-btn {
+  background: #1a2d42; border: 1px solid #2a4d72; border-radius: 6px;
+  padding: 6px 14px; color: #6cb4f5; font-size: 12px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+
+  <div class="sec-label">{{ title }}</div>
+
+  <div style="display:grid;grid-template-columns:1fr 380px;gap:20px;align-items:start">
+
+    <!-- 左：表单 -->
+    <form method="post" action="/{{ action }}" enctype="multipart/form-data">
+
+      <!-- 基本信息 -->
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-hdr"><span class="card-title">BASIC · 基本信息</span></div>
+        <div class="card-body">
+          <div class="form-grid cols3">
+            <div class="form-group">
+              <label>房源 ID（留空自动生成）</label>
+              <input type="text" name="listing_id" value="{{ listing.listing_id if listing else '' }}"
+                     placeholder="L250601001" {% if listing %}readonly{% endif %}>
+            </div>
+            <div class="form-group">
+              <label>房源类型 *</label>
+              <select name="type">
+                {% for t in ['公寓','别墅','商铺','办公室','独栋'] %}
+                  <option value="{{ t }}" {% if listing and listing.type == t %}selected{% endif %}>{{ t }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label>区域 * <span class="form-hint">（BKK1 / TSB / 7makara）</span></label>
+              <input type="text" name="area" value="{{ listing.area if listing else '' }}" placeholder="BKK1" required>
+            </div>
+            <div class="form-group">
+              <label>楼盘 / 小区名 *</label>
+              <input type="text" name="project" value="{{ listing.project if listing else '' }}" placeholder="The Peak" required>
+            </div>
+            <div class="form-group span2">
+              <label>标题（内部备注，不发到频道）</label>
+              <input type="text" name="title" value="{{ listing.title if listing else '' }}" placeholder="便于内部识别的标题">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 价格与户型 -->
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-hdr"><span class="card-title">PRICE & LAYOUT · 价格户型</span></div>
+        <div class="card-body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>月租价格 * <span class="form-hint">（含单位，如 $650）</span></label>
+              <input type="text" name="price" value="{{ listing.price if listing else '' }}" placeholder="$650" required>
+            </div>
+            <div class="form-group">
+              <label>面积</label>
+              <input type="text" name="size" value="{{ listing.size if listing else '' }}" placeholder="52㎡">
+            </div>
+            <div class="form-group">
+              <label>户型 *</label>
+              <input type="text" name="layout" value="{{ listing.layout if listing else '' }}" placeholder="1房1厅1卫" required>
+            </div>
+            <div class="form-group">
+              <label>押金方式</label>
+              <input type="text" name="deposit" value="{{ listing.deposit if listing else '' }}" placeholder="押1付1">
+            </div>
+            <div class="form-group">
+              <label>合同期限</label>
+              <input type="text" name="contract_term" value="{{ listing.contract_term if listing else '' }}" placeholder="6个月起租">
+            </div>
+            <div class="form-group">
+              <label>可入住时间</label>
+              <input type="text" name="available_date" value="{{ listing.available_date if listing else '' }}" placeholder="即可入住">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 标签与亮点 -->
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-hdr"><span class="card-title">TAGS & HIGHLIGHTS · 标签亮点</span></div>
+        <div class="card-body">
+          <div class="form-grid">
+            <div class="form-group span2">
+              <label>亮点（逗号分隔，最多 4 条，会显示在频道第一张图 caption）</label>
+              <input type="text" name="highlights"
+                     value="{{ listing.highlights if listing else '' }}"
+                     placeholder="拎包入住,泳池,健身房,24小时安保">
+              <span class="form-hint">示例：拎包入住,泳池,健身房,24小时安保</span>
+            </div>
+            <div class="form-group span2">
+              <label>标签（用于内部分类，逗号分隔）</label>
+              <input type="text" name="tags"
+                     value="{{ listing.tags if listing else '' }}"
+                     placeholder="豪华,拎包,低层">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 顾问详情 -->
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-hdr"><span class="card-title">ADVISOR · 顾问详情（频道按钮消息内容）</span></div>
+        <div class="card-body">
+          <div class="form-grid">
+            <div class="form-group span2">
+              <label>顾问点评（实地踩盘评价，显示在按钮消息）</label>
+              <textarea name="advisor_comment" rows="3" placeholder="这套我们亲自上过，52㎡格局方正，厨房独立，卧室带窗，采光比同楼层好一档...">{{ listing.advisor_comment if listing else '' }}</textarea>
+            </div>
+            <div class="form-group span2">
+              <label>缺点提醒（提前说清楚，诚实建立信任）</label>
+              <textarea name="drawbacks" rows="2" placeholder="高楼层停电时等梯稍久；周边餐饮尚在完善中">{{ listing.drawbacks if listing else '' }}</textarea>
+            </div>
+            <div class="form-group span2">
+              <label>费用说明（水电物业等）</label>
+              <textarea name="cost_notes" rows="2" placeholder="水电按实际用量，物业费 $50/月已含">{{ listing.cost_notes if listing else '' }}</textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 图片上传 -->
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-hdr"><span class="card-title">IMAGES · 房源图片（3-5 张，第一张为封面）</span></div>
+        <div class="card-body">
+          {% if listing and listing.images %}
+            <div style="margin-bottom:12px">
+              <label class="form-group" style="margin-bottom:6px"><span>当前图片（共 {{ listing.images|length }} 张）</span></label>
+              <div class="img-grid" id="imgGrid">
+                {% for img in listing.images %}
+                  <div class="img-thumb-wrap" data-idx="{{ loop.index0 }}">
+                    <img src="/uploads/{{ img | basename if '/' in img else img }}"
+                         onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2272%22 height=%2260%22><rect fill=%22%23222%22 width=%2272%22 height=%2260%22/><text x=%2236%22 y=%2234%22 text-anchor=%22middle%22 fill=%22%23555%22 font-size=%2211%22>图片</text></svg>'"
+                         class="img-thumb">
+                    <button type="button" class="img-del"
+                            onclick="removeImg({{ loop.index0 }}, '{{ listing.listing_id }}')">×</button>
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
+          <div class="form-group">
+            <label>上传新图片（JPG / PNG / WEBP，可多选）</label>
+            <input type="file" name="images" multiple accept="image/jpeg,image/png,image/webp"
+                   style="padding:6px">
+            <span class="form-hint">新图会追加到已有图片后面；封面始终取第一张</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:4px">
+        <button type="submit" class="btn btn-primary" style="padding:10px 28px;font-size:14px">
+          💾 保存房源
+        </button>
+        <a href="/" class="btn" style="padding:10px 18px">取消</a>
+      </div>
+
+    </form>
+
+    <!-- 右：实时预览 -->
+    <div style="position:sticky;top:70px">
+      <div class="sec-label">PREVIEW · 频道预览</div>
+      <div class="card">
+        <div class="card-hdr"><span class="card-title">第一张图 Caption</span></div>
+        <div class="card-body" style="padding:12px">
+          <div class="preview-box" id="captionPreview">填写左侧表单后自动更新</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-hdr"><span class="card-title">按钮消息 + 引流按钮</span></div>
+        <div class="card-body" style="padding:12px">
+          <div class="preview-box" id="detailPreview" style="min-height:80px"></div>
+          <div class="tg-btn-row">
+            <div class="tg-btn">💬 立即咨询</div>
+            <div class="tg-btn">📅 预约看房</div>
+            <div class="tg-btn">❤️ 收藏房源</div>
+            <div class="tg-btn">🏠 同区域更多</div>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.6">
+        📸 Media Group：上传 3-5 张图<br>
+        🔤 Caption 限制：第一张图附 1024 字符内<br>
+        📋 按钮消息：紧跟 Media Group 后发送<br>
+        🔗 按钮 deep-link：start=consult_&lt;ID&gt; 等
+      </div>
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// 实时预览
+const fields = ['type','area','project','price','layout','size','deposit','contract_term','available_date','highlights','advisor_comment','drawbacks','cost_notes'];
+fields.forEach(id => {
+  const el = document.querySelector(`[name="${id}"]`);
+  if (el) el.addEventListener('input', updatePreview);
+});
+
+function val(name) {
+  const el = document.querySelector(`[name="${name}"]`);
+  return el ? el.value.trim() : '';
+}
+
+function updatePreview() {
+  const type      = val('type') || '公寓';
+  const area      = val('area');
+  const project   = val('project');
+  const price     = val('price');
+  const layout    = val('layout');
+  const size      = val('size');
+  const deposit   = val('deposit');
+  const contract  = val('contract_term');
+  const available = val('available_date');
+  const hiRaw     = val('highlights');
+
+  const highlights = hiRaw ? hiRaw.split(',').map(s => s.trim()).filter(Boolean).slice(0,4) : [];
+  const hiStr = highlights.join(' / ');
+  const layoutSize = layout + (size ? '｜' + size : '');
+  const depositParts = [deposit, contract, available ? available + '可入住' : ''].filter(Boolean);
+
+  let cap = `🏠【${type}出租】${area} · ${project}\n`;
+  if (price)       cap += `💰 ${price}/月\n`;
+  if (layoutSize)  cap += `🛏 ${layoutSize}\n`;
+  if (hiStr)       cap += `✨ ${hiStr}\n`;
+  if (depositParts.length) cap += `📌 ${depositParts.join('，')}\n`;
+  cap += '侨联实拍，细节真实可核。';
+
+  document.getElementById('captionPreview').textContent = cap;
+
+  const advisor   = val('advisor_comment');
+  const drawbacks = val('drawbacks');
+  const costNotes = val('cost_notes');
+
+  let det = `📋 ${area} · ${project}　${price}/月\n`;
+  if (advisor)   det += `\n💬 顾问说\n${advisor}\n`;
+  if (drawbacks) det += `\n⚠️ 提前说清楚\n${drawbacks}\n`;
+  if (costNotes) det += `\n💵 费用说明\n${costNotes}\n`;
+  det += '\n👇 点击按钮联系侨联顾问';
+
+  document.getElementById('detailPreview').textContent = det;
+}
+
+updatePreview();
+
+// 删除单张图片
+function removeImg(idx, lid) {
+  if (!confirm('确认删除这张图片？')) return;
+  fetch('/api/remove_image/' + lid, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({index: idx})
+  }).then(r => r.json()).then(d => {
+    if (d.ok) location.reload();
+  });
+}
+</script>
+{% endblock %}

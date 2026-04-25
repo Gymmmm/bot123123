@@ -1,0 +1,16 @@
+# Telegram
+python-telegram-bot==21.*
+telethon>=1.36.0
+
+# AI 解析
+openai>=1.0.0
+
+# Notion 同步（可选）
+notion-client>=2.0.0
+
+# 图像处理
+Pillow>=10.0.0
+
+# 工具
+python-dotenv>=1.0.0
+requests>=2.31.0
