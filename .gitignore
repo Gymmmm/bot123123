@@ -1,0 +1,11 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+logs/
+tmp_preview/
+data/*.db
+data/*.json
+*.session
+qiaolian*.db
+test_qiaolian_dual_bot.db
