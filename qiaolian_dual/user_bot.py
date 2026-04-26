@@ -29,6 +29,7 @@ try:
         appointment_hub_text as copy_appointment_hub_text,
         advisor_text as copy_advisor_text,
         brand_text as copy_brand_text,
+        channel_welcome_text as copy_channel_welcome_text,
         deposit_text as copy_deposit_text,
         find_area_budget_hint_text,
         find_no_match_text,
@@ -53,6 +54,7 @@ except ImportError:  # pragma: no cover - script mode fallback
         appointment_hub_text as copy_appointment_hub_text,
         advisor_text as copy_advisor_text,
         brand_text as copy_brand_text,
+        channel_welcome_text as copy_channel_welcome_text,
         deposit_text as copy_deposit_text,
         find_area_budget_hint_text,
         find_no_match_text,
@@ -373,6 +375,11 @@ def old_tenant_followup_keyboard() -> InlineKeyboardMarkup:
 
 def welcome_text() -> str:
     return copy_home_text()
+
+
+def channel_welcome_text() -> str:
+    """频道新人欢迎语，首次 /start 且无深链参数时显示。"""
+    return copy_channel_welcome_text()
 
 
 def _channel_index_action(action: str) -> dict | None:
@@ -1917,8 +1924,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             reply_markup=_contract_actions_keyboard(user.id),
         )
         return MAIN
+    # 首次裸 /start（无深链参数）：展示频道新人引导欢迎语
     await update.effective_message.reply_text(
-        welcome_text(),
+        channel_welcome_text(),
         reply_markup=main_keyboard(),
         parse_mode=ParseMode.HTML,
     )
