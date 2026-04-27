@@ -75,10 +75,34 @@ CHANNEL_BTN_PROMPT = os.getenv(
 )
 # 讨论区首条引导（挂在自动转发帖的评论线程下）
 DISCUSSION_MORE_PROMPT = os.getenv("DISCUSSION_MORE_PROMPT", "点击查看更多图片 详情")
-# 频道已发长文时，讨论区补充组图首图说明（避免与频道正文整段重复）
+# 讨论区三段式：第一段 - 预约承接
+DISCUSSION_APPT_TEXT = os.getenv(
+    "DISCUSSION_APPT_TEXT",
+    "📅 随时可以预约看房\n\n"
+    "点击下方按钮，侨联客服会在 15 分钟内联系您安排：\n"
+    "• 实地看房\n"
+    "• 视频看房\n\n"
+    "侨联地产｜您在金边的自己人",
+)
+# 讨论区三段式：第二段 - 补充实拍组图首图说明
 DISCUSSION_EXTRA_INTRO = os.getenv(
     "DISCUSSION_EXTRA_INTRO",
-    "📎 <b>补充实拍</b>。户型/租金/付款等完整说明请往上滑，看<b>频道相册下方的长文</b>。",
+    "📎 <b>补充实拍</b>\n\n"
+    "真实房源现场拍摄\n"
+    "户型 / 公区 / 采光情况\n\n"
+    "侨联地产实拍\n"
+    "金边租房更透明",
+)
+# 讨论区三段式：第三段 - 继续看房入口
+DISCUSSION_CONTINUE_TEXT = os.getenv(
+    "DISCUSSION_CONTINUE_TEXT",
+    "还想继续看看房源？\n\n"
+    "侨联小助手可以帮你：\n"
+    "• 推荐同区域房源\n"
+    "• 按预算筛选\n"
+    "• 预约看房\n"
+    "• 视频带看\n\n"
+    "👇 点击进入",
 )
 # 讨论区分批发送时，第 2 批及以后首张图说明
 DISCUSSION_EXTRA_INTRO_CONT = os.getenv(
@@ -1718,6 +1742,136 @@ async def send_discussion_cta_with_retry(
     return mid is not None
 
 
+def _build_discussion_appt_keyboard(listing_id: str, post_token: str) -> InlineKeyboardMarkup:
+    """讨论区第一段：预约看房按钮，深链到用户 Bot 的预约流程。"""
+    if BOT_USERNAME:
+        user = BOT_USERNAME.lstrip("@")
+        appt_payload = build_start_payload("a", listing_id, post_token)
+        return InlineKeyboardMarkup(
+            [[InlineKeyboardButton("📅 预约看房", url=f"https://t.me/{user}?start={appt_payload}")]]
+        )
+    return InlineKeyboardMarkup([])
+
+
+def _build_discussion_continue_keyboard(listing_id: str, post_token: str) -> InlineKeyboardMarkup:
+    """讨论区第三段：继续看房入口，深链到用户 Bot 的讨论区入口。"""
+    if BOT_USERNAME:
+        user = BOT_USERNAME.lstrip("@")
+        entry_payload = f"discussion_entry__{post_token}__{listing_id}" if post_token else f"discussion_entry____{listing_id}"
+        return InlineKeyboardMarkup(
+            [[InlineKeyboardButton("🤖 侨联小助手", url=f"https://t.me/{user}?start={entry_payload}")]]
+        )
+    return InlineKeyboardMarkup([])
+
+
+async def send_discussion_three_segments(
+    bot: Bot,
+    channel_post_id: int,
+    listing_id: str,
+    post_token: str,
+    *,
+    extra_album: list | None = None,
+    attempts: int = 30,
+    delay_seconds: float = 2.0,
+) -> bool:
+    """
+    频道发帖后，讨论区三段式：
+    1) 预约承接（文案 + 预约按钮）
+    2) 补充实拍组图（若有 extra_album）
+    3) 继续看房入口（文案 + 小助手深链按钮）
+    成功发出第一段返回 True，否则 False。
+    """
+    discussion_id = await resolve_discussion_chat_id(bot)
+    if not discussion_id:
+        logger.warning("三段式讨论区发帖：无法获取讨论组 chat_id，跳过。channel_post_id=%s", channel_post_id)
+        return False
+
+    # 等待讨论区自动转发就绪，然后发第一段（预约承接）
+    appt_keyboard = _build_discussion_appt_keyboard(listing_id, post_token)
+    seg1_mid = await poll_discussion_first_reply(
+        bot,
+        channel_post_id,
+        DISCUSSION_APPT_TEXT,
+        reply_markup=appt_keyboard if appt_keyboard.inline_keyboard else None,
+        attempts=attempts,
+        delay_seconds=delay_seconds,
+    )
+    if not seg1_mid:
+        logger.warning("三段式讨论区：第一段发送失败。channel_post_id=%s", channel_post_id)
+        return False
+
+    # 第二段：补充实拍（若有）
+    if extra_album:
+        mapping = load_discuss_map()
+        thread_reply_id = mapping.get(str(channel_post_id)) or seg1_mid
+        chunk = 10
+        total_extra = len(extra_album)
+        for batch_start in range(0, total_extra, chunk):
+            batch_paths = extra_album[batch_start : batch_start + chunk]
+            extra_media = []
+            for j, path in enumerate(batch_paths):
+                with open(path, "rb") as raw:
+                    data_bytes = raw.read()
+                data_bytes = normalize_album_image(data_bytes, target_size=1280, force_square=False)
+                buf = add_detail_logo_watermark(data_bytes)
+                buf.name = f"extra_{batch_start + j}.jpg"
+                if j == 0:
+                    cap = (
+                        DISCUSSION_EXTRA_INTRO
+                        if batch_start == 0
+                        else DISCUSSION_EXTRA_INTRO_CONT
+                    )
+                    extra_media.append(
+                        InputMediaPhoto(
+                            media=buf,
+                            caption=cap[:1024],
+                            parse_mode=ParseMode.HTML,
+                        )
+                    )
+                else:
+                    extra_media.append(InputMediaPhoto(media=buf))
+            try:
+                if len(extra_media) == 1:
+                    await bot.send_photo(
+                        chat_id=discussion_id,
+                        photo=extra_media[0].media,
+                        caption=extra_media[0].caption,
+                        parse_mode=ParseMode.HTML,
+                        reply_to_message_id=int(thread_reply_id),
+                        allow_sending_without_reply=True,
+                    )
+                else:
+                    await bot.send_media_group(
+                        chat_id=discussion_id,
+                        media=extra_media,
+                        reply_to_message_id=int(thread_reply_id),
+                        allow_sending_without_reply=True,
+                    )
+            except Exception:
+                logger.exception("三段式讨论区：第二段实拍发送失败 batch_start=%s", batch_start)
+            if batch_start + chunk < total_extra:
+                await asyncio.sleep(0.6)
+        logger.info("三段式讨论区：第二段已发 %s 张实拍", total_extra)
+
+    # 第三段：继续看房入口
+    try:
+        mapping = load_discuss_map()
+        thread_reply_id = mapping.get(str(channel_post_id)) or seg1_mid
+        continue_keyboard = _build_discussion_continue_keyboard(listing_id, post_token)
+        await bot.send_message(
+            chat_id=discussion_id,
+            text=DISCUSSION_CONTINUE_TEXT,
+            reply_to_message_id=int(thread_reply_id),
+            reply_markup=continue_keyboard if continue_keyboard.inline_keyboard else None,
+            allow_sending_without_reply=True,
+        )
+        logger.info("三段式讨论区：第三段已发。channel_post_id=%s listing_id=%s", channel_post_id, listing_id)
+    except Exception:
+        logger.exception("三段式讨论区：第三段发送失败。channel_post_id=%s", channel_post_id)
+
+    return True
+
+
 def build_channel_caption(
     d: dict, album_paths: list[str], caption_variant: str | None = "a"
 ) -> str:
@@ -2279,95 +2433,24 @@ async def _tg_publish(
         first_message_id = msgs[0].message_id if msgs else None
         post_token = make_post_token(first_message_id)
 
-    # 单图 / 多图共用：溢出实拍进讨论区
-    if extra_album:
+    # 单图 / 多图共用：发讨论区三段式（预约承接 + 补充实拍 + 继续看房入口）
+    channel_mid = media_message_ids[0] if media_message_ids else None
+    if channel_mid:
         discuss_id = await resolve_discussion_chat_id(bot)
-        if str(discuss_id) == str(CHANNEL_ID):
-            logger.warning("讨论区 chat_id 与频道相同，跳过溢出实拍，避免频道重复媒体。")
-            discuss_id = None
-        if not discuss_id:
-            logger.warning(
-                "有 %s 张溢出实拍但未配置讨论区，已跳过（请绑定频道讨论组或设置 DISCUSSION_CHAT_ID）",
-                len(extra_album),
-            )
-        elif discuss_id:
-            channel_mid = media_message_ids[0] if media_message_ids else None
-            if not channel_mid:
-                return {
-                    "media_group_id": media_group_id,
-                    "media_message_ids": media_message_ids,
-                    "button_message_id": button_message_id,
-                    "file_ids": file_ids,
-                    "caption": caption,
-                }
-            anchor_msg_id = await poll_discussion_first_reply(
+        if discuss_id and str(discuss_id) != str(CHANNEL_ID):
+            await send_discussion_three_segments(
                 bot,
                 channel_mid,
-                DISCUSSION_MORE_PROMPT,
+                listing_id,
+                post_token,
+                extra_album=extra_album if extra_album else None,
                 attempts=60,
                 delay_seconds=2.0,
             )
-
-            if not anchor_msg_id:
-                logger.warning("skip extra media: no discussion mapping for channel_mid=%s", channel_mid)
-                return {
-                    "media_group_id": media_group_id,
-                    "media_message_ids": media_message_ids,
-                    "button_message_id": button_message_id,
-                    "file_ids": file_ids,
-                    "caption": caption,
-                }
-
-            chunk = 10
-            total_extra = len(extra_album)
-            for batch_start in range(0, total_extra, chunk):
-                batch_paths = extra_album[batch_start : batch_start + chunk]
-                extra_media = []
-                for j, path in enumerate(batch_paths):
-                    with open(path, "rb") as raw:
-                        data = raw.read()
-                    data = normalize_album_image(data, target_size=1280, force_square=False)
-                    buf = add_detail_logo_watermark(data)
-                    buf.name = f"extra_{batch_start + j}.jpg"
-                    if j == 0:
-                        cap = (
-                            DISCUSSION_EXTRA_INTRO
-                            if batch_start == 0
-                            else DISCUSSION_EXTRA_INTRO_CONT
-                        )
-                        extra_media.append(
-                            InputMediaPhoto(
-                                media=buf,
-                                caption=cap[:1024],
-                                parse_mode=ParseMode.HTML,
-                            )
-                        )
-                    else:
-                        extra_media.append(InputMediaPhoto(media=buf))
-
-                if len(extra_media) == 1:
-                    await bot.send_photo(
-                        chat_id=discuss_id,
-                        photo=extra_media[0].media,
-                        caption=extra_media[0].caption,
-                        parse_mode=ParseMode.HTML,
-                        reply_to_message_id=anchor_msg_id,
-                        allow_sending_without_reply=True,
-                    )
-                else:
-                    await bot.send_media_group(
-                        chat_id=discuss_id,
-                        media=extra_media,
-                        reply_to_message_id=anchor_msg_id,
-                        allow_sending_without_reply=True,
-                    )
-                if batch_start + chunk < total_extra:
-                    await asyncio.sleep(0.6)
-            logger.info(
-                "讨论区已发溢出实拍 %s 张（分 %s 批）reply_to=%s",
-                total_extra,
-                (total_extra + chunk - 1) // chunk,
-                anchor_msg_id,
+        elif extra_album:
+            logger.warning(
+                "有 %s 张溢出实拍但未配置讨论区或讨论区与频道相同，已跳过",
+                len(extra_album),
             )
 
     return {

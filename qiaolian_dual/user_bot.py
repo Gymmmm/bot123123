@@ -36,6 +36,7 @@ try:
         help_repeat_keyboard,
         help_text as copy_help_text,
         home_text as copy_home_text,
+        lead_capture_text as copy_lead_capture_text,
         listing_match_footer_text,
         listing_match_intro_text,
         search_entry_intro_text,
@@ -61,6 +62,7 @@ except ImportError:  # pragma: no cover - script mode fallback
         help_repeat_keyboard,
         help_text as copy_help_text,
         home_text as copy_home_text,
+        lead_capture_text as copy_lead_capture_text,
         listing_match_footer_text,
         listing_match_intro_text,
         search_entry_intro_text,
@@ -218,20 +220,12 @@ def main_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("📍 按区域找房", callback_data="hub:area"),
-                InlineKeyboardButton("💰 按预算找房", callback_data="hub:budget"),
+                InlineKeyboardButton("🏠 推荐房源", callback_data="hub:latest"),
+                InlineKeyboardButton("📅 预约看房", callback_data="hub:appoint"),
             ],
             [
-                InlineKeyboardButton("🛏 按户型找房", callback_data="hub:layout"),
-                InlineKeyboardButton("🆕 看最新房源", callback_data="hub:latest"),
-            ],
-            [
-                InlineKeyboardButton("📹 预约实拍 / 视频看房", callback_data="hub:appoint"),
-                InlineKeyboardButton("💬 咨询中文顾问", callback_data="hub:advisor"),
-            ],
-            [
-                InlineKeyboardButton("🧰 租后服务说明", callback_data="hub:service"),
-                InlineKeyboardButton("⭐ 我的收藏 / 预约", callback_data="hub:account"),
+                InlineKeyboardButton("📍 按区域找", callback_data="hub:area"),
+                InlineKeyboardButton("💬 联系顾问", callback_data="hub:advisor"),
             ],
         ]
     )
@@ -356,6 +350,19 @@ def channel_return_keyboard(channel_url: str = "") -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(rows)
 
 
+def lead_capture_keyboard() -> InlineKeyboardMarkup:
+    """留资触发后的操作按钮：发手机号 / 直接联系顾问 / 继续看房。"""
+    rows: list[list[InlineKeyboardButton]] = []
+    advisor_url = _advisor_tg_url()
+    rows.append([InlineKeyboardButton("📱 发送手机号", callback_data="lead_capture:phone")])
+    if advisor_url:
+        rows.append([InlineKeyboardButton("💬 直接联系顾问", url=advisor_url)])
+    else:
+        rows.append([InlineKeyboardButton("💬 直接联系顾问", callback_data="hub:advisor")])
+    rows.append([InlineKeyboardButton("🏠 继续看房", callback_data="home")])
+    return InlineKeyboardMarkup(rows)
+
+
 def old_tenant_followup_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         [
@@ -377,9 +384,14 @@ def welcome_text() -> str:
     return copy_home_text()
 
 
-def channel_welcome_text() -> str:
-    """频道新人欢迎语，首次 /start 且无深链参数时显示。"""
-    return copy_channel_welcome_text()
+def channel_welcome_text(first_name: str = "") -> str:
+    """首屏 /start 欢迎语，压缩版：一屏内展示核心动作按钮。"""
+    return copy_channel_welcome_text(first_name=first_name)
+
+
+def lead_capture_text() -> str:
+    """留资触发节点文案：在关键行为后请求联系方式。"""
+    return copy_lead_capture_text()
 
 
 def _channel_index_action(action: str) -> dict | None:
@@ -759,6 +771,23 @@ def parse_start_arg_payload(arg: str) -> dict | None:
         return {
             "action": "channel_topic",
             "target": arg[len("ch_") :],
+            "post_token": "",
+            "channel_message_id": None,
+        }
+    # 讨论区入口深链：discussion_entry__<post_token>__<listing_id>
+    if arg.startswith("discussion_entry__"):
+        parts = arg.split("__", 2)
+        if len(parts) == 3:
+            post_token, listing_id = parts[1], parts[2]
+            return {
+                "action": "discussion_entry",
+                "target": listing_id,
+                "post_token": post_token,
+                "channel_message_id": _base36_decode(post_token),
+            }
+        return {
+            "action": "discussion_entry",
+            "target": "",
             "post_token": "",
             "channel_message_id": None,
         }
@@ -1883,6 +1912,39 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
             )
         return MAIN
 
+    if action == "discussion_entry":
+        listing_id = target
+        context.user_data["contact_listing_id"] = listing_id or None
+        create_lead(
+            user,
+            action="discussion_entry_click",
+            source="discussion_entry",
+            listing_id=listing_id,
+            payload={
+                "post_token": post_token,
+                "listing_id": listing_id,
+                "source": "discussion_entry",
+                **touch_payload,
+            },
+        )
+        await _notify_admins(
+            context,
+            title="讨论区入口点击",
+            lines=[
+                f"用户：{_user_mention_html(user)}",
+                f"联系方式：{he(_user_contact_text(user))}",
+                f"房源：{he(listing_id or '-')}",
+                f"post_token：{he(post_token or '-')}",
+            ],
+        )
+        first_name = str(getattr(user, "first_name", "") or "")
+        await message.reply_text(
+            channel_welcome_text(first_name=first_name),
+            parse_mode=ParseMode.HTML,
+            reply_markup=main_keyboard(),
+        )
+        return MAIN
+
     return None
 
 
@@ -1920,9 +1982,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             reply_markup=_contract_actions_keyboard(user.id),
         )
         return MAIN
-    # 首次裸 /start（无深链参数）：展示频道新人引导欢迎语
+    # 首次裸 /start（无深链参数）：展示压缩版首屏欢迎语
     await update.effective_message.reply_text(
-        channel_welcome_text(),
+        channel_welcome_text(first_name=str(getattr(user, "first_name", "") or "")),
         reply_markup=main_keyboard(),
         parse_mode=ParseMode.HTML,
     )
@@ -3419,6 +3481,29 @@ async def handle_ui_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             initial_mode=mode,
         )
 
+    if data == "lead_capture:phone":
+        create_lead(
+            user,
+            action="lead_capture_phone_request",
+            source="lead_capture",
+            listing_id=str(context.user_data.get("contact_listing_id") or ""),
+            payload={"intent": "phone_share"},
+        )
+        await render_panel(
+            update,
+            text=(
+                "好的，请直接发送您的手机号码。\n\n"
+                "或者，可以发 Telegram 账号 / 微信 ID 也可以，顾问会主动联系您。"
+            ),
+            reply_markup=InlineKeyboardMarkup(
+                [
+                    [InlineKeyboardButton("🏠 继续看房", callback_data="home")],
+                ]
+            ),
+            context=context,
+        )
+        return MAIN
+
     if data == "pref:clear":
         context.user_data["pref_select"] = {"source": "menu_precise", "selected": []}
         await query.edit_message_text(
@@ -3534,10 +3619,17 @@ async def handle_ui_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return MAIN
 
     if data == "service:deposit":
+        create_lead(
+            user,
+            action="deposit_inquiry",
+            source="service_deposit",
+            listing_id=str(context.user_data.get("contact_listing_id") or ""),
+            payload={"intent": "price_question"},
+        )
         await query.edit_message_text(
-            deposit_text(),
+            deposit_text() + "\n\n" + lead_capture_text(),
             parse_mode=ParseMode.HTML,
-            reply_markup=service_detail_keyboard(),
+            reply_markup=lead_capture_keyboard(),
         )
         return MAIN
 
@@ -4038,15 +4130,10 @@ async def appoint_flow_cb(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         context.user_data.pop("appt", None)
         await query.edit_message_text(
             "✅ <b>预约已提交</b>\n\n"
-            "管理号已收到你的预约，会尽快确认具体时间。\n"
-            "如需改期或补充要求，可直接点下方联系顾问。",
+            "管理号已收到你的预约，会尽快确认具体时间。\n\n"
+            + lead_capture_text(),
             parse_mode=ParseMode.HTML,
-            reply_markup=InlineKeyboardMarkup(
-                [
-                    [InlineKeyboardButton("💎 联系顾问", callback_data="appointment_menu:contact")],
-                    [InlineKeyboardButton("🏠 返回首页", callback_data="home")],
-                ]
-            ),
+            reply_markup=lead_capture_keyboard(),
         )
         return MAIN
 
@@ -4076,7 +4163,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 
 _MAIN_CB_PATTERN = (
     r"^(home|hub:|resume:|unavail:|findmode:|findtype:|findarea:|findbudget:|findback:area"
-    r"|roompick:|appointment_menu:|service:|service_request:|service_slot:|pref:|profile:|contract:)"
+    r"|roompick:|appointment_menu:|service:|service_request:|service_slot:|pref:|profile:|contract:|lead_capture:)"
 )
 
 

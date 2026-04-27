@@ -57,11 +57,27 @@ def home_text() -> str:
     )
 
 
-def channel_welcome_text() -> str:
-    """频道新人欢迎语：用户首次进入机器人（从频道加入）时展示。"""
+def channel_welcome_text(first_name: str = "") -> str:
+    """首屏 /start 欢迎语（无深链参数）：精简版，保留核心动作按钮。"""
+    name_part = f" {e(first_name)}" if first_name else ""
     return (
-        f"👋 <b>欢迎来到{BRAND_NAME}</b>\n\n"
-        "点下方按钮开始找房，或直接发关键词（区域、预算、户型）给我。"
+        f"👋 你好{name_part}\n\n"
+        f"我是{BRAND_NAME}找房助手\n\n"
+        "可以帮你：\n"
+        "🏠 找房\n"
+        "📅 预约看房\n"
+        "📹 视频看房\n"
+        "📍 按区域找\n\n"
+        "👇 选一个开始"
+    )
+
+
+def lead_capture_text() -> str:
+    """留资触发节点文案：在预约/视频看房/费用咨询/联系顾问后触发。"""
+    return (
+        "好的，方便留一个联系方式吗？\n\n"
+        "顾问确认房源和看房时间会更快一点。\n\n"
+        "可以发 Telegram / 微信 / 电话。"
     )
 
 

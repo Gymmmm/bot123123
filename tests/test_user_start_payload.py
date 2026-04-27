@@ -69,6 +69,20 @@ class UserStartPayloadTests(unittest.TestCase):
         self.assertEqual(payload["target"], "district_guide")
         self.assertEqual(payload["post_token"], "")
 
+    def test_discussion_entry_deep_link_is_parsed(self):
+        """讨论区入口深链：discussion_entry__<post_token>__<listing_id>"""
+        payload = parse_start_arg_payload("discussion_entry__abc123__l_42")
+        self.assertIsNotNone(payload)
+        self.assertEqual(payload["action"], "discussion_entry")
+        self.assertEqual(payload["post_token"], "abc123")
+        self.assertEqual(payload["target"], "l_42")
+
+    def test_discussion_entry_deep_link_without_token(self):
+        """讨论区入口深链：只有 prefix，无 token，返回 discussion_entry action。"""
+        payload = parse_start_arg_payload("discussion_entry__")
+        self.assertIsNotNone(payload)
+        self.assertEqual(payload["action"], "discussion_entry")
+
 
 if __name__ == "__main__":
     unittest.main()
