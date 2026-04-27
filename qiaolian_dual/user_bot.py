@@ -354,7 +354,7 @@ def contact_handoff_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("📅 确认预约", callback_data="appointment_menu:offline"),
+                InlineKeyboardButton("📅 预约实地看房", callback_data="appointment_menu:offline"),
                 InlineKeyboardButton("📹 改成视频看房", callback_data="appointment_menu:video"),
             ],
             [
