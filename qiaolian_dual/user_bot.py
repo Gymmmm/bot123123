@@ -38,6 +38,17 @@ try:
         home_text as copy_home_text,
         listing_match_footer_text,
         listing_match_intro_text,
+        local_life_text as copy_local_life_text,
+        merchant_join_text as copy_merchant_join_text,
+        rfcity_bbq_text as copy_rfcity_bbq_text,
+        rfcity_drinks_text as copy_rfcity_drinks_text,
+        rfcity_hotel_text as copy_rfcity_hotel_text,
+        rfcity_logistics_text as copy_rfcity_logistics_text,
+        rfcity_property_text as copy_rfcity_property_text,
+        rfcity_recreation_text as copy_rfcity_recreation_text,
+        rfcity_restaurant_text as copy_rfcity_restaurant_text,
+        rfcity_supermarket_text as copy_rfcity_supermarket_text,
+        rfcity_text as copy_rfcity_text,
         search_entry_intro_text,
         service_promise_text as copy_service_promise_text,
         service_hub_text as copy_service_hub_text,
@@ -63,6 +74,17 @@ except ImportError:  # pragma: no cover - script mode fallback
         home_text as copy_home_text,
         listing_match_footer_text,
         listing_match_intro_text,
+        local_life_text as copy_local_life_text,
+        merchant_join_text as copy_merchant_join_text,
+        rfcity_bbq_text as copy_rfcity_bbq_text,
+        rfcity_drinks_text as copy_rfcity_drinks_text,
+        rfcity_hotel_text as copy_rfcity_hotel_text,
+        rfcity_logistics_text as copy_rfcity_logistics_text,
+        rfcity_property_text as copy_rfcity_property_text,
+        rfcity_recreation_text as copy_rfcity_recreation_text,
+        rfcity_restaurant_text as copy_rfcity_restaurant_text,
+        rfcity_supermarket_text as copy_rfcity_supermarket_text,
+        rfcity_text as copy_rfcity_text,
         search_entry_intro_text,
         service_promise_text as copy_service_promise_text,
         service_hub_text as copy_service_hub_text,
@@ -218,20 +240,15 @@ def main_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("📍 按区域找房", callback_data="hub:area"),
-                InlineKeyboardButton("💰 按预算找房", callback_data="hub:budget"),
+                InlineKeyboardButton("🏠 推荐房源", callback_data="hub:latest"),
+                InlineKeyboardButton("📅 预约看房", callback_data="hub:appoint"),
             ],
             [
-                InlineKeyboardButton("🛏 按户型找房", callback_data="hub:layout"),
-                InlineKeyboardButton("🆕 看最新房源", callback_data="hub:latest"),
+                InlineKeyboardButton("📍 按区域找", callback_data="hub:area"),
             ],
             [
-                InlineKeyboardButton("📹 预约实拍 / 视频看房", callback_data="hub:appoint"),
-                InlineKeyboardButton("💬 咨询中文顾问", callback_data="hub:advisor"),
-            ],
-            [
-                InlineKeyboardButton("🧰 租后服务说明", callback_data="hub:service"),
-                InlineKeyboardButton("⭐ 我的收藏 / 预约", callback_data="hub:account"),
+                InlineKeyboardButton("🧰 入住服务", callback_data="hub:service"),
+                InlineKeyboardButton("💬 联系顾问", callback_data="hub:advisor"),
             ],
         ]
     )
@@ -328,18 +345,24 @@ def _advisor_tg_url() -> str:
 
 
 def contact_handoff_keyboard() -> InlineKeyboardMarkup:
-    rows: list[list[InlineKeyboardButton]] = []
     advisor_url = _advisor_tg_url()
-    if advisor_url:
-        rows.append([InlineKeyboardButton("💬 直连顾问", url=advisor_url)])
-    rows.append(
+    chat_btn = (
+        InlineKeyboardButton("💬 找顾问聊聊", url=advisor_url)
+        if advisor_url
+        else InlineKeyboardButton("💬 找顾问聊聊", callback_data="appointment_menu:contact")
+    )
+    return InlineKeyboardMarkup(
         [
-            InlineKeyboardButton("📅 预约实地看房", callback_data="appointment_menu:offline"),
-            InlineKeyboardButton("📹 预约视频代看", callback_data="appointment_menu:video"),
+            [
+                InlineKeyboardButton("📅 预约实地看房", callback_data="appointment_menu:offline"),
+                InlineKeyboardButton("📹 改成视频看房", callback_data="appointment_menu:video"),
+            ],
+            [
+                InlineKeyboardButton("🏠 继续看房", callback_data="home"),
+                chat_btn,
+            ],
         ]
     )
-    rows.append([InlineKeyboardButton("🏠 返回首页", callback_data="home")])
-    return InlineKeyboardMarkup(rows)
 
 
 def channel_return_keyboard(channel_url: str = "") -> InlineKeyboardMarkup:
@@ -510,6 +533,14 @@ def service_hub_text() -> str:
     return copy_service_hub_text()
 
 
+def local_life_text() -> str:
+    return copy_local_life_text()
+
+
+def rfcity_text() -> str:
+    return copy_rfcity_text()
+
+
 def want_home_prompt_text() -> str:
     return copy_want_home_text()
 
@@ -647,7 +678,7 @@ def service_hub_keyboard() -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton("🔧 报修 / 物业事务", callback_data="service:repair_hub"),
-                InlineKeyboardButton("🗺 周边生活指南", callback_data="service:guide"),
+                InlineKeyboardButton("🗺️ 周边生活", callback_data="service:local_life"),
             ],
             [
                 InlineKeyboardButton("💎 咨询顾问", callback_data="service:contact"),
@@ -686,6 +717,73 @@ def service_detail_keyboard() -> InlineKeyboardMarkup:
             ],
         ]
     )
+
+
+def local_life_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [
+            [InlineKeyboardButton("🏙 富力周边", callback_data="local:rfcity")],
+            [
+                InlineKeyboardButton("↩️ 返回入住服务", callback_data="service:hub"),
+                InlineKeyboardButton("🏠 返回首页", callback_data="home"),
+            ],
+        ]
+    )
+
+
+def rfcity_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton("🍴 餐厅小吃", callback_data="rfcity:restaurant"),
+                InlineKeyboardButton("🔥 烧烤夜宵", callback_data="rfcity:bbq"),
+            ],
+            [
+                InlineKeyboardButton("🥤 奶茶饮品", callback_data="rfcity:drinks"),
+                InlineKeyboardButton("🛒 超市便利", callback_data="rfcity:supermarket"),
+            ],
+            [
+                InlineKeyboardButton("🏨 酒店租房", callback_data="rfcity:hotel"),
+                InlineKeyboardButton("🏋️ 休闲生活", callback_data="rfcity:recreation"),
+            ],
+            [
+                InlineKeyboardButton("🚛 快递物流", callback_data="rfcity:logistics"),
+                InlineKeyboardButton("👨‍💻 富力物业", callback_data="rfcity:property"),
+            ],
+            [InlineKeyboardButton("🤝 商家入驻", callback_data="rfcity:join")],
+            [
+                InlineKeyboardButton("↩️ 返回周边生活", callback_data="service:local_life"),
+                InlineKeyboardButton("🏠 返回首页", callback_data="home"),
+            ],
+        ]
+    )
+
+
+def rfcity_back_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton("↩️ 返回富力周边", callback_data="local:rfcity"),
+                InlineKeyboardButton("🏠 返回首页", callback_data="home"),
+            ],
+        ]
+    )
+
+
+def merchant_join_keyboard() -> InlineKeyboardMarkup:
+    advisor_url = _advisor_tg_url()
+    rows: list[list[InlineKeyboardButton]] = []
+    if advisor_url:
+        rows.append([InlineKeyboardButton("📩 提交商家信息 / 联系侨联合作", url=advisor_url)])
+    else:
+        rows.append([InlineKeyboardButton("💬 联系侨联合作", callback_data="appointment_menu:contact")])
+    rows.append(
+        [
+            InlineKeyboardButton("🏙 返回富力周边", callback_data="local:rfcity"),
+            InlineKeyboardButton("🏠 返回首页", callback_data="home"),
+        ]
+    )
+    return InlineKeyboardMarkup(rows)
 
 
 def user_display_name(user) -> str:
@@ -2084,11 +2182,19 @@ async def show_precise_filter(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 async def show_appointment_hub(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user = update.effective_user
+    upsert_user_profile(user)
+    create_lead(
+        user,
+        action="appointment_hub_view",
+        source="main_menu",
+        payload={"from_menu": True},
+    )
     await render_panel(
         update,
-        text=appointment_hub_text(),
+        text=advisor_text(),
         parse_mode=ParseMode.HTML,
-        reply_markup=appointment_menu_keyboard(),
+        reply_markup=contact_handoff_keyboard(),
         context=context,
     )
     return MAIN
@@ -3567,17 +3673,11 @@ async def handle_ui_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         return MAIN
 
-    if data == "service:guide":
+    if data in ("service:guide", "service:local_life"):
         await query.edit_message_text(
-            "<b>🗺 周边生活指南</b>\n\n"
-            "如果您刚到金边，我们可以继续补这些信息：\n"
-            "• 附近超市 / 菜市场\n"
-            "• 外卖一般送到哪里\n"
-            "• 常用医院 / 诊所\n"
-            "• 停车、门禁、取快递的实际习惯\n\n"
-            "请点下方「联系顾问」转人工协助。",
+            local_life_text(),
             parse_mode=ParseMode.HTML,
-            reply_markup=service_detail_keyboard(),
+            reply_markup=local_life_keyboard(),
         )
         return MAIN
 
@@ -3679,6 +3779,61 @@ async def handle_ui_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             reply_markup=main_keyboard(),
         )
         return MAIN
+
+    if data == "local:rfcity":
+        create_lead(
+            user,
+            action="local_area_click",
+            source="local_life",
+            area="rfcity",
+            payload={"area": "rfcity", "category": "overview"},
+        )
+        await query.edit_message_text(
+            rfcity_text(),
+            parse_mode=ParseMode.HTML,
+            reply_markup=rfcity_keyboard(),
+        )
+        return MAIN
+
+    if data.startswith("rfcity:"):
+        category = data.split(":", 1)[1]
+        create_lead(
+            user,
+            action="local_category_click",
+            source="rfcity",
+            area="rfcity",
+            payload={"area": "rfcity", "category": category},
+        )
+        _rfcity_texts = {
+            "restaurant": copy_rfcity_restaurant_text,
+            "bbq": copy_rfcity_bbq_text,
+            "drinks": copy_rfcity_drinks_text,
+            "supermarket": copy_rfcity_supermarket_text,
+            "hotel": copy_rfcity_hotel_text,
+            "recreation": copy_rfcity_recreation_text,
+            "logistics": copy_rfcity_logistics_text,
+            "property": copy_rfcity_property_text,
+        }
+        if category == "join":
+            await query.edit_message_text(
+                copy_merchant_join_text(),
+                parse_mode=ParseMode.HTML,
+                reply_markup=merchant_join_keyboard(),
+            )
+        elif category in _rfcity_texts:
+            await query.edit_message_text(
+                _rfcity_texts[category](),
+                parse_mode=ParseMode.HTML,
+                reply_markup=rfcity_back_keyboard(),
+            )
+        else:
+            await query.edit_message_text(
+                rfcity_text(),
+                parse_mode=ParseMode.HTML,
+                reply_markup=rfcity_keyboard(),
+            )
+        return MAIN
+
     return MAIN
 
 
@@ -4076,7 +4231,8 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 
 _MAIN_CB_PATTERN = (
     r"^(home|hub:|resume:|unavail:|findmode:|findtype:|findarea:|findbudget:|findback:area"
-    r"|roompick:|appointment_menu:|service:|service_request:|service_slot:|pref:|profile:|contract:)"
+    r"|roompick:|appointment_menu:|service:|service_request:|service_slot:|pref:|profile:|contract:"
+    r"|local:|rfcity:)"
 )
 
 
