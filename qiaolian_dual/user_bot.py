@@ -2186,7 +2186,7 @@ async def show_appointment_hub(update: Update, context: ContextTypes.DEFAULT_TYP
     upsert_user_profile(user)
     create_lead(
         user,
-        action="appointment_click",
+        action="appointment_hub_view",
         source="main_menu",
         payload={"from_menu": True},
     )
