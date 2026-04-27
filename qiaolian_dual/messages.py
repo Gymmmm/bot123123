@@ -83,13 +83,19 @@ def lead_capture_text() -> str:
 
 def advisor_text() -> str:
     return (
-        "💬 <b>中文顾问已接入</b>\n\n"
-        "您可以直接问：房源、片区、价格范围、押付、签约、入住安排或租后问题。\n"
-        "如果您是从某套房源点进来的，顾问会按当前房源继续跟进，不用重复说明。\n\n"
-        f"📱 Telegram：{e(ADVISOR_TG)}\n"
-        f"💬 微信：{e(ADVISOR_WECHAT)}\n"
-        f"📞 电话：{e(ADVISOR_PHONE)}\n"
-        f"📢 频道：{e(CHANNEL_URL)}"
+        "✅ <b>已收到你的需求</b>\n\n"
+        "侨联顾问会直接通过 Telegram 联系你确认：\n"
+        "• 房源是否还在\n"
+        "• 看房时间\n"
+        "• 实地看房 / 视频看房方式\n\n"
+        "你也可以继续看看其他房源。"
+    )
+
+
+def advisor_contact_supplement_text() -> str:
+    return (
+        "如果你希望顾问用微信或电话联系，也可以直接发给我。\n"
+        "不填也可以，Telegram 会正常接收顾问消息。"
     )
 
 
@@ -292,4 +298,162 @@ def want_home_ack_text() -> str:
         "✅ <b>已收到您的找房条件</b>\n\n"
         "顾问会<b>人工收窄</b>到 1–3 套，并提前标注每套的关键费用项，方便您对比决策。\n\n"
         "💡 想加快：再补一下预算硬上限、是否需要民水民电、电梯/泳池需求，或者直接发截图也行。"
+    )
+
+
+# ─── 周边生活 / 富力周边便民导航 ────────────────────────────────────────────
+
+_RFCITY_FOOTER = (
+    "\n\n💡 可点击 <b>@用户名</b> 直接联系商家；如显示手机号，请复制号码联系。\n"
+    "部分联系方式可能待补充，信息会持续更新，具体价格和服务以商家实际回复为准。"
+)
+
+
+def local_life_text() -> str:
+    return (
+        "🗺️ <b>周边生活</b>\n\n"
+        "侨联正在整理金边各区域常用生活信息。\n"
+        "当前已上线：富力城 R&amp;F City 便民导航。\n\n"
+        "后续会陆续补充 BKK1、钻石岛、炳发城等区域。"
+    )
+
+
+def rfcity_text() -> str:
+    return (
+        "🏙 <b>R&amp;F City 便民导航</b>\n\n"
+        "富力生活常用服务都在这里：\n"
+        "吃饭、超市、快递、物业、酒店、休闲。\n\n"
+        "先看房，也可以先看生活是否方便。"
+    )
+
+
+def rfcity_restaurant_text() -> str:
+    return (
+        "🍴 <b>富力餐厅 · 小吃</b>\n\n"
+        "小明菜煎饼：@XMCaiJianBing\n"
+        "金饭碗融合食：@JFW_8888\n"
+        "木森快餐：@hei32567\n"
+        "邻居家盒饭：@linjujia8899\n"
+        "麻了个面：@fq666520\n"
+        "兰州拉面：@LZLM_RF\n"
+        "云南老妈米线：+855962510133\n"
+        "重庆小面：@CY_ccxm\n"
+        "味之道重庆小面：@WZD8889\n"
+        "川妹子餐厅：@cuan_meizi\n"
+        "A4沙县小吃：+855964039606\n"
+        "太二酸菜鱼：@taiersuancaiyu\n"
+        "幺妹麻辣烫：@Ruilin585\n"
+        "沙县小吃(正门)：@cheng1149\n"
+        "猪事顺杀猪粉：@zssflzd\n"
+        "广州海鲜城富力店：+855016248811\n"
+        "麦德仕汉堡炸鸡：@MDS0188838388\n"
+        "川遇菜馆：+8550969794108\n"
+        "小仙女手工凉皮：@ba521520\n"
+        "鼎阁重庆老火锅：@xh918888\n"
+        "四海食府：待补充\n"
+        "羊汤一品：+8550883019759\n"
+        "麻小姬·麻椒鸡：@Wwen52025"
+        + _RFCITY_FOOTER
+    )
+
+
+def rfcity_bbq_text() -> str:
+    return (
+        "🔥 <b>富力烧烤 · 夜宵</b>\n\n"
+        "留一手烤鱼：@clgxyxy\n"
+        "东北吉林烧烤：@Jinniu99998888\n"
+        "江湖烧烤：@jianghushaokao\n"
+        "A8烤鹅翅：@FUAN68899"
+        + _RFCITY_FOOTER
+    )
+
+
+def rfcity_drinks_text() -> str:
+    return (
+        "🥤 <b>富力奶茶 · 饮品</b>\n\n"
+        "麦诺咖啡：@mnppsc\n"
+        "霸王茶姬：@Jolyne777\n"
+        "A8 ManMan 糖水饮品：@manmanC3121"
+        + _RFCITY_FOOTER
+    )
+
+
+def rfcity_supermarket_text() -> str:
+    return (
+        "🛒 <b>富力超市 · 便利店</b>\n\n"
+        "喜来优品超市：@xilai1818\n"
+        "够意思超市：@gouyisi\n"
+        "文轩888便利店：@WENXUAN188\n"
+        "富田生鲜超市：@FUTIAN668899\n"
+        "中柬易购生活超市：@Yin_zhuochao\n"
+        "糖巢省钱超市：@WGTC99\n"
+        "叮当猫百货伟哥数码：@yuna666666\n"
+        "如意烟酒：@w1025\n"
+        "1919商行(烟酒茶)：@FL191919\n"
+        "庆丰优选超市：@gtffgfffdff\n"
+        "B11世纪超市：@b11shijichaoshi"
+        + _RFCITY_FOOTER
+    )
+
+
+def rfcity_hotel_text() -> str:
+    return (
+        "🏨 <b>富力酒店 · 租房</b>\n\n"
+        "橙乐酒店：@FlMinsu2025\n"
+        "富力酒店：@RF_Hotel\n"
+        "美辰地产富力店：@pengqingw"
+        + _RFCITY_FOOTER
+    )
+
+
+def rfcity_recreation_text() -> str:
+    return (
+        "🏋️ <b>富力运动 · 休闲生活</b>\n\n"
+        "富力体育会所：@Sportcity1098\n"
+        "泰自然按摩店：@taiziran01\n"
+        "茜茜美容SPA：@d11631876\n"
+        "东方贵足：+855965840694\n"
+        "高棉城市按摩24小时：+855089355788\n"
+        "A4理发店：+855968455609\n"
+        "A7理发店：待补充\n"
+        "理享美容美发沙龙：+855963781029\n"
+        "A5美甲店：+85593626126\n"
+        "安妮奢侈品回收典当：@anne168777\n"
+        "宠物之家：@motopet188\n"
+        "奢依阁男装：@SYG666888"
+        + _RFCITY_FOOTER
+    )
+
+
+def rfcity_logistics_text() -> str:
+    return (
+        "🚛 <b>富力快递 · 物流</b>\n\n"
+        "YA速递富力站：@yaexpres\n"
+        "CE速递：@CECS006\n"
+        "中通快递：+85566666280"
+        + _RFCITY_FOOTER
+    )
+
+
+def rfcity_property_text() -> str:
+    return (
+        "🏙 <b>R&amp;F City 基础服务</b>\n\n"
+        "👨‍💻 富力物业24小时：@rfservice24\n"
+        "🏢 富力会客厅：+85569927771"
+        + _RFCITY_FOOTER
+    )
+
+
+def merchant_join_text() -> str:
+    return (
+        "🤝 <b>富力商家合作 / 入驻</b>\n\n"
+        "如果你在富力周边做餐饮、超市、维修、搬家、快递、酒店、接机、签证、税务、生活服务，"
+        "可以联系侨联合作。\n\n"
+        "侨联客户多是正在找房、准备入住、已经入住富力的华人用户，需求很精准。\n\n"
+        "可以提交：\n"
+        "• 店名\n"
+        "• 类别\n"
+        "• Telegram / 电话\n"
+        "• 位置\n"
+        "• 优惠或服务说明"
     )
