@@ -231,6 +231,29 @@ def _ensure_excel_batch(conn: sqlite3.Connection, *, batch_id: str, source_name:
     )
 
 
+def _insert_cover_render_job(
+    conn: sqlite3.Connection,
+    *,
+    row_id: str,
+    desired_w: int,
+    desired_h: int,
+    desired_kind: str,
+) -> None:
+    """为 excel_listing_rows 记录创建对应的 cover_render_jobs 任务。"""
+    if not _table_exists(conn, "cover_render_jobs"):
+        return
+    job_id = f"JOB_{uuid.uuid4()}"
+    conn.execute(
+        """
+        INSERT INTO cover_render_jobs (
+            job_id, row_id, desired_w, desired_h, desired_kind,
+            render_status, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """,
+        (job_id, row_id, desired_w, desired_h, desired_kind),
+    )
+
+
 def _insert_excel_row(
     conn: sqlite3.Connection,
     *,
@@ -298,6 +321,13 @@ def _insert_excel_row(
             _json_dumps(payload.get("raw_meta_json", {})),
             source_post_id,
         ),
+    )
+    _insert_cover_render_job(
+        conn,
+        row_id=row_id,
+        desired_w=desired_w,
+        desired_h=desired_h,
+        desired_kind=desired_kind,
     )
 
 
