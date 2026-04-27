@@ -1068,13 +1068,9 @@ def listing_landing_text(listing_id: str) -> str:
         # 对应频道 A 款（信息决策型）：下一步按钮最短路径
         next_step = "这套房我先帮您接住了，下面的按钮直接就是下一步，不用重新解释是哪套。"
     return (
-        "💎 <b>侨联地产</b>\n"
-        "您在金边的自己人\n\n"
-        f"您点进来的是这套：\n\n"
         f"🏠 <b>{he(area)}｜{he(layout)}</b>\n"
         f"💰 {he(price_text)}"
         f"{he(detail_line)}\n\n"
-        "帖里尽量标清<b>隐性成本</b>（水电按表或包月、物业费、网络等），方便您提前心里有数。\n\n"
         f"{he(next_step)}"
     )
 
@@ -1665,7 +1661,7 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
     if action == "index_area":
         context.user_data["search_pref"] = {"source": "channel_index", "goal": "any", "touch_payload": touch_payload}
         await message.reply_text(
-            "💎 <b>侨联地产</b>\n您在金边的自己人\n\n先按区域看最省时间。\n请选择您想先看的区域：",
+            "📍 <b>按区域找房</b>\n\n请选择区域：",
             parse_mode=ParseMode.HTML,
             reply_markup=find_area_keyboard(),
         )
@@ -1674,7 +1670,7 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
     if action == "index_budget":
         context.user_data["search_pref"] = {"source": "channel_index", "goal": "any", "touch_payload": touch_payload}
         await message.reply_text(
-            "💎 <b>侨联地产</b>\n您在金边的自己人\n\n先按预算缩小一轮，结果会更快更稳：",
+            "💰 <b>按预算找房</b>\n\n请选择预算区间：",
             parse_mode=ParseMode.HTML,
             reply_markup=find_budget_keyboard("any"),
         )
@@ -1682,7 +1678,7 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
 
     if action == "index_layout":
         await message.reply_text(
-            "💎 <b>侨联地产</b>\n您在金边的自己人\n\n先按户型看一轮，后面再补区域或预算也来得及：",
+            "🛏 <b>按户型找房</b>\n\n请选择户型：",
             parse_mode=ParseMode.HTML,
             reply_markup=room_type_keyboard(),
         )
