@@ -1361,65 +1361,50 @@ def _qc_code_from_draft(d: dict) -> str:
 
 
 def build_chinese_listing_post(d: dict, caption_variant: str | None = "a") -> str:
+    """生成频道发帖正文。全三款变体输出相同内容（变体差异只体现在私聊落地页）。"""
     area = _listing_value(d, "area", default="金边")
     room_type = normalize_room_type(_listing_value(d, "room_type", "layout", default="整租"))
     if not room_type:
         room_type = _resolved_property_type(d)
     listing_code = _qc_code_from_draft(d)
     price = _price_compact_for_post(d)
-    project = _project_label_for_post(d) or "精选房源"
+
+    # 第 1 行：摘要标头
+    line1 = f"{area}｜{room_type}｜{price}｜编号:{listing_code}"
+
+    # 第 2 行：核心亮点
     highlight_text = _factual_highlight_text(d)
-    tag_line = " ".join(build_listing_tags(d)[:3]).strip()
-    
-    # A/B/C 文案变体差异化
-    variant = str(caption_variant or "a").lower()
-    if variant == "b":
-        cta_line = "💬 想了解更多？点击下方按钮咨询"
-    elif variant == "c":
-        cta_line = "📞 立即联系顾问了解详情"
-    else:  # variant == "a" (默认)
-        cta_line = "👇 点击下方按钮：立即咨询 / 预约看房"
-    
-    badge_line = "🏷 侨联甄选" if _is_manual_intake_listing(d) else ""
-    
-    # 二级索引：自动生成区域和预算标签（支持频道内点 hashtag 搜索）
-    hashtags = []
-    if area:
-        hashtags.append(f"#{area.replace(' ', '')}")
-    price_str = _price_compact_for_post(d)
-    if price_str and "$" in price_str:
-        # 提取数字部分做预算分类
-        import re
-        match = re.search(r"\d+", price_str)
-        if match:
-            price_num = int(match.group())
-            if price_num <= 300:
-                hashtags.append("#预算300以下")
-            elif price_num <= 500:
-                hashtags.append("#预算300-500")
-            elif price_num <= 800:
-                hashtags.append("#预算500-800")
-            elif price_num <= 1200:
-                hashtags.append("#预算800-1200")
-            else:
-                hashtags.append("#预算1200以上")
-    hashtags.extend(["#金边租房", "#实拍房源"])
-    hashtag_line = " ".join(hashtags)
-    
-    lines = [
-        f"<b>{area} · {room_type}</b>",
-        f"编号：<code>{listing_code}</code>",
-        badge_line,
-        f"租金：<b>{price}</b>",
-        "实地实拍｜中文顾问｜可预约看房",
-        f"亮点：{highlight_text}",
-        cta_line,
-        f"{BRAND_NAME}｜金边华人租房",
-        tag_line,
-        hashtag_line,
-    ]
-    lines = [x for x in lines if str(x).strip()]
-    return "\n".join(lines)[:1024]
+    line2 = f"核心亮点：{highlight_text}"
+
+    # 第 3 行：项目参数（面积、楼层 + 可追溯说明）
+    params: list[str] = []
+    size = _listing_value(d, "size", "size_sqm", default="")
+    if size:
+        raw_size = str(size).strip()
+        if raw_size.replace(".", "", 1).isdigit():
+            raw_size = f"{raw_size}平"
+        params.append(raw_size)
+    floor_raw = _listing_value(d, "floor", default="")
+    if floor_raw:
+        params.append(floor_raw)
+    params.append("实拍直发，编号可追溯")
+    line3 = "项目参数：" + "；".join(params)
+
+    # 第 4 行：费用提醒（包含押付/合同年限）
+    fee_text = _factual_fee_text(d)
+    line4 = f"费用提醒：{fee_text}"
+
+    # 第 5 行：看房方式
+    line5 = "看房方式：实地看房 / 实时视频代看"
+
+    # 第 6 行：统一行动号召
+    line6 = "下方按钮：咨询这套 / 预约看房"
+
+    # 第 7 行：品牌 + 最多 4 个 hashtag
+    tag_line = " ".join(build_listing_tags(d)[:4]).strip()
+    line7 = f"{BRAND_NAME}｜{tag_line}" if tag_line else BRAND_NAME
+
+    return "\n".join([line1, line2, line3, line4, line5, line6, line7])[:1024]
 
 
 def build_cover_listing_data(d: dict) -> dict:

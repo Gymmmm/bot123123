@@ -106,34 +106,41 @@ def _direct_publish_enabled() -> bool:
 DAILY_TEMPLATES: dict[int, tuple[str, str]] = {
     1: (
         "早间房源提示",
-        f"<b>{BRAND_NAME} 今日实拍房源更新</b>\n"
-        "金边华人租房 · 中文顾问服务\n"
-        "可预约实地看房 / 视频代看\n"
-        "如需同区域房源，请点下方按钮。"
+        f"<b>{BRAND_NAME} 今日实拍房源已更新</b>\n"
+        "📸 全部实拍直发，编号可追溯\n"
+        "📍 金边华人租房 · 中文顾问 · 可约看房\n"
+        "点下方按钮按区域或预算直接找。"
     ),
     2: (
-        "频道定位说明",
-        f"<b>{BRAND_NAME}</b> · QIAO LIAN PROPERTY\n"
-        "我们专注金边华人租房实拍信息\n"
-        "房源咨询、预约看房、入住协助均可对接。"
+        "品牌定位说明",
+        f"<b>{BRAND_NAME} · 您在金边的自己人</b>\n"
+        "看对房 · 签约稳 · 入住顺\n\n"
+        "我们做三件事：\n"
+        "• 实拍先行，帖内费用透明\n"
+        "• 中文顾问带看，从咨询到入住不断档\n"
+        "• 押付水电等隐性项签前说清楚"
     ),
     3: (
         "看房准备建议",
-        "<b>看房前建议先确认 3 件事</b>\n"
-        "预算区间、意向区域、可入住时间\n"
-        "提交后将由中文顾问按实拍房源匹配。"
+        "<b>看房前建议先想清楚 3 件事</b>\n"
+        "💰 预算区间（含水电物业，不只租金）\n"
+        "📍 意向区域（通勤 / 生活圈优先）\n"
+        "📅 可入住时间（越具体越好锁房）\n\n"
+        "发给顾问后，中文跟进，实拍匹配。"
     ),
     4: (
         "周末值班通知",
-        "<b>周末正常值班</b>\n"
-        "支持实地看房与视频代看\n"
-        "留言预算与区域即可开始匹配。"
+        "<b>周末正常值班，实地 / 视频代看均可约</b>\n"
+        "发区域 + 预算 → 顾问帮你收窄 1–3 套\n"
+        "当天预约当天看，决策更快。"
     ),
     5: (
-        "品牌服务说明",
-        f"<b>{BRAND_NAME}</b> · QIAO LIAN PROPERTY\n"
-        "实拍房源、中文顾问、统一管理号跟进\n"
-        "从预约到入住，流程清晰可追踪。"
+        "服务亮点说明",
+        f"<b>{BRAND_NAME} 服务亮点</b>\n"
+        "📷 实拍房源，所见即实况\n"
+        "📋 费用透明：水电押付物业提前标注\n"
+        "🧑‍💼 中文顾问：预约、签约、入住、报修全程跟\n"
+        "📹 视频代看：不到场也能清楚看房"
     ),
 }
 
@@ -399,26 +406,75 @@ def default_pin_html() -> str:
     custom = _get_setting(KEY_PIN_TEXT, "").strip()
     if custom:
         return custom
+    b = html.escape(BRAND_NAME)
     return (
-        f"<b>🏠 {html.escape(BRAND_NAME)} | 金边您的自己人</b>\n"
-        "实拍房源更新频道 · 中文顾问全程协助\n\n"
-        "<b>📍 快速入口</b>\n"
-        "🔍 <b>按区域看</b> → 点下方按钮直达\n"
-        "💰 <b>按预算看</b> → 点下方按钮直达\n"
-        "⭐ <b>今日新上</b> → 频道内上滑查看\n"
-        "💎 <b>降价房源</b> → 频道内上滑查看\n\n"
-        "<b>❓ 看中房源怎么做</b>\n"
-        "1️⃣ 直接点帖内「📅 预约看房」或「💬 问这套」\n"
-        "2️⃣ 机器人自动带房源信息进私聊\n"
-        "3️⃣ 确认需求 → 给你同预算同区域选项 → 留资（可选）\n"
-        "4️⃣ 完成后点「返回频道继续看」\n\n"
-        "💡 <b>核心承诺</b>\n"
-        "✅ 中文顾问实地带看 / 实时视频代看\n"
-        "✅ 入住与售后一条龙（报修、物业沟通）\n"
-        "✅ 费用隐性项前置说清楚\n\n"
-        "👇 点下方按钮开始浏览"
+        f"<b>🏠 {b} · 您在金边的自己人</b>\n"
+        "金边华人实拍租房 · 中文顾问全程陪跑\n\n"
+        "<b>📍 找房路径（3 步）</b>\n"
+        "1️⃣ 在频道里看实拍相册，找感兴趣的户型\n"
+        "2️⃣ 点帖内「💬 咨询这套」或「📅 预约看房」\n"
+        "3️⃣ Bot 会直接接住当前入口，不用重新解释是哪套房\n\n"
+        "<b>🔍 主动找房</b>\n"
+        "点下方按钮 → 按区域 / 按预算 / 最新房源 三路直达\n\n"
+        "<b>✅ 三项承诺</b>\n"
+        "• 实拍直发，编号可追溯，所见即实况\n"
+        "• 水电押付等隐性成本帖里先列，签前不踩坑\n"
+        "• 从预约到入住售后，管理号全程不断档\n\n"
+        "👇 直接点下方按钮开始"
     )
 
+
+def channel_index_html() -> str:
+    """频道第二条置顶：区域 / 预算导航索引帖，方便新用户快速定位。"""
+    b = html.escape(BRAND_NAME)
+    return (
+        f"<b>📋 {b} · 频道房源索引</b>\n"
+        "按下方分类快速找到你想要的房源 👇\n\n"
+        "<b>📍 按区域</b>\n"
+        "富力城 · 炳发城 · 太子/幸福 · BKK1\n"
+        "钻石岛 · TK/7月区 · 洪森大道 · 森速\n\n"
+        "<b>💰 按预算（USD/月）</b>\n"
+        "$300 以下 · $300–500 · $500–800\n"
+        "$800–1200 · $1200 以上\n\n"
+        "<b>🏠 按户型</b>\n"
+        "Studio 单间 · 1房 · 2房 · 3房+ · 别墅/排屋\n\n"
+        "<b>📹 特色服务</b>\n"
+        "• 实时视频代看：你在哪儿都能看房\n"
+        "• 实地带看：中文顾问陪同，当场确认细节\n"
+        "• 入住交接留档：全屋现状、水电表、家电清单一次做齐\n\n"
+        "点下方按钮进入找房助手，30 秒锁定目标房源 ↓"
+    )
+
+
+async def cmd_post_index(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """发布频道索引帖（第二条置顶）。"""
+    if not _is_admin(update.effective_user.id):
+        return
+    if not CHANNEL_ID:
+        await update.message.reply_text("未配置 CHANNEL_ID。")
+        return
+    if not _direct_publish_enabled():
+        logger.warning("Direct publish via autopilot blocked. Set AUTOPILOT_DIRECT_PUBLISH_ENABLED=yes to enable.")
+        return
+    text = channel_index_html()
+    kb = build_channel_menu_keyboard()
+    try:
+        msg = await context.bot.send_message(
+            chat_id=CHANNEL_ID,
+            text=text,
+            parse_mode=ParseMode.HTML,
+            disable_web_page_preview=True,
+            reply_markup=kb if kb.inline_keyboard else None,
+        )
+        try:
+            await context.bot.pin_chat_message(chat_id=CHANNEL_ID, message_id=msg.message_id, disable_notification=True)
+            note = "已尝试置顶。"
+        except Exception as e:
+            note = f"发帖成功，置顶失败：{e}"
+        await update.message.reply_text(f"频道索引帖已发送。\n{note}")
+    except Exception as e:
+        logger.exception("cmd_post_index")
+        await update.message.reply_text(f"发送失败：{e}")
 
 
 # ── 命令 ──────────────────────────────────────────────────
@@ -444,7 +500,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "<b>兼容旧命令</b>\n"
         "/publish /approve /reject /sources\n\n"
         "<b>运营功能</b>\n"
-        "/daily /tpl /post_menu\n"
+        "/daily /tpl /post_menu /post_index\n"
         "/intake — 开始微信导入\n"
         "/intake_done — 导入并自动生草稿\n"
         "/intake_pending 或 /wx — 查看微信草稿\n\n"
@@ -1774,6 +1830,7 @@ def register_autopilot_features(
     application.add_handler(CommandHandler("intake_pending", cmd_intake_pending), group=grp_cmd)
     application.add_handler(CommandHandler("wx", cmd_intake_pending), group=grp_cmd)
     application.add_handler(CommandHandler("post_menu", cmd_post_menu), group=grp_cmd)
+    application.add_handler(CommandHandler("post_index", cmd_post_index), group=grp_cmd)
     application.add_handler(CommandHandler("pin_text", cmd_pin_text), group=grp_cmd)
     if include_cancel:
         application.add_handler(CommandHandler("cancel", cmd_cancel), group=grp_cmd)

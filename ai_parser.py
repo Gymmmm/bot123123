@@ -210,8 +210,11 @@ class AIParserModule:
                 extracted_data=extracted_data_json,
                 normalized_data=normalized_data_json,
                 review_status="pending",
+                water_rate=parsed_data.get("water_rate"),
+                electric_rate=parsed_data.get("electric_rate"),
+                queue_score=parsed_data.get("quality_score", 0),
+                review_note=self._build_review_note(parsed_data),
             )
-            self._apply_parsed_data_to_draft(draft_id, parsed_data)
 
             self._mark_source_post(post_id, "parsed", "")
             return "parsed", draft_id
