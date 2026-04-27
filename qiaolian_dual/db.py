@@ -203,6 +203,12 @@ class Database:
             self._ensure_column(conn, "leads", "agent_id", "TEXT NOT NULL DEFAULT ''")
             self._ensure_column(conn, "leads", "response_at", "TEXT NOT NULL DEFAULT ''")
             self._ensure_column(conn, "leads", "conversion_value", "REAL NOT NULL DEFAULT 0")
+            # 顾问分配字段
+            self._ensure_column(conn, "leads", "advisor_id", "TEXT NOT NULL DEFAULT ''")
+            self._ensure_column(conn, "leads", "advisor_name", "TEXT NOT NULL DEFAULT ''")
+            self._ensure_column(conn, "leads", "assigned_at", "TEXT NOT NULL DEFAULT ''")
+            # 客户意图标签
+            self._ensure_column(conn, "leads", "intent", "TEXT NOT NULL DEFAULT ''")
 
     def _table_columns(self, table: str) -> set[str]:
         with self.connect() as conn:
