@@ -1757,7 +1757,7 @@ def _build_discussion_continue_keyboard(listing_id: str, post_token: str) -> Inl
     """讨论区第三段：继续看房入口，深链到用户 Bot 的讨论区入口。"""
     if BOT_USERNAME:
         user = BOT_USERNAME.lstrip("@")
-        entry_payload = f"discussion_entry__{post_token}__{listing_id}" if post_token else f"discussion_entry____{listing_id}"
+        entry_payload = f"discussion_entry__{post_token or ''}__{listing_id}"
         return InlineKeyboardMarkup(
             [[InlineKeyboardButton("🤖 侨联小助手", url=f"https://t.me/{user}?start={entry_payload}")]]
         )
