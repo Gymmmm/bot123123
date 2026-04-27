@@ -1,0 +1,19 @@
+[Unit]
+Description=Qiaolian Collector Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=qiaolianbot
+Group=qiaolianbot
+WorkingDirectory=/opt/qiaolian_dual_bots
+EnvironmentFile=/opt/qiaolian_dual_bots/.env
+ExecStart=/opt/qiaolian_dual_bots/.venv/bin/python /opt/qiaolian_dual_bots/collector_bot.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
