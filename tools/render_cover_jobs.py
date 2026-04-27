@@ -148,11 +148,10 @@ def render_pending_jobs(
         JOIN excel_listing_rows r ON r.row_id = j.row_id
         WHERE j.render_status = 'pending'
         ORDER BY j.id
+        LIMIT ?
     """
-    if limit is not None and limit > 0:
-        query += f" LIMIT {int(limit)}"
-
-    jobs = conn.execute(query).fetchall()
+    params: tuple = (limit if limit is not None and limit > 0 else -1,)
+    jobs = conn.execute(query, params).fetchall()
     if not jobs:
         return 0, 0
 
@@ -198,7 +197,7 @@ def render_pending_jobs(
             conn.commit()
             success += 1
             print(f"✓ {job_id}  →  {output_path}")
-        except Exception as exc:  # noqa: BLE001
+        except (OSError, ValueError, RuntimeError, AttributeError, TypeError) as exc:
             err = str(exc)[:400]
             conn.execute(
                 """
