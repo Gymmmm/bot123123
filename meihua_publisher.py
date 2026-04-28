@@ -2371,6 +2371,26 @@ async def _tg_publish(
     post_token = ""
 
     button_message_id = None
+    keyboard = build_keyboard(listing_id, area, caption_variant=caption_variant)
+
+    def _prepare_channel_photo_buf(data: bytes, *, is_cover: bool, slot_index: int) -> io.BytesIO:
+        """频道图品牌层容错：坏图/异常时回退原图，避免整条发布失败。"""
+        try:
+            buf = (
+                add_brand_watermark(data, cover_listing, with_listing_footer=True)
+                if is_cover
+                else add_detail_logo_watermark(data)
+            )
+        except Exception:
+            logger.exception(
+                "频道图片品牌层处理失败，回退原图 slot=%s cover=%s",
+                slot_index,
+                is_cover,
+            )
+            buf = io.BytesIO(data)
+        buf.name = f"p{slot_index}.jpg"
+        buf.seek(0)
+        return buf
 
     # 1) 发送图片（单图或相册），首图带 caption；相册不再额外发送独立按钮消息
     if len(album) == 1:
@@ -2378,12 +2398,7 @@ async def _tg_publish(
             data = raw.read()
         data = normalize_album_image(data, target_size=1280, force_square=False)
         is_cover = bool(cover_path and os.path.abspath(album[0]) == os.path.abspath(cover_path))
-        buf = (
-            add_brand_watermark(data, cover_listing, with_listing_footer=True)
-            if is_cover
-            else add_detail_logo_watermark(data)
-        )
-        keyboard = build_keyboard(listing_id, area, caption_variant=caption_variant)
+        buf = _prepare_channel_photo_buf(data, is_cover=is_cover, slot_index=0)
         sent = await bot.send_photo(
             chat_id=CHANNEL_ID,
             photo=buf,
@@ -2397,42 +2412,61 @@ async def _tg_publish(
         file_ids = [sent.photo[-1].file_id]
         post_token = make_post_token(sent.message_id)
     else:
-        media = []
+        prepared: list[io.BytesIO] = []
         na = len(album)
         for i, path in enumerate(album):
-            with open(path, "rb") as raw:
-                data = raw.read()
-            data = _normalize_for_album_slot(data, index=i, total=na)
-            is_cover = bool(cover_path and os.path.abspath(path) == os.path.abspath(cover_path))
-            buf = (
-                add_brand_watermark(data, cover_listing, with_listing_footer=True)
-                if is_cover
-                else add_detail_logo_watermark(data)
-            )
-            buf.name = f"p{i}.jpg"
-            if i == 0:
-                media.append(
-                    InputMediaPhoto(
-                        media=buf, caption=caption, parse_mode=ParseMode.HTML
-                    )
-                )
-            else:
-                media.append(InputMediaPhoto(media=buf))
-        msgs = await bot.send_media_group(chat_id=CHANNEL_ID, media=media)
-        mgid = msgs[0].media_group_id if msgs else None
-        media_group_id = str(mgid) if mgid else str(msgs[0].message_id)
-        # 讨论组自动转发常缺 forward_from_message_id，用 media_group_id 与 pending 对齐映射
-        if msgs:
-            add_discuss_publish_queue(int(msgs[0].message_id))
-        media_message_ids = [m.message_id for m in msgs]
-        file_ids = []
-        for m in msgs:
-            if m.photo:
-                file_ids.append(m.photo[-1].file_id)
+            try:
+                with open(path, "rb") as raw:
+                    data = raw.read()
+                data = _normalize_for_album_slot(data, index=i, total=na)
+                is_cover = bool(cover_path and os.path.abspath(path) == os.path.abspath(cover_path))
+                prepared.append(_prepare_channel_photo_buf(data, is_cover=is_cover, slot_index=i))
+            except Exception:
+                logger.exception("频道主帖图片处理失败，已跳过: %s", path)
+                continue
 
-        # media_group 不能挂 inline keyboard；咨询入口已保留在 caption 中，避免频道多出一条 CTA 消息。
-        first_message_id = msgs[0].message_id if msgs else None
-        post_token = make_post_token(first_message_id)
+        if not prepared:
+            raise ValueError("publish_no_valid_media")
+
+        if len(prepared) == 1:
+            sent = await bot.send_photo(
+                chat_id=CHANNEL_ID,
+                photo=prepared[0],
+                caption=caption,
+                parse_mode=ParseMode.HTML,
+                reply_markup=keyboard,
+            )
+            add_discuss_publish_queue(int(sent.message_id))
+            media_group_id = str(getattr(sent, "media_group_id", None) or sent.message_id)
+            media_message_ids = [sent.message_id]
+            file_ids = [sent.photo[-1].file_id]
+            post_token = make_post_token(sent.message_id)
+        else:
+            media = []
+            for i, buf in enumerate(prepared):
+                if i == 0:
+                    media.append(
+                        InputMediaPhoto(
+                            media=buf, caption=caption, parse_mode=ParseMode.HTML
+                        )
+                    )
+                else:
+                    media.append(InputMediaPhoto(media=buf))
+            msgs = await bot.send_media_group(chat_id=CHANNEL_ID, media=media)
+            mgid = msgs[0].media_group_id if msgs else None
+            media_group_id = str(mgid) if mgid else str(msgs[0].message_id)
+            # 讨论组自动转发常缺 forward_from_message_id，用 media_group_id 与 pending 对齐映射
+            if msgs:
+                add_discuss_publish_queue(int(msgs[0].message_id))
+            media_message_ids = [m.message_id for m in msgs]
+            file_ids = []
+            for m in msgs:
+                if m.photo:
+                    file_ids.append(m.photo[-1].file_id)
+
+            # media_group 不能挂 inline keyboard；咨询入口已保留在 caption 中，避免频道多出一条 CTA 消息。
+            first_message_id = msgs[0].message_id if msgs else None
+            post_token = make_post_token(first_message_id)
 
     # 单图 / 多图共用：发讨论区三段式（预约承接 + 补充实拍 + 继续看房入口）
     channel_mid = media_message_ids[0] if media_message_ids else None
