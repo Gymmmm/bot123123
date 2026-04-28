@@ -51,9 +51,19 @@ def listing_detail(item: dict) -> str:
 
 
 def home_text() -> str:
+    advisor = (ADVISOR_TG or "").strip()
+    if advisor and not advisor.startswith("@"):
+        advisor = f"@{advisor}"
+    advisor = advisor or "@qiaolian_support"
     return (
-        f"🏠 <b>{BRAND_NAME}找房助手</b>\n\n"
-        "点下方按钮找房、预约或咨询顾问。"
+        "<b>侨联地产｜金边华人房产服务</b>\n\n"
+        "真实房源｜实拍更新\n"
+        "公寓｜别墅｜商铺｜土地\n\n"
+        "专注金边生活服务\n\n"
+        "在金边找房\n"
+        "找自己人\n\n"
+        "咨询客服\n"
+        f"{e(advisor)}"
     )
 
 
@@ -300,7 +310,7 @@ def listing_match_intro_text() -> str:
 
 def listing_match_footer_text() -> str:
     return (
-        "\n\n<b>下一步</b>：点菜单 <b>📅 预约看房</b> 直接约到场，或 <b>💎 咨询顾问</b> 让管理号帮你对比决策。"
+        "\n\n<b>下一步</b>：点菜单 <b>📅 预约看房</b> 直接约到场，或 <b>💬 联系顾问</b> 让管理号帮你对比决策。"
     )
 
 

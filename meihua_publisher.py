@@ -1902,7 +1902,7 @@ def build_keyboard(
         rows = [
             [
                 InlineKeyboardButton(
-                    "💬 立即咨询",
+                    "💬 咨询这套",
                     url=f"{base}{build_start_payload('q', listing_id, post_token, caption_variant)}",
                 ),
                 InlineKeyboardButton(
@@ -1912,11 +1912,11 @@ def build_keyboard(
             ],
             [
                 InlineKeyboardButton(
-                    "❤️ 收藏房源",
+                    "❤️ 收藏这套",
                     url=f"{base}{build_start_payload('f', listing_id, post_token, caption_variant)}",
                 ),
                 InlineKeyboardButton(
-                    "🏠 同区域更多",
+                    "🏠 同区更多",
                     url=f"{base}{build_start_payload('m', area or '金边', post_token, caption_variant)}",
                 ),
             ],

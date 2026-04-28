@@ -245,10 +245,11 @@ def main_keyboard() -> InlineKeyboardMarkup:
         [
             [
                 InlineKeyboardButton("🏠 推荐房源", callback_data="hub:latest"),
-                InlineKeyboardButton("📅 预约看房", callback_data="hub:appoint"),
+                InlineKeyboardButton("📍 按区域找", callback_data="hub:area"),
             ],
             [
-                InlineKeyboardButton("📍 按区域找", callback_data="hub:area"),
+                InlineKeyboardButton("📅 预约看房", callback_data="hub:appoint"),
+                InlineKeyboardButton("🎥 视频代看", callback_data="hub:video_tour"),
             ],
             [
                 InlineKeyboardButton("🧰 入住服务", callback_data="hub:service"),
@@ -261,9 +262,9 @@ def main_keyboard() -> InlineKeyboardMarkup:
 def no_match_followup_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         [
-            [InlineKeyboardButton("💎 直接咨询顾问", callback_data="appointment_menu:contact")],
+            [InlineKeyboardButton("💬 联系顾问", callback_data="appointment_menu:contact")],
             [
-                InlineKeyboardButton("🎯 继续条件筛选", callback_data="findmode:guided"),
+                InlineKeyboardButton("🎯 继续筛选", callback_data="findmode:guided"),
                 InlineKeyboardButton("🏠 返回首页", callback_data="home"),
             ],
         ]
@@ -303,9 +304,12 @@ def latest_listing_keyboard() -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton("🛏 按户型继续找", callback_data="hub:layout"),
-                InlineKeyboardButton("💬 咨询中文顾问", callback_data="hub:advisor"),
+                InlineKeyboardButton("🎥 视频代看", callback_data="hub:video_tour"),
             ],
-            [InlineKeyboardButton("🏠 返回首页", callback_data="home")],
+            [
+                InlineKeyboardButton("💬 联系顾问", callback_data="hub:advisor"),
+                InlineKeyboardButton("🏠 返回首页", callback_data="home"),
+            ],
         ]
     )
 
@@ -335,8 +339,8 @@ def keyword_followup_keyboard(*, area: str = "", room_type: str = "") -> InlineK
         )
     rows.append(
         [
-            InlineKeyboardButton("📹 预约视频看房", callback_data="appointment_menu:video"),
-            InlineKeyboardButton("💬 咨询中文顾问", callback_data="appointment_menu:contact"),
+            InlineKeyboardButton("🎥 视频代看", callback_data="appointment_menu:video"),
+            InlineKeyboardButton("💬 联系顾问", callback_data="appointment_menu:contact"),
         ]
     )
     rows.append([InlineKeyboardButton("🏠 返回首页", callback_data="home")])
@@ -351,15 +355,15 @@ def _advisor_tg_url() -> str:
 def contact_handoff_keyboard() -> InlineKeyboardMarkup:
     advisor_url = _advisor_tg_url()
     chat_btn = (
-        InlineKeyboardButton("💬 找顾问聊聊", url=advisor_url)
+        InlineKeyboardButton("💬 联系顾问", url=advisor_url)
         if advisor_url
-        else InlineKeyboardButton("💬 找顾问聊聊", callback_data="appointment_menu:contact")
+        else InlineKeyboardButton("💬 联系顾问", callback_data="appointment_menu:contact")
     )
     return InlineKeyboardMarkup(
         [
             [
                 InlineKeyboardButton("📅 预约实地看房", callback_data="appointment_menu:offline"),
-                InlineKeyboardButton("📹 改成视频看房", callback_data="appointment_menu:video"),
+                InlineKeyboardButton("🎥 改视频代看", callback_data="appointment_menu:video"),
             ],
             [
                 InlineKeyboardButton("🏠 继续看房", callback_data="home"),
@@ -389,9 +393,9 @@ def lead_capture_keyboard() -> InlineKeyboardMarkup:
     advisor_url = _advisor_tg_url()
     rows.append([InlineKeyboardButton("📱 发送手机号", callback_data="lead_capture:phone")])
     if advisor_url:
-        rows.append([InlineKeyboardButton("💬 直接联系顾问", url=advisor_url)])
+        rows.append([InlineKeyboardButton("💬 联系顾问", url=advisor_url)])
     else:
-        rows.append([InlineKeyboardButton("💬 直接联系顾问", callback_data="hub:advisor")])
+        rows.append([InlineKeyboardButton("💬 联系顾问", callback_data="hub:advisor")])
     rows.append([InlineKeyboardButton("🏠 继续看房", callback_data="home")])
     return InlineKeyboardMarkup(rows)
 
@@ -405,7 +409,7 @@ def old_tenant_followup_keyboard() -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton("🏠 我要换房", callback_data="contract:change"),
-                InlineKeyboardButton("💎 联系顾问", callback_data="appointment_menu:contact"),
+                InlineKeyboardButton("💬 联系顾问", callback_data="appointment_menu:contact"),
             ],
             [InlineKeyboardButton("📅 预约看房", callback_data="appointment_menu:offline")],
             [InlineKeyboardButton("🏠 返回首页", callback_data="home")],
@@ -634,7 +638,7 @@ def find_budget_keyboard(goal: str) -> InlineKeyboardMarkup:
         rows.append(row)
     rows.append(
         [
-            InlineKeyboardButton("↩️ 返回区域", callback_data="findback:area"),
+            InlineKeyboardButton("⬅️ 返回区域", callback_data="findback:area"),
             InlineKeyboardButton("🏠 返回首页", callback_data="home"),
         ]
     )
@@ -653,11 +657,11 @@ def appointment_menu_keyboard() -> InlineKeyboardMarkup:
         [
             [
                 InlineKeyboardButton("📅 预约实地看房", callback_data="appointment_menu:offline"),
-                InlineKeyboardButton("📹 预约实时视频代看", callback_data="appointment_menu:video"),
+                InlineKeyboardButton("🎥 视频代看", callback_data="appointment_menu:video"),
             ],
             [
                 InlineKeyboardButton("📋 查看我的预约", callback_data="appointment_menu:list"),
-                InlineKeyboardButton("💬 联系管理", callback_data="appointment_menu:contact"),
+                InlineKeyboardButton("💬 联系顾问", callback_data="appointment_menu:contact"),
             ],
             [InlineKeyboardButton("🏠 返回首页", callback_data="home")],
         ]
@@ -806,6 +810,28 @@ def clear_session_for_fresh_entry(context: ContextTypes.DEFAULT_TYPE) -> None:
     clear_main_flags(context)
     context.user_data.pop("appt", None)
     context.user_data.pop("contact_touch_payload", None)
+
+
+def _remember_video_pref(
+    context: ContextTypes.DEFAULT_TYPE,
+    *,
+    area: str | None = None,
+    budget_min: int | None = None,
+    budget_max: int | None = None,
+    layout: str | None = None,
+) -> None:
+    snap = context.user_data.get("video_pref")
+    if not isinstance(snap, dict):
+        snap = {}
+    if area is not None:
+        snap["area"] = str(area or "").strip()
+    if budget_min is not None:
+        snap["budget_min"] = budget_min
+    if budget_max is not None:
+        snap["budget_max"] = budget_max
+    if layout is not None:
+        snap["layout"] = str(layout or "").strip()
+    context.user_data["video_pref"] = snap
 
 
 def _base36_decode(token: str) -> int | None:
@@ -1109,8 +1135,8 @@ def channel_topic_welcome_text(topic: str) -> str:
             "如果您想咨询代看、合同、入住协助或租后问题，直接点按钮就能接上顾问。"
         ),
         "video_tour": (
-            "🎥 已进入代看入口。\n\n"
-            "告诉我房源链接、区域或预算，我们可以安排实地代看或实时视频代看。"
+            "🎥 已进入视频代看入口。\n\n"
+            "先发你要找的区域、预算、户型，我会先推两套再接顾问视频代看。"
         ),
     }
     return topic_map.get(
@@ -1132,12 +1158,223 @@ def _resolve_area_from_target(target: str) -> tuple[str, str]:
     return area, listing_id
 
 
-def _latest_listing_text(limit: int = 3) -> str:
+def _daily_listing_line(item: dict) -> str:
+    area = str(item.get("area") or "金边").strip() or "金边"
+    layout = str(item.get("layout") or item.get("property_type") or "房源").strip() or "房源"
+    return f"{he(area)}｜{he(layout)}｜{he(_fmt_price(item.get('price')))}"
+
+
+def _latest_listing_text(limit: int = 5) -> str:
     matches = db.list_recent_listings(limit)
     if not matches:
-        return "🆕 暂时还没有可展示的最新房源，您可以先按区域或预算告诉我，我先帮您缩小范围。"
-    return "🆕 <b>最新房源</b>\n\n" + _format_listing_choice_lines(matches)
+        return "🏠 <b>今日可看房源更新</b>\n\n暂时还没有可展示的最新房源，您可以先告诉我区域和预算。"
+    lines = [
+        "🏠 <b>今日可看房源更新</b>",
+        "",
+        "今日新增：",
+        "",
+    ]
+    for item in matches[:limit]:
+        lines.append(_daily_listing_line(item))
+    lines.extend(
+        [
+            "",
+            "房源变动很快，",
+            "看到合适的建议先咨询是否还在。",
+            "",
+            "侨联可以先帮您确认：",
+            "• 是否可入住",
+            "• 押金怎么收",
+            "• 费用怎么算",
+            "• 能不能视频代看",
+        ]
+    )
+    return "\n".join(lines)
 
+
+def _resolve_video_pref_snapshot(context: ContextTypes.DEFAULT_TYPE) -> dict[str, object]:
+    def _int_or_none(v: object) -> int | None:
+        if v in (None, ""):
+            return None
+        try:
+            return int(v)
+        except (TypeError, ValueError):
+            return None
+
+    snap = context.user_data.get("video_pref")
+    snap = dict(snap) if isinstance(snap, dict) else {}
+
+    area = str(snap.get("area") or "").strip()
+    budget_min = _int_or_none(snap.get("budget_min"))
+    budget_max = _int_or_none(snap.get("budget_max"))
+    layout = str(snap.get("layout") or "").strip()
+
+    pref = context.user_data.get("search_pref")
+    if isinstance(pref, dict):
+        if not area:
+            area = str(pref.get("area") or "").strip()
+        if not layout:
+            goal = str(pref.get("goal") or "").strip()
+            if goal and goal not in {"any", "住宅"}:
+                layout = goal
+
+    listing_id = str(context.user_data.get("contact_listing_id") or "").strip()
+    if listing_id:
+        info = listing_context(listing_id)
+        if not area:
+            area = str(info.get("area") or "").strip()
+        if not layout:
+            layout = str(info.get("layout") or info.get("property_type") or "").strip()
+
+    area_display = area or "未填写"
+    budget_display = _budget_text(budget_min, budget_max)
+    if budget_display == "-":
+        budget_display = "未填写"
+    layout_display = layout or "未填写"
+
+    return {
+        "area": area,
+        "area_display": area_display,
+        "budget_min": budget_min,
+        "budget_max": budget_max,
+        "budget_display": budget_display,
+        "layout": layout,
+        "layout_display": layout_display,
+    }
+
+
+def _video_tour_intro_text(*, area: str, budget: str, layout: str) -> str:
+    return (
+        "🎥 可以，侨联可以先帮您视频代看。\n\n"
+        "适合这些情况：\n\n"
+        "✔ 人还没到金边\n"
+        "✔ 没时间一套套跑\n"
+        "✔ 想先确认房子真实情况\n"
+        "✔ 想看周边环境\n"
+        "✔ 想提前看家具家电状态\n"
+        "稍等，小助手正在为你从侨联房源库中检索...\n\n"
+        "按你的需求：\n"
+        f"区域：{he(area)}\n"
+        f"预算：{he(budget)}\n"
+        f"户型：{he(layout)}"
+    )
+
+
+def _video_tour_match_text(matches: list[dict], *, match_mode: str = "strict") -> str:
+    if not matches:
+        return "暂时没有完全匹配的在架房源，我先把你接给顾问人工优先处理。"
+    lines = ["已为你先匹配 2 套：", ""]
+    for idx, item in enumerate(matches[:2], start=1):
+        area = str(item.get("area") or "金边").strip() or "金边"
+        layout = str(item.get("layout") or item.get("property_type") or "房源").strip() or "房源"
+        listing_id = str(item.get("listing_id") or "-").strip() or "-"
+        lines.append(f"{idx}. {he(area)}｜{he(layout)}｜{he(_fmt_price(item.get('price')))}")
+        lines.append(f"房源编号：<code>{he(listing_id)}</code>")
+    if match_mode in {"no_type", "no_area", "budget_only", "fuzzy", "fallback_recent"}:
+        lines.append("\n已自动放宽条件先给你匹配，顾问会继续人工精筛。")
+    return "\n".join(lines)
+
+
+def _video_match_keyboard(matches: list[dict]) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    for item in matches[:2]:
+        listing_id = str(item.get("listing_id") or "").strip()
+        if listing_id:
+            rows.append([InlineKeyboardButton(f"💬 咨询 {listing_id}", callback_data=f"appointment_menu:contact:listing:{listing_id}")])
+    rows.append([InlineKeyboardButton("📅 安排视频代看", callback_data="appointment_menu:video")])
+    rows.append([InlineKeyboardButton("🏠 查看更多房源", callback_data="hub:latest")])
+    return InlineKeyboardMarkup(rows)
+
+
+async def start_video_tour_flow(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    *,
+    source: str,
+    area: str = "",
+    budget_min: int | None = None,
+    budget_max: int | None = None,
+    layout: str = "",
+) -> int:
+    _remember_video_pref(
+        context,
+        area=area or None,
+        budget_min=budget_min,
+        budget_max=budget_max,
+        layout=layout or None,
+    )
+    pref = _resolve_video_pref_snapshot(context)
+    area_value = str(pref.get("area") or "")
+    budget_lo = pref.get("budget_min")
+    budget_hi = pref.get("budget_max")
+    layout_value = str(pref.get("layout") or "")
+
+    create_lead(
+        update.effective_user,
+        action="video_tour_click",
+        source=source,
+        area=area_value if area_value and area_value != "不限" else "",
+        budget_min=budget_lo if isinstance(budget_lo, int) else None,
+        budget_max=budget_hi if isinstance(budget_hi, int) else None,
+        payload={
+            "preferred_mode": "video",
+            "layout": layout_value,
+            "area": area_value,
+        },
+    )
+
+    notify_key = f"video_tour_click:{source}"
+    if _allow_admin_notify(context, key=notify_key, cooldown_seconds=120):
+        await _notify_admins(
+            context,
+            title="视频代看入口点击",
+            lines=[
+                f"用户：{_user_mention_html(update.effective_user)}",
+                f"联系方式：{he(_user_contact_text(update.effective_user))}",
+                f"来源：{he(source)}",
+                f"区域：{he(str(pref.get('area_display') or '未填写'))}",
+                f"预算：{he(str(pref.get('budget_display') or '未填写'))}",
+                f"户型：{he(str(pref.get('layout_display') or '未填写'))}",
+            ],
+        )
+
+    await render_panel(
+        update,
+        text=_video_tour_intro_text(
+            area=str(pref.get("area_display") or "未填写"),
+            budget=str(pref.get("budget_display") or "未填写"),
+            layout=str(pref.get("layout_display") or "未填写"),
+        ),
+        parse_mode=ParseMode.HTML,
+        reply_markup=main_keyboard(),
+        context=context,
+    )
+
+    has_condition = bool(area_value or layout_value or isinstance(budget_lo, int) or isinstance(budget_hi, int))
+    if not has_condition:
+        await update.effective_message.reply_text(
+            "请先发找房条件后我再推 2 套：例如 <code>BKK1 500-800 一房</code>。",
+            parse_mode=ParseMode.HTML,
+            reply_markup=keyword_followup_keyboard(),
+        )
+        return MAIN
+
+    property_type = detect_property_type(layout_value)
+    matches, match_mode = search_listings_with_fallback(
+        property_type=property_type or None,
+        area=area_value if area_value and area_value != "不限" else "",
+        budget_min=budget_lo if isinstance(budget_lo, int) else None,
+        budget_max=budget_hi if isinstance(budget_hi, int) else None,
+        text_fragment=f"{area_value} {layout_value} {pref.get('budget_display')}",
+        limit=2,
+    )
+
+    await update.effective_message.reply_text(
+        _video_tour_match_text(matches, match_mode=match_mode),
+        parse_mode=ParseMode.HTML,
+        reply_markup=_video_match_keyboard(matches),
+    )
+    return MAIN
 
 def _keyword_intro_text(*, area: str = "", room_type: str = "", budget_min: int | None = None, budget_max: int | None = None) -> str:
     parts: list[str] = []
@@ -1195,7 +1432,7 @@ def listing_landing_keyboard(listing_id: str, area: str = "") -> InlineKeyboardM
                     url=_deep_link(_build_start_payload("appoint", listing_id, mode="offline")),
                 ),
                 InlineKeyboardButton(
-                    "📹 预约视频看房",
+                    "🎥 视频代看",
                     url=_deep_link(_build_start_payload("appoint", listing_id, mode="video")),
                 ),
             ],
@@ -1203,7 +1440,7 @@ def listing_landing_keyboard(listing_id: str, area: str = "") -> InlineKeyboardM
                 InlineKeyboardButton("❤️ 先收藏这套", url=_deep_link(_build_start_payload("fav", listing_id))),
                 InlineKeyboardButton("🏠 看同区域更多", url=_deep_link(_build_start_payload("more", listing_id or area_payload))),
             ],
-            [InlineKeyboardButton("💬 咨询中文顾问", callback_data=f"appointment_menu:contact:listing:{listing_id}")],
+            [InlineKeyboardButton("💬 联系顾问", callback_data=f"appointment_menu:contact:listing:{listing_id}")],
         ]
     )
 
@@ -1481,7 +1718,7 @@ def _binding_contract_text(binding: dict | None, user_id: int | None = None) -> 
         return (
             "📋 <b>我的租约</b>\n\n"
             "当前还没有绑定租约档案。\n"
-            "请点「💎 联系顾问」，我们会后台录入房号/交租日/到期日。"
+            "请点「💬 联系顾问」，我们会后台录入房号/交租日/到期日。"
         )
     property_name = str(binding.get("property_name") or "-")
     rent_day = binding.get("rent_day")
@@ -1528,7 +1765,7 @@ def _contract_actions_keyboard(user_id: int | None = None) -> InlineKeyboardMark
         ],
         [
             InlineKeyboardButton(reminder_label, callback_data="contract:toggle_reminder"),
-            InlineKeyboardButton("💎 联系顾问", callback_data="appointment_menu:contact"),
+            InlineKeyboardButton("💬 联系顾问", callback_data="appointment_menu:contact"),
         ],
         [InlineKeyboardButton("🏠 返回首页", callback_data="home")],
     ]
@@ -1632,7 +1869,7 @@ def list_recent_appointments(user_id: int) -> str:
         parts.append(
             f"• {row.get('listing_id', '未填写')} | {row.get('appointment_date', '')} | {time_label} | {mode} | {status}"
         )
-    parts.append("\n如需改时间，请点「💎 咨询顾问」由管理号协助处理。")
+    parts.append("\n如需改时间，请点「💬 联系顾问」由管理号协助处理。")
     return "\n".join(parts)
 
 
@@ -1654,7 +1891,7 @@ def list_favorites_text(user_id: int) -> str:
         parts.append(
             f"• {item.get('listing_id', '-')} | {item.get('area', '金边')} | {_fmt_price(item.get('price'))}{detail_text}"
         )
-    parts.append("\n需要从收藏里优先挑选，点「💎 咨询顾问」即可。")
+    parts.append("\n需要从收藏里优先挑选，点「💬 联系顾问」即可。")
     return "\n".join(parts)
 
 
@@ -1843,14 +2080,10 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
         return MAIN
 
     if action == "index_video":
-        create_lead(user, action="appointment_click", source="channel_index", payload={"preferred_mode": "video"})
-        return await start_appointment(
+        return await start_video_tour_flow(
             update,
             context,
-            "待推荐",
             source="channel_index",
-            touch_payload={**touch_payload, "from_channel_index": True},
-            initial_mode="video",
         )
 
     if action == "index_advisor":
@@ -1921,13 +2154,10 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
             await message.reply_text(channel_topic_welcome_text(topic), reply_markup=service_hub_keyboard())
             return MAIN
         if topic == "video_tour":
-            return await start_appointment(
+            return await start_video_tour_flow(
                 update,
                 context,
-                "待推荐",
                 source="channel_topic",
-                touch_payload={"topic": topic},
-                initial_mode="video",
             )
         await message.reply_text(channel_topic_welcome_text(topic), reply_markup=main_keyboard())
         return MAIN
@@ -2124,8 +2354,8 @@ def _appointment_date_keyboard() -> InlineKeyboardMarkup:
             btns[0:3],
             btns[3:5],
             [
-                InlineKeyboardButton("🔙 返回上一步", callback_data="appoint_back_mode"),
-                InlineKeyboardButton("🏠 首页", callback_data="home"),
+                InlineKeyboardButton("⬅️ 返回上一步", callback_data="appoint_back_mode"),
+                InlineKeyboardButton("🏠 返回首页", callback_data="home"),
             ],
         ]
     )
@@ -2163,8 +2393,8 @@ def _appointment_focus_keyboard(selected: set[str]) -> InlineKeyboardMarkup:
     )
     btn_rows.append(
         [
-            InlineKeyboardButton("↩️ 返回方式选择", callback_data="apfocus:back_mode"),
-            InlineKeyboardButton("🏠 首页", callback_data="home"),
+            InlineKeyboardButton("⬅️ 返回方式", callback_data="apfocus:back_mode"),
+            InlineKeyboardButton("🏠 返回首页", callback_data="home"),
         ]
     )
     return InlineKeyboardMarkup(btn_rows)
@@ -2219,9 +2449,9 @@ async def start_appointment(
         [
             [
                 InlineKeyboardButton("📅 实地看房", callback_data="apmode:offline"),
-                InlineKeyboardButton("📹 实时视频代看", callback_data="apmode:video"),
+                InlineKeyboardButton("🎥 视频代看", callback_data="apmode:video"),
             ],
-            [InlineKeyboardButton("🏠 返回主菜单", callback_data="home")],
+            [InlineKeyboardButton("🏠 返回首页", callback_data="home")],
         ]
     )
     await render_panel(
@@ -2434,23 +2664,24 @@ async def handle_main_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     property_type = detect_property_type(text)
     wants_video = any(token in normalized_text for token in ("视频看房", "视频代看", "实拍", "视频"))
 
+    if area_use or room_type or budget_min is not None or budget_max is not None:
+        _remember_video_pref(
+            context,
+            area=area_use or None,
+            budget_min=budget_min,
+            budget_max=budget_max,
+            layout=room_type or property_type or None,
+        )
+
     if wants_video:
-        create_lead(
-            user,
-            action="appointment_click",
+        return await start_video_tour_flow(
+            update,
+            context,
             source="natural_keyword",
             area=area_use,
             budget_min=budget_min,
             budget_max=budget_max,
-            payload={"message": text[:700], "preferred_mode": "video", "room_type": room_type},
-        )
-        return await start_appointment(
-            update,
-            context,
-            "待推荐",
-            source="natural_keyword",
-            touch_payload={"message": text[:700], "area": area_use, "room_type": room_type},
-            initial_mode="video",
+            layout=room_type or property_type,
         )
 
     if area_use or room_type or budget_min is not None or budget_max is not None:
@@ -2499,7 +2730,7 @@ async def handle_main_message(update: Update, context: ContextTypes.DEFAULT_TYPE
             )
         return MAIN
 
-    if text in {"🏠 返回首页", "🏠 首页"}:
+    if text in {"🏠 返回首页", "🏠 返回首页"}:
         clear_session_for_fresh_entry(context)
         await render_panel(
             update,
@@ -2578,6 +2809,7 @@ async def handle_find_area(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         "goal": goal,
         "touch_payload": current.get("touch_payload") or {},
     }
+    _remember_video_pref(context, area=area)
     await render_panel(
         update,
         text=find_area_budget_hint_text(),
@@ -2597,6 +2829,14 @@ async def handle_find_budget(update: Update, context: ContextTypes.DEFAULT_TYPE)
     property_type = detect_property_type(text)
     area = pref.get("area", "")
     goal = str(pref.get("goal") or "")
+    room_hint = detect_room_type(text) or ("" if goal in {"", "any", "住宅"} else goal)
+    _remember_video_pref(
+        context,
+        area=area or None,
+        budget_min=budget_min,
+        budget_max=budget_max,
+        layout=room_hint or None,
+    )
 
     create_lead(
         user,
@@ -3039,6 +3279,9 @@ async def handle_ui_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if data == "hub:appoint":
         return await show_appointment_hub(update, context)
 
+    if data == "hub:video_tour":
+        return await start_video_tour_flow(update, context, source="home_video_button")
+
     if data == "hub:advisor":
         return await contact_management(update, context, source="hub")
 
@@ -3149,6 +3392,7 @@ async def handle_ui_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     if data.startswith("roompick:"):
         room_type = data.split(":", 1)[1]
+        _remember_video_pref(context, layout=room_type)
         property_type = detect_property_type(room_type)
         matches, match_mode = search_listings_with_fallback(
             property_type=property_type or None,
@@ -3261,7 +3505,7 @@ async def handle_ui_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         if not binding:
             await render_panel(
                 update,
-                text="当前还没有绑定租约档案。\n请点「💎 联系顾问」，我们先把房号和到期日录入。",
+                text="当前还没有绑定租约档案。\n请点「💬 联系顾问」，我们先把房号和到期日录入。",
                 reply_markup=contact_handoff_keyboard(),
             )
             return MAIN
@@ -3303,7 +3547,7 @@ async def handle_ui_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
                         ),
                         InlineKeyboardButton("🏠 我想换房", callback_data="contract:change"),
                     ],
-                    [InlineKeyboardButton("💎 先联系顾问", callback_data="appointment_menu:contact")],
+                    [InlineKeyboardButton("💬 联系顾问", callback_data="appointment_menu:contact")],
                 ]
             ),
         )
@@ -3401,7 +3645,7 @@ async def handle_ui_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             reply_markup=InlineKeyboardMarkup(
                 [
                     [InlineKeyboardButton("🔍 立即筛房", callback_data="findmode:guided")],
-                    [InlineKeyboardButton("💎 联系顾问", callback_data="appointment_menu:contact")],
+                    [InlineKeyboardButton("💬 联系顾问", callback_data="appointment_menu:contact")],
                     [InlineKeyboardButton("📋 返回租约", callback_data="contract:view")],
                 ]
             ),
@@ -3492,6 +3736,15 @@ async def handle_ui_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         goal = str(pref.get("goal") or "any")
         area = str(pref.get("area") or "")
         budget_label, budget_min, budget_max = _decode_budget_choice(goal, code)
+
+        layout_hint = "" if goal in {"any", "住宅"} else goal
+        _remember_video_pref(
+            context,
+            area=area or None,
+            budget_min=budget_min,
+            budget_max=budget_max,
+            layout=layout_hint or None,
+        )
 
         type_filter = "" if goal in {"any", "住宅"} else goal
         create_lead(
@@ -4034,7 +4287,7 @@ async def lease_reminder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
                         ),
                         InlineKeyboardButton("🏠 我想换房", callback_data="contract:change"),
                     ],
-                    [InlineKeyboardButton("💎 联系顾问", callback_data="appointment_menu:contact")],
+                    [InlineKeyboardButton("💬 联系顾问", callback_data="appointment_menu:contact")],
                 ]
             )
             try:
@@ -4113,7 +4366,7 @@ async def rent_day_reminder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         )
         keyboard = InlineKeyboardMarkup(
             [
-                [InlineKeyboardButton("💎 联系顾问", callback_data="appointment_menu:contact")],
+                [InlineKeyboardButton("💬 联系顾问", callback_data="appointment_menu:contact")],
             ]
         )
         try:
@@ -4233,8 +4486,8 @@ async def appoint_flow_cb(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                     InlineKeyboardButton("下午 (14:00-18:00)", callback_data="aptime:pm"),
                 ],
                 [
-                    InlineKeyboardButton("🔙 返回上一步", callback_data="appoint_back_date"),
-                    InlineKeyboardButton("🏠 首页", callback_data="home"),
+                    InlineKeyboardButton("⬅️ 返回上一步", callback_data="appoint_back_date"),
+                    InlineKeyboardButton("🏠 返回首页", callback_data="home"),
                 ],
             ]
         )
@@ -4262,7 +4515,7 @@ async def appoint_flow_cb(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             [
                 [InlineKeyboardButton("✅ 确认提交", callback_data="apconfirm:yes")],
                 [
-                    InlineKeyboardButton("🔙 返回上一步", callback_data="appoint_back_time"),
+                    InlineKeyboardButton("⬅️ 返回上一步", callback_data="appoint_back_time"),
                     InlineKeyboardButton("❌ 取消", callback_data="home"),
                 ],
             ]
