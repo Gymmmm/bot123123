@@ -72,6 +72,21 @@ def channel_welcome_text(first_name: str = "") -> str:
     )
 
 
+def discussion_entry_welcome_text(first_name: str = "", listing_id: str = "") -> str:
+    """讨论区第三段深链进入后的承接欢迎语。"""
+    name_part = f" {e(first_name)}" if first_name else ""
+    listing_line = f"房源：<code>{e(listing_id)}</code>\n\n" if listing_id else ""
+    return (
+        f"🤖 已进入侨联小助手{name_part}\n\n"
+        f"{listing_line}"
+        "已为你同步讨论区线索到顾问后台，继续点按钮即可：\n"
+        "• 预约实地看房 / 视频看房\n"
+        "• 按区域继续找同类房源\n"
+        "• 按预算收窄到 1-3 套\n\n"
+        "👇 先选一个继续"
+    )
+
+
 def lead_capture_text() -> str:
     """留资触发节点文案：在预约/视频看房/费用咨询/联系顾问后触发。"""
     return (

@@ -31,6 +31,7 @@ try:
         brand_text as copy_brand_text,
         channel_welcome_text as copy_channel_welcome_text,
         deposit_text as copy_deposit_text,
+        discussion_entry_welcome_text as copy_discussion_entry_welcome_text,
         find_area_budget_hint_text,
         find_no_match_text,
         help_repeat_keyboard,
@@ -68,6 +69,7 @@ except ImportError:  # pragma: no cover - script mode fallback
         brand_text as copy_brand_text,
         channel_welcome_text as copy_channel_welcome_text,
         deposit_text as copy_deposit_text,
+        discussion_entry_welcome_text as copy_discussion_entry_welcome_text,
         find_area_budget_hint_text,
         find_no_match_text,
         help_repeat_keyboard,
@@ -418,6 +420,10 @@ def welcome_text() -> str:
 def channel_welcome_text(first_name: str = "") -> str:
     """首屏 /start 欢迎语，压缩版：一屏内展示核心动作按钮。"""
     return copy_channel_welcome_text(first_name=first_name)
+
+
+def discussion_entry_welcome_text(first_name: str = "", listing_id: str = "") -> str:
+    return copy_discussion_entry_welcome_text(first_name=first_name, listing_id=listing_id)
 
 
 def lead_capture_text() -> str:
@@ -1610,6 +1616,25 @@ async def _notify_admins(
             logger.exception("发送管理号消息失败: admin_id=%s title=%s", admin_id, title)
 
 
+def _allow_admin_notify(
+    context: ContextTypes.DEFAULT_TYPE,
+    *,
+    key: str,
+    cooldown_seconds: int = 180,
+) -> bool:
+    """简单节流：避免同一用户短时间重复点击导致管理号刷屏。"""
+    box = context.user_data.setdefault("_notify_throttle", {})
+    if not isinstance(box, dict):
+        box = {}
+    now_ts = datetime.now().timestamp()
+    last_ts = float(box.get(key) or 0)
+    if now_ts - last_ts < max(1, int(cooldown_seconds)):
+        return False
+    box[key] = now_ts
+    context.user_data["_notify_throttle"] = box
+    return True
+
+
 def old_tenant_binding_text(user_id: int) -> tuple[str, dict | None]:
     binding = db.get_active_binding(user_id)
     if not binding:
@@ -1697,6 +1722,10 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
             or "a"
         )
         touch_payload["caption_variant"] = caption_variant
+        entry_source = str(target_meta.get("entry") or target_meta.get("src") or "").strip().lower()
+        if entry_source:
+            touch_payload["entry"] = entry_source
+            touch_payload["entry_step"] = str(target_meta.get("step") or "").strip()
         context.user_data["contact_listing_id"] = listing_id
         context.user_data["contact_touch_payload"] = {**touch_payload, "caption_variant": caption_variant}
         _store_active_entry(
@@ -1729,12 +1758,29 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
             listing_id=listing_id,
             payload={**touch_payload, "preferred_mode": initial_mode, "caption_variant": caption_variant},
         )
+        if entry_source == "discussion" and _allow_admin_notify(
+            context,
+            key=f"discussion_appoint:{listing_id}:{post_token}:{int(user.id)}",
+            cooldown_seconds=180,
+        ):
+            await _notify_admins(
+                context,
+                title="讨论区预约点击（首段）",
+                lines=[
+                    f"用户：{_user_mention_html(user)}",
+                    f"联系方式：{he(_user_contact_text(user))}",
+                    f"房源：{he(listing_id or '-')}",
+                    f"来源：{he(source)}",
+                    f"post_token：{he(post_token or '-')}",
+                    f"预约方式：{he(initial_mode or '未选择')}",
+                ],
+            )
         return await start_appointment(
             update,
             context,
             listing_id,
             source=source,
-            touch_payload=touch_payload,
+            touch_payload={**touch_payload, "entry": entry_source or ""},
             initial_mode=initial_mode,
         )
 
@@ -2020,6 +2066,7 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
 
     if action == "discussion_entry":
         listing_id = target
+        entry_source = str(target_meta.get("entry") or "discussion").strip().lower() or "discussion"
         context.user_data["contact_listing_id"] = listing_id or None
         create_lead(
             user,
@@ -2030,6 +2077,7 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
                 "post_token": post_token,
                 "listing_id": listing_id,
                 "source": "discussion_entry",
+                "entry": entry_source,
                 **touch_payload,
             },
         )
@@ -2045,7 +2093,7 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
         )
         first_name = str(getattr(user, "first_name", "") or "")
         await message.reply_text(
-            channel_welcome_text(first_name=first_name),
+            discussion_entry_welcome_text(first_name=first_name, listing_id=listing_id),
             parse_mode=ParseMode.HTML,
             reply_markup=main_keyboard(),
         )

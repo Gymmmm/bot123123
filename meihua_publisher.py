@@ -78,11 +78,11 @@ DISCUSSION_MORE_PROMPT = os.getenv("DISCUSSION_MORE_PROMPT", "点击查看更多
 # 讨论区三段式：第一段 - 预约承接
 DISCUSSION_APPT_TEXT = os.getenv(
     "DISCUSSION_APPT_TEXT",
-    "📅 随时可以预约看房\n\n"
-    "点击下方按钮，侨联客服会在 15 分钟内联系您安排：\n"
+    "📅 这套房现在可以预约看房\n\n"
+    "点击下方按钮，我会把你的预约请求同步给顾问后台：\n"
     "• 实地看房\n"
     "• 视频看房\n\n"
-    "侨联地产｜您在金边的自己人",
+    "通常 15 分钟内会有顾问联系你",
 )
 # 讨论区三段式：第二段 - 补充实拍组图首图说明
 DISCUSSION_EXTRA_INTRO = os.getenv(
@@ -96,13 +96,13 @@ DISCUSSION_EXTRA_INTRO = os.getenv(
 # 讨论区三段式：第三段 - 继续看房入口
 DISCUSSION_CONTINUE_TEXT = os.getenv(
     "DISCUSSION_CONTINUE_TEXT",
-    "还想继续看看房源？\n\n"
-    "侨联小助手可以帮你：\n"
-    "• 推荐同区域房源\n"
-    "• 按预算筛选\n"
+    "还想继续看同区域房源？\n\n"
+    "点下方侨联小助手，可以马上：\n"
+    "• 推荐同区域在租房\n"
+    "• 按预算继续筛选\n"
     "• 预约看房\n"
-    "• 视频带看\n\n"
-    "👇 点击进入",
+    "• 一键转顾问跟进\n\n"
+    "👇 点击下方按钮进入",
 )
 # 讨论区分批发送时，第 2 批及以后首张图说明
 DISCUSSION_EXTRA_INTRO_CONT = os.getenv(
@@ -1746,7 +1746,8 @@ def _build_discussion_appt_keyboard(listing_id: str, post_token: str) -> InlineK
     """讨论区第一段：预约看房按钮，深链到用户 Bot 的预约流程。"""
     if BOT_USERNAME:
         user = BOT_USERNAME.lstrip("@")
-        appt_payload = build_start_payload("a", listing_id, post_token)
+        listing_target = f"{listing_id}|entry=discussion|step=seg1"
+        appt_payload = build_start_payload("a", listing_target, post_token)
         return InlineKeyboardMarkup(
             [[InlineKeyboardButton("📅 预约看房", url=f"https://t.me/{user}?start={appt_payload}")]]
         )
@@ -1757,9 +1758,9 @@ def _build_discussion_continue_keyboard(listing_id: str, post_token: str) -> Inl
     """讨论区第三段：继续看房入口，深链到用户 Bot 的讨论区入口。"""
     if BOT_USERNAME:
         user = BOT_USERNAME.lstrip("@")
-        entry_payload = f"discussion_entry__{post_token or ''}__{listing_id}"
+        entry_payload = f"discussion_entry__{post_token or ''}__{listing_id}|entry=discussion|step=seg3"
         return InlineKeyboardMarkup(
-            [[InlineKeyboardButton("🤖 侨联小助手", url=f"https://t.me/{user}?start={entry_payload}")]]
+            [[InlineKeyboardButton("🤖 打开侨联小助手", url=f"https://t.me/{user}?start={entry_payload}")]]
         )
     return InlineKeyboardMarkup([])
 

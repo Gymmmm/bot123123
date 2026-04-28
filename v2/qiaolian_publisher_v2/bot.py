@@ -489,7 +489,7 @@ class PublisherBot:
             "例如：<code>/send DRF_7a806f77-5451-49a4-90eb-be9c95ca95aa</code>\n\n"
             "批量文案对比：<code>/send_variants DRF_xxx</code>\n\n"
             "先用 <code>/pending</code> 看待审编号，再复制粘贴发布。\n\n"
-            "🎨 封面测试：<code>/cover_test DRF_xxx</code>（按真实草稿渲染 4 款）",
+            "🎨 封面测试：<code>/cover_test DRF_xxx</code>（按真实草稿渲染 2 款精选）",
             parse_mode=ParseMode.HTML,
             reply_markup=admin_menu(),
         )
@@ -624,7 +624,7 @@ class PublisherBot:
         )
 
     async def cmd_cover_test(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """测试 4 款封面模板。支持 /cover_test DRF_xxx 使用真实草稿数据。"""
+        """测试 2 款精选封面模板。支持 /cover_test DRF_xxx 使用真实草稿数据。"""
         if not await self._ensure_admin(update):
             return
         msg = update.effective_message
@@ -642,14 +642,13 @@ class PublisherBot:
                 parse_mode=ParseMode.HTML,
             )
 
+        # 旧的 classic / vertical 视觉稳定性一般，已下线测试入口，仅保留可上线模板。
         styles = [
-            ("classic", "经典蓝卡"),
-            ("minimal", "极简白条"),
-            ("price_tag", "右侧价签"),
-            ("vertical", "竖版视频(9:16)"),
+            ("minimal", "精选A·清爽信息条"),
+            ("price_tag", "精选B·价格角标"),
         ]
 
-        await msg.reply_text(f"正在生成 4 款封面并发送到频道...\n数据来源：{source_desc}")
+        await msg.reply_text(f"正在生成 2 款精选封面并发送到频道...\n数据来源：{source_desc}")
         try:
             out_dir = self._runtime_render_dir()
         except Exception as e:
@@ -689,7 +688,7 @@ class PublisherBot:
                 f"失败项：{', '.join(failed)}"
             )
         else:
-            await msg.reply_text("✅ 4 款封面测试已发送到频道，请查看对比效果。")
+            await msg.reply_text("✅ 2 款精选封面已发送到频道，请查看对比效果。")
 
     @staticmethod
     def _coerce_highlights(raw: Any) -> list[str]:
