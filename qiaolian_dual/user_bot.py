@@ -4324,12 +4324,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
     logger.exception("user_bot handler error: %s", context.error)
 
 
-_MAIN_CB_PATTERN = (
-    r"^(home|hub:|resume:|unavail:|findmode:|findtype:|findarea:|findbudget:|findback:area"
-    r"|roompick:|appointment_menu:|service:|service_request:|service_slot:|pref:|profile:|contract:|lead_capture:)"
-    r"|roompick:|appointment_menu:|service:|service_request:|service_slot:|pref:|profile:|contract:"
-    r"|local:|rfcity:)"
-)
+_MAIN_CB_PATTERN = r"^(home|hub:|resume:|unavail:|findmode:|findtype:|findarea:|findbudget:|findback:area|roompick:|appointment_menu:|service:|service_request:|service_slot:|pref:|profile:|contract:|lead_capture:|local:|rfcity:)"
 
 
 def build_application() -> Application:
