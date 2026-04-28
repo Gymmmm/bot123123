@@ -59,16 +59,17 @@ def home_text() -> str:
 
 def channel_welcome_text(first_name: str = "") -> str:
     """首屏 /start 欢迎语（无深链参数）：精简版，保留核心动作按钮。"""
-    name_part = f" {e(first_name)}" if first_name else ""
     return (
-        f"👋 你好{name_part}\n\n"
-        f"我是{BRAND_NAME}找房助手\n\n"
-        "可以帮你：\n"
-        "🏠 找房\n"
-        "📅 预约看房\n"
-        "📹 视频看房\n"
-        "📍 按区域找\n\n"
-        "👇 选一个开始"
+        "👋 欢迎来到侨联地产\n\n"
+        "💎 侨联地产 · 金边华人租房服务\n"
+        "您在金边的自己人\n\n"
+        "这里可以帮你：\n\n"
+        "🏠 找真实房源\n"
+        "📅 预约实地看房 / 视频看房\n"
+        "🧰 入住后的报修 / 物业 / 续租服务\n"
+        "🗺️ 查看金边华人生活配套\n\n"
+        "━━━━━━━━━━━━\n\n"
+        "选择你现在需要的："
     )
 
 
@@ -98,10 +99,10 @@ def lead_capture_text() -> str:
 
 def advisor_text() -> str:
     return (
-        "✅ <b>已收到你的需求</b>\n\n"
+        "✅ 已收到你的需求\n\n"
         "侨联顾问会直接通过 Telegram 联系你确认：\n"
         "• 房源是否还在\n"
-        "• 看房时间\n"
+        "• 看房时间安排\n"
         "• 实地看房 / 视频看房方式\n\n"
         "你也可以继续看看其他房源。"
     )
