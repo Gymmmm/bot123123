@@ -1128,20 +1128,20 @@ def channel_topic_welcome_text(topic: str) -> str:
     topic_map = {
         "district_guide": (
             "📍 已收到区域导流。\n\n"
-            "想看这个区域的实拍房源，可以直接发预算和户型偏好，或点下方按钮开始找房。"
+            "想看这个区域的实拍房源，直接发预算和户型偏好，或点下方按钮开始找房。"
         ),
         "service": (
             "🧰 已进入侨联服务入口。\n\n"
-            "如果您想咨询代看、合同、入住协助或租后问题，直接点按钮就能接上顾问。"
+            "想咨询代看、合同、入住协助或租后问题，直接点按钮就能接上顾问。"
         ),
         "video_tour": (
             "🎥 已进入视频代看入口。\n\n"
-            "先发你要找的区域、预算、户型，我会先推两套再接顾问视频代看。"
+            "先发你要找的区域、预算、户型，我先推两套，再接顾问视频代看。"
         ),
     }
     return topic_map.get(
         topic,
-        "已收到频道导流入口。\n\n告诉我您的需求，我们这边马上帮您接上顾问或开始找房。",
+        "已收到频道入口。\n\n告诉我你的需求，我马上帮你接上顾问或开始找房。",
     )
 
 
@@ -1167,7 +1167,7 @@ def _daily_listing_line(item: dict) -> str:
 def _latest_listing_text(limit: int = 5) -> str:
     matches = db.list_recent_listings(limit)
     if not matches:
-        return "🏠 <b>今日可看房源更新</b>\n\n暂时还没有可展示的最新房源，您可以先告诉我区域和预算。"
+        return "🏠 <b>今日可看房源更新</b>\n\n暂时还没有可展示的最新房源，你可以先发区域和预算，我马上筛一轮。"
     lines = [
         "🏠 <b>今日可看房源更新</b>",
         "",
@@ -1262,7 +1262,7 @@ def _video_tour_intro_text(*, area: str, budget: str, layout: str) -> str:
 
 def _video_tour_match_text(matches: list[dict], *, match_mode: str = "strict") -> str:
     if not matches:
-        return "暂时没有完全匹配的在架房源，我先把你接给顾问人工优先处理。"
+        return "暂时没有完全匹配的在架房源，我先把你接给顾问优先人工匹配。"
     lines = ["已为你先匹配 2 套：", ""]
     for idx, item in enumerate(matches[:2], start=1):
         area = str(item.get("area") or "金边").strip() or "金边"
@@ -1353,7 +1353,7 @@ async def start_video_tour_flow(
     has_condition = bool(area_value or layout_value or isinstance(budget_lo, int) or isinstance(budget_hi, int))
     if not has_condition:
         await update.effective_message.reply_text(
-            "请先发找房条件后我再推 2 套：例如 <code>BKK1 500-800 一房</code>。",
+            "请先发找房条件，我再推 2 套：例如 <code>BKK1 500-800 一房</code>。",
             parse_mode=ParseMode.HTML,
             reply_markup=keyword_followup_keyboard(),
         )
