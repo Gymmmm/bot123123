@@ -1859,9 +1859,12 @@ async def send_discussion_three_segments(
         mapping = load_discuss_map()
         thread_reply_id = mapping.get(str(channel_post_id)) or seg1_mid
         continue_keyboard = _build_discussion_continue_keyboard(listing_id, post_token)
+        continue_text = str(DISCUSSION_CONTINUE_TEXT or "").strip()
+        if "机器人对话" not in continue_text:
+            continue_text = (continue_text + "\n\n🤖 点击下方按钮进入侨联机器人对话").strip()
         await bot.send_message(
             chat_id=discussion_id,
-            text=DISCUSSION_CONTINUE_TEXT,
+            text=continue_text,
             reply_to_message_id=int(thread_reply_id),
             reply_markup=continue_keyboard if continue_keyboard.inline_keyboard else None,
             allow_sending_without_reply=True,
@@ -2108,10 +2111,15 @@ def _album_paths_for_draft(d: dict, cover_path: str, db_path: str) -> list:
                     base = b
     except Exception:
         pass
+    image_exts = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff"}
     for path in raw_paths:
         if len(out) >= ALBUM_SOURCE_MAX:
             break
         if not path or not os.path.isfile(path):
+            continue
+        ext = os.path.splitext(str(path).lower())[1]
+        if ext not in image_exts:
+            # 原始组可能混入视频，频道主帖首页只保留有效图片，避免四图被视频占位。
             continue
         if path == base:
             continue
@@ -2123,7 +2131,12 @@ def _album_paths_for_draft(d: dict, cover_path: str, db_path: str) -> list:
 
 def _real_media_paths_for_draft(d: dict, db_path: str) -> list[str]:
     album_paths = _album_paths_for_draft(d, "", db_path)
-    return [path for path in album_paths if path and os.path.isfile(path)]
+    image_exts = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff"}
+    return [
+        path
+        for path in album_paths
+        if path and os.path.isfile(path) and os.path.splitext(str(path).lower())[1] in image_exts
+    ]
 
 
 def _draft_quality_score(d: dict) -> int:
