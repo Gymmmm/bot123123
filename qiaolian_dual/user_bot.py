@@ -171,10 +171,10 @@ def _fmt_price(price: object) -> str:
             return f"${value}/月"
     return "价格待确认"
 SERVICE_REQUEST_LABELS = {
-    "repair_ac": "空调 / 电器故障",
-    "repair_water": "水管 / 漏水报修",
-    "repair_power": "电路 / 热水器问题",
-    "property": "物业事务沟通",
+    "repair_ac": "空调 / 家电故障",
+    "repair_water": "水管漏水 / 下水堵塞",
+    "repair_power": "门锁 / 灯具 / 电路问题",
+    "property": "物业沟通",
 }
 
 PREF_CONDITION_LABELS = {
@@ -690,26 +690,11 @@ def precise_filter_keyboard(selected: set[str] | None = None) -> InlineKeyboardM
 def service_hub_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         [
-            [
-                InlineKeyboardButton("📦 搬家协助", callback_data="service:move"),
-                InlineKeyboardButton("🧾 入住交接留档", callback_data="service:handover"),
-            ],
-            [
-                InlineKeyboardButton("🔒 押金 / 费用说明", callback_data="service:deposit"),
-                InlineKeyboardButton("📹 代拍验房", callback_data="service:staging"),
-            ],
-            [
-                InlineKeyboardButton("🛋 家具家电补配", callback_data="service:addons"),
-                InlineKeyboardButton("📋 入住注意事项", callback_data="service:checkin_tips"),
-            ],
-            [
-                InlineKeyboardButton("🔧 报修 / 物业事务", callback_data="service:repair_hub"),
-                InlineKeyboardButton("🗺️ 周边生活", callback_data="service:local_life"),
-            ],
-            [
-                InlineKeyboardButton("💎 咨询顾问", callback_data="service:contact"),
-                InlineKeyboardButton("🏠 返回首页", callback_data="home"),
-            ],
+            [InlineKeyboardButton("🔧 我要报修", callback_data="service:repair_hub")],
+            [InlineKeyboardButton("🏢 物业沟通", callback_data="service_request:property")],
+            [InlineKeyboardButton("🔁 续租/换房", callback_data="service:renew_change")],
+            [InlineKeyboardButton("🗺️ 周边生活", callback_data="service:local_life")],
+            [InlineKeyboardButton("💬 联系顾问", callback_data="service:contact")],
         ]
     )
 
@@ -718,17 +703,14 @@ def service_repair_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("❄️ 空调 / 电器故障", callback_data="service_request:repair_ac"),
-                InlineKeyboardButton("💧 水管 / 漏水报修", callback_data="service_request:repair_water"),
+                InlineKeyboardButton("❄️ 空调 / 家电故障", callback_data="service_request:repair_ac"),
+                InlineKeyboardButton("💧 水管漏水 / 下水堵塞", callback_data="service_request:repair_water"),
             ],
             [
-                InlineKeyboardButton("🔥 电路 / 热水器", callback_data="service_request:repair_power"),
-                InlineKeyboardButton("🏢 物业事务沟通", callback_data="service_request:property"),
+                InlineKeyboardButton("🔌 门锁 / 灯具 / 电路问题", callback_data="service_request:repair_power"),
+                InlineKeyboardButton("🏢 物业沟通", callback_data="service_request:property"),
             ],
-            [
-                InlineKeyboardButton("↩️ 返回入住服务", callback_data="service:hub"),
-                InlineKeyboardButton("🏠 返回首页", callback_data="home"),
-            ],
+            [InlineKeyboardButton("⬅️ 返回入住服务", callback_data="service:hub")],
         ]
     )
 
@@ -736,10 +718,9 @@ def service_repair_keyboard() -> InlineKeyboardMarkup:
 def service_detail_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         [
-            [InlineKeyboardButton("💎 联系顾问", callback_data="service:contact")],
+            [InlineKeyboardButton("💬 联系顾问", callback_data="service:contact")],
             [
-                InlineKeyboardButton("↩️ 返回入住服务", callback_data="service:hub"),
-                InlineKeyboardButton("🏠 返回首页", callback_data="home"),
+                InlineKeyboardButton("⬅️ 返回入住服务", callback_data="service:hub"),
             ],
         ]
     )
@@ -749,10 +730,7 @@ def local_life_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         [
             [InlineKeyboardButton("🏙 富力周边", callback_data="local:rfcity")],
-            [
-                InlineKeyboardButton("↩️ 返回入住服务", callback_data="service:hub"),
-                InlineKeyboardButton("🏠 返回首页", callback_data="home"),
-            ],
+            [InlineKeyboardButton("⬅️ 返回入住服务", callback_data="service:hub")],
         ]
     )
 
@@ -777,10 +755,7 @@ def rfcity_keyboard() -> InlineKeyboardMarkup:
                 InlineKeyboardButton("👨‍💻 富力物业", callback_data="rfcity:property"),
             ],
             [InlineKeyboardButton("🤝 商家入驻", callback_data="rfcity:join")],
-            [
-                InlineKeyboardButton("↩️ 返回周边生活", callback_data="service:local_life"),
-                InlineKeyboardButton("🏠 返回首页", callback_data="home"),
-            ],
+            [InlineKeyboardButton("⬅️ 返回周边生活", callback_data="service:local_life")],
         ]
     )
 
@@ -788,10 +763,7 @@ def rfcity_keyboard() -> InlineKeyboardMarkup:
 def rfcity_back_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         [
-            [
-                InlineKeyboardButton("↩️ 返回富力周边", callback_data="local:rfcity"),
-                InlineKeyboardButton("🏠 返回首页", callback_data="home"),
-            ],
+            [InlineKeyboardButton("🏙 返回富力周边", callback_data="local:rfcity")],
         ]
     )
 
@@ -800,15 +772,12 @@ def merchant_join_keyboard() -> InlineKeyboardMarkup:
     advisor_url = _advisor_tg_url()
     rows: list[list[InlineKeyboardButton]] = []
     if advisor_url:
-        rows.append([InlineKeyboardButton("📩 提交商家信息 / 联系侨联合作", url=advisor_url)])
+        rows.append([InlineKeyboardButton("📩 提交商家信息", url=advisor_url)])
+        rows.append([InlineKeyboardButton("💬 联系侨联合作", url=advisor_url)])
     else:
-        rows.append([InlineKeyboardButton("💬 联系侨联合作", callback_data="appointment_menu:contact")])
-    rows.append(
-        [
-            InlineKeyboardButton("🏙 返回富力周边", callback_data="local:rfcity"),
-            InlineKeyboardButton("🏠 返回首页", callback_data="home"),
-        ]
-    )
+        rows.append([InlineKeyboardButton("📩 提交商家信息", callback_data="service:contact")])
+        rows.append([InlineKeyboardButton("💬 联系侨联合作", callback_data="service:contact")])
+    rows.append([InlineKeyboardButton("🏙 返回富力周边", callback_data="local:rfcity")])
     return InlineKeyboardMarkup(rows)
 
 
@@ -3758,6 +3727,34 @@ async def handle_ui_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         return MAIN
 
+    if data == "service:renew_change":
+        create_lead(
+            user,
+            action="service_renew_change_click",
+            source="service_hub",
+            listing_id=str(context.user_data.get("contact_listing_id") or ""),
+        )
+        await query.edit_message_text(
+            "🔁 <b>续租 / 换房服务</b>\n\n"
+            "如果你准备续租、换房或退租，侨联可以协助：\n"
+            "• 先核对当前租约关键条款\n"
+            "• 评估续租谈判或换房方案\n"
+            "• 对接下一套看房与衔接时间\n\n"
+            "请选择你现在更需要哪种协助：",
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton("🔄 续租咨询", callback_data="contract:renew"),
+                        InlineKeyboardButton("🏠 我要换房", callback_data="contract:change"),
+                    ],
+                    [InlineKeyboardButton("💬 联系顾问", callback_data="service:contact")],
+                    [InlineKeyboardButton("⬅️ 返回入住服务", callback_data="service:hub")],
+                ]
+            ),
+        )
+        return MAIN
+
     if data == "service:move":
         await query.edit_message_text(
             "<b>📦 搬家协助</b>\n\n"
@@ -3865,9 +3862,9 @@ async def handle_ui_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 ],
                 [
                     InlineKeyboardButton("🕒 明天下午", callback_data=f"service_slot:{issue_key}:tomorrow_pm"),
-                    InlineKeyboardButton("💎 联系顾问", callback_data="service:contact"),
+                    InlineKeyboardButton("💬 联系顾问", callback_data="service:contact"),
                 ],
-                [InlineKeyboardButton("↩️ 返回入住服务", callback_data="service:hub")],
+                [InlineKeyboardButton("⬅️ 返回入住服务", callback_data="service:hub")],
             ]
         )
         await render_panel(

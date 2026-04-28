@@ -23,6 +23,7 @@ import random
 from datetime import datetime, timezone
 from pathlib import Path
 import io
+from html import escape as he
 
 from dotenv import load_dotenv
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
@@ -762,44 +763,50 @@ def _area_tags(area: str) -> list[str]:
     raw = str(area or "").strip()
     compact = _tag_safe(raw)
     mapping = {
-        "BKK1": ["#BKK1"],
-        "BKK2": ["#BKK2"],
-        "BKK3": ["#BKK3"],
-        "钻石岛": ["#钻石岛", "#DiamondIsland"],
-        "DiamondIsland": ["#钻石岛", "#DiamondIsland"],
-        "KohPich": ["#钻石岛", "#DiamondIsland"],
-        "堆谷": ["#堆谷区", "#TuolKork"],
-        "堆谷区": ["#堆谷区", "#TuolKork"],
-        "ToulKork": ["#堆谷区", "#TuolKork"],
-        "水净华": ["#水净华", "#ChroyChangvar"],
-        "水静华": ["#水净华", "#ChroyChangvar"],
-        "ChroyChangvar": ["#水净华", "#ChroyChangvar"],
-        "桑园区": ["#桑园区", "#Chamkarmon"],
-        "Chamkarmon": ["#桑园区", "#Chamkarmon"],
-        "隆边区": ["#隆边区", "#DaunPenh"],
-        "DaunPenh": ["#隆边区", "#DaunPenh"],
-        "玛卡拉区": ["#玛卡拉区", "#7Makara"],
-        "7Makara": ["#玛卡拉区", "#7Makara"],
-        "俄罗斯市场": ["#俄罗斯市场", "#TTP"],
-        "RussianMarket": ["#俄罗斯市场", "#TTP"],
-        "TTP": ["#俄罗斯市场", "#TTP"],
-        "百色河": ["#百色河"],
-        "TonleBassac": ["#百色河"],
+        "富力城": ["#富力城租房", "#RFCity"],
+        "RFCity": ["#富力城租房", "#RFCity"],
+        "RFCITY": ["#富力城租房", "#RFCity"],
+        "BKK1": ["#BKK1租房", "#BKK1"],
+        "BKK2": ["#BKK2租房", "#BKK2"],
+        "BKK3": ["#BKK3租房", "#BKK3"],
+        "钻石岛": ["#钻石岛租房", "#钻石岛"],
+        "DiamondIsland": ["#钻石岛租房", "#DiamondIsland"],
+        "KohPich": ["#钻石岛租房", "#DiamondIsland"],
+        "俄罗斯市场": ["#俄罗斯市场租房", "#TTP"],
+        "RussianMarket": ["#俄罗斯市场租房", "#TTP"],
+        "TTP": ["#俄罗斯市场租房", "#TTP"],
     }
-    return mapping.get(compact) or ([f"#{compact}"] if compact and compact not in {"金边", "未知"} else [])
+    if compact in mapping:
+        return mapping[compact]
+    if compact and compact not in {"金边", "未知"}:
+        return [f"#{compact}租房"]
+    return []
 
 
 def _room_type_tags(room_type: str) -> list[str]:
     raw = str(room_type or "").strip().lower()
     if "studio" in raw or "单间" in raw or "单身" in raw:
-        return ["#单身公寓", "#Studio"]
+        return ["#单间"]
     if "1房" in raw or "一房" in raw:
         return ["#一房一厅"]
     if "2房" in raw or "两房" in raw or "二房" in raw:
         return ["#两房一厅"]
     if any(x in raw for x in ("3房", "三房", "4房", "四房", "5房", "五房")):
-        return ["#三房以上"]
+        return ["#三房"]
     return []
+
+
+def _price_range_tags(d: dict) -> list[str]:
+    price = _price_value(d)
+    if price <= 0:
+        return []
+    if price < 400:
+        return ["#400美金以下"]
+    if price < 800:
+        return ["#400到800美金"]
+    if price < 1500:
+        return ["#800到1500美金"]
+    return ["#1500美金以上"]
 
 
 def _property_tags(d: dict) -> list[str]:
@@ -843,13 +850,15 @@ def _feature_tags(d: dict) -> list[str]:
 
 
 def build_listing_tags(d: dict) -> list[str]:
-    area = _listing_value(d, "area", default="金边")
+    area = _listing_value(d, "area", "project", "community", default="金边")
     room_type = normalize_room_type(_listing_value(d, "room_type", "layout", default=""))
     tags = [
         "#金边租房",
+        "#金边华人租房",
         "#侨联实拍",
         *_area_tags(area),
         *_room_type_tags(room_type),
+        *_price_range_tags(d),
         *_property_tags(d),
         *_feature_tags(d),
     ]
@@ -857,8 +866,14 @@ def build_listing_tags(d: dict) -> list[str]:
     for tag in tags:
         if tag and tag not in out:
             out.append(tag)
-        if len(out) >= 5:
+        if len(out) >= 8:
             break
+    fallback_pool = ["#实地看房", "#视频看房", "#金边生活"]
+    for tag in fallback_pool:
+        if len(out) >= 6:
+            break
+        if tag not in out:
+            out.append(tag)
     return out
 
 
@@ -1385,50 +1400,41 @@ def _qc_code_from_draft(d: dict) -> str:
 
 
 def build_chinese_listing_post(d: dict, caption_variant: str | None = "a") -> str:
-    """生成频道发帖正文。全三款变体输出相同内容（变体差异只体现在私聊落地页）。"""
+    """生成频道标准发帖正文（固定顺序 + 系统标签 + SEO 标签）。"""
     area = _listing_value(d, "area", default="金边")
     room_type = normalize_room_type(_listing_value(d, "room_type", "layout", default="整租"))
     if not room_type:
         room_type = _resolved_property_type(d)
-    listing_code = _qc_code_from_draft(d)
+    listing_id = system_listing_id_from_draft(d)
     price = _price_compact_for_post(d)
+    title_main = _listing_value(d, "title", "project", "community", default="")
+    title_raw = title_main or f"{area}｜{room_type}｜{price}"
+    title = _compact_copy(title_raw, 40)
+    location_seed = _listing_value(d, "area", "project", "community", default="金边")
+    location = _compact_copy(location_seed, 22)
+    payment = _compact_copy(_payment_contract_summary(d) or "待确认", 24)
+    fee_hint = _compact_copy(_factual_fee_text(d), 30)
+    judge_hint = _compact_copy(_factual_highlight_text(d), 30)
+    tags = " ".join(build_listing_tags(d)[:8]).strip()
 
-    # 第 1 行：摘要标头
-    line1 = f"{area}｜{room_type}｜{price}｜编号:{listing_code}"
-
-    # 第 2 行：核心亮点
-    highlight_text = _factual_highlight_text(d)
-    line2 = f"核心亮点：{highlight_text}"
-
-    # 第 3 行：项目参数（面积、楼层 + 可追溯说明）
-    params: list[str] = []
-    size = _listing_value(d, "size", "size_sqm", default="")
-    if size:
-        raw_size = str(size).strip()
-        if raw_size.replace(".", "", 1).isdigit():
-            raw_size = f"{raw_size}平"
-        params.append(raw_size)
-    floor_raw = _listing_value(d, "floor", default="")
-    if floor_raw:
-        params.append(floor_raw)
-    params.append("实拍直发，编号可追溯")
-    line3 = "项目参数：" + "；".join(params)
-
-    # 第 4 行：费用提醒（包含押付/合同年限）
-    fee_text = _factual_fee_text(d)
-    line4 = f"费用提醒：{fee_text}"
-
-    # 第 5 行：看房方式
-    line5 = "看房方式：实地看房 / 实时视频代看"
-
-    # 第 6 行：统一行动号召
-    line6 = "下方按钮：咨询这套 / 预约看房"
-
-    # 第 7 行：品牌 + 最多 4 个 hashtag
-    tag_line = " ".join(build_listing_tags(d)[:4]).strip()
-    line7 = f"{BRAND_NAME}｜{tag_line}" if tag_line else BRAND_NAME
-
-    return "\n".join([line1, line2, line3, line4, line5, line6, line7])[:1024]
+    lines = [
+        f"<b>{he(title)}</b>",
+        "<code>QIAOLIAN VERIFIED LISTING</code>",
+        "━━━━━━━━━━━━",
+        f"房源编号：<code>{he(listing_id)}</code>",
+        f"位置：{he(location)}",
+        f"户型：{he(room_type)}",
+        f"租金：{he(price)}",
+        f"押付：{he(payment)}",
+        "━━━━━━━━━━━━",
+        f"提前说清：{he(fee_hint)}",
+        f"侨联判断：{he(judge_hint)}",
+        "━━━━━━━━━━━━",
+        f"{he(BRAND_NAME)}｜您在金边的自己人",
+        "",
+        tags,
+    ]
+    return "\n".join(lines)[:1024]
 
 
 def build_cover_listing_data(d: dict) -> dict:
