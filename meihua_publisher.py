@@ -115,6 +115,9 @@ LISTING_OVERLAY_EDGE = float(os.getenv("LISTING_OVERLAY_EDGE", "40"))
 LISTING_PANEL_ALPHA = int(os.getenv("LISTING_PANEL_ALPHA", "230"))
 DETAIL_LOGO_PANEL_ALPHA = int(os.getenv("DETAIL_LOGO_PANEL_ALPHA", "190"))
 DETAIL_LOGO_SCALE = float(os.getenv("DETAIL_LOGO_SCALE", "1.15"))
+DETAIL_PHOTO_STYLE = os.getenv("DETAIL_PHOTO_STYLE", "mini_card").strip().lower()
+DETAIL_MAIN_TAG_TEXT = os.getenv("DETAIL_MAIN_TAG_TEXT", "实拍房源")
+DETAIL_FALLBACK_SUBTAG = os.getenv("DETAIL_FALLBACK_SUBTAG", "金边 · 精选房源")
 # 单帖可采集的实拍上限（需大于频道主帖张数，才有「溢出图」进讨论区）
 ALBUM_SOURCE_MAX = int(os.getenv("ALBUM_SOURCE_MAX", "30"))
 # 6 张相册比例：landscape=横向 3:2（不少客户端更接近「3 列×2 行」观感）；square=1:1 方图（常为 2 列×3 行）
@@ -317,6 +320,172 @@ def _draw_detail_logo_badge(
     draw.text((text_x, sub_y), subtitle, font=sub_font, fill=sub_white)
 
 
+def _compact_layout_for_detail_tag(layout: str) -> str:
+    raw = str(layout or "").strip()
+    if not raw:
+        return ""
+    lower = raw.lower()
+    if "studio" in lower or "单间" in raw:
+        return "单间"
+    m = re.search(r"([一二三四五六七八九\d]+)\s*房", raw)
+    if m:
+        return f"{m.group(1)}房"
+    short = normalize_room_type(raw)
+    if len(short) > 8:
+        return short[:8]
+    return short
+
+
+def _detail_subtag_from_listing(listing: dict | None) -> str:
+    if not listing:
+        return DETAIL_FALLBACK_SUBTAG
+    area = _listing_value(listing, "area", "project", "community", default="").strip()
+    layout_raw = _listing_value(listing, "room_type", "layout", default="").strip()
+    layout = _compact_layout_for_detail_tag(layout_raw)
+    if area and layout:
+        return f"{area} · {layout}"
+    if area:
+        return area
+    if layout:
+        return layout
+    return DETAIL_FALLBACK_SUBTAG
+
+
+def _apply_detail_photo_shade(overlay: Image.Image) -> None:
+    w, h = overlay.size
+    d = ImageDraw.Draw(overlay)
+    d.rectangle((0, 0, w, h), fill=(5, 18, 36, 28))
+    top_h = max(1, int(h * 0.18))
+    bottom_h = max(1, int(h * 0.42))
+    for y in range(top_h):
+        a = int(22 * (1 - y / max(1, top_h)))
+        d.line((0, y, w, y), fill=(5, 18, 36, a))
+    start = h - bottom_h
+    for y in range(start, h):
+        a = int(26 + (y - start) / max(1, bottom_h) * 86)
+        d.line((0, y, w, y), fill=(5, 18, 36, min(124, a)))
+
+
+def _draw_detail_mini_logo_badge(
+    im: Image.Image,
+    overlay: Image.Image,
+    *,
+    edge: int,
+    scale: float,
+    ref: float,
+) -> Image.Image:
+    draw = ImageDraw.Draw(overlay)
+    logo_w = max(196, min(320, int(ref * 0.28)))
+    logo_h = max(62, min(110, int(logo_w * 0.34)))
+    x2 = overlay.size[0] - edge
+    x1 = x2 - logo_w
+    y1 = edge
+    y2 = y1 + logo_h
+
+    im = _apply_frosted_panel(
+        im,
+        (x1, y1, x2, y2),
+        radius=max(10, int(14 * scale)),
+        blur_radius=max(7, int(10 * scale)),
+        tint_rgb=(7, 18, 36),
+        tint_alpha=178,
+        outline=(246, 210, 122, 138),
+    )
+
+    pad_x = max(12, int(16 * scale))
+    pad_y = max(8, int(10 * scale))
+    cn_font = _font_for_listing(max(18, min(34, int(logo_h * 0.40))), bold=True)
+    en_font = _font_for_listing(max(8, min(13, int(logo_h * 0.16))), bold=False)
+    cn = BRAND_NAME
+    en = BRAND_NAME_EN
+
+    cn_box = draw.textbbox((0, 0), cn, font=cn_font)
+    en_box = draw.textbbox((0, 0), en, font=en_font)
+    cn_h = cn_box[3] - cn_box[1]
+    gap = max(1, int(logo_h * 0.04))
+    cn_y = y1 + pad_y - cn_box[1]
+    en_y = cn_y + cn_h + gap - en_box[1]
+    tx = x1 + pad_x
+
+    draw.text((tx, cn_y), cn, font=cn_font, fill=(246, 210, 122, 255))
+    draw.text((tx, en_y), en, font=en_font, fill=(232, 238, 247, 225))
+    return im
+
+
+def _draw_detail_corner_tags(
+    im: Image.Image,
+    overlay: Image.Image,
+    *,
+    edge: int,
+    scale: float,
+    ref: float,
+    listing: dict | None,
+) -> Image.Image:
+    draw = ImageDraw.Draw(overlay)
+    main_text = str(DETAIL_MAIN_TAG_TEXT or "实拍房源").strip() or "实拍房源"
+    sub_text = _detail_subtag_from_listing(listing)
+
+    font_main = _font_for_listing(max(18, min(34, int(ref * 0.031))), bold=True)
+    font_sub = _font_for_listing(max(16, min(30, int(ref * 0.026))), bold=True)
+
+    m_box = draw.textbbox((0, 0), main_text, font=font_main)
+    s_box = draw.textbbox((0, 0), sub_text, font=font_sub)
+    m_w, m_h = m_box[2] - m_box[0], m_box[3] - m_box[1]
+    s_w, s_h = s_box[2] - s_box[0], s_box[3] - s_box[1]
+
+    gap = max(8, int(12 * scale))
+    pad_x_m = max(12, int(18 * scale))
+    pad_y_m = max(8, int(11 * scale))
+    pad_x_s = max(11, int(16 * scale))
+    pad_y_s = max(7, int(10 * scale))
+
+    m_w2 = m_w + pad_x_m * 2
+    m_h2 = m_h + pad_y_m * 2
+    s_w2 = s_w + pad_x_s * 2
+    s_h2 = s_h + pad_y_s * 2
+
+    total_w = m_w2 + gap + s_w2
+    x1 = edge
+    y2 = overlay.size[1] - edge
+    y1 = y2 - max(m_h2, s_h2)
+
+    m_box_px = (x1, y1, x1 + m_w2, y1 + m_h2)
+    s_box_px = (x1 + m_w2 + gap, y1 + (m_h2 - s_h2) // 2, x1 + total_w, y1 + (m_h2 - s_h2) // 2 + s_h2)
+
+    im = _apply_frosted_panel(
+        im,
+        m_box_px,
+        radius=max(12, int(16 * scale)),
+        blur_radius=max(7, int(10 * scale)),
+        tint_rgb=(7, 18, 36),
+        tint_alpha=188,
+        outline=(246, 210, 122, 154),
+    )
+    im = _apply_frosted_panel(
+        im,
+        s_box_px,
+        radius=max(12, int(16 * scale)),
+        blur_radius=max(7, int(10 * scale)),
+        tint_rgb=(255, 255, 255),
+        tint_alpha=44,
+        outline=(255, 255, 255, 86),
+    )
+
+    draw.text(
+        (m_box_px[0] + pad_x_m - m_box[0], m_box_px[1] + pad_y_m - m_box[1]),
+        main_text,
+        font=font_main,
+        fill=(246, 210, 122, 255),
+    )
+    draw.text(
+        (s_box_px[0] + pad_x_s - s_box[0], s_box_px[1] + pad_y_s - s_box[1]),
+        sub_text,
+        font=font_sub,
+        fill=(255, 255, 255, 242),
+    )
+    return im
+
+
 def _font_for_listing(size: int, *, bold: bool = False):
     """信息卡副文 / pill 用常规体，避免整段粗黑。"""
     bold_paths = [
@@ -417,6 +586,7 @@ def add_channel_listing_overlay(
     *,
     with_listing_footer: bool = False,
     detail_mode: bool = False,
+    detail_listing: dict | None = None,
 ) -> io.BytesIO:
     """频道图片加角标：封面轻角标，细节图用更清晰 logo。"""
     # 频道首图也必须叠品牌层，不能直通原图；否则会出现"没封面/没 logo"的观感。
@@ -441,10 +611,24 @@ def add_channel_listing_overlay(
     pad_x = max(10, int(15 * scale * logo_scale))
     pad_y = max(7, int(9 * scale * logo_scale))
 
+    detail_payload = detail_listing or listing
     show_brand = detail_mode or not with_listing_footer
     if show_brand:
         if detail_mode:
-            _draw_detail_logo_badge(overlay, edge=edge, scale=scale, ref=ref)
+            style = DETAIL_PHOTO_STYLE
+            if style in ("mini_card", "mini", "v2", "new"):
+                _apply_detail_photo_shade(overlay)
+                im = _draw_detail_mini_logo_badge(im, overlay, edge=edge, scale=scale, ref=ref)
+                im = _draw_detail_corner_tags(
+                    im,
+                    overlay,
+                    edge=edge,
+                    scale=scale,
+                    ref=ref,
+                    listing=detail_payload,
+                )
+            else:
+                _draw_detail_logo_badge(overlay, edge=edge, scale=scale, ref=ref)
         else:
             corner_logo = _load_corner_logo()
             logo_w = 0
@@ -573,13 +757,14 @@ def add_brand_watermark(
     )
 
 
-def add_detail_logo_watermark(image_bytes: bytes) -> io.BytesIO:
-    """细节图加清晰侨联 logo，便于四图后三张统一品牌识别。"""
+def add_detail_logo_watermark(image_bytes: bytes, listing: dict | None = None) -> io.BytesIO:
+    """细节图加小图样式品牌层（右上 mini logo + 左下标签）。"""
     return add_channel_listing_overlay(
         image_bytes,
-        None,
+        listing,
         with_listing_footer=False,
         detail_mode=True,
+        detail_listing=listing,
     )
 def normalize_album_image(
     image_bytes: bytes,
@@ -2398,7 +2583,7 @@ async def _tg_publish(
             buf = (
                 add_brand_watermark(data, cover_listing, with_listing_footer=True)
                 if is_cover
-                else add_detail_logo_watermark(data)
+                else add_detail_logo_watermark(data, d)
             )
         except Exception:
             logger.exception(
