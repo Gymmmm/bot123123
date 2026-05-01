@@ -28,16 +28,22 @@ try:
         about_text as copy_about_text,
         appointment_hub_text as copy_appointment_hub_text,
         advisor_text as copy_advisor_text,
+        advisor_notify_ok_text as copy_advisor_notify_ok_text,
+        appoint_entry_text as copy_appoint_entry_text,
+        appoint_success_text as copy_appoint_success_text,
         brand_text as copy_brand_text,
         channel_welcome_text as copy_channel_welcome_text,
+        consult_submit_ok_text as copy_consult_submit_ok_text,
         deposit_text as copy_deposit_text,
         discussion_entry_welcome_text as copy_discussion_entry_welcome_text,
         find_area_budget_hint_text,
         find_no_match_text,
+        handoff_find_ok_text as copy_handoff_find_ok_text,
         help_repeat_keyboard,
         help_text as copy_help_text,
         home_text as copy_home_text,
         lead_capture_text as copy_lead_capture_text,
+        legacy_callback_degraded_text as copy_legacy_callback_degraded_text,
         listing_detail as copy_listing_detail,
         listing_match_footer_text,
         listing_match_intro_text,
@@ -58,6 +64,7 @@ try:
         smart_find_guided_header_text,
         smart_find_play_footer_hint_text,
         smart_find_play_prompt_text,
+        smart_search_text as copy_smart_search_text,
         want_home_ack_text as copy_want_home_ack_text,
         want_home_text as copy_want_home_text,
     )
@@ -68,16 +75,22 @@ except ImportError:  # pragma: no cover - script mode fallback
         about_text as copy_about_text,
         appointment_hub_text as copy_appointment_hub_text,
         advisor_text as copy_advisor_text,
+        advisor_notify_ok_text as copy_advisor_notify_ok_text,
+        appoint_entry_text as copy_appoint_entry_text,
+        appoint_success_text as copy_appoint_success_text,
         brand_text as copy_brand_text,
         channel_welcome_text as copy_channel_welcome_text,
+        consult_submit_ok_text as copy_consult_submit_ok_text,
         deposit_text as copy_deposit_text,
         discussion_entry_welcome_text as copy_discussion_entry_welcome_text,
         find_area_budget_hint_text,
         find_no_match_text,
+        handoff_find_ok_text as copy_handoff_find_ok_text,
         help_repeat_keyboard,
         help_text as copy_help_text,
         home_text as copy_home_text,
         lead_capture_text as copy_lead_capture_text,
+        legacy_callback_degraded_text as copy_legacy_callback_degraded_text,
         listing_detail as copy_listing_detail,
         listing_match_footer_text,
         listing_match_intro_text,
@@ -98,6 +111,7 @@ except ImportError:  # pragma: no cover - script mode fallback
         smart_find_guided_header_text,
         smart_find_play_footer_hint_text,
         smart_find_play_prompt_text,
+        smart_search_text as copy_smart_search_text,
         want_home_ack_text as copy_want_home_ack_text,
         want_home_text as copy_want_home_text,
     )
@@ -248,16 +262,16 @@ def main_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("🏠 推荐房源", callback_data="hub:latest"),
-                InlineKeyboardButton("📍 按区域找", callback_data="hub:area"),
+                InlineKeyboardButton("🔍 智能找房", callback_data="home_smart_search"),
+                InlineKeyboardButton("📖 关于侨联地产", callback_data="home_brand"),
             ],
             [
-                InlineKeyboardButton("📅 预约看房", callback_data="hub:appoint"),
-                InlineKeyboardButton("🎥 视频代看", callback_data="hub:video_tour"),
+                InlineKeyboardButton("📅 预约看房", callback_data="home_appoint"),
+                InlineKeyboardButton("💎 直接问顾问", callback_data="home_consult"),
             ],
             [
-                InlineKeyboardButton("🧰 入住服务", callback_data="hub:service"),
-                InlineKeyboardButton("💬 联系顾问", callback_data="hub:advisor"),
+                InlineKeyboardButton("⚡ 入住管家", callback_data="home_living"),
+                InlineKeyboardButton("🧭 周边服务", callback_data="home_nearby"),
             ],
         ]
     )
@@ -549,8 +563,8 @@ def advisor_handoff_text(*, listing_id: str = "", user_id: int | None = None) ->
     return copy_advisor_text()
 
 
-def appointment_hub_text() -> str:
-    return copy_appointment_hub_text()
+def smart_search_text() -> str:
+    return copy_smart_search_text()
 
 
 def about_text() -> str:
@@ -859,7 +873,9 @@ def parse_start_arg_payload(arg: str) -> dict | None:
     index_payload = _channel_index_action(arg)
     if index_payload is not None:
         return index_payload
-    if arg in {"brand", "about", "want_home", "ask"}:
+    # 静态单词型入口
+    _static_actions = {"brand", "about", "want_home", "ask", "find_home", "area_index", "latest", "cooperate", "consult_general"}
+    if arg in _static_actions:
         return {
             "action": arg,
             "target": "",
@@ -912,6 +928,37 @@ def parse_start_arg_payload(arg: str) -> dict | None:
             "post_token": "",
             "channel_message_id": None,
         }
+
+    # 兼容旧格式：{listing_id}_appoint → book，{listing_id}_consult → consult
+    # 例如 12345_appoint  或  l_99_consult
+    _old_suffix_map = {
+        "_appoint": "book",
+        "_consult": "consult",
+        "_video": "video",
+    }
+    for suffix, mapped_action in _old_suffix_map.items():
+        if arg.endswith(suffix):
+            target = arg[: -len(suffix)]
+            if target:
+                return {
+                    "action": mapped_action,
+                    "target": target,
+                    "post_token": "",
+                    "channel_message_id": None,
+                }
+
+    # 新动作前缀：book_{listing_id}, similar_{listing_id}, video_{listing_id}
+    _new_prefix_actions = ("book", "similar", "video")
+    for action in _new_prefix_actions:
+        prefix = f"{action}_"
+        if arg.startswith(prefix):
+            return {
+                "action": action,
+                "target": arg[len(prefix) :],
+                "post_token": "",
+                "channel_message_id": None,
+            }
+
     if re.match(r"^l_\d+$", arg):
         # 兼容裸 listing 深链，默认走咨询入口。
         return {
@@ -1442,21 +1489,21 @@ def listing_landing_keyboard(listing_id: str, area: str = "") -> InlineKeyboardM
         [
             [
                 InlineKeyboardButton(
-                    "📅 预约实地看房",
-                    url=_deep_link(_build_start_payload("appoint", listing_id, mode="offline")),
-                ),
-                InlineKeyboardButton(
-                    "🎥 视频代看",
-                    url=_deep_link(_build_start_payload("appoint", listing_id, mode="video")),
+                    "📅 预约看房",
+                    url=_deep_link(f"book_{listing_id}"),
                 ),
             ],
             [
-                InlineKeyboardButton("❤️ 先收藏这套", url=_deep_link(_build_start_payload("fav", listing_id))),
-                InlineKeyboardButton("🏠 看同区域更多", url=_deep_link(_build_start_payload("more", listing_id or area_payload))),
+                InlineKeyboardButton(
+                    "📹 约视频代看",
+                    url=_deep_link(f"video_{listing_id}"),
+                ),
+            ],
+            [
+                InlineKeyboardButton("💎 问问侨联顾问", callback_data=f"appointment_menu:contact:listing:{listing_id}"),
             ],
             [
                 InlineKeyboardButton("📋 查看详情", callback_data=f"listing:detail:{listing_id}"),
-                InlineKeyboardButton("💬 联系顾问", callback_data=f"appointment_menu:contact:listing:{listing_id}"),
             ],
         ]
     )
@@ -2315,6 +2362,79 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
         )
         return MAIN
 
+    # book_ 是 appoint_ 的新版别名
+    if action == "book":
+        touch_payload["first_touch_action"] = "book"
+        initial_mode = str(target_meta.get("mode") or "").strip().lower()
+        listing_id = target
+        is_available, availability_reason = listing_is_available(listing_id)
+        if not is_available:
+            if availability_reason == "missing":
+                create_lead(user, action="broken_link", source=source, listing_id=listing_id, payload={**touch_payload, "reason": availability_reason})
+            await message.reply_text(listing_unavailable_text(), reply_markup=listing_unavailable_keyboard(listing_id))
+            return MAIN
+        listing_info = listing_context(listing_id)
+        caption_variant = (
+            _normalize_variant(target_meta.get("cv"))
+            or _normalize_variant(listing_info.get("caption_variant"))
+            or "a"
+        )
+        touch_payload["caption_variant"] = caption_variant
+        context.user_data["contact_listing_id"] = listing_id
+        context.user_data["contact_touch_payload"] = {**touch_payload}
+        _store_active_entry(context, arg=arg, action="appoint", listing_id=listing_id, touch_payload=touch_payload)
+        create_lead(user, action="appointment_click", source=source, listing_id=listing_id, payload={**touch_payload, "preferred_mode": initial_mode})
+        return await start_appointment(update, context, listing_id, source=source, touch_payload=touch_payload, initial_mode=initial_mode)
+
+    # similar_{listing_id}：找类似房源
+    if action == "similar":
+        listing_id = target
+        area = ""
+        if listing_id:
+            area = str(listing_context(listing_id).get("area") or "")
+        create_lead(user, action="similar_click", source=source, listing_id=listing_id, area=area, payload=touch_payload)
+        matches = db.search_listings(areas=[area] if area and area != "不限" else None, limit=3)
+        if matches:
+            await message.reply_text(
+                _format_listing_choice_lines(matches),
+                parse_mode=ParseMode.HTML,
+                reply_markup=keyword_followup_keyboard(area=area),
+            )
+        else:
+            await message.reply_text(
+                f"当前同区域（{he(area or '金边')}）暂无更多在架房源，已同步顾问人工推荐。",
+                parse_mode=ParseMode.HTML,
+                reply_markup=no_match_followup_keyboard(),
+            )
+        return MAIN
+
+    # video_{listing_id}：视频代看入口
+    if action == "video":
+        listing_id = target
+        info = listing_context(listing_id)
+        area = str(info.get("area") or "")
+        create_lead(user, action="video_click", source=source, listing_id=listing_id, area=area, payload=touch_payload)
+        return await start_video_tour_flow(update, context, source=source, area=area)
+
+    # find_home / area_index / latest / cooperate / consult_general
+    if action == "find_home":
+        return await show_search_entry(update, context)
+
+    if action in ("area_index", "index_area"):
+        context.user_data["search_pref"] = {"source": "deeplink", "goal": "any", "touch_payload": touch_payload}
+        await message.reply_text("📍 <b>按区域找房</b>\n\n请选择区域：", parse_mode=ParseMode.HTML, reply_markup=find_area_keyboard())
+        return FIND_AREA
+
+    if action in ("latest", "index_latest"):
+        await message.reply_text(_latest_listing_text(), parse_mode=ParseMode.HTML, reply_markup=latest_listing_keyboard())
+        return MAIN
+
+    if action in ("cooperate", "consult_general"):
+        create_lead(user, action=action, source=source, payload=touch_payload)
+        await _notify_admins(context, title=f"深链入口点击：{action}", lines=[f"用户：{_user_mention_html(user)}", f"联系方式：{he(_user_contact_text(user))}"])
+        await message.reply_text(advisor_text(), parse_mode=ParseMode.HTML, reply_markup=contact_handoff_keyboard())
+        return MAIN
+
     return None
 
 
@@ -2457,10 +2577,8 @@ async def start_appointment(
         return APPT_FOCUS
 
     text = (
-        f"<b>📅 预约看房</b>\n"
-        f"房源：<code>{he(listing_id if listing_id and listing_id != '待推荐' else '暂未指定')}</code>\n\n"
-        "流程：1) 选方式 2) 选关注点 3) 选日期 4) 选时段 5) 提交\n\n"
-        "第一步：请选择看房方式。"
+        f"📅 已为你进入预约流程\n"
+        f"先选看房方式："
     )
     keyboard = InlineKeyboardMarkup(
         [
@@ -3249,6 +3367,151 @@ async def handle_ui_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             text=welcome_text(),
             reply_markup=main_keyboard(),
             parse_mode=ParseMode.HTML,
+        )
+        return MAIN
+
+    # ── 首页新按钮处理 ───────────────────────────────────────────────────────
+    if data == "home_smart_search":
+        await render_panel(
+            update,
+            text=smart_search_text(),
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton("📍 按区域找", callback_data="hub:area"),
+                        InlineKeyboardButton("🏘 按户型找", callback_data="hub:layout"),
+                    ],
+                    [
+                        InlineKeyboardButton("💰 按预算找", callback_data="hub:budget"),
+                        InlineKeyboardButton("🏢 按公寓/楼盘找", callback_data="smart_project"),
+                    ],
+                    [
+                        InlineKeyboardButton("📅 按入住时间", callback_data="smart_movein"),
+                        InlineKeyboardButton("💎 让顾问帮我找", callback_data="keyword:handoff"),
+                    ],
+                    [InlineKeyboardButton("🏠 返回首页", callback_data="home")],
+                ]
+            ),
+        )
+        return MAIN
+
+    if data == "home_brand":
+        await render_panel(
+            update,
+            text=brand_story_text(),
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton("🔍 智能找房", callback_data="home_smart_search"),
+                        InlineKeyboardButton("📅 预约看房", callback_data="home_appoint"),
+                    ],
+                    [
+                        InlineKeyboardButton("💎 直接问顾问", callback_data="home_consult"),
+                        InlineKeyboardButton("🏠 返回首页", callback_data="home"),
+                    ],
+                ]
+            ),
+        )
+        return MAIN
+
+    if data == "home_appoint":
+        create_lead(user, action="appointment_click", source="home_button", payload={"from_home": True})
+        return await start_appointment(
+            update,
+            context,
+            "待推荐",
+            source="home_button",
+            touch_payload={"from_home": True, "listing_unknown": True},
+        )
+
+    if data == "home_consult":
+        create_lead(user, action="consult_click", source="home_button", payload={"from_home": True})
+        await _notify_admins(
+            context,
+            title="直接问顾问（首页按钮）",
+            lines=[
+                f"用户：{_user_mention_html(user)}",
+                f"联系方式：{he(_user_contact_text(user))}",
+                "来源：home_consult",
+            ],
+        )
+        await render_panel(
+            update,
+            text=advisor_text(),
+            parse_mode=ParseMode.HTML,
+            reply_markup=contact_handoff_keyboard(),
+        )
+        return MAIN
+
+    if data == "home_living":
+        await render_panel(
+            update,
+            text=service_hub_text(),
+            parse_mode=ParseMode.HTML,
+            reply_markup=service_hub_keyboard(),
+        )
+        return MAIN
+
+    if data == "home_nearby":
+        # 统一用 edit_message_text，避免重复发送两条
+        await render_panel(
+            update,
+            text=local_life_text(),
+            parse_mode=ParseMode.HTML,
+            reply_markup=local_life_keyboard(),
+        )
+        return MAIN
+
+    # ── 智能找房子页 ──────────────────────────────────────────────────────────
+    if data == "smart_project":
+        await render_panel(
+            update,
+            text=(
+                "<b>🏢 按公寓/楼盘找</b>\n\n"
+                "请输入楼盘/公寓关键词（可带预算和户型），"
+                "例如：<code>富力 800 一房</code>"
+            ),
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("🏠 返回首页", callback_data="home")]]
+            ),
+        )
+        context.user_data["awaiting_keyword_find"] = {"source": "smart_project"}
+        return MAIN
+
+    if data == "smart_movein":
+        await render_panel(
+            update,
+            text=(
+                "<b>📅 按入住时间找</b>\n\n"
+                "请输入你的入住时间（可带区域/预算），"
+                "例如：<code>下月初 BKK1 700以内</code>"
+            ),
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("🏠 返回首页", callback_data="home")]]
+            ),
+        )
+        context.user_data["awaiting_keyword_find"] = {"source": "smart_movein"}
+        return MAIN
+
+    if data == "keyword:handoff":
+        create_lead(user, action="handoff_find_click", source="smart_search", payload={"from_smart": True})
+        await _notify_admins(
+            context,
+            title="找房需求已提交（让顾问帮我找）",
+            lines=[
+                f"用户：{_user_mention_html(user)}",
+                f"联系方式：{he(_user_contact_text(user))}",
+                "来源：smart_search 让顾问帮我找",
+            ],
+        )
+        await render_panel(
+            update,
+            text=copy_handoff_find_ok_text(),
+            reply_markup=main_keyboard(),
         )
         return MAIN
 
@@ -4648,7 +4911,8 @@ async def appoint_flow_cb(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         context.user_data.pop("appt", None)
         await query.edit_message_text(
             "✅ <b>预约已提交</b>\n\n"
-            "管理号已收到你的预约，会尽快确认具体时间。\n\n"
+            "侨联顾问会在看房前尽快\n"
+            "通过 Telegram 联系你确认。\n\n"
             + lead_capture_text(),
             parse_mode=ParseMode.HTML,
             reply_markup=lead_capture_keyboard(),
@@ -4679,7 +4943,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
     logger.exception("user_bot handler error: %s", context.error)
 
 
-_MAIN_CB_PATTERN = r"^(home|hub:|resume:|unavail:|findmode:|findtype:|findarea:|findbudget:|findback:area|roompick:|appointment_menu:|service:|service_request:|service_slot:|pref:|profile:|contract:|lead_capture:|local:|rfcity:|listing:)"
+_MAIN_CB_PATTERN = r"^(home$|home_smart_search|home_brand|home_appoint|home_consult|home_living|home_nearby|smart_project|smart_movein|keyword:handoff|hub:|resume:|unavail:|findmode:|findtype:|findarea:|findbudget:|findback:area|roompick:|appointment_menu:|service:|service_request:|service_slot:|pref:|profile:|contract:|lead_capture:|local:|rfcity:|listing:)"
 
 
 def build_application() -> Application:

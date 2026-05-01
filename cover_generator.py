@@ -885,11 +885,19 @@ class CoverGenerator:
         property_type: str = "",
         project: str = "",
     ) -> str:
-        """选择首页模板：微信固定专用模板，普通来源在两套主视觉间稳定分流。"""
+        """
+        选择首页封面模板。
+        默认全部走 hero_collage（纯 Pillow，无需 Chromium）。
+        旧模板仍可通过环境变量强制开启，但不再自动分流。
+        """
+        _VALID_KINDS = {"hero_collage", "right_price_fixed", "villa_premium", "dark_glass"}
+
+        # 强制指定（环境变量）
         force_kind = os.getenv("HOME_COVER_FORCE_KIND", "").strip().lower()
-        if force_kind in {"right_price_fixed", "villa_premium", "dark_glass"}:
+        if force_kind in _VALID_KINDS:
             return force_kind
 
+        # 样式槽（旧兼容）
         style_slots = {
             "s1": "right_price_fixed",
             "s2": "villa_premium",
@@ -900,30 +908,24 @@ class CoverGenerator:
         if slot in style_slots:
             return style_slots[slot]
 
-        preferred = os.getenv("AUTO_HOME_COVER_KIND", "auto").strip().lower()
-        if preferred in {"right_price_fixed", "villa_premium", "dark_glass"}:
+        # 明确指定的自动封面种类
+        preferred = os.getenv("AUTO_HOME_COVER_KIND", "").strip().lower()
+        if preferred in _VALID_KINDS:
             return preferred
 
+        # 微信来源
         normalized_source_type = (source_type or "").strip().lower()
         normalized_source_name = (source_name or "").strip().lower()
-        if normalized_source_type in {"wechat_note", "wechat_manual", "wechat_import"} or "wechat" in normalized_source_name:
-            wechat_kind = os.getenv("WECHAT_HOME_COVER_KIND", "right_price_fixed").strip().lower()
-            if wechat_kind in {"right_price_fixed", "villa_premium", "dark_glass"}:
+        if normalized_source_type in {"wechat_note", "wechat_manual", "wechat_import"} \
+                or "wechat" in normalized_source_name:
+            wechat_kind = os.getenv("WECHAT_HOME_COVER_KIND", "").strip().lower()
+            if wechat_kind in _VALID_KINDS:
                 return wechat_kind
-            return "right_price_fixed"
+            # 微信来源也默认 hero_collage
+            return "hero_collage"
 
-        normal_pool = ("right_price_fixed", "villa_premium")
-        seed = "|".join(
-            [
-                str(draft_id or ""),
-                str(source_post_id or ""),
-                str(project or ""),
-                str(layout or ""),
-                str(price or ""),
-            ]
-        )
-        digest = hashlib.sha1(seed.encode("utf-8", errors="ignore")).hexdigest()
-        return normal_pool[int(digest[:8], 16) % len(normal_pool)]
+        # 默认：hero_collage（不再在旧模板间随机分流）
+        return "hero_collage"
 
     def _render_home_cover(
         self,
@@ -938,6 +940,7 @@ class CoverGenerator:
         price,
         highlights: list,
         bg_local_path: Optional[str] = None,
+        source_images: Optional[List[str]] = None,
         draft_id: str = "",
         source_post_id=None,
         source_type: str = "",
@@ -945,6 +948,7 @@ class CoverGenerator:
     ) -> Tuple[bool, str]:
         """
         使用 tools/render_blue_card_template.py 生成首页封面。
+        kind=hero_collage 时传入 --hero-img / --thumb1~3。
         返回 (ok, report)。
         """
         if os.getenv("AUTO_HOME_COVER_ENABLED", "1").strip().lower() not in {"1", "true", "yes"}:
@@ -966,9 +970,9 @@ class CoverGenerator:
         while len(clean_hl) < 3:
             clean_hl.append(["实拍房源", "中文顾问", "可预约看房"][len(clean_hl)])
         project_display = self._normalize_home_project(project, area)
-        layout_display = self._normalize_home_layout(layout)
-        size_display = self._normalize_home_size(size)
-        floor_display = self._normalize_home_floor(floor)
+        layout_display  = self._normalize_home_layout(layout)
+        size_display    = self._normalize_home_size(size)
+        floor_display   = self._normalize_home_floor(floor)
         kind = self._pick_home_template_kind(
             draft_id=draft_id,
             source_post_id=source_post_id,
@@ -979,15 +983,15 @@ class CoverGenerator:
             property_type=property_type,
             project=project_display,
         )
-        # 频道首页封面默认按 4:3（1280x960）输出，和大多数实拍图比例一致；
-        # 仍允许通过环境变量覆盖尺寸。
+
+        # 锁死 hero_collage 默认尺寸 1280×960
         try:
-            default_w = 1080 if kind == "portrait_luxe" else 1280
-            default_h = 1350 if kind == "portrait_luxe" else 960
+            default_w = 1280
+            default_h = 960
             viewport_w = int(os.getenv("HOME_COVER_W", str(default_w)))
             viewport_h = int(os.getenv("HOME_COVER_H", str(default_h)))
         except Exception:
-            viewport_w, viewport_h = (1080, 1350) if kind == "portrait_luxe" else (1280, 960)
+            viewport_w, viewport_h = 1280, 960
 
         price_arg = "面议"
         try:
@@ -1003,21 +1007,36 @@ class CoverGenerator:
         cmd = [
             py_exec,
             render_script,
-            "--kind", kind,
-            "--w", str(viewport_w),
-            "--h", str(viewport_h),
+            "--kind",    kind,
+            "--w",       str(viewport_w),
+            "--h",       str(viewport_h),
             "--project", (project_display or "精选房源"),
-            "--layout", (layout_display or "户型可咨询"),
-            "--area", (area or "金边"),
-            "--size", (size_display or "面积可咨询"),
-            "--floor", (floor_display or "楼层可咨询"),
-            "--price", price_arg,
-            "--h1", clean_hl[0],
-            "--h2", clean_hl[1],
-            "--h3", clean_hl[2],
-            "--out", output_path,
+            "--layout",  (layout_display  or "户型可咨询"),
+            "--area",    (area            or "金边"),
+            "--size",    (size_display    or "面积可咨询"),
+            "--floor",   (floor_display   or "条件可沟通"),
+            "--price",   price_arg,
+            "--h1",      clean_hl[0],
+            "--h2",      clean_hl[1],
+            "--h3",      clean_hl[2],
+            "--out",     output_path,
         ]
-        if bg_local_path and os.path.isfile(bg_local_path):
+
+        if kind == "hero_collage":
+            # 主图：bg_local_path（组内最佳图）
+            if bg_local_path and os.path.isfile(bg_local_path):
+                cmd.extend(["--hero-img", bg_local_path])
+
+            # thumb1/2/3：从 source_images 中取不同于主图的其他图
+            imgs = [p for p in (source_images or []) if p and os.path.isfile(p)]
+            # 排除主图，保留其他；不足时重复使用主图兜底
+            other_imgs = [p for p in imgs if p != bg_local_path] or imgs
+            fallback   = bg_local_path or (imgs[0] if imgs else None)
+            for flag, idx in [("--thumb1", 0), ("--thumb2", 1), ("--thumb3", 2)]:
+                src = other_imgs[idx] if idx < len(other_imgs) else fallback
+                if src and os.path.isfile(src):
+                    cmd.extend([flag, src])
+        elif bg_local_path and os.path.isfile(bg_local_path):
             cmd.extend(["--bg-local", bg_local_path])
 
         try:
@@ -1142,6 +1161,7 @@ class CoverGenerator:
                 price=price,
                 highlights=highlights,
                 bg_local_path=chosen_image,
+                source_images=group_images if group_images else [],
                 draft_id=draft_id,
                 source_post_id=source_post_id,
                 source_type=source_type or "",

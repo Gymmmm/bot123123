@@ -209,6 +209,19 @@ class Database:
             self._ensure_column(conn, "leads", "assigned_at", "TEXT NOT NULL DEFAULT ''")
             # 客户意图标签
             self._ensure_column(conn, "leads", "intent", "TEXT NOT NULL DEFAULT ''")
+            # 性能索引（IF NOT EXISTS，不破坏已有数据）
+            conn.executescript("""
+                CREATE INDEX IF NOT EXISTS idx_listings_status_created
+                    ON listings(status, created_at);
+                CREATE INDEX IF NOT EXISTS idx_listings_area_price
+                    ON listings(area, price);
+                CREATE INDEX IF NOT EXISTS idx_leads_user_created
+                    ON leads(user_id, created_at);
+                CREATE INDEX IF NOT EXISTS idx_leads_listing_action
+                    ON leads(listing_id, action);
+                CREATE INDEX IF NOT EXISTS idx_appointments_user_status
+                    ON appointments(user_id, status);
+            """)
 
     def _table_columns(self, table: str) -> set[str]:
         with self.connect() as conn:

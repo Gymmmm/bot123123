@@ -123,15 +123,45 @@ def publish_post_keyboard(
     user_bot_username: str,
     detail_url: str | None = None,
     maps_url: str | None = None,
+    channel_username: str = "",
+    channel_message_id: int | None = None,
+    discussion_group_link: str = "",
 ) -> InlineKeyboardMarkup:
-    # 频道卡片按钮：预约看房 + 问这套，可选 📍 查看位置。
-    ask_url = detail_url or deep_link(user_bot_username, f"consult_{listing_id}")
-    rows = [
+    """频道房源帖按钮，升级为 4 个。
+
+    第一排：📅 预约看房 | 💎 问问顾问
+    第二排：🖼 更多实拍/评论区 | 🔍 找类似房源
+
+    评论区链接优先使用 channel_username + channel_message_id。
+    降级策略：CHANNEL_USERNAME 缺失时使用 discussion_group_link。
+    """
+    book_url = deep_link(user_bot_username, f"book_{listing_id}")
+    consult_url = deep_link(user_bot_username, f"consult_{listing_id}")
+    similar_url = deep_link(user_bot_username, f"similar_{listing_id}")
+
+    # 评论区链接生成
+    comment_url: str | None = None
+    _ch_user = (channel_username or "").strip().lstrip("@")
+    if _ch_user and channel_message_id:
+        comment_url = f"https://t.me/{_ch_user}/{channel_message_id}?comment=1"
+    elif discussion_group_link:
+        comment_url = discussion_group_link
+
+    rows: list[list[InlineKeyboardButton]] = [
         [
-            InlineKeyboardButton("📅 预约看房", url=deep_link(user_bot_username, f"appoint_{listing_id}")),
-            InlineKeyboardButton("💬 问这套", url=ask_url),
+            InlineKeyboardButton("📅 预约看房", url=book_url),
+            InlineKeyboardButton("💎 问问顾问", url=consult_url),
         ],
     ]
-    if maps_url:
-        rows.append([InlineKeyboardButton("📍 查看位置", url=maps_url)])
+    if comment_url:
+        rows.append(
+            [
+                InlineKeyboardButton("🖼 更多实拍/评论区", url=comment_url),
+                InlineKeyboardButton("🔍 找类似房源", url=similar_url),
+            ]
+        )
+    else:
+        rows.append(
+            [InlineKeyboardButton("🔍 找类似房源", url=similar_url)]
+        )
     return InlineKeyboardMarkup(rows)
