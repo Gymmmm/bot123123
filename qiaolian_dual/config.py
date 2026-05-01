@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -39,6 +40,9 @@ ADMIN_IDS = {
 
 USER_BASE_URL = f"https://t.me/{USER_BOT_USERNAME}"
 
+_CHANNEL_URL_RE = re.compile(r"https?://t\.me/([A-Za-z0-9_]+)")
+
+
 # 频道用户名（不含 @ 前缀），用于生成评论区链接
 # https://t.me/{CHANNEL_USERNAME}/{channel_message_id}?comment=1
 def _derive_channel_username() -> str:
@@ -46,9 +50,7 @@ def _derive_channel_username() -> str:
     if raw:
         return raw
     # 尝试从 CHANNEL_URL 推导，例如 https://t.me/my_channel → my_channel
-    _url = (CHANNEL_URL or "").strip()
-    import re as _re
-    m = _re.match(r"https?://t\.me/([A-Za-z0-9_]+)", _url)
+    m = _CHANNEL_URL_RE.match((CHANNEL_URL or "").strip())
     if m:
         return m.group(1)
     return ""

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from dotenv import load_dotenv
@@ -12,6 +13,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # 2) 项目根目录 /opt/qiaolian_dual_bots/.env（本地也是这一种）
 load_dotenv(BASE_DIR / ".env")
 load_dotenv(BASE_DIR.parent / ".env")
+
+_CHANNEL_URL_RE = re.compile(r"https?://t\.me/([A-Za-z0-9_]+)")
 
 
 def _normalize_username(raw: str) -> str:
@@ -61,11 +64,9 @@ def get_settings() -> Settings:
     )
 
     # 频道用户名：优先读 CHANNEL_USERNAME，否则从 CHANNEL_URL 推导
-    import re as _re
     raw_ch_user = _normalize_username(os.getenv("CHANNEL_USERNAME", ""))
     if not raw_ch_user:
-        _url = os.getenv("CHANNEL_URL", "").strip()
-        m = _re.match(r"https?://t\.me/([A-Za-z0-9_]+)", _url)
+        m = _CHANNEL_URL_RE.match(os.getenv("CHANNEL_URL", "").strip())
         if m:
             raw_ch_user = m.group(1)
 
