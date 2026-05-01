@@ -56,45 +56,44 @@ def home_text() -> str:
         advisor = f"@{advisor}"
     advisor = advisor or "@qiaolian_support"
     return (
-        "<b>侨联地产｜金边华人房产服务</b>\n\n"
-        "真实房源｜实拍更新\n"
-        "公寓｜别墅｜商铺｜土地\n\n"
-        "专注金边生活服务\n\n"
-        "在金边找房\n"
-        "找自己人\n\n"
-        "咨询客服\n"
-        f"{e(advisor)}\n\n"
-        "点下方按钮开始："
+        "🏠 <b>侨联地产 · 金边华人房产服务</b>\n\n"
+        "真实房源 · 实拍更新\n"
+        "公寓 · 别墅 · 商铺 · 土地\n\n"
+        "━━━━━━━━━━━━\n\n"
+        "在金边找房，找自己人\n\n"
+        f"📱 顾问：{e(advisor)}\n\n"
+        "👇 点按钮开始："
     )
 
 
 def channel_welcome_text(first_name: str = "") -> str:
     """首屏 /start 欢迎语（无深链参数）：精简版，保留核心动作按钮。"""
+    name_part = f" {e(first_name)}" if first_name else ""
     return (
-        "👋 欢迎来到侨联地产\n\n"
-        "💎 侨联地产 · 金边华人租房服务\n"
-        "您在金边的自己人\n\n"
-        "这里可以帮你：\n\n"
-        "🏠 找真实房源\n"
-        "📅 预约实地看房 / 视频看房\n"
-        "🧰 入住后的报修 / 物业 / 续租服务\n"
-        "🗺️ 查看金边华人生活配套\n\n"
+        f"👋 <b>欢迎{name_part}，侨联地产为您服务</b>\n\n"
+        "💎 金边华人房产服务平台\n"
+        "<i>您在金边的自己人</i>\n\n"
         "━━━━━━━━━━━━\n\n"
-        "选择你现在要办的："
+        "🏠 找真实在租房源\n"
+        "📅 预约实地看房 / 视频代看\n"
+        "🧰 入住报修 · 物业 · 续租\n"
+        "🗺️ 金边华人生活配套\n\n"
+        "━━━━━━━━━━━━\n\n"
+        "👇 选一个开始："
     )
 
 
 def discussion_entry_welcome_text(first_name: str = "", listing_id: str = "") -> str:
     """讨论区第三段深链进入后的承接欢迎语。"""
     name_part = f" {e(first_name)}" if first_name else ""
-    listing_line = f"房源：<code>{e(listing_id)}</code>\n\n" if listing_id else ""
+    listing_line = f"🏠 房源：<code>{e(listing_id)}</code>\n\n" if listing_id else ""
     return (
-        f"🤖 已进入侨联小助手{name_part}\n\n"
+        f"🤖 <b>已进入侨联小助手{name_part}</b>\n\n"
         f"{listing_line}"
-        "已为你同步讨论区线索到顾问后台，继续点按钮即可：\n"
-        "• 预约实地看房 / 视频看房\n"
-        "• 按区域继续找同类房源\n"
-        "• 按预算收窄到 1-3 套\n\n"
+        "已同步讨论区线索到顾问后台，继续点按钮即可：\n\n"
+        "📅 预约实地看房 / 视频代看\n"
+        "📍 按区域继续找同类房源\n"
+        "💰 按预算收窄到 1–3 套\n\n"
         "👇 先选一个继续"
     )
 
@@ -271,7 +270,7 @@ def smart_find_guided_header_text() -> str:
     return (
         "<b>📍 按类型找</b>\n\n"
         "按 <b>类型 → 区域 → 预算</b> 三步筛选。\n"
-        "直接点下方按钮即可，无需手动输入。"
+        "下面直接点按钮即可，无需手动输入。"
     )
 
 

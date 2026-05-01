@@ -80,8 +80,8 @@ class UserJourneyRehearsalTests(unittest.IsolatedAsyncioTestCase):
             q4 = _mk_query("findbudget:r3")
             state4 = await handle_ui_callback(SimpleNamespace(callback_query=q4, effective_user=user), context)
             self.assertEqual(state4, MAIN)
-            q4.message.reply_text.assert_awaited()
-            self.assertIn("已为您筛出更匹配的房源", q4.message.reply_text.await_args.args[0])
+            q4.edit_message_text.assert_awaited()
+            self.assertIn("已为您筛出更匹配的房源", q4.edit_message_text.await_args.args[0])
 
         self.assertGreaterEqual(create_lead.call_count, 1)
 
@@ -104,16 +104,16 @@ class UserJourneyRehearsalTests(unittest.IsolatedAsyncioTestCase):
             state = await handle_ui_callback(SimpleNamespace(callback_query=query, effective_user=user), context)
 
         self.assertEqual(state, MAIN)
-        query.message.reply_text.assert_awaited()
-        text = query.message.reply_text.await_args.args[0]
+        query.edit_message_text.assert_awaited()
+        text = query.edit_message_text.await_args.args[0]
         self.assertIn("BKK1 The Peak 12A", text)
         self.assertIn("每月 15 号", text)
         self.assertIn("2026-12-31", text)
 
-        markup = query.message.reply_text.await_args.kwargs.get("reply_markup")
+        markup = query.edit_message_text.await_args.kwargs.get("reply_markup")
         button_texts = [btn.text for row in markup.inline_keyboard for btn in row]
         self.assertIn("🏠 我要换房", button_texts)
-        self.assertIn("💎 联系顾问", button_texts)
+        self.assertIn("💬 联系顾问", button_texts)
         self.assertIn("📅 预约看房", button_texts)
 
 

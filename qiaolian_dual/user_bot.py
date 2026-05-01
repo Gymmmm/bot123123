@@ -38,6 +38,7 @@ try:
         help_text as copy_help_text,
         home_text as copy_home_text,
         lead_capture_text as copy_lead_capture_text,
+        listing_detail as copy_listing_detail,
         listing_match_footer_text,
         listing_match_intro_text,
         local_life_text as copy_local_life_text,
@@ -57,6 +58,7 @@ try:
         smart_find_guided_header_text,
         smart_find_play_footer_hint_text,
         smart_find_play_prompt_text,
+        want_home_ack_text as copy_want_home_ack_text,
         want_home_text as copy_want_home_text,
     )
 except ImportError:  # pragma: no cover - script mode fallback
@@ -76,6 +78,7 @@ except ImportError:  # pragma: no cover - script mode fallback
         help_text as copy_help_text,
         home_text as copy_home_text,
         lead_capture_text as copy_lead_capture_text,
+        listing_detail as copy_listing_detail,
         listing_match_footer_text,
         listing_match_intro_text,
         local_life_text as copy_local_life_text,
@@ -95,6 +98,7 @@ except ImportError:  # pragma: no cover - script mode fallback
         smart_find_guided_header_text,
         smart_find_play_footer_hint_text,
         smart_find_play_prompt_text,
+        want_home_ack_text as copy_want_home_ack_text,
         want_home_text as copy_want_home_text,
     )
 
@@ -458,13 +462,14 @@ async def render_panel(
     prefer_edit_anchor: bool = False,
 ) -> None:
     """统一面板渲染：优先就地编辑，其次回退新消息。"""
-    query = update.callback_query
+    query = getattr(update, "callback_query", None)
     if query is not None and query.message is not None:
         kwargs: dict[str, object] = {"text": text, "reply_markup": reply_markup}
         if parse_mode:
             kwargs["parse_mode"] = parse_mode
         try:
-            await query.edit_message_text(**kwargs)
+            _edit_text = str(kwargs.pop("text", ""))
+            await query.edit_message_text(_edit_text, **kwargs)
             if context is not None:
                 context.user_data[PANEL_ANCHOR_KEY] = {
                     "chat_id": int(query.message.chat_id),
@@ -494,7 +499,8 @@ async def render_panel(
     kwargs2: dict[str, object] = {"text": text, "reply_markup": reply_markup}
     if parse_mode:
         kwargs2["parse_mode"] = parse_mode
-    sent = await msg.reply_text(**kwargs2)
+    _reply_text = str(kwargs2.pop("text", ""))
+    sent = await msg.reply_text(_reply_text, **kwargs2)
     if context is not None:
         context.user_data[PANEL_ANCHOR_KEY] = {
             "chat_id": int(sent.chat_id),
@@ -573,6 +579,14 @@ def rfcity_text() -> str:
 
 def want_home_prompt_text() -> str:
     return copy_want_home_text()
+
+
+def want_home_ack_text() -> str:
+    return copy_want_home_ack_text()
+
+
+def listing_detail_text(item: dict) -> str:
+    return copy_listing_detail(item)
 
 
 def _search_type_button_rows() -> list[list[InlineKeyboardButton]]:
@@ -1440,7 +1454,10 @@ def listing_landing_keyboard(listing_id: str, area: str = "") -> InlineKeyboardM
                 InlineKeyboardButton("❤️ 先收藏这套", url=_deep_link(_build_start_payload("fav", listing_id))),
                 InlineKeyboardButton("🏠 看同区域更多", url=_deep_link(_build_start_payload("more", listing_id or area_payload))),
             ],
-            [InlineKeyboardButton("💬 联系顾问", callback_data=f"appointment_menu:contact:listing:{listing_id}")],
+            [
+                InlineKeyboardButton("📋 查看详情", callback_data=f"listing:detail:{listing_id}"),
+                InlineKeyboardButton("💬 联系顾问", callback_data=f"appointment_menu:contact:listing:{listing_id}"),
+            ],
         ]
     )
 
@@ -2791,7 +2808,7 @@ async def handle_main_message(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     await render_panel(
         update,
-        text="我这边先给您走按钮导航，您也可以直接发“BKK1、500以内、一房、视频看房”这类关键词。",
+        text="主流程走按钮导航，除「🎲 一句话找房」外请直接点按钮；您也可以直接发「BKK1、500以内、一房、视频看房」这类关键词。",
         reply_markup=main_keyboard(),
         context=context,
         prefer_edit_anchor=True,
@@ -3947,8 +3964,8 @@ async def handle_ui_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         await render_panel(
             update,
-            text="✅ 已收到您的条件，已推送管理号人工筛选。\n"
-            "接下来会优先给您 1-3 套可直接做决定的房源。",
+            text=want_home_ack_text(),
+            parse_mode=ParseMode.HTML,
             reply_markup=main_keyboard(),
         )
         return MAIN
@@ -4230,6 +4247,46 @@ async def handle_ui_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 parse_mode=ParseMode.HTML,
                 reply_markup=rfcity_keyboard(),
             )
+        return MAIN
+
+    if data.startswith("listing:detail:"):
+        lid = data.split(":", 2)[2]
+        item = db.get_listing(lid) if lid else None
+        if not item:
+            await render_panel(
+                update,
+                text="未找到该房源详情，可能已下架。",
+                reply_markup=main_keyboard(),
+            )
+            return MAIN
+        create_lead(
+            user,
+            action="listing_detail_view",
+            source="listing_landing",
+            listing_id=lid,
+        )
+        detail_kb = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton(
+                        "📅 预约实地看房",
+                        url=_deep_link(_build_start_payload("appoint", lid, mode="offline")),
+                    ),
+                    InlineKeyboardButton(
+                        "🎥 视频代看",
+                        url=_deep_link(_build_start_payload("appoint", lid, mode="video")),
+                    ),
+                ],
+                [InlineKeyboardButton("💬 咨询这套", callback_data=f"appointment_menu:contact:listing:{lid}")],
+                [InlineKeyboardButton("⬅️ 返回", callback_data="home")],
+            ]
+        )
+        await render_panel(
+            update,
+            text=listing_detail_text(item),
+            parse_mode=ParseMode.HTML,
+            reply_markup=detail_kb,
+        )
         return MAIN
 
     return MAIN
@@ -4622,7 +4679,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
     logger.exception("user_bot handler error: %s", context.error)
 
 
-_MAIN_CB_PATTERN = r"^(home|hub:|resume:|unavail:|findmode:|findtype:|findarea:|findbudget:|findback:area|roompick:|appointment_menu:|service:|service_request:|service_slot:|pref:|profile:|contract:|lead_capture:|local:|rfcity:)"
+_MAIN_CB_PATTERN = r"^(home|hub:|resume:|unavail:|findmode:|findtype:|findarea:|findbudget:|findback:area|roompick:|appointment_menu:|service:|service_request:|service_slot:|pref:|profile:|contract:|lead_capture:|local:|rfcity:|listing:)"
 
 
 def build_application() -> Application:
