@@ -576,6 +576,8 @@ class PublisherBot:
             listing_key,
             str(post_dict.get("area") or "").strip(),
             self.settings.user_bot_username,
+            channel_username=self.settings.channel_username,
+            discussion_group_link=self.settings.discussion_group_link,
             maps_url=_maps_url,
         )
         variants = build_post_variants(post_dict)
@@ -1091,6 +1093,8 @@ class PublisherBot:
                 listing_key,
                 draft.area or "",
                 self.settings.user_bot_username,
+                channel_username=self.settings.channel_username,
+                discussion_group_link=self.settings.discussion_group_link,
                 maps_url=_maps_url,
             )
 
@@ -1152,12 +1156,16 @@ class PublisherBot:
                         reply_markup=kb,
                     )
 
-                # 发完封面图后立即更新按钮，注入真实 message_id 构成的详情链接
+                # 发完封面图后立即更新按钮，注入真实 channel_message_id 以生成评论区链接
                 try:
-                    _ch_url = (self.settings.channel_url or "").rstrip("/")
-                    _detail_url = f"{_ch_url}/{media_msg.message_id}?comment=1" if _ch_url else None
+                    _channel_message_id = int(media_msg.message_id)
                     _kb_with_detail = publish_post_keyboard(
-                        listing_key, draft.area or "", self.settings.user_bot_username, _detail_url,
+                        listing_key,
+                        draft.area or "",
+                        self.settings.user_bot_username,
+                        channel_username=self.settings.channel_username,
+                        channel_message_id=_channel_message_id,
+                        discussion_group_link=self.settings.discussion_group_link,
                         maps_url=_maps_url,
                     )
                     await bot.edit_message_reply_markup(

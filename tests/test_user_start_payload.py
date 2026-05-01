@@ -14,6 +14,25 @@ class UserStartPayloadTests(unittest.TestCase):
             self.assertEqual(payload["post_token"], "")
             self.assertIsNone(payload["channel_message_id"])
 
+    def test_new_static_start_args_are_parsed(self):
+        """新增静态深链参数：find_home, area_index, latest, cooperate, consult_general"""
+        # find_home, cooperate, consult_general → action = arg itself
+        for arg in ("find_home", "cooperate", "consult_general"):
+            payload = parse_start_arg_payload(arg)
+            self.assertIsNotNone(payload, f"parse_start_arg_payload({arg!r}) returned None")
+            self.assertEqual(payload["action"], arg)
+            self.assertEqual(payload["target"], "")
+
+        # area_index → mapped via _channel_index_action to "index_area"
+        payload = parse_start_arg_payload("area_index")
+        self.assertIsNotNone(payload)
+        self.assertEqual(payload["target"], "")
+
+        # latest → mapped via _channel_index_action to "index_latest"
+        payload = parse_start_arg_payload("latest")
+        self.assertIsNotNone(payload)
+        self.assertIn("latest", payload["action"])
+
     def test_channel_payload_format_still_supported(self):
         payload = parse_start_arg_payload("consult__abc__l_1|cv=b")
         self.assertIsNotNone(payload)
@@ -46,15 +65,54 @@ class UserStartPayloadTests(unittest.TestCase):
         self.assertEqual(payload["post_token"], "abc")
         self.assertEqual(payload["target"], "BKK1|cv=a")
 
-    def test_listing_landing_keyboard_uses_short_aliases(self):
-        with patch("qiaolian_dual.user_bot.USER_BOT_USERNAME", "TestDeepLinkBot"):
-            keyboard = listing_landing_keyboard("l_1024", area="BKK1")
+    def test_new_deeplink_formats(self):
+        """新版深链：book_{id}, similar_{id}, video_{id}"""
+        for action, prefix in (("book", "book_"), ("similar", "similar_"), ("video", "video_")):
+            payload = parse_start_arg_payload(f"{prefix}l_123")
+            self.assertIsNotNone(payload, f"parse_start_arg_payload({prefix}l_123) returned None")
+            self.assertEqual(payload["action"], action)
+            self.assertEqual(payload["target"], "l_123")
+
+    def test_legacy_deeplink_compat_appoint(self):
+        """兼容旧格式：appoint_{id} → action=appoint, {id}_appoint → action=book"""
+        # appoint_123 → action appoint (via START_ACTIONS loop)
+        payload = parse_start_arg_payload("appoint_123")
+        self.assertIsNotNone(payload)
+        self.assertEqual(payload["action"], "appoint")
+        self.assertEqual(payload["target"], "123")
+
+        # 123_appoint → action book (via old suffix map)
+        payload = parse_start_arg_payload("123_appoint")
+        self.assertIsNotNone(payload)
+        self.assertEqual(payload["action"], "book")
+        self.assertEqual(payload["target"], "123")
+
+    def test_legacy_deeplink_compat_consult(self):
+        """兼容旧格式：consult_{id} 和 {id}_consult"""
+        payload = parse_start_arg_payload("consult_l_99")
+        self.assertIsNotNone(payload)
+        self.assertEqual(payload["action"], "consult")
+        self.assertEqual(payload["target"], "l_99")
+
+        payload = parse_start_arg_payload("l_99_consult")
+        self.assertIsNotNone(payload)
+        self.assertEqual(payload["action"], "consult")
+        self.assertEqual(payload["target"], "l_99")
+
+    def test_listing_landing_keyboard_has_three_buttons(self):
+        """listing_landing_keyboard 应有 3 行各 1 个按钮"""
+        with patch("qiaolian_dual.user_bot.USER_BOT_USERNAME", "TestBot"):
+            with patch("qiaolian_dual.user_bot.listing_context", return_value={}):
+                keyboard = listing_landing_keyboard("l_1024", area="BKK1")
 
         rows = keyboard.inline_keyboard
-        self.assertIn("start=a_l_1024%7Cmode%3Doffline", rows[0][0].url)
-        self.assertIn("start=a_l_1024%7Cmode%3Dvideo", rows[0][1].url)
-        self.assertIn("start=f_l_1024", rows[1][0].url)
-        self.assertIn("start=m_l_1024", rows[1][1].url)
+        self.assertEqual(len(rows), 3, f"Expected 3 rows, got {len(rows)}: {rows}")
+        # Row 0: 预约看房
+        self.assertIn("book_l_1024", rows[0][0].url)
+        # Row 1: 视频代看
+        self.assertIn("video_l_1024", rows[1][0].url)
+        # Row 2: callback, not URL
+        self.assertIn("l_1024", rows[2][0].callback_data)
 
     def test_tenant_bind_and_channel_topic_payloads_are_supported(self):
         payload = parse_start_arg_payload("t_bind_ABC123")

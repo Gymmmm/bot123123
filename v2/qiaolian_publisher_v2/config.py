@@ -34,6 +34,8 @@ class Settings:
     user_bot_username: str
     channel_id: str
     channel_url: str
+    channel_username: str
+    discussion_group_link: str
     admin_ids: list[int]
     sqlite_path: Path
     default_contact_handle: str
@@ -58,11 +60,22 @@ def get_settings() -> Settings:
         or _normalize_username(os.getenv("PUBLISHER_BOT_USERNAME", ""))
     )
 
+    # 频道用户名：优先读 CHANNEL_USERNAME，否则从 CHANNEL_URL 推导
+    import re as _re
+    raw_ch_user = _normalize_username(os.getenv("CHANNEL_USERNAME", ""))
+    if not raw_ch_user:
+        _url = os.getenv("CHANNEL_URL", "").strip()
+        m = _re.match(r"https?://t\.me/([A-Za-z0-9_]+)", _url)
+        if m:
+            raw_ch_user = m.group(1)
+
     return Settings(
         publisher_bot_token=token,
         user_bot_username=deep_link_user,
         channel_id=os.getenv("CHANNEL_ID", "").strip(),
         channel_url=os.getenv("CHANNEL_URL", "").strip(),
+        channel_username=raw_ch_user,
+        discussion_group_link=os.getenv("DISCUSSION_GROUP_LINK", "").strip(),
         admin_ids=admin_ids,
         sqlite_path=sqlite_path,
         default_contact_handle=os.getenv("DEFAULT_CONTACT_HANDLE", "@qiaolian_advisor").strip(),
