@@ -81,7 +81,7 @@ class UserJourneyRehearsalTests(unittest.IsolatedAsyncioTestCase):
             state4 = await handle_ui_callback(SimpleNamespace(callback_query=q4, effective_user=user), context)
             self.assertEqual(state4, MAIN)
             q4.edit_message_text.assert_awaited()
-            self.assertIn("已为您筛出更匹配的房源", q4.edit_message_text.await_args.args[0])
+            self.assertIn("已为你筛出更匹配的房源", q4.edit_message_text.await_args.args[0])
 
         self.assertGreaterEqual(create_lead.call_count, 1)
 

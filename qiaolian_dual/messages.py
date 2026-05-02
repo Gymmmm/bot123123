@@ -71,8 +71,7 @@ def channel_welcome_text(first_name: str = "") -> str:
     name_part = f" {e(first_name)}" if first_name else ""
     return (
         f"👋 欢迎{name_part}来到 <b>侨联找房助手</b>\n\n"
-        "我是侨联智能小助手 🤖\n"
-        "找房、看房、视频代看、入住后的服务，我都可以协助你。\n\n"
+        "找房、看房、视频代看、入住后的服务，我都可以帮你。\n\n"
         "你可以直接告诉我需求，例如：\n\n"
         "<code>富力800公寓</code>\n"
         "<code>BKK一居</code>\n"
@@ -86,7 +85,7 @@ def discussion_entry_welcome_text(first_name: str = "", listing_id: str = "") ->
     name_part = f" {e(first_name)}" if first_name else ""
     listing_line = f"🏠 房源：<code>{e(listing_id)}</code>\n\n" if listing_id else ""
     return (
-        f"🤖 <b>已进入侨联小助手{name_part}</b>\n\n"
+        f"🤖 <b>侨联找房助手{name_part}</b>\n\n"
         f"{listing_line}"
         "已同步讨论区线索到顾问后台，继续点按钮即可：\n\n"
         "📅 预约实地看房 / 视频代看\n"
@@ -177,20 +176,20 @@ def brand_text() -> str:
 def about_text() -> str:
     return (
         f"🏢 <b>关于{BRAND_NAME}</b>\n\n"
-        f"{BRAND_NAME}是金边华人社区专业租房平台，核心定位是<b>您在金边的在地伙伴</b>。\n\n"
+        f"{BRAND_NAME}是金边华人社区专业租房平台，核心定位是<b>你在金边的自己人</b>。\n\n"
         "<b>我们的工作方式</b>\n"
         "• <b>房源先筛选</b>：按预算 + 区域 + 户型先收窄到 1–3 套，减少无效看房\n"
         "• <b>费用先对齐</b>：押付、水电、物业、网络等关键项在看房前尽量摊开说\n"
         "• <b>过程可追踪</b>：预约、咨询、入住、售后，统一由管理号持续跟进\n"
         "• <b>实拍可验证</b>：所有帖子均含实拍编号，入住后与帖内状态可对照\n\n"
-        "您可以先从「智能找房」或「预约看房」开始，我们会一步步协助。"
+        "你可以先从「智能找房」或「预约看房」开始，我们会一步步协助。"
     )
 
 
 def want_home_text() -> str:
     return (
         "<b>📍 条件筛选</b>（高意向入口）\n\n"
-        "这里默认走 <b>点击选择</b>，不让您反复打字。\n"
+        "这里默认走 <b>点击选择</b>，不让你反复打字。\n"
         "勾选完条件后点「提交条件」，系统会同步推送管理号，人工收窄到 1-3 套。\n\n"
         "可选条件包括：预算、区域、民水民电、停车、安静、采光、宠物、拎包、电梯/泳池等。"
     )
@@ -269,9 +268,9 @@ def help_repeat_keyboard() -> InlineKeyboardMarkup:
 def search_entry_intro_text() -> str:
     return (
         "<b>🏠 开始找房</b>\n\n"
-        "您可以直接点按钮，也可以发一句话给我。\n"
+        "你可以直接点按钮，也可以发一句话给我。\n"
         "例如：<code>BKK1 500以内 一房</code>、<code>钻石岛 两房</code>、<code>视频看房</code>\n\n"
-        "如果您想更稳一点，就走按钮筛选；如果您想快一点，就直接发关键词。"
+        "如果想更稳一点，就走按钮筛选；如果想快一点，就直接发关键词。"
     )
 
 
@@ -281,7 +280,7 @@ def smart_find_play_prompt_text() -> str:
         "请直接发一句需求，无需固定格式。\n"
         "例如：<code>BKK1 预算800内 1房</code>\n"
         "也可以只发：<code>钻石岛</code>、<code>500以内</code>、<code>两房</code>、<code>视频看房</code>\n\n"
-        "我会先按您说的方向筛一轮，再引导您继续缩小范围。"
+        "我会先按你说的方向筛一轮，再引导你继续缩小范围。"
     )
 
 
@@ -324,7 +323,7 @@ def find_area_budget_hint_text() -> str:
 
 
 def listing_match_intro_text() -> str:
-    return "✅ <b>已为您筛出更匹配的房源</b>（优先展示可快速决策的少量选项）"
+    return "✅ <b>已为你筛出更匹配的房源</b>（优先展示可快速决策的少量选项）"
 
 
 def listing_match_footer_text() -> str:
@@ -336,18 +335,18 @@ def listing_match_footer_text() -> str:
 def find_no_match_text() -> str:
     return (
         "这个条件暂时没有完全匹配的在架房源。\n\n"
-        "✅ <b>已通知顾问</b>，会优先为您盯新上的房\n\n"
-        "💡 同时您可以：\n"
-        "• 点「💬 联系顾问」，人工帮您扩一圈推荐\n"
+        "✅ <b>已通知顾问</b>，会优先为你盯新上的房\n\n"
+        "💡 同时你可以：\n"
+        "• 点「💬 联系顾问」，人工帮你扩一圈推荐\n"
         "• 点「🎯 重新筛选」调整预算或区域，通常可以多出不少选项\n\n"
-        "<i>您的需求已同步管理号，有新房上架第一时间跟进。</i>"
+        "<i>你的需求已同步管理号，有新房上架第一时间跟进。</i>"
     )
 
 
 def want_home_ack_text() -> str:
     return (
-        "✅ <b>已收到您的找房条件</b>\n\n"
-        "顾问会<b>人工收窄</b>到 1–3 套，并提前标注每套的关键费用项，方便您对比决策。\n\n"
+        "✅ <b>已收到你的找房条件</b>\n\n"
+        "顾问会<b>人工收窄</b>到 1–3 套，并提前标注每套的关键费用项，方便你对比决策。\n\n"
         "💡 想加快：补一下预算上限、民水民电、电梯/泳池需求，或直接发截图。"
     )
 
