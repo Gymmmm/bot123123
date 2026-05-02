@@ -97,7 +97,7 @@ class ChannelKeyboardTests(unittest.TestCase):
         self.assertIsNotNone(discussion_btn, "Discussion group link button should exist")
 
     def test_two_buttons_when_no_comment_link(self):
-        """无 channel_username 且无 discussion_group_link 时，只发 2+1 按钮（第二排 1 个）。"""
+        """无 channel_username 且无 discussion_group_link 时，仍保持 4 按钮格局（🖼 更多实拍降级兜底）。"""
         from v2.qiaolian_publisher_v2.keyboards import publish_post_keyboard
         kb = publish_post_keyboard(
             listing_id="l_1001",
@@ -108,7 +108,10 @@ class ChannelKeyboardTests(unittest.TestCase):
             discussion_group_link="",
         )
         flat = [btn for row in kb.inline_keyboard for btn in row]
-        self.assertEqual(len(flat), 3, f"Expected 3 buttons (2+1), got {len(flat)}")
+        self.assertEqual(len(flat), 4, f"Expected 4 buttons (2+2 with fallback), got {len(flat)}")
+        # 第二排的 🖼 按钮应仍然存在（使用兜底链接）
+        media_btn = next((b for b in flat if b.text and "实拍" in b.text), None)
+        self.assertIsNotNone(media_btn, "🖼 更多实拍 button should always be present")
 
     def test_book_and_consult_deeplinks(self):
         """预约和咨询按钮应使用新格式 book_ / consult_。"""

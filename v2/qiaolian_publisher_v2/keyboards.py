@@ -1,9 +1,13 @@
 
 from __future__ import annotations
 
+import logging
+
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from .formatters import AREA_OPTIONS, TYPE_LABELS, deep_link
+
+log = logging.getLogger(__name__)
 
 
 def main_menu() -> InlineKeyboardMarkup:
@@ -146,6 +150,12 @@ def publish_post_keyboard(
         comment_url = f"https://t.me/{_ch_user}/{channel_message_id}?comment=1"
     elif discussion_group_link:
         comment_url = discussion_group_link
+    else:
+        log.warning(
+            "[publish_post_keyboard] listing=%s: 无 channel_message_id 且无 DISCUSSION_GROUP_LINK，"
+            "「更多实拍/评论区」按钮将使用「找类似房源」兜底链接，请在 .env 配置 DISCUSSION_GROUP_LINK。",
+            listing_id,
+        )
 
     rows: list[list[InlineKeyboardButton]] = [
         [
@@ -161,7 +171,11 @@ def publish_post_keyboard(
             ]
         )
     else:
+        # 兜底：评论区按钮改用「找类似房源」链接，保持 4 按钮格局不变
         rows.append(
-            [InlineKeyboardButton("🔍 找类似房源", url=similar_url)]
+            [
+                InlineKeyboardButton("🖼 更多实拍", url=similar_url),
+                InlineKeyboardButton("🔍 找类似房源", url=similar_url),
+            ]
         )
     return InlineKeyboardMarkup(rows)
