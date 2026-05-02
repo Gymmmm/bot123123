@@ -1584,6 +1584,52 @@ def _qc_code_from_draft(d: dict) -> str:
     return "QC0000"
 
 
+def _compact_listing_title(d: dict, area: str, room_type: str, price: str) -> str:
+    """生成频道帖子标题：优先 项目名｜户型｜租金，始终保持短标题格式。
+    只读 project/community，不读 title（title 字段往往是长句）。
+    """
+    raw = _listing_value(d, "project", "community", default="")
+    project_label = _compact_copy(_clean_project_label(raw), 24) if raw else ""
+    prefix = project_label or area
+    return _compact_copy(f"{prefix}｜{room_type}｜{price}", 40)
+
+
+def _contextual_viewing_hint(d: dict) -> str:
+    """生成"提前说清"段：真实、靠谱，不写广告腔。最多 28 字。"""
+    raw_notes = " ".join(
+        [
+            _listing_value(d, "cost_notes", default=""),
+            _listing_value(d, "drawbacks", default=""),
+            _listing_value(d, "hidden_costs", default=""),
+        ]
+    ).lower()
+
+    # 噪音/安静
+    if any(x in raw_notes for x in ("噪", "马路", "高架", "highway", "loud", "noise", "吵", "嘈")):
+        return "比较在意安静的话，看房时建议重点确认楼层和窗外环境"
+    # 最短租期
+    if any(x in raw_notes for x in ("短租", "minimum", "min lease", "至少", "最少", "3个月", "半年")):
+        return "有最短租期要求，短租需求请看房前先确认"
+    # 停车
+    if any(x in raw_notes for x in ("停车", "parking", "车位少", "无车位")):
+        return "停车位有限，有用车需求的建议提前确认"
+    # 宠物
+    if any(x in raw_notes for x in ("不允许宠物", "no pet", "禁止养宠")):
+        return "业主不允许养宠，有宠物需求请提前说明"
+    # 水电类型
+    if any(x in raw_notes for x in ("商业电", "商电", "commercial", "高电费", "电费贵")):
+        return "用的是商业电，电费会比民电高，建议看房时问清月均用电"
+
+    # 无特定风险 → 通用付款提醒
+    payment = _normalize_deposit_text(_listing_value(d, "payment_terms", "deposit", default=""))
+    contract = _normalize_contract_term(_listing_value(d, "contract_term", default=""))
+    if payment and contract:
+        return _compact_copy(f"押付 {payment}，合同 {contract}，细节看房前可逐项确认", 28)
+    if payment:
+        return _compact_copy(f"押付 {payment}，具体费用细节建议看房前问清", 28)
+    return "价格和空房以实时确认为准，建议看房前先问清押付"
+
+
 def build_chinese_listing_post(d: dict, caption_variant: str | None = "a") -> str:
     """生成频道标准发帖正文（固定顺序 + 系统标签 + SEO 标签）。"""
     area = _listing_value(d, "area", default="金边")
@@ -1592,13 +1638,13 @@ def build_chinese_listing_post(d: dict, caption_variant: str | None = "a") -> st
         room_type = _resolved_property_type(d)
     listing_id = system_listing_id_from_draft(d)
     price = _price_compact_for_post(d)
-    title_main = _listing_value(d, "title", "project", "community", default="")
-    title_raw = title_main or f"{area}｜{room_type}｜{price}"
-    title = _compact_copy(title_raw, 40)
+    title = _compact_listing_title(d, area, room_type, price)
     location_seed = _listing_value(d, "area", "project", "community", default="金边")
     location = _compact_copy(location_seed, 22)
-    payment = _compact_copy(_payment_contract_summary(d) or "待确认", 24)
-    fee_hint = _compact_copy(_factual_fee_text(d), 30)
+    deposit_raw = _normalize_deposit_text(_listing_value(d, "payment_terms", "deposit", default="")) or "待确认"
+    contract_raw = _normalize_contract_term(_listing_value(d, "contract_term", default="")) or "待确认"
+    payment = _compact_copy(f"付款/合同：{deposit_raw}｜{contract_raw}", 28)
+    viewing_hint = _compact_copy(_contextual_viewing_hint(d), 32)
     judge_hint = _compact_copy(_factual_highlight_text(d), 30)
     tags = " ".join(build_listing_tags(d)[:8]).strip()
 
@@ -1612,7 +1658,7 @@ def build_chinese_listing_post(d: dict, caption_variant: str | None = "a") -> st
         f"租金：{he(price)}",
         f"押付：{he(payment)}",
         "━━━━━━━━━━━━",
-        f"提前说清：{he(fee_hint)}",
+        f"提前说清：{he(viewing_hint)}",
         f"侨联判断：{he(judge_hint)}",
         "━━━━━━━━━━━━",
         f"{he(BRAND_NAME)}｜您在金边的自己人",
