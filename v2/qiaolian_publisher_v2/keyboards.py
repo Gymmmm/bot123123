@@ -151,10 +151,13 @@ def publish_post_keyboard(
     elif discussion_group_link:
         comment_url = discussion_group_link
     else:
-        # 兜底：使用「找类似房源」深链，避免按钮缺失；同时记录警告提示运维配置
+        # Degraded state: both 🖼 and 🔍 buttons share the same URL (similar listings).
+        # This keeps the layout intact but 🖼 will NOT lead to media/comments.
+        # Resolve by setting DISCUSSION_GROUP_LINK in .env.
         log.warning(
             "[publish_post_keyboard] listing=%s: 无 channel_message_id 且无 DISCUSSION_GROUP_LINK，"
-            "「🖼 更多实拍/评论区」将降级为「找类似房源」链接。请在 .env 配置 DISCUSSION_GROUP_LINK。",
+            "「🖼 更多实拍/评论区」与「🔍 找类似房源」将指向同一链接（降级状态）。"
+            "请在 .env 配置 DISCUSSION_GROUP_LINK 以恢复评论区入口。",
             listing_id,
         )
         comment_url = similar_url

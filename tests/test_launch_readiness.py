@@ -115,7 +115,8 @@ class ChannelKeyboardTests(unittest.TestCase):
         similar_btn = next((b for b in flat if b.text and "类似" in b.text), None)
         self.assertIsNotNone(media_btn, "🖼 更多实拍/评论区 must always be present")
         self.assertIsNotNone(similar_btn, "🔍 找类似房源 must always be present")
-        # 兜底时，🖼 按钮的链接应等于「找类似房源」deep link
+        # Degraded state: both buttons share the same URL.
+        # Configure DISCUSSION_GROUP_LINK in .env to restore proper media/comments link.
         self.assertEqual(media_btn.url, similar_btn.url)
 
     def test_book_and_consult_deeplinks(self):
