@@ -96,8 +96,8 @@ class ChannelKeyboardTests(unittest.TestCase):
         discussion_btn = next((b for b in flat if "group" in (b.url or "")), None)
         self.assertIsNotNone(discussion_btn, "Discussion group link button should exist")
 
-    def test_two_buttons_when_no_comment_link(self):
-        """无 channel_username 且无 discussion_group_link 时，第二排降级为仅 1 个「找类似房源」按钮（共 3 按钮），并输出警告日志。"""
+    def test_four_buttons_always_including_fallback(self):
+        """无 channel_username 且无 discussion_group_link 时，仍输出 4 按钮（🖼 降级为 similar 链接），并输出警告日志。"""
         import logging
         from v2.qiaolian_publisher_v2.keyboards import publish_post_keyboard
         with self.assertLogs("v2.qiaolian_publisher_v2.keyboards", level=logging.WARNING):
@@ -110,9 +110,13 @@ class ChannelKeyboardTests(unittest.TestCase):
                 discussion_group_link="",
             )
         flat = [btn for row in kb.inline_keyboard for btn in row]
-        self.assertEqual(len(flat), 3, f"Expected 3 buttons (2+1 fallback), got {len(flat)}")
+        self.assertEqual(len(flat), 4, f"Expected 4 buttons always, got {len(flat)}")
+        media_btn = next((b for b in flat if b.text and "实拍" in b.text), None)
         similar_btn = next((b for b in flat if b.text and "类似" in b.text), None)
-        self.assertIsNotNone(similar_btn, "🔍 找类似房源 button must always be present")
+        self.assertIsNotNone(media_btn, "🖼 更多实拍/评论区 must always be present")
+        self.assertIsNotNone(similar_btn, "🔍 找类似房源 must always be present")
+        # 兜底时，🖼 按钮的链接应等于「找类似房源」deep link
+        self.assertEqual(media_btn.url, similar_btn.url)
 
     def test_book_and_consult_deeplinks(self):
         """预约和咨询按钮应使用新格式 book_ / consult_。"""

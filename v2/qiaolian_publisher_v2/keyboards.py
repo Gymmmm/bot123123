@@ -137,42 +137,37 @@ def publish_post_keyboard(
     第二排：🖼 更多实拍/评论区 | 🔍 找类似房源
 
     评论区链接优先使用 channel_username + channel_message_id。
-    降级策略：CHANNEL_USERNAME 缺失时使用 discussion_group_link。
+    降级策略：CHANNEL_USERNAME 缺失时使用 discussion_group_link；
+    两者均无时「🖼 更多实拍/评论区」使用「找类似房源」链接兜底，保持 4 按钮布局。
     """
     book_url = deep_link(user_bot_username, f"book_{listing_id}")
     consult_url = deep_link(user_bot_username, f"consult_{listing_id}")
     similar_url = deep_link(user_bot_username, f"similar_{listing_id}")
 
-    # 评论区链接生成
-    comment_url: str | None = None
+    # 评论区链接生成（三级优先）
     _ch_user = (channel_username or "").strip().lstrip("@")
     if _ch_user and channel_message_id:
-        comment_url = f"https://t.me/{_ch_user}/{channel_message_id}?comment=1"
+        comment_url: str = f"https://t.me/{_ch_user}/{channel_message_id}?comment=1"
     elif discussion_group_link:
         comment_url = discussion_group_link
     else:
+        # 兜底：使用「找类似房源」深链，避免按钮缺失；同时记录警告提示运维配置
         log.warning(
             "[publish_post_keyboard] listing=%s: 无 channel_message_id 且无 DISCUSSION_GROUP_LINK，"
-            "第二排将仅显示「🔍 找类似房源」按钮。请在 .env 配置 DISCUSSION_GROUP_LINK 以启用评论区入口。",
+            "「🖼 更多实拍/评论区」将降级为「找类似房源」链接。请在 .env 配置 DISCUSSION_GROUP_LINK。",
             listing_id,
         )
+        comment_url = similar_url
 
-    rows: list[list[InlineKeyboardButton]] = [
+    return InlineKeyboardMarkup(
         [
-            InlineKeyboardButton("📅 预约看房", url=book_url),
-            InlineKeyboardButton("💎 问问顾问", url=consult_url),
-        ],
-    ]
-    if comment_url:
-        rows.append(
+            [
+                InlineKeyboardButton("📅 预约看房", url=book_url),
+                InlineKeyboardButton("💎 问问顾问", url=consult_url),
+            ],
             [
                 InlineKeyboardButton("🖼 更多实拍/评论区", url=comment_url),
                 InlineKeyboardButton("🔍 找类似房源", url=similar_url),
-            ]
-        )
-    else:
-        # 无评论区链接时仍保留第二排，但只显示「找类似房源」
-        rows.append(
-            [InlineKeyboardButton("🔍 找类似房源", url=similar_url)]
-        )
-    return InlineKeyboardMarkup(rows)
+            ],
+        ]
+    )
