@@ -1594,6 +1594,13 @@ def _compact_listing_title(d: dict, area: str, room_type: str, price: str) -> st
     return _compact_copy(f"{prefix}｜{room_type}｜{price}", 40)
 
 
+_NOISE_KEYWORDS = ("噪", "马路", "高架", "highway", "loud", "noise", "吵", "嘈")
+_MIN_LEASE_KEYWORDS = ("短租", "minimum", "min lease", "至少", "最少", "3个月", "半年")
+_PARKING_KEYWORDS = ("停车", "parking", "车位少", "无车位")
+_NO_PET_KEYWORDS = ("不允许宠物", "no pet", "禁止养宠")
+_COMMERCIAL_ELEC_KEYWORDS = ("商业电", "商电", "commercial", "高电费", "电费贵")
+
+
 def _contextual_viewing_hint(d: dict) -> str:
     """生成"提前说清"段：真实、靠谱，不写广告腔。最多 28 字。"""
     raw_notes = " ".join(
@@ -1604,29 +1611,24 @@ def _contextual_viewing_hint(d: dict) -> str:
         ]
     ).lower()
 
-    # 噪音/安静
-    if any(x in raw_notes for x in ("噪", "马路", "高架", "highway", "loud", "noise", "吵", "嘈")):
+    if any(x in raw_notes for x in _NOISE_KEYWORDS):
         return "比较在意安静的话，看房时建议重点确认楼层和窗外环境"
-    # 最短租期
-    if any(x in raw_notes for x in ("短租", "minimum", "min lease", "至少", "最少", "3个月", "半年")):
+    if any(x in raw_notes for x in _MIN_LEASE_KEYWORDS):
         return "有最短租期要求，短租需求请看房前先确认"
-    # 停车
-    if any(x in raw_notes for x in ("停车", "parking", "车位少", "无车位")):
+    if any(x in raw_notes for x in _PARKING_KEYWORDS):
         return "停车位有限，有用车需求的建议提前确认"
-    # 宠物
-    if any(x in raw_notes for x in ("不允许宠物", "no pet", "禁止养宠")):
+    if any(x in raw_notes for x in _NO_PET_KEYWORDS):
         return "业主不允许养宠，有宠物需求请提前说明"
-    # 水电类型
-    if any(x in raw_notes for x in ("商业电", "商电", "commercial", "高电费", "电费贵")):
+    if any(x in raw_notes for x in _COMMERCIAL_ELEC_KEYWORDS):
         return "用的是商业电，电费会比民电高，建议看房时问清月均用电"
 
     # 无特定风险 → 通用付款提醒
-    payment = _normalize_deposit_text(_listing_value(d, "payment_terms", "deposit", default=""))
+    deposit = _normalize_deposit_text(_listing_value(d, "payment_terms", "deposit", default=""))
     contract = _normalize_contract_term(_listing_value(d, "contract_term", default=""))
-    if payment and contract:
-        return _compact_copy(f"押付 {payment}，合同 {contract}，细节看房前可逐项确认", 28)
-    if payment:
-        return _compact_copy(f"押付 {payment}，具体费用细节建议看房前问清", 28)
+    if deposit and contract:
+        return _compact_copy(f"押付 {deposit}，合同 {contract}，细节看房前可逐项确认", 28)
+    if deposit:
+        return _compact_copy(f"押付 {deposit}，具体费用细节建议看房前问清", 28)
     return "价格和空房以实时确认为准，建议看房前先问清押付"
 
 
@@ -1643,7 +1645,7 @@ def build_chinese_listing_post(d: dict, caption_variant: str | None = "a") -> st
     location = _compact_copy(location_seed, 22)
     deposit_raw = _normalize_deposit_text(_listing_value(d, "payment_terms", "deposit", default="")) or "待确认"
     contract_raw = _normalize_contract_term(_listing_value(d, "contract_term", default="")) or "待确认"
-    payment = _compact_copy(f"付款/合同：{deposit_raw}｜{contract_raw}", 28)
+    payment_contract = _compact_copy(f"付款/合同：{deposit_raw}｜{contract_raw}", 28)
     viewing_hint = _compact_copy(_contextual_viewing_hint(d), 32)
     judge_hint = _compact_copy(_factual_highlight_text(d), 30)
     tags = " ".join(build_listing_tags(d)[:8]).strip()
@@ -1656,7 +1658,7 @@ def build_chinese_listing_post(d: dict, caption_variant: str | None = "a") -> st
         f"位置：{he(location)}",
         f"户型：{he(room_type)}",
         f"租金：{he(price)}",
-        f"押付：{he(payment)}",
+        f"押付：{he(payment_contract)}",
         "━━━━━━━━━━━━",
         f"提前说清：{he(viewing_hint)}",
         f"侨联判断：{he(judge_hint)}",
