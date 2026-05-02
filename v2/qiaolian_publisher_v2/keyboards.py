@@ -153,7 +153,7 @@ def publish_post_keyboard(
     else:
         log.warning(
             "[publish_post_keyboard] listing=%s: 无 channel_message_id 且无 DISCUSSION_GROUP_LINK，"
-            "「更多实拍/评论区」按钮将使用「找类似房源」兜底链接，请在 .env 配置 DISCUSSION_GROUP_LINK。",
+            "第二排将仅显示「🔍 找类似房源」按钮。请在 .env 配置 DISCUSSION_GROUP_LINK 以启用评论区入口。",
             listing_id,
         )
 
@@ -171,11 +171,8 @@ def publish_post_keyboard(
             ]
         )
     else:
-        # 兜底：评论区按钮改用「找类似房源」链接，保持 4 按钮格局不变
+        # 无评论区链接时仍保留第二排，但只显示「找类似房源」
         rows.append(
-            [
-                InlineKeyboardButton("🖼 更多实拍", url=similar_url),
-                InlineKeyboardButton("🔍 找类似房源", url=similar_url),
-            ]
+            [InlineKeyboardButton("🔍 找类似房源", url=similar_url)]
         )
     return InlineKeyboardMarkup(rows)
