@@ -34,6 +34,7 @@ ROOT = Path(__file__).resolve().parents[1]
 RIGHT_PRICE_FIXED_TEMPLATE = ROOT / "templates" / "03_右侧价格牌_fixed_v1_template_render.html"
 DARK_GLASS_TEMPLATE = ROOT / "templates" / "06_暗夜玻璃_template_render.html"
 VILLA_PREMIUM_TEMPLATE = ROOT / "templates" / "12_别墅高级风_template_render.html"
+DRAGGABLE_TEMPLATE = ROOT / "templates" / "property_listing_draggable.html"
 
 KIND_ALIASES = {
     "blue_card": "right_price_fixed",
@@ -43,6 +44,9 @@ KIND_ALIASES = {
     "metro_panel": "right_price_fixed",
     "lite_strip": "right_price_fixed",
     "portrait_luxe": "right_price_fixed",
+    "drag": "draggable",
+    "swipe": "draggable",
+    "card": "draggable",
 }
 
 
@@ -651,6 +655,7 @@ def main() -> int:
             "right_price_fixed",
             "dark_glass",
             "villa_premium",
+            "draggable",
             "right_price",
             "blue_card",
             "white_bar",
@@ -658,6 +663,9 @@ def main() -> int:
             "metro_panel",
             "lite_strip",
             "portrait_luxe",
+            "drag",
+            "swipe",
+            "card",
         ),
         default=kind,
         help="Template kind. hero_collage = pure-Pillow (recommended). Others require Chromium.",
@@ -708,6 +716,16 @@ def main() -> int:
         default_h1      = "家具家电齐全"
         default_h2      = "拎包入住"
         default_h3      = "实拍可核验"
+    elif canonical_kind == "draggable":
+        default_project = "金都·时代广场"
+        default_layout  = "2房1厅1卫"
+        default_area    = "BKK1"
+        default_size    = "72㎡"
+        default_floor   = "押一付一"
+        default_price   = "$650/月"
+        default_h1      = "支持视频实拍代看"
+        default_h2      = "精装修拎包住"
+        default_h3      = "近商场地铁"
     else:
         default_project = "太子幸福"
         default_layout  = "Studio"
@@ -782,6 +800,7 @@ def main() -> int:
             "right_price_fixed": RIGHT_PRICE_FIXED_TEMPLATE,
             "dark_glass":        DARK_GLASS_TEMPLATE,
             "villa_premium":     VILLA_PREMIUM_TEMPLATE,
+            "draggable":         DRAGGABLE_TEMPLATE,
         }.get(args.kind)
         if tpl is None:
             print(f"Unknown kind for HTML branch: {args.kind}", file=sys.stderr)
@@ -796,6 +815,8 @@ def main() -> int:
         default_bg = "https://images.unsplash.com/photo-1494526585095-c41746248156?q=80&w=1800&auto=format&fit=crop"
     elif args.kind == "villa_premium":
         default_bg = "https://images.unsplash.com/photo-1600607687644-c7f34b5f7ef5?q=80&w=1800&auto=format&fit=crop"
+    elif args.kind == "draggable":
+        default_bg = "https://images.unsplash.com/photo-1560185007-cde436f6a4d0?q=80&w=1800&auto=format&fit=crop"
     else:
         default_bg = "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?q=80&w=1800&auto=format&fit=crop"
     render_w, render_h = 1600, 1200
