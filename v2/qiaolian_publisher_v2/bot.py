@@ -52,7 +52,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 from discussion_map_store import load_discuss_map, save_discuss_map
-from meihua_publisher import add_detail_logo_watermark
+from meihua_publisher import add_detail_logo_watermark, resolve_discussion_id
 
 for _cover_module_dir in (
     _REPO_ROOT / "v2_admin",
@@ -1034,6 +1034,58 @@ class PublisherBot:
         await query.answer()
         action = query.data.split(":", 1)[1]
 
+        if action == "compare_covers":
+            draft = self._draft(context)
+            await query.edit_message_text("⏳ 正在生成两款封面对比，请稍候…")
+            try:
+                out_dir = self._runtime_render_dir()
+            except Exception as e:
+                await query.edit_message_text(f"❌ 渲染目录不可写：{e}")
+                return ST_PREVIEW
+            bg_path = await self._resolve_cover_background(query.message, draft, out_dir)
+            hl = draft.highlights or ["实拍真房源", "中文顾问", "可预约看房"]
+            cover_kwargs = dict(
+                project=(draft.title or "侨联地产").strip() or "侨联地产",
+                property_type=(draft.layout or "精选房源").strip() or "精选房源",
+                area=(draft.area or "金边").strip() or "金边",
+                size=(draft.size_sqm or "—").strip() or "—",
+                floor=(draft.fee_note or "—").strip() or "—",
+                price=(draft.price or "面议").strip() or "面议",
+                highlights=hl,
+            )
+            styles = [
+                ("minimal", "🅰️ A款：清爽信息条"),
+                ("price_tag", "🅱️ B款：价格角标"),
+            ]
+            chat_id = query.message.chat_id
+            sent_any = False
+            for style_code, style_label in styles:
+                out_path = str(out_dir / f"compare_{draft.listing_id}_{style_code}.jpg")
+                try:
+                    generate_house_cover(bg_path, out_path, style=style_code, **cover_kwargs)
+                    with open(out_path, "rb") as f:
+                        await context.bot.send_photo(
+                            chat_id=chat_id,
+                            photo=f,
+                            caption=f"{style_label}\n\n点下方按钮选用此款：",
+                            reply_markup=InlineKeyboardMarkup([[
+                                InlineKeyboardButton(f"✅ 选用此款", callback_data=f"style:pick:{style_code}"),
+                            ]]),
+                        )
+                    sent_any = True
+                except Exception as e:
+                    logger.warning("compare_covers: 生成 %s 失败: %s", style_code, e)
+                    await context.bot.send_message(chat_id=chat_id, text=f"⚠️ {style_label} 生成失败：{e}")
+            if sent_any:
+                current = draft.cover_style or "minimal"
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=f"👆 对比两款后，点图片下方「✅ 选用此款」设定封面。\n当前选定款式：<code>{current}</code>",
+                    reply_markup=preview_keyboard(),
+                    parse_mode=ParseMode.HTML,
+                )
+            return ST_PREVIEW
+
         if action in {"publish", "publish_variants"}:
             draft = self._draft(context)
             uid = update.effective_user.id
@@ -1176,35 +1228,35 @@ class PublisherBot:
                 except Exception as _e:
                     logger.warning("更新详情按钮失败（不影响发布）: %s", _e)
 
-                # 3) 如果用户上传了原图，作为 media_group 发送
-                if draft.media_file_id and draft.media_type == "photo":
+                # 3) 如果用户上传了原图/视频，发讨论区而非频道主贴（主贴只保留封面+按钮，讨论区承载实拍）
+                if draft.media_file_id and draft.media_type in {"photo", "video"}:
                     await asyncio.sleep(0.5)
+                    discuss_id = await resolve_discussion_id(bot)
+                    media_dest = discuss_id if discuss_id else ch
+                    if not discuss_id:
+                        logger.info("讨论组未配置，实拍图回退发频道主贴: listing=%s", listing_key)
                     try:
-                        wm_photo = None
-                        try:
-                            tg_file = await bot.get_file(draft.media_file_id)
-                            raw = await tg_file.download_as_bytearray()
-                            wm_photo = add_detail_logo_watermark(bytes(raw))
-                        except Exception as e:
-                            logger.warning("原图加 logo 失败，回退原图发送: %s", e)
-
-                        await bot.send_photo(
-                            chat_id=ch,
-                            photo=wm_photo if wm_photo is not None else draft.media_file_id,
-                            caption="📷 实拍图",
-                        )
+                        if draft.media_type == "photo":
+                            wm_photo = None
+                            try:
+                                tg_file = await bot.get_file(draft.media_file_id)
+                                raw = await tg_file.download_as_bytearray()
+                                wm_photo = add_detail_logo_watermark(bytes(raw))
+                            except Exception as e:
+                                logger.warning("原图加 logo 失败，回退原图发送: %s", e)
+                            await bot.send_photo(
+                                chat_id=media_dest,
+                                photo=wm_photo if wm_photo is not None else draft.media_file_id,
+                                caption="📷 实拍图",
+                            )
+                        else:
+                            await bot.send_video(
+                                chat_id=media_dest,
+                                video=draft.media_file_id,
+                                caption="🎥 实拍视频",
+                            )
                     except Exception as e:
-                        logger.warning("Failed to send original photo: %s", e)
-                elif draft.media_file_id and draft.media_type == "video":
-                    await asyncio.sleep(0.5)
-                    try:
-                        await bot.send_video(
-                            chat_id=ch,
-                            video=draft.media_file_id,
-                            caption="🎥 实拍视频",
-                        )
-                    except Exception as e:
-                        logger.warning("Failed to send original video: %s", e)
+                        logger.warning("Failed to send original media: %s", e)
 
                 post_id = f"v2_{uuid.uuid4().hex[:16]}"
                 try:
@@ -1276,6 +1328,14 @@ class PublisherBot:
         data = query.data
 
         if data == "style:back":
+            await self.show_preview(update, context)
+            return ST_PREVIEW
+
+        if data.startswith("style:pick:"):
+            # 来自「对比两款封面」图片下方的直接选款按钮（不尝试编辑图片消息为文字）
+            style = data.split(":", 2)[2]
+            draft = self._draft(context)
+            draft.cover_style = style
             await self.show_preview(update, context)
             return ST_PREVIEW
 
