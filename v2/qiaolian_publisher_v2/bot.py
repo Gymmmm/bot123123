@@ -1256,7 +1256,7 @@ class PublisherBot:
                                 caption="🎥 实拍视频",
                             )
                     except Exception as e:
-                        logger.warning("Failed to send original media: %s", e)
+                        logger.warning("Failed to send original %s: %s", draft.media_type, e)
 
                 post_id = f"v2_{uuid.uuid4().hex[:16]}"
                 try:
