@@ -319,6 +319,9 @@
     </div>
 
     <script>
+      var EMPTY_REF_PATTERN = 'QC0000';
+      var INVALID_STRINGS = ['可咨询', '金边'];
+
       function txt(id) {
         const el = document.getElementById(id);
         return (el ? String(el.textContent || '') : '').trim();
@@ -327,7 +330,7 @@
         const s = String(v || '').trim();
         const low = s.toLowerCase();
         return !s || s === '-' || s === '—' || s === '--' || low === 'n/a'
-          || low === 'na' || s.includes('可咨询') || s === '金边';
+          || low === 'na' || INVALID_STRINGS.some(w => s.includes(w));
       }
       function hide(id) {
         const el = document.getElementById(id);
@@ -336,7 +339,7 @@
 
       // 编号
       const refRaw = txt('ref-badge');
-      if (!refRaw || refRaw.includes('QC0000')) hide('ref-badge');
+      if (!refRaw || refRaw.includes(EMPTY_REF_PATTERN)) hide('ref-badge');
 
       // 位置 / 面积 / 楼层
       if (bad(txt('t-area')))  hide('t-area');
