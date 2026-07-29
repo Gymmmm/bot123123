@@ -209,6 +209,7 @@ class Database:
             self._ensure_column(conn, "leads", "assigned_at", "TEXT NOT NULL DEFAULT ''")
             # 客户意图标签
             self._ensure_column(conn, "leads", "intent", "TEXT NOT NULL DEFAULT ''")
+            self._ensure_column(conn, "leads", "lead_status", "TEXT NOT NULL DEFAULT 'new'")
             # 性能索引（IF NOT EXISTS，不破坏已有数据）
             conn.executescript("""
                 CREATE INDEX IF NOT EXISTS idx_listings_status_created
@@ -475,6 +476,41 @@ class Database:
             )
             return cur.rowcount > 0
 
+    def update_lead_workflow(
+        self,
+        lead_id: int,
+        *,
+        status: str,
+        advisor_id: str = "",
+        advisor_name: str = "",
+    ) -> bool:
+        allowed = {"new", "claimed", "contacted", "invalid", "converted"}
+        if status not in allowed:
+            return False
+        with self.connect() as conn:
+            cur = conn.execute(
+                """
+                UPDATE leads
+                SET lead_status=?,
+                    advisor_id=CASE WHEN ?<>'' THEN ? ELSE advisor_id END,
+                    advisor_name=CASE WHEN ?<>'' THEN ? ELSE advisor_name END,
+                    assigned_at=CASE WHEN ?='claimed' THEN datetime('now', 'localtime') ELSE assigned_at END,
+                    response_at=CASE WHEN ?='contacted' THEN datetime('now', 'localtime') ELSE response_at END
+                WHERE id=?
+                """,
+                (
+                    status,
+                    advisor_id,
+                    advisor_id,
+                    advisor_name,
+                    advisor_name,
+                    status,
+                    status,
+                    int(lead_id),
+                ),
+            )
+            return cur.rowcount > 0
+
     def create_appointment(self, data: dict[str, Any]) -> int:
         with self.connect() as conn:
             cur = conn.execute(
@@ -507,6 +543,17 @@ class Database:
                 (user_id, limit),
             ).fetchall()
         return [row_to_dict(row) or {} for row in rows]
+
+    def update_appointment_status(self, appointment_id: int, status: str) -> bool:
+        allowed = {"pending", "assigned", "contacted", "confirmed", "done", "cancelled"}
+        if status not in allowed:
+            return False
+        with self.connect() as conn:
+            cur = conn.execute(
+                "UPDATE appointments SET status=? WHERE id=?",
+                (status, int(appointment_id)),
+            )
+            return cur.rowcount > 0
 
     def create_binding(
         self,

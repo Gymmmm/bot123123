@@ -166,6 +166,8 @@ APPOINTMENT_FOCUS_LABELS = {
 APPOINTMENT_FOCUS_ORDER = ["ac", "appliances", "light_noise", "water", "fee_contract"]
 APPOINTMENT_STATUS_LABELS = {
     "pending": "待确认",
+    "assigned": "顾问已接手",
+    "contacted": "顾问跟进中",
     "confirmed": "已确认",
     "done": "已完成",
     "cancelled": "已取消",
@@ -1665,7 +1667,7 @@ def create_lead(
     budget_min: int | None = None,
     budget_max: int | None = None,
     payload: dict | None = None,
-) -> None:
+) -> int | None:
     lead_payload = payload or {}
     raw_message_id = lead_payload.get("channel_message_id", lead_payload.get("message_id"))
     try:
@@ -1677,7 +1679,7 @@ def create_lead(
     agent_id = str(lead_payload.get("agent_id") or "").strip()
     response_at = str(lead_payload.get("response_at") or "").strip()
     try:
-        db.create_lead(
+        return db.create_lead(
             {
                 "user_id": user.id,
                 "username": getattr(user, "username", "") or "",
@@ -1700,6 +1702,7 @@ def create_lead(
         )
     except Exception:
         logger.exception("写入 leads 失败: action=%s listing=%s", action, listing_id)
+        return None
 
 
 def _user_mention_html(user) -> str:
@@ -1902,6 +1905,7 @@ async def _notify_admins(
     *,
     title: str,
     lines: list[str],
+    reply_markup: InlineKeyboardMarkup | None = None,
 ) -> None:
     if not ADMIN_IDS:
         return
@@ -1914,9 +1918,30 @@ async def _notify_admins(
                 text=text,
                 parse_mode=ParseMode.HTML,
                 disable_web_page_preview=True,
+                reply_markup=reply_markup,
             )
         except Exception:
             logger.exception("发送管理号消息失败: admin_id=%s title=%s", admin_id, title)
+
+
+def admin_lead_keyboard(
+    *,
+    lead_id: int,
+    appointment_id: int,
+    user_id: int,
+) -> InlineKeyboardMarkup:
+    suffix = f"{lead_id}:{appointment_id}:{user_id}"
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton("✅ 我来接单", callback_data=f"adminlead:claim:{suffix}"),
+                InlineKeyboardButton("💬 已联系", callback_data=f"adminlead:contacted:{suffix}"),
+            ],
+            [
+                InlineKeyboardButton("❌ 无效线索", callback_data=f"adminlead:invalid:{suffix}"),
+            ],
+        ]
+    )
 
 
 def _allow_admin_notify(
@@ -2791,16 +2816,22 @@ async def handle_main_message(update: Update, context: ContextTypes.DEFAULT_TYPE
             budget_max=budget_max,
             payload={"message": text, "match_mode": match_mode},
         )
-        await _notify_admins(
+        if _allow_admin_notify(
             context,
-            title="趣味关键词找房",
-            lines=[
-                f"用户：{_user_mention_html(user)}",
-                f"联系方式：{he(_user_contact_text(user))}",
-                f"模式：{he(match_mode)}",
-                f"原文：<code>{he(text[:700])}</code>",
-            ],
-        )
+            key=f"search_activity:{int(user.id)}",
+            cooldown_seconds=600,
+        ):
+            await _notify_admins(
+                context,
+                title="找房需求（普通线索）",
+                lines=[
+                    f"用户：{_user_mention_html(user)}",
+                    f"联系方式：{he(_user_contact_text(user))}",
+                    f"模式：{he(match_mode)}",
+                    f"需求：<code>{he(text[:700])}</code>",
+                    "说明：10 分钟内重复搜索仅记录，不重复提醒",
+                ],
+            )
         if match_mode == "strict":
             head = "✅ <b>已按你的需求先筛出这些房源</b>："
         elif match_mode in {"no_type", "no_area", "budget_only"}:
@@ -3406,6 +3437,75 @@ async def handle_ui_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     data = query.data or ""
     user = update.effective_user
     upsert_user_profile(user)
+
+    if data.startswith("adminlead:"):
+        if int(user.id) not in ADMIN_IDS:
+            await query.answer("仅顾问可操作", show_alert=True)
+            return MAIN
+        parts = data.split(":")
+        if len(parts) != 5 or not all(part.isdigit() for part in parts[2:]):
+            await query.answer("线索参数已失效", show_alert=True)
+            return MAIN
+        action = parts[1]
+        lead_id, appointment_id, customer_id = map(int, parts[2:])
+        status_map = {
+            "claim": ("claimed", "assigned", "顾问已接手"),
+            "contacted": ("contacted", "contacted", "顾问跟进中"),
+            "invalid": ("invalid", "cancelled", "已标记无效"),
+        }
+        if action not in status_map:
+            return MAIN
+        lead_status, appointment_status, label = status_map[action]
+        advisor_name = user_display_name(user)
+        ok = db.update_lead_workflow(
+            lead_id,
+            status=lead_status,
+            advisor_id=str(user.id),
+            advisor_name=advisor_name,
+        )
+        if appointment_id > 0:
+            db.update_appointment_status(appointment_id, appointment_status)
+        if not ok:
+            await query.answer("线索不存在或已失效", show_alert=True)
+            return MAIN
+
+        original = str(getattr(query.message, "text_html", "") or getattr(query.message, "text", "") or "")
+        status_line = f"\n\n<b>处理状态：</b>{he(label)} · {he(advisor_name)}"
+        await query.edit_message_text(
+            original + status_line,
+            parse_mode=ParseMode.HTML,
+            reply_markup=(
+                admin_lead_keyboard(
+                    lead_id=lead_id,
+                    appointment_id=appointment_id,
+                    user_id=customer_id,
+                )
+                if action == "claim"
+                else None
+            ),
+        )
+        if action in {"claim", "contacted"}:
+            user_text = (
+                "✅ <b>你的预约已有顾问接手</b>\n\n"
+                f"预约编号：<code>#{appointment_id}</code>\n"
+                f"当前状态：<b>{he(label)}</b>\n\n"
+                "你可以继续在 Bot 查看预约，顾问会通过 Telegram 跟进。"
+            )
+            try:
+                await context.bot.send_message(
+                    chat_id=customer_id,
+                    text=user_text,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=InlineKeyboardMarkup(
+                        [
+                            [InlineKeyboardButton("📋 查看我的预约", callback_data="appointment_menu:list")],
+                            [InlineKeyboardButton("🏠 返回首页", callback_data="home")],
+                        ]
+                    ),
+                )
+            except Exception:
+                logger.exception("预约状态通知用户失败: user_id=%s", customer_id)
+        return MAIN
 
     if data == "home":
         clear_session_for_fresh_entry(context)
@@ -4093,17 +4193,23 @@ async def handle_ui_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 **(pref.get("touch_payload") or {}),
             },
         )
-        await _notify_admins(
+        if _allow_admin_notify(
             context,
-            title="新找房条件（点击提交）",
-            lines=[
-                f"用户：{_user_mention_html(user)}",
-                f"联系方式：{he(_user_contact_text(user))}",
-                f"类型意向：{he(goal)}",
-                f"区域：{he(area or '-')}",
-                f"预算：{he(budget_label)}",
-            ],
-        )
+            key=f"search_activity:{int(user.id)}",
+            cooldown_seconds=600,
+        ):
+            await _notify_admins(
+                context,
+                title="找房需求（普通线索）",
+                lines=[
+                    f"用户：{_user_mention_html(user)}",
+                    f"联系方式：{he(_user_contact_text(user))}",
+                    f"类型意向：{he(goal)}",
+                    f"区域：{he(area or '-')}",
+                    f"预算：{he(budget_label)}",
+                    "说明：10 分钟内重复筛选仅记录，不重复提醒",
+                ],
+            )
 
         matches, match_mode = search_listings_with_fallback(
             property_type=type_filter or None,
@@ -4940,7 +5046,7 @@ async def appoint_flow_cb(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         focus_keys = [k for k in APPOINTMENT_FOCUS_ORDER if k in set(appt.get("focus_keys") or APPOINTMENT_FOCUS_ORDER)]
         focus_labels = [APPOINTMENT_FOCUS_LABELS[k] for k in focus_keys]
         focus_text = "；".join(focus_labels)
-        db.create_appointment(
+        appointment_id = db.create_appointment(
             {
                 "user_id": user.id,
                 "username": getattr(user, "username", "") or "",
@@ -4955,7 +5061,7 @@ async def appoint_flow_cb(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 "created_at": now_ts(),
             }
         )
-        create_lead(
+        lead_id = create_lead(
             user,
             action="appointment_submit",
             source=appt.get("source", "user_bot"),
@@ -4972,8 +5078,9 @@ async def appoint_flow_cb(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
         await _notify_admins(
             context,
-            title="新预约提醒",
+            title=f"高意向预约 #{appointment_id}",
             lines=[
+                f"线索编号：<code>{lead_id or '-'}</code>",
                 f"用户：{_user_mention_html(user)}",
                 f"联系方式：{he(_user_contact_text(user))}",
                 f"房源：{he(appt.get('listing_id', '') or '-')}",
@@ -4982,13 +5089,25 @@ async def appoint_flow_cb(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 f"关注点：{he(focus_text or '默认全项')}",
                 f"来源：{he(str(appt.get('source', 'user_bot')))}",
             ],
+            reply_markup=(
+                admin_lead_keyboard(
+                    lead_id=lead_id,
+                    appointment_id=appointment_id,
+                    user_id=int(user.id),
+                )
+                if lead_id is not None
+                else None
+            ),
         )
 
         context.user_data.pop("appt", None)
         await query.edit_message_text(
             "✅ <b>预约已提交</b>\n\n"
-            "侨联顾问会在看房前尽快\n"
-            "通过 Telegram 联系你确认。\n\n"
+            f"预约编号：<code>#{appointment_id}</code>\n"
+            f"房源：<code>{he(str(appt.get('listing_id', '') or '待推荐'))}</code>\n"
+            f"方式：{he(mode_label)}\n"
+            f"时间：{he(str(appt.get('date', '') or '-'))} {he(time_label)}\n"
+            "状态：<b>等待顾问确认</b>\n\n"
             + lead_capture_text(),
             parse_mode=ParseMode.HTML,
             reply_markup=lead_capture_keyboard(),
@@ -5019,7 +5138,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
     logger.exception("user_bot handler error: %s", context.error)
 
 
-_MAIN_CB_PATTERN = r"^(home$|home_smart_search|home_brand|home_appoint|home_consult|home_living|home_nearby|smart_project|smart_movein|keyword:handoff|hub:|resume:|unavail:|findmode:|findtype:|findarea:|findbudget:|findback:area|roompick:|appointment_menu:|service:|service_request:|service_slot:|pref:|profile:|contract:|lead_capture:|local:|rfcity:|listing:)"
+_MAIN_CB_PATTERN = r"^(home$|home_smart_search|home_brand|home_appoint|home_consult|home_living|home_nearby|smart_project|smart_movein|keyword:handoff|hub:|resume:|unavail:|findmode:|findtype:|findarea:|findbudget:|findback:area|roompick:|appointment_menu:|adminlead:|service:|service_request:|service_slot:|pref:|profile:|contract:|lead_capture:|local:|rfcity:|listing:)"
 
 
 def build_application() -> Application:
