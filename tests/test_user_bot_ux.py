@@ -6,7 +6,7 @@ from qiaolian_dual.user_bot import MAIN, handle_main_message, old_tenant_binding
 
 
 class UserBotUxTests(unittest.IsolatedAsyncioTestCase):
-    async def test_non_keyword_text_is_routed_back_to_buttons(self):
+    async def test_vague_find_intent_is_routed_to_search_entry(self):
         message = SimpleNamespace(text="我想租房", reply_text=AsyncMock())
         update = SimpleNamespace(
             effective_user=SimpleNamespace(id=1001, username="u1", full_name="Test User"),
@@ -20,7 +20,10 @@ class UserBotUxTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(state, MAIN)
         message.reply_text.assert_awaited()
         text = message.reply_text.await_args.args[0]
-        self.assertIn("除「🎲 一句话找房」外", text)
+        self.assertIn("我来帮你找", text)
+        markup = message.reply_text.await_args.kwargs["reply_markup"]
+        button_texts = [button.text for row in markup.inline_keyboard for button in row]
+        self.assertIn("🎲 一句话关键词", button_texts)
 
     async def test_guided_pref_state_blocks_free_text(self):
         message = SimpleNamespace(text="BKK1", reply_text=AsyncMock())
