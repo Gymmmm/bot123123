@@ -16,6 +16,8 @@ import sys
 import time
 from pathlib import Path
 
+from qiaolian_dual.preflight import validate_environment
+
 BASE_DIR = Path(__file__).resolve().parent
 _children: list[tuple[str, subprocess.Popen]] = []
 
@@ -79,10 +81,40 @@ def main() -> None:
         action="store_true",
         help="仅启动 v2 发布 Bot（不设默认；与「只要用户 Bot」场景分离）",
     )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="只检查配置和数据库，不启动 Bot",
+    )
     args = parser.parse_args()
 
     if args.publisher_only and args.with_publisher:
         parser.error("--publisher-only 与 --with-publisher 不要同时使用")
+
+    result = validate_environment(
+        BASE_DIR / ".env",
+        with_user=not args.publisher_only,
+        with_publisher=args.publisher_only or args.with_publisher,
+        with_collector=args.with_collector,
+    )
+    for warning in result.warnings:
+        print(f"[check] 警告：{warning}", flush=True)
+    if not result.ok:
+        for error in result.errors:
+            print(f"[check] 错误：{error}", file=sys.stderr, flush=True)
+        raise SystemExit(2)
+
+    bootstrap = subprocess.run(
+        [sys.executable, str(BASE_DIR / "scripts/bootstrap_db.py")],
+        cwd=str(BASE_DIR),
+        env=os.environ.copy(),
+        check=False,
+    )
+    if bootstrap.returncode != 0:
+        raise SystemExit(bootstrap.returncode)
+    print("[check] 配置与数据库检查通过", flush=True)
+    if args.check:
+        return
 
     signal.signal(signal.SIGINT, _on_signal)
     signal.signal(signal.SIGTERM, _on_signal)
