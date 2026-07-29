@@ -2135,7 +2135,7 @@ def build_keyboard(
         rows = [
             [
                 InlineKeyboardButton(
-                    "💬 咨询这套",
+                    "💬 立即咨询",
                     url=f"{base}{build_start_payload('q', listing_id, post_token, caption_variant)}",
                 ),
                 InlineKeyboardButton(
@@ -2145,11 +2145,11 @@ def build_keyboard(
             ],
             [
                 InlineKeyboardButton(
-                    "❤️ 收藏这套",
+                    "❤️ 收藏房源",
                     url=f"{base}{build_start_payload('f', listing_id, post_token, caption_variant)}",
                 ),
                 InlineKeyboardButton(
-                    "🏠 同区更多",
+                    "🏠 同区域更多",
                     url=f"{base}{build_start_payload('m', area or '金边', post_token, caption_variant)}",
                 ),
             ],
@@ -2866,13 +2866,27 @@ class MeihuaPublisher:
         d = self._draft_to_dict(row)
         source_post_id = d.get("source_post_id")
         if source_post_id not in (None, ""):
-            src_row = self.db.fetch_one(
-                "SELECT source_type, source_name FROM source_posts WHERE id=? LIMIT 1",
-                (source_post_id,),
+            # 兼容早期数据库：旧版 source_posts 尚无这两个来源字段。
+            source_columns = {
+                str(column[1])
+                for column in self.db.fetch_all("PRAGMA table_info(source_posts)")
+            }
+            selected = [
+                column
+                for column in ("source_type", "source_name")
+                if column in source_columns
+            ]
+            src_row = (
+                self.db.fetch_one(
+                    f"SELECT {', '.join(selected)} FROM source_posts WHERE id=? LIMIT 1",
+                    (source_post_id,),
+                )
+                if selected
+                else None
             )
             if src_row:
-                d["source_type"] = src_row[0]
-                d["source_name"] = src_row[1]
+                for index, column in enumerate(selected):
+                    d[column] = src_row[index]
         original_status = str(d.get("review_status") or "").strip().lower()
         if original_status == "published":
             print(f"[Publisher] Draft {draft_id} 已是 published，跳过重复发布。")
