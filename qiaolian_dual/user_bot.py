@@ -406,15 +406,19 @@ def channel_return_keyboard(channel_url: str = "") -> InlineKeyboardMarkup:
 
 
 def lead_capture_keyboard() -> InlineKeyboardMarkup:
-    """留资触发后的操作按钮：发手机号 / 直接联系顾问 / 继续看房。"""
+    """关键行为完成后的下一步：直接联系顾问或继续看房。"""
     rows: list[list[InlineKeyboardButton]] = []
     advisor_url = _advisor_tg_url()
-    rows.append([InlineKeyboardButton("📱 发送手机号", callback_data="lead_capture:phone")])
     if advisor_url:
-        rows.append([InlineKeyboardButton("💬 联系顾问", url=advisor_url)])
+        rows.append([InlineKeyboardButton("💬 打开顾问对话", url=advisor_url)])
     else:
         rows.append([InlineKeyboardButton("💬 联系顾问", callback_data="hub:advisor")])
-    rows.append([InlineKeyboardButton("🏠 继续看房", callback_data="home")])
+    rows.append(
+        [
+            InlineKeyboardButton("🔍 继续找房", callback_data="home_smart_search"),
+            InlineKeyboardButton("🏠 返回首页", callback_data="home"),
+        ]
+    )
     return InlineKeyboardMarkup(rows)
 
 
@@ -436,7 +440,8 @@ def old_tenant_followup_keyboard() -> InlineKeyboardMarkup:
 
 
 def welcome_text() -> str:
-    return copy_home_text()
+    # 裸 /start 与“返回首页”保持同一个首屏，避免用户看到两套首页。
+    return copy_channel_welcome_text()
 
 
 def channel_welcome_text(first_name: str = "") -> str:
@@ -1490,13 +1495,13 @@ def listing_landing_keyboard(listing_id: str, area: str = "") -> InlineKeyboardM
             [
                 InlineKeyboardButton(
                     "📅 预约看房",
-                    url=_deep_link(f"book_{listing_id}"),
+                    callback_data=f"listing:appoint:offline:{listing_id}",
                 ),
             ],
             [
                 InlineKeyboardButton(
                     "📹 约视频代看",
-                    url=_deep_link(f"video_{listing_id}"),
+                    callback_data=f"listing:appoint:video:{listing_id}",
                 ),
             ],
             [
@@ -1862,6 +1867,34 @@ def _format_listing_choice_lines(matches: list[dict]) -> str:
         lines.append(_format_match_line(item))
     lines.append(listing_match_footer_text())
     return "\n".join(lines)
+
+
+def search_results_keyboard(matches: list[dict]) -> InlineKeyboardMarkup:
+    """让搜索结果可以直接点开，不要求用户复制房源编号。"""
+    rows: list[list[InlineKeyboardButton]] = []
+    for item in matches[:3]:
+        listing_id = str(item.get("listing_id") or "").strip()
+        if not listing_id:
+            continue
+        area = str(item.get("area") or "金边").strip()
+        layout = str(item.get("layout") or item.get("property_type") or "房源").strip()
+        label = f"🏠 {area} · {layout} · {_fmt_price(item.get('price'))}"
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    label[:55],
+                    callback_data=f"listing:open:{listing_id}",
+                )
+            ]
+        )
+    rows.append(
+        [
+            InlineKeyboardButton("✏️ 修改条件", callback_data="home_smart_search"),
+            InlineKeyboardButton("💬 让顾问帮我找", callback_data="keyword:handoff"),
+        ]
+    )
+    rows.append([InlineKeyboardButton("🏠 返回首页", callback_data="home")])
+    return InlineKeyboardMarkup(rows)
 
 
 async def _notify_admins(
@@ -2778,14 +2811,14 @@ async def handle_main_message(update: Update, context: ContextTypes.DEFAULT_TYPE
             head = "📌 <b>暂时没有完全对上的</b>，先看近期在架房源："
         room_type = detect_room_type(text)
         body_parts = [_keyword_intro_text(area=area_use, room_type=room_type, budget_min=budget_min, budget_max=budget_max), "", head, ""]
-        for item in matches:
+        for item in matches[:3]:
             body_parts.append(_format_match_line(item))
         body_parts.append(smart_find_play_footer_hint_text(used_fallback=used_fb))
         await render_panel(
             update,
             text="\n".join(body_parts),
             parse_mode=ParseMode.HTML,
-            reply_markup=keyword_followup_keyboard(area=area_use, room_type=room_type),
+            reply_markup=search_results_keyboard(matches),
             context=context,
             prefer_edit_anchor=True,
         )
@@ -2840,14 +2873,14 @@ async def handle_main_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
         if matches:
             body_parts = [_keyword_intro_text(area=area_use, room_type=room_type, budget_min=budget_min, budget_max=budget_max), "", "我先按这个方向给你筛了一轮：", ""]
-            for item in matches:
+            for item in matches[:3]:
                 body_parts.append(_format_match_line(item))
             body_parts.append("\n如需更准，可以继续补一个区域、预算或户型，我会再收窄一轮。")
             await render_panel(
                 update,
                 text="\n".join(body_parts),
                 parse_mode=ParseMode.HTML,
-                reply_markup=keyword_followup_keyboard(area=area_use, room_type=room_type),
+                reply_markup=search_results_keyboard(matches),
                 context=context,
                 prefer_edit_anchor=True,
             )
@@ -2872,6 +2905,23 @@ async def handle_main_message(update: Update, context: ContextTypes.DEFAULT_TYPE
             text=welcome_text(),
             reply_markup=main_keyboard(),
             parse_mode=ParseMode.HTML,
+            context=context,
+            prefer_edit_anchor=True,
+        )
+        return MAIN
+
+    if any(token in normalized_text for token in ("找房", "租房", "房子", "公寓", "别墅")):
+        await render_panel(
+            update,
+            text=(
+                "<b>🔍 我来帮你找</b>\n\n"
+                "直接发一句需求就可以，例如：\n"
+                "<code>BKK1 800以内 一房</code>\n"
+                "<code>钻石岛 两房 下月入住</code>\n\n"
+                "不想打字，也可以点按钮选择。"
+            ),
+            parse_mode=ParseMode.HTML,
+            reply_markup=search_entry_keyboard(),
             context=context,
             prefer_edit_anchor=True,
         )
@@ -3691,14 +3741,14 @@ async def handle_ui_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         if matches:
             lines = [f"已先按 <b>{he(room_type)}</b> 给你筛一轮：", ""]
-            for item in matches:
+            for item in matches[:3]:
                 lines.append(_format_match_line(item))
             lines.append("\n如需更准，可以再补一个区域或预算。")
             await render_panel(
                 update,
                 text="\n".join(lines),
                 parse_mode=ParseMode.HTML,
-                reply_markup=keyword_followup_keyboard(room_type=room_type),
+                reply_markup=search_results_keyboard(matches),
             )
         else:
             await render_panel(
@@ -3967,7 +4017,7 @@ async def handle_ui_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 update,
                 text=_format_listing_choice_lines(matches),
                 parse_mode=ParseMode.HTML,
-                reply_markup=main_keyboard(),
+                reply_markup=search_results_keyboard(matches),
             )
         else:
             await render_panel(
@@ -4146,24 +4196,14 @@ async def handle_ui_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
 
     if data == "lead_capture:phone":
-        create_lead(
-            user,
-            action="lead_capture_phone_request",
-            source="lead_capture",
-            listing_id=str(context.user_data.get("contact_listing_id") or ""),
-            payload={"intent": "phone_share"},
-        )
+        # 兼容旧消息上残留的按钮；新版不再要求用户提交手机号/微信。
         await render_panel(
             update,
             text=(
-                "好的，请直接发送你的手机号码。\n\n"
-                "或者，可以发 Telegram 账号 / 微信 ID 也可以，顾问会主动联系你。"
+                "无需另外填写手机号或微信。\n\n"
+                "侨联顾问会直接通过 Telegram 接手当前需求。"
             ),
-            reply_markup=InlineKeyboardMarkup(
-                [
-                    [InlineKeyboardButton("🏠 继续看房", callback_data="home")],
-                ]
-            ),
+            reply_markup=lead_capture_keyboard(),
             context=context,
         )
         return MAIN
@@ -4511,6 +4551,42 @@ async def handle_ui_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 reply_markup=rfcity_keyboard(),
             )
         return MAIN
+
+    if data.startswith("listing:open:"):
+        lid = data.split(":", 2)[2]
+        item = listing_context(lid)
+        if not item or not item.get("listing_id"):
+            await render_panel(
+                update,
+                text="这套房源可能已下架。我可以继续帮你找相近房源。",
+                reply_markup=no_match_followup_keyboard(),
+                context=context,
+            )
+            return MAIN
+        context.user_data["contact_listing_id"] = lid
+        await render_panel(
+            update,
+            text=listing_landing_text(lid),
+            parse_mode=ParseMode.HTML,
+            reply_markup=listing_landing_keyboard(lid, str(item.get("area") or "")),
+            context=context,
+        )
+        return MAIN
+
+    if data.startswith("listing:appoint:"):
+        parts = data.split(":", 3)
+        if len(parts) != 4 or parts[2] not in {"offline", "video"}:
+            return MAIN
+        mode, lid = parts[2], parts[3]
+        context.user_data["contact_listing_id"] = lid
+        return await start_appointment(
+            update,
+            context,
+            lid,
+            source="listing_landing",
+            touch_payload={"listing_id": lid},
+            initial_mode=mode,
+        )
 
     if data.startswith("listing:detail:"):
         lid = data.split(":", 2)[2]

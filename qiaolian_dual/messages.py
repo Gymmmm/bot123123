@@ -96,11 +96,10 @@ def discussion_entry_welcome_text(first_name: str = "", listing_id: str = "") ->
 
 
 def lead_capture_text() -> str:
-    """留资触发节点文案：在预约/视频看房/费用咨询/联系顾问后触发。"""
+    """关键行为完成后的 Telegram 承接文案。"""
     return (
-        "方便留一个联系方式吗？\n\n"
-        "顾问确认房源和可约时间会更快。\n\n"
-        "可以发 Telegram / 微信 / 电话。"
+        "侨联顾问会直接通过 Telegram 接手，"
+        "你不用重复填写联系方式或重新说明需求。"
     )
 
 
@@ -117,8 +116,7 @@ def advisor_text() -> str:
 
 def advisor_contact_supplement_text() -> str:
     return (
-        "如果你希望顾问用微信或电话联系，也可以直接发给我。\n"
-        "不填也可以，Telegram 会正常接收顾问消息。"
+        "顾问会直接通过 Telegram 联系你，无需另外填写手机号或微信。"
     )
 
 

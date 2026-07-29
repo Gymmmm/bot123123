@@ -108,9 +108,9 @@ class UserStartPayloadTests(unittest.TestCase):
         rows = keyboard.inline_keyboard
         self.assertEqual(len(rows), 4, f"Expected 4 rows, got {len(rows)}: {rows}")
         # Row 0: 预约看房
-        self.assertIn("book_l_1024", rows[0][0].url)
+        self.assertEqual(rows[0][0].callback_data, "listing:appoint:offline:l_1024")
         # Row 1: 视频代看
-        self.assertIn("video_l_1024", rows[1][0].url)
+        self.assertEqual(rows[1][0].callback_data, "listing:appoint:video:l_1024")
         # Row 2: callback, not URL (问顾问)
         self.assertIn("l_1024", rows[2][0].callback_data)
         # Row 3: 查看详情 callback
