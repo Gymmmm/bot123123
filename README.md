@@ -113,6 +113,17 @@ python run_integrated_stack.py
 
 要带 v2 发布：`python run_integrated_stack.py --with-publisher`。要带采集：`python run_integrated_stack.py --with-collector`（勿与现网双开，见 `INTEGRATION.txt`）。
 
+启动前可先做只读配置检查（不连接 Telegram）：
+
+```bash
+python run_integrated_stack.py --check
+python run_integrated_stack.py --check --with-publisher
+python run_integrated_stack.py --check --with-collector
+```
+
+检查会验证 `.env`、Bot Token 格式、管理员和频道配置、采集凭据与
+`sources.json`，并自动初始化/校验 SQLite 表结构。检查信息不会打印 Token。
+
 ## 用户服务 Bot 已做好的功能
 
 - `/start`

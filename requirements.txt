@@ -1,5 +1,5 @@
 # Telegram
-python-telegram-bot==21.*
+python-telegram-bot[job-queue]==21.*
 telethon>=1.36.0
 
 # AI 解析
