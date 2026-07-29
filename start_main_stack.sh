@@ -19,6 +19,12 @@ echo "[start] launching main stack from $BASE_DIR"
 echo "[start] args: $*"
 
 mkdir -p logs
-nohup python3 run_integrated_stack.py "$@" > logs/stack.out 2>&1 &
+PYTHON_BIN="python3"
+if [[ -x ".venv/bin/python" ]]; then
+  PYTHON_BIN=".venv/bin/python"
+fi
+
+"$PYTHON_BIN" run_integrated_stack.py --check "$@"
+nohup "$PYTHON_BIN" run_integrated_stack.py "$@" > logs/stack.out 2>&1 &
 echo "[start] started pid=$!"
 echo "[start] tail log: tail -f logs/stack.out"
