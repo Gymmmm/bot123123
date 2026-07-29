@@ -100,7 +100,13 @@ KEY_PIN_TEXT = "channel_pin_html"
 
 
 def _direct_publish_enabled() -> bool:
-    return os.getenv("AUTOPILOT_DIRECT_PUBLISH_ENABLED", "").strip().lower() == "yes"
+    # ready 队列默认应当按时发布；显式设为 no/false/0 才停用。
+    return os.getenv("AUTOPILOT_DIRECT_PUBLISH_ENABLED", "yes").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
 
 # 每日广播预设模版（编号 -> (标题, HTML 片段)）
 DAILY_TEMPLATES: dict[int, tuple[str, str]] = {
