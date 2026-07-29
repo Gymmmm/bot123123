@@ -658,7 +658,9 @@ def non_rental_source_reasons(text: str) -> list[str]:
         return ["empty_text"]
     reasons: list[str] = []
     rental_intent = _has_rental_intent(text)
-    if NON_RENTAL_KEYWORD_PATTERN.search(text) and not rental_intent:
+    # 转让/出售帖常同时写“租约稳定”“剩余租期”，不能让这些字样
+    # 抵消明确的转让/出售信号。
+    if NON_RENTAL_KEYWORD_PATTERN.search(text):
         reasons.append("blacklist_keyword")
     for price_str in USD_AMOUNT_PATTERN.findall(text):
         try:
