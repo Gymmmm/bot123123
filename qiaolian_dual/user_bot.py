@@ -4947,6 +4947,10 @@ _MAIN_CB_PATTERN = r"^(home$|home_smart_search|home_brand|home_appoint|home_cons
 
 
 def build_application() -> Application:
+    if not USER_BOT_TOKEN.strip():
+        raise RuntimeError(
+            "USER_BOT_TOKEN 未配置：请先复制 .env.example 为 .env，并填写 BotFather Token"
+        )
     app = Application.builder().token(USER_BOT_TOKEN).build()
     conv_handler = ConversationHandler(
         entry_points=[
