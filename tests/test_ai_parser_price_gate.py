@@ -10,7 +10,7 @@ class AIParserPriceGateTests(unittest.TestCase):
     def test_source_without_price_is_skipped(self):
         with tempfile.TemporaryDirectory() as td:
             db_path = Path(td) / "test.db"
-            schema = Path(__file__).resolve().parent / "schema_core.sql"
+            schema = Path(__file__).resolve().parent.parent / "schema_core.sql"
             conn = sqlite3.connect(str(db_path))
             try:
                 conn.executescript(schema.read_text(encoding="utf-8"))
