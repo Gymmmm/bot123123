@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BASE_DIR="/Users/a1/projects/qiaolian_dual_bots_local"
+BASE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd "$BASE_DIR"
 
 if [[ ! -f "run_integrated_stack.py" ]]; then
@@ -18,6 +18,7 @@ fi
 echo "[start] launching main stack from $BASE_DIR"
 echo "[start] args: $*"
 
+mkdir -p logs
 nohup python3 run_integrated_stack.py "$@" > logs/stack.out 2>&1 &
 echo "[start] started pid=$!"
 echo "[start] tail log: tail -f logs/stack.out"
