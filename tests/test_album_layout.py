@@ -78,6 +78,8 @@ class AlbumLayoutTests(unittest.TestCase):
 
         self.assertTrue(gate["is_publishable"])
         self.assertEqual(gate["mode"], "premium_4image")
+        self.assertIn("missing_deposit_details", gate["warnings"])
+        self.assertIn("missing_recurring_cost_details", gate["warnings"])
         self.assertEqual(gate["album_all"][0], cover)
         self.assertEqual(gate["album_all"][1:], real_paths)
         self.assertEqual(main_album, [cover] + real_paths[:3])
@@ -131,6 +133,21 @@ class AlbumLayoutTests(unittest.TestCase):
 
         self.assertFalse(gate["is_publishable"])
         self.assertIn("suspicious_sale_price_in_rent", gate["reasons"])
+
+    def test_listing_without_specific_area_or_project_is_blocked(self):
+        cover, _ = self._seed_real_media(4)
+        draft = {
+            "source_post_id": 1,
+            "area": "金边",
+            "layout": "1房1卫",
+            "price": 600,
+            "queue_score": 90,
+        }
+
+        gate = evaluate_publish_gate(draft, cover, self.db_path)
+
+        self.assertFalse(gate["is_publishable"])
+        self.assertIn("invalid_area", gate["reasons"])
 
 
 if __name__ == "__main__":
