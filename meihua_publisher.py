@@ -1594,7 +1594,18 @@ def _compact_listing_title(d: dict, area: str, room_type: str, price: str) -> st
     return _compact_copy(f"{prefix}｜{room_type}｜{price}", 40)
 
 
-_NOISE_KEYWORDS = ("噪", "马路", "高架", "highway", "loud", "noise", "吵", "嘈")
+_NOISE_KEYWORDS = (
+    "噪",
+    "马路",
+    "高架",
+    "临街",
+    "车声",
+    "highway",
+    "loud",
+    "noise",
+    "吵",
+    "嘈",
+)
 _MIN_LEASE_KEYWORDS = ("短租", "minimum", "min lease", "至少", "最少", "3个月", "半年")
 _PARKING_KEYWORDS = ("停车", "parking", "车位少", "无车位")
 _NO_PET_KEYWORDS = ("不允许宠物", "no pet", "禁止养宠")
@@ -1632,8 +1643,83 @@ def _contextual_viewing_hint(d: dict) -> str:
     return "价格和空房以实时确认为准，建议看房前先问清押付"
 
 
+def _advisor_decision_hint(d: dict) -> str:
+    """只基于已解析事实给建议，不虚构房源优缺点。"""
+    raw_notes = " ".join(
+        [
+            _listing_value(d, "cost_notes", default=""),
+            _listing_value(d, "drawbacks", default=""),
+            _listing_value(d, "hidden_costs", default=""),
+        ]
+    ).lower()
+    if any(x in raw_notes for x in _NOISE_KEYWORDS):
+        return "位置方便；重视安静建议优先看高楼层"
+    if any(x in raw_notes for x in _COMMERCIAL_ELEC_KEYWORDS):
+        return "入住成本可能偏高，先核对月均电费"
+    if any(x in raw_notes for x in _NO_PET_KEYWORDS):
+        return "不适合养宠家庭，可让顾问另找同区房源"
+    if any(x in raw_notes for x in _PARKING_KEYWORDS):
+        return "有车用户先确认车位，再安排看房"
+    return _factual_highlight_text(d)
+
+
+def _verification_status_text(d: dict) -> str:
+    """频道外显核实状态：优先展示审核时间，不把采集时间冒充核实时间。"""
+    raw = _listing_value(d, "approved_at", default="")
+    if raw:
+        match = re.search(r"(\d{4})-(\d{1,2})-(\d{1,2})", str(raw))
+        if match:
+            return f"🟢 {int(match.group(2))}月{int(match.group(3))}日已核实"
+    return "🟢 发布前已核实"
+
+
+def _monthly_cost_summary(d: dict) -> str:
+    """生成用户真正关心的入住后费用，不确定的信息明确标注待确认。"""
+    fields = (
+        ("管理", ("management_fee", "property_fee", "management")),
+        ("水", ("water_rate", "water_fee")),
+        ("电", ("electric_rate", "electricity_rate", "electric_fee")),
+        ("网络", ("internet_fee", "wifi_fee", "internet")),
+        ("停车", ("parking_fee", "parking")),
+    )
+    parts: list[str] = []
+    for label, keys in fields:
+        value = _listing_value(d, *keys, default="")
+        cleaned = _normalize_fact_fragment(value, 14)
+        if cleaned:
+            parts.append(f"{label}{cleaned}")
+    if parts:
+        return "｜".join(parts[:5])
+
+    notes = _collect_fee_fragments(
+        "；".join(
+            [
+                _listing_value(d, "cost_notes", default=""),
+                _listing_value(d, "hidden_costs", default=""),
+            ]
+        ),
+        max_n=3,
+    )
+    if notes:
+        return "｜".join(notes)
+    return "管理费、水电、网络及停车待确认"
+
+
+def _listing_detail_summary(d: dict) -> str:
+    parts: list[str] = []
+    property_type = _resolved_property_type(d)
+    size = _listing_value(d, "size", "size_sqm", default="")
+    floor = _display_floor(_listing_value(d, "floor", default=""))
+    furniture = furniture_text(d)
+    for value in (property_type, size, floor, furniture):
+        cleaned = _normalize_fact_fragment(value, 12)
+        if cleaned and cleaned != "可咨询确认" and cleaned not in parts:
+            parts.append(cleaned)
+    return "｜".join(parts[:4]) or "实拍房源"
+
+
 def build_chinese_listing_post(d: dict, caption_variant: str | None = "a") -> str:
-    """生成频道标准发帖正文（固定顺序 + 系统标签 + SEO 标签）。"""
+    """生成频道标准发帖正文：5 秒读懂，费用透明，支持快速决策。"""
     area = _listing_value(d, "area", default="金边")
     room_type = normalize_room_type(_listing_value(d, "room_type", "layout", default="整租"))
     if not room_type:
@@ -1645,24 +1731,30 @@ def build_chinese_listing_post(d: dict, caption_variant: str | None = "a") -> st
     location = _compact_copy(location_seed, 22)
     deposit_raw = _normalize_deposit_text(_listing_value(d, "payment_terms", "deposit", default="")) or "待确认"
     contract_raw = _normalize_contract_term(_listing_value(d, "contract_term", default="")) or "待确认"
-    payment_contract = _compact_copy(f"付款/合同：{deposit_raw}｜{contract_raw}", 28)
+    payment_contract = _compact_copy(f"{deposit_raw}｜{contract_raw}", 28)
+    verification = _verification_status_text(d)
+    details = _listing_detail_summary(d)
+    monthly_costs = _monthly_cost_summary(d)
+    audience = _compact_copy(_audience_hint(room_type, d), 32)
     viewing_hint = _compact_copy(_contextual_viewing_hint(d), 32)
-    judge_hint = _compact_copy(_factual_highlight_text(d), 30)
-    tags = " ".join(build_listing_tags(d)[:8]).strip()
+    judge_hint = _compact_copy(_advisor_decision_hint(d), 30)
+    tags = " ".join(build_listing_tags(d)[:5]).strip()
 
     lines = [
         f"<b>{he(title)}</b>",
-        "<code>QIAOLIAN VERIFIED LISTING</code>",
-        "━━━━━━━━━━━━",
-        f"房源编号：<code>{he(listing_id)}</code>",
-        f"位置：{he(location)}",
-        f"户型：{he(room_type)}",
-        f"租金：{he(price)}",
-        f"押付：{he(payment_contract)}",
-        "━━━━━━━━━━━━",
-        f"提前说清：{he(viewing_hint)}",
-        f"侨联判断：{he(judge_hint)}",
-        "━━━━━━━━━━━━",
+        he(verification),
+        "",
+        f"📍 {he(location)}",
+        f"🏠 {he(details)}",
+        f"💵 租金 {he(price)}",
+        f"📄 押付/合同：{he(payment_contract)}",
+        f"🧾 每月费用：{he(monthly_costs)}",
+        "",
+        f"✅ 适合：{he(audience)}",
+        f"⚠️ 提前说清：{he(viewing_hint)}",
+        f"💬 侨联判断：{he(judge_hint)}",
+        "",
+        f"编号：<code>{he(listing_id)}</code>",
         f"{he(BRAND_NAME)}｜您在金边的自己人",
         "",
         tags,
@@ -2511,6 +2603,7 @@ def evaluate_publish_gate(d: dict, cover_path: str, db_path: str) -> dict:
 
     hard_block_reasons: list[str] = []
     fallback_reasons: list[str] = []
+    quality_warnings: list[str] = []
 
     quality_flags = _review_quality_flags(d.get("review_note") or "")
     source_text = _source_raw_text(d, db_path)
@@ -2530,7 +2623,7 @@ def evaluate_publish_gate(d: dict, cover_path: str, db_path: str) -> dict:
     if not valid_price:
         hard_block_reasons.append("invalid_price")
     if not valid_area:
-        fallback_reasons.append("vague_area")
+        hard_block_reasons.append("invalid_area")
     if not valid_room:
         hard_block_reasons.append("invalid_layout")
     if not cover_path or not os.path.isfile(cover_path):
@@ -2540,7 +2633,7 @@ def evaluate_publish_gate(d: dict, cover_path: str, db_path: str) -> dict:
     if "missing_price" in quality_flags:
         hard_block_reasons.append("quality_missing_price")
     if "missing_area" in quality_flags:
-        fallback_reasons.append("quality_missing_area")
+        hard_block_reasons.append("quality_missing_area")
     if "missing_layout" in quality_flags:
         hard_block_reasons.append("quality_missing_layout")
     if source_room_max >= 2 and layout_room_count > 0 and layout_room_count < (source_room_max - 1):
@@ -2553,6 +2646,15 @@ def evaluate_publish_gate(d: dict, cover_path: str, db_path: str) -> dict:
         hard_block_reasons.append("price_unit_ambiguous")
     if ("rent" in property_type or "rental" in property_type) and price_value > 50000:
         hard_block_reasons.append("suspicious_sale_price_in_rent")
+
+    deposit = _normalize_deposit_text(
+        _listing_value(d, "payment_terms", "deposit", default="")
+    )
+    recurring_costs = _monthly_cost_summary(d)
+    if not deposit:
+        quality_warnings.append("missing_deposit_details")
+    if recurring_costs == "管理费、水电、网络及停车待确认":
+        quality_warnings.append("missing_recurring_cost_details")
 
     if score < PREMIUM_PUBLISH_MIN_SCORE:
         fallback_reasons.append(f"score_below_premium:{score}")
@@ -2577,6 +2679,7 @@ def evaluate_publish_gate(d: dict, cover_path: str, db_path: str) -> dict:
         "score": score,
         "real_media_count": len(real_media),
         "reasons": reasons,
+        "warnings": quality_warnings,
         "album_all": album_all,
         "cover_path": gate_cover_path,
         "cover": gate_cover_path,
@@ -2971,6 +3074,8 @@ class MeihuaPublisher:
         gate_note = f"publish_path:{gate['mode']};score={gate['score']};real_media={gate['real_media_count']}"
         if gate.get("reasons"):
             gate_note += ";reasons=" + ",".join(gate["reasons"])
+        if gate.get("warnings"):
+            gate_note += ";warnings=" + ",".join(gate["warnings"])
         merged_review_note = f"{(d.get('review_note') or '').strip()} | {gate_note}".strip(" |")
         self.db.execute(
             "UPDATE drafts SET review_note=?, updated_at=CURRENT_TIMESTAMP WHERE draft_id=?",
