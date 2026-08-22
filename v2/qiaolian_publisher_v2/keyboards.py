@@ -93,9 +93,10 @@ def preview_keyboard() -> InlineKeyboardMarkup:
                 InlineKeyboardButton("✏️ 修改字段", callback_data="preview:edit"),
             ],
             [
+                InlineKeyboardButton("🖼 对比两款封面", callback_data="preview:compare_covers"),
                 InlineKeyboardButton("🎨 切换封面模板", callback_data="preview:style"),
-                InlineKeyboardButton("🧪 多文案对比发布", callback_data="preview:publish_variants"),
             ],
+            [InlineKeyboardButton("🧪 多文案对比发布", callback_data="preview:publish_variants")],
             [InlineKeyboardButton("❌ 取消", callback_data="pub:cancel")],
         ]
     )
