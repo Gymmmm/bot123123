@@ -323,7 +323,8 @@ def test_e2e_canonical_package_uses_one_source_and_freezes_after_approval(
         frozen_snapshot = row["snapshot_json"]
         snapshot = json.loads(frozen_snapshot)
         assert snapshot["caption_variant"] == "b"
-        assert "<i>亮点｜" in row["post_text"]
+        assert "Urban Village" in row["post_text"] or "洪森大道" in row["post_text"]
+        assert "$680" in row["post_text"]
     with pytest.raises(ValueError, match="approved_package_frozen"):
         build_package(str(db_path), str(draft_id))
     with sqlite3.connect(db_path) as conn:

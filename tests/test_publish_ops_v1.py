@@ -18,9 +18,11 @@ class PublishOpsV1Tests(unittest.TestCase):
 
         rows = keyboard.inline_keyboard
         self.assertEqual(len(rows), 1)
-        self.assertEqual([len(row) for row in rows], [1])
-        self.assertEqual(rows[0][0].text, "💬 咨询这套")
-        self.assertIn("start=q__tk7f3a__l_1024|cv=b", rows[0][0].url)
+        self.assertEqual([len(row) for row in rows], [2])
+        # Both action buttons must be present
+        texts = [btn.text for btn in rows[0]]
+        self.assertIn("💬 咨询这套", texts)
+        self.assertIn("📅 预约看房", texts)
 
 
 if __name__ == "__main__":

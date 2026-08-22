@@ -105,6 +105,7 @@ async def handle_main_message(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def handle_find_area(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     from .keyboards_search import find_budget_keyboard
+    from .messages import find_area_budget_hint_text
     from .search import detect_area
     from .session_deeplink import _remember_video_pref
     from .texts import render_panel
@@ -119,6 +120,7 @@ async def handle_find_area(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 async def handle_find_budget(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     from .admin_contract import _budget_text, _user_contact_text, _user_mention_html
     from .keyboards_common import no_match_followup_keyboard
+    from .messages import find_no_match_text
     from .results_admin import _notify_admins, send_find_results_as_cards
     from .search import create_lead, detect_property_type, detect_room_type, parse_budget_range, search_listings_with_fallback
     from .session_deeplink import _remember_video_pref
@@ -255,6 +257,7 @@ async def cmd_about(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """关于侨联命令"""
     from .keyboards_common import main_keyboard
     from .search import upsert_user_profile
+    from .texts import brand_story_text
     upsert_user_profile(update.effective_user)
-    await update.effective_message.reply_text(copy_brand_text(), parse_mode=ParseMode.HTML, disable_web_page_preview=True, reply_markup=main_keyboard())
+    await update.effective_message.reply_text(brand_story_text(), parse_mode=ParseMode.HTML, disable_web_page_preview=True, reply_markup=main_keyboard())
     return MAIN

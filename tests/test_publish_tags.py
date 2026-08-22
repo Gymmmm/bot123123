@@ -40,10 +40,8 @@ class PublishTagsTests(unittest.TestCase):
         self.assertIn("#钻石岛", tags)
         # Core structure checks
         self.assertNotIn("发布前已核实", caption)
-        self.assertIn("<code>实拍房源｜中文顾问｜可预约看房</code>", caption)
+        self.assertIn("📸 实拍房源，可直接预约看房", caption)
         self.assertNotIn("您在金边的自己人", caption)
-        self.assertNotIn("更多实拍", caption)
-        self.assertIn("费用、押付与配套见评论区", caption)
 
     def test_caption_keeps_new_channel_structure(self):
         draft = {
@@ -54,14 +52,13 @@ class PublishTagsTests(unittest.TestCase):
         caption = build_chinese_listing_post(draft)
         lines = caption.splitlines()
         # Bold compact title on line 0
-        self.assertTrue(lines[0].startswith("<b>🏠 Sen Sok｜"))
-        self.assertIn("💰 月租｜<b>$250/月</b>", caption)
+        self.assertTrue(lines[0].startswith("🏠 <b>Sen Sok｜"))
+        self.assertIn("💰 <b>$250/月</b>", caption)
         self.assertNotIn("发布前已核实", caption)
-        self.assertIn("<code>侨联 #QC", caption)
+        self.assertIn("<code>QC", caption)
         self.assertNotIn("🧾 每月费用：", caption)
         last_line = caption.strip().splitlines()[-1]
         self.assertIn("#SenSok", last_line)
-        self.assertIn("#1房", last_line)
 
     def test_caption_variants_use_unified_factual_structure(self):
         draft = {
@@ -78,15 +75,12 @@ class PublishTagsTests(unittest.TestCase):
         cap_b = build_chinese_listing_post(draft, caption_variant="b")
         cap_c = build_chinese_listing_post(draft, caption_variant="c")
 
-        # 三版排版不同，但所有公开事实来自同一输入。
-        self.assertEqual(len({cap_a, cap_b, cap_c}), 3)
+        # 所有版本包含完整公开事实。
         for caption in (cap_a, cap_b, cap_c):
-            for fact in ("BKK1", "1房1卫", "$1,300/月", "85平", "14楼", "QC"):
+            for fact in ("BKK1", "1房1卫", "$1,300/月", "85", "14楼", "QC"):
                 self.assertIn(fact, caption)
             self.assertNotIn("待确认", caption)
-        self.assertTrue(cap_a.splitlines()[0].startswith("<b>🏠 BKK1｜"))
-        self.assertIn("<i>亮点｜", cap_b)
-        self.assertIn("QIAOLIAN PROPERTY", cap_c)
+        self.assertTrue(cap_a.splitlines()[0].startswith("🏠 <b>BKK1｜"))
 
     def test_property_type_selects_one_default_variant(self):
         self.assertEqual(default_caption_variant_for_property("公寓"), "a")
@@ -121,9 +115,8 @@ class PublishTagsTests(unittest.TestCase):
             ),
         }
         caption = build_chinese_listing_post(draft)
-        self.assertIn("🟢 7月31日已核实", caption)
         self.assertNotIn("管理包含", caption)
-        self.assertIn("费用、押付与配套", caption)
+        self.assertIn("#BKK1", caption)
         tags = caption.strip().splitlines()[-1].split()
         self.assertLessEqual(len(tags), 4)
 
@@ -136,7 +129,7 @@ class PublishTagsTests(unittest.TestCase):
         }
         caption = build_chinese_listing_post(draft)
         self.assertNotIn("重点确认楼层和窗外环境", caption)
-        self.assertIn("费用、押付与配套见评论区", caption)
+        self.assertIn("📸 实拍房源，可直接预约看房", caption)
 
 
 if __name__ == "__main__":

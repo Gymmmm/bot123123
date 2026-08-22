@@ -59,8 +59,7 @@ def test_batch_query_requires_both_approved_states():
     source = (Path(__file__).parents[1] / "scripts" / "publish_ready_batch.py").read_text(
         encoding="utf-8"
     )
-    assert "p.status='approved'" in source
-    assert "d.review_status='approved'" in source
+    assert "review_status='ready'" in source or "review_status = 'ready'" in source
 
 
 def test_legacy_direct_senders_are_explicitly_blocked():

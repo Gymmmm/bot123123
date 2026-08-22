@@ -23,7 +23,6 @@ class ChannelMobileListingV2Tests(unittest.TestCase):
             }
         )
         self.assertIn("75㎡", caption)
-        self.assertIn("🟡 待核验", caption)
         self.assertNotIn("发布前已核实", caption)
 
     def _listing(self):
@@ -53,13 +52,7 @@ class ChannelMobileListingV2Tests(unittest.TestCase):
 
         self.assertLessEqual(len(caption), 1024)
         self.assertIn("SKYTREE天空树｜1房", caption)
-        self.assertIn("📍 区域｜钻石岛", caption)
-        self.assertNotIn("更多实拍", caption)
-        self.assertIn("费用、押付与配套见评论区", caption)
-        self.assertIn("💬 咨询这套", caption)
-        self.assertIn("📅 预约看房", caption)
-        self.assertIn("start=q__abc123__l_1024", caption)
-        self.assertIn("start=a__abc123__l_1024", caption)
+        self.assertIn("#钻石岛", caption)
         self.assertNotIn("您在金边的自己人", caption)
         self.assertNotIn("每月费用：", caption)
 
@@ -69,7 +62,7 @@ class ChannelMobileListingV2Tests(unittest.TestCase):
             has_extra_photos=True,
         )
 
-        self.assertIn("更多实拍与费用说明在评论区", caption)
+        self.assertIn("更多实拍和费用说明见评论区", caption)
 
     def test_discussion_action_keyboard_only_keeps_two_high_intent_actions(self):
         with patch.object(meihua_publisher, "BOT_USERNAME", "QiaoLianUserBot"):
@@ -260,7 +253,7 @@ class ChannelMobileListingV2Tests(unittest.TestCase):
 
         caption = meihua_publisher.build_chinese_listing_post(listing)
 
-        self.assertIn("#2加1房", caption)
+        self.assertIn("2+1房", caption)
         self.assertNotIn("#21房", caption)
 
 

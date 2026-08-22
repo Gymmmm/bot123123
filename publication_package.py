@@ -23,14 +23,14 @@ from qiaolian_dual.publishability_contract import evaluate_publishability
 ROOT = Path(__file__).resolve().parent
 PACKAGE_ROOT = ROOT / "media" / "publication_packages"
 COVER_TEMPLATE_MAP = {
-    "classic_blue": ROOT / "templates" / "property" / "01_经典蓝卡模板.html",
-    "minimal_white": ROOT / "templates" / "property" / "02_极简白条模板.html",
-    "right_price": ROOT / "templates" / "property" / "03_右侧价格牌模板.html",
-    "left_info": ROOT / "templates" / "property" / "03_右侧价格牌模板.html",
-    "black_gold": ROOT / "templates" / "property" / "04_黑金高级感_右侧价格牌模板.html",
+    "classic_blue": ROOT / "templates" / "01_经典蓝卡_template_editor.html",
+    "minimal_white": ROOT / "templates" / "03_右侧价格牌_fixed_v1_template_render.html",
+    "right_price": ROOT / "templates" / "03_右侧价格牌_fixed_v1_template_render.html",
+    "left_info": ROOT / "templates" / "03_右侧价格牌_fixed_v1_template_render.html",
+    "black_gold": ROOT / "templates" / "06_暗夜玻璃_template_render.html",
     "villa_premium": ROOT / "templates" / "12_别墅高级风_template_render.html",
-    "video_vertical": ROOT / "templates" / "property" / "04_竖版视频封面模板.html",
-    "editorial_mobile": ROOT / "templates" / "property" / "09_readable_card.html",
+    "video_vertical": ROOT / "templates" / "property_listing_draggable.html",
+    "editorial_mobile": ROOT / "templates" / "property_listing_draggable.html",
 }
 
 PACKAGE_ADDITIVE_COLUMNS = {
