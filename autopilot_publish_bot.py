@@ -2800,6 +2800,7 @@ def register_autopilot_features(
     *,
     include_cancel: bool = True,
     simple_mode: bool = False,
+    enable_scheduler: bool = False,
 ) -> None:
     """
     将队列/预览/定时/运营命令挂到已有 Application（与 v2 共用 meihua666 时调用）。
@@ -2807,6 +2808,13 @@ def register_autopilot_features(
     """
     grp_cmd = -1
     grp_txt = 1
+    def _mount_scheduler() -> None:
+        jq = application.job_queue
+        if jq is None:
+            logger.warning("job_queue 不可用：定时 ready 发帖与每日广播不启动（pip install 'python-telegram-bot[job-queue]'）")
+        else:
+            jq.run_repeating(tick_schedules, interval=30.0, first=8.0, name="tick_schedules")
+            logger.info("已挂载调度 tick（30s）时区=%s 槽=%s", TZ_NAME, _slots_raw_effective())
     if simple_mode:
         application.add_handler(CommandHandler("pending", cmd_pending), group=grp_cmd)
         application.add_handler(CommandHandler("send", cmd_send), group=grp_cmd)
@@ -2827,7 +2835,11 @@ def register_autopilot_features(
             MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, on_text_private),
             group=grp_txt,
         )
-        logger.info("已启用简单发布模式：导入 → 处理 → 手动发布；定时发布关闭")
+        if enable_scheduler:
+            _mount_scheduler()
+            logger.info("已启用简单发布模式：导入 → 处理 → 手动发布；同时保留 ready 队列定时发布")
+        else:
+            logger.info("已启用简单发布模式：导入 → 处理 → 手动发布；定时发布关闭")
         return
     application.add_handler(CommandHandler("ops", cmd_ops), group=grp_cmd)
     application.add_handler(CommandHandler("help", cmd_help), group=grp_cmd)
@@ -2887,12 +2899,7 @@ def register_autopilot_features(
         group=grp_txt,
     )
 
-    jq = application.job_queue
-    if jq is None:
-        logger.warning("job_queue 不可用：定时 ready 发帖与每日广播不启动（pip install 'python-telegram-bot[job-queue]'）")
-    else:
-        jq.run_repeating(tick_schedules, interval=30.0, first=8.0, name="tick_schedules")
-        logger.info("已挂载调度 tick（30s）时区=%s 槽=%s", TZ_NAME, _slots_raw_effective())
+    _mount_scheduler()
 
 
 def main() -> None:

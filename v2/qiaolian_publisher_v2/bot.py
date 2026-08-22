@@ -1282,7 +1282,12 @@ def main() -> None:
     from autopilot_publish_bot import register_autopilot_features
 
     application = Application.builder().token(settings.publisher_bot_token).build()
-    register_autopilot_features(application, include_cancel=False, simple_mode=True)
+    register_autopilot_features(
+        application,
+        include_cancel=False,
+        simple_mode=True,
+        enable_scheduler=True,
+    )
 
     async def post_init(app):
         # 只保留入口和取消；正常操作全部点按钮。

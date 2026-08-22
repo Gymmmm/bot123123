@@ -4,7 +4,8 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 import tempfile
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 
 class HomeKeyboardTests(unittest.TestCase):
@@ -198,6 +199,39 @@ class ConfigDerivationTests(unittest.TestCase):
 
 
 class DeploymentReadinessTests(unittest.TestCase):
+    def test_simple_mode_can_keep_scheduler_for_v2_runtime(self):
+        import autopilot_publish_bot as ap
+
+        job_queue = Mock()
+        app = SimpleNamespace(job_queue=job_queue, add_handler=Mock())
+        ap.register_autopilot_features(app, include_cancel=False, simple_mode=True, enable_scheduler=True)
+        job_queue.run_repeating.assert_called_once()
+
+    def test_v2_main_enables_scheduler_without_restoring_full_legacy_menu(self):
+        import v2.qiaolian_publisher_v2.bot as bot_module
+
+        fake_builder = Mock()
+        fake_application = SimpleNamespace(
+            add_handler=Mock(),
+            add_error_handler=Mock(),
+            bot=SimpleNamespace(set_my_commands=Mock()),
+            run_polling=Mock(),
+            post_init=None,
+        )
+        fake_builder.token.return_value = fake_builder
+        fake_builder.build.return_value = fake_application
+        fake_ptb_application = SimpleNamespace(builder=Mock(return_value=fake_builder))
+
+        with patch.object(bot_module, "get_settings", return_value=SimpleNamespace(publisher_bot_token="123:abc", sqlite_path=":memory:", admin_ids=[])), patch.object(bot_module, "PublisherBot"), patch.object(bot_module, "Application", fake_ptb_application), patch("autopilot_publish_bot.register_autopilot_features") as register:
+            bot_module.main()
+
+        register.assert_called_once_with(
+            fake_application,
+            include_cancel=False,
+            simple_mode=True,
+            enable_scheduler=True,
+        )
+
     def test_root_requirements_include_admin_web_runtime(self):
         requirements = Path(__file__).resolve().parents[1] / "requirements.txt"
         content = requirements.read_text(encoding="utf-8").lower()
