@@ -6,6 +6,7 @@ import sqlite3
 import json
 import os
 from datetime import datetime
+from pathlib import Path
 
 DB_PATH = os.getenv("DB_PATH", "data/qiaolian_dual_bot.db")
 _SCHEMA  = os.path.join(os.path.dirname(__file__), "schema.sql")
@@ -14,6 +15,7 @@ _SCHEMA  = os.path.join(os.path.dirname(__file__), "schema.sql")
 # ── 连接 ──────────────────────────────────────────────────
 
 def get_conn() -> sqlite3.Connection:
+    Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")

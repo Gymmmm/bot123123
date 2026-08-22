@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
+import tempfile
 from unittest.mock import patch
 
 
@@ -193,6 +195,37 @@ class ConfigDerivationTests(unittest.TestCase):
             import qiaolian_dual.config as cfg
             importlib.reload(cfg)
             self.assertEqual(cfg.CHANNEL_USERNAME, "explicit_ch")
+
+
+class DeploymentReadinessTests(unittest.TestCase):
+    def test_root_requirements_include_admin_web_runtime(self):
+        requirements = Path(__file__).resolve().parents[1] / "requirements.txt"
+        content = requirements.read_text(encoding="utf-8").lower()
+        self.assertIn("flask==3.1.3", content)
+        self.assertIn("waitress==3.0.1", content)
+
+    def test_procfile_starts_admin_server_with_waitress(self):
+        procfile = Path(__file__).resolve().parents[1] / "Procfile"
+        content = procfile.read_text(encoding="utf-8").strip()
+        self.assertIn("cd v2_admin", content)
+        self.assertIn("python -m waitress", content)
+        self.assertIn("admin_server:app", content)
+
+    def test_admin_db_creates_parent_directory_for_default_like_path(self):
+        import v2_admin.db as admin_db
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "data" / "qiaolian_dual_bot.db"
+            original = admin_db.DB_PATH
+            try:
+                admin_db.DB_PATH = str(db_path)
+                conn = admin_db.get_conn()
+                conn.close()
+            finally:
+                admin_db.DB_PATH = original
+
+            self.assertTrue(db_path.parent.is_dir())
+            self.assertTrue(db_path.is_file())
 
 
 if __name__ == "__main__":
