@@ -57,7 +57,7 @@ async def appoint_flow_cb(update: Update, context: ContextTypes.DEFAULT_TYPE, *,
         if not selected:
             await query.answer('至少保留 1 个关注点', show_alert=True)
             return APPT_FOCUS
-        text = '第三步：请选择预约日期。'
+        text = '📅 请选择预约日期：'
         await query.edit_message_text(text, reply_markup=_appointment_date_keyboard(), parse_mode=ParseMode.HTML)
         return APPT_DATE
     if data == 'appoint_back_mode':

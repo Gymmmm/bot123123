@@ -64,8 +64,6 @@ def listing_detail(item: dict) -> str:
         lines.append(f"\n<b>费用说明</b>\n{e(hidden_costs)}")
     if drawbacks:
         lines.append(f"\n<b>顾问提醒</b>\n{e(drawbacks)}")
-    lines.append("\n支持实地看房与实时视频代看。")
-    lines.append("<b>侨联地产｜金边华人长租服务</b>")
     return "\n".join(lines)
 
 
@@ -89,9 +87,8 @@ def advisor_text() -> str:
     """联系我们页面"""
     return (
         "✅ <b>已收到您的需求</b>\n\n"
-        "侨联顾问会尽快通过 Telegram 联系您。\n\n"
-        "⏱️ 预计 30 分钟内响应\n"
-        f"📞 急事可直接联系：{ADVISOR_TG or '@pengqingw'}"
+        "顾问会尽快通过 Telegram 联系您。\n"
+        f"⏱️ 30 分钟内响应｜急事：{ADVISOR_TG or '@pengqingw'}"
     )
 
 
@@ -155,14 +152,8 @@ def brand_text() -> str:
 def home_text() -> str:
     """首页欢迎文案：用客户任务说明入口，不暴露内部术语。"""
     return (
-        "🏠 <b>侨联地产｜金边租房中介</b>\n"
-        "金边华人的租房与生活服务平台\n\n"
-        "金边找房、预约看房、签约入住、租后服务，\n"
-        "都可以在这里完成。\n\n"
-        "🔍 找房：按区域、预算、户型筛选\n"
-        "🆕 最新实拍：看当前可见房源\n"
-        "🏠 我已租住：查看租约和入住服务\n\n"
-        "请选择你现在需要的服务："
+        "🏠 <b>侨联地产｜金边租房</b>\n\n"
+        "金边找房、预约看房、签约入住、租后服务。"
     )
 
 
@@ -226,14 +217,10 @@ def service_promise_text() -> str:
 
 def appointment_hub_text() -> str:
     return (
-        "<b>📅 预约实拍 / 视频看房</b>\n\n"
+        "<b>📅 预约看房</b>\n\n"
         "看中某套房，点帖子里的预约按钮会自动带上房源。\n"
-        "还没定房，也可以先约视频代看或实地看房，我来帮你继续收窄。\n\n"
-        "流程很短：\n"
-        "1）选方式\n"
-        "2）选关注点\n"
-        "3）选日期和时段\n"
-        "4）提交给顾问跟进"
+        "还没定好，也可以先约，顾问会帮你筛。\n\n"
+        "选方式 → 选日期 → 提交，流程三步。"
     )
 def service_hub_text() -> str:
     return (
@@ -283,20 +270,16 @@ def help_repeat_keyboard() -> InlineKeyboardMarkup:
 
 def search_entry_intro_text() -> str:
     return (
-        "<b>🏠 开始找房</b>\n\n"
-        "你可以直接点按钮，也可以发一句话给我。\n"
-        "例如：<code>BKK1 500以内 一房</code>、<code>钻石岛 两房</code>、<code>视频看房</code>\n\n"
-        "如果想更稳一点，就走按钮筛选；如果想快一点，就直接发关键词。"
+        "<b>🔍 找房</b>\n\n"
+        "直接发需求（如 <code>BKK1 500以内 1房</code>），或点按钮按步骤筛选。"
     )
 
 
 def smart_find_play_prompt_text() -> str:
     return (
-        "<b>🎲 一句话关键词</b>\n\n"
-        "请直接发一句需求，无需固定格式。\n"
-        "例如：<code>BKK1 预算800内 1房</code>\n"
-        "也可以只发：<code>钻石岛</code>、<code>500以内</code>、<code>两房</code>、<code>视频看房</code>\n\n"
-        "我会先按你说的方向筛一轮，再引导你继续缩小范围。"
+        "<b>🔍 关键词找房</b>\n\n"
+        "直接发一句需求，例如：<code>BKK1 预算800内 1房</code>\n"
+        "也可以只发：<code>钻石岛</code>、<code>500以内</code>、<code>两房</code>"
     )
 
 
@@ -344,18 +327,14 @@ def listing_match_intro_text() -> str:
 
 def listing_match_footer_text() -> str:
     return (
-        "\n\n<b>下一步</b>：点菜单 <b>📅 预约看房</b> 直接约到场，或 <b>💬 联系我们</b> 让管理号帮你对比决策。"
+        "\n\n点 <b>📅 预约看房</b> 直接约，或 <b>💬 联系我们</b> 让顾问帮你对比。"
     )
 
 
 def find_no_match_text() -> str:
     return (
-        "这个条件暂时没有完全匹配的在架房源。\n\n"
-        "✅ <b>已通知管理号</b>，会优先为你盯新上的房\n\n"
-        "💡 同时你可以：\n"
-        "• 点「💬 联系我们」，人工帮你扩一圈推荐\n"
-        "• 点「🎯 重新筛选」调整预算或区域，通常可以多出不少选项\n\n"
-        "<i>你的需求已同步管理号，有新房上架第一时间跟进。</i>"
+        "暂时没有完全匹配的在架房源。\n\n"
+        "✅ 已通知管理号，有新上架会优先跟进。"
     )
 
 
@@ -544,8 +523,7 @@ def consult_submit_ok_text() -> str:
     """咨询提交成功文案。"""
     return (
         "✅ 已收到你的咨询\n"
-        "顾问会尽快通过 Telegram 回复你。\n"
-        "也可点下方直接预约看房。"
+        "顾问会尽快通过 Telegram 回复你。"
     )
 
 
@@ -561,8 +539,7 @@ def appoint_success_text() -> str:
     """预约成功文案。"""
     return (
         "✅ <b>预约已提交</b>\n\n"
-        "侨联顾问会在看房前尽快\n"
-        "通过 Telegram 联系你确认。"
+        "顾问会尽快通过 Telegram 联系你确认时间。"
     )
 
 
