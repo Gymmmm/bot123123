@@ -17,6 +17,11 @@ async def handle_main_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     upsert_user_profile(user)
     text = (update.effective_message.text or '').strip()
     logger.info('route=handle_main_message update_id=%s user_id=%s', getattr(update, 'update_id', None), getattr(user, 'id', None))
+    
+    # 修复：确保 context.user_data 不为 None
+    if context.user_data is None:
+        context.user_data = {}
+    
     old_customer = context.user_data.pop('awaiting_old_customer', None)
     if old_customer is not None:
         if len(text) < 4:
@@ -24,8 +29,8 @@ async def handle_main_message(update: Update, context: ContextTypes.DEFAULT_TYPE
             await update.effective_message.reply_text('请发姓氏 + 手机尾号 4 位，或签约时使用的 Telegram 账号。')
             return MAIN
         create_lead(user, action='repeat_tenant_details', source='service_hub', payload={'details': text[:500]})
-        await _notify_admins(context, title='老客档案查询', lines=[f'用户：{_user_mention_html(user)}', f'联系方式：{he(_user_contact_text(user))}', f'查询信息：<code>{he(text[:500])}</code>'])
-        await render_panel(update, text='✅ <b>已提交老客档案查询</b>\n\n顾问核实后会帮您调取历史档案，再继续处理报修、续租或换房需求。\n\n⏱️ 预计 30 分钟内响应\n🔐 信息仅用于内部档案核实。', parse_mode=ParseMode.HTML, reply_markup=service_hub_keyboard(user.id), context=context)
+        await _notify_admins(context, title='老客档案查询', lines=[f'用户：{_user_mention_html(user)}', f'联系方式：{he(_user_contact_text(user))}', f'查询信息：<code>{he(text[:200])}</code>'])
+        await render_panel(update, text='✅ <b>已提交老客档案查询</b>\n\n顾问核实后会帮您调取历史档案，再继续处理报修、续租或换房需求。\n\n⏱️ 预计 30 分钟内联系你。')
         return MAIN
     service_request = context.user_data.pop('awaiting_service_request', None)
     if isinstance(service_request, dict):
@@ -36,7 +41,7 @@ async def handle_main_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         service_request['detail'] = text[:800]
         context.user_data['service_request_detail'] = service_request
         issue_key = str(service_request.get('issue_key') or 'repair_other')
-        await render_panel(update, text=f'✅ 已记录：{he(text[:500])}\n\n请选择希望处理的时间：', parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('🚨 今天内', callback_data=f'service_slot:{issue_key}:today'), InlineKeyboardButton('🕘 明天上午', callback_data=f'service_slot:{issue_key}:tomorrow_am')], [InlineKeyboardButton('🕒 明天下午', callback_data=f'service_slot:{issue_key}:tomorrow_pm')], [InlineKeyboardButton('⬅️ 返回', callback_data='service:hub')]]), context=context)
+        await render_panel(update, text=f'✅ 已记录：{he(text[:500])}\n\n请选择希望处理的时间：', parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("立即处理", callback_data="svc_asap"), InlineKeyboardButton("工作时间", callback_data="svc_work_hours")]]))
         return MAIN
     kctx = context.user_data.pop('awaiting_keyword_find', None)
     if kctx is not None:
@@ -48,10 +53,10 @@ async def handle_main_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         area_use = area_raw if area_raw != text[:40] else ''
         property_type = detect_property_type(text)
         matches, match_mode = search_listings_with_fallback(property_type=property_type or None, area=area_use, budget_min=budget_min, budget_max=budget_max, text_fragment=text, limit=5)
-        logger.info('route=awaiting_keyword update_id=%s user_id=%s area=%s budget=%s-%s mode=%s matched=%d ids=%s', getattr(update, 'update_id', None), getattr(user, 'id', None), area_use or '-', budget_min, budget_max, match_mode, len(matches), ','.join((str(item.get('listing_id') or '-') for item in matches[:5])))
-        create_lead(user, action='keyword_find_play', source=str(kctx.get('source', 'smart_find_play')), area=area_use, property_type=property_type, budget_min=budget_min, budget_max=budget_max, payload={'message': text, 'match_mode': match_mode})
+        logger.info('route=awaiting_keyword update_id=%s user_id=%s area=%s budget=%s-%s mode=%s matched=%d ids=%s', getattr(update, 'update_id', None), getattr(user, 'id', None), area_use or '-', f'{budget_min}-{budget_max}', match_mode, len(matches or []), ','.join(str(m.get('listing_id', '')) for m in (matches or [])))
+        create_lead(user, action='keyword_find_play', source=str(kctx.get('source', 'smart_find_play')), area=area_use, property_type=property_type, budget_min=budget_min, budget_max=budget_max, payload={'message': text[:100]})
         if _allow_admin_notify(context, key=f'search_activity:{int(user.id)}', cooldown_seconds=600):
-            await _notify_admins(context, title='找房需求（普通线索）', lines=[f'用户：{_user_mention_html(user)}', f'联系方式：{he(_user_contact_text(user))}', f'模式：{he(match_mode)}', f'需求：<code>{he(text[:700])}</code>', '说明：10 分钟内重复搜索仅记录，不重复提醒'])
+            await _notify_admins(context, title='找房需求（普通线索）', lines=[f'用户：{_user_mention_html(user)}', f'联系方式：{he(_user_contact_text(user))}', f'模式：{he(match_mode)}', f'需求：{he(text[:100])}'])
         await send_find_results_as_cards(update, context, matches, match_mode)
         return MAIN
     normalized_text = text.lower()
@@ -73,29 +78,29 @@ async def handle_main_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         return await start_video_tour_flow(update, context, source='natural_keyword', area=area_use, budget_min=budget_min, budget_max=budget_max, layout=room_type or property_type)
     if area_use or room_type or budget_min is not None or (budget_max is not None):
         matches, match_mode = search_listings_with_fallback(property_type=property_type or None, area=area_use, budget_min=budget_min, budget_max=budget_max, text_fragment=f'{text} {room_type}'.strip(), limit=5)
-        logger.info('route=natural_keyword update_id=%s user_id=%s area=%s budget=%s-%s mode=%s matched=%d ids=%s', getattr(update, 'update_id', None), getattr(user, 'id', None), area_use or '-', budget_min, budget_max, match_mode, len(matches), ','.join((str(item.get('listing_id') or '-') for item in matches[:5])))
-        create_lead(user, action='keyword_find_play', source='natural_keyword', area=area_use, property_type=property_type, budget_min=budget_min, budget_max=budget_max, payload={'message': text[:700], 'match_mode': match_mode, 'room_type': room_type})
+        logger.info('route=natural_keyword update_id=%s user_id=%s area=%s budget=%s-%s mode=%s matched=%d ids=%s', getattr(update, 'update_id', None), getattr(user, 'id', None), area_use or '-', f'{budget_min}-{budget_max}', match_mode, len(matches or []), ','.join(str(m.get('listing_id', '')) for m in (matches or [])))
+        create_lead(user, action='keyword_find_play', source='natural_keyword', area=area_use, property_type=property_type, budget_min=budget_min, budget_max=budget_max, payload={'message': text[:100]})
         if matches:
             await send_find_results_as_cards(update, context, matches, match_mode)
         else:
-            await render_panel(update, text=_keyword_intro_text(area=area_use, room_type=room_type, budget_min=budget_min, budget_max=budget_max) + '\n\n当前还没有完全对上的在架房源，我可以继续帮你缩小条件，或者直接转中文顾问继续筛。', parse_mode=ParseMode.HTML, reply_markup=keyword_followup_keyboard(area=area_use, room_type=room_type), context=context, prefer_edit_anchor=True)
+            await render_panel(update, text=_keyword_intro_text(area=area_use, room_type=room_type, budget_min=budget_min, budget_max=budget_max) + '\n\n当前还没有完全对上的在架房源，你也可以直接联系顾问或试试其他条件。', reply_markup=main_keyboard(), context=context, prefer_edit_anchor=True)
         return MAIN
     if text in {'🏠 返回首页', '🏠 返回首页'}:
         clear_session_for_fresh_entry(context)
         await render_panel(update, text=welcome_text(), reply_markup=main_keyboard(), parse_mode=ParseMode.HTML, context=context, prefer_edit_anchor=True)
         return MAIN
     if any((token in normalized_text for token in ('找房', '租房', '房子', '公寓', '别墅'))):
-        await render_panel(update, text='<b>🔍 我来帮你找</b>\n\n直接发一句需求就可以，例如：\n<code>BKK1 800以内 一房</code>\n<code>钻石岛 两房 下月入住</code>\n\n不想打字，也可以点按钮选择。', parse_mode=ParseMode.HTML, reply_markup=search_entry_keyboard(), context=context, prefer_edit_anchor=True)
+        await render_panel(update, text='<b>🔍 我来帮你找</b>\n\n直接发一句需求就可以，例如：\n<code>BKK1 800以内 一房</code>\n<code>钻石岛 两房 下月入住</code>\n<code>预算1000 视频看房</code>', parse_mode=ParseMode.HTML, reply_markup=main_keyboard(), context=context, prefer_edit_anchor=True)
         return MAIN
     contact_listing_id = str(context.user_data.get('contact_listing_id') or '').strip()
     if contact_listing_id:
         item = listing_context(contact_listing_id)
         contact_touch_payload = context.user_data.get('contact_touch_payload') or {}
-        create_lead(user, action='consult_message', source='listing_chat', listing_id=contact_listing_id, area=str(item.get('area') or ''), property_type=str(item.get('property_type') or ''), payload={'message': text[:700], **contact_touch_payload})
-        await _notify_admins(context, title='房源咨询留言', lines=[f'用户：{_user_mention_html(user)}', f'联系方式：{he(_user_contact_text(user))}', f'房源：{he(_display_listing_id(contact_listing_id))}', f'留言：<code>{he(text[:700])}</code>'])
-        await render_panel(update, text='已收到你对这套房的留言，顾问会按这条内容继续跟进。\n\n如果方便，也可以直接点下方按钮预约看房或直连顾问。', reply_markup=contact_handoff_keyboard(), parse_mode=ParseMode.HTML, context=context, prefer_edit_anchor=True)
+        create_lead(user, action='consult_message', source='listing_chat', listing_id=contact_listing_id, area=str(item.get('area') or ''), property_type=str(item.get('property_type') or ''), payload={'message': text[:100]})
+        await _notify_admins(context, title='房源咨询留言', lines=[f'用户：{_user_mention_html(user)}', f'联系方式：{he(_user_contact_text(user))}', f'房源：{he(_display_listing_id(contact_listing_id))}', f'留言：{he(text[:100])}'])
+        await render_panel(update, text='已收到你对这套房的留言，顾问会按这条内容继续跟进。\n\n如果方便，也可以直接点下方按钮预约看房或直连顾问。', reply_markup=main_keyboard(), context=context, prefer_edit_anchor=True)
         return MAIN
-    await render_panel(update, text='主流程走按钮导航，除「🎲 一句话找房」外请直接点按钮；你也可以直接发「BKK1、500以内、一房、视频看房」这类关键词。', reply_markup=main_keyboard(), context=context, prefer_edit_anchor=True)
+    await render_panel(update, text='主流程走按钮导航，除「🎲 一句话找房」外请直接点按钮；你也可以直接发「BKK1、500以内、一房、视频看房」这类关键词，我会智能匹配房源。', reply_markup=main_keyboard(), context=context, prefer_edit_anchor=True)
     return MAIN
 
 async def handle_find_area(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -127,8 +132,8 @@ async def handle_find_budget(update: Update, context: ContextTypes.DEFAULT_TYPE)
     goal = str(pref.get('goal') or '')
     room_hint = detect_room_type(text) or ('' if goal in {'', 'any', '住宅'} else goal)
     _remember_video_pref(context, area=area or None, budget_min=budget_min, budget_max=budget_max, layout=room_hint or None)
-    create_lead(user, action='search_pref_submit', source=pref.get('source', 'user_search'), area=area, property_type=property_type, budget_min=budget_min, budget_max=budget_max, payload={'message': text, 'area_hint': area, 'goal': goal, **(pref.get('touch_payload') or {})})
-    await _notify_admins(context, title='新找房条件', lines=[f'用户：{_user_mention_html(user)}', f'联系方式：{he(_user_contact_text(user))}', f"来源：{he(str(pref.get('source', 'user_search')))}", f"类型意向：{he(goal or '-')}", f"区域：{he(area or '-')}", f'预算：{he(_budget_text(budget_min, budget_max))}', f"户型：{he(property_type or '-')}", f'条件：<code>{he(text[:700])}</code>'])
+    create_lead(user, action='search_pref_submit', source=pref.get('source', 'user_search'), area=area, property_type=property_type, budget_min=budget_min, budget_max=budget_max, payload={'message': text[:100]})
+    await _notify_admins(context, title='新找房条件', lines=[f'用户：{_user_mention_html(user)}', f'联系方式：{he(_user_contact_text(user))}', f"来源：{he(str(pref.get('source', 'unknown')))}", f"条件：{he(text[:100])}"])
     matches, match_mode = search_listings_with_fallback(property_type=property_type or None, area=area, budget_min=budget_min, budget_max=budget_max, text_fragment=text, limit=3)
     if matches:
         await send_find_results_as_cards(update, context, matches, match_mode)
