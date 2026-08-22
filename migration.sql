@@ -117,6 +117,24 @@ CREATE TABLE IF NOT EXISTS posts (
     published_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS publication_delivery_attempts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    attempt_id TEXT NOT NULL UNIQUE,
+    package_id TEXT NOT NULL,
+    draft_id TEXT NOT NULL,
+    listing_id TEXT NOT NULL,
+    channel_chat_id TEXT NOT NULL,
+    state TEXT NOT NULL DEFAULT 'prepared',
+    telegram_result_json TEXT NOT NULL DEFAULT '',
+    error_message TEXT NOT NULL DEFAULT '',
+    prepared_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    sending_at TEXT,
+    sent_at TEXT,
+    committed_at TEXT,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(package_id, channel_chat_id)
+);
+CREATE INDEX IF NOT EXISTS idx_publication_delivery_state ON publication_delivery_attempts(state, updated_at);
 CREATE TABLE IF NOT EXISTS publish_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     log_id TEXT NOT NULL UNIQUE,

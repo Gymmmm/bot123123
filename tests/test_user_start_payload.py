@@ -99,22 +99,19 @@ class UserStartPayloadTests(unittest.TestCase):
         self.assertEqual(payload["action"], "consult")
         self.assertEqual(payload["target"], "l_99")
 
-    def test_listing_landing_keyboard_has_three_buttons(self):
-        """listing_landing_keyboard 应有 4 行按钮（预约/视频/顾问/详情）"""
+    def test_listing_landing_keyboard_has_four_actions_in_two_rows(self):
+        """Bot 内房源操作使用适合手机端的 2x2 布局。"""
         with patch("qiaolian_dual.user_bot.USER_BOT_USERNAME", "TestBot"):
             with patch("qiaolian_dual.user_bot.listing_context", return_value={}):
                 keyboard = listing_landing_keyboard("l_1024", area="BKK1")
 
         rows = keyboard.inline_keyboard
-        self.assertEqual(len(rows), 4, f"Expected 4 rows, got {len(rows)}: {rows}")
-        # Row 0: 预约看房
-        self.assertEqual(rows[0][0].callback_data, "listing:appoint:offline:l_1024")
-        # Row 1: 视频代看
-        self.assertEqual(rows[1][0].callback_data, "listing:appoint:video:l_1024")
-        # Row 2: callback, not URL (问顾问)
-        self.assertIn("l_1024", rows[2][0].callback_data)
-        # Row 3: 查看详情 callback
-        self.assertIn("listing:detail:l_1024", rows[3][0].callback_data)
+        self.assertEqual(len(rows), 2, f"Expected 2 rows, got {len(rows)}: {rows}")
+        self.assertEqual([len(row) for row in rows], [2, 2])
+        self.assertEqual(rows[0][0].callback_data, "listing:detail:l_1024")
+        self.assertEqual(rows[0][1].callback_data, "listing:appoint:l_1024")
+        self.assertIn("l_1024", rows[1][0].callback_data)
+        self.assertEqual(rows[1][1].callback_data, "listing:similar:l_1024")
 
     def test_tenant_bind_and_channel_topic_payloads_are_supported(self):
         payload = parse_start_arg_payload("t_bind_ABC123")

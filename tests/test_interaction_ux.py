@@ -46,7 +46,7 @@ class InteractionUxTests(unittest.TestCase):
 
     def test_return_home_uses_same_product_identity(self):
         text = welcome_text()
-        self.assertIn("侨联找房助手", text)
+        self.assertIn("侨联地产", text)
         self.assertNotIn("土地", text)
 
 

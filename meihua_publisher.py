@@ -13,30 +13,40 @@ from __future__ import annotations
 import os
 import json
 import uuid
+from publication_delivery import DeliveryBlocked, PublicationDeliveryRepository
 import sqlite3
 import asyncio
 import logging
 import time
 import re
 import hashlib
-import random
 from datetime import datetime, timezone
 from pathlib import Path
 import io
 from html import escape as he
+from typing import Callable
+from urllib.parse import quote
 
 from dotenv import load_dotenv
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
-from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageFilter
+from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageFilter, ImageEnhance, ImageStat
 
 from telegram import Bot, InputMediaPhoto, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.constants import ParseMode
-from telegram.error import TelegramError
+from telegram.error import BadRequest, TelegramError
 from telegram.request import HTTPXRequest
 
 from notion_client import Client as NotionClient
 
 from cover_generator import CoverGenerator
+from media_consistency import (
+    assess_draft_media,
+    mark_draft_media_broken,
+    media_blocks_publish,
+)
+from qiaolian_dual.canonical_fact_projection import validate_facts
+from qiaolian_dual.publishability_contract import evaluate_publishability
+from qiaolian_dual.listing_taxonomy import PHYSICAL_AREAS
 
 logger = logging.getLogger(__name__)
 
@@ -88,11 +98,8 @@ DISCUSSION_APPT_TEXT = os.getenv(
 # 讨论区三段式：第二段 - 补充实拍组图首图说明
 DISCUSSION_EXTRA_INTRO = os.getenv(
     "DISCUSSION_EXTRA_INTRO",
-    "📎 <b>补充实拍</b>\n\n"
-    "真实房源现场拍摄\n"
-    "户型 / 公区 / 采光情况\n\n"
-    "侨联地产实拍\n"
-    "金边租房更透明",
+    "📸 <b>更多现场实拍</b>\n"
+    "以下均为同一套房源，点击图片可逐张放大。",
 )
 # 讨论区三段式：第三段 - 继续看房入口
 DISCUSSION_CONTINUE_TEXT = os.getenv(
@@ -108,7 +115,7 @@ DISCUSSION_CONTINUE_TEXT = os.getenv(
 # 讨论区分批发送时，第 2 批及以后首张图说明
 DISCUSSION_EXTRA_INTRO_CONT = os.getenv(
     "DISCUSSION_EXTRA_INTRO_CONT",
-    "📎 <b>补充实拍（续）</b>",
+    "📸 <b>更多现场实拍（续）</b>",
 )
 # 角标距边约 40px（随图幅按比例缩放）；品牌块背景透明度约 90%（230/255）
 LISTING_OVERLAY_EDGE = float(os.getenv("LISTING_OVERLAY_EDGE", "40"))
@@ -141,6 +148,18 @@ PREMIUM_REAL_MEDIA_MIN = int(os.getenv("PREMIUM_REAL_MEDIA_MIN", "3"))
 CORNER_LOGO_PATH = os.getenv(
     "CORNER_LOGO_PATH",
     str((Path(__file__).resolve().parent / "assets" / "brand" / "qiaolian_corner_mark_120x40.png").resolve()),
+)
+
+_CJK_FONT_PATHS = (
+    "/System/Library/Fonts/PingFang.ttc",
+    "/System/Library/Fonts/Hiragino Sans GB.ttc",
+    "/System/Library/Fonts/STHeiti Medium.ttc",
+    "/Library/Fonts/Arial Unicode.ttf",
+    "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+    "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc",
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+    "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+    "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
 )
 
 
@@ -176,6 +195,13 @@ def _font_for_watermark(size: int):
             except Exception:
                 continue
     return ImageFont.load_default()
+
+
+def _watermark_brand_lines() -> tuple[str, str]:
+    """Avoid tofu boxes when a deployment is missing a Chinese font."""
+    if any(os.path.isfile(path) for path in _CJK_FONT_PATHS):
+        return BRAND_NAME, BRAND_NAME_EN
+    return "QIAO LIAN", "PROPERTY · PHNOM PENH"
 
 
 def _apply_frosted_panel(
@@ -351,6 +377,43 @@ def _detail_subtag_from_listing(listing: dict | None) -> str:
     return DETAIL_FALLBACK_SUBTAG
 
 
+def _source_visual_profile(listing: dict | None) -> tuple[str, str]:
+    """人工/微信来源可标注为侨联实拍；外部自动采集只标注侨联地产。
+
+    这里不把第三方来源图伪装成侨联自拍，但两类图都统一加侨联 Logo。
+    """
+    payload = listing or {}
+    key = " ".join(
+        str(payload.get(field) or "").strip().lower()
+        for field in ("source_type", "source_name")
+    )
+    manual_markers = ("wechat", "manual", "admin_upload", "csv_intake", "excel_intake")
+    if any(marker in key for marker in manual_markers):
+        return "manual", "侨联实拍"
+    return "collector", "侨联地产"
+
+
+def _apply_source_color_style(image: Image.Image, listing: dict | None) -> Image.Image:
+    """按素材来源统一调色，但不篡改房屋真实颜色。
+
+    微信/人工：暖金自然，适合侨联自有实拍。
+    自动采集：冷蓝清透，便于在频道中一眼区分来源。
+    """
+    profile, _ = _source_visual_profile(listing)
+    rgb = image.convert("RGB")
+    if profile == "manual":
+        rgb = ImageEnhance.Brightness(rgb).enhance(1.035)
+        rgb = ImageEnhance.Color(rgb).enhance(1.055)
+        tint = Image.new("RGB", rgb.size, (255, 190, 105))
+        rgb = Image.blend(rgb, tint, 0.035)
+    else:
+        rgb = ImageEnhance.Contrast(rgb).enhance(1.06)
+        rgb = ImageEnhance.Color(rgb).enhance(0.97)
+        tint = Image.new("RGB", rgb.size, (92, 158, 226))
+        rgb = Image.blend(rgb, tint, 0.045)
+    return rgb.convert("RGBA")
+
+
 def _apply_detail_photo_shade(overlay: Image.Image) -> None:
     w, h = overlay.size
     d = ImageDraw.Draw(overlay)
@@ -373,44 +436,82 @@ def _draw_detail_mini_logo_badge(
     edge: int,
     scale: float,
     ref: float,
+    listing: dict | None = None,
 ) -> Image.Image:
-    draw = ImageDraw.Draw(overlay)
-    logo_w = max(196, min(320, int(ref * 0.28)))
-    logo_h = max(62, min(110, int(logo_w * 0.34)))
-    x2 = overlay.size[0] - edge
-    x1 = x2 - logo_w
-    y1 = edge
-    y2 = y1 + logo_h
-
-    im = _apply_frosted_panel(
-        im,
-        (x1, y1, x2, y2),
-        radius=max(10, int(14 * scale)),
-        blur_radius=max(7, int(10 * scale)),
-        tint_rgb=(7, 18, 36),
-        tint_alpha=178,
-        outline=(246, 210, 122, 138),
+    """Draw an adaptive glass wordmark in the quietest image corner."""
+    logo = _load_corner_logo()
+    panel_w = max(156, min(286, int(ref * 0.205)))
+    panel_h = max(52, min(88, int(panel_w * 0.295)))
+    w, h = im.size
+    candidates = (
+        (edge, edge),
+        (w - edge - panel_w, edge),
+        (w - edge - panel_w, h - edge - panel_h),
+        (edge, h - edge - panel_h),
     )
 
-    pad_x = max(12, int(16 * scale))
-    pad_y = max(8, int(10 * scale))
-    cn_font = _font_for_listing(max(18, min(34, int(logo_h * 0.40))), bold=True)
-    en_font = _font_for_listing(max(8, min(13, int(logo_h * 0.16))), bold=False)
-    cn = BRAND_NAME
-    en = BRAND_NAME_EN
+    def activity(position: tuple[int, int]) -> float:
+        x, y = position
+        crop = im.convert("L").crop((x, y, x + panel_w, y + panel_h)).resize((64, 24))
+        edges = crop.filter(ImageFilter.FIND_EDGES)
+        edge_mean = float(ImageStat.Stat(edges).mean[0])
+        contrast = float(ImageStat.Stat(crop).stddev[0])
+        return edge_mean + contrast * 0.18
 
-    cn_box = draw.textbbox((0, 0), cn, font=cn_font)
-    en_box = draw.textbbox((0, 0), en, font=en_font)
-    cn_h = cn_box[3] - cn_box[1]
-    gap = max(1, int(logo_h * 0.04))
-    cn_y = y1 + pad_y - cn_box[1]
-    en_y = cn_y + cn_h + gap - en_box[1]
-    tx = x1 + pad_x
+    badge_x, badge_y = min(candidates, key=activity)
+    badge_box = (badge_x, badge_y, badge_x + panel_w, badge_y + panel_h)
+    im = _apply_frosted_panel(
+        im,
+        badge_box,
+        radius=max(12, int(panel_h * 0.24)),
+        blur_radius=max(7, int(10 * scale)),
+        tint_rgb=(10, 24, 48),
+        tint_alpha=min(148, max(88, DETAIL_LOGO_PANEL_ALPHA)),
+        outline=(255, 255, 255, 54),
+    )
 
-    draw.text((tx, cn_y), cn, font=cn_font, fill=(246, 210, 122, 255))
-    draw.text((tx, en_y), en, font=en_font, fill=(232, 238, 247, 225))
+    draw = ImageDraw.Draw(overlay)
+    pad_x = max(12, int(panel_h * 0.22))
+    if logo is not None:
+        max_w = panel_w - pad_x * 2
+        max_h = panel_h - max(10, int(panel_h * 0.20))
+        ratio = logo.width / max(1, logo.height)
+        logo_w = min(max_w, int(max_h * ratio))
+        logo_h = max(1, int(logo_w / max(ratio, 0.01)))
+        mark = logo.resize((logo_w, logo_h), Image.Resampling.LANCZOS)
+        overlay.paste(
+            mark,
+            (badge_x + (panel_w - logo_w) // 2, badge_y + (panel_h - logo_h) // 2),
+            mark,
+        )
+        return im
+
+    icon_size = max(24, int(panel_h * 0.43))
+    icon_x = badge_x + pad_x
+    icon_y = badge_y + (panel_h - int(icon_size * 0.72)) // 2
+    _draw_house_outline_mark(
+        draw,
+        x=icon_x,
+        y=icon_y,
+        size=icon_size,
+        fill=(244, 207, 119, 245),
+        shadow=(0, 0, 0, 84),
+    )
+    text_x = icon_x + icon_size + max(10, int(panel_h * 0.16))
+    title_text, sub_text = _watermark_brand_lines()
+    title_font = _font_for_listing(max(17, int(panel_h * 0.32)), bold=True)
+    sub_font = _font_for_listing(max(8, int(panel_h * 0.135)), bold=False)
+    title_box = draw.textbbox((0, 0), title_text, font=title_font)
+    sub_box = draw.textbbox((0, 0), sub_text, font=sub_font)
+    title_h = title_box[3] - title_box[1]
+    sub_h = sub_box[3] - sub_box[1]
+    gap = max(2, int(panel_h * 0.045))
+    content_h = title_h + sub_h + gap
+    title_y = badge_y + (panel_h - content_h) // 2 - title_box[1]
+    sub_y = title_y + title_h + gap - sub_box[1]
+    draw.text((text_x, title_y), title_text, font=title_font, fill=(255, 255, 255, 246))
+    draw.text((text_x, sub_y), sub_text, font=sub_font, fill=(224, 232, 245, 205))
     return im
-
 
 def _draw_detail_corner_tags(
     im: Image.Image,
@@ -541,7 +642,7 @@ def _display_floor(floor: str) -> str:
     flo = str(floor).strip()
     if not flo:
         return ""
-    return flo if flo.endswith("楼") or flo.upper().endswith("F") else f"{flo}楼"
+    return flo if flo.endswith(("楼", "楼层")) or flo.upper().endswith("F") else f"{flo}楼"
 
 
 def _overlay_price_compact(d: dict | None) -> str:
@@ -575,6 +676,47 @@ def _listing_highlight_pills(listing: dict, max_n: int = 3) -> list[str]:
     return out[:max_n]
 
 
+def _wrap_cover_title(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    font,
+    max_width: int,
+    max_lines: int = 2,
+) -> list[str]:
+    """按实际字宽切分封面主标题，最多两行。
+
+    封面是手机首页扫读入口，不允许过长项目名挤压价格或越出安全区。
+    """
+    remaining = str(text or "").strip()
+    if not remaining:
+        return []
+    lines: list[str] = []
+    for line_index in range(max_lines):
+        if not remaining:
+            break
+        current = ""
+        for char in remaining:
+            candidate = current + char
+            bbox = draw.textbbox((0, 0), candidate, font=font)
+            if current and bbox[2] - bbox[0] > max_width:
+                break
+            current = candidate
+        if not current:
+            current = remaining[0]
+        remaining = remaining[len(current):]
+        if line_index == max_lines - 1 and remaining:
+            ellipsis = "…"
+            while current:
+                bbox = draw.textbbox((0, 0), current + ellipsis, font=font)
+                if bbox[2] - bbox[0] <= max_width:
+                    break
+                current = current[:-1]
+            current += ellipsis
+            remaining = ""
+        lines.append(current)
+    return lines
+
+
 def build_channel_platform_header_html() -> str:
     """侨联频道统一版头。用户可见内容只保留中文。"""
     return f"<b>{BRAND_NAME}</b>\n━━━━━━━━━━"
@@ -592,6 +734,9 @@ def add_channel_listing_overlay(
     # 频道首图也必须叠品牌层，不能直通原图；否则会出现"没封面/没 logo"的观感。
 
     im = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
+    if detail_mode:
+        # 详情图只加单一轻 Logo；保持原始实拍颜色，不再按来源调色。
+        im = im
     w, h = im.size
     overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay)
@@ -612,20 +757,30 @@ def add_channel_listing_overlay(
     pad_y = max(7, int(9 * scale * logo_scale))
 
     detail_payload = detail_listing or listing
-    show_brand = detail_mode or not with_listing_footer
+    cover_mode = bool(with_listing_footer and listing and not detail_mode)
+    safe_x = max(edge, int(w * 0.045)) if cover_mode else edge
+    safe_top = max(edge, int(h * 0.05)) if cover_mode else edge
+
+    # 封面只压暗左侧文字区，保留右侧房源主体的真实明暗和色彩。
+    if cover_mode:
+        gradient_w = max(1, int(w * 0.60))
+        shade = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        shade_draw = ImageDraw.Draw(shade)
+        for gx in range(gradient_w):
+            progress = gx / gradient_w
+            alpha = int(142 * ((1.0 - progress) ** 1.7))
+            shade_draw.line([(gx, 0), (gx, h)], fill=(7, 17, 38, alpha))
+        im = Image.alpha_composite(im, shade)
+
+    # 频道首图在首页信息流里会脱离帖子文字被单独扫到，
+    # 因此即使有房源信息栏也必须保留品牌标识。
+    show_brand = True
     if show_brand:
         if detail_mode:
             style = DETAIL_PHOTO_STYLE
             if style in ("mini_card", "mini", "v2", "new"):
-                _apply_detail_photo_shade(overlay)
-                im = _draw_detail_mini_logo_badge(im, overlay, edge=edge, scale=scale, ref=ref)
-                im = _draw_detail_corner_tags(
-                    im,
-                    overlay,
-                    edge=edge,
-                    scale=scale,
-                    ref=ref,
-                    listing=detail_payload,
+                im = _draw_detail_mini_logo_badge(
+                    im, overlay, edge=edge, scale=scale, ref=ref, listing=detail_payload
                 )
             else:
                 _draw_detail_logo_badge(overlay, edge=edge, scale=scale, ref=ref)
@@ -661,7 +816,9 @@ def add_channel_listing_overlay(
 
             brand_w = content_w + pad_x * 2
             brand_h = content_h + pad_y * 2
-            brand_box = (edge, edge, edge + brand_w, edge + brand_h)
+            brand_x = w - safe_x - brand_w if cover_mode else edge
+            brand_y = safe_top if cover_mode else edge
+            brand_box = (brand_x, brand_y, brand_x + brand_w, brand_y + brand_h)
             radius = max(9, int(13 * scale * logo_scale))
             panel_alpha = min(DETAIL_LOGO_PANEL_ALPHA, 110) if detail_mode else 92
             panel_tint = (28, 41, 68) if detail_mode else (20, 28, 46)
@@ -675,8 +832,8 @@ def add_channel_listing_overlay(
                 outline=(255, 255, 255, 56),
             )
 
-            cursor_x = edge + pad_x
-            center_y = edge + brand_h // 2
+            cursor_x = brand_x + pad_x
+            center_y = brand_y + brand_h // 2
             if logo_img is not None:
                 ly = center_y - logo_h // 2
                 overlay.paste(logo_img, (cursor_x, ly), logo_img)
@@ -709,33 +866,113 @@ def add_channel_listing_overlay(
     if with_listing_footer and listing:
         price_text = _overlay_price_compact(listing)
         if price_text:
-            fs_price = max(20, min(40, int(ref * 0.034)))
+            project_text = str(listing.get("project") or "").strip()
+            area_text = str(listing.get("area") or "").strip()
+            layout_text = str(listing.get("layout") or "").strip()
+            size_text = str(listing.get("size") or "").strip()
+            floor_text = _display_floor(str(listing.get("floor") or "").strip())
+            meta_text = " · ".join(x for x in (area_text, size_text, floor_text) if x)
+
+            fs_project = max(44, min(112, int(ref * 0.083)))
+            fs_layout = max(28, min(60, int(ref * 0.046)))
+            fs_meta = max(24, min(50, int(ref * 0.037)))
+            fs_price = max(48, min(104, int(ref * 0.078)))
+            fs_price_label = max(16, min(32, int(ref * 0.024)))
+            font_project = _font_for_listing(fs_project, bold=True)
+            font_layout = _font_for_listing(fs_layout, bold=True)
+            font_meta = _font_for_listing(fs_meta, bold=True)
             font_price = _font_for_watermark(fs_price)
-            bbox = draw.textbbox((0, 0), price_text, font=font_price)
-            tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
-            chip_pad_x = max(14, int(20 * scale))
-            chip_pad_y = max(9, int(12 * scale))
-            chip_w = tw + chip_pad_x * 2
-            chip_h = th + chip_pad_y * 2
-            x2 = w - edge
-            y2 = h - edge
-            x1 = x2 - chip_w
-            y1 = y2 - chip_h
-            chip_radius = max(10, int(15 * scale))
+            font_price_label = _font_for_listing(fs_price_label, bold=False)
+
+            title_x = safe_x
+            title_y = max(safe_top + int(ref * 0.14), int(h * 0.19))
+            title_max_w = int(w * 0.56)
+            title_lines = _wrap_cover_title(
+                draw, project_text, font_project, title_max_w, max_lines=2
+            )
+            title_line_h = int(fs_project * 1.10)
+            for idx, line in enumerate(title_lines):
+                draw.text(
+                    (title_x, title_y + idx * title_line_h),
+                    line,
+                    font=font_project,
+                    fill=(255, 255, 255, 255),
+                    stroke_width=max(1, int(ref * 0.0022)),
+                    stroke_fill=(4, 10, 24, 170),
+                )
+
+            cursor_y = title_y + len(title_lines) * title_line_h + int(ref * 0.025)
+            if layout_text:
+                layout_bbox = draw.textbbox((0, 0), layout_text, font=font_layout)
+                layout_w = layout_bbox[2] - layout_bbox[0]
+                layout_h = layout_bbox[3] - layout_bbox[1]
+                layout_pad_x = int(ref * 0.020)
+                layout_pad_y = int(ref * 0.010)
+                pill = (
+                    title_x,
+                    cursor_y,
+                    title_x + layout_w + layout_pad_x * 2,
+                    cursor_y + layout_h + layout_pad_y * 2,
+                )
+                draw.rounded_rectangle(
+                    pill,
+                    radius=max(14, int(ref * 0.022)),
+                    fill=(246, 201, 72, 242),
+                )
+                draw.text(
+                    (title_x + layout_pad_x - layout_bbox[0], cursor_y + layout_pad_y - layout_bbox[1]),
+                    layout_text,
+                    font=font_layout,
+                    fill=(12, 28, 58, 255),
+                )
+                cursor_y = pill[3] + int(ref * 0.024)
+
+            if meta_text:
+                draw.text(
+                    (title_x, cursor_y),
+                    meta_text,
+                    font=font_meta,
+                    fill=(255, 255, 255, 245),
+                    stroke_width=max(1, int(ref * 0.0018)),
+                    stroke_fill=(4, 10, 24, 175),
+                )
+
+            price_bbox = draw.textbbox((0, 0), price_text, font=font_price)
+            price_w = price_bbox[2] - price_bbox[0]
+            label_bbox = draw.textbbox((0, 0), "月租参考", font=font_price_label)
+            label_h = label_bbox[3] - label_bbox[1]
+            price_pad_x = max(24, int(ref * 0.028))
+            price_pad_top = max(16, int(ref * 0.018))
+            price_pad_bottom = max(20, int(ref * 0.024))
+            panel_w = max(int(w * 0.28), price_w + price_pad_x * 2)
+            panel_h = label_h + fs_price + price_pad_top + price_pad_bottom + int(ref * 0.010)
+            x2 = w - safe_x
+            x1 = x2 - panel_w
+            y2 = h - max(int(h * 0.115), int(ref * 0.115))
+            y1 = y2 - panel_h
+            chip_radius = max(18, int(ref * 0.024))
             im = _apply_frosted_panel(
                 im,
                 (x1, y1, x2, y2),
                 radius=chip_radius,
                 blur_radius=max(8, int(12 * scale)),
-                tint_rgb=(248, 250, 255),
-                tint_alpha=182,
-                outline=(255, 255, 255, 88),
+                tint_rgb=(13, 28, 58),
+                tint_alpha=220,
+                outline=(246, 201, 72, 108),
             )
+            label_x = x1 + (panel_w - (label_bbox[2] - label_bbox[0])) // 2
             draw.text(
-                (x1 + chip_pad_x - bbox[0], y1 + chip_pad_y - bbox[1]),
+                (label_x - label_bbox[0], y1 + price_pad_top - label_bbox[1]),
+                "月租参考",
+                font=font_price_label,
+                fill=(236, 240, 248, 238),
+            )
+            price_x = x1 + (panel_w - price_w) // 2
+            draw.text(
+                (price_x - price_bbox[0], y2 - price_pad_bottom - fs_price - price_bbox[1]),
                 price_text,
                 font=font_price,
-                fill=(42, 84, 188, 255),
+                fill=(246, 201, 72, 255),
             )
 
     out = Image.alpha_composite(im, overlay).convert("RGB")
@@ -758,7 +995,7 @@ def add_brand_watermark(
 
 
 def add_detail_logo_watermark(image_bytes: bytes, listing: dict | None = None) -> io.BytesIO:
-    """细节图加小图样式品牌层（右上 mini logo + 左下标签）。"""
+    """详情图加自适应轻量磨砂角标，不改变原图色彩与比例。"""
     return add_channel_listing_overlay(
         image_bytes,
         listing,
@@ -766,6 +1003,27 @@ def add_detail_logo_watermark(image_bytes: bytes, listing: dict | None = None) -
         detail_mode=True,
         detail_listing=listing,
     )
+
+
+def prepare_channel_photo_for_publish(
+    image_bytes: bytes,
+    listing: dict | None,
+    *,
+    is_generated_cover: bool,
+) -> io.BytesIO:
+    """发布阶段只处理一次视觉信息层。
+
+    CoverGenerator 生成的首图已包含品牌、标题、户型和价格；这里必须原样透传，
+    否则会出现双品牌、双价格和旧底栏残留。普通细节图仍只加轻量 logo。
+    """
+    if is_generated_cover:
+        buf = io.BytesIO(image_bytes)
+        buf.name = "cover.jpg"
+        buf.seek(0)
+        return buf
+    return add_detail_logo_watermark(image_bytes, listing)
+
+
 def normalize_album_image(
     image_bytes: bytes,
     *,
@@ -807,19 +1065,19 @@ def _normalize_for_album_slot(image_bytes: bytes, *, index: int, total: int) -> 
                     image_bytes, fit_box=ONE_THREE_HERO_BOX
                 )
             return normalize_album_image(
-                image_bytes, target_size=ONE_THREE_TILE, force_square=True
+                image_bytes, target_size=ONE_THREE_TILE, force_square=False
             )
         if total == 3:
             if index == 0:
                 return normalize_album_image(image_bytes, fit_box=ONE_THREE_HERO_BOX)
             return normalize_album_image(
-                image_bytes, target_size=ONE_THREE_TILE, force_square=True
+                image_bytes, target_size=ONE_THREE_TILE, force_square=False
             )
         if total == 2:
             if index == 0:
                 return normalize_album_image(image_bytes, fit_box=ONE_THREE_HERO_BOX)
             return normalize_album_image(
-                image_bytes, target_size=ONE_THREE_TILE, force_square=True
+                image_bytes, target_size=ONE_THREE_TILE, force_square=False
             )
         return normalize_album_image(image_bytes, target_size=1280, force_square=False)
 
@@ -827,10 +1085,8 @@ def _normalize_for_album_slot(image_bytes: bytes, *, index: int, total: int) -> 
         h32 = max(720, int(round(1280 * 2 / 3)))
         return normalize_album_image(image_bytes, target_size=1280, fit_box=(1280, h32))
 
-    force_square_grid = total in (4, 6, 9)
-    return normalize_album_image(
-        image_bytes, target_size=1280, force_square=force_square_grid
-    )
+    # 详情实拍不强制裁切；仅封面使用设计模板，避免切掉房屋主体。
+    return normalize_album_image(image_bytes, target_size=1280, force_square=False)
 
 
 # ── 文案构造 ──────────────────────────────────────────────
@@ -903,7 +1159,7 @@ def _price_is_consultable(raw: str) -> bool:
 def _price_compact_for_post(d: dict) -> str:
     price = _price_value(d)
     if price > 0:
-        return f"${price}/月"
+        return f"${price:,}/月"
     raw = str(d.get("price") or _parsed_normalized(d).get("price") or "").strip()
     if _price_is_consultable(raw):
         return "面议"
@@ -1093,9 +1349,7 @@ def generate_advantages_and_notes(d: dict) -> tuple[list[str], list[str]]:
         advantages.append("生活便利")
     if any(x in raw_text for x in ("家具齐全", "拎包", "全新")) and "拎包入住" not in advantages:
         advantages.append("拎包入住")
-    advantages = advantages[:2] or ["实拍房源", "中文顾问可约看房"]
-    while len(advantages) < 2:
-        advantages.append("生活配套方便")
+    advantages = advantages[:2]
 
     notes: list[str] = []
     cost_notes = _listing_value(d, "cost_notes", default="")
@@ -1150,7 +1404,7 @@ def _clean_display_text(raw: str) -> str:
 
 
 def _clean_project_label(raw: str) -> str:
-    text = _clean_display_text(raw)
+    text = _public_clean_text(_clean_display_text(raw), keep_project=True)
     if text in GENERIC_PROJECT_VALUES:
         return ""
     return text
@@ -1177,9 +1431,13 @@ def _resolved_property_type(d: dict) -> str:
 
 
 def _project_label_for_post(d: dict) -> str:
-    raw = _listing_value(d, "project", "community", "title", default="")
-    cleaned = _clean_project_label(raw)
-    return _compact_copy(cleaned, 24) if cleaned else ""
+    """Return only canonical project_name; never infer from title or raw text."""
+    normalized = _parsed_normalized(d)
+    # drafts.project is the canonical projection written by ai_parser; accept
+    # it when callers already decoded a draft without normalized_data.
+    primary = normalized.get("project_name") or d.get("project_name") or d.get("project") or ""
+    primary = str(primary or "").strip()
+    return _compact_copy(primary, 24) if primary else ""
 
 
 def _listing_snapshot_for_post(d: dict) -> str:
@@ -1308,6 +1566,71 @@ def _normalize_fact_fragment(text: str, max_len: int = 18) -> str:
     cleaned = re.sub(r"[|｜]+", " ", str(text or "").strip())
     cleaned = _compact_copy(cleaned, max_len).strip("，。；;、 ")
     return cleaned
+
+
+_PUBLIC_INTERNAL_ID_RE = re.compile(
+    # QCxxxx is the approved public identifier; only legacy/internal identifiers
+    # remain forbidden in customer-facing output.
+    r"(?i)(?<![A-Za-z0-9])(?:B\d{3,}|L_?\d{2,}|SP_?\d{2,})(?![A-Za-z0-9])"
+)
+_PUBLIC_TOKEN_RE = re.compile(r"(?:\{\{[^{}]+\}\}|\$\{[^{}]+\})")
+
+def _public_clean_text(value: object, *, keep_project: bool = False) -> str:
+    """最终公开输出清洗：移除来源/内部编号，不改真正项目名正文。"""
+    text = str(value or "").strip()
+    text = _PUBLIC_INTERNAL_ID_RE.sub("", text)
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    text = re.sub(r"^[\s|｜·•:：、,，-]+|[\s|｜·•:：、,，-]+$", "", text)
+    return text.strip()
+
+def _semantic_area_values(d: dict) -> tuple[str, str, str]:
+    nd = _parsed_normalized(d)
+    land = _public_clean_text(d.get("land_size") or nd.get("land_size") or "")
+    building = _public_clean_text(d.get("building_size") or nd.get("building_size") or "")
+    size = _public_clean_text(d.get("size") or d.get("size_sqm") or nd.get("size") or nd.get("size_sqm") or "")
+    # 带乘号的表达只能保留为尺寸，绝不能截成单一 sqm。
+    if "×" in size or "x" in size.lower() or "*" in size:
+        size = ""
+    return size, land, building
+
+def _public_area_lines(d: dict) -> list[str]:
+    size, land, building = _semantic_area_values(d)
+    out = []
+    if size:
+        value = size if re.search(r"㎡|m²|sqm", size, re.I) else f"{size}㎡"
+        out.append(f"<b>面积：</b>{he(value)}")
+    if land:
+        out.append(f"<b>土地尺寸：</b>{he(land)}")
+    if building:
+        out.append(f"<b>建筑尺寸：</b>{he(building)}")
+    return out
+
+def assert_public_output_safe(*values: object, context: str = "public_output") -> None:
+    visible = []
+    for value in values:
+        text = re.sub(r"<[^>]+>", "", str(value or ""))
+        visible.append(text)
+    blob = "\n".join(visible)
+    token = _PUBLIC_TOKEN_RE.search(blob)
+    if token:
+        raise ValueError(f"public_output_unresolved_token:{context}:{token.group(0)}")
+    internal = _PUBLIC_INTERNAL_ID_RE.search(blob)
+    if internal:
+        raise ValueError(f"public_output_internal_id:{context}:{internal.group(0)}")
+    contact = re.search(
+        r"(?:https?://|www\.|t\.me/|(?<![\w@])@[A-Za-z][A-Za-z0-9_]{3,}|"
+        r"(?<!\d)(?:\+?\d[\d\s().-]{6,}\d)(?!\d))",
+        blob, flags=re.I,
+    )
+    if contact:
+        raise ValueError(f"public_output_source_contact:{context}:{contact.group(0)}")
+    attribution = re.search(
+        r"(?:来源频道|原频道|来源联系人|原联系人|联系(?:方式|人)?\s*[:：]|"
+        r"微信\s*[:：]|wechat\s*[:：]|whatsapp\s*[:：]|telegram\s*[:：])",
+        blob, flags=re.I,
+    )
+    if attribution:
+        raise ValueError(f"public_output_source_attribution:{context}:{attribution.group(0)}")
 
 
 def _canonical_highlight_phrase(text: str) -> str:
@@ -1506,20 +1829,45 @@ def _normalize_caption_variant(caption_variant: str | None) -> str:
     return v if v in {"a", "b", "c"} else "a"
 
 
-def _pick_weighted_caption_variant(db: "DB") -> str:
-    fixed_variant = str(os.getenv("CAPTION_VARIANT_FIXED", "a")).strip().lower()
-    if fixed_variant in {"a", "b", "c"}:
-        return fixed_variant
-    weights = db.get_caption_variant_weights()
-    variants = ["a", "b", "c"]
-    probs = [float(weights.get(v, 0.0)) for v in variants]
-    if sum(probs) <= 0:
-        return "a"
-    try:
-        return random.choices(variants, weights=probs, k=1)[0]
-    except Exception:
-        logger.exception("按权重选择 caption_variant 失败，回退 A")
-        return "a"
+CAPTION_VARIANT_LABELS = {
+    "a": "标准信息版",
+    "b": "亮点价格版",
+    "c": "专业参数版",
+}
+
+
+def default_caption_variant_for_property(property_type: str | None) -> str:
+    """Return the deterministic copy layout for one canonical property type.
+
+    公寓/住宅强调手机首屏扫读；别墅/排屋强调空间与亮点；商办类强调
+    参数和租赁条件。未知类型保守回退 A，不从标题或项目名重新猜类型。
+    """
+    raw = str(property_type or "").strip().lower()
+    if any(token in raw for token in (
+        "商铺", "店面", "办公室", "写字楼", "商业", "仓库", "厂房", "土地",
+        "shop", "office", "commercial", "warehouse", "land",
+    )):
+        return "c"
+    if any(token in raw for token in (
+        "别墅", "排屋", "联排", "双拼", "整栋", "villa", "townhouse", "house", "building",
+    )):
+        return "b"
+    return "a"
+
+
+def resolve_caption_variant(d: dict, caption_variant: str | None = None) -> str:
+    explicit = str(caption_variant or "").strip().lower()
+    if explicit in {"a", "b", "c"}:
+        return explicit
+    normalized = _parsed_normalized(d)
+    property_type = (
+        normalized.get("property_type_display")
+        or normalized.get("property_type")
+        or d.get("property_type_display")
+        or d.get("property_type")
+        or ""
+    )
+    return default_caption_variant_for_property(str(property_type))
 
 
 def _attach_caption_variant_to_target(target: str, caption_variant: str | None = None) -> str:
@@ -1664,12 +2012,14 @@ def _advisor_decision_hint(d: dict) -> str:
 
 
 def _verification_status_text(d: dict) -> str:
-    """频道外显核实状态：优先展示审核时间，不把采集时间冒充核实时间。"""
-    raw = _listing_value(d, "approved_at", default="")
-    if raw:
-        match = re.search(r"(\d{4})-(\d{1,2})-(\d{1,2})", str(raw))
-        if match:
-            return f"🟢 {int(match.group(2))}月{int(match.group(3))}日已核实"
+    """频道正式标准只展示状态，不让日期变化破坏固定版式。"""
+    status = _listing_value(d, "verification_status", default="").strip().lower()
+    if status in {"pending", "unverified", "待核验", "待确认"}:
+        return "🟡 待核验"
+    if status in {"expired", "已过期", "过期"}:
+        return "🟠 需重新核验"
+    if status in {"disputed", "有争议", "信息冲突"}:
+        return "🔴 信息待复核"
     return "🟢 发布前已核实"
 
 
@@ -1718,59 +2068,352 @@ def _listing_detail_summary(d: dict) -> str:
     return "｜".join(parts[:4]) or "实拍房源"
 
 
-def build_chinese_listing_post(d: dict, caption_variant: str | None = "a") -> str:
-    """生成频道标准发帖正文：5 秒读懂，费用透明，支持快速决策。"""
-    area = _listing_value(d, "area", default="金边")
-    room_type = normalize_room_type(_listing_value(d, "room_type", "layout", default="整租"))
-    if not room_type:
-        room_type = _resolved_property_type(d)
+def _caption_action_links(
+    listing_id: str,
+    listing: dict | None = None,
+    post_token: str = "",
+    caption_variant: str | None = "a",
+) -> str:
+    if not BOT_USERNAME:
+        return ""
+    user = BOT_USERNAME.lstrip("@")
+    if post_token:
+        appoint_payload = (
+            f"a__{post_token}" if str(post_token).startswith("ql")
+            else build_start_payload("a", listing_id, post_token)
+        )
+        consult_payload = (
+            f"q__{post_token}" if str(post_token).startswith("ql")
+            else build_start_payload("q", listing_id, post_token)
+        )
+    else:
+        appoint_payload = build_start_payload("a", listing_id)
+        consult_payload = build_start_payload("q", listing_id)
+    appoint = f"https://t.me/{user}?start={appoint_payload}"
+    consult = f"https://t.me/{user}?start={consult_payload}"
+    return (
+        f'<a href="{he(appoint, quote=True)}">📅 预约看房</a>'
+        f'　｜　<a href="{he(consult, quote=True)}">💬 咨询这套</a>'
+    )
+
+
+def _discussion_fact_blob(d: dict) -> str:
+    """只汇总可追溯的原始/结构化事实，供评论区费用与配套识别；不补造内容。"""
+    normalized = _parsed_normalized(d)
+    values = [
+        _listing_value(d, "cost_notes", "hidden_costs", default=""),
+        _listing_value(d, "raw_text", "source_text", default=""),
+        "；".join(_as_list(d.get("highlights"))),
+        "；".join(_as_list(normalized.get("highlights"))),
+    ]
+    return "\n".join(str(value) for value in values if str(value or "").strip())
+
+
+def _discussion_fee_value(d: dict, keys: tuple[str, ...], aliases: tuple[str, ...]) -> str:
+    direct = _normalize_fact_fragment(_listing_value(d, *keys, default=""), 20)
+    if direct:
+        return direct
+    for segment in re.split(r"[\n；;]+", _discussion_fact_blob(d)):
+        item = _normalize_fact_fragment(segment, 28)
+        low = item.lower()
+        if not item or not any(alias.lower() in low or alias in item for alias in aliases):
+            continue
+        if "免费" in item:
+            return "免费"
+        if "已含" in item or "包含" in item or "包" in item:
+            return "已含"
+        match = re.search(r"(?:[:：｜|]|为|是)\s*([^，,；;]+)", item)
+        if match:
+            value = _normalize_fact_fragment(match.group(1), 20)
+            if value:
+                return value
+    return ""
+
+
+def _discussion_amenities(d: dict) -> list[str]:
+    blob = _discussion_fact_blob(d).lower()
+    groups = (
+        ("家具家电齐全", ("家具家电齐全", "家具齐全", "全家具", "fully furnished")),
+        ("泳池", ("泳池", "pool")),
+        ("健身房", ("健身", "gym")),
+        ("停车场", ("停车场", "parking lot")),
+        ("24H安保", ("24h安保", "24小时安保", "24h security", "security")),
+    )
+    return [label for label, needles in groups if any(needle in blob for needle in needles)]
+
+
+def _confirmed_public_detail(value: object, max_len: int = 24) -> str:
+    cleaned = _normalize_fact_fragment(str(value or ""), max_len)
+    if not cleaned:
+        return ""
+    compact = cleaned.replace(" ", "")
+    if any(token in compact for token in ("待确认", "待定", "未知", "___", "【", "】")):
+        return ""
+    return cleaned
+
+
+def build_discussion_detail_text(d: dict) -> str:
+    """评论区详情卡：仅输出已确认值，不生成横线、括号或“待确认”占位。"""
+    raw_price = _listing_value(d, "price", default="")
+    price = _price_compact_for_post(d) if (_price_value(d) > 0 or _price_is_consultable(raw_price)) else ""
+    contract = _confirmed_public_detail(_normalize_contract_term(_listing_value(d, "contract_term", default="")))
+    deposit = _confirmed_public_detail(_normalize_deposit_text(_listing_value(d, "payment_terms", "deposit", default="")))
+    available = _confirmed_public_detail(_listing_value(d, "available_date", default=""), 16)
+    management = _confirmed_public_detail(_discussion_fee_value(d, ("management_fee", "property_fee", "management"), ("管理费", "物业费", "property fee", "management fee")))
+    internet = _confirmed_public_detail(_discussion_fee_value(d, ("internet_fee", "wifi_fee", "internet"), ("网络", "网费", "wifi", "internet")))
+    water = _confirmed_public_detail(_discussion_fee_value(d, ("water_rate", "water_fee"), ("水费", "水", "water")))
+    electric = _confirmed_public_detail(_discussion_fee_value(d, ("electric_rate", "electricity_rate", "electric_fee"), ("电费", "电", "electric")))
+    parking = _confirmed_public_detail(_discussion_fee_value(d, ("parking_fee", "parking"), ("停车费", "停车", "车位", "parking")))
+    amenities = _discussion_amenities(d)
+
+    qc_code = _qc_code_from_draft(d)
+    lines = [f"📋 <b>房源详情</b>｜<code>{he(qc_code)}</code>"]
+    rental_lines: list[str] = []
+    if price:
+        rental_lines.append(f"月租｜<b>{he(price)}</b>")
+    if contract:
+        rental_lines.append(f"租期｜{he(contract)}")
+    if deposit:
+        rental_lines.append(f"押付｜{he(deposit)}")
+    if available:
+        rental_lines.append(f"入住｜{he(available)}")
+    if rental_lines:
+        lines.extend(["", "💰 <b>租赁</b>", *rental_lines])
+
+    fee_lines: list[str] = []
+    if management or internet:
+        fee_lines.append("　·　".join(
+            part for part in (
+                f"管理费｜{he(management)}" if management else "",
+                f"网络｜{he(internet)}" if internet else "",
+            ) if part
+        ))
+    if water or electric:
+        fee_lines.append("　·　".join(
+            part for part in (
+                f"水费｜{he(water)}" if water else "",
+                f"电费｜{he(electric)}" if electric else "",
+            ) if part
+        ))
+    if parking:
+        fee_lines.append(f"停车｜{he(parking)}")
+    cost_notes = _confirmed_public_detail(_listing_value(d, "cost_notes", default=""), 80)
+    if cost_notes and cost_notes not in " ".join(fee_lines):
+        fee_lines.append(f"费用说明｜{he(cost_notes)}")
+    if fee_lines:
+        lines.extend(["", "🧾 <b>费用</b>", *fee_lines])
+    if amenities:
+        lines.extend(["", "🏡 <b>配套</b>", " · ".join(he(item) for item in amenities)])
+    viewing_time = _confirmed_public_detail(_listing_value(d, "viewing_time", "viewing_hours", default=""), 28)
+    video_viewing = _confirmed_public_detail(_listing_value(d, "video_viewing", "video_tour", default=""), 20)
+    viewing: list[str] = []
+    if viewing_time:
+        viewing.append(f"看房时间｜{he(viewing_time)}")
+    if video_viewing:
+        viewing.append(f"视频看房｜{he(video_viewing)}")
+    if viewing:
+        lines.extend(["", "📅 <b>看房</b>", *viewing])
+    return "\n".join(lines)[:4096]
+
+
+def _short_room_label(value: str) -> str:
+    """首页标题只显示房数，完整户型仍放在面积行，避免首屏过长。"""
+    text = str(value or "").strip()
+    match = re.search(r"(\d{1,2})\s*(?:\+\s*\d{1,2}\s*)?房", text)
+    if not match:
+        return text
+    numerals = {"0": "零", "1": "一", "2": "两", "3": "三", "4": "四", "5": "五", "6": "六", "7": "七", "8": "八", "9": "九", "10": "十"}
+    number = match.group(1)
+    return f"{numerals.get(number, number)}房"
+
+
+def build_chinese_listing_post(
+    d: dict,
+    caption_variant: str | None = None,
+    post_token: str = "",
+    has_extra_photos: bool = False,
+) -> str:
+    """Build one of three factual Telegram HTML layouts from one fact object."""
+    normalized = _parsed_normalized(d)
+    variant = resolve_caption_variant(d, caption_variant)
+    area = str(normalized.get("normalized_area") or d.get("normalized_area") or d.get("area") or "").strip()
+    area_display = f"{area}附近" if area and bool(normalized.get("nearby")) else area
+    project = _compact_copy(_project_label_for_post(d), 20) or _compact_copy(area_display, 20) or "金边房源"
+    room_type = normalize_room_type(_listing_value(d, "room_type", "layout", default="")) or _resolved_property_type(d)
+    room_type = _compact_copy(room_type, 16) or "整租"
     listing_id = system_listing_id_from_draft(d)
     price = _price_compact_for_post(d)
-    title = _compact_listing_title(d, area, room_type, price)
-    location_seed = _listing_value(d, "area", "project", "community", default="金边")
-    location = _compact_copy(location_seed, 22)
-    deposit_raw = _normalize_deposit_text(_listing_value(d, "payment_terms", "deposit", default="")) or "待确认"
-    contract_raw = _normalize_contract_term(_listing_value(d, "contract_term", default="")) or "待确认"
-    payment_contract = _compact_copy(f"{deposit_raw}｜{contract_raw}", 28)
-    verification = _verification_status_text(d)
-    details = _listing_detail_summary(d)
-    monthly_costs = _monthly_cost_summary(d)
-    audience = _compact_copy(_audience_hint(room_type, d), 32)
-    viewing_hint = _compact_copy(_contextual_viewing_hint(d), 32)
-    judge_hint = _compact_copy(_advisor_decision_hint(d), 30)
-    tags = " ".join(build_listing_tags(d)[:5]).strip()
+    size, _land_size, _building_size = _semantic_area_values(d)
+    size = _normalize_fact_fragment(size, 12)
+    if size and re.fullmatch(r"\d+(?:\.\d+)?", size):
+        size = f"{size}㎡"
+    deposit = _normalize_deposit_text(_listing_value(d, "payment_terms", "deposit", default=""))
+    contract = _normalize_contract_term(_listing_value(d, "contract_term", default=""))
+    action_links = _caption_action_links(
+        listing_id, listing=d, post_token=post_token, caption_variant=variant
+    )
 
+    normalized_type = str(normalized.get("property_type_display") or "").strip()
+    heading_type = normalized_type or str(normalized.get("property_type") or d.get("property_type_display") or d.get("property_type") or "").strip()
+    heading_type = _compact_copy(heading_type or _resolved_property_type(d), 16)
+    # 所有公开外显统一使用 QC 编号；内部 listing_id 不直接展示。
+    qc_code = _qc_code_from_draft(d)
+    title_room_match = re.search(r"\d{1,2}(?:\s*\+\s*\d{1,2})?房", room_type)
+    title_room = re.sub(r"\s+", "", title_room_match.group(0)) if title_room_match else room_type
+    floor = _display_floor(_listing_value(d, "floor", default=""))
+    raw_original = _listing_value(d, "original_price", "original_monthly_rent_usd", default="")
+    try:
+        original_value = int(float(raw_original.replace("$", "").replace(",", "").strip()))
+    except (TypeError, ValueError):
+        original_value = 0
+    current_value = _price_value(d)
+    original_price = f"${original_value:,}" if original_value > 0 and original_value != current_value else ""
+    price_markup = (
+        f"<s>{he(original_price)}</s>　<b>{he(price)}</b>"
+        if original_price else f"<b>{he(price)}</b>"
+    )
+
+    raw_highlights = _as_list(normalized.get("highlights")) + _as_list(d.get("highlights"))
+    caption_highlights: list[str] = []
+    for item in raw_highlights:
+        cleaned = _canonical_highlight_phrase(_normalize_fact_fragment(item, 18))
+        if _is_noisy_highlight(cleaned) or cleaned in {"实拍房源", "可预约看房", "中文顾问"}:
+            continue
+        if cleaned not in caption_highlights:
+            caption_highlights.append(cleaned)
+        if len(caption_highlights) >= 3:
+            break
+    verification = str(_listing_value(d, "verification_status", default="")).strip()
+    verified_line = ""
+    if "待核验" in verification or "待确认" in verification:
+        verified_line = "🟡 待核验"
+    else:
+        approved_at = str(d.get("approved_at") or "").strip()
+        verified_date = re.search(r"\d{4}-(\d{1,2})-(\d{1,2})", approved_at)
+        if verified_date:
+            verified_line = f"🟢 {int(verified_date.group(1))}月{int(verified_date.group(2))}日已核实"
+    comment_line = (
+        "📸 更多实拍与费用说明在评论区👇"
+        if has_extra_photos
+        else "📋 费用、押付与配套见评论区👇"
+    )
+    tag_values = ["金边租房"]
+    for raw in (area_display, heading_type, title_room):
+        tag = re.sub(r"[^0-9A-Za-z\u4e00-\u9fff]+", "", str(raw or "").replace("+", "加"))
+        if tag and tag not in tag_values:
+            tag_values.append(tag)
+    tag_line = " ".join(f"#{tag}" for tag in tag_values[:4])
+    # 生产只保留一个简洁版本。按钮已经承担咨询和预约动作，正文不再堆链接、
+    # 内部状态或多套 A/B/C 口径。
+    simple_heading = "｜".join(
+        dict.fromkeys(part for part in (area_display, project, title_room) if part)
+    )
+    fact_parts = [part for part in (room_type, size, floor) if part]
+    public_tag = re.sub(r"[^0-9A-Za-z\u4e00-\u9fff]+", "", area_display or "金边租房")
     lines = [
-        f"<b>{he(title)}</b>",
-        he(verification),
+        f"🏠 <b>{he(simple_heading or '金边实拍房源')}</b>",
+        f"<code>{he(qc_code)}</code>",
+        f"💰 <b>{he(price)}</b>/月" if price and "/月" not in price else f"💰 <b>{he(price)}</b>",
+        " · ".join(he(part) for part in fact_parts),
+        f"✨ {' · '.join(he(item) for item in caption_highlights[:2])}" if caption_highlights else "",
+        f"🔑 {he(deposit)}" if deposit else "",
+        f"📄 {he(contract)}" if contract else "",
         "",
-        f"📍 {he(location)}",
-        f"🏠 {he(details)}",
-        f"💵 租金 {he(price)}",
-        f"📄 押付/合同：{he(payment_contract)}",
-        f"🧾 每月费用：{he(monthly_costs)}",
-        "",
-        f"✅ 适合：{he(audience)}",
-        f"⚠️ 提前说清：{he(viewing_hint)}",
-        f"💬 侨联判断：{he(judge_hint)}",
-        "",
-        f"编号：<code>{he(listing_id)}</code>",
-        f"{he(BRAND_NAME)}｜您在金边的自己人",
-        "",
-        tags,
+        "📸 更多实拍和费用说明见评论区" if has_extra_photos else "📸 实拍房源，可直接预约看房",
+        f"#{public_tag} #金边租房",
     ]
-    return "\n".join(lines)[:1024]
+    compact: list[str] = []
+    for line in lines:
+        if not line:
+            if compact and compact[-1]:
+                compact.append("")
+            continue
+        compact.append(line)
+    while compact and not compact[-1]:
+        compact.pop()
+    return "\n".join(compact).strip()[:1024]
 
+    section_break = "__CAPTION_SECTION_BREAK__"
+
+    if variant == "b":
+        summary = "｜".join(part for part in (area_display, room_type, size) if part)
+        lines = [
+            f"📍 <b>{he(summary or project)}</b>",
+            f"<code>侨联 #{he(qc_code)}</code>",
+            section_break,
+            f"💰 {price_markup}",
+            f"🏠 {he(project)}｜{he(heading_type)}" if project and heading_type else "",
+            f"🏢 {he(floor)}" if floor else "",
+            f"<i>亮点｜{' · '.join(he(item) for item in caption_highlights)}</i>" if caption_highlights else "",
+            verified_line,
+            section_break,
+            "<code>实拍房源｜中文顾问｜可预约看房</code>",
+        ]
+    elif variant == "c":
+        heading = "｜".join(dict.fromkeys(part for part in (project, heading_type) if part))
+        lines = [
+            f"🏢 <b>{he(heading or area_display or '金边房源')}</b>｜{price_markup}",
+            f"<code>QIAOLIAN PROPERTY · {he(qc_code)}</code>",
+            section_break,
+            "━━━━━━━━━━━━",
+            f"📍 位置｜{he(area_display)}" if area_display else "",
+            f"🏷 类型｜{he(heading_type)}" if heading_type else "",
+            f"🛏 户型｜{he(room_type)}" if room_type else "",
+            f"📐 面积｜<u>{he(size)}</u>" if size else "",
+            f"🏢 楼层｜{he(floor)}" if floor else "",
+            f"💰 租金｜{price_markup}",
+            f"🔑 押付｜{he(deposit)}" if deposit else "",
+            f"📄 租期｜{he(contract)}" if contract else "",
+            f"✨ {' · '.join(he(item) for item in caption_highlights)}" if caption_highlights else "",
+            verified_line,
+        ]
+    else:
+        heading = "｜".join(dict.fromkeys(part for part in (project, title_room) if part))
+        lines = [
+            f"<b>🏠 {he(heading or area_display or '金边房源')}</b>",
+            f"<code>侨联 #{he(qc_code)}</code>",
+            section_break,
+            f"💰 月租｜{price_markup}",
+            f"📍 区域｜{he(area_display)}" if area_display else "",
+            f"🛏 户型｜{he(room_type)}" if room_type else "",
+            f"📐 面积｜<u>{he(size)}</u>" if size else "",
+            f"🏢 楼层｜{he(floor)}" if floor else "",
+            f"🏷 类型｜{he(heading_type)}" if heading_type else "",
+            f"<i>亮点｜{' · '.join(he(item) for item in caption_highlights)}</i>" if caption_highlights else "",
+            verified_line,
+            section_break,
+            "<code>实拍房源｜中文顾问｜可预约看房</code>",
+        ]
+
+    lines = [line for line in lines if line]
+    while lines and lines[-1] == section_break:
+        lines.pop()
+    lines.extend([section_break, comment_line])
+    if action_links:
+        lines.extend(["──────────────", action_links, "──────────────"])
+    if tag_line:
+        lines.append(tag_line)
+    compact_lines: list[str] = []
+    for line in lines:
+        if line == section_break:
+            line = ""
+        if not line and compact_lines and not compact_lines[-1]:
+            continue
+        compact_lines.append(line)
+    return "\n".join(compact_lines).strip()[:1024]
 
 def build_cover_listing_data(d: dict) -> dict:
+    normalized = _parsed_normalized(d)
     return {
-        "project": "",
-        "layout": "",
-        "price": d.get("price"),
-        "area": "",
-        "size": "",
-        "floor": "",
-        "highlights": [],
+        "project": normalized.get("project_name") or d.get("project_name") or d.get("project") or "",
+        "project_alias": normalized.get("project_alias") or d.get("project_alias") or "",
+        "property_type": normalized.get("property_type_display") or d.get("property_type_display") or d.get("property_type") or "",
+        "layout": normalized.get("layout") or d.get("layout") or d.get("room_type") or "",
+        "price": normalized.get("monthly_rent_usd") or d.get("price"),
+        "area": normalized.get("public_location_display") or d.get("public_location_display") or d.get("area") or "",
+        "size": normalized.get("size_sqm") or d.get("size") or "",
+        "floor": normalized.get("floor") or d.get("floor") or "",
+        "highlights": _listing_highlight_pills(d),
     }
 
 
@@ -1812,11 +2455,12 @@ def build_caption_consult_lines(d: dict, caption_variant: str | None = "a") -> l
 
 def system_listing_id_from_draft(d: dict) -> str:
     """统一新房源编号：展示/深链都使用 l_房源ID，例如 l_1024。"""
-    existing = (d.get("listing_id") or "").strip()
-    if existing.startswith("l_"):
-        return existing
-    if existing.startswith("QJ-") and existing[3:].isdigit():
-        return f"l_{existing[3:]}"
+    existing = str(d.get("listing_id") or "").strip()
+    # 兼容历史 l_1024 / L1024 / L_1024 / QJ-1024 / QC1024，
+    # 新发布统一收敛到内部协议 l_1024。
+    match = re.fullmatch(r"(?i)(?:l[_-]?|qj[-_]?|qc[-_]?)(\d+)", existing)
+    if match:
+        return f"l_{match.group(1)}"
     if existing and not existing.startswith("LST_"):
         return existing
     raw_id = d.get("id")
@@ -1828,21 +2472,30 @@ def system_listing_id_from_draft(d: dict) -> str:
     return f"l_{int(time.time())}"
 
 
-def build_caption(d: dict, caption_variant: str | None = "a") -> str:
+def display_listing_id(listing_id: str) -> str:
+    """所有客户、频道和管理端外显统一为 QCxxxx；内部仍保留 l_xxxx。"""
+    raw = str(listing_id or "").strip()
+    match = re.fullmatch(r"(?i)l[_-]?(\d+)", raw)
+    if match:
+        return f"QC{int(match.group(1)):04d}"
+    return raw.upper()
+
+
+def build_caption(d: dict, caption_variant: str | None = None) -> str:
     """发布层统一生成中文租房帖，不透传 AI 模板文案。"""
     return build_chinese_listing_post(d, caption_variant=caption_variant)
 
-def build_detail_text(d: dict, caption_variant: str | None = "a") -> str:
+def build_detail_text(d: dict, caption_variant: str | None = None) -> str:
     """文字消息正文：统一中文结构，避免模板名/开发调试词进入频道。"""
     return build_chinese_listing_post(d, caption_variant=caption_variant)
 
 
-def build_rich_album_caption(d: dict, caption_variant: str | None = "a") -> str:
+def build_rich_album_caption(d: dict, caption_variant: str | None = None) -> str:
     """频道主帖文案：固定中文租房结构，不展示内部编号或模板名。"""
     return build_chinese_listing_post(d, caption_variant=caption_variant)
 
 
-def build_channel_teaser_caption(d: dict, caption_variant: str | None = "a") -> str:
+def build_channel_teaser_caption(d: dict, caption_variant: str | None = None) -> str:
     """频道首图 caption 同样使用中文租房结构。"""
     return build_chinese_listing_post(d, caption_variant=caption_variant)
 
@@ -1876,17 +2529,64 @@ def _merge_photo_labels_into_caption(main: str, photo_labels: list[str]) -> str:
     return out[:1024]
 
 
+def _image_difference_hash(path: str) -> int | None:
+    """低成本 dHash；坏图返回 None，由调用方按原顺序容错。"""
+    try:
+        with Image.open(path) as image:
+            gray = image.convert("L").resize((9, 8), Image.Resampling.BILINEAR)
+            pixels = list(gray.getdata())
+        value = 0
+        for row in range(8):
+            offset = row * 9
+            for col in range(8):
+                value = (value << 1) | int(pixels[offset + col] > pixels[offset + col + 1])
+        return value
+    except Exception:
+        logger.warning("差异选图无法读取，保留顺序容错: %s", path)
+        return None
+
+
+def _select_diverse_detail_paths(paths: list[str], limit: int) -> list[str]:
+    """贪心选择与已选图片最不相似的实拍，避免连续相似角度。"""
+    unique = list(dict.fromkeys(paths))
+    if limit <= 0 or len(unique) <= limit:
+        return unique[:limit]
+    hashes = {path: _image_difference_hash(path) for path in unique}
+    valid = [path for path in unique if hashes[path] is not None]
+    selected: list[str] = valid[:1]
+    remaining = valid[1:]
+    while remaining and len(selected) < limit:
+        candidate = max(
+            remaining,
+            key=lambda path: min((hashes[path] ^ hashes[chosen]).bit_count() for chosen in selected),
+        )
+        selected.append(candidate)
+        remaining.remove(candidate)
+    for path in unique:
+        if len(selected) >= limit:
+            break
+        if path not in selected:
+            selected.append(path)
+    return selected
+
+
+def split_album_for_channel(paths: list[str]) -> tuple[list[str], list[str]]:
+    """返回频道首页与关联评论图；extra 按未选路径计算，绝不使用位置切片。"""
+    unique = list(dict.fromkeys(paths or []))
+    if not unique:
+        return [], []
+    cap = max(1, CHANNEL_MAIN_ALBUM_MAX)
+    cover = unique[0]
+    selected = [cover, *_select_diverse_detail_paths(unique[1:], cap - 1)]
+    selected = selected[:cap]
+    selected_set = set(selected)
+    extra = [path for path in unique if path not in selected_set]
+    return selected, extra
+
+
 def normalize_album_grid(paths: list[str]) -> list[str]:
-    """
-    频道主帖只取前 CHANNEL_MAIN_ALBUM_MAX 张（默认 4 = 一套 1+3），
-    其余路径留在 album_all 里由调用方作为 extra 发讨论组。
-    源图张数 ≤ 上限时频道全发、讨论组不加图。
-    """
-    if not paths:
-        return paths
-    n = len(paths)
-    cap = CHANNEL_MAIN_ALBUM_MAX
-    selected = paths[:cap] if n > cap else list(paths)
+    """兼容旧调用：频道默认保持封面 + 三张差异较大的独立实拍。"""
+    selected, _ = split_album_for_channel(paths)
     return selected
 
 
@@ -1938,7 +2638,7 @@ def save_discuss_map(data: dict) -> None:
 
 
 def _default_discussion_bridge() -> dict:
-    return {"publish_queue": [], "discuss_mgid": {}}
+    return {"publish_queue": [], "discuss_mgid": {}, "pending_forwards": []}
 
 
 def load_discussion_bridge() -> dict:
@@ -1949,6 +2649,7 @@ def load_discussion_bridge() -> dict:
                 if isinstance(data, dict):
                     data.setdefault("publish_queue", [])
                     data.setdefault("discuss_mgid", {})
+                    data.setdefault("pending_forwards", [])
                     if not isinstance(data["publish_queue"], list):
                         data["publish_queue"] = []
                     if not isinstance(data["discuss_mgid"], dict):
@@ -1966,15 +2667,44 @@ def save_discussion_bridge(data: dict) -> None:
 
 
 def add_discuss_publish_queue(channel_post_id: int) -> None:
-    """发帖成功后调用：记录频道首条 message_id，供讨论区自动转发对齐（与频道 mgid 无关）。"""
+    """记录频道首条 message_id，并对账已先到达的讨论区自动转发回执。"""
     if not channel_post_id:
         return
+    now = time.time()
     data = load_discussion_bridge()
-    data["publish_queue"].append(
-        {"t": time.time(), "channel_post_id": int(channel_post_id)}
-    )
-    if len(data["publish_queue"]) > 50:
-        data["publish_queue"] = data["publish_queue"][-50:]
+    pending = data.setdefault("pending_forwards", [])
+    fresh = [item for item in pending if now - float(item.get("t", 0) or 0) <= 120]
+    if fresh:
+        receipt = fresh.pop(0)
+        sk = str(int(channel_post_id))
+        mapping = load_discuss_map()
+        mapping[sk] = int(receipt["discussion_msg_id"])
+        save_discuss_map(mapping)
+        mgid = receipt.get("discuss_mgid")
+        if mgid:
+            data.setdefault("discuss_mgid", {})[str(mgid)] = {
+                "channel_post_id": int(channel_post_id),
+                "t": now,
+            }
+        try:
+            with sqlite3.connect(DB_PATH) as conn:
+                conn.execute(
+                    """UPDATE posts SET discuss_chat_id=?, discuss_thread_id=?, discuss_message_id=?, updated_at=CURRENT_TIMESTAMP WHERE channel_message_id=?""",
+                    (str(receipt.get("discussion_chat_id") or ""), str(receipt.get("discussion_thread_id") or ""), str(receipt.get("discussion_msg_id") or ""), str(channel_post_id)),
+                )
+                conn.commit()
+        except Exception:
+            logger.exception("pending discussion receipt 回写 posts 失败: channel_post_id=%s", channel_post_id)
+        matched_mgid = str(receipt.get("discuss_mgid") or "")
+        if matched_mgid:
+            fresh = [item for item in fresh if str(item.get("discuss_mgid") or "") != matched_mgid]
+        data["pending_forwards"] = fresh
+        logger.info("已对账提前到达的评论映射: channel_post_id=%s -> discussion_msg_id=%s", channel_post_id, receipt.get("discussion_msg_id"))
+    else:
+        data["pending_forwards"] = fresh
+        data["publish_queue"].append({"t": now, "channel_post_id": int(channel_post_id)})
+        if len(data["publish_queue"]) > 50:
+            data["publish_queue"] = data["publish_queue"][-50:]
     save_discussion_bridge(data)
 
 
@@ -2073,14 +2803,30 @@ async def send_discussion_cta_with_retry(
     return mid is not None
 
 
-def _build_discussion_appt_keyboard(listing_id: str, post_token: str) -> InlineKeyboardMarkup:
-    """讨论区第一段：预约看房按钮，深链到用户 Bot 的预约流程。"""
+def _build_discussion_action_keyboard(listing_id: str, post_token: str) -> InlineKeyboardMarkup:
+    """讨论区末尾只保留两个高意向动作。"""
     if BOT_USERNAME:
         user = BOT_USERNAME.lstrip("@")
-        listing_target = f"{listing_id}|entry=discussion|step=seg1"
-        appt_payload = build_start_payload("a", listing_target, post_token)
+        base = f"https://t.me/{user}?start="
+        consult_payload = (
+            f"q__{post_token}" if str(post_token).startswith("ql")
+            else build_start_payload("q", listing_id, post_token)
+        )
+        appoint_payload = (
+            f"a__{post_token}" if str(post_token).startswith("ql")
+            else build_start_payload("a", listing_id, post_token)
+        )
         return InlineKeyboardMarkup(
-            [[InlineKeyboardButton("📅 预约看房", url=f"https://t.me/{user}?start={appt_payload}")]]
+            [[
+                InlineKeyboardButton(
+                    "💬 问清费用",
+                    url=base + consult_payload,
+                ),
+                InlineKeyboardButton(
+                    "📅 预约这套",
+                    url=base + appoint_payload,
+                ),
+            ]]
         )
     return InlineKeyboardMarkup([])
 
@@ -2102,66 +2848,65 @@ async def send_discussion_three_segments(
     listing_id: str,
     post_token: str,
     *,
+    listing: dict | None = None,
     extra_album: list | None = None,
+    frozen_detail_text: str = "",
     attempts: int = 30,
     delay_seconds: float = 2.0,
-) -> bool:
-    """
-    频道发帖后，讨论区三段式：
-    1) 预约承接（文案 + 预约按钮）
-    2) 补充实拍组图（若有 extra_album）
-    3) 继续看房入口（文案 + 小助手深链按钮）
-    成功发出第一段返回 True，否则 False。
-    """
+) -> tuple[bool, bool]:
+    """讨论区按手机阅读顺序发布：实拍 → 费用/判断 → 行动入口。"""
     discussion_id = await resolve_discussion_chat_id(bot)
     if not discussion_id:
-        logger.warning("三段式讨论区发帖：无法获取讨论组 chat_id，跳过。channel_post_id=%s", channel_post_id)
-        return False
+        logger.warning("讨论区发帖：无法获取讨论组 chat_id，跳过。channel_post_id=%s", channel_post_id)
+        return False, False
 
-    # 等待讨论区自动转发就绪，然后发第一段（预约承接）
-    appt_keyboard = _build_discussion_appt_keyboard(listing_id, post_token)
-    seg1_mid = await poll_discussion_first_reply(
-        bot,
-        channel_post_id,
-        DISCUSSION_APPT_TEXT,
-        reply_markup=appt_keyboard if appt_keyboard.inline_keyboard else None,
-        attempts=attempts,
-        delay_seconds=delay_seconds,
-    )
-    if not seg1_mid:
-        logger.warning("三段式讨论区：第一段发送失败。channel_post_id=%s", channel_post_id)
-        return False
-
-    # 第二段：补充实拍（若有）
-    if extra_album:
+    thread_reply_id = None
+    for _ in range(max(1, attempts)):
+        await asyncio.sleep(delay_seconds)
         mapping = load_discuss_map()
-        thread_reply_id = mapping.get(str(channel_post_id)) or seg1_mid
+        thread_reply_id = mapping.get(str(channel_post_id))
+        if thread_reply_id:
+            break
+    if not thread_reply_id:
+        logger.warning("讨论区映射等待超时。channel_post_id=%s", channel_post_id)
+        return False, False
+
+    sent_any = False
+    sent_extra_photos = False
+
+    # 第一段：原比例补充实拍。每张只加轻量 Logo，不叠价格、户型或大字。
+    if extra_album:
         chunk = 10
         total_extra = len(extra_album)
         for batch_start in range(0, total_extra, chunk):
             batch_paths = extra_album[batch_start : batch_start + chunk]
             extra_media = []
             for j, path in enumerate(batch_paths):
-                with open(path, "rb") as raw:
-                    data_bytes = raw.read()
-                data_bytes = normalize_album_image(data_bytes, target_size=1280, force_square=False)
-                buf = add_detail_logo_watermark(data_bytes)
-                buf.name = f"extra_{batch_start + j}.jpg"
-                if j == 0:
-                    cap = (
-                        DISCUSSION_EXTRA_INTRO
-                        if batch_start == 0
-                        else DISCUSSION_EXTRA_INTRO_CONT
-                    )
-                    extra_media.append(
-                        InputMediaPhoto(
-                            media=buf,
-                            caption=cap[:1024],
-                            parse_mode=ParseMode.HTML,
+                try:
+                    with open(path, "rb") as raw:
+                        data_bytes = raw.read()
+                    # Frozen discussion files are already final package outputs; send unchanged.
+                    buf = io.BytesIO(data_bytes)
+                    buf.name = f"extra_{batch_start + j}.jpg"
+                    if j == 0:
+                        cap = (
+                            DISCUSSION_EXTRA_INTRO
+                            if batch_start == 0
+                            else DISCUSSION_EXTRA_INTRO_CONT
                         )
-                    )
-                else:
-                    extra_media.append(InputMediaPhoto(media=buf))
+                        extra_media.append(
+                            InputMediaPhoto(
+                                media=buf,
+                                caption=cap[:1024],
+                                parse_mode=ParseMode.HTML,
+                            )
+                        )
+                    else:
+                        extra_media.append(InputMediaPhoto(media=buf))
+                except Exception:
+                    logger.exception("讨论区实拍处理失败，已跳过: %s", path)
+            if not extra_media:
+                continue
             try:
                 if len(extra_media) == 1:
                     await bot.send_photo(
@@ -2179,39 +2924,62 @@ async def send_discussion_three_segments(
                         reply_to_message_id=int(thread_reply_id),
                         allow_sending_without_reply=True,
                     )
+                sent_any = True
+                sent_extra_photos = True
             except Exception:
-                logger.exception("三段式讨论区：第二段实拍发送失败 batch_start=%s", batch_start)
+                logger.exception("讨论区实拍发送失败 batch_start=%s", batch_start)
             if batch_start + chunk < total_extra:
                 await asyncio.sleep(0.6)
-        logger.info("三段式讨论区：第二段已发 %s 张实拍", total_extra)
 
-    # 第三段：继续看房入口
+    # 第二段：新发布只发送 approved package 中冻结的房源详情；
+    # 对旧 package 保留兼容生成，以便历史包不因新字段缺失而无法发送。
+    d = listing or {}
+    detail_text = str(frozen_detail_text or "").strip() or build_discussion_detail_text(d)
     try:
-        mapping = load_discuss_map()
-        thread_reply_id = mapping.get(str(channel_post_id)) or seg1_mid
-        continue_keyboard = _build_discussion_continue_keyboard(listing_id, post_token)
-        continue_text = str(DISCUSSION_CONTINUE_TEXT or "").strip()
-        if "机器人对话" not in continue_text:
-            continue_text = (continue_text + "\n\n🤖 点击下方按钮进入侨联机器人对话").strip()
         await bot.send_message(
             chat_id=discussion_id,
-            text=continue_text,
+            text=detail_text[:4096],
+            parse_mode=ParseMode.HTML,
             reply_to_message_id=int(thread_reply_id),
-            reply_markup=continue_keyboard if continue_keyboard.inline_keyboard else None,
             allow_sending_without_reply=True,
         )
-        logger.info("三段式讨论区：第三段已发。channel_post_id=%s listing_id=%s", channel_post_id, listing_id)
+        sent_any = True
     except Exception:
-        logger.exception("三段式讨论区：第三段发送失败。channel_post_id=%s", channel_post_id)
+        logger.exception("讨论区房源详情发送失败。channel_post_id=%s", channel_post_id)
 
-    return True
+    # 第三段：看完资料后的行动入口，避免在看图前先推销。
+    try:
+        keyboard = _build_discussion_action_keyboard(listing_id, post_token)
+        await bot.send_message(
+            chat_id=discussion_id,
+            text=(
+                "想看这套？选好日期和时间即可预约。\n"
+                "还有疑问，也可直接联系侨联顾问。"
+            ),
+            reply_to_message_id=int(thread_reply_id),
+            reply_markup=keyboard if keyboard.inline_keyboard else None,
+            allow_sending_without_reply=True,
+        )
+        sent_any = True
+    except Exception:
+        logger.exception("讨论区行动入口发送失败。channel_post_id=%s", channel_post_id)
 
+    return sent_any, sent_extra_photos
 
 def build_channel_caption(
-    d: dict, album_paths: list[str], caption_variant: str | None = "a"
+    d: dict,
+    album_paths: list[str],
+    caption_variant: str | None = None,
+    post_token: str = "",
+    has_extra_photos: bool = False,
 ) -> str:
     """生成发频道用的首图 caption。只输出中文租房帖，不附加调试图注。"""
-    return build_chinese_listing_post(d, caption_variant=caption_variant)[:1024]
+    return build_chinese_listing_post(
+        d,
+        caption_variant=caption_variant,
+        post_token=post_token,
+        has_extra_photos=has_extra_photos,
+    )[:1024]
 
 
 def build_keyboard(
@@ -2220,36 +2988,57 @@ def build_keyboard(
     post_token: str = "",
     caption_variant: str | None = "a",
 ) -> InlineKeyboardMarkup:
-    """房源帖固定 CTA：咨询、预约、收藏、同区域更多。"""
-    if BOT_USERNAME:
-        user = BOT_USERNAME.lstrip("@")
-        base = f"https://t.me/{user}?start="
-        rows = [
-            [
-                InlineKeyboardButton(
-                    "💬 立即咨询",
-                    url=f"{base}{build_start_payload('q', listing_id, post_token, caption_variant)}",
-                ),
-                InlineKeyboardButton(
-                    "📅 预约看房",
-                    url=f"{base}{build_start_payload('a', listing_id, post_token, caption_variant)}",
-                ),
-            ],
-            [
-                InlineKeyboardButton(
-                    "❤️ 收藏房源",
-                    url=f"{base}{build_start_payload('f', listing_id, post_token, caption_variant)}",
-                ),
-                InlineKeyboardButton(
-                    "🏠 同区域更多",
-                    url=f"{base}{build_start_payload('m', area or '金边', post_token, caption_variant)}",
-                ),
-            ],
-        ]
-    else:
-        ch_link = f"https://t.me/c/{str(CHANNEL_ID).lstrip('-100')}"
-        rows = [[InlineKeyboardButton(f"📞 联系{BRAND_NAME}", url=ch_link)]]
-    return InlineKeyboardMarkup(rows)
+    """租客只需要两个明确动作：预约或咨询。"""
+    if not BOT_USERNAME:
+        return InlineKeyboardMarkup([])
+    public_token = ""
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            row = conn.execute(
+                """SELECT public_token FROM publication_packages
+                   WHERE property_id=? AND status IN ('approved','published')
+                     AND length(trim(coalesce(public_token,'')))>0
+                   ORDER BY package_version DESC LIMIT 1""",
+                (listing_id,),
+            ).fetchone()
+        public_token = str(row[0] or "").strip() if row else ""
+    except Exception:
+        logger.exception("读取公开房源 token 失败: %s", listing_id)
+    if public_token:
+        return InlineKeyboardMarkup([[
+            InlineKeyboardButton(
+                "📅 预约看房",
+                url=f"https://t.me/{BOT_USERNAME.lstrip('@')}?start=book__{public_token}",
+            ),
+            InlineKeyboardButton(
+                "💬 咨询这套",
+                url=f"https://t.me/{BOT_USERNAME.lstrip('@')}?start=consult__{public_token}",
+            ),
+        ]])
+    consult_payload = build_start_payload(
+        "q",
+        listing_id,
+        post_token=post_token,
+        caption_variant=caption_variant,
+    )
+    appoint_payload = build_start_payload(
+        "a",
+        listing_id,
+        post_token=post_token,
+        caption_variant=caption_variant,
+    )
+    return InlineKeyboardMarkup(
+        [[
+            InlineKeyboardButton(
+                "📅 预约看房",
+                url=f"https://t.me/{BOT_USERNAME.lstrip('@')}?start={appoint_payload}",
+            ),
+            InlineKeyboardButton(
+                "💬 咨询这套",
+                url=f"https://t.me/{BOT_USERNAME.lstrip('@')}?start={consult_payload}",
+            )
+        ]]
+    )
 
 
 # ── 数据库工具 ────────────────────────────────────────────
@@ -2392,6 +3181,25 @@ class DB:
         finally:
             conn.close()
 
+    def successful_channel_post(self, listing_id: str, channel_chat_id: str) -> tuple | None:
+        """返回同一房源在同一频道的成功发布记录，用作发布幂等键。"""
+        try:
+            return self.fetch_one(
+                """SELECT post_id, channel_message_id
+                   FROM posts
+                   WHERE listing_id=?
+                     AND platform='telegram'
+                     AND CAST(channel_chat_id AS TEXT)=?
+                     AND publish_status IN ('published', 'success', 'ok')
+                   ORDER BY id DESC LIMIT 1""",
+                (str(listing_id or ""), str(channel_chat_id or "")),
+            )
+        except sqlite3.OperationalError as exc:
+            # 极简离线预检库可能尚未迁移 posts；正式库初始化后必有该表。
+            if "no such table: posts" in str(exc).lower():
+                return None
+            raise
+
     def create_post(self, post_id, listing_id, draft_id, platform,
                     channel_chat_id=None, channel_message_id=None,
                     media_group_id=None, button_message_id=None,
@@ -2424,6 +3232,12 @@ def _album_paths_for_draft(d: dict, cover_path: str, db_path: str) -> list:
         return out
     gen = CoverGenerator(db_path)
     raw_paths = gen._get_source_post_images(sp_id)
+    original_paths = [
+        path for path in raw_paths
+        if "原图" in os.path.basename(str(path or ""))
+    ]
+    if original_paths:
+        raw_paths = original_paths
     base = None
     try:
         cid = d.get("cover_asset_id")
@@ -2470,11 +3284,84 @@ def _real_media_paths_for_draft(d: dict, db_path: str) -> list[str]:
     ]
 
 
+def sync_published_listing_for_user_bot(
+    db_path: str,
+    draft: dict,
+    listing_id: str,
+    cover_path: str,
+    channel_message_id: int | None,
+) -> str:
+    """将频道发布结果同步到用户 Bot 使用的 listings 表。"""
+    source_cover = Path(cover_path)
+    listing_media_dir = Path(db_path).resolve().parent.parent / "media" / "listings"
+    listing_media_dir.mkdir(parents=True, exist_ok=True)
+    target_cover = listing_media_dir / f"{listing_id}{source_cover.suffix.lower() or '.jpg'}"
+    target_cover.write_bytes(source_cover.read_bytes())
+
+    highlights = draft.get("highlights") or []
+    if isinstance(highlights, str):
+        try:
+            highlights = json.loads(highlights)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            highlights = [highlights]
+    size = str(draft.get("size") or "").strip().replace("平方米", "").replace("㎡", "")
+    now = datetime.now().isoformat(timespec="seconds")
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute(
+            """INSERT INTO listings (
+                   listing_id, title, property_type, area, community, price, currency,
+                   layout, size_sqm, tags_json, highlights, hidden_costs, drawbacks,
+                   deposit_rule, available_date, media_file_id, media_type,
+                   channel_message_id, source_post_url, status, created_at, updated_at
+               ) VALUES (?,?,?,?,?,?,'USD',?,?,?,?,?,?,?,?,?,'photo',?,?,'pending',?,?)
+               ON CONFLICT(listing_id) DO UPDATE SET
+                   title=excluded.title, property_type=excluded.property_type,
+                   area=excluded.area, community=excluded.community, price=excluded.price,
+                   layout=excluded.layout, size_sqm=excluded.size_sqm,
+                   highlights=excluded.highlights, hidden_costs=excluded.hidden_costs,
+                   drawbacks=excluded.drawbacks, deposit_rule=excluded.deposit_rule,
+                   available_date=excluded.available_date, media_file_id=excluded.media_file_id,
+                   media_type=excluded.media_type, channel_message_id=excluded.channel_message_id,
+                   source_post_url=excluded.source_post_url,
+                   -- Preserve administrator-controlled listing status (e.g. rented/offline).
+                   updated_at=excluded.updated_at""",
+            (
+                listing_id,
+                str(draft.get("title") or "房源"),
+                str(draft.get("property_type") or "公寓"),
+                str(draft.get("area") or "金边"),
+                str(draft.get("community") or draft.get("project") or ""),
+                int(float(draft.get("price") or 0)),
+                str(draft.get("layout") or ""),
+                size,
+                "[]",
+                "\n".join(str(item) for item in highlights if str(item).strip()),
+                str(draft.get("cost_notes") or ""),
+                "\n".join(str(item) for item in (draft.get("drawbacks") or []) if str(item).strip()),
+                str(draft.get("deposit") or ""),
+                str(draft.get("available_date") or ""),
+                str(target_cover),
+                int(channel_message_id) if channel_message_id else None,
+                str(draft.get("source_url") or ""),
+                now,
+                now,
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return str(target_cover)
+
+
 def _draft_quality_score(d: dict) -> int:
     nd = _parsed_normalized(d)
     raw = d.get("queue_score")
     if raw in (None, ""):
-        raw = nd.get("quality_score", 0)
+        raw = nd.get("quality_score")
+    if raw in (None, ""):
+        quality = nd.get("quality") if isinstance(nd.get("quality"), dict) else {}
+        raw = quality.get("score", 0)
     try:
         return int(float(raw or 0))
     except (TypeError, ValueError):
@@ -2558,7 +3445,7 @@ def _max_rooms_from_source(raw_text: str) -> int:
             best = max(best, n)
         except (TypeError, ValueError):
             continue
-    for m in re.finditer(r"(\d{1,2})\s*房", text):
+    for m in re.finditer(r"(\d{1,2})\s*房(?!间)", text):
         try:
             n = int(m.group(1))
             best = max(best, n)
@@ -2567,22 +3454,34 @@ def _max_rooms_from_source(raw_text: str) -> int:
     return best
 
 
-def _review_quality_flags(review_note: str) -> set[str]:
-    note = str(review_note or "")
-    m = re.search(r"quality:([^|]+)", note)
-    if not m:
-        return set()
-    raw = m.group(1)
-    out = set()
-    for item in raw.split(","):
-        tag = str(item or "").strip().lower()
-        if tag:
-            out.add(tag)
-    return out
+def _review_quality_flags(draft: dict) -> set[str]:
+    """Read machine quality only from canonical facts/quality_json.
+
+    review_note is historical human-facing text and is deliberately not a
+    source for publish decisions. Missing canonical quality fails closed in
+    the surrounding gate instead of being reconstructed from prose.
+    """
+    quality = {}
+    raw_quality = draft.get("quality_json")
+    if raw_quality:
+        try:
+            parsed = json.loads(raw_quality) if isinstance(raw_quality, str) else raw_quality
+            quality = parsed if isinstance(parsed, dict) else {}
+        except (TypeError, ValueError, json.JSONDecodeError):
+            quality = {}
+    if not quality:
+        normalized = _parsed_normalized(draft)
+        quality = normalized.get("quality") if isinstance(normalized.get("quality"), dict) else {}
+    return {
+        str(flag).strip().lower()
+        for key in ("hard_flags", "review_flags", "blocking_flags", "warning_flags", "info_flags", "all_flags")
+        for flag in (quality.get(key) or [])
+        if str(flag).strip()
+    }
 
 
-def evaluate_publish_gate(d: dict, cover_path: str, db_path: str) -> dict:
-    real_media = _real_media_paths_for_draft(d, db_path)
+def evaluate_publish_gate(d: dict, cover_path: str, db_path: str, frozen_media_paths: list[str] | None = None) -> dict:
+    real_media = [str(p) for p in (frozen_media_paths if frozen_media_paths is not None else _real_media_paths_for_draft(d, db_path)) if str(p).strip() and os.path.isfile(str(p))]
     score = _draft_quality_score(d)
     project = (d.get("project") or "").strip()
     area = (d.get("area") or "").strip()
@@ -2601,11 +3500,7 @@ def evaluate_publish_gate(d: dict, cover_path: str, db_path: str) -> dict:
     if price_value <= 0:
         price_value = _first_number_int(price_raw)
 
-    hard_block_reasons: list[str] = []
-    fallback_reasons: list[str] = []
-    quality_warnings: list[str] = []
-
-    quality_flags = _review_quality_flags(d.get("review_note") or "")
+    quality_flags = _review_quality_flags(d)
     source_text = _source_raw_text(d, db_path)
     source_room_max = _max_rooms_from_source(source_text)
     layout_room_count = _layout_rooms_count(layout)
@@ -2613,7 +3508,43 @@ def evaluate_publish_gate(d: dict, cover_path: str, db_path: str) -> dict:
     size_raw = str(d.get("size") or "").strip()
     size_value = _size_value(size_raw)
 
-    valid_area = bool(area and area not in {"金边", "未知"}) or bool(project and project not in {"金边", "未知", ""})
+    normalized = _parsed_normalized(d)
+    unified_contract = evaluate_publishability(
+        normalized,
+        media_count=len(real_media),
+        cover_exists=bool(cover_path and os.path.isfile(cover_path)),
+    )
+    hard_block_reasons: list[str] = list(unified_contract["blocking"])
+    fallback_reasons: list[str] = []
+    quality_warnings: list[str] = list(unified_contract["warnings"])
+    normalized_area = str(normalized.get("normalized_area") or d.get("normalized_area") or "").strip()
+    # Canonical facts distinguish precise physical area from safe public location.
+    # For canonical v1, a confirmed market/unique-project location is publishable
+    # without inventing a sangkat/khan.  City, brand-only and unknown locations
+    # remain invalid.  Legacy drafts retain the historical canonical-area check.
+    canonical_schema = str(normalized.get("schema_version") or "").strip()
+    canonical_level = str(normalized.get("publication_location_level") or "").strip()
+    canonical_public_location = str(normalized.get("public_location_display") or "").strip()
+    canonical_blocking = set((normalized.get("quality") or {}).get("blocking_flags") or [])
+    if canonical_schema == "canonical_facts.v1":
+        valid_area = bool(
+            canonical_level in {"level_2_physical_confirmed", "level_1_market_confirmed", "level_1_project_confirmed"}
+            and canonical_public_location
+            and "missing_public_location" not in canonical_blocking
+        )
+    else:
+        # Project/community is descriptive only; it cannot replace a canonical
+        # searchable area. Legacy drafts without normalized_data may use only an
+        # exact value from the physical-area catalog; city and free text fail closed.
+        physical_area_values = {
+            value
+            for item in PHYSICAL_AREAS
+            for value in (item.key, item.display)
+        }
+        valid_area = bool(
+            (normalized_area and normalized_area in physical_area_values)
+            or (not normalized_area and area in physical_area_values)
+        )
     # 频道自动发布必须带明确价格，避免"价格待确认"误发。
     valid_price = 100 <= price_value <= 20000
     valid_room = bool(layout and layout not in {"整租", "住宅"})
@@ -2639,9 +3570,9 @@ def evaluate_publish_gate(d: dict, cover_path: str, db_path: str) -> dict:
     if source_room_max >= 2 and layout_room_count > 0 and layout_room_count < (source_room_max - 1):
         hard_block_reasons.append(f"layout_mismatch:{layout_room_count}_lt_src_{source_room_max}")
     if "别墅" in property_type and size_value > 0 and size_value < 25:
-        hard_block_reasons.append(f"suspicious_villa_size:{size_value:g}")
+        quality_warnings.append(f"suspicious_villa_size:{size_value:g}")
     if "别墅" in property_type and size_raw and re.search(r"[xX×*]", source_text) and size_value > 0 and size_value < 40:
-        hard_block_reasons.append("villa_size_may_be_dimension_not_area")
+        quality_warnings.append("villa_size_may_be_dimension_not_area")
     if "sale" in property_type and 0 < price_value < 5000:
         hard_block_reasons.append("price_unit_ambiguous")
     if ("rent" in property_type or "rental" in property_type) and price_value > 50000:
@@ -2653,6 +3584,11 @@ def evaluate_publish_gate(d: dict, cover_path: str, db_path: str) -> dict:
     recurring_costs = _monthly_cost_summary(d)
     if not deposit:
         quality_warnings.append("missing_deposit_details")
+    contract = _normalize_contract_term(
+        _listing_value(d, "contract_term", default="")
+    )
+    if not contract:
+        quality_warnings.append("missing_contract_details")
     if recurring_costs == "管理费、水电、网络及停车待确认":
         quality_warnings.append("missing_recurring_cost_details")
 
@@ -2664,14 +3600,14 @@ def evaluate_publish_gate(d: dict, cover_path: str, db_path: str) -> dict:
     mode = "premium_4image"
     gate_cover_path = cover_path if cover_path and os.path.isfile(cover_path) else None
     # 频道相册顺序：封面在前，后接同组实拍；主帖截前 4 张，其余进讨论组。
-    album_all = _album_paths_for_draft(d, cover_path, db_path) if gate_cover_path else list(real_media)
+    album_all = ([cover_path] + list(real_media)) if gate_cover_path else list(real_media)
     if hard_block_reasons:
         mode = "blocked"
         gate_cover_path = None
         album_all = []
     elif fallback_reasons:
         mode = "fallback_media"
-        album_all = _album_paths_for_draft(d, cover_path, db_path) if gate_cover_path else list(real_media)
+        album_all = ([cover_path] + list(real_media)) if gate_cover_path else list(real_media)
 
     reasons = hard_block_reasons if hard_block_reasons else fallback_reasons
     return {
@@ -2696,6 +3632,8 @@ async def _tg_publish(
     cover_path: str,
     gate: dict | None = None,
     caption_variant: str | None = "a",
+    frozen_caption: str | None = None,
+    frozen_discussion_text: str | None = None,
 ) -> dict:
     """
     排版：频道主帖仅 CHANNEL_MAIN_ALBUM_MAX 张（默认 4，封面在前/实拍在后）+ 首图短 caption；
@@ -2714,35 +3652,29 @@ async def _tg_publish(
     gate = gate or evaluate_publish_gate(d, cover_path, DB_PATH)
     if not gate.get("is_publishable", True):
         raise ValueError("publish_blocked:" + ",".join(gate.get("reasons") or []))
-    cover_listing = build_cover_listing_data(d)
-
     # 收集图片（封面 + 实拍）→ 频道最多 CHANNEL_MAIN_ALBUM_MAX 张，其余 extra
     album_all = gate.get("album_all") or _album_paths_for_draft(d, cover_path, DB_PATH)
-    album = normalize_album_grid(album_all)
-    extra_album = album_all[len(album):]
+    # 正式标准：频道首屏为封面 + 3 张精选实拍；留言区承载完整实拍档案。
+    album, overflow_album = split_album_for_channel(album_all)
+    extra_album = list(dict.fromkeys(overflow_album))
 
     # 文案（首张图 caption，限 1024）
-    caption = build_channel_caption(d, album, caption_variant=caption_variant)
+    # 频道正文先使用保守文案；只有评论区补充图实际发送成功后，
+    # 才在下方编辑 caption 承诺“更多实拍”。
+    # Production freeze rule: an approved package supplies the complete caption.
+    # Only the post-token injection after Telegram assigns a message id may alter it.
+    caption = str(frozen_caption or gate.get("frozen_post_text") or "").strip()
+    if not caption:
+        raise ValueError("publish_missing_frozen_caption")
     post_token = ""
 
     button_message_id = None
     keyboard = build_keyboard(listing_id, area, caption_variant=caption_variant)
+    reply_markup = keyboard if keyboard.inline_keyboard else None
 
     def _prepare_channel_photo_buf(data: bytes, *, is_cover: bool, slot_index: int) -> io.BytesIO:
-        """频道图品牌层容错：坏图/异常时回退原图，避免整条发布失败。"""
-        try:
-            buf = (
-                add_brand_watermark(data, cover_listing, with_listing_footer=True)
-                if is_cover
-                else add_detail_logo_watermark(data, d)
-            )
-        except Exception:
-            logger.exception(
-                "频道图片品牌层处理失败，回退原图 slot=%s cover=%s",
-                slot_index,
-                is_cover,
-            )
-            buf = io.BytesIO(data)
+        """Return the frozen final bytes unchanged; package build owns every pixel transform."""
+        buf = io.BytesIO(data)
         buf.name = f"p{slot_index}.jpg"
         buf.seek(0)
         return buf
@@ -2751,7 +3683,6 @@ async def _tg_publish(
     if len(album) == 1:
         with open(album[0], "rb") as raw:
             data = raw.read()
-        data = normalize_album_image(data, target_size=1280, force_square=False)
         is_cover = bool(cover_path and os.path.abspath(album[0]) == os.path.abspath(cover_path))
         buf = _prepare_channel_photo_buf(data, is_cover=is_cover, slot_index=0)
         sent = await bot.send_photo(
@@ -2759,7 +3690,7 @@ async def _tg_publish(
             photo=buf,
             caption=caption,
             parse_mode=ParseMode.HTML,
-            reply_markup=keyboard,
+            reply_markup=reply_markup,
         )
         add_discuss_publish_queue(int(sent.message_id))
         media_group_id = str(getattr(sent, "media_group_id", None) or sent.message_id)
@@ -2773,7 +3704,6 @@ async def _tg_publish(
             try:
                 with open(path, "rb") as raw:
                     data = raw.read()
-                data = _normalize_for_album_slot(data, index=i, total=na)
                 is_cover = bool(cover_path and os.path.abspath(path) == os.path.abspath(cover_path))
                 prepared.append(_prepare_channel_photo_buf(data, is_cover=is_cover, slot_index=i))
             except Exception:
@@ -2822,18 +3752,35 @@ async def _tg_publish(
             # media_group 不能挂 inline keyboard；咨询入口已保留在 caption 中，避免频道多出一条 CTA 消息。
             first_message_id = msgs[0].message_id if msgs else None
             post_token = make_post_token(first_message_id)
+            # Media-group keyboards are not rendered consistently by Telegram
+            # channel clients. Always send one compact action strip after the
+            # album; this is the reliable customer entry point.
+            cta = await bot.send_message(
+                chat_id=CHANNEL_ID,
+                text="👇 预约看房或咨询这套",
+                reply_markup=build_keyboard(
+                    listing_id,
+                    area,
+                    post_token=post_token,
+                    caption_variant=caption_variant,
+                ),
+            )
+            button_message_id = int(cta.message_id)
 
     # 单图 / 多图共用：发讨论区三段式（预约承接 + 补充实拍 + 继续看房入口）
     channel_mid = media_message_ids[0] if media_message_ids else None
+    discussion_photos_published = False
     if channel_mid:
         discuss_id = await resolve_discussion_chat_id(bot)
         if discuss_id and str(discuss_id) != str(CHANNEL_ID):
-            await send_discussion_three_segments(
+            _, discussion_photos_published = await send_discussion_three_segments(
                 bot,
                 channel_mid,
                 listing_id,
                 post_token,
+                listing=d,
                 extra_album=extra_album if extra_album else None,
+                frozen_detail_text=str(frozen_discussion_text or ""),
                 attempts=60,
                 delay_seconds=2.0,
             )
@@ -2841,6 +3788,58 @@ async def _tg_publish(
             logger.warning(
                 "有 %s 张溢出实拍但未配置讨论区或讨论区与频道相同，已跳过",
                 len(extra_album),
+            )
+
+    # Telegram 分配消息 id 后补上带 post_token 的咨询/预约链接，保证渠道归因。
+    channel_mid = media_message_ids[0] if media_message_ids else None
+    if channel_mid and post_token:
+        if frozen_caption:
+            tracked_caption = _inject_frozen_post_token(frozen_caption, post_token)
+        else:
+            # Compatibility only: production publish_draft always passes frozen_caption.
+            tracked_caption = build_channel_caption(
+                d,
+                album,
+                caption_variant=caption_variant,
+                post_token=post_token,
+                has_extra_photos=discussion_photos_published,
+            )
+        tracked_keyboard = build_keyboard(
+            listing_id,
+            area,
+            post_token=post_token,
+            caption_variant=caption_variant,
+        )
+        try:
+            await bot.edit_message_caption(
+                chat_id=CHANNEL_ID,
+                message_id=int(channel_mid),
+                caption=tracked_caption,
+                parse_mode=ParseMode.HTML,
+                reply_markup=tracked_keyboard if len(album) == 1 else None,
+            )
+            caption = tracked_caption
+        except BadRequest as exc:
+            if "message is not modified" not in str(exc).lower():
+                logger.warning(
+                    "补充带追踪参数的 caption 失败，但主帖已发布 message_id=%s",
+                    channel_mid,
+                    exc_info=True,
+                )
+                # Client/API variants may reject markup edits on an album.
+                # Fall back to one short action strip so the customer is never
+                # left with a listing that cannot be booked or consulted.
+                cta = await bot.send_message(
+                    chat_id=CHANNEL_ID,
+                    text="👇 预约看房或咨询这套",
+                    reply_markup=tracked_keyboard,
+                )
+                button_message_id = int(cta.message_id)
+        except Exception:
+            logger.warning(
+                "补充带追踪参数的 caption 失败，但主帖已发布 message_id=%s",
+                channel_mid,
+                exc_info=True,
             )
 
     return {
@@ -2855,13 +3854,35 @@ async def _tg_publish(
     }
 
 
+def _inject_frozen_post_token(caption: str, post_token: str) -> str:
+    """Only inject tracking tokens into existing book/consult Deep Links.
+
+    No listing facts, prices, areas, layouts, or wording are regenerated here.
+    """
+    if not post_token:
+        return caption
+    pattern = re.compile(r"(start=(?:book|consult)_+)(l_\d+)")
+    return pattern.sub(lambda m: f"{m.group(1).split('_')[0]}__{post_token}__{m.group(2)}", caption)
+
+
 def tg_publish(
     d: dict,
     cover_path: str,
     gate: dict | None = None,
     caption_variant: str | None = "a",
+    frozen_caption: str | None = None,
+    frozen_discussion_text: str | None = None,
 ) -> dict:
-    return asyncio.run(_tg_publish(d, cover_path, gate=gate, caption_variant=caption_variant))
+    return asyncio.run(
+        _tg_publish(
+            d,
+            cover_path,
+            gate=gate,
+            caption_variant=caption_variant,
+            frozen_caption=frozen_caption,
+            frozen_discussion_text=frozen_discussion_text,
+        )
+    )
 
 
 # ── Notion 同步 ───────────────────────────────────────────
@@ -2914,9 +3935,17 @@ def notion_sync(d: dict, listing_id: str) -> str | None:
 
 # ── 主发布流程 ────────────────────────────────────────────
 class MeihuaPublisher:
-    def __init__(self, db_path: str = DB_PATH):
+    def __init__(
+        self,
+        db_path: str = DB_PATH,
+        *,
+        telegram_sender: Callable[..., dict] | None = None,
+    ):
         self.db = DB(db_path)
         self.cover_gen = CoverGenerator(db_path)
+        # Injectable only for isolated regression; production defaults to the
+        # sole real Telegram sender defined in this module.
+        self.telegram_sender = telegram_sender or tg_publish
 
     def _draft_to_dict(self, row) -> dict:
         cols = [
@@ -2937,7 +3966,13 @@ class MeihuaPublisher:
                     d[f] = []
         return d
 
-    def publish_draft(self, draft_id: str, caption_variant: str | None = None) -> bool:
+    def publish_draft(
+        self,
+        draft_id: str,
+        caption_variant: str | None = None,
+        *,
+        allow_republish: bool = False,
+    ) -> bool:
         """
         发布单条 draft。完整链路：
         draft → cover_generator → media_assets
@@ -2991,16 +4026,251 @@ class MeihuaPublisher:
                 for index, column in enumerate(selected):
                     d[column] = src_row[index]
         original_status = str(d.get("review_status") or "").strip().lower()
-        if original_status == "published":
+        # 发布前必须存在 approved package；Telegram 发送只读取冻结包资产。
+        try:
+            from publication_package import approved_package
+            frozen_package = approved_package(self.db.path, draft_id)
+        except Exception as exc:
+            print(f"[Publisher] approved package 读取失败：{exc}")
+            frozen_package = None
+        if not frozen_package:
+            print(f"[Publisher] 发布拦截：draft {draft_id} 没有 approved package")
+            media_status = assess_draft_media(draft_id, self.db.path)
+            if media_blocks_publish(media_status):
+                mark_draft_media_broken(draft_id, media_status, self.db.path)
+                reason = ",".join(media_status.issue_codes) or "media_precheck_failed"
+                target_type = "media_consistency"
+            else:
+                current_note = str(d.get("review_note") or "").strip()
+                note_parts = [part.strip() for part in current_note.split("|") if part.strip()]
+                for marker in ("publish_gate_blocked", "approved_package_missing"):
+                    if marker not in note_parts:
+                        note_parts.append(marker)
+                self.db.execute(
+                    "UPDATE drafts SET review_note=?, updated_at=CURRENT_TIMESTAMP WHERE draft_id=?",
+                    (" | ".join(note_parts)[-500:], draft_id),
+                )
+                reason = "approved_package_missing"
+                target_type = "publication_package"
+            self.db.execute(
+                "UPDATE drafts SET review_status=?, updated_at=CURRENT_TIMESTAMP WHERE draft_id=?",
+                ("pending", draft_id),
+            )
+            self.db.write_log(
+                log_id=f"LOG_{uuid.uuid4()}",
+                post_id=None,
+                draft_id=draft_id,
+                listing_id=str(d.get("listing_id") or ""),
+                target_type=target_type,
+                target_ref="telegram",
+                action="publish_precheck",
+                status="failed",
+                error_message=reason,
+                log_message=f"发布前安全拦截：{reason}",
+            )
+            return False
+        try:
+            frozen_snapshot = json.loads(frozen_package.get("snapshot_json") or "{}")
+            frozen_main_images = json.loads(frozen_package.get("main_images_json") or "[]")
+            frozen_discussion_images = json.loads(frozen_package.get("discussion_images_json") or "[]")
+            frozen_source_identity = json.loads(frozen_package.get("source_identity_json") or "{}")
+        except Exception as exc:
+            print(f"[Publisher] 发布拦截：approved package 快照无效：{exc}")
+            return False
+        # The approved package owns the caption variant. A stale review_note,
+        # scheduler argument or old callback may not relabel or regenerate it
+        # after approval.
+        frozen_caption_variant = str(frozen_snapshot.get("caption_variant") or "").strip().lower()
+        if frozen_caption_variant in {"a", "b", "c"}:
+            if caption_variant not in (None, "") and str(caption_variant).strip().lower() != frozen_caption_variant:
+                logger.warning(
+                    "ignored caption variant %s for frozen package %s; using %s",
+                    caption_variant,
+                    frozen_package.get("package_id"),
+                    frozen_caption_variant,
+                )
+            caption_variant = frozen_caption_variant
+        # Canonical-fact contract: packages built by the new intake pipeline must
+        # still represent the current approved draft immediately before any Telegram call.
+        frozen_canonical = frozen_snapshot.get("canonical_facts") or {}
+        live_canonical = _parsed_normalized(d)
+        if frozen_canonical:
+            canonical_errors = validate_facts(live_canonical)
+            if canonical_errors:
+                print(f"[Publisher] 发布拦截：live canonical facts 无效：{','.join(canonical_errors)}")
+                return False
+            frozen_hash = str(frozen_canonical.get("canonical_facts_hash") or "")
+            live_hash = str(live_canonical.get("canonical_facts_hash") or "")
+            package_hash = str(frozen_package.get("canonical_facts_hash") or "")
+            if not frozen_hash or frozen_hash != live_hash or package_hash != live_hash:
+                print("[Publisher] 发布拦截：approved package canonical facts 与当前 draft 不一致")
+                return False
+            if str(frozen_canonical.get("publication_location_level") or "") not in {
+                "level_2_physical_confirmed", "level_1_market_confirmed", "level_1_project_confirmed"
+            }:
+                print("[Publisher] 发布拦截：approved package 缺少可公开展示位置")
+                return False
+        # Freeze integrity: new packages bind caption, discussion detail and exact media bytes.
+        # Existing approved packages predate discussion_text; keep them publishable without rewriting history.
+        base_payload = {
+            "package_id": frozen_package.get("package_id"),
+            "draft_id": frozen_package.get("draft_id"),
+            "property_id": frozen_package.get("property_id"),
+            "public_token": frozen_package.get("public_token"),
+            "package_version": frozen_package.get("package_version"),
+            "source_type": frozen_package.get("source_type"),
+            "listing_type": frozen_package.get("listing_type"),
+            "media_type": frozen_package.get("media_type"),
+            "cover_template": frozen_package.get("cover_template"),
+            "cover_path": frozen_package.get("cover_path"),
+            "main_images": frozen_main_images,
+            "discussion_images": frozen_discussion_images,
+            "post_text": frozen_package.get("post_text"),
+            "snapshot": frozen_snapshot,
+        }
+        legacy_hash = hashlib.sha256(json.dumps(base_payload, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+        hardened_legacy_payload = dict(base_payload)
+        hardened_legacy_payload["source_identity_hash"] = frozen_package.get("source_identity_hash") or ""
+        hardened_legacy_payload["media_asset_hashes"] = frozen_source_identity.get("media_asset_hashes") or []
+        hardened_legacy_hash = hashlib.sha256(json.dumps(hardened_legacy_payload, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+        frozen_payload = dict(base_payload)
+        frozen_payload["discussion_text"] = frozen_package.get("discussion_text") or ""
+        hardened_payload = dict(frozen_payload)
+        hardened_payload["source_identity_hash"] = frozen_package.get("source_identity_hash") or ""
+        hardened_payload["media_asset_hashes"] = frozen_source_identity.get("media_asset_hashes") or []
+        hardened_hash = hashlib.sha256(json.dumps(hardened_payload, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+        stored_hash = str(frozen_package.get("content_hash") or "")
+        freeze_schema = str(frozen_snapshot.get("freeze_schema") or "").strip()
+        has_frozen_discussion = bool(str(frozen_package.get("discussion_text") or "").strip())
+        if freeze_schema == "FREEZE_V2":
+            expected_hash = hardened_hash if has_frozen_discussion else hardened_legacy_hash
+            if not stored_hash or stored_hash != expected_hash:
+                print(f"[Publisher] 发布拦截：FREEZE_V2 content_hash 不匹配：{frozen_package.get('package_id')}")
+                return False
+            frozen_file_hashes = frozen_snapshot.get("frozen_file_hashes") or {}
+            if not isinstance(frozen_file_hashes, dict) or not frozen_file_hashes:
+                print(f"[Publisher] 发布拦截：FREEZE_V2 缺少 frozen_file_hashes：{frozen_package.get('package_id')}")
+                return False
+            for frozen_path, expected_hash in frozen_file_hashes.items():
+                path = Path(str(frozen_path)).resolve()
+                if not path.is_file():
+                    print(f"[Publisher] 发布拦截：冻结文件不存在：{path}")
+                    return False
+                actual_hash = hashlib.sha256(path.read_bytes()).hexdigest()
+                if actual_hash != str(expected_hash):
+                    print(f"[Publisher] 发布拦截：冻结文件内容已变化：{path}")
+                    return False
+        elif not stored_hash or stored_hash not in {legacy_hash, hardened_legacy_hash, hardened_hash}:
+            print(f"[Publisher] 发布拦截：legacy approved package content_hash 不匹配：{frozen_package.get('package_id')}")
+            return False
+        if not isinstance(frozen_source_identity, dict) or not frozen_source_identity.get("source_post_db_id"):
+            print(f"[Publisher] 发布拦截：approved package 缺少 source identity：{frozen_package.get('package_id')}")
+            return False
+        if str(frozen_source_identity.get("source_post_db_id")) != str(d.get("source_post_id") or ""):
+            print("[Publisher] 发布拦截：package/source_post 不一致")
+            return False
+        expected_assets = {str(x) for x in (frozen_source_identity.get("media_asset_ids") or []) if str(x)}
+        if not expected_assets:
+            print("[Publisher] 发布拦截：package 缺少 media_asset_ids")
+            return False
+        actual_asset_rows = self.db.fetch_all(
+            "SELECT asset_id FROM media_assets WHERE owner_type='source_post' AND owner_ref_id=?",
+            (str(d.get("source_post_id")),),
+        )
+        actual_assets = {str(row[0]) for row in actual_asset_rows if row[0]}
+        if not expected_assets.issubset(actual_assets):
+            print("[Publisher] 发布拦截：冻结媒体不属于同一 source_post")
+            return False
+
+        package_listing_id = str(frozen_package.get("property_id") or "").strip()
+        if not package_listing_id or package_listing_id != str(d.get("listing_id") or "").strip():
+            print(f"[Publisher] 发布拦截：package/listing 不一致：{package_listing_id} != {d.get('listing_id')}")
+            return False
+        for key in ("area", "property_type", "price", "layout"):
+            if str(frozen_snapshot.get(key) or "").strip() != str(d.get(key) or "").strip():
+                print(f"[Publisher] 发布拦截：冻结快照字段不一致：{key}")
+                return False
+        frozen_cover_path = str(frozen_package.get("cover_path") or "").strip()
+        frozen_all_images = [str(x) for x in (frozen_main_images + frozen_discussion_images) if str(x).strip()]
+        if not frozen_cover_path or not os.path.isfile(frozen_cover_path):
+            print(f"[Publisher] 发布拦截：冻结封面不存在：{frozen_cover_path}")
+            return False
+        if not frozen_all_images or any(not os.path.isfile(p) for p in frozen_all_images):
+            print("[Publisher] 发布拦截：冻结图片缺失")
+            return False
+        d["_frozen_package_id"] = frozen_package.get("package_id")
+        d["_frozen_content_hash"] = frozen_package.get("content_hash")
+        d["_frozen_post_text"] = frozen_package.get("post_text") or ""
+        d["_frozen_discussion_text"] = frozen_package.get("discussion_text") or ""
+        expected_qc = _qc_code_from_draft(d)
+        if expected_qc not in d["_frozen_post_text"]:
+            print(f"[Publisher] 发布拦截：冻结正文缺少统一 QC 编号 {expected_qc}")
+            return False
+        d["_frozen_main_images"] = frozen_main_images
+        d["_frozen_discussion_images"] = frozen_discussion_images
+        d["_frozen_cover_path"] = frozen_cover_path
+        assert_public_output_safe(
+            d["_frozen_post_text"],
+            d["_frozen_discussion_text"],
+            frozen_package.get("advice_text"),
+            context=f"approved_package:{frozen_package.get('package_id')}",
+        )
+        if original_status == "published" and not allow_republish:
             print(f"[Publisher] Draft {draft_id} 已是 published，跳过重复发布。")
             return False
-        if not self.db.claim_draft_for_publish(draft_id):
-            print(f"[Publisher] Draft {draft_id} 正在发布或状态不允许，跳过。")
+
+        if allow_republish:
+            # Re-publication is never a flag on an existing frozen package.  It
+            # requires a new draft and a newly approved frozen package.
+            print("[Publisher] 发布拦截：不支持复用已审核发布包重新公开发帖。")
             return False
+        listing_id = system_listing_id_from_draft(d)
+        existing_post = self.db.successful_channel_post(listing_id, str(CHANNEL_ID))
+        if existing_post:
+            print(
+                f"[Publisher] 房源 {listing_id} 已发布到当前频道，"
+                f"message_id={existing_post[1]}，已阻止重复发布。"
+            )
+            self.db.write_log(
+                log_id=f"LOG_{uuid.uuid4()}", post_id=existing_post[0],
+                draft_id=draft_id, listing_id=listing_id,
+                target_type="telegram_channel", target_ref=str(CHANNEL_ID),
+                action="prevent_duplicate_publish", status="blocked",
+                response_payload={"existing_message_id": existing_post[1]},
+                log_message="同一 listing_id 已有成功频道帖；重新公开发帖须新建草稿并重新审核冻结包",
+            )
+            return False
+        delivery = PublicationDeliveryRepository(self.db.path)
+        try:
+            attempt = delivery.prepare(
+                package_id=str(frozen_package["package_id"]),
+                draft_id=draft_id,
+                listing_id=listing_id,
+                channel_chat_id=str(CHANNEL_ID),
+            )
+        except DeliveryBlocked as exc:
+            print(f"[Publisher] 发布拦截：{exc}")
+            self.db.write_log(
+                log_id=f"LOG_{uuid.uuid4()}", post_id=None, draft_id=draft_id,
+                listing_id=listing_id, target_type="publication_delivery",
+                target_ref=str(CHANNEL_ID), action="prepare_attempt", status="blocked",
+                error_message=str(exc), log_message="发布 attempt 已存在或需要人工对账，拒绝再次公开发送",
+            )
+            return False
+        if attempt.state == "committed":
+            print(f"[Publisher] attempt {attempt.attempt_id} 已完成，拒绝重复发布。")
+            return False
+        if attempt.state == "sent":
+            try:
+                delivery.commit_saved_result(attempt=attempt, post_id=f"TG_{attempt.attempt_id}")
+            except DeliveryBlocked as exc:
+                print(f"[Publisher] 已保存回执的本地恢复失败：{exc}")
+                return False
+            print(f"[Publisher] 已从 durable Telegram 回执恢复 attempt {attempt.attempt_id}，未再次发送。")
+            return True
         d["review_status"] = "publishing"
 
         # 2. 统一 listing_id：新发布使用 l_房源ID（例：l_1024）
-        listing_id = system_listing_id_from_draft(d)
         if d.get("listing_id") != listing_id:
             self.db.execute(
                 "UPDATE drafts SET listing_id=?, updated_at=CURRENT_TIMESTAMP WHERE draft_id=?",
@@ -3009,60 +4279,23 @@ class MeihuaPublisher:
             d["listing_id"] = listing_id
         print(f"[Publisher] listing_id: {listing_id}")
 
-        from media_consistency import (
-            assess_draft_media,
-            mark_draft_media_broken,
-            media_blocks_publish,
-        )
-
-        media_status = assess_draft_media(draft_id, self.db.path)
-        if media_blocks_publish(media_status):
-            media_note = media_status.note()
-            print(f"[Publisher] 媒体文件缺失，中止发布：{media_note}")
-            mark_draft_media_broken(draft_id, media_status, self.db.path)
-            self.db.execute(
-                "UPDATE drafts SET review_status='pending', updated_at=CURRENT_TIMESTAMP WHERE draft_id=?",
-                (draft_id,),
-            )
-            self.db.write_log(
-                log_id=f"LOG_{uuid.uuid4()}",
-                post_id=None,
-                draft_id=draft_id,
-                listing_id=listing_id,
-                target_type="media_consistency",
-                target_ref="filesystem",
-                action="pre_publish_check",
-                status="failed",
-                error_message=",".join(media_status.issue_codes),
-                response_payload={
-                    "cover_path": media_status.cover_path,
-                    "existing_real_media": len(media_status.existing_real_media),
-                    "missing_real_media": media_status.missing_real_media[:20],
-                },
-                log_message=f"媒体文件缺失，已退回 pending：{media_note}",
-            )
+        # approved package 是发布事实源；此处只验证冻结文件存在，不重新评估当前 draft 媒体。
+        if not frozen_all_images or any(not os.path.isfile(path) for path in frozen_all_images):
+            print("[Publisher] 发布拦截：冻结媒体文件缺失")
             return False
 
-        # 3. 生成封面图 → media_assets
-        print(f"[Publisher] 生成封面图...")
-        media_asset_id, cover_path = self.cover_gen.generate_for_draft(draft_id)
-        if not cover_path or not os.path.exists(cover_path):
-            print(f"[Publisher] 封面图生成失败，中止发布。")
-            self.db.execute(
-                "UPDATE drafts SET review_status=?, updated_at=CURRENT_TIMESTAMP WHERE draft_id=?",
-                (original_status or "ready", draft_id),
-            )
-            self.db.write_log(
-                log_id=f"LOG_{uuid.uuid4()}", post_id=None, draft_id=draft_id,
-                listing_id=listing_id, target_type="cover_generator",
-                target_ref="local", action="generate_cover", status="failed",
-                error_message="封面图生成失败",
-            )
-            return False
-        print(f"[Publisher] 封面图路径: {cover_path}")
+        # 3. 读取 approved package 冻结的封面与四图；发布时不重新抓图、不重新选图。
+        cover_path = d["_frozen_cover_path"]
+        media_asset_id = d.get("cover_asset_id")
+        print(f"[Publisher] 使用冻结发布包封面: {cover_path}")
+        print(f"[Publisher] approved package: {d.get('_frozen_package_id')} hash={d.get('_frozen_content_hash')}")
         d["cover_asset_id"] = media_asset_id
 
-        gate = evaluate_publish_gate(d, cover_path, self.db.path)
+        gate = evaluate_publish_gate(d, cover_path, self.db.path, frozen_media_paths=frozen_all_images)
+        gate["album_all"] = list(d.get("_frozen_main_images") or []) + list(d.get("_frozen_discussion_images") or [])
+        gate["cover_path"] = cover_path
+        gate["cover"] = cover_path
+        gate["frozen_post_text"] = d.get("_frozen_post_text") or ""
         if gate.get("price_value", 0) > 0:
             raw_price = d.get("price")
             try:
@@ -3083,6 +4316,9 @@ class MeihuaPublisher:
         )
         if not gate.get("is_publishable", True):
             print(f"[Publisher] 发布拦截：{gate_note}")
+            # No Telegram call has started.  Record a safe pre-send failure so
+            # a later retry must re-check the draft approval boundary.
+            delivery.mark_failed_before_send(attempt.attempt_id, f"publish_gate:{','.join(gate.get('reasons') or [])}")
             restore_status = "pending" if any(
                 r in {"missing_cover", "missing_real_media"} for r in gate.get("reasons", [])
             ) else (original_status or "ready")
@@ -3108,76 +4344,89 @@ class MeihuaPublisher:
             )
             return False
 
-        # 4. TG 频道发布
+        # 4. TG channel delivery.  After mark_sending, every failure is treated
+        # as externally ambiguous until a durable Telegram receipt proves otherwise.
         print(f"[Publisher] 发布到 TG 频道 {CHANNEL_ID}...")
         tg_result = None
-        tg_post_id = f"TG_{uuid.uuid4()}"
+        tg_post_id = f"TG_{attempt.attempt_id}"
         try:
             if caption_variant is None:
-                caption_variant = _pick_weighted_caption_variant(self.db)
+                caption_variant = resolve_caption_variant(d)
             else:
                 caption_variant = _normalize_caption_variant(caption_variant)
+            delivery.mark_sending(attempt.attempt_id)
             print(f"[Publisher] caption_variant: {caption_variant}")
-            tg_result = tg_publish(d, cover_path, gate=gate, caption_variant=caption_variant)
-            channel_message_id = tg_result["media_message_ids"][0]
-            button_message_id  = tg_result["button_message_id"]
-            media_group_id     = tg_result["media_group_id"]
-            print(f"[Publisher] TG 发布成功：msg_id={channel_message_id}, btn_id={button_message_id}")
-
-            # 写入 posts
-            post_db_id = self.db.create_post(
-                post_id=tg_post_id,
-                listing_id=listing_id,
-                draft_id=draft_id,
-                platform="telegram",
-                channel_chat_id=str(CHANNEL_ID),
-                channel_message_id=channel_message_id,
-                media_group_id=media_group_id,
-                button_message_id=button_message_id,
-                post_text=tg_result["caption"],
-                publish_status="published",
-            )
-            print(f"[Publisher] posts 记录写入：db_id={post_db_id}")
-            self.db.write_publish_analytics(
-                draft_id=draft_id,
-                post_id=tg_post_id,
-                message_id=channel_message_id,
-                listing_id=listing_id,
-                area=str(d.get("area") or ""),
-                property_type=str(d.get("property_type") or ""),
-                monthly_rent=d.get("price"),
+            tg_result = self.telegram_sender(
+                d,
+                cover_path,
+                gate=gate,
                 caption_variant=caption_variant,
-                published_at=datetime.now().isoformat(timespec="seconds"),
+                frozen_caption=d.get("_frozen_post_text"),
+                frozen_discussion_text=d.get("_frozen_discussion_text"),
             )
-
-            # publish_log: TG 成功
+            channel_message_id = tg_result["media_message_ids"][0]
+            delivery.mark_sent(attempt.attempt_id, tg_result)
+            delivery.commit_success(
+                attempt_id=attempt.attempt_id,
+                post_id=tg_post_id,
+                package_id=str(frozen_package["package_id"]),
+                draft_id=draft_id,
+                listing_id=listing_id,
+                channel_chat_id=str(CHANNEL_ID),
+                telegram_result=tg_result,
+            )
+            print(f"[Publisher] TG 发布并持久化成功：msg_id={channel_message_id}")
+        except Exception as exc:
+            print(f"[Publisher] TG 投递未完成：{exc}")
+            delivery.mark_unknown(attempt.attempt_id, str(exc), tg_result)
             self.db.write_log(
                 log_id=f"LOG_{uuid.uuid4()}", post_id=tg_post_id, draft_id=draft_id,
-                listing_id=listing_id, target_type="telegram_channel",
-                target_ref=str(CHANNEL_ID), action="send_photo", status="success",
-                response_payload={
-                    "message_id": channel_message_id,
-                    "button_message_id": button_message_id,
-                    "publish_mode": tg_result.get("publish_mode"),
-                    "caption_variant": caption_variant,
-                    "post_token": tg_result.get("post_token"),
-                },
-                log_message=f"TG 频道发布成功，msg_id={channel_message_id}; mode={tg_result.get('publish_mode')}",
-            )
-        except Exception as e:
-            print(f"[Publisher] TG 发布失败: {e}")
-            self.db.execute(
-                "UPDATE drafts SET review_status=?, updated_at=CURRENT_TIMESTAMP WHERE draft_id=?",
-                (original_status or "ready", draft_id),
-            )
-            self.db.write_log(
-                log_id=f"LOG_{uuid.uuid4()}", post_id=tg_post_id, draft_id=draft_id,
-                listing_id=listing_id, target_type="telegram_channel",
-                target_ref=str(CHANNEL_ID), action="send_photo", status="failed",
-                error_message=str(e),
-                log_message=f"TG 频道发布失败: {e}",
+                listing_id=listing_id, target_type="publication_delivery",
+                target_ref=str(CHANNEL_ID), action="telegram_delivery", status="unknown",
+                error_message=str(exc),
+                log_message="Telegram 调用后或本地提交期间发生异常；已熔断，禁止自动重发，需以回执恢复或人工对账",
             )
             return False
+
+        # Non-core enrichments run only after the public send is durably committed.
+        self.db.write_publish_analytics(
+            draft_id=draft_id, post_id=tg_post_id,
+            message_id=tg_result["media_message_ids"][0], listing_id=listing_id,
+            area=str(d.get("area") or ""), property_type=str(d.get("property_type") or ""),
+            monthly_rent=d.get("price"), caption_variant=caption_variant,
+            published_at=datetime.now().isoformat(timespec="seconds"),
+        )
+        self.db.write_log(
+            log_id=f"LOG_{uuid.uuid4()}", post_id=tg_post_id, draft_id=draft_id,
+            listing_id=listing_id, target_type="telegram_channel", target_ref=str(CHANNEL_ID),
+            action="send_frozen_package", status="success",
+            response_payload={
+                "attempt_id": attempt.attempt_id,
+                "package_id": frozen_package["package_id"],
+                "message_id": tg_result["media_message_ids"][0],
+                "publish_mode": tg_result.get("publish_mode"),
+                "caption_variant": caption_variant,
+            },
+            log_message="approved frozen package 已发送并完成本地状态提交",
+        )
+        try:
+            synced_cover = sync_published_listing_for_user_bot(
+                self.db.path, d, listing_id, cover_path, tg_result["media_message_ids"][0]
+            )
+            self.db.write_log(
+                log_id=f"LOG_{uuid.uuid4()}", post_id=tg_post_id, draft_id=draft_id,
+                listing_id=listing_id, target_type="user_bot_listings", target_ref=listing_id,
+                action="sync_listing", status="success", response_payload={"media_file_id": synced_cover},
+                log_message="已同步用户 Bot 房源投影",
+            )
+        except Exception as exc:
+            # The public send remains committed.  Do not mutate its state or retry Telegram.
+            self.db.write_log(
+                log_id=f"LOG_{uuid.uuid4()}", post_id=tg_post_id, draft_id=draft_id,
+                listing_id=listing_id, target_type="user_bot_listings", target_ref=listing_id,
+                action="sync_listing", status="failed", error_message=str(exc),
+                log_message="频道发布已提交；用户房源投影同步失败，需要本地修复，不会重发频道帖",
+            )
 
         # 5. Notion 同步
         print(f"[Publisher] 同步到 Notion...")
@@ -3202,12 +4451,8 @@ class MeihuaPublisher:
                 log_message="Notion 未配置或同步失败，已跳过",
             )
 
-        # 6. 更新 draft 状态为 published
-        self.db.execute(
-            "UPDATE drafts SET review_status='published', published_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP WHERE draft_id=?",
-            (draft_id,),
-        )
-        # 同一 source_post 的其余草稿降级为去重，避免连续发布同一组房源。
+        # 6. The draft, listing, package and post were already committed atomically.
+        # Deduplicate sibling drafts only after that fact exists.
         spid = d.get("source_post_id")
         if spid not in (None, ""):
             self.db.execute(
@@ -3262,38 +4507,8 @@ if __name__ == "__main__":
     print(f"  NOTION_DATABASE_ID: {NOTION_DB_ID or '未配置（跳过）'}")
     print("=" * 60)
 
-    if not PUBLISHER_TOKEN or not CHANNEL_ID:
-        print("错误：PUBLISHER_BOT_TOKEN 或 CHANNEL_ID 未设置，无法发布。")
-        sys.exit(1)
-
-    # 查找 approved 状态的 drafts，若无则将 pending 的第一条临时设为 approved 用于测试
-    approved = publisher.db.fetch_all(
-        "SELECT draft_id, title FROM drafts WHERE review_status='approved' LIMIT 5"
+    print(
+        "安全退出：禁止直接执行 meihua_publisher.py 批量发布。\n"
+        "请通过 systemd 管理的审核发布 Bot 操作；它只接受人工审核并冻结的 publication package。"
     )
-    if not approved:
-        print("\n没有 approved 状态的 drafts，将第一条 pending draft 临时设为 approved 进行测试...")
-        first = publisher.db.fetch_one(
-            "SELECT draft_id FROM drafts WHERE review_status='pending' LIMIT 1"
-        )
-        if not first:
-            print("没有任何 drafts，请先运行 ai_parser.py")
-            sys.exit(1)
-        publisher.db.execute(
-            "UPDATE drafts SET review_status='approved' WHERE draft_id=?", (first[0],)
-        )
-        approved = [(first[0], "（测试）")]
-
-    print(f"\n共 {len(approved)} 条 approved drafts 待发布：")
-    for did, title in approved:
-        print(f"  - {did}: {title}")
-
-    results = publisher.publish_all_approved()
-    print(f"\n发布结果：成功 {results['success']} 条，失败 {results['failed']} 条")
-
-    # 验证 publish_logs
-    logs = publisher.db.fetch_all(
-        "SELECT target_type, action, status, log_message FROM publish_logs ORDER BY id DESC LIMIT 10"
-    )
-    print("\n最新 publish_logs：")
-    for log in logs:
-        print(f"  [{log[2]}] {log[0]} / {log[1]}: {log[3]}")
+    sys.exit(2)

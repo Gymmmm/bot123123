@@ -8,7 +8,7 @@ from typing import Any, Iterable
 
 from .config import DB_PATH, logger
 
-LISTING_STATUSES = {"active", "rented", "inactive"}
+LISTING_STATUSES = {"active", "pending", "reserved", "rented", "inactive"}
 
 SCHEMA = '''
 PRAGMA journal_mode=WAL;
@@ -34,6 +34,14 @@ CREATE TABLE IF NOT EXISTS listings (
     channel_message_id INTEGER,
     source_post_url TEXT NOT NULL DEFAULT '',
     status TEXT NOT NULL DEFAULT 'active',
+    canonical_facts_hash TEXT,
+    canonical_facts_schema TEXT,
+    public_location_key TEXT,
+    public_location_display TEXT,
+    publication_location_level TEXT,
+    canonical_area_key TEXT,
+    property_subtype TEXT,
+    project_brand TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -229,6 +237,13 @@ class Database:
             rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
         return {str(row["name"]) for row in rows}
 
+    def _table_names(self) -> set[str]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        return {str(row["name"]) for row in rows}
+
     @staticmethod
     def _ensure_column(conn: sqlite3.Connection, table: str, column: str, ddl: str) -> None:
         cols = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
@@ -319,6 +334,25 @@ class Database:
             )
             return cur.rowcount > 0
 
+    def list_listings_by_status(self, status: str, limit: int = 20) -> list[dict[str, Any]]:
+        """管理员房态列表。status=all 时返回最近房源。"""
+        normalized = str(status or "").strip().lower()
+        with self.connect() as conn:
+            if normalized == "all":
+                rows = conn.execute(
+                    "SELECT * FROM listings ORDER BY updated_at DESC, created_at DESC LIMIT ?",
+                    (int(limit),),
+                ).fetchall()
+            elif normalized in LISTING_STATUSES:
+                rows = conn.execute(
+                    "SELECT * FROM listings WHERE status=? ORDER BY updated_at DESC, created_at DESC LIMIT ?",
+                    (normalized, int(limit)),
+                ).fetchall()
+            else:
+                return []
+        return [row_to_dict(row) or {} for row in rows]
+
+
     def get_listing(self, listing_id: str) -> dict[str, Any] | None:
         with self.connect() as conn:
             row = conn.execute("SELECT * FROM listings WHERE listing_id=?", (listing_id,)).fetchone()
@@ -328,9 +362,18 @@ class Database:
         return item
 
     def list_recent_listings(self, limit: int = 10) -> list[dict[str, Any]]:
+        if not {"drafts", "posts"}.issubset(self._table_names()):
+            return []
         with self.connect() as conn:
             rows = conn.execute(
-                "SELECT * FROM listings ORDER BY created_at DESC LIMIT ?",
+                """SELECT l.* FROM listings l
+                   WHERE l.status='active'
+                     AND EXISTS (
+                       SELECT 1 FROM drafts d JOIN posts p ON p.draft_id=d.draft_id
+                       WHERE d.listing_id=l.listing_id AND d.review_status='published'
+                         AND p.platform='telegram' AND p.publish_status IN ('published','success','ok')
+                     )
+                   ORDER BY l.created_at DESC LIMIT ?""",
                 (limit,),
             ).fetchall()
         result = []
@@ -350,7 +393,13 @@ class Database:
         ilike_fragment: str | None = None,
         limit: int = 6,
     ) -> list[dict[str, Any]]:
-        clauses = ["status='active'"]
+        if not {"drafts", "posts"}.issubset(self._table_names()):
+            return []
+        clauses = ["status='active'", """EXISTS (
+            SELECT 1 FROM drafts d JOIN posts p ON p.draft_id=d.draft_id
+            WHERE d.listing_id=listings.listing_id AND d.review_status='published'
+              AND p.platform='telegram' AND p.publish_status IN ('published','success','ok')
+        )"""]
         params: list[Any] = []
         if property_type:
             clauses.append("property_type=?")
@@ -395,6 +444,17 @@ class Database:
             items.append(item)
         return items
 
+    def is_listing_public(self, listing_id: str) -> bool:
+        if not {"drafts", "posts"}.issubset(self._table_names()):
+            return False
+        with self.connect() as conn:
+            row = conn.execute("""SELECT 1 FROM listings l
+                JOIN drafts d ON d.listing_id=l.listing_id AND d.review_status='published'
+                JOIN posts p ON p.listing_id=l.listing_id
+                WHERE l.listing_id=? AND l.status='active'
+                  AND p.platform='telegram' AND p.publish_status IN ('published','success','ok')
+                LIMIT 1""", (str(listing_id or ''),)).fetchone()
+            return row is not None
     def favorite_listing(self, user_id: int, listing_id: str, created_at: str) -> None:
         with self.connect() as conn:
             conn.execute(

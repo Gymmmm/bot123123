@@ -65,13 +65,58 @@ CREATE TABLE IF NOT EXISTS drafts (
     review_note TEXT,
     operator_user_id TEXT,
     cover_asset_id INTEGER,
+    is_real_photo INTEGER NOT NULL DEFAULT 0,
     approved_at TEXT,
     published_at TEXT,
     queue_score REAL DEFAULT 0,
     preview_msg_chat_id TEXT,
     preview_msg_id TEXT,
+    canonical_facts_hash TEXT,
+    canonical_facts_schema TEXT,
+    public_location_key TEXT,
+    public_location_display TEXT,
+    publication_location_level TEXT,
+    canonical_area_key TEXT,
+    property_subtype TEXT,
+    project_brand TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Canonical package materialization target.  This is intentionally part of
+-- the shared core schema because collector intake may build a package before
+-- the user Bot process has initialized its compatibility schema.
+CREATE TABLE IF NOT EXISTS listings (
+    listing_id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    property_type TEXT NOT NULL,
+    area TEXT NOT NULL,
+    community TEXT NOT NULL,
+    price INTEGER NOT NULL,
+    currency TEXT NOT NULL DEFAULT 'USD',
+    layout TEXT NOT NULL DEFAULT '',
+    size_sqm TEXT NOT NULL DEFAULT '',
+    tags_json TEXT NOT NULL DEFAULT '[]',
+    highlights TEXT NOT NULL DEFAULT '',
+    hidden_costs TEXT NOT NULL DEFAULT '',
+    drawbacks TEXT NOT NULL DEFAULT '',
+    deposit_rule TEXT NOT NULL DEFAULT '',
+    available_date TEXT NOT NULL DEFAULT '',
+    media_file_id TEXT NOT NULL DEFAULT '',
+    media_type TEXT NOT NULL DEFAULT '',
+    channel_message_id INTEGER,
+    source_post_url TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'pending',
+    canonical_facts_hash TEXT,
+    canonical_facts_schema TEXT,
+    public_location_key TEXT,
+    public_location_display TEXT,
+    publication_location_level TEXT,
+    canonical_area_key TEXT,
+    property_subtype TEXT,
+    project_brand TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS media_assets (
@@ -266,6 +311,64 @@ CREATE INDEX IF NOT EXISTS idx_drafts_review_status ON drafts (review_status);
 CREATE INDEX IF NOT EXISTS idx_drafts_listing_id ON drafts (listing_id);
 CREATE INDEX IF NOT EXISTS idx_drafts_ready_queue ON drafts (review_status, queue_score, id) WHERE review_status = 'ready';
 CREATE INDEX IF NOT EXISTS idx_drafts_pending_preview ON drafts (review_status, id) WHERE review_status = 'pending';
+
+CREATE TABLE IF NOT EXISTS publication_packages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    package_id TEXT NOT NULL,
+    draft_id TEXT NOT NULL,
+    property_id TEXT NOT NULL,
+    package_version INTEGER NOT NULL,
+    source_type TEXT NOT NULL,
+    listing_type TEXT NOT NULL,
+    media_type TEXT NOT NULL,
+    cover_template TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'package_ready',
+    cover_path TEXT NOT NULL,
+    main_images_json TEXT NOT NULL,
+    discussion_images_json TEXT NOT NULL,
+    post_text TEXT NOT NULL,
+    discussion_text TEXT NOT NULL DEFAULT '',
+    fee_text TEXT NOT NULL DEFAULT '',
+    advice_text TEXT NOT NULL DEFAULT '',
+    snapshot_json TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    source_identity_json TEXT,
+    source_identity_hash TEXT,
+    source_identity_migrated_at TEXT,
+    public_token TEXT,
+    canonical_facts_hash TEXT,
+    canonical_facts_schema TEXT,
+    publication_location_level TEXT,
+    approved_by TEXT,
+    approved_at TEXT,
+    published_at TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(draft_id, package_version)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_publication_packages_one_approved ON publication_packages(draft_id) WHERE status='approved';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_publication_packages_package_id ON publication_packages(package_id);
+CREATE INDEX IF NOT EXISTS idx_publication_packages_status ON publication_packages(status, id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_publication_packages_public_token ON publication_packages(public_token) WHERE public_token IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS publication_delivery_attempts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    attempt_id TEXT NOT NULL UNIQUE,
+    package_id TEXT NOT NULL,
+    draft_id TEXT NOT NULL,
+    listing_id TEXT NOT NULL,
+    channel_chat_id TEXT NOT NULL,
+    state TEXT NOT NULL DEFAULT 'prepared',
+    telegram_result_json TEXT NOT NULL DEFAULT '',
+    error_message TEXT NOT NULL DEFAULT '',
+    prepared_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    sending_at TEXT,
+    sent_at TEXT,
+    committed_at TEXT,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(package_id, channel_chat_id)
+);
+CREATE INDEX IF NOT EXISTS idx_publication_delivery_state ON publication_delivery_attempts(state, updated_at);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_media_assets_asset_id ON media_assets (asset_id);
 CREATE INDEX IF NOT EXISTS idx_media_assets_owner ON media_assets (owner_type, owner_ref_id);
 CREATE INDEX IF NOT EXISTS idx_media_assets_hash ON media_assets (file_hash);

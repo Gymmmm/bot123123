@@ -1,0 +1,26 @@
+侨联地产双 Bot · 最终隔离验收发布说明
+验收日期：2026-08-22
+发布标识：qiaolian-final-verified-20260822-r3
+
+范围
+本发布包来自 requested_sources_20260822.zip 的隔离副本。验收过程未连接生产服务器、生产数据库、真实 Telegram Bot 或频道。
+
+本轮收口
+1. source_post、Canonical Facts、draft、listing、publication package、封面、caption 和用户 Bot 展示使用同一事实链。
+2. listing_taxonomy.py 是 location/project/type 唯一 catalog；城市、Level 2 物理区域、Level 1 市场/项目分层，人工 area 修改会同步 Canonical 字段并重算 hash。
+3. 修复“不出售”误判 mixed、Level 2 public key 重新推导遗漏、项目别名/物业类型封面丢失和出售封面错误 `/月`。
+4. 每种 Canonical 物业类型使用确定默认文案：公寓/住宅 A，别墅/排屋 B，商办/仓储/土地 C；管理员审核前可改选，审核后冻结。
+5. 三版 Telegram HTML 正文支持粗体、斜体、下划线、代码字体；只有来源显式原价/现价才显示删除线，不生成“默认原价 + $100”。
+6. 详情图使用自适应安静角落的磨砂品牌角标；不盖中心、不改变比例，缺 CJK 字体时安全回退英文。
+7. 评论区只显示已确认租赁、费用、配套和看房事实；/send 为可点击的已审核队列；approved/published package 和 durable delivery 均 fail closed。
+8. 修复独立复测发现的冷启动 listings schema、发布失败回退、预约/深链合同和按钮行为。
+9. 封面 renderer 自身改为 canonical-first；CSV、send-next、zufang555 等直发旁路已关闭，批量发布必须读取 approved frozen package。
+
+验证
+全量套件：156 passed，0 failed，2 skipped，66 warnings，21 subtests passed。
+
+限制
+隔离容器不允许 Chromium 创建 socket，真实 HTML 封面未能启动；Pillow 详情图角标已真实渲染。真实 Telegram、systemd、生产 DB、字体和 Chromium 仍需按 DEPLOYMENT_COMMANDS.md 人工预检。
+
+判定
+隔离代码验收已通过；生产切换仍须完成 DEPLOYMENT_COMMANDS.md 的人工预检。

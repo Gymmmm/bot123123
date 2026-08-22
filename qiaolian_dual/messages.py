@@ -6,93 +6,75 @@ from .config import ADVISOR_PHONE, ADVISOR_TG, ADVISOR_WECHAT, BRAND_NAME, CHANN
 from .utils import compact_join, e
 
 
+def public_brand_name() -> str:
+    """用户可见品牌名不携开发环境标记。"""
+    return (BRAND_NAME or "侨联地产").replace("测试", "").strip() or "侨联地产"
+
+
 def listing_summary(item: dict) -> str:
     tags = compact_join(item.get("tags", []), " / ")
     lines = [
         f"🏠 <b>{e(item.get('title'))}</b>",
-        f"💰 ${e(item.get('price'))}/月",
-        f"📍 {e(item.get('area'))} · {e(item.get('community'))}",
+        f"<b>金额：</b><b>${e(item.get('price'))}/月</b>",
+        f"<b>区域：</b>{e(item.get('area'))} · {e(item.get('community'))}",
     ]
     if item.get("layout"):
-        lines.append(f"🛏 {e(item.get('layout'))}")
+        lines.append(f"<b>户型：</b>{e(item.get('layout'))}")
     if item.get("size_sqm"):
-        lines.append(f"📐 {e(item.get('size_sqm'))}㎡")
+        lines.append(f"<b>面积：</b>{e(item.get('size_sqm'))}㎡")
     if tags:
-        lines.append(f"✨ {e(tags)}")
+        lines.append(f"<b>标签：</b>{e(tags)}")
     return "\n".join(lines)
 
 
 def listing_detail(item: dict) -> str:
+    from .text_utils import clean_telegram_text, remove_test_markers, fix_duplicate_words
+    from .location_mapping import get_display_location
+
+    # 清理所有显示字段
+    title = remove_test_markers(item.get('title', ''))
+    listing_id = item.get('listing_id', '')
+    area_raw = item.get('area', '')
+    area = get_display_location(area_raw)
+    community = remove_test_markers(item.get('community', ''))
+    highlights = clean_telegram_text(item.get('highlights', ''))
+    hidden_costs = clean_telegram_text(item.get('hidden_costs', ''))
+    drawbacks = clean_telegram_text(item.get('drawbacks', ''))
+    available_date = fix_duplicate_words(item.get('available_date', ''))
+
     tags = compact_join(item.get("tags", []), " / ")
     lines = [
-        f"🏠 <b>{e(item.get('title'))}</b>",
-        f"编号：<code>{e(item.get('listing_id'))}</code>",
+        f"🏠 <b>{e(title)}</b>",
         f"💰 月租：<b>${e(item.get('price'))}</b>",
-        f"📍 区域：{e(item.get('area'))} · {e(item.get('community'))}",
+        f"<b>位置：</b>{e(area)} · {e(community)}",
     ]
     if item.get("layout"):
-        lines.append(f"🛏 户型：{e(item.get('layout'))}")
+        lines.append(f"<b>户型：</b>{e(item.get('layout'))}")
     if item.get("size_sqm"):
-        lines.append(f"📐 面积：{e(item.get('size_sqm'))}㎡")
+        lines.append(f"<b>面积：</b>{e(item.get('size_sqm'))}㎡")
     if item.get("deposit_rule"):
-        lines.append(f"🔑 押金：{e(item.get('deposit_rule'))}")
-    if item.get("available_date"):
-        lines.append(f"📅 可入住：{e(item.get('available_date'))}")
+        lines.append(f"<b>押付：</b>{e(item.get('deposit_rule'))}")
+    if available_date:
+        lines.append(f"<b>可入住：</b>{e(available_date)}")
     if tags:
-        lines.append(f"✨ 标签：{e(tags)}")
-    if item.get("highlights"):
-        lines.append(f"\n<b>亮点</b>\n{e(item.get('highlights'))}")
-    if item.get("hidden_costs"):
-        lines.append(f"\n<b>费用说明</b>\n{e(item.get('hidden_costs'))}")
-    if item.get("drawbacks"):
-        lines.append(f"\n<b>顾问提醒</b>\n{e(item.get('drawbacks'))}")
-    lines.append(f"\n💬 看中这套，点下面按钮继续。")
+        lines.append(f"<b>标签：</b>{e(tags)}")
+    if highlights:
+        lines.append(f"\n<b>亮点</b>\n{e(highlights)}")
+    if hidden_costs:
+        lines.append(f"\n<b>费用说明</b>\n{e(hidden_costs)}")
+    if drawbacks:
+        lines.append(f"\n<b>顾问提醒</b>\n{e(drawbacks)}")
+    lines.append("\n支持实地看房与实时视频代看。")
+    lines.append("<b>侨联地产｜金边华人长租服务</b>")
     return "\n".join(lines)
 
 
-def home_text() -> str:
-    advisor = (ADVISOR_TG or "").strip()
-    if advisor and not advisor.startswith("@"):
-        advisor = f"@{advisor}"
-    advisor = advisor or "@qiaolian_support"
-    return (
-        "🏠 <b>侨联地产 · 金边华人房产服务</b>\n\n"
-        "真实房源 · 实拍更新\n"
-        "公寓 · 别墅 · 商铺 · 土地\n\n"
-        "━━━━━━━━━━━━\n\n"
-        "在金边找房，找自己人\n\n"
-        f"📱 顾问：{e(advisor)}\n\n"
-        "👇 点按钮开始："
-    )
-
-
-def channel_welcome_text(first_name: str = "") -> str:
-    """首屏 /start 欢迎语（无深链参数）：精简版，保留核心动作按钮。"""
-    name_part = f" {e(first_name)}" if first_name else ""
-    return (
-        f"👋 欢迎{name_part}来到 <b>侨联找房助手</b>\n\n"
-        "找房、看房、视频代看、入住后的服务，我都可以帮你。\n\n"
-        "你可以直接告诉我需求，例如：\n\n"
-        "<code>富力800公寓</code>\n"
-        "<code>BKK一居</code>\n"
-        "<code>1000以内房子</code>\n\n"
-        "也可以点击下面入口开始："
-    )
-
-
 def discussion_entry_welcome_text(first_name: str = "", listing_id: str = "") -> str:
-    """讨论区第三段深链进入后的承接欢迎语。"""
-    name_part = f" {e(first_name)}" if first_name else ""
-    listing_line = f"🏠 房源：<code>{e(listing_id)}</code>\n\n" if listing_id else ""
-    return (
-        f"🤖 <b>侨联找房助手{name_part}</b>\n\n"
-        f"{listing_line}"
-        "已同步讨论区线索到顾问后台，继续点按钮即可：\n\n"
-        "📅 预约实地看房 / 视频代看\n"
-        "📍 按区域继续找同类房源\n"
-        "💰 按预算收窄到 1–3 套\n\n"
-        "👇 先选一个继续"
-    )
+    """讨论区深链进入文案 - 精简版"""
+    from .text_utils import remove_test_markers
+
+    # 深链落地页已废弃，深链现在直达动作
+    return ""
 
 
 def lead_capture_text() -> str:
@@ -104,13 +86,12 @@ def lead_capture_text() -> str:
 
 
 def advisor_text() -> str:
+    """联系我们页面"""
     return (
-        "✅ 已收到你的需求\n\n"
-        "侨联顾问会直接通过 Telegram 联系你确认：\n"
-        "• 房源是否还在\n"
-        "• 看房时间安排\n"
-        "• 实地看房 / 视频看房方式\n\n"
-        "你也可以继续看其他房源。"
+        "✅ <b>已收到您的需求</b>\n\n"
+        "侨联顾问会尽快通过 Telegram 联系您。\n\n"
+        "⏱️ 预计 30 分钟内响应\n"
+        f"📞 急事可直接联系：{ADVISOR_TG or '@pengqingw'}"
     )
 
 
@@ -171,16 +152,52 @@ def brand_text() -> str:
     )
 
 
-def about_text() -> str:
+def home_text() -> str:
+    """首页欢迎文案：用客户任务说明入口，不暴露内部术语。"""
     return (
-        f"🏢 <b>关于{BRAND_NAME}</b>\n\n"
-        f"{BRAND_NAME}是金边华人社区专业租房平台，核心定位是<b>你在金边的自己人</b>。\n\n"
-        "<b>我们的工作方式</b>\n"
-        "• <b>房源先筛选</b>：按预算 + 区域 + 户型先收窄到 1–3 套，减少无效看房\n"
-        "• <b>费用先对齐</b>：押付、水电、物业、网络等关键项在看房前尽量摊开说\n"
-        "• <b>过程可追踪</b>：预约、咨询、入住、售后，统一由管理号持续跟进\n"
-        "• <b>实拍可验证</b>：所有帖子均含实拍编号，入住后与帖内状态可对照\n\n"
-        "你可以先从「智能找房」或「预约看房」开始，我们会一步步协助。"
+        "🏠 <b>侨联地产｜金边租房中介</b>\n"
+        "金边华人的租房与生活服务平台\n\n"
+        "金边找房、预约看房、签约入住、租后服务，\n"
+        "都可以在这里完成。\n\n"
+        "🔍 找房：按区域、预算、户型筛选\n"
+        "🆕 最新实拍：看当前可见房源\n"
+        "🏠 我已租住：查看租约和入住服务\n\n"
+        "请选择你现在需要的服务："
+    )
+
+
+def channel_welcome_text(first_name: str = "") -> str:
+    """带称呼的统一首页文案；不依赖易失效的字符串替换。"""
+    if not first_name:
+        return home_text()
+    return f"👋 你好 <b>{e(first_name)}</b>，我是侨联小助手。\n\n{home_text()}"
+
+
+def about_text() -> str:
+    """关于侨联地产"""
+    return (
+        f"🏠 <b>{public_brand_name()}｜金边租房中介</b>\n\n"
+        "<b>我们的服务：</b>\n"
+        "✅ 看房透明 — 实拍更新，所见即所得\n"
+        "✅ 费用透明 — 无隐藏费用，提前说清\n"
+        "✅ 入住留档 — 全程记录，售后无忧\n"
+        "✅ 全程跟进 — 从看房到入住一条龙\n\n"
+        f"📱 联系我们：{ADVISOR_TG}\n"
+        f"📢 房源频道：{CHANNEL_URL}"
+    )
+
+
+def brand_text() -> str:
+    """关于侨联"""
+    return (
+        f"🏠 <b>{public_brand_name()}｜金边租房中介</b>\n\n"
+        "中文顾问帮你筛房、带看、确认费用、沟通条件并跟进签约入住。\n\n"
+        "✅ 房源先筛 — 按需求收窄到 1-3 套\n"
+        "✅ 费用透明 — 押付、水电提前说清\n"
+        "✅ 实地/视频看房\n"
+        "✅ 顾问全程跟进\n\n"
+        f"📱 联系：{ADVISOR_TG}\n"
+        f"📢 房源频道：{CHANNEL_URL}"
     )
 
 
@@ -220,7 +237,7 @@ def appointment_hub_text() -> str:
     )
 def service_hub_text() -> str:
     return (
-        "⚡ <b>入住管家</b>\n\n"
+        "🏠 <b>侨联地产 · 入住后服务</b>\n\n"
         "通过侨联租房后，如果遇到这些问题：\n\n"
         "• 空调 / 家电故障\n"
         "• 水管漏水 / 下水堵塞\n"
@@ -234,32 +251,33 @@ def service_hub_text() -> str:
 
 def help_text() -> str:
     return (
-        "<b>📘 使用说明</b>\n\n"
-        "<b>常用命令</b>\n"
-        "<code>/start</code> — 回到首页\n"
-        "<code>/find</code> — 快速找房（按钮向导）\n"
-        "<code>/favorites</code> — 我的收藏\n"
-        "<code>/appointments</code> — 我的预约\n"
-        "<code>/contact</code> — 联系顾问\n"
-        "<code>/help</code> — 本页\n\n"
-        "<b>使用方式</b>\n"
-        "• 建议优先使用页面按钮导航\n"
-        "• 只有「🎲 一句话关键词找房」需要手动输入\n"
-        "• 从频道帖子进入时，咨询与预约会自动绑定对应房源\n\n"
-        "<b>补充说明</b>\n"
-        "• 合同、押付、入住时间等问题，可直接转顾问人工确认\n"
-        "• 看中频道房源，直接点帖内「咨询 / 预约」跟进最快\n"
-        "• 老客可点下面入口登记，便于换房、续租与售后衔接"
+        "<b>📘 侨联小助手怎么用</b>\n\n"
+        "<b>🏠 找房</b>\n"
+        "点「智能找房」按区域、户型、预算筛选；"
+        "也可随时发一句 <code>BKK1 800以内 1房</code>。\n\n"
+        "<b>📅 预约看房</b>\n"
+        "先打开一套房源，再点「预约看房」。"
+        "房源编号、项目、户型和价格会自动带入，不用重新说一遍。\n\n"
+        "<b>💬 咨询房源</b>\n"
+        "房源详情页点「咨询房源」，顾问会收到对应房源信息；"
+        "也可从首页直接联系顾问。\n\n"
+        "<b>⚡ 侨联服务</b>\n"
+        "已入住用户可提交报修、物业沟通、续租、换房或退租需求。"
+        "以前在侨联租过的用户，进入「侨联服务」后可登记老客并找回租约档案。\n\n"
+        "<b>🔐 隐私与进度</b>\n"
+        "只保存完成服务所需的联系和需求记录。"
+        "「我的预约」可查看最近提交的看房安排。"
     )
 
 
 def help_repeat_keyboard() -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = [
-        [InlineKeyboardButton("🏠 我以前在侨联租过（登记）", callback_data="profile:repeat")],
+        [InlineKeyboardButton("⚡ 侨联服务", callback_data="hub:service")],
     ]
     ch = (CHANNEL_URL or "").strip()
     if ch:
         rows.append([InlineKeyboardButton("📢 频道实拍上新", url=ch)])
+    rows.append([InlineKeyboardButton("🏠 返回首页", callback_data="home")])
     return InlineKeyboardMarkup(rows)
 
 
@@ -326,16 +344,16 @@ def listing_match_intro_text() -> str:
 
 def listing_match_footer_text() -> str:
     return (
-        "\n\n<b>下一步</b>：点菜单 <b>📅 预约看房</b> 直接约到场，或 <b>💬 联系顾问</b> 让管理号帮你对比决策。"
+        "\n\n<b>下一步</b>：点菜单 <b>📅 预约看房</b> 直接约到场，或 <b>💬 联系我们</b> 让管理号帮你对比决策。"
     )
 
 
 def find_no_match_text() -> str:
     return (
         "这个条件暂时没有完全匹配的在架房源。\n\n"
-        "✅ <b>已通知顾问</b>，会优先为你盯新上的房\n\n"
+        "✅ <b>已通知管理号</b>，会优先为你盯新上的房\n\n"
         "💡 同时你可以：\n"
-        "• 点「💬 联系顾问」，人工帮你扩一圈推荐\n"
+        "• 点「💬 联系我们」，人工帮你扩一圈推荐\n"
         "• 点「🎯 重新筛选」调整预算或区域，通常可以多出不少选项\n\n"
         "<i>你的需求已同步管理号，有新房上架第一时间跟进。</i>"
     )

@@ -1,5 +1,5 @@
 # Telegram
-python-telegram-bot[job-queue]==21.*
+python-telegram-bot[job-queue,socks]==21.*
 telethon>=1.36.0
 
 # AI 解析
@@ -10,6 +10,7 @@ notion-client>=2.0.0
 
 # 图像处理
 Pillow>=10.0.0
+playwright==1.55.0
 
 # 工具
 python-dotenv>=1.2.2

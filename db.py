@@ -1,263 +1,885 @@
+from __future__ import annotations
 
-import sqlite3
-import os
 import json
-import threading
-from datetime import datetime
+import sqlite3
+from contextlib import contextmanager
+from pathlib import Path
+from typing import Any, Iterable
 
-DATABASE_PATH = os.getenv("DB_PATH", "qiaolian_dual_bot.db")
+try:
+    from .config import DB_PATH, logger
+except ImportError:
+    from config import DB_PATH, logger
 
-# Per-thread connection cache: {db_path: sqlite3.Connection}
-_thread_local = threading.local()
+LISTING_STATUSES = {"active", "pending", "reserved", "rented", "inactive"}
+
+SCHEMA = '''
+PRAGMA journal_mode=WAL;
+
+CREATE TABLE IF NOT EXISTS listings (
+    listing_id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    property_type TEXT NOT NULL,
+    area TEXT NOT NULL,
+    community TEXT NOT NULL,
+    price INTEGER NOT NULL,
+    currency TEXT NOT NULL DEFAULT 'USD',
+    layout TEXT NOT NULL DEFAULT '',
+    size_sqm TEXT NOT NULL DEFAULT '',
+    tags_json TEXT NOT NULL DEFAULT '[]',
+    highlights TEXT NOT NULL DEFAULT '',
+    hidden_costs TEXT NOT NULL DEFAULT '',
+    drawbacks TEXT NOT NULL DEFAULT '',
+    deposit_rule TEXT NOT NULL DEFAULT '',
+    available_date TEXT NOT NULL DEFAULT '',
+    media_file_id TEXT NOT NULL DEFAULT '',
+    media_type TEXT NOT NULL DEFAULT '',
+    channel_message_id INTEGER,
+    source_post_url TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'active',
+    canonical_facts_hash TEXT,
+    canonical_facts_schema TEXT,
+    public_location_key TEXT,
+    public_location_display TEXT,
+    publication_location_level TEXT,
+    canonical_area_key TEXT,
+    property_subtype TEXT,
+    project_brand TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS users (
+    user_id INTEGER PRIMARY KEY,
+    username TEXT NOT NULL DEFAULT '',
+    first_name TEXT NOT NULL DEFAULT '',
+    last_name TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    last_active_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS favorites (
+    user_id INTEGER NOT NULL,
+    listing_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, listing_id)
+);
+
+CREATE TABLE IF NOT EXISTS leads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    username TEXT NOT NULL DEFAULT '',
+    display_name TEXT NOT NULL DEFAULT '',
+    source TEXT NOT NULL DEFAULT '',
+    action TEXT NOT NULL DEFAULT '',
+    listing_id TEXT NOT NULL DEFAULT '',
+    area TEXT NOT NULL DEFAULT '',
+    property_type TEXT NOT NULL DEFAULT '',
+    budget_min INTEGER,
+    budget_max INTEGER,
+    payload_json TEXT NOT NULL DEFAULT '{}',
+    message_id INTEGER,
+    post_token TEXT NOT NULL DEFAULT '',
+    caption_variant TEXT NOT NULL DEFAULT '',
+    agent_id TEXT NOT NULL DEFAULT '',
+    response_at TEXT NOT NULL DEFAULT '',
+    conversion_value REAL NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS appointments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    username TEXT NOT NULL DEFAULT '',
+    display_name TEXT NOT NULL DEFAULT '',
+    listing_id TEXT NOT NULL DEFAULT '',
+    viewing_mode TEXT NOT NULL DEFAULT '',
+    appointment_date TEXT NOT NULL DEFAULT '',
+    appointment_time TEXT NOT NULL DEFAULT '',
+    contact_value TEXT NOT NULL DEFAULT '',
+    note TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS tenant_bindings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    binding_code TEXT NOT NULL UNIQUE,
+    property_name TEXT NOT NULL DEFAULT '',
+    lease_end_date TEXT NOT NULL DEFAULT '',
+    rent_day INTEGER,
+    monthly_rent REAL NOT NULL DEFAULT 0,
+    contract_start_date TEXT NOT NULL DEFAULT '',
+    contract_end_date TEXT NOT NULL DEFAULT '',
+    deposit_months INTEGER NOT NULL DEFAULT 2,
+    contract_notes TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'active',
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS repair_tickets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    binding_id INTEGER,
+    issue_type TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'new',
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS subscriptions (
+    user_id INTEGER PRIMARY KEY,
+    daily_enabled INTEGER NOT NULL DEFAULT 1,
+    area_alerts_json TEXT NOT NULL DEFAULT '[]',
+    lease_reminder_enabled INTEGER NOT NULL DEFAULT 1,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS renewal_tracking (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    binding_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    listing_id TEXT NOT NULL DEFAULT '',
+    renewal_status TEXT NOT NULL DEFAULT 'pending',
+    user_response TEXT NOT NULL DEFAULT '',
+    advisor_notes TEXT NOT NULL DEFAULT '',
+    contacted_at TEXT NOT NULL DEFAULT '',
+    completed_at TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS lease_reminder_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    binding_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    lease_end_date TEXT NOT NULL DEFAULT '',
+    remind_for_date TEXT NOT NULL DEFAULT '',
+    remind_type TEXT NOT NULL DEFAULT '',
+    remind_date TEXT NOT NULL DEFAULT '',
+    sent_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS publish_analytics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    draft_id TEXT NOT NULL DEFAULT '',
+    post_id TEXT NOT NULL DEFAULT '',
+    message_id INTEGER,
+    listing_id TEXT NOT NULL DEFAULT '',
+    area TEXT NOT NULL DEFAULT '',
+    property_type TEXT NOT NULL DEFAULT '',
+    monthly_rent REAL NOT NULL DEFAULT 0,
+    caption_variant TEXT NOT NULL DEFAULT 'a',
+    publish_hour INTEGER,
+    publish_day_of_week INTEGER,
+    published_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS system_config (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL
+);
+'''
+
+def row_to_dict(row: sqlite3.Row | None) -> dict[str, Any] | None:
+    if row is None:
+        return None
+    return {key: row[key] for key in row.keys()}
 
 
-class DatabaseManager:
-    def __init__(self, db_path):
-        self.db_path = db_path
-        self._create_tables()
-        self._ensure_optional_columns()
+class Database:
+    def __init__(self, path: Path | str = DB_PATH):
+        self.path = str(path)
+        Path(self.path).parent.mkdir(parents=True, exist_ok=True)
+        self.init_db()
 
-    def _get_connection(self):
-        """Return a thread-local persistent connection, creating it on first use."""
-        cache = getattr(_thread_local, "db_conns", None)
-        if cache is None:
-            _thread_local.db_conns = {}
-            cache = _thread_local.db_conns
-        conn = cache.get(self.db_path)
-        if conn is None:
-            conn = sqlite3.connect(self.db_path)
-            conn.execute("PRAGMA journal_mode=WAL")
-            # SQLite 不接受 PRAGMA busy_timeout 的 ? 占位符，需内联非负整数
-            busy_ms = max(0, int(os.getenv("SQLITE_BUSY_TIMEOUT_MS", "30000")))
-            conn.execute(f"PRAGMA busy_timeout={busy_ms}")
-            cache[self.db_path] = conn
-        return conn
-
-    def _create_tables(self):
-        # This method is for initial table creation if the DB is empty.
-        # For migration, we use separate SQL scripts.
-        pass
-
-    def _ensure_optional_columns(self):
-        """Best-effort schema evolution for additive fields used by newer parsers."""
-        conn = self._get_connection()
-        cur = conn.cursor()
-        cur.execute("PRAGMA table_info(drafts)")
-        cols = {str(r[1]) for r in (cur.fetchall() or [])}
-        alters = []
-        if "water_rate" not in cols:
-            alters.append("ALTER TABLE drafts ADD COLUMN water_rate TEXT")
-        if "electric_rate" not in cols:
-            alters.append("ALTER TABLE drafts ADD COLUMN electric_rate TEXT")
-        if "queue_score" not in cols:
-            alters.append("ALTER TABLE drafts ADD COLUMN queue_score INTEGER")
-        if "review_note" not in cols:
-            alters.append("ALTER TABLE drafts ADD COLUMN review_note TEXT")
-        for sql in alters:
-            cur.execute(sql)
-        if alters:
-            conn.commit()
-
-    def _execute_query(self, query, params=()):
-        conn = self._get_connection()
-        cursor = conn.cursor()
+    @contextmanager
+    def connect(self):
+        conn = sqlite3.connect(self.path)
+        conn.row_factory = sqlite3.Row
         try:
-            cursor.execute(query, params)
+            yield conn
             conn.commit()
-            return cursor
-        except sqlite3.Error as e:
-            print(f"Database error: {e}")
-            conn.rollback()
-            raise
+        finally:
+            conn.close()
 
-    def _fetch_one(self, query, params=()):
-        conn = self._get_connection()
-        cursor = conn.cursor()
-        cursor.execute(query, params)
-        return cursor.fetchone()
+    def init_db(self) -> None:
+        with self.connect() as conn:
+            conn.executescript(SCHEMA)
+            self._ensure_column(conn, "leads", "message_id", "INTEGER")
+            self._ensure_column(conn, "leads", "post_token", "TEXT NOT NULL DEFAULT ''")
+            self._ensure_column(conn, "leads", "caption_variant", "TEXT NOT NULL DEFAULT ''")
+            self._ensure_column(conn, "leads", "agent_id", "TEXT NOT NULL DEFAULT ''")
+            self._ensure_column(conn, "leads", "response_at", "TEXT NOT NULL DEFAULT ''")
+            self._ensure_column(conn, "leads", "conversion_value", "REAL NOT NULL DEFAULT 0")
+            # 顾问分配字段
+            self._ensure_column(conn, "leads", "advisor_id", "TEXT NOT NULL DEFAULT ''")
+            self._ensure_column(conn, "leads", "advisor_name", "TEXT NOT NULL DEFAULT ''")
+            self._ensure_column(conn, "leads", "assigned_at", "TEXT NOT NULL DEFAULT ''")
+            # 客户意图标签
+            self._ensure_column(conn, "leads", "intent", "TEXT NOT NULL DEFAULT ''")
+            self._ensure_column(conn, "leads", "lead_status", "TEXT NOT NULL DEFAULT 'new'")
+            # 性能索引（IF NOT EXISTS，不破坏已有数据）
+            conn.executescript("""
+                CREATE INDEX IF NOT EXISTS idx_listings_status_created
+                    ON listings(status, created_at);
+                CREATE INDEX IF NOT EXISTS idx_listings_area_price
+                    ON listings(area, price);
+                CREATE INDEX IF NOT EXISTS idx_leads_user_created
+                    ON leads(user_id, created_at);
+                CREATE INDEX IF NOT EXISTS idx_leads_listing_action
+                    ON leads(listing_id, action);
+                CREATE INDEX IF NOT EXISTS idx_appointments_user_status
+                    ON appointments(user_id, status);
+            """)
 
-    def _fetch_all(self, query, params=()):
-        conn = self._get_connection()
-        cursor = conn.cursor()
-        cursor.execute(query, params)
-        return cursor.fetchall()
+    def _table_columns(self, table: str) -> set[str]:
+        with self.connect() as conn:
+            rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
+        return {str(row["name"]) for row in rows}
 
-    # --- Operation-specific functions ---
+    @staticmethod
+    def _ensure_column(conn: sqlite3.Connection, table: str, column: str, ddl: str) -> None:
+        cols = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+        if column in cols:
+            return
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
 
-    def save_source_post(self, source_id, source_type, source_name, source_post_id, source_url, source_author, raw_text, raw_images_json, raw_videos_json, raw_contact, raw_meta_json, dedupe_hash, parse_status='pending'):
-        query = """
-        INSERT INTO source_posts (
-            source_id, source_type, source_name, source_post_id, source_url, source_author,
-            raw_text, raw_images_json, raw_videos_json, raw_contact, raw_meta_json, dedupe_hash,
-            parse_status, fetched_at, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        """
-        conn = self._get_connection()
-        cur = conn.cursor()
-        cur.execute(
-            query,
-            (
-                source_id,
-                source_type,
-                source_name,
-                source_post_id,
-                source_url,
-                source_author,
-                raw_text,
-                json.dumps(raw_images_json),
-                json.dumps(raw_videos_json),
-                raw_contact,
-                json.dumps(raw_meta_json),
-                dedupe_hash,
-                parse_status,
-            ),
-        )
-        conn.commit()
-        return int(cur.lastrowid)
+    def upsert_user(self, user_id: int, username: str, first_name: str, last_name: str, ts: str) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                '''
+                INSERT INTO users (user_id, username, first_name, last_name, created_at, last_active_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    username=excluded.username,
+                    first_name=excluded.first_name,
+                    last_name=excluded.last_name,
+                    last_active_at=excluded.last_active_at
+                ''',
+                (user_id, username or "", first_name or "", last_name or "", ts, ts),
+            )
 
-    def create_draft(self, draft_id, source_post_id, title, project, community, area, property_type, price, layout, size, floor, deposit, available_date, highlights, drawbacks, advisor_comment, cost_notes, extracted_data, normalized_data, review_status='pending', operator_user_id=None, cover_asset_id=None, water_rate=None, electric_rate=None, queue_score=None, review_note=None):
-        query = """
-        INSERT INTO drafts (
-            draft_id, source_post_id, listing_id, title, project, community, area, property_type, price, layout, size, floor, deposit, available_date,
-            highlights, drawbacks, advisor_comment, cost_notes, extracted_data, normalized_data, review_status, operator_user_id, cover_asset_id,
-            water_rate, electric_rate, queue_score, review_note,
-            created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        """
-        conn = self._get_connection()
-        cur = conn.cursor()
-        cur.execute(
-            query,
-            (
-                draft_id,
-                source_post_id,
-                None,
-                title,
-                project,
-                community,
-                area,
-                property_type,
-                price,
-                layout,
-                size,
-                floor,
-                deposit,
-                available_date,
-                json.dumps(highlights),
-                json.dumps(drawbacks),
-                advisor_comment,
-                cost_notes,
-                extracted_data,
-                normalized_data,
-                review_status,
-                operator_user_id,
-                cover_asset_id,
-                water_rate,
-                electric_rate,
-                queue_score,
-                review_note,
-            ),
-        )
-        conn.commit()
-        return int(cur.lastrowid)
+    def next_listing_id(self) -> str:
+        with self.connect() as conn:
+            rows = conn.execute(
+                "SELECT listing_id FROM listings WHERE listing_id LIKE 'l_%'"
+            ).fetchall()
+        numbers = []
+        for row in rows:
+            raw = str(row["listing_id"] or "")
+            if raw.startswith("l_") and raw[2:].isdigit():
+                numbers.append(int(raw[2:]))
+        if numbers:
+            return f"l_{max(numbers) + 1}"
+        return "l_1001"
 
-    def update_draft(self, draft_id, **kwargs):
-        set_clauses = []
-        params = []
-        for key, value in kwargs.items():
-            if key in ['highlights', 'drawbacks'] and isinstance(value, list):
-                value = json.dumps(value)
-            set_clauses.append(f"{key} = ?")
-            params.append(value)
-        params.append(datetime.now().strftime("%Y-%m-%d %H:%M:%S")) # updated_at
-        params.append(draft_id)
+    def create_listing(self, data: dict[str, Any]) -> None:
+        tags_json = json.dumps(data.get("tags", []), ensure_ascii=False)
+        with self.connect() as conn:
+            conn.execute(
+                '''
+                INSERT INTO listings (
+                    listing_id, title, property_type, area, community, price, currency, layout, size_sqm,
+                    tags_json, highlights, hidden_costs, drawbacks, deposit_rule, available_date,
+                    media_file_id, media_type, channel_message_id, source_post_url, status, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''',
+                (
+                    data["listing_id"],
+                    data["title"],
+                    data["property_type"],
+                    data["area"],
+                    data["community"],
+                    int(data["price"]),
+                    data.get("currency", "USD"),
+                    data.get("layout", ""),
+                    data.get("size_sqm", ""),
+                    tags_json,
+                    data.get("highlights", ""),
+                    data.get("hidden_costs", ""),
+                    data.get("drawbacks", ""),
+                    data.get("deposit_rule", ""),
+                    data.get("available_date", ""),
+                    data.get("media_file_id", ""),
+                    data.get("media_type", ""),
+                    data.get("channel_message_id"),
+                    data.get("source_post_url", ""),
+                    data.get("status", "active"),
+                    data["created_at"],
+                    data["updated_at"],
+                ),
+            )
 
-        query = f"UPDATE drafts SET {', '.join(set_clauses)}, updated_at = ? WHERE draft_id = ?"
-        self._execute_query(query, tuple(params))
+    def update_listing_publish_meta(self, listing_id: str, *, channel_message_id: int | None, source_post_url: str) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                "UPDATE listings SET channel_message_id=?, source_post_url=?, updated_at=datetime('now', 'localtime') WHERE listing_id=?",
+                (channel_message_id, source_post_url, listing_id),
+            )
 
-    def approve_draft(self, draft_id, operator_user_id):
-        query = "UPDATE drafts SET review_status = ?, operator_user_id = ?, approved_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE draft_id = ?"
-        self._execute_query(query, (
-            'approved', operator_user_id, draft_id
-        ))
+    def update_listing_status(self, listing_id: str, status: str) -> bool:
+        if status not in LISTING_STATUSES:
+            return False
+        with self.connect() as conn:
+            cur = conn.execute(
+                "UPDATE listings SET status=?, updated_at=datetime('now', 'localtime') WHERE listing_id=?",
+                (status, listing_id),
+            )
+            return cur.rowcount > 0
 
-    def create_listing_from_draft(self, draft_id, listing_data):
-        # This function would typically interact with the existing 'listings' table.
-        # As per instructions, we are not modifying existing tables, so this is a placeholder.
-        # In a real scenario, 'listing_data' would be inserted into the 'listings' table.
-        # For now, we'll just update the draft's listing_id.
-        listing_id = f"LST_{datetime.now().strftime('%Y%m%d%H%M%S%f')}" # Generate a dummy listing_id
-        self.update_draft(draft_id, listing_id=listing_id, published_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        return listing_id
+    def list_listings_by_status(self, status: str, limit: int = 20) -> list[dict[str, Any]]:
+        """管理员房态列表。status=all 时返回最近房源。"""
+        normalized = str(status or "").strip().lower()
+        with self.connect() as conn:
+            if normalized == "all":
+                rows = conn.execute(
+                    "SELECT * FROM listings ORDER BY updated_at DESC, created_at DESC LIMIT ?",
+                    (int(limit),),
+                ).fetchall()
+            elif normalized in LISTING_STATUSES:
+                rows = conn.execute(
+                    "SELECT * FROM listings WHERE status=? ORDER BY updated_at DESC, created_at DESC LIMIT ?",
+                    (normalized, int(limit)),
+                ).fetchall()
+            else:
+                return []
+        return [row_to_dict(row) or {} for row in rows]
 
-    def save_media_asset(self, asset_id, owner_type, owner_ref_id, owner_ref_key, asset_type, source_type, source_url, source_file_id, local_path, file_url, file_hash, telegram_file_id, telegram_file_unique_id, media_type, is_watermarked=0, is_cover=0, sort_order=0, width=None, height=None, duration=None, file_size=None, mime_type=None, meta_json=None, status='active'):
-        query = """
-        INSERT INTO media_assets (
-            asset_id, owner_type, owner_ref_id, owner_ref_key, asset_type, source_type, source_url, source_file_id,
-            local_path, file_url, file_hash, telegram_file_id, telegram_file_unique_id, media_type, is_watermarked,
-            is_cover, sort_order, width, height, duration, file_size, mime_type, meta_json, status,
-            created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        """
-        conn = self._get_connection()
-        cur = conn.cursor()
-        cur.execute(
-            query,
-            (
-                asset_id,
-                owner_type,
-                owner_ref_id,
-                owner_ref_key,
-                asset_type,
-                source_type,
-                source_url,
-                source_file_id,
-                local_path,
-                file_url,
-                file_hash,
-                telegram_file_id,
-                telegram_file_unique_id,
-                media_type,
-                is_watermarked,
-                is_cover,
-                sort_order,
-                width,
-                height,
-                duration,
-                file_size,
-                mime_type,
-                json.dumps(meta_json) if meta_json else None,
-                status,
-            ),
-        )
-        conn.commit()
-        return int(cur.lastrowid)
 
-    def create_post_record(self, post_id, listing_id, draft_id, platform, channel_chat_id, channel_message_id, media_group_id, caption_message_id, button_message_id, discuss_chat_id, discuss_thread_id, discuss_message_id, notion_page_id, platform_post_id, post_url, publish_version=1, publish_status='published', post_text=None, comment_text=None, published_by=None):
-        query = """
-        INSERT INTO posts (
-            post_id, listing_id, draft_id, platform, channel_chat_id, channel_message_id, media_group_id, caption_message_id,
-            button_message_id, discuss_chat_id, discuss_thread_id, discuss_message_id, notion_page_id, platform_post_id,
-            post_url, publish_version, publish_status, post_text, comment_text, published_by, published_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        """
-        self._execute_query(query, (
-            post_id, listing_id, draft_id, platform, channel_chat_id, channel_message_id, media_group_id, caption_message_id,
-            button_message_id, discuss_chat_id, discuss_thread_id, discuss_message_id, notion_page_id, platform_post_id,
-            post_url, publish_version, publish_status, post_text, comment_text, published_by
-        ))
-        return self._fetch_one("SELECT last_insert_rowid()")[0]
+    def get_listing(self, listing_id: str) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            row = conn.execute("SELECT * FROM listings WHERE listing_id=?", (listing_id,)).fetchone()
+        item = row_to_dict(row)
+        if item:
+            item["tags"] = json.loads(item.pop("tags_json", "[]") or "[]")
+        return item
 
-    def write_publish_log(self, log_id, post_id, draft_id, listing_id, target_type, target_ref, action, status, attempt_no=1, request_payload=None, response_payload=None, error_code=None, error_message=None, log_message=None, log_level='INFO', started_at=None, finished_at=None):
-        query = """
-        INSERT INTO publish_logs (
-            log_id, post_id, draft_id, listing_id, target_type, target_ref, action, status, attempt_no,
-            request_payload, response_payload, error_code, error_message, log_message, log_level, started_at, finished_at,
-            created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-        """
-        self._execute_query(query, (
-            log_id, post_id, draft_id, listing_id, target_type, target_ref, action, status, attempt_no,
-            json.dumps(request_payload) if request_payload else None, json.dumps(response_payload) if response_payload else None, error_code, error_message, log_message, log_level, started_at, finished_at
-        ))
-        return self._fetch_one("SELECT last_insert_rowid()")[0]
+    def list_recent_listings(self, limit: int = 10) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM listings WHERE status='active' ORDER BY created_at DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+        result = []
+        for row in rows:
+            item = row_to_dict(row) or {}
+            item["tags"] = json.loads(item.pop("tags_json", "[]") or "[]")
+            result.append(item)
+        return result
+
+    def search_listings(
+        self,
+        *,
+        property_type: str | None = None,
+        areas: Iterable[str] | None = None,
+        budget_min: int | None = None,
+        budget_max: int | None = None,
+        ilike_fragment: str | None = None,
+        limit: int = 6,
+    ) -> list[dict[str, Any]]:
+        clauses = ["status='active'"]
+        params: list[Any] = []
+        if property_type:
+            clauses.append("property_type=?")
+            params.append(property_type)
+        cleaned_areas = [area for area in (areas or []) if area and area != "不限"]
+        if cleaned_areas:
+            placeholders = ",".join("?" for _ in cleaned_areas)
+            clauses.append(f"area IN ({placeholders})")
+            params.extend(cleaned_areas)
+        if budget_min is not None:
+            clauses.append("price>=?")
+            params.append(budget_min)
+        if budget_max is not None:
+            clauses.append("price<=?")
+            params.append(budget_max)
+        frag = (ilike_fragment or "").strip()
+        if frag:
+            k = f"%{frag[:120]}%"
+            like_cols = [
+                "title",
+                "highlights",
+                "layout",
+                "area",
+                "community",
+                "tags_json",
+                "hidden_costs",
+                "drawbacks",
+            ]
+            existing = self._table_columns("listings")
+            like_cols = [c for c in like_cols if c in existing]
+            if like_cols:
+                clauses.append("(" + " OR ".join(f"{c} LIKE ?" for c in like_cols) + ")")
+                params.extend([k] * len(like_cols))
+        sql = f"SELECT * FROM listings WHERE {' AND '.join(clauses)} ORDER BY created_at DESC LIMIT ?"
+        params.append(limit)
+        with self.connect() as conn:
+            rows = conn.execute(sql, params).fetchall()
+        items: list[dict[str, Any]] = []
+        for row in rows:
+            item = row_to_dict(row) or {}
+            item["tags"] = json.loads(item.pop("tags_json", "[]") or "[]")
+            items.append(item)
+        return items
+
+    def favorite_listing(self, user_id: int, listing_id: str, created_at: str) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                "INSERT OR IGNORE INTO favorites (user_id, listing_id, created_at) VALUES (?, ?, ?)",
+                (user_id, listing_id, created_at),
+            )
+
+    def unfavorite_listing(self, user_id: int, listing_id: str) -> None:
+        with self.connect() as conn:
+            conn.execute("DELETE FROM favorites WHERE user_id=? AND listing_id=?", (user_id, listing_id))
+
+    def is_favorite(self, user_id: int, listing_id: str) -> bool:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT 1 FROM favorites WHERE user_id=? AND listing_id=?",
+                (user_id, listing_id),
+            ).fetchone()
+        return row is not None
+
+    def list_favorites(self, user_id: int) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                '''
+                SELECT l.* FROM favorites f
+                JOIN listings l ON l.listing_id = f.listing_id
+                WHERE f.user_id=?
+                ORDER BY f.created_at DESC
+                ''',
+                (user_id,),
+            ).fetchall()
+        items: list[dict[str, Any]] = []
+        for row in rows:
+            item = row_to_dict(row) or {}
+            item["tags"] = json.loads(item.pop("tags_json", "[]") or "[]")
+            items.append(item)
+        return items
+
+    def create_lead(self, data: dict[str, Any]) -> int:
+        with self.connect() as conn:
+            cur = conn.execute(
+                '''
+                INSERT INTO leads (
+                    user_id, username, display_name, source, action, listing_id, area,
+                    property_type, budget_min, budget_max, payload_json, message_id, post_token,
+                    caption_variant, agent_id, response_at, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''',
+                (
+                    data.get("user_id"),
+                    data.get("username", ""),
+                    data.get("display_name", ""),
+                    data.get("source", ""),
+                    data.get("action", ""),
+                    data.get("listing_id", ""),
+                    data.get("area", ""),
+                    data.get("property_type", ""),
+                    data.get("budget_min"),
+                    data.get("budget_max"),
+                    json.dumps(data.get("payload", {}), ensure_ascii=False),
+                    data.get("message_id"),
+                    data.get("post_token", ""),
+                    data.get("caption_variant", ""),
+                    data.get("agent_id", ""),
+                    data.get("response_at", ""),
+                    data["created_at"],
+                ),
+            )
+            return int(cur.lastrowid)
+
+    def mark_lead_responded(self, lead_id: int, *, agent_id: str, response_at: str) -> bool:
+        with self.connect() as conn:
+            cur = conn.execute(
+                """
+                UPDATE leads
+                SET agent_id=?, response_at=?
+                WHERE id=?
+                """,
+                (agent_id or "", response_at or "", int(lead_id)),
+            )
+            return cur.rowcount > 0
+
+    def update_lead_workflow(
+        self,
+        lead_id: int,
+        *,
+        status: str,
+        advisor_id: str = "",
+        advisor_name: str = "",
+    ) -> bool:
+        allowed = {"new", "claimed", "contacted", "invalid", "converted"}
+        if status not in allowed:
+            return False
+        with self.connect() as conn:
+            cur = conn.execute(
+                """
+                UPDATE leads
+                SET lead_status=?,
+                    advisor_id=CASE WHEN ?<>'' THEN ? ELSE advisor_id END,
+                    advisor_name=CASE WHEN ?<>'' THEN ? ELSE advisor_name END,
+                    assigned_at=CASE WHEN ?='claimed' THEN datetime('now', 'localtime') ELSE assigned_at END,
+                    response_at=CASE WHEN ?='contacted' THEN datetime('now', 'localtime') ELSE response_at END
+                WHERE id=?
+                """,
+                (
+                    status,
+                    advisor_id,
+                    advisor_id,
+                    advisor_name,
+                    advisor_name,
+                    status,
+                    status,
+                    int(lead_id),
+                ),
+            )
+            return cur.rowcount > 0
+
+    def create_appointment(self, data: dict[str, Any]) -> int:
+        with self.connect() as conn:
+            cur = conn.execute(
+                '''
+                INSERT INTO appointments (
+                    user_id, username, display_name, listing_id, viewing_mode,
+                    appointment_date, appointment_time, contact_value, note, status, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''',
+                (
+                    data["user_id"],
+                    data.get("username", ""),
+                    data.get("display_name", ""),
+                    data.get("listing_id", ""),
+                    data.get("viewing_mode", ""),
+                    data.get("appointment_date", ""),
+                    data.get("appointment_time", ""),
+                    data.get("contact_value", ""),
+                    data.get("note", ""),
+                    data.get("status", "pending"),
+                    data["created_at"],
+                ),
+            )
+            return int(cur.lastrowid)
+
+    def list_appointments(self, user_id: int, limit: int = 10) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM appointments WHERE user_id=? ORDER BY created_at DESC LIMIT ?",
+                (user_id, limit),
+            ).fetchall()
+        return [row_to_dict(row) or {} for row in rows]
+
+    def update_appointment_status(self, appointment_id: int, status: str) -> bool:
+        allowed = {"pending", "assigned", "contacted", "confirmed", "done", "cancelled"}
+        if status not in allowed:
+            return False
+        with self.connect() as conn:
+            cur = conn.execute(
+                "UPDATE appointments SET status=? WHERE id=?",
+                (status, int(appointment_id)),
+            )
+            return cur.rowcount > 0
+
+    def create_binding(
+        self,
+        user_id: int,
+        binding_code: str,
+        property_name: str,
+        lease_end_date: str,
+        rent_day: int | None,
+        created_at: str,
+        status: str = "active",
+    ) -> int:
+        with self.connect() as conn:
+            cur = conn.execute(
+                '''
+                INSERT INTO tenant_bindings (
+                    user_id, binding_code, property_name, lease_end_date, rent_day,
+                    monthly_rent, contract_start_date, contract_end_date, deposit_months, contract_notes,
+                    status, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, 0, '', '', 2, '', ?, ?)
+                ''',
+                (user_id, binding_code, property_name, lease_end_date, rent_day, status, created_at),
+            )
+            return int(cur.lastrowid)
+
+    def get_active_binding(self, user_id: int) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM tenant_bindings WHERE user_id=? AND status='active' ORDER BY id DESC LIMIT 1",
+                (user_id,),
+            ).fetchone()
+        return row_to_dict(row)
+
+    def get_binding_by_id(self, binding_id: int) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM tenant_bindings WHERE id=? LIMIT 1",
+                (binding_id,),
+            ).fetchone()
+        return row_to_dict(row)
+
+    def list_active_bindings_by_property(self, keyword: str) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT b.*, u.first_name, u.username
+                FROM tenant_bindings b
+                LEFT JOIN users u ON u.user_id = b.user_id
+                WHERE b.status='active'
+                  AND b.property_name LIKE ?
+                ORDER BY b.id ASC
+                """,
+                (f"%{keyword.strip()}%",),
+            ).fetchall()
+        return [row_to_dict(row) or {} for row in rows]
+
+    def list_all_active_bindings(self) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT b.*, u.first_name, u.username
+                FROM tenant_bindings b
+                LEFT JOIN users u ON u.user_id = b.user_id
+                WHERE b.status='active'
+                  AND b.user_id > 0
+                ORDER BY b.id ASC
+                """,
+            ).fetchall()
+        return [row_to_dict(row) or {} for row in rows]
+
+    def list_bindings_with_rent_day(self, day: int) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT b.*, u.first_name, u.username
+                FROM tenant_bindings b
+                LEFT JOIN users u ON u.user_id = b.user_id
+                WHERE b.status='active'
+                  AND b.rent_day = ?
+                ORDER BY b.id ASC
+                """,
+                (day,),
+            ).fetchall()
+        return [row_to_dict(row) or {} for row in rows]
+
+    def list_bindings_expiring_on(self, date_str: str) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT b.*, u.first_name, u.username
+                FROM tenant_bindings b
+                LEFT JOIN users u ON u.user_id = b.user_id
+                WHERE b.status='active'
+                  AND COALESCE(NULLIF(b.contract_end_date, ''), b.lease_end_date) = ?
+                ORDER BY b.id ASC
+                """,
+                (date_str,),
+            ).fetchall()
+        return [row_to_dict(row) or {} for row in rows]
+
+    def bind_by_code(self, user_id: int, binding_code: str) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                """
+                SELECT *
+                FROM tenant_bindings
+                WHERE binding_code=?
+                  AND COALESCE(NULLIF(status, ''), 'pending') NOT IN ('expired', 'inactive', 'used', 'cancelled')
+                LIMIT 1
+                """,
+                (binding_code,),
+            ).fetchone()
+            if row is None:
+                return None
+            owner_user_id = int(row["user_id"] or 0)
+            if owner_user_id not in (0, user_id):
+                return None
+            conn.execute(
+                "UPDATE tenant_bindings SET user_id=?, status='active' WHERE id=?",
+                (user_id, row["id"]),
+            )
+            refreshed = conn.execute(
+                "SELECT * FROM tenant_bindings WHERE id=? LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+        return row_to_dict(refreshed)
+
+    def create_repair_ticket(self, user_id: int, binding_id: int | None, issue_type: str, description: str, created_at: str) -> int:
+        with self.connect() as conn:
+            cur = conn.execute(
+                '''
+                INSERT INTO repair_tickets (user_id, binding_id, issue_type, description, status, created_at)
+                VALUES (?, ?, ?, ?, 'new', ?)
+                ''',
+                (user_id, binding_id, issue_type, description, created_at),
+            )
+            return int(cur.lastrowid)
+
+    def create_renewal_tracking(
+        self,
+        *,
+        binding_id: int,
+        user_id: int,
+        listing_id: str = "",
+        renewal_status: str = "pending",
+        user_response: str = "",
+        advisor_notes: str = "",
+        created_at: str,
+    ) -> int:
+        with self.connect() as conn:
+            cur = conn.execute(
+                """
+                INSERT INTO renewal_tracking (
+                    binding_id, user_id, listing_id, renewal_status, user_response, advisor_notes, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    binding_id,
+                    user_id,
+                    listing_id or "",
+                    renewal_status or "pending",
+                    user_response or "",
+                    advisor_notes or "",
+                    created_at,
+                ),
+            )
+            return int(cur.lastrowid)
+
+    def get_open_renewal_tracking(self, *, binding_id: int, user_id: int) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                """
+                SELECT *
+                FROM renewal_tracking
+                WHERE binding_id=?
+                  AND user_id=?
+                  AND COALESCE(NULLIF(renewal_status, ''), 'pending') NOT IN ('completed', 'cancelled', 'closed')
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                (binding_id, user_id),
+            ).fetchone()
+        return row_to_dict(row)
+
+    def has_reminder_sent(self, *, binding_id: int, remind_type: str, remind_date: str) -> bool:
+        with self.connect() as conn:
+            row = conn.execute(
+                """
+                SELECT 1
+                FROM lease_reminder_logs
+                WHERE binding_id=?
+                  AND remind_type=?
+                  AND COALESCE(NULLIF(remind_date, ''), remind_for_date) = ?
+                LIMIT 1
+                """,
+                (binding_id, remind_type, remind_date),
+            ).fetchone()
+        return row is not None
+
+    def log_reminder_sent(
+        self,
+        *,
+        binding_id: int,
+        user_id: int,
+        lease_end_date: str,
+        remind_for_date: str,
+        remind_type: str,
+        sent_at: str,
+    ) -> int:
+        with self.connect() as conn:
+            cur = conn.execute(
+                """
+                INSERT INTO lease_reminder_logs (
+                    binding_id, user_id, lease_end_date, remind_for_date, remind_type, remind_date, sent_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    binding_id,
+                    user_id,
+                    lease_end_date or "",
+                    remind_for_date or "",
+                    remind_type or "",
+                    remind_for_date or "",
+                    sent_at,
+                ),
+            )
+            return int(cur.lastrowid)
+
+    def get_subscription(self, user_id: int) -> dict[str, Any]:
+        with self.connect() as conn:
+            row = conn.execute("SELECT * FROM subscriptions WHERE user_id=?", (user_id,)).fetchone()
+        if row is None:
+            return {
+                "user_id": user_id,
+                "daily_enabled": 1,
+                "area_alerts_json": "[]",
+                "lease_reminder_enabled": 1,
+            }
+        return row_to_dict(row) or {}
+
+    def is_lease_reminder_enabled(self, user_id: int) -> bool:
+        sub = self.get_subscription(user_id)
+        return int(sub.get("lease_reminder_enabled", 1) or 1) == 1
+
+    def toggle_daily_subscription(self, user_id: int, updated_at: str) -> dict[str, Any]:
+        current = self.get_subscription(user_id)
+        new_value = 0 if int(current.get("daily_enabled", 1)) else 1
+        with self.connect() as conn:
+            conn.execute(
+                '''
+                INSERT INTO subscriptions (user_id, daily_enabled, area_alerts_json, lease_reminder_enabled, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    daily_enabled=excluded.daily_enabled,
+                    updated_at=excluded.updated_at
+                ''',
+                (user_id, new_value, current.get("area_alerts_json", "[]"), current.get("lease_reminder_enabled", 1), updated_at),
+            )
+        return self.get_subscription(user_id)
+
+    def toggle_lease_reminder(self, user_id: int, updated_at: str) -> dict[str, Any]:
+        current = self.get_subscription(user_id)
+        new_value = 0 if int(current.get("lease_reminder_enabled", 1) or 1) else 1
+        with self.connect() as conn:
+            conn.execute(
+                '''
+                INSERT INTO subscriptions (user_id, daily_enabled, area_alerts_json, lease_reminder_enabled, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    lease_reminder_enabled=excluded.lease_reminder_enabled,
+                    updated_at=excluded.updated_at
+                ''',
+                (user_id, current.get("daily_enabled", 1), current.get("area_alerts_json", "[]"), new_value, updated_at),
+            )
+        return self.get_subscription(user_id)
+
+    def stats(self) -> dict[str, int]:
+        with self.connect() as conn:
+            listings = conn.execute("SELECT COUNT(*) AS c FROM listings").fetchone()["c"]
+            active = conn.execute("SELECT COUNT(*) AS c FROM listings WHERE status='active'").fetchone()["c"]
+            leads = conn.execute("SELECT COUNT(*) AS c FROM leads").fetchone()["c"]
+            appointments = conn.execute("SELECT COUNT(*) AS c FROM appointments").fetchone()["c"]
+            favorites = conn.execute("SELECT COUNT(*) AS c FROM favorites").fetchone()["c"]
+        return {
+            "listings": int(listings),
+            "active_listings": int(active),
+            "leads": int(leads),
+            "appointments": int(appointments),
+            "favorites": int(favorites),
+        }
+
+
+db = Database()
+
+# Backwards-compatible collector import.  The collector implementation lives
+# in collector_db_compat.py; exporting the same class here preserves the legacy
+# ``from db import DatabaseManager`` contract without duplicating either data
+# access implementation.
+from collector_db_compat import DatabaseManager  # noqa: E402,F401

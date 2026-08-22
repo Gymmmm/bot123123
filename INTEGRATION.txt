@@ -121,7 +121,7 @@ sudo systemctl restart qiaolian-publisher-bot.service
 ----------------
 OPENROUTER_API_KEY
 PUBLISHER_BOT_TOKEN
-PUBLISHER_BOT_USERNAME（可选，人类可读，如 meihua666bot；与发帖 Token 对应）
+PUBLISHER_BOT_USERNAME（可选，人类可读；当前正式发帖 Bot 为 AAAutopilotbot，必须与发帖 Token 对应）
 CHANNEL_ID
 ADMIN_IDS
 DB_PATH（或默认 data/qiaolian_dual_bot.db）

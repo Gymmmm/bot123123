@@ -5,7 +5,7 @@ from pathlib import Path
 from qiaolian_dual.preflight import validate_environment
 
 
-VALID_TOKEN = "123456789:abcdefghijklmnopqrstuvwxyzABCDE"
+VALID_TOKEN = "123456789:abcdefghijklmnopqrstuvwxyz_ABCDE"
 
 
 class PreflightTests(unittest.TestCase):

@@ -1,4 +1,5 @@
 .env
+*.log
 .venv/
 __pycache__/
 *.pyc
@@ -18,3 +19,4 @@ plans/
 data/
 media/
 reports/
+work/

@@ -1,0 +1,66 @@
+{
+  "release_id": "qiaolian-final-verified-20260822-r3",
+  "executed_at": "2026-08-22T10:05:00+07:00",
+  "timezone": "Asia/Phnom_Penh",
+  "scope": "isolated workspace only; no SSH, production DB/service, Telegram API, channel or user mutation",
+  "retest_baseline": {
+    "source": "user-supplied independent retest report",
+    "initial_result": "17 failed, 134 passed, 2 skipped",
+    "accepted_as_blocking": true
+  },
+  "static_checks": {
+    "python_compileall": "passed",
+    "zip_secret_policy": "passed; no env, DB, session, private key or certificate payload",
+    "clean_release_python_files_compiled": 172,
+    "canonical_cover_boundary_tests": "passed",
+    "legacy_direct_sender_gate_tests": "passed"
+  },
+  "full_test_suite": {
+    "status": "passed",
+    "command": "PYTHONPATH=.testenv/lib/python3.12/site-packages python3 -m pytest -q",
+    "passed": 156,
+    "failed": 0,
+    "skipped": 2,
+    "warnings": 66,
+    "subtests_passed": 21,
+    "duration_seconds": 3.81
+  },
+  "fixed_failure_groups": {
+    "appointment_and_user_journey_contract": "fixed_and_passed",
+    "publish_failure_returns_pending": "fixed_and_passed",
+    "cold_intake_listings_schema": "fixed_and_passed",
+    "home_channel_brand_and_deeplink_contract": "fixed_and_passed",
+    "canonical_first_cover_mapping": "fixed_and_passed",
+    "csv_and_batch_frozen_package_gate": "fixed_and_passed"
+  },
+  "database": {
+    "cold_schema_includes_listings": true,
+    "materializer_idempotently_creates_listings": true,
+    "local_intake_e2e": "passed",
+    "production_database_accessed": false
+  },
+  "cover_renderer": {
+    "canonical_first_mapping": "passed",
+    "rent_and_sale_suffix_regression": "passed",
+    "five_template_playwright_previous_independent_result": "passed",
+    "five_template_playwright_after_r3_in_current_container": "unable_to_verify",
+    "reason": "container denies Chromium process singleton socket",
+    "production_visual_preflight_required": true
+  },
+  "publishing_safety": {
+    "missing_or_unapproved_package_returns_pending": "passed",
+    "scheduler_orphan_ready_item_returns_pending": "passed",
+    "publish_ready_batch_requires_draft_and_package_approved": "passed",
+    "csv_direct_send": "disabled",
+    "legacy_zufang555_direct_send": "disabled",
+    "sample_sender_uses_only_frozen_approved_post_text": "passed",
+    "telegram_messages_sent": 0
+  },
+  "production_mutations": {
+    "ssh_connections": 0,
+    "database_writes": 0,
+    "service_actions": 0,
+    "telegram_messages": 0
+  },
+  "overall": "code_acceptance_passed_production_preflight_required"
+}
