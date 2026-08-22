@@ -33,14 +33,14 @@ class PublishTagsTests(unittest.TestCase):
             "highlights": ["全家具", "24小时安保"],
         }
         caption = build_chinese_listing_post(draft)
-        # Tags are on the last line
-        last_line = caption.strip().splitlines()[-1]
-        tags = [part for part in last_line.split() if part.startswith("#")]
+        # Tags are on the FIRST line (置顶，只出现一次)
+        first_line = caption.strip().splitlines()[0]
+        tags = [part for part in first_line.split() if part.startswith("#")]
         self.assertLessEqual(len(tags), 8)
         self.assertIn("#钻石岛", tags)
         # Core structure checks
         self.assertNotIn("发布前已核实", caption)
-        self.assertIn("📸 实拍房源，可直接预约看房", caption)
+        self.assertIn("📋 费用·押付·配套见评论区", caption)
         self.assertNotIn("您在金边的自己人", caption)
 
     def test_caption_keeps_new_channel_structure(self):
@@ -51,14 +51,15 @@ class PublishTagsTests(unittest.TestCase):
         }
         caption = build_chinese_listing_post(draft)
         lines = caption.splitlines()
-        # Bold compact title on line 0
-        self.assertTrue(lines[0].startswith("🏠 <b>Sen Sok｜"))
+        # Tags are on line 0 (置顶), bold title appears on a later non-empty line
+        self.assertTrue(lines[0].startswith("#"), f"First line should be tags: {lines[0]!r}")
+        self.assertIn("#SenSok", lines[0])
+        # Title appears somewhere in the caption
+        self.assertTrue(any("🏠 <b>Sen Sok｜" in line for line in lines), "Title not found in caption")
         self.assertIn("💰 <b>$250/月</b>", caption)
         self.assertNotIn("发布前已核实", caption)
         self.assertIn("<code>QC", caption)
         self.assertNotIn("🧾 每月费用：", caption)
-        last_line = caption.strip().splitlines()[-1]
-        self.assertIn("#SenSok", last_line)
 
     def test_caption_variants_use_unified_factual_structure(self):
         draft = {
@@ -80,7 +81,9 @@ class PublishTagsTests(unittest.TestCase):
             for fact in ("BKK1", "1房1卫", "$1,300/月", "85", "14楼", "QC"):
                 self.assertIn(fact, caption)
             self.assertNotIn("待确认", caption)
-        self.assertTrue(cap_a.splitlines()[0].startswith("🏠 <b>BKK1｜"))
+        # Tags on first line; bold title on a subsequent line
+        self.assertTrue(cap_a.splitlines()[0].startswith("#"), "First line should be tags")
+        self.assertTrue(any("🏠 <b>BKK1｜" in line for line in cap_a.splitlines()), "Title not found")
 
     def test_property_type_selects_one_default_variant(self):
         self.assertEqual(default_caption_variant_for_property("公寓"), "a")
@@ -100,8 +103,11 @@ class PublishTagsTests(unittest.TestCase):
         caption = build_chinese_listing_post(draft)
         detail = build_discussion_detail_text(draft)
         self.assertNotIn("押付/合同：", caption)
-        self.assertIn("押付｜押1付1", detail)
-        self.assertIn("租期｜1年", detail)
+        # New format: separator changed to ideographic space for alignment
+        self.assertIn("押付", detail)
+        self.assertIn("押1付1", detail)
+        self.assertIn("租期", detail)
+        self.assertIn("1年", detail)
 
     def test_caption_shows_verification_date_and_recurring_costs(self):
         draft = {
@@ -129,7 +135,8 @@ class PublishTagsTests(unittest.TestCase):
         }
         caption = build_chinese_listing_post(draft)
         self.assertNotIn("重点确认楼层和窗外环境", caption)
-        self.assertIn("📸 实拍房源，可直接预约看房", caption)
+        # New CTA: 无额外图时指引用户到评论区查看详情
+        self.assertIn("评论区", caption)
 
 
 if __name__ == "__main__":

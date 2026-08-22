@@ -2153,7 +2153,8 @@ def _confirmed_public_detail(value: object, max_len: int = 24) -> str:
 
 
 def build_discussion_detail_text(d: dict) -> str:
-    """评论区详情卡：仅输出已确认值，不生成横线、括号或“待确认”占位。"""
+    """评论区详情卡：仅输出已确认值，不生成横线、括号或"待确认"占位。
+    排版原则：关键数字粗体，次要信息普通字，分节清晰，阅读节奏流畅。"""
     raw_price = _listing_value(d, "price", default="")
     price = _price_compact_for_post(d) if (_price_value(d) > 0 or _price_is_consultable(raw_price)) else ""
     contract = _confirmed_public_detail(_normalize_contract_term(_listing_value(d, "contract_term", default="")))
@@ -2167,52 +2168,59 @@ def build_discussion_detail_text(d: dict) -> str:
     amenities = _discussion_amenities(d)
 
     qc_code = _qc_code_from_draft(d)
-    lines = [f"📋 <b>房源详情</b>｜<code>{he(qc_code)}</code>"]
+    # 标题：房源编号清晰标识，与主帖封面呼应
+    lines = [f"📋 <b>租赁详情</b>　<code>{he(qc_code)}</code>"]
+
+    # ── 租赁核心条件（粗体重点，决策第一屏）────────────────
     rental_lines: list[str] = []
     if price:
-        rental_lines.append(f"月租｜<b>{he(price)}</b>")
-    if contract:
-        rental_lines.append(f"租期｜{he(contract)}")
+        rental_lines.append(f"月租　<b>{he(price)}</b>")
     if deposit:
-        rental_lines.append(f"押付｜{he(deposit)}")
+        rental_lines.append(f"押付　<b>{he(deposit)}</b>")
+    if contract:
+        rental_lines.append(f"租期　{he(contract)}")
     if available:
-        rental_lines.append(f"入住｜{he(available)}")
+        rental_lines.append(f"入住　{he(available)}")
     if rental_lines:
-        lines.extend(["", "💰 <b>租赁</b>", *rental_lines])
+        lines.extend(["", "💰 <b>租赁条件</b>", *rental_lines])
 
+    # ── 费用明细（逐项列出，不遗漏）──────────────────────
     fee_lines: list[str] = []
-    if management or internet:
-        fee_lines.append("　·　".join(
-            part for part in (
-                f"管理费｜{he(management)}" if management else "",
-                f"网络｜{he(internet)}" if internet else "",
-            ) if part
-        ))
-    if water or electric:
-        fee_lines.append("　·　".join(
-            part for part in (
-                f"水费｜{he(water)}" if water else "",
-                f"电费｜{he(electric)}" if electric else "",
-            ) if part
-        ))
+    if management:
+        fee_lines.append(f"管理费　{he(management)}")
+    if internet:
+        fee_lines.append(f"网　络　{he(internet)}")
+    if water:
+        fee_lines.append(f"水　费　{he(water)}")
+    if electric:
+        fee_lines.append(f"电　费　{he(electric)}")
     if parking:
-        fee_lines.append(f"停车｜{he(parking)}")
+        fee_lines.append(f"停　车　{he(parking)}")
     cost_notes = _confirmed_public_detail(_listing_value(d, "cost_notes", default=""), 80)
     if cost_notes and cost_notes not in " ".join(fee_lines):
-        fee_lines.append(f"费用说明｜{he(cost_notes)}")
+        fee_lines.append(f"备　注　{he(cost_notes)}")
     if fee_lines:
-        lines.extend(["", "🧾 <b>费用</b>", *fee_lines])
+        lines.extend(["", "🧾 <b>费用明细</b>", *fee_lines])
+
+    # ── 配套设施 ──────────────────────────────────────────
     if amenities:
-        lines.extend(["", "🏡 <b>配套</b>", " · ".join(he(item) for item in amenities)])
+        lines.extend(["", "🏡 <b>配套设施</b>", " · ".join(he(item) for item in amenities)])
+
+    # ── 看房安排 ──────────────────────────────────────────
     viewing_time = _confirmed_public_detail(_listing_value(d, "viewing_time", "viewing_hours", default=""), 28)
     video_viewing = _confirmed_public_detail(_listing_value(d, "video_viewing", "video_tour", default=""), 20)
     viewing: list[str] = []
     if viewing_time:
-        viewing.append(f"看房时间｜{he(viewing_time)}")
+        viewing.append(f"看房时间　{he(viewing_time)}")
     if video_viewing:
-        viewing.append(f"视频看房｜{he(video_viewing)}")
-    if viewing:
-        lines.extend(["", "📅 <b>看房</b>", *viewing])
+        viewing.append(f"视频看房　{he(video_viewing)}")
+    if not viewing:
+        viewing.append("支持实地看房与实时视频代看")
+    lines.extend(["", "📅 <b>看房安排</b>", *viewing])
+
+    # ── 尾部品牌 ──────────────────────────────────────────
+    lines.extend(["", "━━━━━━━━━━━━", "<b>侨联地产｜金边华人长租服务</b>"])
+
     return "\n".join(lines)[:4096]
 
 
@@ -2302,6 +2310,7 @@ def build_chinese_listing_post(
         tag = re.sub(r"[^0-9A-Za-z\u4e00-\u9fff]+", "", str(raw or "").replace("+", "加"))
         if tag and tag not in tag_values:
             tag_values.append(tag)
+    # 标签行：置顶、只出现一次，便于搜索发现
     tag_line = " ".join(f"#{tag}" for tag in tag_values[:4])
     # 生产只保留一个简洁版本。按钮已经承担咨询和预约动作，正文不再堆链接、
     # 内部状态或多套 A/B/C 口径。
@@ -2309,18 +2318,35 @@ def build_chinese_listing_post(
         dict.fromkeys(part for part in (area_display, project, title_room) if part)
     )
     fact_parts = [part for part in (room_type, size, floor) if part]
-    public_tag = re.sub(r"[^0-9A-Za-z\u4e00-\u9fff]+", "", area_display or "金边租房")
+    # 深浅层次：关键数字用粗体锚定注意力，次要描述用普通字，节奏控制用空行
+    price_line = (
+        f"💰 <b>{he(price)}</b>/月" if price and "/月" not in price else f"💰 <b>{he(price)}</b>"
+    ) if price else ""
+    fact_line = " · ".join(he(part) for part in fact_parts)
+    highlights_line = f"✨ {' · '.join(he(item) for item in caption_highlights[:2])}" if caption_highlights else ""
+    deposit_line = f"🔑 押付 <b>{he(deposit)}</b>" if deposit else ""
+    contract_line = f"📄 租期 {he(contract)}" if contract else ""
+    comment_cta = "📸 更多实拍和费用说明见评论区👇" if has_extra_photos else "📋 费用·押付·配套见评论区👇"
     lines = [
+        # 顶部：标签（只在这里出现一次）
+        tag_line,
+        "",
+        # 核心信息：粗体标题 + 编号
         f"🏠 <b>{he(simple_heading or '金边实拍房源')}</b>",
         f"<code>{he(qc_code)}</code>",
-        f"💰 <b>{he(price)}</b>/月" if price and "/月" not in price else f"💰 <b>{he(price)}</b>",
-        " · ".join(he(part) for part in fact_parts),
-        f"✨ {' · '.join(he(item) for item in caption_highlights[:2])}" if caption_highlights else "",
-        f"🔑 {he(deposit)}" if deposit else "",
-        f"📄 {he(contract)}" if contract else "",
         "",
-        "📸 更多实拍和费用说明见评论区" if has_extra_photos else "📸 实拍房源，可直接预约看房",
-        f"#{public_tag} #金边租房",
+        # 第一优先级：价格（粗体）
+        price_line,
+        # 次要：户型、面积、楼层（普通字）
+        fact_line,
+        # 亮点（斜体风格靠 emoji 区分层次）
+        highlights_line,
+        # 押付/租期（用户决策前必看）
+        deposit_line,
+        contract_line,
+        "",
+        # 行动引导
+        comment_cta,
     ]
     compact: list[str] = []
     for line in lines:

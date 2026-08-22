@@ -386,6 +386,34 @@ def ensure_source_media_assets(conn: sqlite3.Connection, source_post_id: Any) ->
 
 def _render_cover(d: dict, source: str, output: str, template: str) -> None:
     from cover_generator import _draw_new_cover
+
+    # 金边楼盘别名 → 标准展示名映射（封面首行显示）
+    _PHNOM_PENH_LANDMARKS: list[tuple[list[str], str]] = [
+        (["富力城", "rfcity", "rf city", "富力"], "富力城"),
+        (["炳发城", "borey peng huoth", "bph", "炳发", "borey"], "炳发城"),
+        (["钻石岛", "diamond island", "koh pich", "kohpich", "钻石"], "钻石岛"),
+        (["bkk1", "boeung keng kang 1", "bkk 1"], "BKK1"),
+        (["bkk2", "boeung keng kang 2", "bkk 2"], "BKK2"),
+        (["bkk3", "boeung keng kang 3", "bkk 3"], "BKK3"),
+        (["toul tom poung", "ttp", "俄罗斯市场", "russian market"], "俄罗斯市场"),
+        (["daun penh", "金边中央", "市中心", "中央"], "金边中央"),
+        (["sen sok", "洪森大道", "七星海", "sensok"], "Sen Sok"),
+        (["meanchey", "meanchy", "7makara"], "Meanchey"),
+        (["tuol kork", "toul kork", "tol kork"], "Toul Kork"),
+        (["chamkarmon", "chamcar mon", "chamkar mon"], "Chamkarmon"),
+        (["tep vong", "olympic", "奥林匹克"], "奥林匹克"),
+    ]
+
+    def _infer_landmark(text: str) -> str:
+        """从任意文本中识别金边楼盘/区域标准名，找不到返回空串。"""
+        low = text.lower().strip()
+        if not low:
+            return ""
+        for aliases, canonical in _PHNOM_PENH_LANDMARKS:
+            if any(alias in low for alias in aliases):
+                return canonical
+        return ""
+
     try:
         normalized = json.loads(d.get("normalized_data") or "{}")
     except Exception:
@@ -400,6 +428,12 @@ def _render_cover(d: dict, source: str, output: str, template: str) -> None:
     # the public location in its own field.
     generic_projects = {"房源", "优质房源", "公寓房源", "别墅房源", "独栋别墅房源", "双拼别墅房源", "排屋房源", "联排房源"}
     trusted_project = "" if project_name in generic_projects else project_name
+    # 当无明确楼盘名时，尝试从区域/标题文字中识别金边知名地标
+    if not trusted_project:
+        raw_title = str(d.get("title") or "").strip()
+        inferred = _infer_landmark(area) or _infer_landmark(raw_title) or _infer_landmark(project_alias)
+        if inferred:
+            trusted_project = inferred
     public_title = trusted_project or (listing_kind if listing_kind else "优质房源")
     project_name = trusted_project
     if project_name and project_alias:
