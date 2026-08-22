@@ -25,7 +25,11 @@ class SimplifiedAppointmentTests(unittest.IsolatedAsyncioTestCase):
     async def test_known_viewing_mode_skips_customer_focus_form(self):
         context = SimpleNamespace(user_data={})
 
-        with patch.object(user_bot, "render_panel", new=AsyncMock()) as render:
+        with (
+            patch.object(user_bot, "render_panel", new=AsyncMock()) as render,
+            patch("qiaolian_dual.listing.listing_is_available", return_value=(True, "ok")),
+            patch("qiaolian_dual.listing.listing_context", return_value={}),
+        ):
             state = await user_bot.start_appointment(
                 SimpleNamespace(),
                 context,

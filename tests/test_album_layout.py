@@ -66,12 +66,24 @@ class AlbumLayoutTests(unittest.TestCase):
 
     def test_gate_returns_cover_first_and_keeps_extra_media_for_discussion(self):
         cover, real_paths = self._seed_real_media(5)
+        import json
         draft = {
             "source_post_id": 1,
             "area": "BKK1",
             "layout": "1房1卫",
             "price": 600,
             "queue_score": 90,
+            "normalized_data": json.dumps({
+                "schema_version": "canonical_facts.v1",
+                "deal_type": "rent",
+                "publication_location_level": "level_2_physical_confirmed",
+                "public_location_display": "BKK1",
+                "public_location_key": "bkk1",
+                "property_type": "公寓",
+                "layout": "1房1卫",
+                "monthly_rent_usd": 600,
+                "canonical_facts_hash": "test_hash_001",
+            }),
         }
 
         gate = evaluate_publish_gate(draft, cover, self.db_path)
@@ -103,12 +115,24 @@ class AlbumLayoutTests(unittest.TestCase):
 
     def test_fallback_gate_keeps_same_album_order_without_relaxing_threshold(self):
         cover, real_paths = self._seed_real_media(4)
+        import json
         draft = {
             "source_post_id": 1,
             "area": "BKK1",
             "layout": "1房1卫",
             "price": 600,
             "queue_score": BASIC_PUBLISH_MIN_SCORE,
+            "normalized_data": json.dumps({
+                "schema_version": "canonical_facts.v1",
+                "deal_type": "rent",
+                "publication_location_level": "level_2_physical_confirmed",
+                "public_location_display": "BKK1",
+                "public_location_key": "bkk1",
+                "property_type": "公寓",
+                "layout": "1房1卫",
+                "monthly_rent_usd": 600,
+                "canonical_facts_hash": "test_hash_002",
+            }),
         }
 
         gate = evaluate_publish_gate(draft, cover, self.db_path)

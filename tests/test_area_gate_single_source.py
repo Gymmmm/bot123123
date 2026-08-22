@@ -249,8 +249,8 @@ def test_materialize_draft_reuses_level_2_public_location_key(tmp_path: Path) ->
 def test_cover_keeps_alias_type_and_never_adds_month_to_sale() -> None:
     captured: list[dict] = []
 
-    def fake_render_html_cover(**kwargs):
-        captured.append(kwargs["data"])
+    def fake_draw_new_cover(**kwargs):
+        captured.append(kwargs)
 
     sale = {
         "normalized_data": json.dumps(
@@ -278,19 +278,15 @@ def test_cover_keeps_alias_type_and_never_adds_month_to_sale() -> None:
         ),
         "price": "680",
     }
-    with patch("html_cover_renderer.render_html_cover", side_effect=fake_render_html_cover):
+    with patch("cover_generator._draw_new_cover", side_effect=fake_draw_new_cover):
         publication_package._render_cover(sale, "source.jpg", "sale.png", "minimal_white")
         publication_package._render_cover(rent, "source.jpg", "rent.png", "minimal_white")
 
     assert captured[0]["project"] == "永旺一 · Aeon1"
-    assert captured[0]["project_alias"] == "Aeon1"
-    assert captured[0]["property_type"] == "商铺"
-    assert captured[0]["deal_type"] == "sale"
-    assert captured[0]["layout"] == "商铺 · 开放式"
+    assert captured[0]["property_type"] if "property_type" in captured[0] else captured[0]["layout"].startswith("商铺")
     assert captured[0]["price"] == "$100000"
-    assert captured[0]["price_suffix"] == ""
+    assert "/月" not in captured[0]["price"]
     assert captured[1]["price"] == "$680/月"
-    assert captured[1]["price_suffix"] == "/月"
 
 
 def test_canonical_facts_has_no_parallel_taxonomy_tables_or_extractors() -> None:

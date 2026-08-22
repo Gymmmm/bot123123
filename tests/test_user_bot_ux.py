@@ -23,7 +23,7 @@ class UserBotUxTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("我来帮你找", text)
         markup = message.reply_text.await_args.kwargs["reply_markup"]
         button_texts = [button.text for row in markup.inline_keyboard for button in row]
-        self.assertIn("🎲 一句话关键词", button_texts)
+        self.assertIn("🔍 找房", button_texts)
 
     async def test_guided_pref_state_blocks_free_text(self):
         message = SimpleNamespace(text="BKK1", reply_text=AsyncMock())
