@@ -247,13 +247,9 @@ def main() -> int:
     args.prepared_dir = Path(args.prepared_dir).expanduser().resolve()
 
     if args.mode == "send-next":
-        if not args.bot_token:
-            print("missing bot token")
-            return 1
-        if not args.channel_id:
-            print("missing channel id")
-            return 1
-        return asyncio.run(_send_one(args))
+        print("BLOCKED: send-next cannot bypass an approved frozen publication package.")
+        print("Use this script in prepare mode, then import/review/publish through the canonical pipeline.")
+        return 4
     return asyncio.run(_prepare_all(args))
 
 

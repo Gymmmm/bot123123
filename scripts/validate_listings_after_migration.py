@@ -28,9 +28,9 @@ def main() -> int:
             fail = True
 
         cols = {r[1] for r in cur.execute("PRAGMA table_info(listings)").fetchall()}
-        has_type = "type" in cols
-        if not has_type:
-            print("[FAIL] listings.type column missing")
+        has_pt = "property_type" in cols
+        if not has_pt:
+            print("[FAIL] listings.property_type column missing")
             n_empty = -1
             fail = True
         else:
@@ -38,17 +38,20 @@ def main() -> int:
                 """
                 SELECT COUNT(*)
                 FROM listings
-                WHERE "type" IS NULL OR TRIM(COALESCE("type", '')) = ''
+                WHERE "property_type" IS NULL
+                   OR TRIM(COALESCE("property_type", '')) = ''
                 """
             ).fetchone()[0]
             if n_empty == 0:
-                print(f"[OK] empty type rows = {n_empty}")
+                print(f"[OK] empty property_type rows = {n_empty}")
             else:
-                print(f"[FAIL] empty type rows = {n_empty}")
+                print(f"[FAIL] empty property_type rows = {n_empty}")
                 fail = True
 
-        has_pt = "property_type" in cols
-        if has_pt:
+        # 旧库可能仍保留 type 兼容列；新正式 schema 只使用
+        # property_type，不应因缺少已废弃的 type 而判定迁移失败。
+        has_type = "type" in cols
+        if has_pt and has_type:
             n_mis = cur.execute(
                 """
                 SELECT COUNT(*)
@@ -58,7 +61,7 @@ def main() -> int:
             ).fetchone()[0]
         else:
             n_mis = 0
-            print("[—] property_type column missing — skip mismatch (treated 0)")
+            print("[—] legacy listings.type column absent — skip compatibility comparison")
 
         if n_mis == 0:
             print(f"[OK] mismatched (property_type vs type) rows = {n_mis}")

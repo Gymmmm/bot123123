@@ -18,23 +18,13 @@ try:
 except Exception:
     CHANNEL_ID = CHANNEL_ID_STR
 
-PINNED_TEXT = """<b>🏠 侨联地产 · 您在金边的自己人</b>
-金边华人实拍租房 · 中文顾问全程陪跑
+PINNED_TEXT = """<b>🏠 侨联地产｜金边华人租房</b>
+实拍房源 · 费用先说 · 中文带看
 
-<b>📍 找房路径（3 步）</b>
-1️⃣ 在频道里看实拍相册，找感兴趣的户型
-2️⃣ 点帖内「💬 咨询这套」或「📅 预约看房」
-3️⃣ Bot 会直接接住当前入口，不用重新解释是哪套房
+看中房源，直接点帖内「咨询」或「预约」，
+系统会自动带上房源编号。
 
-<b>🔍 主动找房</b>
-点下方按钮 → 按区域 / 按预算 / 最新房源 三路直达
-
-<b>✅ 三项承诺</b>
-• 实拍直发，编号可追溯，所见即实况
-• 水电押付等隐性成本帖里先列，签前不踩坑
-• 从预约到入住售后，管理号全程不断档
-
-👇 直接点下方按钮开始"""
+👇 也可以按区域或预算开始找"""
 
 async def main():
     from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
@@ -55,12 +45,12 @@ async def main():
         reply_markup = InlineKeyboardMarkup(
             [
                 [
-                    InlineKeyboardButton("品牌故事", url=f"{base}brand"),
-                    InlineKeyboardButton("关于侨联", url=f"{base}about"),
+                    InlineKeyboardButton("📍 区域找房", url=f"{base}find_area"),
+                    InlineKeyboardButton("💰 预算找房", url=f"{base}find_budget"),
                 ],
                 [
-                    InlineKeyboardButton("预约想住", url=f"{base}want_home"),
-                    InlineKeyboardButton("立即咨询", url=f"{base}ask"),
+                    InlineKeyboardButton("🆕 最新房源", url=f"{base}latest"),
+                    InlineKeyboardButton("💬 中文顾问", url=f"{base}advisor"),
                 ],
             ]
         )
@@ -88,4 +78,5 @@ async def main():
 
     await bot.close()
 
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())

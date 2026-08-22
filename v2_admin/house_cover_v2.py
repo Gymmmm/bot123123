@@ -211,85 +211,39 @@ def generate_style_classic(
     price: str = "$680/月",
     highlights: list | None = None,
 ) -> None:
-    """经典蓝卡：深蓝渐变背景 + 金色点缀 + 几何线条。"""
+    """经典蓝卡：忠实对齐 01 HTML（左上品牌块 + 左下信息卡）。"""
     W, H = 1600, 1200
-    highlights = highlights or ["家具基本全新", "小区泳池", "健身房"]
-    hl = [str(h).strip() for h in highlights if str(h).strip()][:3]
-    while len(hl) < 3:
-        hl.append("")
-
-    # 创建背景
-    img = _create_luxury_bg(W, H, "dark")
+    img = _photo_bg(base_image_path, (W, H), (11, 32, 72))
     draw = ImageDraw.Draw(img)
+    draw.rectangle([0, 0, 540, 185], fill=(12, 53, 133, 232))
+    draw.text((34, 28), "侨联地产", font=_font(72), fill=(255, 255, 255, 255))
+    draw.text((36, 108), "QIAO LIAN PROPERTY", font=_font(24), fill=(255, 255, 255, 225))
 
-    # 字体
-    f_brand_cn = _font(56)
-    f_brand_en = _font(18)
-    f_project = _font(84)
-    f_type = _font(48)
-    f_info = _font(32)
-    f_price = _font(96)
-    f_price_unit = _font(40)
-    f_tag = _font(26)
-    f_hash = _font(20)
-
-    # ── 顶部品牌区 ──
-    _draw_brand_chip(draw, 80, 52, scale=1.15)
-
-    # 顶部装饰线
-    draw.line([(80, 160), (520, 160)], fill=(246, 201, 72, 200), width=3)
-
-    # ── 中部主视觉区 ──
-    content_y = 280
-
-    # 项目名称（超大）
-    draw.text((80, content_y), project, font=f_project, fill=(255, 255, 255, 255))
-
-    # 户型标签（金色pill）
-    type_text = property_type
-    type_w = 180
-    type_h = 56
-    type_x = 80
-    type_y = content_y + 120
-    draw.rounded_rectangle([type_x, type_y, type_x + type_w, type_y + type_h], radius=999, fill=(246, 201, 72, 230))
-    draw.text((type_x + 22, type_y + 8), type_text, font=f_type, fill=(8, 16, 40, 255))
-
-    # ── 信息区 ──
-    info_x = 80
-    info_y = type_y + 100
-    info_line = f"📍 {area}    📐 {size}    🏢 {floor}"
-    draw.text((info_x, info_y), info_line, font=f_info, fill=(255, 255, 255, 200))
-
-    # ── 右侧价格（竖排设计）──
-    price_x = W - 400
-    price_y = content_y + 20
-
-    # 价格背景框
+    title = str(project or area or "精选房源").strip()
+    kind = str(property_type or "").strip()
     p_main, p_unit = _norm_price(price)
-    draw.rounded_rectangle([price_x - 30, price_y - 20, W - 60, price_y + 140], radius=20, fill=(246, 201, 72, 240))
+    price_text = p_main + (p_unit or "")
 
-    # "租金"标签
-    draw.text((price_x, price_y), "租金", font=f_info, fill=(8, 16, 40, 200))
-    # 价格数字
-    draw.text((price_x, price_y + 45), p_main, font=f_price, fill=(8, 16, 40, 255))
-    if p_unit:
-        draw.text((price_x, price_y + 105), p_unit, font=f_price_unit, fill=(8, 16, 40, 180))
+    card_x, card_y, card_w, card_h = 36, H - 356, 960, 322
+    draw.rounded_rectangle([card_x, card_y, card_x + card_w, card_y + card_h], radius=28, fill=(17, 71, 178, 226))
+    title_line = " · ".join(x for x in (title, kind) if x)
+    title_font = _font(66 if len(title_line) <= 12 else 54)
+    draw.text((card_x + 30, card_y + 22), title_line, font=title_font, fill=(255, 255, 255, 255))
 
-    # ── 底部亮点区 ──
-    hl_y = H - 200
-    icons = ("🛋️", "🏊", "🏋️")
-    for i in range(3):
-        if hl[i]:
-            xi = 80 + i * 280
-            # 小圆点装饰
-            draw.ellipse([xi, hl_y + 8, xi + 12, hl_y + 20], fill=(246, 201, 72, 200))
-            draw.text((xi + 20, hl_y), f"{hl[i]}", font=f_tag, fill=(255, 255, 255, 230))
+    meta = " ｜ ".join(x for x in (str(size or "").strip(), str(floor or "").strip()) if x)
+    draw.text((card_x + 30, card_y + 120), meta, font=_font(38), fill=(255, 255, 255, 245))
+    price_font = _font(70)
+    pb = draw.textbbox((0, 0), price_text, font=price_font)
+    draw.text((card_x + card_w - (pb[2] - pb[0]) - 30, card_y + 112), price_text, font=price_font, fill=(246, 201, 72, 255))
 
-    # ── 底部hashtag──
-    hash_line = _build_hashtags(area, property_type, project)
-    draw.text((80, H - 50), hash_line, font=f_hash, fill=(255, 255, 255, 160))
+    clean_hl = [str(x).strip() for x in (highlights or []) if str(x).strip()][:3]
+    if clean_hl:
+        draw.line([(card_x + 30, card_y + 218), (card_x + card_w - 30, card_y + 218)], fill=(255, 255, 255, 40), width=2)
+        x = card_x + 30
+        for value in clean_hl:
+            draw.text((x, card_y + 244), value[:10], font=_font(28), fill=(255, 255, 255, 245))
+            x += 285
 
-    # 保存
     out = img.convert("RGB")
     out.save(output_path, "JPEG", quality=96, optimize=True)
 
@@ -308,26 +262,41 @@ def generate_style_minimal(
     price: str = "$1200/月",
     highlights: list | None = None,
 ) -> None:
-    """极简白条：参考频道主图，照片为主 + 底部白色信息卡。"""
+    """极简白条：手机信息流优先，只保留项目、户型和价格。"""
     W, H = 1280, 960
     img = _cover_bg(base_image_path, (W, H), (239, 243, 248))
     draw = ImageDraw.Draw(img)
 
-    f_price = _font(64)
-    f_info = _font(28)
-
     _draw_brand_chip(draw, 22, 22, 0.92)
 
-    bar_h = int(H * 0.115)
+    # Telegram 手机信息流会把 1280px 图片缩到约 330px 宽；首图只放三项
+    # 决策信息，区域、面积、楼层和亮点留给正文，避免缩略图小字失去意义。
+    bar_h = 190
     bar_y = H - bar_h
     draw.rectangle([0, bar_y, W, H], fill=(255, 255, 255, 242))
 
     p_main, p_unit = _norm_price(price)
     price_text = p_main + (p_unit or "")
-    info_line = " · ".join([str(x).strip() for x in (area, property_type, floor) if str(x).strip()])
-    f_price_lg = _font(80)
-    draw.text((52, bar_y + 8), price_text, font=f_price_lg, fill=(15, 23, 42, 255))
-    draw.text((54, bar_y + 80), info_line, font=f_info, fill=(71, 85, 105, 255))
+    title_text = str(project or "精选房源").strip()
+    type_text = str(property_type or "").strip()
+
+    def fit(text: str, start: int, minimum: int, width: int):
+        for font_size in range(start, minimum - 1, -2):
+            font = _font(font_size)
+            if draw.textbbox((0, 0), text, font=font)[2] <= width:
+                return font
+        return _font(minimum)
+
+    price_font = fit(price_text, 76, 56, 390)
+    title_font = fit(title_text, 62, 42, 700)
+    type_font = fit(type_text, 38, 30, 520)
+    draw.text((46, bar_y + 24), title_text, font=title_font, fill=(20, 29, 43, 255))
+    price_box = draw.textbbox((0, 0), price_text, font=price_font)
+    draw.text((W - 42 - (price_box[2] - price_box[0]), bar_y + 30), price_text,
+              font=price_font, fill=(20, 77, 177, 255))
+    if type_text:
+        draw.text((48, bar_y + 112), type_text, font=type_font,
+                  fill=(42, 92, 176, 245))
 
     out = img.convert("RGB")
     out.save(output_path, "JPEG", quality=96, optimize=True)

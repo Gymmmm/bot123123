@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.qiaolian.user</string>
+  <key>WorkingDirectory</key>
+  <string>/Users/a1/分流区/01_执行区/线路归类包_123/01_侨联Bot/bot123123-current</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/a1/分流区/01_执行区/线路归类包_123/01_侨联Bot/bot123123-current/.venv/bin/python</string>
+    <string>/Users/a1/分流区/01_执行区/线路归类包_123/01_侨联Bot/bot123123-current/run_user_bot.py</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+  <key>StandardOutPath</key>
+  <string>/Users/a1/分流区/01_执行区/线路归类包_123/01_侨联Bot/bot123123-current/logs/user_launchd.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/a1/分流区/01_执行区/线路归类包_123/01_侨联Bot/bot123123-current/logs/user_launchd.err</string>
+</dict>
+</plist>

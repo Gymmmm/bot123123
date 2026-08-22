@@ -11,7 +11,11 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parent.parent
-load_dotenv(ROOT / ".env", override=True)
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+# Explicit process environment must win over the project .env.  This keeps
+# one-off validation/backup jobs from accidentally touching the live DB.
+load_dotenv(ROOT / ".env", override=False)
 DB_PATH = Path(os.getenv("DB_PATH", str(ROOT / "data/qiaolian_dual_bot.db"))).resolve()
 SCHEMA = ROOT / "schema_core.sql"
 
@@ -53,10 +57,15 @@ def main() -> int:
             )
             return 2
 
+    # 发布流水线和用户 Bot 共用同一个 SQLite。新环境必须一次建立两套表，
+    # 否则发布端可运行，但用户端的收藏、留资、预约和租客服务会缺表。
     sql = SCHEMA.read_text(encoding="utf-8")
+    from qiaolian_dual.db import SCHEMA as USER_BOT_SCHEMA
+
     conn = sqlite3.connect(DB_PATH)
     try:
         conn.executescript(sql)
+        conn.executescript(USER_BOT_SCHEMA)
         conn.commit()
     finally:
         conn.close()

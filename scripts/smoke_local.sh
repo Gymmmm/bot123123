@@ -9,14 +9,14 @@ if [[ ! -x .venv/bin/python ]]; then
   exit 1
 fi
 
-echo "[1/5] unit tests"
-.venv/bin/python -m unittest discover -p 'test_*.py' -v
+echo "[1/5] full pytest suite"
+.venv/bin/python -m pytest tests -q
 
-echo "[2/5] runtime configuration"
-.venv/bin/python run_integrated_stack.py --check
-
-echo "[3/5] schema/bootstrap check"
+echo "[2/5] schema/bootstrap check"
 .venv/bin/python scripts/bootstrap_db.py
+
+echo "[3/5] runtime configuration"
+.venv/bin/python run_integrated_stack.py --check
 
 echo "[4/5] workflow snapshot"
 .venv/bin/python scripts/check_workflow.py
