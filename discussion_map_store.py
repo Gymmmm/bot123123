@@ -78,14 +78,17 @@ def _load_posts_sqlite() -> dict:
         if not {"channel_message_id", "discuss_message_id"}.issubset(cols):
             return {}
         out: dict[str, int] = {}
+        clauses = [
+            "channel_message_id IS NOT NULL",
+            "discuss_message_id IS NOT NULL",
+            "TRIM(CAST(discuss_message_id AS TEXT))<>''",
+        ]
+        if "platform" in cols:
+            clauses.append("platform='telegram'")
+        if "publish_status" in cols:
+            clauses.append("publish_status IN ('published','success','ok')")
         rows = conn.execute(
-            """SELECT channel_message_id, discuss_message_id
-               FROM posts
-               WHERE channel_message_id IS NOT NULL
-                 AND discuss_message_id IS NOT NULL
-                 AND TRIM(CAST(discuss_message_id AS TEXT))<>''
-                 AND platform='telegram'
-                 AND publish_status IN ('published','success','ok')"""
+            "SELECT channel_message_id, discuss_message_id FROM posts WHERE " + " AND ".join(clauses)
         ).fetchall()
         for cid, mid in rows:
             try:

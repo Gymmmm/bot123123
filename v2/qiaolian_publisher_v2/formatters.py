@@ -20,6 +20,7 @@ AREA_OPTIONS = {
 TYPE_LABELS = {
     "apartment": "公寓",
     "villa": "别墅",
+    "townhouse": "排屋",
     "shop": "商铺",
     "office": "办公室",
 }

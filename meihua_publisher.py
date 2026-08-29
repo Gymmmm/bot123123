@@ -129,10 +129,12 @@ DETAIL_MAIN_TAG_TEXT = os.getenv("DETAIL_MAIN_TAG_TEXT", "实拍房源")
 DETAIL_FALLBACK_SUBTAG = os.getenv("DETAIL_FALLBACK_SUBTAG", "金边 · 精选房源")
 # 单帖可采集的实拍上限（需大于频道主帖张数，才有「溢出图」进讨论区）
 ALBUM_SOURCE_MAX = int(os.getenv("ALBUM_SOURCE_MAX", "30"))
-# Telegram 手机端 grouped media 统一使用 4:5 竖图派生稿。
-# 原始素材永不覆盖；横图/方图使用模糊延展背景完整保留主体，不做硬裁切。
-CHANNEL_ALBUM_SIZE = (1080, 1350)
-CHANNEL_ALBUM_LAYOUT = "portrait_4_5"
+# Telegram grouped media / Bot 实拍统一使用 4:3 白卡片派生稿。
+# 原始素材永不覆盖；主体完整 contain，四周留统一白边，频道宫格更干净。
+CHANNEL_ALBUM_SIZE = (1200, 900)
+CHANNEL_ALBUM_LAYOUT = "clean_white_4_3"
+CHANNEL_ALBUM_MARGIN = 22
+CHANNEL_ALBUM_CORNER_RADIUS = 18
 # 评论区版主帖固定为封面 + 3 张实拍；其余图片进入关联评论区。
 CHANNEL_MAIN_ALBUM_MAX = max(1, min(4, int(os.getenv("CHANNEL_MAIN_ALBUM_MAX", "4"))))
 CHANNEL_FORCE_FOUR_IMAGES = os.getenv("CHANNEL_FORCE_FOUR_IMAGES", "true").strip().lower() in (
@@ -1023,33 +1025,37 @@ def prepare_channel_photo_for_publish(
     return add_detail_logo_watermark(image_bytes, listing)
 
 
-def _fit_to_45_canvas(
+def _fit_to_clean_album_card(
     image: Image.Image,
     *,
     canvas_size: tuple[int, int] = CHANNEL_ALBUM_SIZE,
 ) -> Image.Image:
-    """生成 Telegram 4:5 发布派生图，同时完整保留原图主体。"""
+    """生成 4:3 白卡片实拍图；照片完整保留，不为填满画布硬裁主体。"""
     src = image.convert("RGB")
     cw, ch = canvas_size
-    bg = ImageOps.fit(src, (cw, ch), method=Image.Resampling.LANCZOS)
-    bg = bg.filter(ImageFilter.GaussianBlur(radius=max(18, int(min(cw, ch) * 0.025))))
-    bg = ImageEnhance.Brightness(bg).enhance(0.78)
-    bg = ImageEnhance.Color(bg).enhance(0.92)
+    margin = max(10, int(CHANNEL_ALBUM_MARGIN))
+    inner_w = max(1, cw - margin * 2)
+    inner_h = max(1, ch - margin * 2)
+
     fg = src.copy()
-    fg.thumbnail((cw, ch), Image.Resampling.LANCZOS)
+    fg.thumbnail((inner_w, inner_h), Image.Resampling.LANCZOS)
     x = (cw - fg.width) // 2
     y = (ch - fg.height) // 2
-    canvas = bg.convert("RGBA")
-    shadow_pad = max(6, int(min(cw, ch) * 0.008))
-    shadow = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+
+    canvas = Image.new("RGBA", (cw, ch), (255, 255, 255, 255))
+    # 极轻阴影只负责把白边从 Telegram 深色背景中分离出来。
+    shadow = Image.new("RGBA", (cw, ch), (0, 0, 0, 0))
     sd = ImageDraw.Draw(shadow)
-    sd.rounded_rectangle(
-        (x - shadow_pad, y - shadow_pad, x + fg.width + shadow_pad, y + fg.height + shadow_pad),
-        radius=max(10, int(min(cw, ch) * 0.012)),
-        fill=(0, 0, 0, 42),
-    )
+    radius = max(8, int(CHANNEL_ALBUM_CORNER_RADIUS))
+    shadow_box = (x - 3, y - 3, x + fg.width + 3, y + fg.height + 3)
+    sd.rounded_rectangle(shadow_box, radius=radius + 2, fill=(0, 0, 0, 28))
+    shadow = shadow.filter(ImageFilter.GaussianBlur(5))
     canvas = Image.alpha_composite(canvas, shadow)
-    canvas.paste(fg, (x, y))
+
+    mask = Image.new("L", (fg.width, fg.height), 0)
+    md = ImageDraw.Draw(mask)
+    md.rounded_rectangle((0, 0, fg.width - 1, fg.height - 1), radius=radius, fill=255)
+    canvas.paste(fg, (x, y), mask)
     return canvas.convert("RGB")
 
 
@@ -1060,21 +1066,22 @@ def normalize_album_image(
     force_square: bool = False,
     fit_box: tuple[int, int] | None = None,
 ) -> bytes:
-    """统一 Telegram grouped media 为 1080x1350 (4:5) 派生图；旧参数仅兼容。"""
+    """统一 Telegram 实拍派生图为 1200x900 白卡片；旧参数仅兼容调用。"""
+    _ = (target_size, force_square, fit_box)
     im = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-    im = _fit_to_45_canvas(im)
+    im = _fit_to_clean_album_card(im)
     out = io.BytesIO()
-    im.save(out, "JPEG", quality=91, optimize=True)
+    im.save(out, "JPEG", quality=92, optimize=True)
     return out.getvalue()
 
 
 def _album_layout_is_one_three() -> bool:
-    """兼容旧调用；新发布布局固定为 portrait_4_5。"""
+    """兼容旧调用；新发布布局固定为 clean_white_4_3。"""
     return False
 
 
 def _normalize_for_album_slot(image_bytes: bytes, *, index: int, total: int) -> bytes:
-    """所有频道主相册和评论区相册统一 4:5，不按槽位改变比例。"""
+    """所有频道主相册和评论区相册统一 4:3 白卡片，不按槽位改变比例。"""
     return normalize_album_image(image_bytes)
 
 
@@ -2973,14 +2980,15 @@ async def send_discussion_three_segments(
     attempts: int = 30,
     delay_seconds: float = 2.0,
 ) -> tuple[bool, bool]:
-    """讨论区按手机阅读顺序发布：实拍 → 费用/判断 → 行动入口。"""
+    """兼容旧函数名；新评论区固定为两层：补充实拍 → 预约/咨询。"""
+    _ = frozen_detail_text  # 历史包字段继续接收，但新帖子不再重复详情正文。
     discussion_id = await resolve_discussion_chat_id(bot)
     if not discussion_id:
         logger.warning("讨论区发帖：无法获取讨论组 chat_id，跳过。channel_post_id=%s", channel_post_id)
         return False, False
 
     thread_reply_id = None
-    for _ in range(max(1, attempts)):
+    for _attempt in range(max(1, attempts)):
         await asyncio.sleep(delay_seconds)
         mapping = load_discuss_map()
         thread_reply_id = mapping.get(str(channel_post_id))
@@ -2993,7 +3001,7 @@ async def send_discussion_three_segments(
     sent_any = False
     sent_extra_photos = False
 
-    # 第一段：原比例补充实拍。每张只加轻量 Logo，不叠价格、户型或大字。
+    # 第一层：只放补充实拍。冻结图片已经是最终派生字节，不再二次处理。
     if extra_album:
         chunk = 10
         total_extra = len(extra_album)
@@ -3002,24 +3010,17 @@ async def send_discussion_three_segments(
             extra_media = []
             for j, path in enumerate(batch_paths):
                 try:
-                    with open(path, "rb") as raw:
-                        data_bytes = raw.read()
-                    # Frozen discussion files are already final package outputs; send unchanged.
+                    data_bytes = Path(path).read_bytes()
                     buf = io.BytesIO(data_bytes)
                     buf.name = f"extra_{batch_start + j}.jpg"
                     if j == 0:
+                        qc = _qc_code_from_draft({"listing_id": listing_id})
                         cap = (
-                            DISCUSSION_EXTRA_INTRO
+                            f"📸 <b>更多实拍｜{he(qc)}</b>\n点击图片可左右滑动查看"
                             if batch_start == 0
-                            else DISCUSSION_EXTRA_INTRO_CONT
+                            else "📸 <b>更多实拍（续）</b>"
                         )
-                        extra_media.append(
-                            InputMediaPhoto(
-                                media=buf,
-                                caption=cap[:1024],
-                                parse_mode=ParseMode.HTML,
-                            )
-                        )
+                        extra_media.append(InputMediaPhoto(media=buf, caption=cap[:1024], parse_mode=ParseMode.HTML))
                     else:
                         extra_media.append(InputMediaPhoto(media=buf))
                 except Exception:
@@ -3050,23 +3051,7 @@ async def send_discussion_three_segments(
             if batch_start + chunk < total_extra:
                 await asyncio.sleep(0.6)
 
-    # 第二段：新发布只发送 approved package 中冻结的房源详情；
-    # 对旧 package 保留兼容生成，以便历史包不因新字段缺失而无法发送。
-    d = listing or {}
-    detail_text = str(frozen_detail_text or "").strip() or build_discussion_detail_text(d)
-    try:
-        await bot.send_message(
-            chat_id=discussion_id,
-            text=detail_text[:4096],
-            parse_mode=ParseMode.HTML,
-            reply_to_message_id=int(thread_reply_id),
-            allow_sending_without_reply=True,
-        )
-        sent_any = True
-    except Exception:
-        logger.exception("讨论区房源详情发送失败。channel_post_id=%s", channel_post_id)
-
-    # 第三段：正文内可点击链接，不发送 Telegram inline keyboard。
+    # 第二层：只留两个高意向动作，不重复房源详情/费用/找房说明。
     try:
         action_links = _caption_action_links(
             listing_id,
@@ -3076,11 +3061,7 @@ async def send_discussion_three_segments(
         )
         await bot.send_message(
             chat_id=discussion_id,
-            text=(
-                "📅 <b>看房与咨询</b>\n"
-                "可预约现场看房，也可以安排视频代看。咨询时会自动带上这套房的信息。\n\n"
-                f"{action_links}"
-            ),
+            text=f"📅 <b>预约与咨询</b>\n{action_links}",
             parse_mode=ParseMode.HTML,
             reply_to_message_id=int(thread_reply_id),
             allow_sending_without_reply=True,
@@ -3427,7 +3408,7 @@ def sync_published_listing_for_user_bot(
                    layout, size_sqm, tags_json, highlights, hidden_costs, drawbacks,
                    deposit_rule, available_date, media_file_id, media_type,
                    channel_message_id, source_post_url, status, created_at, updated_at
-               ) VALUES (?,?,?,?,?,?,'USD',?,?,?,?,?,?,?,?,?,'photo',?,?,'pending',?,?)
+               ) VALUES (?,?,?,?,?,?,'USD',?,?,?,?,?,?,?,?,?,'photo',?,?,'active',?,?)
                ON CONFLICT(listing_id) DO UPDATE SET
                    title=excluded.title, property_type=excluded.property_type,
                    area=excluded.area, community=excluded.community, price=excluded.price,
@@ -3437,7 +3418,8 @@ def sync_published_listing_for_user_bot(
                    available_date=excluded.available_date, media_file_id=excluded.media_file_id,
                    media_type=excluded.media_type, channel_message_id=excluded.channel_message_id,
                    source_post_url=excluded.source_post_url,
-                   -- Preserve administrator-controlled listing status (e.g. rented/offline).
+                   -- A successfully published pending/draft listing becomes active; explicit admin states remain authoritative.
+                   status=CASE WHEN lower(coalesce(listings.status,'')) IN ('','pending','draft') THEN 'active' ELSE listings.status END,
                    updated_at=excluded.updated_at""",
             (
                 listing_id,

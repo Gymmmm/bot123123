@@ -25,11 +25,11 @@ def admin_menu() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("🏠 房源队列", callback_data="cmd:queue"),
+                InlineKeyboardButton("🏠 待发布房源", callback_data="cmd:queue"),
                 InlineKeyboardButton("🟢 房态管理", callback_data="cmd:listing_states"),
             ],
             [
-                InlineKeyboardButton("➕ 录入房源", callback_data="cmd:intake"),
+                InlineKeyboardButton("➕ 添加房源", callback_data="cmd:intake"),
                 InlineKeyboardButton("📡 采集源", callback_data="cmd:sources"),
             ],
             [
@@ -52,9 +52,10 @@ def type_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton("🏡 别墅", callback_data="type:villa"),
         ],
         [
+            InlineKeyboardButton("🏘 排屋", callback_data="type:townhouse"),
             InlineKeyboardButton("🏪 商铺", callback_data="type:shop"),
-            InlineKeyboardButton("💼 办公室", callback_data="type:office"),
         ],
+        [InlineKeyboardButton("💼 办公室", callback_data="type:office")],
         [InlineKeyboardButton("❌ 取消", callback_data="pub:cancel")],
     ]
     return InlineKeyboardMarkup(rows)
@@ -81,7 +82,7 @@ def preview_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("✅ 立即发布", callback_data="preview:publish"),
+                InlineKeyboardButton("✅ 保存到待审", callback_data="preview:publish"),
                 InlineKeyboardButton("✏️ 修改字段", callback_data="preview:edit"),
             ],
             [InlineKeyboardButton("🎨 切换封面模板", callback_data="preview:style")],
@@ -130,15 +131,16 @@ def publish_post_keyboard(
     book_url = deep_link(user_bot_username, payload("book"))
     consult_url = deep_link(user_bot_username, payload("consult"))
     similar_url = deep_link(user_bot_username, payload("similar"))
+    photos_url = deep_link(user_bot_username, f"photos_{listing_id}")
     clean_channel = str(channel_username or "").strip().lstrip("@")
     if clean_channel and channel_message_id:
         media_url = f"https://t.me/{clean_channel}/{int(channel_message_id)}?comment=1"
     elif str(discussion_group_link or "").strip():
         media_url = str(discussion_group_link).strip()
     else:
-        media_url = similar_url
+        media_url = photos_url
         log.warning(
-            "频道评论链接未配置，更多实拍按钮已安全降级到类似房源：listing_id=%s",
+            "频道评论链接未配置，更多实拍已降级到同房源 Bot 相册：listing_id=%s",
             listing_id,
         )
     return InlineKeyboardMarkup(

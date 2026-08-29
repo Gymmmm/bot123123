@@ -1087,7 +1087,7 @@ async def cmd_ops(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         f"发帖时段：<code>{html.escape(slots)}</code>\n\n"
         f"待审核Top：{pending_line}\n"
         f"下一个审核包待批准：{ready_line}\n\n"
-        "快捷：<code>/pending</code> <code>/send DRF_xxx</code> <code>/slots 10:30,17:00,21:30</code>",
+        "快捷：<code>/pending</code> <code>/send QC0001</code> <code>/slots 10:30,17:00,21:30</code>",
         parse_mode=ParseMode.HTML,
         reply_markup=admin_menu(),
     )

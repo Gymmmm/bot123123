@@ -113,6 +113,24 @@ def _source_style_scope(source_type: str, source_name: str = "") -> str:
     return "manual" if any(token in raw for token in ("wechat_note", "manual", "admin_import", "手工", "管理导入")) else "collected"
 
 
+def _default_publish_layout_for_scope(scope: str) -> str:
+    """管理员自录默认单图按钮；采集房源默认原生相册+评论区。"""
+    return "buttons" if str(scope or "").strip().lower() == "manual" else "links"
+
+
+def _main_album_limit(*, property_type: str, price: Any, scope: str, publish_layout: str) -> int:
+    """频道主相册张数：普通公寓4张，别墅/排屋或高价房6张；按钮帖只发首图。"""
+    if str(publish_layout or "").lower() == "buttons" or str(scope or "").lower() == "manual":
+        return 1
+    kind = str(property_type or "").lower()
+    landed = any(token in kind for token in ("别墅", "排屋", "联排", "双拼", "townhouse", "villa"))
+    try:
+        monthly = float(re.sub(r"[^0-9.]", "", str(price or "0")) or 0)
+    except (TypeError, ValueError):
+        monthly = 0
+    return 6 if landed or monthly >= 1500 else 4
+
+
 def _default_publish_styles(
     conn: sqlite3.Connection,
     source_type: str,
@@ -175,7 +193,8 @@ def classify(*, source_type: str, source_name: str, property_type: str,
         }
 
     is_villa = "别墅" in listing or "villa" in listing
-    listing_type = "villa" if is_villa else "apartment"
+    is_townhouse = any(token in listing for token in ("排屋", "联排", "townhouse"))
+    listing_type = "villa" if is_villa else ("townhouse" if is_townhouse else "apartment")
 
     try:
         numeric_price = float(re.sub(r"[^0-9.]", "", str(price or "0")) or 0)
@@ -184,10 +203,10 @@ def classify(*, source_type: str, source_name: str, property_type: str,
 
     highlight_count = len(_json_list(highlights))
 
-    if is_villa:
+    if is_villa or is_townhouse:
         return {
             "source_type": normalized_source,
-            "listing_type": "villa",
+            "listing_type": listing_type,
             "media_type": "image",
             "cover_template": "black_gold",
         }
@@ -810,7 +829,7 @@ def build_package(
     styles["caption_variant"] = selected_variant
     review_note = str(d.get("review_note") or "")
     layout_match = re.search(r"publish_layout:(buttons|links)", review_note, flags=re.I)
-    publish_layout = layout_match.group(1).lower() if layout_match else "links"
+    publish_layout = layout_match.group(1).lower() if layout_match else _default_publish_layout_for_scope(styles["scope"])
     cover_match = re.search(r"publish_cover:(cover|none)", review_note, flags=re.I)
     publish_cover = cover_match.group(1).lower() if cover_match else "cover"
     template = template_override or styles["cover_template"] or routing["cover_template"]
@@ -828,7 +847,12 @@ def build_package(
         target = out / f"image_{index:02d}.jpg"
         # Package 阶段生成最终详情字节；Publisher 之后只读取并发送，不再加 Logo/调色/裁切。
         _finalize_detail_image(path, str(target)); processed.append(str(target))
-    max_main_images = max(1, min(4, int(os.getenv("CHANNEL_MAIN_ALBUM_MAX", "4"))))
+    max_main_images = _main_album_limit(
+        property_type=d.get("property_type") or "",
+        price=d.get("price"),
+        scope=styles["scope"],
+        publish_layout=publish_layout,
+    )
     main = [str(cover)] + processed[: max_main_images - 1]
     discussion = processed[max_main_images - 1 :]
     from meihua_publisher import (
