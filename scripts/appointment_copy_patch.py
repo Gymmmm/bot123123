@@ -1,0 +1,175 @@
+from pathlib import Path
+
+
+def replace_once(path: str, old: str, new: str, label: str) -> None:
+    p = Path(path)
+    text = p.read_text(encoding="utf-8")
+    if old not in text:
+        raise SystemExit(f"missing patch target: {label}")
+    p.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+
+# appointment_flow.py: customer success page + advisor notification
+p = Path("qiaolian_dual/appointment_flow.py")
+text = p.read_text(encoding="utf-8")
+old = '''        await _notify_admins(context, title=f'新预约 · 待处理 #{appointment_id}', lines=[f'用户：{_user_mention_html(user)}', f"房源：{he(str(appt.get('listing_id') or '待推荐'))}", f"时间：{he(_appointment_date_compact(appt.get('date') or '-'))} · {he(_appointment_time_compact(time_value))}", f'方式：{he(mode_label)}', f'联系：{he(_user_contact_text(user))}', f'关注：{he(focus_short)}', f"来源：{he(str(appt.get('source', 'user_bot')))} · 线索 #{lead_id or '-'}"], reply_markup=admin_lead_keyboard(lead_id=lead_id, appointment_id=appointment_id, user_id=int(user.id)) if lead_id is not None else None)\n        item = listing_context(lid_submit)\n        title = str(item.get('project') or item.get('title') or item.get('area') or '这套房').strip()\n        layout = _display_layout(item.get('layout') or item.get('property_type'), item.get('property_type'))\n        contact = str(appt.get('contact_value') or _user_contact_text(user))\n        subject_text = '🏠 <b>房源尚未确定</b>' if is_general_request else f"🏠 <b>{he(_title_layout_label(title, layout))}</b>"\n        context.user_data.pop('appt', None)\n        await query.edit_message_text(f"✅ <b>已收到你的预约申请</b>\\n\\n{subject_text}\\n📅 {he(str(appt.get('date', '') or '-'))} · {he(time_label)}\\n📍 {he(mode_label)}\\n\\n顾问会先确认房态和可看时间，再通过 Telegram 联系你。无需重复提交。", parse_mode=ParseMode.HTML, reply_markup=appointment_success_keyboard())\n'''
+new = '''        item = listing_context(lid_submit)\n        title = str(item.get('project') or item.get('title') or item.get('area') or '这套房').strip()\n        layout = _display_layout(item.get('layout') or item.get('property_type'), item.get('property_type'))\n        property_type = str(item.get('property_type') or '').strip()\n        area = str(item.get('project') or item.get('community') or item.get('area') or title or '金边').strip()\n        listing_facts = []\n        for value in (area, layout, property_type):\n            if value and value not in listing_facts:\n                listing_facts.append(value)\n        advisor_listing = '｜'.join(listing_facts[:3]) or '房源待确认'\n        date_compact = _appointment_date_compact(appt.get('date') or '-')\n        time_compact = _appointment_time_compact(time_value)\n        await _notify_admins(\n            context,\n            title=f'📅 新预约 #{appointment_id}',\n            lines=[\n                f'🏠 <b>{he(advisor_listing)}</b>',\n                f'🕐 {he(date_compact)} · {he(time_compact)}',\n                f'📍 {he(mode_label)}',\n                '',\n                f'👤 客户｜{_user_mention_html(user)}',\n                f'💬 Telegram｜{he(_user_contact_text(user))}',\n                f'📝 关注｜{he(focus_short)}',\n                '',\n                '<b>当前状态｜🟡 待联系</b>',\n            ],\n            reply_markup=admin_lead_keyboard(lead_id=lead_id, appointment_id=appointment_id, user_id=int(user.id)) if lead_id is not None else None,\n            show_bell=False,\n        )\n        subject_text = '🏠 <b>房源尚未确定</b>' if is_general_request else f"🏠 <b>{he(_title_layout_label(title, layout))}</b>"\n        context.user_data.pop('appt', None)\n        await query.edit_message_text(\n            f"<b>✅ 预约已提交</b>\\n\\n"\n            f"{subject_text}\\n"\n            f"📅 {he(date_compact)} · {he(time_compact)}\\n"\n            f"📍 {he(mode_label)}\\n\\n"\n            "顾问确认房态和时间后，\\n"\n            "会通过 Telegram 联系你。",\n            parse_mode=ParseMode.HTML,\n            reply_markup=appointment_success_keyboard(),\n        )\n'''
+if old not in text:
+    raise SystemExit("missing patch target: appointment submit block")
+p.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+# messages.py
+replace_once(
+    "qiaolian_dual/messages.py",
+    '''def appoint_success_text() -> str:\n    """预约成功文案。"""\n    return (\n        "✅ <b>已收到你的预约申请</b>\\n\\n"\n        "顾问会先确认房态和可看时间，\\n"\n        "再通过 Telegram 联系你。"\n    )\n''',
+    '''def appoint_success_text() -> str:\n    """预约提交后的统一标题/跟进说明。"""\n    return (\n        "<b>✅ 预约已提交</b>\\n\\n"\n        "顾问确认房态和时间后，\\n"\n        "会通过 Telegram 联系你。"\n    )\n''',
+    "appoint_success_text",
+)
+replace_once(
+    "qiaolian_dual/messages.py",
+    '''def advisor_response_notice_text() -> str:\n    """顾问接手或回复时的统一提醒。"""\n    return (\n        "💬 <b>顾问已经接手</b>\\n\\n"\n        "我们已把你的需求交给顾问。\\n"\n        "顾问会通过 Telegram 和你确认细节。\\n\\n"\n        "时间或需求有变化，直接回复这条消息就行。"\n    )\n''',
+    '''def advisor_response_notice_text() -> str:\n    """顾问接手预约后的统一提醒。"""\n    return (\n        "<b>💬 顾问已接手</b>\\n\\n"\n        "你的预约和房源信息已经一起发给顾问。\\n"\n        "顾问会通过 Telegram 联系你确认。\\n\\n"\n        "时间或需求有变化，\\n"\n        "直接回复这条消息就可以。"\n    )\n''',
+    "advisor_response_notice_text",
+)
+
+# results_admin.py: advisor notification title option + buttons
+p = Path("qiaolian_dual/results_admin.py")
+text = p.read_text(encoding="utf-8")
+text = text.replace(
+    "async def _notify_admins(context: ContextTypes.DEFAULT_TYPE, *, title: str, lines: list[str], reply_markup: InlineKeyboardMarkup | None=None) -> None:",
+    "async def _notify_admins(context: ContextTypes.DEFAULT_TYPE, *, title: str, lines: list[str], reply_markup: InlineKeyboardMarkup | None=None, show_bell: bool=True) -> None:",
+    1,
+)
+text = text.replace(
+    "    text = f'🔔 <b>{he(title)}</b>\\n\\n{body}'.strip()",
+    "    prefix = '🔔 ' if show_bell else ''\n    text = f'{prefix}<b>{he(title)}</b>\\n\\n{body}'.strip()",
+    1,
+)
+old_kb = '''def admin_lead_keyboard(*, lead_id: int, appointment_id: int, user_id: int) -> InlineKeyboardMarkup:\n    suffix = f'{lead_id}:{appointment_id}:{user_id}'\n    return InlineKeyboardMarkup([[InlineKeyboardButton('✅ 我来接单', callback_data=f'adminlead:claim:{suffix}'), InlineKeyboardButton('💬 已联系', callback_data=f'adminlead:contacted:{suffix}')], [InlineKeyboardButton('❌ 无效线索', callback_data=f'adminlead:invalid:{suffix}')]])\n'''
+new_kb = '''def admin_lead_keyboard(*, lead_id: int, appointment_id: int, user_id: int) -> InlineKeyboardMarkup:\n    """顾问预约跟进按钮；callback 保持兼容，仅优化手机端措辞。"""\n    suffix = f'{lead_id}:{appointment_id}:{user_id}'\n    return InlineKeyboardMarkup([\n        [InlineKeyboardButton('✅ 我来跟进', callback_data=f'adminlead:claim:{suffix}')],\n        [InlineKeyboardButton('📞 已联系客户', callback_data=f'adminlead:contacted:{suffix}'), InlineKeyboardButton('🚫 结束跟进', callback_data=f'adminlead:invalid:{suffix}')],\n    ])\n'''
+if old_kb not in text:
+    raise SystemExit("missing patch target: admin_lead_keyboard")
+p.write_text(text.replace(old_kb, new_kb, 1), encoding="utf-8")
+
+# callback_admin.py: status replacement + customer buttons
+p = Path("qiaolian_dual/callback_admin.py")
+text = p.read_text(encoding="utf-8")
+old_map = "status_map = {'claim': ('claimed', 'assigned', '顾问已接手'), 'contacted': ('contacted', 'contacted', '顾问跟进中'), 'invalid': ('invalid', 'cancelled', '已标记无效')}"
+new_map = "status_map = {'claim': ('claimed', 'assigned', '🟢 顾问跟进中'), 'contacted': ('contacted', 'contacted', '🟢 顾问跟进中'), 'invalid': ('invalid', 'cancelled', '⚪ 已结束跟进')}"
+if old_map not in text:
+    raise SystemExit("missing patch target: adminlead status map")
+text = text.replace(old_map, new_map, 1)
+old = '''            original = str(getattr(query.message, 'text_html', '') or getattr(query.message, 'text', '') or '')\n            status_line = f'\\n\\n<b>处理状态：</b>{he(label)} · {he(advisor_name)}'\n            await query.edit_message_text(original + status_line, parse_mode=ParseMode.HTML, reply_markup=admin_lead_keyboard(lead_id=lead_id, appointment_id=appointment_id, user_id=customer_id) if action == 'claim' else None)\n            if action in {'claim', 'contacted'}:\n                from .messages import advisor_response_notice_text\n                user_text = advisor_response_notice_text()\n                try:\n                    await context.bot.send_message(chat_id=customer_id, text=user_text, parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('📋 查看我的预约', callback_data='appointment_menu:list')], [InlineKeyboardButton('🏠 返回首页', callback_data='home')]]))\n                except Exception:\n                    logger.exception('预约状态通知用户失败: user_id=%s', customer_id)\n'''
+new = '''            original = str(getattr(query.message, 'text_html', '') or getattr(query.message, 'text', '') or '')\n            status_line = f'<b>当前状态｜{he(label)}</b>\\n跟进顾问｜{he(advisor_name)}'\n            status_pattern = re.compile(r'(?:<b>)?当前状态｜[^\\n<]*(?:</b>)?(?:\\n跟进顾问｜[^\\n<]*)?')\n            if status_pattern.search(original):\n                updated = status_pattern.sub(status_line, original, count=1)\n            else:\n                updated = original.rstrip() + '\\n\\n' + status_line\n            updated = re.sub(r'\\n\\n<b>处理状态：</b>[^\\n]*', '', updated)\n            await query.edit_message_text(updated, parse_mode=ParseMode.HTML, reply_markup=admin_lead_keyboard(lead_id=lead_id, appointment_id=appointment_id, user_id=customer_id) if action == 'claim' else None)\n            if action in {'claim', 'contacted'}:\n                from .messages import advisor_response_notice_text\n                user_text = advisor_response_notice_text()\n                try:\n                    await context.bot.send_message(\n                        chat_id=customer_id,\n                        text=user_text,\n                        parse_mode=ParseMode.HTML,\n                        reply_markup=InlineKeyboardMarkup([\n                            [InlineKeyboardButton('📅 查看我的预约', callback_data='appointment_menu:list')],\n                            [InlineKeyboardButton('🏠 继续看房', callback_data='hub:latest')],\n                        ]),\n                    )\n                except Exception:\n                    logger.exception('预约状态通知用户失败: user_id=%s', customer_id)\n'''
+if old not in text:
+    raise SystemExit("missing patch target: adminlead status block")
+p.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+# tests
+Path("tests/test_appointment_mobile_copy.py").write_text(r'''from pathlib import Path
+
+from qiaolian_dual.keyboards_common import appointment_success_keyboard
+from qiaolian_dual.messages import advisor_response_notice_text, appoint_success_text
+from qiaolian_dual.results_admin import _find_result_card_content, admin_lead_keyboard
+
+
+def _labels(markup):
+    return [button.text for row in markup.inline_keyboard for button in row]
+
+
+def _callbacks(markup):
+    return [button.callback_data for row in markup.inline_keyboard for button in row if button.callback_data]
+
+
+def test_appointment_success_copy_and_buttons():
+    text = appoint_success_text()
+    assert '预约已提交' in text
+    assert '无需重复提交' not in text
+    assert '<b>✅ 预约已提交</b>' in text
+    assert _labels(appointment_success_keyboard()) == ['📅 我的预约', '💬 联系中文顾问', '🏠 继续看房']
+
+
+def test_appointment_submit_page_uses_compact_date_time_and_no_repeat_copy():
+    source = Path('qiaolian_dual/appointment_flow.py').read_text(encoding='utf-8')
+    assert "date_compact = _appointment_date_compact" in source
+    assert "time_compact = _appointment_time_compact" in source
+    assert '<b>✅ 预约已提交</b>' in source
+    assert '无需重复提交' not in source
+
+
+def test_advisor_handoff_customer_copy_and_buttons():
+    text = advisor_response_notice_text()
+    assert '顾问已接手' in text
+    assert '预约和房源信息已经一起发给顾问' in text
+    source = Path('qiaolian_dual/callback_admin.py').read_text(encoding='utf-8')
+    assert "InlineKeyboardButton('📅 查看我的预约'" in source
+    assert "InlineKeyboardButton('🏠 继续看房'" in source
+    assert "callback_data='hub:latest'" in source
+
+
+def test_advisor_notification_hides_backend_words_and_uses_status():
+    source = Path('qiaolian_dual/appointment_flow.py').read_text(encoding='utf-8')
+    start = source.index("title=f'📅 新预约 #{appointment_id}'")
+    end = source.index('subject_text =', start)
+    block = source[start:end]
+    assert 'appointment_hub' not in block
+    assert '线索 #' not in block
+    assert '待处理' not in block
+    assert '<b>当前状态｜🟡 待联系</b>' in block
+    assert 'advisor_listing' in block
+    assert 'show_bell=False' in block
+
+
+def test_advisor_buttons_use_new_copy_with_compatible_callbacks():
+    kb = admin_lead_keyboard(lead_id=281, appointment_id=24, user_id=7)
+    assert _labels(kb) == ['✅ 我来跟进', '📞 已联系客户', '🚫 结束跟进']
+    assert _callbacks(kb) == [
+        'adminlead:claim:281:24:7',
+        'adminlead:contacted:281:24:7',
+        'adminlead:invalid:281:24:7',
+    ]
+    assert '无效线索' not in ' '.join(_labels(kb))
+
+
+def test_admin_status_replaces_current_status_instead_of_appending_old_copy():
+    source = Path('qiaolian_dual/callback_admin.py').read_text(encoding='utf-8')
+    assert '当前状态｜' in source
+    assert '跟进顾问｜' in source
+    assert 'status_pattern.sub(status_line' in source
+    assert "status_line = f'\\n\\n<b>处理状态：</b>" not in source
+
+
+def test_recommendation_card_navigation_and_more_photos_stay_locked(monkeypatch):
+    import qiaolian_dual.results_admin as results_admin
+    monkeypatch.setattr(results_admin, 'os', results_admin.os)
+    monkeypatch.setattr(results_admin, 'listing_context', lambda *_: {}, raising=False)
+    text, kb, _ = _find_result_card_content(
+        {
+            'listing_id': 'l_2',
+            'project': '永旺1',
+            'layout': '1房1办公2卫',
+            'property_type': '公寓',
+            'price': 1800,
+            'status': 'active',
+        },
+        1,
+        4,
+    )
+    labels = _labels(kb)
+    callbacks = _callbacks(kb)
+    assert '⬅️ 上一套' in labels
+    assert '下一套 ➡️' in labels
+    assert '📸 查看更多实拍' in labels
+    assert 'findcard:0' in callbacks
+    assert 'findcard:2' in callbacks
+    assert 'listing:photos:l_2' in callbacks
+''', encoding="utf-8")
+
+# permanent CI includes the new focused regression + import check
+p = Path('.github/workflows/qiaolian-ui-check.yml')
+text = p.read_text(encoding='utf-8')
+if 'tests/test_appointment_mobile_copy.py' not in text:
+    text = text.replace('tests/test_cover_theme_regression.py', 'tests/test_cover_theme_regression.py tests/test_appointment_mobile_copy.py')
+if 'python -c "import qiaolian_dual.user_bot"' not in text:
+    text = text.replace('      - name: Non-outbound regression tests\n', '      - name: User Bot import check\n        env:\n          USER_BOT_TOKEN: \'123456:TESTTOKEN\'\n          PUBLISHER_BOT_TOKEN: \'123456:TESTTOKEN\'\n          DB_PATH: \'${{ runner.temp }}/qiaolian-ui-check.db\'\n        run: python -c "import qiaolian_dual.user_bot"\n      - name: Non-outbound regression tests\n')
+p.write_text(text, encoding='utf-8')
