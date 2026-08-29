@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - codex/qiaolian-ui-cleanup-20260829
+  pull_request:
+    branches:
+      - codex/production-sync-20260829
   workflow_dispatch:
 
 jobs:
