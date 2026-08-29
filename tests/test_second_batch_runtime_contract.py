@@ -160,6 +160,38 @@ def test_first_recommendation_does_not_delete_home_panel():
     assert 'message.delete()' not in block
 
 
+@pytest.mark.asyncio
+async def test_first_recommendation_resolves_listing_context_at_runtime(monkeypatch):
+    """Regression for the real hub:available click path (NameError in production)."""
+    from types import SimpleNamespace
+    import qiaolian_dual.listing as listing_mod
+    import qiaolian_dual.results_admin as results
+
+    monkeypatch.setattr(listing_mod, 'listing_context', lambda lid: {
+        'listing_id': lid,
+        'media_files': [],
+        'media_file_id': '',
+    })
+    calls = []
+
+    async def fake_send(*args, **kwargs):
+        calls.append((args, kwargs))
+
+    monkeypatch.setattr(results, 'send_find_result_card', fake_send)
+    update = SimpleNamespace(callback_query=SimpleNamespace(message=SimpleNamespace(photo=None)))
+    context = SimpleNamespace(user_data={})
+
+    await results.send_find_results_as_cards(
+        update,
+        context,
+        [{'listing_id': 'l_72'}],
+        'strict',
+    )
+
+    assert context.user_data['find_card_listing_ids'] == ['l_72']
+    assert len(calls) == 1
+
+
 def test_stale_current_card_auto_skips_when_other_valid_ids_exist():
     src = Path('qiaolian_dual/results_admin.py').read_text(encoding='utf-8')
     fn_start = src.index('async def send_find_result_card')

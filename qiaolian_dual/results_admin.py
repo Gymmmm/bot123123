@@ -99,6 +99,8 @@ async def send_listing_card(bot, chat_id: int, listing: dict, index: int=0, tota
 
 async def send_find_results_as_cards(update: Update, context: ContextTypes.DEFAULT_TYPE, matches: list[dict], match_mode: str='strict') -> None:
     """搜索结果只发送一张可切换卡片，避免连续图片和消息把页面顶走。"""
+    from .listing import listing_context
+
     count = len(matches)
     if count == 0:
         await update.effective_message.reply_text('暂时没有完全符合条件的房源。\n\n可以换个预算或区域再试；也可以让中文顾问按你的需求继续留意。', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('💬 让中文顾问帮我找', callback_data='keyword:handoff')], [InlineKeyboardButton('✏️ 换个条件', callback_data='home_smart_search')], [InlineKeyboardButton('🏠 返回首页', callback_data='home')]]), parse_mode=ParseMode.HTML)
