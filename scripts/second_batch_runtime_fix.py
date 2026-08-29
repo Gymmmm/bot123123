@@ -1,12 +1,65 @@
 from pathlib import Path
 
-# Make callback ack helper idempotent even for test/fallback query objects without Telegram id.
+# Make callback ack helper idempotent without leaking object-id reuse across callbacks.
 p = Path('qiaolian_dual/common.py')
 text = p.read_text(encoding='utf-8')
-text = text.replace("query_id = str(getattr(query, 'id', '') or '')\n    if query_id and query_id in _CALLBACK_ANSWERED_IDS:",
-                    "query_id = str(getattr(query, 'id', '') or f'obj:{id(query)}')\n    if query_id in _CALLBACK_ANSWERED_IDS:", 1)
-text = text.replace("    if query_id:\n        _CALLBACK_ANSWERED_IDS.add(query_id)\n        _CALLBACK_ANSWERED_ORDER.append(query_id)\n        if len(_CALLBACK_ANSWERED_ORDER) > 2048:\n            stale = _CALLBACK_ANSWERED_ORDER.pop(0)\n            _CALLBACK_ANSWERED_IDS.discard(stale)",
-                    "    _CALLBACK_ANSWERED_IDS.add(query_id)\n    _CALLBACK_ANSWERED_ORDER.append(query_id)\n    if len(_CALLBACK_ANSWERED_ORDER) > 2048:\n        stale = _CALLBACK_ANSWERED_ORDER.pop(0)\n        _CALLBACK_ANSWERED_IDS.discard(stale)", 1)
+old = '''# CallbackQuery can only be answered once. All handlers use this idempotent helper.
+_CALLBACK_ANSWERED_IDS: set[str] = set()
+_CALLBACK_ANSWERED_ORDER: list[str] = []
+
+async def answer_callback_once(query, text: str | None=None, *, show_alert: bool=False) -> bool:
+    query_id = str(getattr(query, 'id', '') or '')
+    if query_id and query_id in _CALLBACK_ANSWERED_IDS:
+        return False
+    await query.answer(text=text, show_alert=show_alert)
+    if query_id:
+        _CALLBACK_ANSWERED_IDS.add(query_id)
+        _CALLBACK_ANSWERED_ORDER.append(query_id)
+        if len(_CALLBACK_ANSWERED_ORDER) > 2048:
+            stale = _CALLBACK_ANSWERED_ORDER.pop(0)
+            _CALLBACK_ANSWERED_IDS.discard(stale)
+    return True
+'''
+new = '''# CallbackQuery can only be answered once. All handlers use this idempotent helper.
+# Real Telegram callbacks have a stable query.id. A weak object set is only for local
+# test/fallback query objects that do not expose an id, avoiding Python id() reuse.
+from weakref import WeakSet
+_CALLBACK_ANSWERED_IDS: set[str] = set()
+_CALLBACK_ANSWERED_ORDER: list[str] = []
+_CALLBACK_ANSWERED_OBJECTS = WeakSet()
+
+async def answer_callback_once(query, text: str | None=None, *, show_alert: bool=False) -> bool:
+    query_id = str(getattr(query, 'id', '') or '')
+    if query_id:
+        if query_id in _CALLBACK_ANSWERED_IDS:
+            return False
+    else:
+        try:
+            if query in _CALLBACK_ANSWERED_OBJECTS:
+                return False
+        except TypeError:
+            if bool(getattr(query, '_qiaolian_answered', False)):
+                return False
+    await query.answer(text=text, show_alert=show_alert)
+    if query_id:
+        _CALLBACK_ANSWERED_IDS.add(query_id)
+        _CALLBACK_ANSWERED_ORDER.append(query_id)
+        if len(_CALLBACK_ANSWERED_ORDER) > 2048:
+            stale = _CALLBACK_ANSWERED_ORDER.pop(0)
+            _CALLBACK_ANSWERED_IDS.discard(stale)
+    else:
+        try:
+            _CALLBACK_ANSWERED_OBJECTS.add(query)
+        except TypeError:
+            try:
+                setattr(query, '_qiaolian_answered', True)
+            except Exception:
+                pass
+    return True
+'''
+if old not in text:
+    raise SystemExit('missing callback helper target')
+text = text.replace(old, new, 1)
 p.write_text(text, encoding='utf-8')
 
 # Existing route tests are route-contract tests, not publication-evidence tests. Keep them
