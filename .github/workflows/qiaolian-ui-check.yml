@@ -23,11 +23,11 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt pytest
       - name: Syntax check
-        run: python -m compileall -q qiaolian_dual meihua_publisher.py publication_package.py discussion_map_store.py tests/test_customer_path_regression.py
+        run: python -m compileall -q qiaolian_dual meihua_publisher.py autopilot_publish_bot.py publication_package.py discussion_map_store.py tests/test_customer_path_regression.py tests/test_daily_broadcast_rotation.py
       - name: Non-outbound regression tests
         env:
           PYTHONPATH: '${{ github.workspace }}'
           USER_BOT_TOKEN: '123456:TESTTOKEN'
           PUBLISHER_BOT_TOKEN: '123456:TESTTOKEN'
           DB_PATH: '${{ runner.temp }}/qiaolian-ui-check.db'
-        run: python -m pytest -q tests/test_user_ui_cleanup.py tests/test_customer_path_regression.py
+        run: python -m pytest -q tests/test_user_ui_cleanup.py tests/test_customer_path_regression.py tests/test_daily_broadcast_rotation.py
