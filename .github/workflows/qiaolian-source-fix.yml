@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Patch source-of-truth display/query code
+      - name: Finish source-of-truth display/query patch
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -30,37 +30,40 @@ jobs:
           db_text = db_path.read_text(encoding='utf-8')
           old = 'clauses = ["status=\'active\'",'
           new = 'clauses = ["status IN (\'active\',\'reserved\')",'
-          count = db_text.count(old)
-          if count != 1:
-              raise SystemExit(f'expected one public search status clause, found {count}')
-          db_path.write_text(db_text.replace(old, new, 1), encoding='utf-8')
+          if old in db_text:
+              db_text = db_text.replace(old, new, 1)
+              db_path.write_text(db_text, encoding='utf-8')
+          if new not in db_text:
+              raise SystemExit('public search status clause is not active+reserved')
 
           package_path = Path('publication_package.py')
           package_text = package_path.read_text(encoding='utf-8')
+
           import_old = 'from qiaolian_dual.utils_formatting import _display_layout'
           import_new = 'from qiaolian_dual.utils_formatting import _display_layout, _display_floor'
-          if import_old not in package_text:
-              raise SystemExit('publication_package display formatter import not found')
-          package_text = package_text.replace(import_old, import_new, 1)
+          if import_old in package_text:
+              package_text = package_text.replace(import_old, import_new, 1)
+          if '_display_floor' not in package_text:
+              raise SystemExit('publication_package display floor formatter import missing')
 
           display_old = 'display_floor = str(d.get("floor") or "").strip() or ""'
-          display_new = 'display_floor = _display_floor(d.get("floor"))'
-          display_count = package_text.count(display_old)
-          if display_count < 1:
-              raise SystemExit('publication_package display_floor assignment not found')
-          package_text = package_text.replace(display_old, display_new)
+          if display_old in package_text:
+              package_text = package_text.replace(display_old, 'display_floor = _display_floor(d.get("floor"))')
 
           floor_old = 'floor = clean(d.get("floor"), 12)'
-          floor_new = 'floor = _display_floor(clean(d.get("floor"), 12))'
-          floor_count = package_text.count(floor_old)
-          if floor_count < 1:
-              raise SystemExit('publication_package caption floor assignment not found')
-          package_text = package_text.replace(floor_old, floor_new)
-          package_path.write_text(package_text, encoding='utf-8')
+          if floor_old in package_text:
+              package_text = package_text.replace(floor_old, 'floor = _display_floor(clean(d.get("floor"), 12))')
 
-          print(f'patched db status clause: {count}')
-          print(f'patched publication display_floor: {display_count}')
-          print(f'patched publication caption floor: {floor_count}')
+          layout_old = 'layout_text = clean(d.get("layout") or d.get("property_type") or "整租", 18)'
+          layout_new = 'layout_text = clean(_display_layout(d.get("layout") or d.get("property_type") or "整租", d.get("property_type")), 18)'
+          layout_count = package_text.count(layout_old)
+          if layout_count:
+              package_text = package_text.replace(layout_old, layout_new)
+          if layout_new not in package_text:
+              raise SystemExit('publication caption layout is not using display-only formatter')
+
+          package_path.write_text(package_text, encoding='utf-8')
+          print(f'patched publication layout assignments: {layout_count}')
           PY
       - name: Syntax check
         run: python -m compileall -q qiaolian_dual publication_package.py
@@ -70,5 +73,5 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add qiaolian_dual/db.py publication_package.py
           git diff --cached --quiet && exit 0
-          git commit -m 'fix reserved search visibility and floor display [skip source-fix]'
+          git commit -m 'finish public search and listing display normalization [skip source-fix]'
           git push origin HEAD:codex/qiaolian-ui-cleanup-20260829
