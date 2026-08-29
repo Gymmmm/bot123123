@@ -22,7 +22,7 @@ async def send_listing_card(bot, chat_id: int, listing: dict, index: int=0, tota
     property_type = listing.get('property_type', '')
     highlights_raw = listing.get('highlights', '')
     media_file = listing.get('media_file_id', '')
-    from .listing import listing_context, listing_cost_text
+    from .listing import listing_context
     full_listing = listing_context(listing_id) if listing_id else {}
     media_files = full_listing.get('media_files', []) if isinstance(full_listing, dict) else []
     logger.info('route=listing_card listing_id=%s send_mode=%s media_count=%s', listing_id or '-', 'media_group' if len(media_files) > 1 else ('photo' if media_file and os.path.exists(media_file) else 'text'), len(media_files) if isinstance(media_files, list) else 0)
@@ -59,7 +59,7 @@ async def send_listing_card(bot, chat_id: int, listing: dict, index: int=0, tota
     caption = '\n'.join(caption_parts)
     keyboard_rows = [
         [InlineKeyboardButton('🏠 查看这套', callback_data=f'listing:open:{listing_id}')],
-        [InlineKeyboardButton('💬 联系顾问', url=_advisor_listing_url(listing_id)), InlineKeyboardButton('📅 预约看房', callback_data=f'listing:appoint:{listing_id}')],
+        [InlineKeyboardButton('💬 联系中文顾问', url=_advisor_listing_url(listing_id)), InlineKeyboardButton('📅 预约看房', callback_data=f'listing:appoint:{listing_id}')],
     ]
     channel_url = _listing_channel_url(listing_id)
     if channel_url:
@@ -101,7 +101,7 @@ async def send_find_results_as_cards(update: Update, context: ContextTypes.DEFAU
     """搜索结果只发送一张可切换卡片，避免连续图片和消息把页面顶走。"""
     count = len(matches)
     if count == 0:
-        await update.effective_message.reply_text('暂时没有完全符合条件的房源。\n\n可以换个预算或区域再试；也可以让顾问按你的需求继续留意。', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('💬 让顾问帮我找', callback_data='keyword:handoff')], [InlineKeyboardButton('✏️ 换个条件', callback_data='home_smart_search')], [InlineKeyboardButton('🏠 返回首页', callback_data='home')]]), parse_mode=ParseMode.HTML)
+        await update.effective_message.reply_text('暂时没有完全符合条件的房源。\n\n可以换个预算或区域再试；也可以让中文顾问按你的需求继续留意。', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('💬 让中文顾问帮我找', callback_data='keyword:handoff')], [InlineKeyboardButton('✏️ 换个条件', callback_data='home_smart_search')], [InlineKeyboardButton('🏠 返回首页', callback_data='home')]]), parse_mode=ParseMode.HTML)
         return
     ids = [str(item.get('listing_id') or '').strip() for item in matches if item.get('listing_id')]
     context.user_data['find_card_listing_ids'] = ids
@@ -118,16 +118,16 @@ async def send_find_results_as_cards(update: Update, context: ContextTypes.DEFAU
 def _find_result_card_content(item: dict, index: int, total: int) -> tuple[str, InlineKeyboardMarkup, str]:
     from .listing import listing_context
     from .text_utils import clean_inline_text
-    from .utils_formatting import _display_listing_id, _fmt_price
+    from .utils_formatting import _display_layout, _fmt_price
     listing_id = str(item.get('listing_id') or '').strip()
     full = listing_context(listing_id)
     if full:
         item = {**item, **{k: v for k, v in full.items() if v not in (None, '', [], {})}}
     area = clean_inline_text(str(item.get('project') or item.get('community') or item.get('area') or '金边'))
-    layout = clean_inline_text(str(item.get('layout') or item.get('property_type') or '房源'))
+    property_type = clean_inline_text(str(item.get('property_type') or ''))
+    layout = _display_layout(clean_inline_text(str(item.get('layout') or item.get('property_type') or '房源')), property_type)
     price = _fmt_price(item.get('price'))
     size = clean_inline_text(str(item.get('size_sqm') or item.get('size') or ''))
-    property_type = clean_inline_text(str(item.get('property_type') or ''))
     deposit = clean_inline_text(str(item.get('deposit_rule') or item.get('deposit') or ''))
     status = str(item.get('status') or 'active').strip().lower()
     status_text = '🟡 已有预约 · 仍可预约' if status == 'reserved' else '🟢 可预约'
@@ -141,25 +141,12 @@ def _find_result_card_content(item: dict, index: int, total: int) -> tuple[str, 
     lines.extend(['', status_text, f'第 {index + 1}/{total} 套'])
     nav = []
     if total > 1:
-        # 当前进度已经写在卡片正文，导航区只保留两个真实可操作按钮。
-        nav = [
-            InlineKeyboardButton('⬅️ 上一套', callback_data=f'findcard:{(index - 1) % total}'),
-            InlineKeyboardButton('下一套 ➡️', callback_data=f'findcard:{(index + 1) % total}'),
-        ]
+        nav = [InlineKeyboardButton('⬅️ 上一套', callback_data=f'findcard:{(index - 1) % total}'), InlineKeyboardButton('下一套 ➡️', callback_data=f'findcard:{(index + 1) % total}')]
     rows = []
     if nav:
         rows.append(nav)
-    # 推荐卡就是用户的决策入口：详情、实拍、预约和咨询一次说清。
-    # 不再用“查看费用”代替整个房源详情，避免用户只左右翻卡
-    # 却不知道下一步点哪里。
-    rows.append([
-        InlineKeyboardButton('📋 租赁详情', callback_data=f'listing:open:{listing_id}'),
-        InlineKeyboardButton('📅 预约看房', callback_data=f'listing:appoint:{listing_id}'),
-    ])
-    rows.append([
-        InlineKeyboardButton('📸 完整实拍', callback_data=f'listing:photos:{listing_id}'),
-        InlineKeyboardButton('💬 咨询这套', callback_data=f'listing:consult:{listing_id}'),
-    ])
+    rows.append([InlineKeyboardButton('📋 租赁详情', callback_data=f'listing:open:{listing_id}'), InlineKeyboardButton('📅 预约看房', callback_data=f'listing:appoint:{listing_id}')])
+    rows.append([InlineKeyboardButton('📸 完整实拍', callback_data=f'listing:photos:{listing_id}'), InlineKeyboardButton('💬 咨询这套', callback_data=f'listing:consult:{listing_id}')])
     rows.append([InlineKeyboardButton('✏️ 换条件', callback_data='home_smart_search')])
     media_files = item.get('media_files') if isinstance(item.get('media_files'), list) else []
     photo_path = next((p for p in media_files if isinstance(p, str) and os.path.exists(p)), '')
@@ -168,41 +155,24 @@ def _find_result_card_content(item: dict, index: int, total: int) -> tuple[str, 
         photo_path = candidate if candidate and os.path.exists(candidate) else ''
     return ('\n'.join(lines), InlineKeyboardMarkup(rows), photo_path)
 
-
 async def send_find_result_card(update: Update, context: ContextTypes.DEFAULT_TYPE, index: int, *, replace: bool=True) -> None:
     from .listing import listing_context
     ids = list(context.user_data.get('find_card_listing_ids') or [])
     if not ids:
-        await update.effective_message.reply_text(
-            '这批推荐已经失效，请重新选择找房条件。',
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton('🔍 重新找房', callback_data='home_smart_search')],
-                [InlineKeyboardButton('🏠 返回首页', callback_data='home')],
-            ]),
-        )
+        await update.effective_message.reply_text('这批推荐已经失效，请重新选择找房条件。', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('🔍 重新找房', callback_data='home_smart_search')], [InlineKeyboardButton('🏠 返回首页', callback_data='home')]]))
         return
     index = int(index) % len(ids)
     item = listing_context(ids[index])
     if not item or not item.get('listing_id'):
         context.user_data['find_card_listing_ids'] = [lid for lid in ids if lid != ids[index]]
-        await update.effective_message.reply_text(
-            '这套推荐已经失效。我可以继续为你筛选其他房源。',
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton('🔍 重新找房', callback_data='home_smart_search')],
-                [InlineKeyboardButton('💬 联系顾问', callback_data='keyword:handoff')],
-                [InlineKeyboardButton('🏠 返回首页', callback_data='home')],
-            ]),
-        )
+        await update.effective_message.reply_text('这套推荐已经失效。我可以继续为你筛选其他房源。', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('🔍 重新找房', callback_data='home_smart_search')], [InlineKeyboardButton('💬 联系中文顾问', callback_data='keyword:handoff')], [InlineKeyboardButton('🏠 返回首页', callback_data='home')]]))
         return
     caption, keyboard, photo_path = _find_result_card_content(item, index, len(ids))
     query = getattr(update, 'callback_query', None)
     if replace and query is not None and getattr(query.message, 'photo', None) and photo_path:
         from telegram import InputMediaPhoto
         with open(photo_path, 'rb') as photo:
-            await query.edit_message_media(
-                media=InputMediaPhoto(media=photo.read(), caption=caption, parse_mode=ParseMode.HTML),
-                reply_markup=keyboard,
-            )
+            await query.edit_message_media(media=InputMediaPhoto(media=photo.read(), caption=caption, parse_mode=ParseMode.HTML), reply_markup=keyboard)
         return
     if replace and query is not None and not getattr(query.message, 'photo', None):
         await query.edit_message_text(caption, parse_mode=ParseMode.HTML, reply_markup=keyboard)
@@ -214,11 +184,11 @@ async def send_find_result_card(update: Update, context: ContextTypes.DEFAULT_TY
         await context.bot.send_message(chat_id=update.effective_chat.id, text=caption, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
 def _format_match_line(item: dict) -> str:
-    from .utils_formatting import _fmt_price
+    from .utils_formatting import _display_layout, _fmt_price
     head = f"• <b>{he(str(item.get('listing_id', '') or '-'))}</b> | {he(str(item.get('area', '') or '金边'))} | {he(_fmt_price(item.get('price')))}"
     detail_parts = []
     if item.get('layout'):
-        detail_parts.append(str(item.get('layout')))
+        detail_parts.append(_display_layout(item.get('layout'), item.get('property_type')))
     if item.get('size_sqm'):
         detail_parts.append(f"{item.get('size_sqm')}㎡")
     detail = f"\n  {he(' · '.join(detail_parts))}" if detail_parts else ''
@@ -248,7 +218,7 @@ def search_results_keyboard(matches: list[dict]) -> InlineKeyboardMarkup:
         layout = _display_layout(item.get('layout') or item.get('property_type') or '房源', item.get('property_type'))
         label = f"🏠 {area} · {layout} · {_fmt_price(item.get('price'))}"
         rows.append([InlineKeyboardButton(label[:55], callback_data=f'listing:open:{listing_id}')])
-    rows.append([InlineKeyboardButton('✏️ 修改条件', callback_data='home_smart_search'), InlineKeyboardButton('💬 让顾问帮我找', callback_data='keyword:handoff')])
+    rows.append([InlineKeyboardButton('✏️ 修改条件', callback_data='home_smart_search'), InlineKeyboardButton('💬 让中文顾问帮我找', callback_data='keyword:handoff')])
     rows.append([InlineKeyboardButton('🏠 返回首页', callback_data='home')])
     return InlineKeyboardMarkup(rows)
 
@@ -258,13 +228,7 @@ async def _notify_admins(context: ContextTypes.DEFAULT_TYPE, *, title: str, line
     if not admin_ids:
         return
     body = '\n'.join([line for line in lines if str(line or '').strip()])
-    # 管理界面只展示中文来源；数据库仍保留原始机器值用于追踪。
-    source_labels = {
-        'channel_deeplink': '频道帖子', 'channel_post': '频道帖子', 'channel_index': '频道首页',
-        'channel_topic': '频道专题', 'user_search': '用户找房', 'home_layout': '按户型找房',
-        'listing_card': '房源卡片', 'listing_landing': '房源详情', 'appointment_hub': '预约中心',
-        'smart_find_play': '智能找房', 'help_inline': '帮助页', 'service_hub': '入住服务',
-    }
+    source_labels = {'channel_deeplink': '频道帖子', 'channel_post': '频道帖子', 'channel_index': '频道首页', 'channel_topic': '频道专题', 'user_search': '用户找房', 'home_layout': '按户型找房', 'listing_card': '房源详情页', 'listing_landing': '房源详情', 'appointment_hub': '预约中心', 'smart_find_play': '智能找房', 'help_inline': '帮助页', 'service_hub': '入住服务'}
     for raw, label in source_labels.items():
         body = body.replace(raw, label)
     text = f'🔔 <b>{he(title)}</b>\n\n{body}'.strip()
@@ -279,49 +243,32 @@ def admin_lead_keyboard(*, lead_id: int, appointment_id: int, user_id: int) -> I
     return InlineKeyboardMarkup([[InlineKeyboardButton('✅ 我来接单', callback_data=f'adminlead:claim:{suffix}'), InlineKeyboardButton('💬 已联系', callback_data=f'adminlead:contacted:{suffix}')], [InlineKeyboardButton('❌ 无效线索', callback_data=f'adminlead:invalid:{suffix}')]])
 
 def admin_repair_keyboard(ticket_id: int) -> InlineKeyboardMarkup:
-    """顾问处理报修只需点中文状态，不要求记住命令或编号。"""
     ticket = int(ticket_id or 0)
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton('✅ 已接手', callback_data=f'adminrepair:accepted:{ticket}'), InlineKeyboardButton('📅 已安排', callback_data=f'adminrepair:scheduled:{ticket}')],
-        [InlineKeyboardButton('🔧 处理中', callback_data=f'adminrepair:in_progress:{ticket}'), InlineKeyboardButton('✅ 已完成', callback_data=f'adminrepair:done:{ticket}')],
-        [InlineKeyboardButton('💬 需要客户补充', callback_data=f'adminrepair:need_info:{ticket}')],
-    ])
-
+    return InlineKeyboardMarkup([[InlineKeyboardButton('✅ 已接手', callback_data=f'adminrepair:accepted:{ticket}'), InlineKeyboardButton('📅 已安排', callback_data=f'adminrepair:scheduled:{ticket}')], [InlineKeyboardButton('🔧 处理中', callback_data=f'adminrepair:in_progress:{ticket}'), InlineKeyboardButton('✅ 已完成', callback_data=f'adminrepair:done:{ticket}')], [InlineKeyboardButton('💬 需要客户补充', callback_data=f'adminrepair:need_info:{ticket}')]])
 
 def _allow_admin_notify(context: ContextTypes.DEFAULT_TYPE, *, key: str, cooldown_seconds: int=180) -> bool:
-    """简单节流：避免同一用户短时间重复点击导致管理号刷屏。"""
-    from .session_deeplink import now_ts
     box = context.user_data.setdefault('_notify_throttle', {})
     if not isinstance(box, dict):
         box = {}
-    now_ts = datetime.now().timestamp()
+    now_value = datetime.now().timestamp()
     last_ts = float(box.get(key) or 0)
-    if now_ts - last_ts < max(1, int(cooldown_seconds)):
+    if now_value - last_ts < max(1, int(cooldown_seconds)):
         return False
-    box[key] = now_ts
+    box[key] = now_value
     context.user_data['_notify_throttle'] = box
     return True
-
 
 async def send_listing_photo_preview(bot, chat_id: int, listing_id: str) -> None:
     """频道查看实拍深链：向私聊发送同一房源完整相册及精简CTA。"""
     from .listing import listing_context, listing_cost_text
     from .text_utils import clean_inline_text
     from telegram import InputMediaPhoto
-    from .keyboards_common import _listing_channel_url
-    from .utils_formatting import _display_listing_id
+    from .utils_formatting import _display_layout, _display_listing_id
     info = listing_context(str(listing_id or '').strip())
     media_files = info.get('media_files', []) if isinstance(info, dict) else []
-    # “更多实拍”只展示真实照片；发布封面不重复放进相册。
-    photos = [
-        p for p in media_files
-        if isinstance(p, str)
-        and os.path.exists(p)
-        and os.path.basename(p).lower() not in {'cover.jpg', 'cover.jpeg', 'cover.png'}
-    ][:10]
+    photos = [p for p in media_files if isinstance(p, str) and os.path.exists(p) and os.path.basename(p).lower() not in {'cover.jpg', 'cover.jpeg', 'cover.png'}][:10]
     area = clean_inline_text(str(info.get('project') or info.get('community') or info.get('area') or '金边'))
-    layout = clean_inline_text(str(info.get('layout') or ''))
-    summary = ' · '.join(part for part in (area, layout) if part)
+    layout = _display_layout(clean_inline_text(str(info.get('layout') or '')), info.get('property_type'))
     qc_id = _display_listing_id(str(listing_id or '').strip())
     heading = f'{qc_id}｜{area}' if area else qc_id
     caption_lines = [f'<b>📸 {he(heading)}</b>']
@@ -330,10 +277,7 @@ async def send_listing_photo_preview(bot, chat_id: int, listing_id: str) -> None
     caption_lines.append(f'以下是这套房的完整实拍，共 {len(photos)} 张。')
     caption_lines.append('点击图片查看大图。')
     caption = '\n'.join(caption_lines)
-    rows = [
-        [InlineKeyboardButton('📋 租赁详情', callback_data=f'listing:detail:{listing_id}'), InlineKeyboardButton('📅 预约看房', callback_data=f'listing:appoint:{listing_id}')],
-        [InlineKeyboardButton('🤖 侨联找房助手', callback_data='home_smart_search')],
-    ]
+    rows = [[InlineKeyboardButton('📋 租赁详情', callback_data=f'listing:detail:{listing_id}'), InlineKeyboardButton('📅 预约看房', callback_data=f'listing:appoint:{listing_id}')], [InlineKeyboardButton('🤖 侨联找房助手', callback_data='home_smart_search')]]
     keyboard = InlineKeyboardMarkup(rows)
     followup_text = f'🏠 <b>{he(qc_id)}｜请选择下一步</b>'
     detail_text = listing_cost_text(str(listing_id or '').strip())
