@@ -175,3 +175,11 @@ def test_find_card_rechecks_listing_status_before_rendering():
     source = Path('qiaolian_dual/results_admin.py').read_text(encoding='utf-8')
     assert "status not in {'active', 'reserved'}" in source
     assert '房态已经变化' in source
+
+
+def test_find_card_keeps_navigation_and_more_photos_cta():
+    source = Path('qiaolian_dual/results_admin.py').read_text(encoding='utf-8')
+    assert "InlineKeyboardButton('⬅️ 上一套'" in source
+    assert "InlineKeyboardButton('下一套 ➡️'" in source
+    assert "InlineKeyboardButton('📸 查看更多实拍'" in source
+    assert "callback_data=f'listing:photos:{listing_id}'" in source
