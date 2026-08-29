@@ -14,7 +14,7 @@ async def handle_listing_callback(update: Update, context: ContextTypes.DEFAULT_
     from .flows import contact_management, show_appointment_hub, show_favorites, show_help, show_precise_filter, show_search_entry, show_service_hub, start_appointment
     from .keyboards_common import _advisor_listing_url, _listing_channel_url, contact_handoff_keyboard, keyword_followup_keyboard, latest_listing_keyboard, lead_capture_keyboard, main_keyboard, no_match_followup_keyboard, old_tenant_followup_keyboard, room_type_keyboard
     from .keyboards_search import _decode_budget_choice, find_area_keyboard, find_budget_keyboard, guided_search_keyboard, local_life_keyboard, merchant_join_keyboard, precise_filter_keyboard, rfcity_back_keyboard, rfcity_keyboard, service_detail_keyboard, service_hub_keyboard, service_repair_keyboard
-    from .listing import _latest_listing_text, listing_context, listing_cost_text, listing_is_available, listing_unavailable_keyboard, listing_unavailable_text, start_video_tour_flow
+    from .listing import _latest_listing_text, listing_action_allowed, listing_context, listing_cost_text, listing_is_available, listing_unavailable_keyboard, listing_unavailable_text, start_video_tour_flow
     from .results_admin import _allow_admin_notify, _format_listing_choice_lines, _format_match_line, _notify_admins, admin_lead_keyboard, search_results_keyboard, send_find_result_card, send_find_results_as_cards, send_listing_card, send_listing_photo_preview
     from .search import create_lead, detect_area, detect_property_type, search_listings_with_fallback, upsert_user_profile
     from .session_deeplink import _remember_video_pref, clear_session_for_fresh_entry, now_ts, user_display_name
@@ -163,7 +163,7 @@ async def handle_listing_callback(update: Update, context: ContextTypes.DEFAULT_
             return MAIN
     if data.startswith('listing:consult:'):
             lid = data.split(':', 2)[2]
-            is_available, availability_reason = listing_is_available(lid)
+            is_available, availability_reason = listing_action_allowed(lid, 'consult')
             if not is_available:
                 await render_panel(update, text=listing_unavailable_text(availability_reason), parse_mode=ParseMode.HTML, reply_markup=listing_unavailable_keyboard(lid), context=context)
                 return MAIN
@@ -172,7 +172,7 @@ async def handle_listing_callback(update: Update, context: ContextTypes.DEFAULT_
             return await contact_management(update, context, source='listing_card', from_listing=lid)
     if data.startswith('listing:detail:'):
             lid = data.split(':', 2)[2]
-            is_available, availability_reason = listing_is_available(lid)
+            is_available, availability_reason = listing_action_allowed(lid, 'detail')
             if not is_available:
                 await render_panel(update, text=listing_unavailable_text(availability_reason), parse_mode=ParseMode.HTML, reply_markup=listing_unavailable_keyboard(lid), context=context)
                 return MAIN
@@ -182,12 +182,18 @@ async def handle_listing_callback(update: Update, context: ContextTypes.DEFAULT_
                 return MAIN
             context.user_data['contact_listing_id'] = lid
             create_lead(user, action='listing_detail_view', source='listing_landing', listing_id=lid)
-            detail_kb = InlineKeyboardMarkup([
-                [InlineKeyboardButton('📅 预约这套', callback_data=f'listing:appoint:{lid}')],
-                [InlineKeyboardButton('📸 查看更多实拍', callback_data=f'listing:photos:{lid}')],
+            detail_rows = []
+            if availability_reason in {'active', 'reserved'}:
+                detail_rows.append([InlineKeyboardButton('📅 预约这套', callback_data=f'listing:appoint:{lid}')])
+                detail_rows.append([InlineKeyboardButton('📸 查看更多实拍', callback_data=f'listing:photos:{lid}')])
+            detail_rows.extend([
                 [InlineKeyboardButton('💬 联系中文顾问', callback_data=f'listing:consult:{lid}')],
-                [InlineKeyboardButton('⬅️ 返回这套房', callback_data=f'listing:open:{lid}')],
+                [InlineKeyboardButton(
+                    '⬅️ 返回这套房' if availability_reason in {'active', 'reserved'} else '🏠 返回首页',
+                    callback_data=f'listing:open:{lid}' if availability_reason in {'active', 'reserved'} else 'home',
+                )],
             ])
+            detail_kb = InlineKeyboardMarkup(detail_rows)
             detail_text = listing_cost_text(lid)
             if getattr(query.message, 'photo', None):
                 await query.edit_message_caption(caption=detail_text, parse_mode=ParseMode.HTML, reply_markup=detail_kb)

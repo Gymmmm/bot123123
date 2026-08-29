@@ -8,7 +8,7 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
     from .flows import contact_management, show_search_entry, start_appointment
     from .keyboards_common import contact_handoff_keyboard, keyword_followup_keyboard, latest_listing_keyboard, main_keyboard, no_match_followup_keyboard, room_type_keyboard
     from .keyboards_search import find_area_keyboard, find_budget_keyboard, precise_filter_keyboard, service_hub_keyboard
-    from .listing import _latest_listing_text, _resolve_area_from_target, _store_active_entry, channel_topic_welcome_text, listing_context, listing_cost_keyboard, listing_cost_text, listing_entry_keyboard, listing_entry_text, listing_is_available, listing_unavailable_keyboard, listing_unavailable_text, start_video_tour_flow
+    from .listing import _latest_listing_text, _resolve_area_from_target, _store_active_entry, channel_topic_welcome_text, listing_action_allowed, listing_context, listing_cost_keyboard, listing_cost_text, listing_entry_keyboard, listing_entry_text, listing_is_available, listing_unavailable_keyboard, listing_unavailable_text, start_video_tour_flow
     from .results_admin import _allow_admin_notify, _format_listing_choice_lines, _notify_admins, send_listing_photo_preview
     from .search import create_lead as default_create_lead, detect_area
     from .session_deeplink import _normalize_variant, _split_target_meta, build_source_label, now_ts, parse_start_arg_payload, resolve_public_token
@@ -62,7 +62,7 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
         return await start_appointment(update, context, listing_id, source=source, touch_payload={**touch_payload, 'entry': entry_source or ''}, initial_mode=initial_mode)
     if action == 'consult':
         listing_id = target
-        is_available, availability_reason = listing_is_available(listing_id)
+        is_available, availability_reason = listing_action_allowed(listing_id, 'consult')
         if not is_available:
             if availability_reason == 'missing':
                 create_lead(user, action='broken_link', source=source, listing_id=listing_id, payload={**touch_payload, 'reason': availability_reason})

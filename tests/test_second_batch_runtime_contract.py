@@ -105,9 +105,22 @@ async def test_answer_callback_once_hits_telegram_only_once():
 
 def test_listing_handlers_all_use_canonical_availability():
     src = Path('qiaolian_dual/callback_listing.py').read_text(encoding='utf-8')
-    for prefix in ('listing:detail:', 'listing:photos:', 'listing:consult:', 'listing:appoint:'):
+    for prefix in ('listing:photos:', 'listing:appoint:'):
         block_start = src.index(prefix)
         assert 'listing_is_available' in src[block_start:block_start + 2200]
+    for prefix in ('listing:detail:', 'listing:consult:'):
+        block_start = src.index(prefix)
+        assert 'listing_action_allowed' in src[block_start:block_start + 2200]
+
+
+def test_pending_allows_detail_and_consult_but_not_album_or_appointment(monkeypatch):
+    import qiaolian_dual.listing as listing_mod
+
+    monkeypatch.setattr(listing_mod.db, 'get_listing', lambda _lid: {'listing_id': 'l_pending', 'status': 'pending'})
+    assert listing_mod.listing_action_allowed('l_pending', 'detail') == (True, 'pending')
+    assert listing_mod.listing_action_allowed('l_pending', 'consult') == (True, 'pending')
+    assert listing_mod.listing_action_allowed('l_pending', 'photos') == (False, 'pending')
+    assert listing_mod.listing_action_allowed('l_pending', 'appoint') == (False, 'pending')
 
 
 def test_full_album_has_no_ten_photo_truncation_and_chunks_by_ten():
@@ -165,8 +178,8 @@ def test_main_pattern_still_routes_all_callbacks():
 
 
 def test_build_application_constructs():
-    from qiaolian_dual.user_bot import build_application
-    assert build_application() is not None
+    from qiaolian_dual.app import build_application
+    assert build_application(token='123456:TEST_CALLBACK_ROUTE_TOKEN') is not None
 
 
 @pytest.mark.asyncio
@@ -206,3 +219,58 @@ async def test_full_album_12_photos_sends_10_plus_2_and_one_action_box(monkeypat
     assert len(bot.photos) == 0
     labels = [button.text for row in bot.messages[0]['reply_markup'].inline_keyboard for button in row]
     assert labels == ['📋 租赁详情', '📅 预约看房', '🤖 侨联找房助手']
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ('photo_count', 'expected_groups', 'expected_single_photos'),
+    [
+        (0, [], 0),
+        (1, [], 1),
+        (4, [4], 0),
+        (10, [10], 0),
+        (11, [10], 1),
+        (23, [10, 10, 3], 0),
+    ],
+)
+async def test_full_album_required_photo_counts(
+    monkeypatch, tmp_path, photo_count, expected_groups, expected_single_photos
+):
+    import qiaolian_dual.listing as listing_mod
+    from qiaolian_dual.results_admin import send_listing_photo_preview
+
+    photos = []
+    for index in range(photo_count):
+        path = tmp_path / f'album_{index:02d}.jpg'
+        path.write_bytes(f'photo-{index}'.encode())
+        photos.append(str(path))
+    monkeypatch.setattr(listing_mod, 'listing_context', lambda lid: {
+        'listing_id': lid,
+        'project': 'BKK1',
+        'layout': '2房',
+        'property_type': '公寓',
+        'media_files': photos,
+    })
+
+    class Bot:
+        def __init__(self):
+            self.groups = []
+            self.messages = []
+            self.photos = []
+        async def send_media_group(self, **kwargs):
+            self.groups.append(kwargs['media'])
+        async def send_message(self, **kwargs):
+            self.messages.append(kwargs)
+        async def send_photo(self, **kwargs):
+            self.photos.append(kwargs)
+
+    bot = Bot()
+    await send_listing_photo_preview(bot, 123, 'l_required_counts')
+    assert [len(group) for group in bot.groups] == expected_groups
+    assert len(bot.photos) == expected_single_photos
+    assert len(bot.messages) == 1
+    terminal = bot.messages[0]
+    labels = [button.text for row in terminal['reply_markup'].inline_keyboard for button in row]
+    assert labels == ['📋 租赁详情', '📅 预约看房', '🤖 侨联找房助手']
+    if photo_count == 0:
+        assert '没有更多可用实拍' in terminal['text']

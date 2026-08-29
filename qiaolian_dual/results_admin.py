@@ -229,7 +229,28 @@ async def send_find_result_card(update: Update, context: ContextTypes.DEFAULT_TY
             await query.edit_message_media(media=InputMediaPhoto(media=photo.read(), caption=caption, parse_mode=ParseMode.HTML), reply_markup=keyboard)
         return
     if replace and query is not None and not getattr(query.message, 'photo', None):
-        await query.edit_message_text(caption, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+        if not photo_path:
+            await query.edit_message_text(caption, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+            context.user_data['find_card_anchor'] = {
+                'chat_id': int(update.effective_chat.id),
+                'message_id': int(query.message.message_id),
+            }
+            return
+        # Telegram cannot turn a text message into a photo in place. Keep the
+        # home panel intact and create exactly one photo-card anchor; every
+        # button on that card subsequently edits the same message.
+        with open(photo_path, 'rb') as photo:
+            sent = await context.bot.send_photo(
+                chat_id=update.effective_chat.id,
+                photo=photo,
+                caption=caption,
+                parse_mode=ParseMode.HTML,
+                reply_markup=keyboard,
+            )
+        context.user_data['find_card_anchor'] = {
+            'chat_id': int(sent.chat_id),
+            'message_id': int(sent.message_id),
+        }
         return
     if photo_path:
         with open(photo_path, 'rb') as photo:

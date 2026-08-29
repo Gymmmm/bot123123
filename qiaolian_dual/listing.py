@@ -183,6 +183,22 @@ def listing_is_available(listing_id: str) -> tuple[bool, str]:
         return (False, 'offline')
     return (False, status or 'pending')
 
+def listing_action_allowed(listing_id: str, action: str) -> tuple[bool, str]:
+    """Apply the canonical status contract to a specific customer action.
+
+    ``listing_is_available`` remains the single appointment/browsing availability
+    check. Pending listings are the one deliberate exception: customers may read
+    their known details and ask a consultant, but may not browse them as public
+    recommendations, open the full album, or submit an appointment.
+    """
+    allowed, reason = listing_is_available(listing_id)
+    if allowed:
+        return (True, reason)
+    normalized_action = str(action or '').strip().lower()
+    if reason == 'pending' and normalized_action in {'detail', 'consult'}:
+        return (True, reason)
+    return (False, reason)
+
 def listing_unavailable_text(reason: str='') -> str:
     """统一不可预约页；具体内部状态不在客户页重复堆叠。"""
     return (
