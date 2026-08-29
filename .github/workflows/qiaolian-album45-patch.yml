@@ -5,7 +5,7 @@ on:
     branches:
       - codex/qiaolian-ui-cleanup-20260829
     paths:
-      - scripts/patch_tg_album_45.py
+      - scripts/patch_tg_album_45_v2.py
       - .github/workflows/qiaolian-album45-patch.yml
 
 permissions:
@@ -24,7 +24,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Apply 4:5 album patch
-        run: python scripts/patch_tg_album_45.py
+        run: python scripts/patch_tg_album_45_v2.py
       - name: Install dependencies
         run: python -m pip install -r requirements.txt pytest
       - name: Syntax check
@@ -40,7 +40,8 @@ jobs:
         run: |
           git config user.name "Gymmmm"
           git config user.email "73370798+Gymmmm@users.noreply.github.com"
-          git add meihua_publisher.py tests/test_tg_album_45.py .github/workflows/qiaolian-ui-check.yml
+          git add meihua_publisher.py tests/test_tg_album_45.py
           git diff --cached --quiet && exit 0
           git commit -m "standardize Telegram albums to 4:5"
+          git pull --rebase origin codex/qiaolian-ui-cleanup-20260829
           git push origin HEAD:codex/qiaolian-ui-cleanup-20260829
