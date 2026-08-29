@@ -141,7 +141,9 @@ def test_listing_entry_keeps_photo_detail_appointment_links():
 
 def test_obsolete_rent_day_reminder_is_removed():
     import qiaolian_dual.jobs as jobs
+    import qiaolian_dual.user_bot as user_bot
     assert not hasattr(jobs, 'rent_day_reminder_job')
+    assert not hasattr(user_bot, 'rent_day_reminder_job')
 
 
 def test_publication_package_has_no_duplicate_floor_import():

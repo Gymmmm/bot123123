@@ -25,7 +25,7 @@ from .flows import start_appointment as _start_appointment_impl, show_search_ent
 from .message_handlers import handle_main_message, handle_find_area, handle_find_budget, cmd_find, cmd_favorites, cmd_appointments, cmd_help, cmd_service, cmd_admin_list, cmd_admin_add, cmd_admin_remove, cmd_contact, cmd_search, cmd_about
 from .admin_commands import cmd_deal_done, cmd_lead_response, cmd_push_local, cmd_push_all
 from .callbacks import handle_ui_callback as _handle_ui_callback_impl
-from .jobs import lease_reminder_job, rent_day_reminder_job
+from .jobs import lease_reminder_job
 from .appointment_flow import appoint_flow_cb as _appoint_flow_cb_impl, handle_appointment_text
 from .app import cancel, error_handler, build_application as _build_application_impl, main
 
