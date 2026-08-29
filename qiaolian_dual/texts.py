@@ -71,23 +71,13 @@ async def render_panel(update: Update, *, text: str, reply_markup: InlineKeyboar
         context.user_data[PANEL_ANCHOR_KEY] = {'chat_id': int(sent.chat_id), 'message_id': int(sent.message_id)}
 
 def promise_text() -> str:
-    return (
-        '🛡 <b>租期服务保障</b>\n\n'
-        '绑定租客档案后：\n'
-        '• 租约到期前 <b>7 天</b>提醒你确认是否续租\n'
-        '• 报修提交即生成工单，处理进度会通知你\n\n'
-        '每一项都有记录，不只是口头跟进。'
-    )
+    return ('🛡 <b>租期服务保障</b>\n\n绑定租客档案后：\n• 租约到期前 <b>7 天</b>提醒你确认是否续租\n• 报修提交即生成工单，处理进度会通知你\n\n每一项都有记录，不只是口头跟进。')
 
 def deposit_text() -> str:
     return copy_deposit_text()
 
 def advisor_text() -> str:
-    return (
-        '✅ <b>中文顾问已收到</b>\n\n'
-        '中文顾问会通过 Telegram 联系你。\n'
-        '如果是具体房源，房源信息会自动带上，不用重复说明。'
-    )
+    return ('✅ <b>中文顾问已收到</b>\n\n中文顾问会通过 Telegram 联系你。\n如果是具体房源，房源信息会自动带上，不用重复说明。')
 
 def advisor_handoff_text(*, listing_id: str='', user_id: int | None=None) -> str:
     from .admin_contract import _binding_end_date
@@ -110,35 +100,16 @@ def smart_search_text() -> str:
     return copy_smart_search_text()
 
 def about_text() -> str:
-    return (
-        f'🏠 <b>{copy_about_text().__class__ and (BRAND_NAME or "侨联地产").replace("测试", "").strip() or "侨联地产"}｜金边租房中介</b>\n\n'
-        '✅ 实拍房源\n'
-        '✅ 中文顾问\n'
-        '✅ 费用核对\n'
-        '✅ 看房、签约、入住后继续跟进\n\n'
-        f'📱 联系中文顾问：{ADVISOR_TG}\n'
-        f'📢 房源频道：{CHANNEL_URL}'
-    )
+    return copy_about_text().replace('联系我们：', '联系中文顾问：')
 
 def brand_story_text() -> str:
     return copy_brand_text()
 
 def help_text() -> str:
-    return (
-        '❓ <b>怎么使用</b>\n\n'
-        '找房：点“帮我找房”，选择类型、位置和预算。\n'
-        '看房：打开一套可预约房源，点“预约看房”。\n'
-        '咨询：点“联系中文顾问”，具体房源会自动带上。\n'
-        '入住后：报修、物业沟通和周边生活都在“入住服务”。\n'
-        '租约：可在“我的租约”查看，到期前 7 天可开启提醒。'
-    )
+    return ('❓ <b>怎么使用</b>\n\n找房：点“帮我找房”，选择类型、位置和预算。\n看房：打开一套可预约房源，点“预约看房”。\n咨询：点“联系中文顾问”，具体房源会自动带上。\n入住后：报修、物业沟通和周边生活都在“入住服务”。\n租约：可在“我的租约”查看，到期前 7 天可开启提醒。')
 
 def service_hub_text() -> str:
-    return (
-        '🛠 <b>入住服务</b>\n\n'
-        '房子有问题或需要物业沟通，直接点下面办理。\n'
-        '侨联在租客户绑定租约后，报修会自动带上房屋信息；租约到期前 7 天会提醒你确认是否续租。'
-    )
+    return ('🛠 <b>入住服务</b>\n\n房子有问题或需要物业沟通，直接点下面办理。\n侨联在租客户绑定租约后，报修会自动带上房屋信息；租约到期前 7 天会提醒你确认是否续租。')
 
 def local_life_text() -> str:
     return copy_local_life_text()
