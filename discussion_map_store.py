@@ -1,9 +1,13 @@
 """
-discussion_map：JSON 与 SQLite 双源整合。
+discussion mapping compatibility store.
+
+Canonical source for published Telegram posts is posts.discuss_message_id.
+The historical discussion_map table and JSON file remain read/write fallbacks so
+old deployments and old posts keep working during migration.
 
 环境变量：
-  DISCUSSION_MAP_BACKEND — auto | json | sqlite（默认 auto：DB 有数据则读 DB，否则读 JSON）
-  DISCUSSION_MAP_WRITE_DB — 1/true 时 save 除写 JSON 外同步 UPSERT 到 SQLite discussion_map 表
+  DISCUSSION_MAP_BACKEND — auto | json | sqlite（默认 auto）
+  DISCUSSION_MAP_WRITE_DB — 1/true 时 save 额外镜像到旧 discussion_map 表
   DISCUSSION_MAP_FILE / DB_PATH — 与主工程一致
 """
 from __future__ import annotations
@@ -55,16 +59,51 @@ def _load_json() -> dict:
         return {}
 
 
-def _load_sqlite() -> dict:
+def _table_exists(conn: sqlite3.Connection, table: str) -> bool:
+    return conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
+    ).fetchone() is not None
+
+
+def _load_posts_sqlite() -> dict:
+    """读取正式 posts 映射；这是已发布房源的唯一优先事实来源。"""
     dbp = _db_file()
     if not dbp.is_file():
         return {}
     conn = sqlite3.connect(str(dbp))
     try:
-        row = conn.execute(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='discussion_map'"
-        ).fetchone()
-        if not row:
+        if not _table_exists(conn, "posts"):
+            return {}
+        cols = {str(row[1]) for row in conn.execute("PRAGMA table_info(posts)").fetchall()}
+        if not {"channel_message_id", "discuss_message_id"}.issubset(cols):
+            return {}
+        out: dict[str, int] = {}
+        rows = conn.execute(
+            """SELECT channel_message_id, discuss_message_id
+               FROM posts
+               WHERE channel_message_id IS NOT NULL
+                 AND discuss_message_id IS NOT NULL
+                 AND TRIM(CAST(discuss_message_id AS TEXT))<>''
+                 AND platform='telegram'
+                 AND publish_status IN ('published','success','ok')"""
+        ).fetchall()
+        for cid, mid in rows:
+            try:
+                out[str(int(cid))] = int(mid)
+            except (TypeError, ValueError):
+                continue
+        return out
+    finally:
+        conn.close()
+
+
+def _load_legacy_sqlite() -> dict:
+    dbp = _db_file()
+    if not dbp.is_file():
+        return {}
+    conn = sqlite3.connect(str(dbp))
+    try:
+        if not _table_exists(conn, "discussion_map"):
             return {}
         out: dict[str, int] = {}
         for cid, mid in conn.execute(
@@ -80,16 +119,33 @@ def _load_sqlite() -> dict:
         conn.close()
 
 
+def _merge_with_priority(*maps: dict) -> dict:
+    """左侧优先；后续来源只补缺失键。"""
+    merged: dict[str, int] = {}
+    for mapping in maps:
+        for key, value in (mapping or {}).items():
+            key = str(key)
+            if key in merged:
+                continue
+            try:
+                merged[key] = int(value)
+            except (TypeError, ValueError):
+                continue
+    return merged
+
+
 def load_discuss_map() -> dict:
     b = _backend()
     if b == "json":
         return _load_json()
+
+    canonical = _load_posts_sqlite()
+    legacy_sqlite = _load_legacy_sqlite()
     if b == "sqlite":
-        return _load_sqlite()
-    d = _load_sqlite()
-    if d:
-        return d
-    return _load_json()
+        return _merge_with_priority(canonical, legacy_sqlite)
+
+    # auto: posts is canonical; old table and JSON only fill missing historical rows.
+    return _merge_with_priority(canonical, legacy_sqlite, _load_json())
 
 
 def _save_json(data: dict) -> None:
@@ -100,6 +156,7 @@ def _save_json(data: dict) -> None:
 
 
 def _save_sqlite(data: dict) -> None:
+    """只维护旧兼容表；正式 posts 映射由发布流程自身写入。"""
     dbp = _db_file()
     dbp.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(dbp))
@@ -131,9 +188,9 @@ def _save_sqlite(data: dict) -> None:
 
 
 def save_discuss_map(data: dict) -> None:
-    """始终写 JSON；DISCUSSION_MAP_WRITE_DB=1 时额外镜像到 SQLite。"""
+    """保留 JSON/旧表兼容写入；新代码读取时始终优先 posts 映射。"""
     _save_json(data or {})
-    if (os.getenv("DISCUSSION_MAP_WRITE_DB", "").strip().lower() in ("1", "true", "yes")):
+    if os.getenv("DISCUSSION_MAP_WRITE_DB", "").strip().lower() in ("1", "true", "yes"):
         try:
             _save_sqlite(data or {})
         except Exception:
