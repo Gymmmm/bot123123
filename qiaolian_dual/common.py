@@ -55,6 +55,43 @@ FIND_BUDGET_OPTIONS: dict[str, list[tuple[str, str, int | None, int | None]]] = 
 db = Database(DB_PATH)
 PANEL_ANCHOR_KEY = '_panel_anchor'
 
+# CallbackQuery can only be answered once. All handlers use this idempotent helper.
+# Real Telegram callbacks have a stable query.id. A weak object set is only for local
+# test/fallback query objects that do not expose an id, avoiding Python id() reuse.
+from weakref import WeakSet
+_CALLBACK_ANSWERED_IDS: set[str] = set()
+_CALLBACK_ANSWERED_ORDER: list[str] = []
+_CALLBACK_ANSWERED_OBJECTS = WeakSet()
+
+async def answer_callback_once(query, text: str | None=None, *, show_alert: bool=False) -> bool:
+    query_id = str(getattr(query, 'id', '') or '')
+    if query_id:
+        if query_id in _CALLBACK_ANSWERED_IDS:
+            return False
+    else:
+        try:
+            if query in _CALLBACK_ANSWERED_OBJECTS:
+                return False
+        except TypeError:
+            if bool(getattr(query, '_qiaolian_answered', False)):
+                return False
+    await query.answer(text=text, show_alert=show_alert)
+    if query_id:
+        _CALLBACK_ANSWERED_IDS.add(query_id)
+        _CALLBACK_ANSWERED_ORDER.append(query_id)
+        if len(_CALLBACK_ANSWERED_ORDER) > 2048:
+            stale = _CALLBACK_ANSWERED_ORDER.pop(0)
+            _CALLBACK_ANSWERED_IDS.discard(stale)
+    else:
+        try:
+            _CALLBACK_ANSWERED_OBJECTS.add(query)
+        except TypeError:
+            try:
+                setattr(query, '_qiaolian_answered', True)
+            except Exception:
+                pass
+    return True
+
 __all__ = [name for name in globals() if not name.startswith('__')]
 
 # ConversationHandler callback patterns

@@ -123,6 +123,7 @@ async def test_listing_detail_calls_real_detail_route(monkeypatch):
     import qiaolian_dual.listing as listing_mod
     import qiaolian_dual.search as search_mod
     monkeypatch.setattr(listing_cb.db, 'get_listing', lambda lid: {'listing_id': lid, 'status': 'active'})
+    monkeypatch.setattr(listing_mod, 'listing_is_available', lambda lid: (True, 'active'))
     monkeypatch.setattr(search_mod, 'create_lead', lambda *a, **k: None)
     monkeypatch.setattr(listing_mod, 'listing_cost_text', lambda lid: '<b>DETAIL</b>')
     seen = {}
@@ -179,6 +180,8 @@ async def test_reserved_listing_is_allowed_by_real_appointment_flow(monkeypatch)
 @pytest.mark.asyncio
 async def test_listing_photos_calls_complete_album_handler(monkeypatch):
     import qiaolian_dual.results_admin as results
+    import qiaolian_dual.listing as listing_mod
+    monkeypatch.setattr(listing_mod, 'listing_is_available', lambda lid: (True, 'active'))
     seen = {}
     async def fake_album(bot, chat_id, listing_id):
         seen['listing_id'] = listing_id
@@ -194,6 +197,8 @@ async def test_listing_photos_calls_complete_album_handler(monkeypatch):
 @pytest.mark.asyncio
 async def test_listing_consult_preserves_listing_context(monkeypatch):
     import qiaolian_dual.flows as flows
+    import qiaolian_dual.listing as listing_mod
+    monkeypatch.setattr(listing_mod, 'listing_is_available', lambda lid: (True, 'active'))
     seen = {}
     async def fake_contact(update, context, **kwargs):
         seen.update(kwargs)

@@ -24,30 +24,30 @@ async def handle_appointment_callback(update: Update, context: ContextTypes.DEFA
             try:
                 appointment_id = int(data.rsplit(':', 1)[1])
             except (TypeError, ValueError):
-                await query.answer('预约编号无效', show_alert=True)
+                await answer_callback_once(query, '预约编号无效', show_alert=True)
                 return MAIN
             row = _find_user_appointment(user.id, appointment_id)
             current_status = str((row or {}).get('status') or '')
             if not row or current_status in {'done', 'cancelled'}:
-                await query.answer('这条预约已无法取消', show_alert=True)
+                await answer_callback_once(query, '这条预约已无法取消', show_alert=True)
                 return MAIN
             if db.update_appointment_status(appointment_id, 'cancelled'):
                 from .channel_status_sync import sync_channel_listing_status
                 await sync_channel_listing_status(str(row.get('listing_id') or ''))
-                await query.answer('预约已取消', show_alert=False)
+                await answer_callback_once(query, '预约已取消', show_alert=False)
                 await render_panel(update, text=appointment_details_text(user.id), parse_mode=ParseMode.HTML, reply_markup=_appointment_details_keyboard(user.id), context=context)
             else:
-                await query.answer('取消失败，请联系顾问', show_alert=True)
+                await answer_callback_once(query, '取消失败，请联系顾问', show_alert=True)
             return MAIN
     if data.startswith('appointment_menu:cancel:'):
             try:
                 appointment_id = int(data.rsplit(':', 1)[1])
             except (TypeError, ValueError):
-                await query.answer('预约编号无效', show_alert=True)
+                await answer_callback_once(query, '预约编号无效', show_alert=True)
                 return MAIN
             row = _find_user_appointment(user.id, appointment_id)
             if not row or str(row.get('status') or '') in {'done', 'cancelled'}:
-                await query.answer('这条预约已无法取消', show_alert=True)
+                await answer_callback_once(query, '这条预约已无法取消', show_alert=True)
                 return MAIN
             listing = _appointment_listing_compact(row.get('listing_id'))
             date_text = _appointment_date_compact(row.get('appointment_date'))

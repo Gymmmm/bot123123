@@ -165,24 +165,23 @@ def listing_entry_keyboard(listing_id: str) -> InlineKeyboardMarkup:
     ])
 
 def listing_is_available(listing_id: str) -> tuple[bool, str]:
-    from .session_deeplink import _latest_draft_review_status
+    """Canonical availability used by home, cards, detail, photos, consult and appointment."""
     listing_id = str(listing_id or '').strip()
     if not listing_id:
         return (False, 'missing')
     listing = db.get_listing(listing_id)
-    if listing:
-        status = str(listing.get('status') or 'active').strip().lower()
-        # active=尚无人排期；reserved=已有客户预约看房。两者都还未出租，均可继续预约。
-        if status not in {'active', 'reserved'}:
-            return (False, status or 'inactive')
-        if not db.is_listing_public(listing_id):
-            return (False, 'unpublished')
-    draft_status = _latest_draft_review_status(listing_id)
-    if draft_status in {'ready', 'published'}:
-        return (True, draft_status)
-    if draft_status:
-        return (False, draft_status)
-    return (False, 'missing')
+    if not listing:
+        return (False, 'missing')
+    status = str(listing.get('status') or 'pending').strip().lower()
+    if status in {'active', 'reserved'}:
+        return ((True, status) if db.is_listing_public(listing_id) else (False, 'unpublished'))
+    if status == 'pending':
+        return (False, 'pending')
+    if status == 'rented':
+        return (False, 'rented')
+    if status in {'offline', 'inactive'}:
+        return (False, 'offline')
+    return (False, status or 'pending')
 
 def listing_unavailable_text(reason: str='') -> str:
     """统一不可预约页；具体内部状态不在客户页重复堆叠。"""

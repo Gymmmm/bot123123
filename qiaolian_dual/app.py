@@ -19,7 +19,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
         query = getattr(update, 'callback_query', None)
         if query is not None:
             try:
-                await query.answer('这个按钮已失效，请重新进入预约流程。', show_alert=True)
+                await answer_callback_once(query, '这个按钮已失效，请重新进入预约流程。', show_alert=True)
             except Exception:
                 pass
         return

@@ -39,6 +39,10 @@ async def handle_listing_callback(update: Update, context: ContextTypes.DEFAULT_
             return MAIN
     if data.startswith('listing:photos:'):
             lid = data.split(':', 2)[2]
+            is_available, availability_reason = listing_is_available(lid)
+            if not is_available:
+                await render_panel(update, text=listing_unavailable_text(availability_reason), parse_mode=ParseMode.HTML, reply_markup=listing_unavailable_keyboard(lid), context=context)
+                return MAIN
             context.user_data['contact_listing_id'] = lid
             try:
                 await send_listing_photo_preview(context.bot, update.effective_chat.id, lid)
@@ -56,27 +60,17 @@ async def handle_listing_callback(update: Update, context: ContextTypes.DEFAULT_
                 )
             return MAIN
     if data == 'find:show_more':
-            bot = context.bot
-            remaining_ids = list(context.user_data.get('find_more_listing_ids') or [])
-            if not remaining_ids:
-                await bot.send_message(chat_id=update.effective_chat.id, text='这批结果已经看完了，可以换个条件继续找。', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('✏️ 换个条件', callback_data='home_smart_search')], [InlineKeyboardButton('🏠 返回首页', callback_data='home')]]))
-                return MAIN
-            batch_ids, remaining_ids = (remaining_ids[:3], remaining_ids[3:])
-            context.user_data['find_more_listing_ids'] = remaining_ids
-            sent = 0
-            for lid in batch_ids:
-                item = listing_context(lid)
-                if item and item.get('listing_id'):
-                    sent += 1
-                    await send_listing_card(bot, update.effective_chat.id, item, sent, len(batch_ids))
-                    await asyncio.sleep(0.5)
-            if remaining_ids:
-                reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(f'再看 {len(remaining_ids)} 套', callback_data='find:show_more')], [InlineKeyboardButton('🏠 返回首页', callback_data='home')]])
-                text = f'后面还有 {len(remaining_ids)} 套。'
+            # Legacy callback only: fold any old remainder into the same single-card carousel.
+            ids = list(context.user_data.get('find_card_listing_ids') or [])
+            ids.extend(str(value) for value in (context.user_data.pop('find_more_listing_ids', []) or []) if str(value or '').strip())
+            ids = list(dict.fromkeys(value for value in ids if value))
+            if not ids:
+                ids = [str(item.get('listing_id') or '') for item in db.list_recent_listings(10) if item.get('listing_id')]
+            context.user_data['find_card_listing_ids'] = ids
+            if ids:
+                await send_find_result_card(update, context, 0, replace=True)
             else:
-                reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton('✏️ 换个条件', callback_data='home_smart_search')], [InlineKeyboardButton('🏠 返回首页', callback_data='home')]])
-                text = '这批结果已经全部看完。'
-            await bot.send_message(chat_id=update.effective_chat.id, text=text, reply_markup=reply_markup)
+                await render_panel(update, text='暂时没有可以安排看房的房源。', parse_mode=ParseMode.HTML, reply_markup=no_match_followup_keyboard(), context=context)
             return MAIN
     if data.startswith('listing:open:'):
             lid = data.split(':', 2)[2]
@@ -169,11 +163,19 @@ async def handle_listing_callback(update: Update, context: ContextTypes.DEFAULT_
             return MAIN
     if data.startswith('listing:consult:'):
             lid = data.split(':', 2)[2]
+            is_available, availability_reason = listing_is_available(lid)
+            if not is_available:
+                await render_panel(update, text=listing_unavailable_text(availability_reason), parse_mode=ParseMode.HTML, reply_markup=listing_unavailable_keyboard(lid), context=context)
+                return MAIN
             context.user_data['contact_listing_id'] = lid
             context.user_data['contact_touch_payload'] = {'listing_id': lid, 'entry': 'listing_card'}
             return await contact_management(update, context, source='listing_card', from_listing=lid)
     if data.startswith('listing:detail:'):
             lid = data.split(':', 2)[2]
+            is_available, availability_reason = listing_is_available(lid)
+            if not is_available:
+                await render_panel(update, text=listing_unavailable_text(availability_reason), parse_mode=ParseMode.HTML, reply_markup=listing_unavailable_keyboard(lid), context=context)
+                return MAIN
             item = db.get_listing(lid) if lid else None
             if not item:
                 await render_panel(update, text='未找到该房源详情，可能已下架。', reply_markup=main_keyboard(), context=context)
@@ -186,7 +188,11 @@ async def handle_listing_callback(update: Update, context: ContextTypes.DEFAULT_
                 [InlineKeyboardButton('💬 联系中文顾问', callback_data=f'listing:consult:{lid}')],
                 [InlineKeyboardButton('⬅️ 返回这套房', callback_data=f'listing:open:{lid}')],
             ])
-            await render_panel(update, text=listing_cost_text(lid), parse_mode=ParseMode.HTML, reply_markup=detail_kb, context=context)
+            detail_text = listing_cost_text(lid)
+            if getattr(query.message, 'photo', None):
+                await query.edit_message_caption(caption=detail_text, parse_mode=ParseMode.HTML, reply_markup=detail_kb)
+            else:
+                await render_panel(update, text=detail_text, parse_mode=ParseMode.HTML, reply_markup=detail_kb, context=context)
             return MAIN
     if data.startswith('listing:similar:'):
             lid = data.split(':', 2)[2]

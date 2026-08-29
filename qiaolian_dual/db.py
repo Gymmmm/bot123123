@@ -9,7 +9,7 @@ from typing import Any, Iterable
 
 from .config import DB_PATH, logger
 
-LISTING_STATUSES = {"active", "pending", "reserved", "rented", "inactive"}
+LISTING_STATUSES = {"active", "pending", "reserved", "rented", "inactive", "offline"}
 
 SCHEMA = '''
 PRAGMA journal_mode=WAL;
@@ -363,25 +363,20 @@ class Database:
         return item
 
     def list_recent_listings(self, limit: int = 10) -> list[dict[str, Any]]:
-        if not {"drafts", "posts"}.issubset(self._table_names()):
-            return []
+        """Public browsing list. Publication evidence is canonical, not the current queue row."""
         with self.connect() as conn:
             rows = conn.execute(
-                """SELECT l.* FROM listings l
-                   WHERE l.status IN ('active','reserved')
-                     AND EXISTS (
-                       SELECT 1 FROM drafts d JOIN posts p ON p.draft_id=d.draft_id
-                       WHERE d.listing_id=l.listing_id AND d.review_status='published'
-                         AND p.platform='telegram' AND p.publish_status IN ('published','success','ok')
-                     )
-                   ORDER BY l.created_at DESC LIMIT ?""",
-                (limit,),
+                "SELECT * FROM listings WHERE status IN ('active','reserved') ORDER BY created_at DESC LIMIT ?",
+                (max(int(limit) * 4, int(limit)),),
             ).fetchall()
-        result = []
+        result: list[dict[str, Any]] = []
         for row in rows:
             item = row_to_dict(row) or {}
             item["tags"] = json.loads(item.pop("tags_json", "[]") or "[]")
-            result.append(item)
+            if self.is_listing_public(str(item.get('listing_id') or '')):
+                result.append(item)
+            if len(result) >= int(limit):
+                break
         return result
 
     def search_listings(
@@ -394,13 +389,7 @@ class Database:
         ilike_fragment: str | None = None,
         limit: int = 6,
     ) -> list[dict[str, Any]]:
-        if not {"drafts", "posts"}.issubset(self._table_names()):
-            return []
-        clauses = ["status IN ('active','reserved')", """EXISTS (
-            SELECT 1 FROM drafts d JOIN posts p ON p.draft_id=d.draft_id
-            WHERE d.listing_id=listings.listing_id AND d.review_status='published'
-              AND p.platform='telegram' AND p.publish_status IN ('published','success','ok')
-        )"""]
+        clauses = ["status IN ('active','reserved')"]
         params: list[Any] = []
         if property_type:
             clauses.append("property_type=?")
@@ -412,50 +401,86 @@ class Database:
             params.extend(cleaned_areas)
         if budget_min is not None:
             clauses.append("price>=?")
-            params.append(budget_min)
+            params.append(int(budget_min))
         if budget_max is not None:
             clauses.append("price<=?")
-            params.append(budget_max)
-        frag = (ilike_fragment or "").strip()
-        if frag:
-            k = f"%{frag[:120]}%"
-            like_cols = [
-                "title",
-                "highlights",
-                "layout",
-                "area",
-                "community",
-                "tags_json",
-                "hidden_costs",
-                "drawbacks",
-            ]
-            existing = self._table_columns("listings")
-            like_cols = [c for c in like_cols if c in existing]
-            if like_cols:
-                clauses.append("(" + " OR ".join(f"{c} LIKE ?" for c in like_cols) + ")")
-                params.extend([k] * len(like_cols))
-        sql = f"SELECT * FROM listings WHERE {' AND '.join(clauses)} ORDER BY created_at DESC LIMIT ?"
-        params.append(limit)
+            params.append(int(budget_max))
+        if ilike_fragment:
+            fragment = f"%{ilike_fragment}%"
+            clauses.append("(title LIKE ? OR community LIKE ? OR area LIKE ? OR layout LIKE ? OR property_type LIKE ?)")
+            params.extend([fragment] * 5)
+        sql = "SELECT * FROM listings WHERE " + " AND ".join(clauses) + " ORDER BY created_at DESC LIMIT ?"
+        params.append(max(int(limit) * 4, int(limit)))
         with self.connect() as conn:
             rows = conn.execute(sql, params).fetchall()
-        items: list[dict[str, Any]] = []
+        result: list[dict[str, Any]] = []
         for row in rows:
             item = row_to_dict(row) or {}
             item["tags"] = json.loads(item.pop("tags_json", "[]") or "[]")
-            items.append(item)
-        return items
+            if self.is_listing_public(str(item.get('listing_id') or '')):
+                result.append(item)
+            if len(result) >= int(limit):
+                break
+        return result
+
+    def has_publication_evidence(self, listing_id: str) -> bool:
+        """Accept current or historical Telegram publication evidence after queue rebuilds."""
+        listing_id = str(listing_id or '').strip()
+        if not listing_id:
+            return False
+        tables = self._table_names()
+        try:
+            with self.connect() as conn:
+                # Current canonical draft -> Telegram post chain.
+                if {'drafts', 'posts'}.issubset(tables):
+                    dcols = {row['name'] for row in conn.execute('PRAGMA table_info(drafts)').fetchall()}
+                    pcols = {row['name'] for row in conn.execute('PRAGMA table_info(posts)').fetchall()}
+                    if {'listing_id', 'draft_id', 'review_status'}.issubset(dcols) and {'draft_id'}.issubset(pcols):
+                        filters = ["d.listing_id=?", "d.review_status='published'"]
+                        if 'platform' in pcols:
+                            filters.append("p.platform='telegram'")
+                        if 'publish_status' in pcols:
+                            filters.append("p.publish_status IN ('published','success','ok')")
+                        row = conn.execute(
+                            'SELECT 1 FROM drafts d JOIN posts p ON p.draft_id=d.draft_id WHERE ' + ' AND '.join(filters) + ' LIMIT 1',
+                            (listing_id,),
+                        ).fetchone()
+                        if row:
+                            return True
+                    # Historical posts may retain listing_id after the draft queue was rebuilt.
+                    if 'listing_id' in pcols:
+                        filters = ['listing_id=?']
+                        if 'platform' in pcols:
+                            filters.append("platform='telegram'")
+                        if 'publish_status' in pcols:
+                            filters.append("publish_status IN ('published','success','ok')")
+                        row = conn.execute('SELECT 1 FROM posts WHERE ' + ' AND '.join(filters) + ' LIMIT 1', (listing_id,)).fetchone()
+                        if row:
+                            return True
+                # Frozen publication package is also valid evidence of a public package.
+                if 'publication_packages' in tables:
+                    cols = {row['name'] for row in conn.execute('PRAGMA table_info(publication_packages)').fetchall()}
+                    id_col = 'property_id' if 'property_id' in cols else ('listing_id' if 'listing_id' in cols else '')
+                    if id_col:
+                        filters = [f'{id_col}=?']
+                        if 'status' in cols:
+                            filters.append("status IN ('published','approved','package_ready')")
+                        row = conn.execute('SELECT 1 FROM publication_packages WHERE ' + ' AND '.join(filters) + ' LIMIT 1', (listing_id,)).fetchone()
+                        if row:
+                            return True
+        except sqlite3.Error:
+            logger.debug('publication evidence lookup failed: %s', listing_id, exc_info=True)
+        return False
 
     def is_listing_public(self, listing_id: str) -> bool:
-        if not {"drafts", "posts"}.issubset(self._table_names()):
+        listing = self.get_listing(str(listing_id or '').strip())
+        if not listing:
             return False
-        with self.connect() as conn:
-            row = conn.execute("""SELECT 1 FROM listings l
-                JOIN drafts d ON d.listing_id=l.listing_id AND d.review_status='published'
-                JOIN posts p ON p.listing_id=l.listing_id
-                WHERE l.listing_id=? AND l.status='active'
-                  AND p.platform='telegram' AND p.publish_status IN ('published','success','ok')
-                LIMIT 1""", (str(listing_id or ''),)).fetchone()
-            return row is not None
+        status = str(listing.get('status') or '').strip().lower()
+        if status not in {'active', 'reserved'}:
+            return False
+        return self.has_publication_evidence(str(listing_id or '').strip())
+
     def favorite_listing(self, user_id: int, listing_id: str, created_at: str) -> None:
         with self.connect() as conn:
             conn.execute(

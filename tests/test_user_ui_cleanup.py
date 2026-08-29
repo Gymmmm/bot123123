@@ -173,8 +173,9 @@ def test_binding_copy_only_promises_service_context_and_seven_day_reminder():
 
 def test_find_card_rechecks_listing_status_before_rendering():
     source = Path('qiaolian_dual/results_admin.py').read_text(encoding='utf-8')
-    assert "status not in {'active', 'reserved'}" in source
-    assert '房态已经变化' in source
+    assert 'listing_is_available' in source
+    assert 'valid_ids' in source
+    assert '房态都已经变化' in source
 
 
 def test_find_card_keeps_navigation_and_more_photos_cta():

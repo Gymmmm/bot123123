@@ -107,7 +107,7 @@ async def handle_search_callback(update: Update, context: ContextTypes.DEFAULT_T
             matches, match_mode = search_listings_with_fallback(property_type=type_filter or None, area=area, budget_min=budget_min, budget_max=budget_max, text_fragment=f'{goal} {area} {budget_label}', limit=5)
             if matches:
                 if match_mode in {'no_type', 'no_area', 'budget_only', 'fuzzy', 'fallback_recent'}:
-                    await query.answer('已自动放宽条件匹配', show_alert=False)
+                    await answer_callback_once(query, '已自动放宽条件匹配', show_alert=False)
                 await send_find_results_as_cards(update, context, matches, match_mode)
             else:
                 await render_panel(update, text=find_no_match_text(), parse_mode=ParseMode.HTML, reply_markup=no_match_followup_keyboard())

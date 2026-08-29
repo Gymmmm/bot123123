@@ -24,11 +24,11 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
             from .admin_contract import _is_admin_user
             from .messages import repair_progress_text
             if not _is_admin_user(getattr(user, 'id', 0)):
-                await query.answer('仅顾问可操作', show_alert=True)
+                await answer_callback_once(query, '仅顾问可操作', show_alert=True)
                 return MAIN
             parts = data.split(':')
             if len(parts) != 3 or not str(parts[2]).isdigit():
-                await query.answer('这条报修已失效', show_alert=True)
+                await answer_callback_once(query, '这条报修已失效', show_alert=True)
                 return MAIN
             stage = str(parts[1] or '')
             labels = {
@@ -40,7 +40,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
             ticket_id = int(parts[2])
             ticket = db.update_repair_ticket_status(ticket_id, stage)
             if not ticket:
-                await query.answer('未找到这条报修，可能已处理', show_alert=True)
+                await answer_callback_once(query, '未找到这条报修，可能已处理', show_alert=True)
                 return MAIN
             customer_id = int(ticket.get('user_id') or 0)
             if customer_id > 0:
@@ -58,16 +58,16 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 original + f'\n\n<b>处理状态：</b>{he(labels[stage])}',
                 parse_mode=ParseMode.HTML,
             )
-            await query.answer(f'已通知客户：{labels[stage]}')
+            await answer_callback_once(query, f'已通知客户：{labels[stage]}')
             return MAIN
     if data.startswith('adminlead:'):
             from .admin_contract import _is_admin_user
             if not _is_admin_user(getattr(user, 'id', 0)):
-                await query.answer('仅顾问可操作', show_alert=True)
+                await answer_callback_once(query, '仅顾问可操作', show_alert=True)
                 return MAIN
             parts = data.split(':')
             if len(parts) != 5 or not all((part.isdigit() for part in parts[2:])):
-                await query.answer('线索参数已失效', show_alert=True)
+                await answer_callback_once(query, '线索参数已失效', show_alert=True)
                 return MAIN
             action = parts[1]
             lead_id, appointment_id, customer_id = map(int, parts[2:])
@@ -85,7 +85,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                     from .channel_status_sync import sync_channel_listing_status
                     await sync_channel_listing_status(str(appt_row[0] or ''))
             if not ok:
-                await query.answer('线索不存在或已失效', show_alert=True)
+                await answer_callback_once(query, '线索不存在或已失效', show_alert=True)
                 return MAIN
             original = str(getattr(query.message, 'text_html', '') or getattr(query.message, 'text', '') or '')
             status_line = f'<b>当前状态｜{he(label)}</b>\n跟进顾问｜{he(advisor_name)}'

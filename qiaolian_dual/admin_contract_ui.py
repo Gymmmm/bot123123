@@ -41,7 +41,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, qu
     from .admin_contract import _is_admin_user
     from .session_deeplink import _deep_link, now_ts
     if not _is_admin_user(getattr(user, "id", 0)):
-        await query.answer("仅管理员可操作", show_alert=True)
+        await answer_callback_once(query, "仅管理员可操作", show_alert=True)
         return MAIN
     action = data.split(":", 1)[1]
     if action in {"home", "cancel"}:
@@ -85,7 +85,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, qu
     if action == "confirm":
         draft = context.user_data.get("admin_contract_draft") or {}
         if draft.get("step") != "confirm":
-            await query.answer("这份录入已失效，请重新开始", show_alert=True)
+            await answer_callback_once(query, "这份录入已失效，请重新开始", show_alert=True)
             return MAIN
         code = f'QL{datetime.now().strftime("%y%m%d")}{secrets.token_hex(3).upper()}'
         target_user_id = int(draft.get("user_id") or 0)

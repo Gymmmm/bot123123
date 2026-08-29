@@ -18,7 +18,7 @@ async def appoint_flow_cb(update: Update, context: ContextTypes.DEFAULT_TYPE, *,
     query = update.callback_query
     create_lead = create_lead_fn or default_create_lead
     _notify_admins = notify_admins_fn or default_notify_admins
-    await query.answer()
+    await answer_callback_once(query)
     data = query.data
     appt = context.user_data.setdefault('appt', {})
     if data != 'home' and (not appt):
@@ -55,7 +55,7 @@ async def appoint_flow_cb(update: Update, context: ContextTypes.DEFAULT_TYPE, *,
     if data == 'apfocus:next':
         selected = set((str(k) for k in appt.get('focus_keys') or []))
         if not selected:
-            await query.answer('至少保留 1 个关注点', show_alert=True)
+            await answer_callback_once(query, '至少保留 1 个关注点', show_alert=True)
             return APPT_FOCUS
         text = '第三步：请选择预约日期。'
         await query.edit_message_text(text, reply_markup=_appointment_date_keyboard(), parse_mode=ParseMode.HTML)
