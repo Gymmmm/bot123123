@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from .common import *
-
 def _search_type_button_rows() -> list[list[InlineKeyboardButton]]:
     return [[InlineKeyboardButton('🏢 公寓', callback_data='findtype:住宅'), InlineKeyboardButton('🏡 别墅/排屋', callback_data='findtype:别墅/排屋')], [InlineKeyboardButton('🏬 商铺/办公', callback_data='findtype:商铺/办公'), InlineKeyboardButton('不限类型', callback_data='findtype:any')]]
 
@@ -55,11 +54,10 @@ def _decode_budget_choice(goal: str, code: str) -> tuple[str, int | None, int | 
     return ('不限', None, None)
 
 def appointment_menu_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([[InlineKeyboardButton('📍 实地看房', callback_data='appointment_menu:offline'), InlineKeyboardButton('📹 视频看房', callback_data='appointment_menu:video')], [InlineKeyboardButton('📅 我的预约', callback_data='appointment_menu:list'), InlineKeyboardButton('💬 联系顾问', callback_data='appointment_menu:contact')], [InlineKeyboardButton('⬅️ 返回首页', callback_data='home')]])
+    return InlineKeyboardMarkup([[InlineKeyboardButton('📍 实地看房', callback_data='appointment_menu:offline'), InlineKeyboardButton('📹 视频看房', callback_data='appointment_menu:video')], [InlineKeyboardButton('📅 我的预约', callback_data='appointment_menu:list'), InlineKeyboardButton('💬 联系中文顾问', callback_data='appointment_menu:contact')], [InlineKeyboardButton('⬅️ 返回首页', callback_data='home')]])
 
 def precise_filter_keyboard(selected: set[str] | None=None) -> InlineKeyboardMarkup:
     picked = selected or set()
-
     def _btn(key: str) -> InlineKeyboardButton:
         label = PREF_CONDITION_LABELS.get(key, key)
         prefix = '✅ ' if key in picked else '▫️ '
@@ -89,7 +87,7 @@ def service_repair_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([[InlineKeyboardButton('❄️ 空调/家电', callback_data='service_request:repair_ac'), InlineKeyboardButton('🚿 漏水/堵水', callback_data='service_request:repair_water')], [InlineKeyboardButton('💡 灯具/电路', callback_data='service_request:repair_power'), InlineKeyboardButton('🚪 门锁/门窗', callback_data='service_request:repair_door')], [InlineKeyboardButton('📦 家具损坏', callback_data='service_request:repair_furniture'), InlineKeyboardButton('🔧 其他问题', callback_data='service_request:repair_other')], [InlineKeyboardButton('⬅️ 返回入住服务', callback_data='service:hub')]])
 
 def service_detail_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([[InlineKeyboardButton('💬 联系顾问', callback_data='service:contact')], [InlineKeyboardButton('⬅️ 返回入住服务', callback_data='service:hub')]])
+    return InlineKeyboardMarkup([[InlineKeyboardButton('💬 联系中文顾问', callback_data='service:contact')], [InlineKeyboardButton('⬅️ 返回入住服务', callback_data='service:hub')]])
 
 def local_life_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
@@ -100,8 +98,7 @@ def local_life_keyboard() -> InlineKeyboardMarkup:
     ])
 
 def rfcity_keyboard() -> InlineKeyboardMarkup:
-    # 商家入驻属于后期生活平台运营，不放在当前租客办事入口。
-    return InlineKeyboardMarkup([[InlineKeyboardButton('🍴 餐厅小吃', callback_data='rfcity:restaurant'), InlineKeyboardButton('🔥 烧烤夜宵', callback_data='rfcity:bbq')], [InlineKeyboardButton('🥤 奶茶饮品', callback_data='rfcity:drinks'), InlineKeyboardButton('🛒 超市便利', callback_data='rfcity:supermarket')], [InlineKeyboardButton('🏨 酒店租房', callback_data='rfcity:hotel'), InlineKeyboardButton('🏋️ 休闲生活', callback_data='rfcity:recreation')], [InlineKeyboardButton('🚛 快递物流', callback_data='rfcity:logistics'), InlineKeyboardButton('👨\u200d💻 富力物业', callback_data='rfcity:property')], [InlineKeyboardButton('⬅️ 返回周边生活', callback_data='service:local_life')]])
+    return InlineKeyboardMarkup([[InlineKeyboardButton('🍴 餐厅小吃', callback_data='rfcity:restaurant'), InlineKeyboardButton('🔥 烧烤夜宵', callback_data='rfcity:bbq')], [InlineKeyboardButton('🥤 奶茶饮品', callback_data='rfcity:drinks'), InlineKeyboardButton('🛒 超市便利', callback_data='rfcity:supermarket')], [InlineKeyboardButton('🏨 酒店租房', callback_data='rfcity:hotel'), InlineKeyboardButton('🏋️ 休闲生活', callback_data='rfcity:recreation')], [InlineKeyboardButton('🚛 快递物流', callback_data='rfcity:logistics'), InlineKeyboardButton('👨‍💻 富力物业', callback_data='rfcity:property')], [InlineKeyboardButton('⬅️ 返回周边生活', callback_data='service:local_life')]])
 
 def rfcity_back_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([[InlineKeyboardButton('🏙 返回富力周边', callback_data='local:rfcity')]])
