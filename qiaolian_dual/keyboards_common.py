@@ -4,16 +4,12 @@ from __future__ import annotations
 from .common import *
 
 def main_keyboard() -> InlineKeyboardMarkup:
-    """手机首页的客户任务入口。
-
-    首页只展示客户真正会使用的动作；收藏、帮助和品牌介绍放到二级
-    页面，避免首次打开时让用户理解内部功能。
-    """
+    """手机首页的客户任务入口。"""
     return InlineKeyboardMarkup(
         [
             [
                 InlineKeyboardButton('🔍 帮我找房', callback_data='home_smart_search'),
-                InlineKeyboardButton('🏠 可看房源', callback_data='hub:latest'),
+                InlineKeyboardButton('🏠 可预约房源', callback_data='hub:latest'),
             ],
             [
                 InlineKeyboardButton('📅 我的预约', callback_data='hub:appointments'),
@@ -33,7 +29,7 @@ def room_type_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([[InlineKeyboardButton('开间', callback_data='roompick:studio'), InlineKeyboardButton('1房', callback_data='roompick:1房')], [InlineKeyboardButton('2房', callback_data='roompick:2房'), InlineKeyboardButton('3房+', callback_data='roompick:3房')], [InlineKeyboardButton('别墅/排屋', callback_data='roompick:别墅'), InlineKeyboardButton('商铺/办公', callback_data='roompick:商铺')], [InlineKeyboardButton('⬅️ 返回', callback_data='home')]])
 
 def latest_listing_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([[InlineKeyboardButton('🔍 帮我找房', callback_data='home_smart_search'), InlineKeyboardButton('💬 联系顾问', callback_data='hub:advisor')], [InlineKeyboardButton('⬅️ 返回首页', callback_data='home')]])
+    return InlineKeyboardMarkup([[InlineKeyboardButton('🔍 帮我找房', callback_data='home_smart_search'), InlineKeyboardButton('💬 联系中文顾问', callback_data='hub:advisor')], [InlineKeyboardButton('⬅️ 返回首页', callback_data='home')]])
 
 def keyword_followup_keyboard(*, area: str='', room_type: str='') -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
@@ -54,12 +50,13 @@ def _advisor_tg_url() -> str:
 def _advisor_listing_url(listing_id: str) -> str:
     """房源页直达真人顾问，并预填当前房源摘要。"""
     from .listing import listing_context
-    from .utils_formatting import _display_listing_id, _fmt_price
+    from .utils_formatting import _display_listing_id, _display_layout, _fmt_price
     base = _advisor_tg_url()
     if not base:
         return ''
     info = listing_context(listing_id)
-    facts = [str(info.get('project') or info.get('community') or info.get('area') or '').strip(), str(info.get('layout') or '').strip(), _fmt_price(info.get('price'))]
+    display_layout = _display_layout(info.get('layout'), info.get('property_type'))
+    facts = [str(info.get('project') or info.get('community') or info.get('area') or '').strip(), display_layout, _fmt_price(info.get('price'))]
     summary = '｜'.join((value for value in facts if value and value != '价格待确认'))
     message = f'你好，我想咨询房源 {_display_listing_id(listing_id)}'
     if summary:
@@ -88,7 +85,7 @@ def contact_handoff_keyboard(*, listing_id: str='') -> InlineKeyboardMarkup:
 def appointment_success_keyboard() -> InlineKeyboardMarkup:
     """提交后给出查看、顾问与继续看房三个明确去向。"""
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton('📅 我的预约', callback_data='appointment_menu:list'), InlineKeyboardButton('💬 联系顾问', callback_data='appointment_menu:contact')],
+        [InlineKeyboardButton('📅 我的预约', callback_data='appointment_menu:list'), InlineKeyboardButton('💬 联系中文顾问', callback_data='appointment_menu:contact')],
         [InlineKeyboardButton('🏠 继续看房', callback_data='hub:latest')],
     ])
 
@@ -101,15 +98,21 @@ def channel_return_keyboard(channel_url: str='') -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(rows)
 
 def lead_capture_keyboard() -> InlineKeyboardMarkup:
-    """关键行为完成后的下一步：直接联系我们或继续看房。"""
+    """关键行为完成后的下一步：联系中文顾问或继续看房。"""
     rows: list[list[InlineKeyboardButton]] = []
     advisor_url = _advisor_tg_url()
     if advisor_url:
-        rows.append([InlineKeyboardButton('💬 打开顾问对话', url=advisor_url)])
+        rows.append([InlineKeyboardButton('💬 联系中文顾问', url=advisor_url)])
     else:
-        rows.append([InlineKeyboardButton('💬 联系顾问', callback_data='hub:advisor')])
+        rows.append([InlineKeyboardButton('💬 联系中文顾问', callback_data='hub:advisor')])
     rows.append([InlineKeyboardButton('🔍 继续找房', callback_data='home_smart_search'), InlineKeyboardButton('🏠 返回首页', callback_data='home')])
     return InlineKeyboardMarkup(rows)
 
 def old_tenant_followup_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([[InlineKeyboardButton('📋 我的租约', callback_data='contract:view'), InlineKeyboardButton('🔄 续租咨询', callback_data='contract:renew')], [InlineKeyboardButton('🏠 我要换房', callback_data='contract:change'), InlineKeyboardButton('💬 联系我们', callback_data='appointment_menu:contact')], [InlineKeyboardButton('📅 预约看房', callback_data='appointment_menu:offline')], [InlineKeyboardButton('🏠 返回首页', callback_data='home')]])
+    """老客新页面不再生成续租/换房按钮；旧回调仍由处理器兼容。"""
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton('📋 我的租约', callback_data='contract:view')],
+        [InlineKeyboardButton('📅 我的预约', callback_data='appointment_menu:list'), InlineKeyboardButton('🛠 入住服务', callback_data='service:hub')],
+        [InlineKeyboardButton('💬 联系中文顾问', callback_data='appointment_menu:contact')],
+        [InlineKeyboardButton('🏠 返回首页', callback_data='home')],
+    ])
