@@ -20,7 +20,7 @@ from qiaolian_dual.canonical_listing_materializer import (
     ensure_canonical_projection_schema, materialize_listing, canonical_projection_hash,
 )
 from qiaolian_dual.publishability_contract import evaluate_publishability
-from qiaolian_dual.utils_formatting import _display_layout, _display_floor, _display_floor
+from qiaolian_dual.utils_formatting import _display_layout, _display_floor
 
 ROOT = Path(__file__).resolve().parent
 PACKAGE_ROOT = ROOT / "media" / "publication_packages"

@@ -137,3 +137,25 @@ def test_listing_entry_keeps_photo_detail_appointment_links():
         'listing:appoint:l_2',
         'home_smart_search',
     ]
+
+
+def test_obsolete_rent_day_reminder_is_removed():
+    import qiaolian_dual.jobs as jobs
+    assert not hasattr(jobs, 'rent_day_reminder_job')
+
+
+def test_publication_package_has_no_duplicate_floor_import():
+    source = Path('publication_package.py').read_text(encoding='utf-8')
+    assert '_display_floor, _display_floor' not in source
+
+
+def test_customer_routes_do_not_leak_internal_listing_wording():
+    source = Path('qiaolian_dual/start_routes.py').read_text(encoding='utf-8')
+    assert '在架房源' not in source
+    assert '请联系我们重新获取绑定码' not in source
+
+
+def test_find_card_rechecks_listing_status_before_rendering():
+    source = Path('qiaolian_dual/results_admin.py').read_text(encoding='utf-8')
+    assert "status not in {'active', 'reserved'}" in source
+    assert '房态已经变化' in source

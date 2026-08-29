@@ -53,7 +53,7 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
         if not is_available:
             if availability_reason == 'missing':
                 create_lead(user, action='broken_link', source=source, listing_id=listing_id, payload={**touch_payload, 'reason': availability_reason})
-            await message.reply_text(listing_unavailable_text(), reply_markup=listing_unavailable_keyboard(listing_id))
+            await message.reply_text(listing_unavailable_text(availability_reason), reply_markup=listing_unavailable_keyboard(listing_id))
             return MAIN
         initial_mode = str(target_meta.get('mode') or '').strip().lower()
         create_lead(user, action='appointment_click', source=source, listing_id=listing_id, payload={**touch_payload, 'preferred_mode': initial_mode, 'caption_variant': caption_variant})
@@ -66,7 +66,7 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
         if not is_available:
             if availability_reason == 'missing':
                 create_lead(user, action='broken_link', source=source, listing_id=listing_id, payload={**touch_payload, 'reason': availability_reason})
-            await message.reply_text(listing_unavailable_text(), reply_markup=listing_unavailable_keyboard(listing_id))
+            await message.reply_text(listing_unavailable_text(availability_reason), reply_markup=listing_unavailable_keyboard(listing_id))
             return MAIN
         listing_info = listing_context(listing_id)
         caption_variant = _normalize_variant(target_meta.get('cv')) or str(listing_info.get('caption_variant') or 'a').lower()
@@ -85,7 +85,7 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
         if not is_available:
             if availability_reason == 'missing':
                 create_lead(user, action='broken_link', source=source, listing_id=listing_id, payload={**touch_payload, 'reason': availability_reason})
-            await message.reply_text(listing_unavailable_text(), reply_markup=listing_unavailable_keyboard(listing_id))
+            await message.reply_text(listing_unavailable_text(availability_reason), reply_markup=listing_unavailable_keyboard(listing_id))
             return MAIN
         context.user_data['contact_listing_id'] = listing_id
         context.user_data['contact_touch_payload'] = {**touch_payload, 'entry': 'photos'}
@@ -119,7 +119,7 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
         binding = db.bind_by_code(user.id, binding_code)
         if not binding:
             create_lead(user, action='tenant_bind_invalid', source='tenant_bind', payload={'binding_code': binding_code})
-            await message.reply_text('这个绑定链接已失效或已使用过。\n请联系我们重新获取绑定码，或直接发消息给我们 ↓', reply_markup=contact_handoff_keyboard())
+            await message.reply_text('这个绑定链接已失效或已使用过。\n请联系中文顾问重新获取绑定码，或直接发消息给我们 ↓', reply_markup=contact_handoff_keyboard())
             return MAIN
         create_lead(user, action='tenant_bind_success', source='tenant_bind', listing_id=str(binding.get('property_name') or ''), payload={'binding_code': binding_code, 'binding_id': binding.get('id')})
         _store_active_entry(context, arg=arg, action=action, listing_id=str(binding.get('property_name') or ''), touch_payload={'binding_code': binding_code, 'binding_id': binding.get('id')})
@@ -157,7 +157,7 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
         if matches:
             intro = ''
             if listing_id:
-                intro = '🏠 这套房同区域还有这些在架房源，你可以直接继续看：\n\n'
+                intro = '🏠 这套房同区域还有这些可预约房源，你可以直接继续看：\n\n'
             await message.reply_text(intro + _format_listing_choice_lines(matches), parse_mode=ParseMode.HTML, reply_markup=keyword_followup_keyboard(area=area))
         else:
             await message.reply_text('暂时没有完全符合条件的房源。\n\n你可以修改条件，也可以让中文顾问继续帮你找。', parse_mode=ParseMode.HTML, reply_markup=no_match_followup_keyboard())
@@ -201,7 +201,7 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
         if not is_available:
             if availability_reason == 'missing':
                 create_lead(user, action='broken_link', source=source, listing_id=listing_id, payload={**touch_payload, 'reason': availability_reason})
-            await message.reply_text(listing_unavailable_text(), reply_markup=listing_unavailable_keyboard(listing_id))
+            await message.reply_text(listing_unavailable_text(availability_reason), reply_markup=listing_unavailable_keyboard(listing_id))
             return MAIN
         listing_info = listing_context(listing_id)
         caption_variant = _normalize_variant(target_meta.get('cv')) or _normalize_variant(listing_info.get('caption_variant')) or 'a'
@@ -221,7 +221,7 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
         if matches:
             await message.reply_text(_format_listing_choice_lines(matches), parse_mode=ParseMode.HTML, reply_markup=keyword_followup_keyboard(area=area))
         else:
-            await message.reply_text(f"当前同区域（{he(area or '金边')}）暂无更多在架房源，已同步顾问人工推荐。", parse_mode=ParseMode.HTML, reply_markup=no_match_followup_keyboard())
+            await message.reply_text(f"当前同区域（{he(area or '金边')}）暂无更多可预约房源，已同步顾问人工推荐。", parse_mode=ParseMode.HTML, reply_markup=no_match_followup_keyboard())
         return MAIN
     if action == 'video':
         listing_id = target

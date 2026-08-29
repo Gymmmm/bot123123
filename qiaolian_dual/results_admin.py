@@ -163,9 +163,10 @@ async def send_find_result_card(update: Update, context: ContextTypes.DEFAULT_TY
         return
     index = int(index) % len(ids)
     item = listing_context(ids[index])
-    if not item or not item.get('listing_id'):
+    status = str((item or {}).get('status') or '').strip().lower()
+    if not item or not item.get('listing_id') or status not in {'active', 'reserved'}:
         context.user_data['find_card_listing_ids'] = [lid for lid in ids if lid != ids[index]]
-        await update.effective_message.reply_text('这套推荐已经失效。我可以继续为你筛选其他房源。', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('🔍 重新找房', callback_data='home_smart_search')], [InlineKeyboardButton('💬 联系中文顾问', callback_data='keyword:handoff')], [InlineKeyboardButton('🏠 返回首页', callback_data='home')]]))
+        await update.effective_message.reply_text('这套推荐的房态已经变化，暂时不能继续预约。我可以继续为你筛选其他房源。', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('🔍 重新找房', callback_data='home_smart_search')], [InlineKeyboardButton('💬 联系中文顾问', callback_data='keyword:handoff')], [InlineKeyboardButton('🏠 返回首页', callback_data='home')]]))
         return
     caption, keyboard, photo_path = _find_result_card_content(item, index, len(ids))
     query = getattr(update, 'callback_query', None)
