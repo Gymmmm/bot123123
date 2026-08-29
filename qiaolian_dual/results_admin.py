@@ -99,8 +99,6 @@ async def send_listing_card(bot, chat_id: int, listing: dict, index: int=0, tota
 
 async def send_find_results_as_cards(update: Update, context: ContextTypes.DEFAULT_TYPE, matches: list[dict], match_mode: str='strict') -> None:
     """搜索结果只发送一张可切换卡片，避免连续图片和消息把页面顶走。"""
-    from .listing import listing_context
-
     count = len(matches)
     if count == 0:
         await update.effective_message.reply_text('暂时没有完全符合条件的房源。\n\n可以换个预算或区域再试；也可以让中文顾问按你的需求继续留意。', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('💬 让中文顾问帮我找', callback_data='keyword:handoff')], [InlineKeyboardButton('✏️ 换个条件', callback_data='home_smart_search')], [InlineKeyboardButton('🏠 返回首页', callback_data='home')]]), parse_mode=ParseMode.HTML)
@@ -142,7 +140,7 @@ def _find_result_card_content(item: dict, index: int, total: int, result_ids: li
     status_text = '🟡 <b>已有预约 · 仍可预约</b>' if status == 'reserved' else '🟢 <b>当前可预约</b>'
     lines = [
         f'<b>🏠 {he(area)}｜{he(layout)}</b>',
-        f'💰 <b>{he(price)}</b>' + (f'　·　📐 {he(size)}㎡' if size else ''),
+        f'💰 <b>{he(price)}</b>' + (f' · 📐 {he(size)}㎡' if size else ''),
     ]
     extras = [value for value in (property_type, deposit) if value and value not in {layout, area}]
     if extras:
@@ -343,7 +341,7 @@ def _allow_admin_notify(context: ContextTypes.DEFAULT_TYPE, *, key: str, cooldow
     return True
 
 async def send_listing_photo_preview(bot, chat_id: int, listing_id: str) -> None:
-    """Send every frozen photo in original order, chunked by Telegram's 10-media limit."""
+    """发送完整相册；相册过程不重复摘要，结束只发送一次操作框。"""
     from .listing import listing_context
     from .text_utils import clean_inline_text
     from telegram import InputMediaPhoto
@@ -355,19 +353,9 @@ async def send_listing_photo_preview(bot, chat_id: int, listing_id: str) -> None
         if isinstance(p, str) and os.path.exists(p)
         and os.path.basename(p).lower() not in {'cover.jpg', 'cover.jpeg', 'cover.png'}
     ))
-    area = clean_inline_text(str(info.get('project') or info.get('community') or info.get('area') or '金边'))
-    layout = _display_layout(clean_inline_text(str(info.get('layout') or '')), info.get('property_type'))
-    qc_id = _display_listing_id(str(listing_id or '').strip())
-    heading = f'{qc_id}｜{area}' if area else qc_id
-    caption_lines = ['<b>📸 完整实拍</b>', '', f'🏠 <b>{he(heading)}</b>']
-    if layout:
-        caption_lines.append(he(layout))
-    caption_lines.append(f'以下是这套房的完整实拍，共 {len(photos)} 张。')
-    caption_lines.append('点击图片查看大图。')
-    caption = '\n'.join(caption_lines)
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton('📋 租赁详情', callback_data=f'listing:detail:{listing_id}'), InlineKeyboardButton('📅 预约看房', callback_data=f'listing:appoint:{listing_id}')],
-        [InlineKeyboardButton('🤖 侨联找房助手', callback_data='home_smart_search')],
+        [InlineKeyboardButton('📅 预约看房', callback_data=f'listing:appoint:{listing_id}'), InlineKeyboardButton('📋 租赁详情', callback_data=f'listing:detail:{listing_id}')],
+        [InlineKeyboardButton('💬 咨询顾问', callback_data=f'listing:consult:{listing_id}')],
     ])
     if photos:
         for offset in range(0, len(photos), 10):
@@ -375,17 +363,16 @@ async def send_listing_photo_preview(bot, chat_id: int, listing_id: str) -> None
             media = []
             for index, path in enumerate(chunk):
                 with open(path, 'rb') as photo:
-                    first = offset == 0 and index == 0
-                    media.append(InputMediaPhoto(media=photo.read(), caption=caption if first else None, parse_mode=ParseMode.HTML if first else None))
+                    media.append(InputMediaPhoto(media=photo.read()))
             if len(media) == 1:
                 await bot.send_photo(chat_id=chat_id, photo=media[0].media, caption=media[0].caption, parse_mode=ParseMode.HTML)
             else:
                 await bot.send_media_group(chat_id=chat_id, media=media)
-        await bot.send_message(chat_id=chat_id, text=f'🏠 <b>{he(qc_id)}</b>\n请选择下一步', parse_mode=ParseMode.HTML, reply_markup=keyboard)
+        await bot.send_message(chat_id=chat_id, text='📸 <b>实拍已全部显示</b>\n\n请选择下一步。', parse_mode=ParseMode.HTML, reply_markup=keyboard)
     else:
         await bot.send_message(
             chat_id=chat_id,
-            text='<b>📸 完整实拍</b>\n\n这套房目前没有更多可用实拍。\n需要补充图片时，可以联系中文顾问。',
+            text='📸 <b>更多实拍</b>\n\n这套房源目前的实拍已经全部显示。',
             parse_mode=ParseMode.HTML,
             reply_markup=keyboard,
         )

@@ -3,22 +3,24 @@ from __future__ import annotations
 
 from .common import *
 
-def _appointment_date_keyboard() -> InlineKeyboardMarkup:
+def _appointment_date_keyboard(*, show_video: bool = True) -> InlineKeyboardMarkup:
     today = datetime.now(ZoneInfo('Asia/Phnom_Penh'))
     btns = [InlineKeyboardButton('今天', callback_data='apdate:' + today.strftime('%m-%d')), InlineKeyboardButton('明天', callback_data='apdate:' + (today + timedelta(days=1)).strftime('%m-%d')), InlineKeyboardButton('后天', callback_data='apdate:' + (today + timedelta(days=2)).strftime('%m-%d'))]
     # 日期页也遵守每行最多两个可操作按钮，避免手机端三按钮挤在一行。
-    return InlineKeyboardMarkup([
+    rows = [
         btns[:2],
-        [btns[2], InlineKeyboardButton('其他日期', callback_data='apdate:other')],
-        [InlineKeyboardButton('⬅️ 返回', callback_data='appoint_back_mode')],
-    ])
+        [btns[2], InlineKeyboardButton('📅 其他日期', callback_data='apdate:other')],
+    ]
+    if show_video:
+        rows.append([InlineKeyboardButton('🎥 实时视频看房', callback_data='apmode:video')])
+    return InlineKeyboardMarkup(rows)
 
 def _appointment_mode_keyboard(listing_id: str) -> InlineKeyboardMarkup:
     back_target = 'home' if str(listing_id or '').strip() in {'', '待推荐'} else f'listing:detail:{listing_id}'
     return InlineKeyboardMarkup([[InlineKeyboardButton('🚶 实地看房', callback_data='apmode:offline'), InlineKeyboardButton('🎥 视频看房', callback_data='apmode:video')], [InlineKeyboardButton('⬅️ 返回', callback_data=back_target)]])
 
 def _appointment_time_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([[InlineKeyboardButton('上午 9:00-12:00', callback_data='aptime:am'), InlineKeyboardButton('下午 14:00-17:00', callback_data='aptime:pm')], [InlineKeyboardButton('傍晚 17:00-19:00', callback_data='aptime:evening'), InlineKeyboardButton('其他时间', callback_data='aptime:other')], [InlineKeyboardButton('⬅️ 返回上一步', callback_data='appoint_back_date'), InlineKeyboardButton('🏠 返回首页', callback_data='home')]])
+    return InlineKeyboardMarkup([[InlineKeyboardButton('上午', callback_data='aptime:am'), InlineKeyboardButton('下午', callback_data='aptime:pm')], [InlineKeyboardButton('晚上', callback_data='aptime:evening'), InlineKeyboardButton('其他时间', callback_data='aptime:other')], [InlineKeyboardButton('⬅️ 返回修改日期', callback_data='appoint_back_date')]])
 
 def _title_layout_label(title: str, layout: str, separator: str=' · ') -> str:
     """房源标题已含户型时不再重复追加。"""
@@ -41,10 +43,10 @@ def _appointment_confirm_text(appt: dict) -> str:
     mode = APPOINTMENT_MODE_LABELS.get(str(appt.get('mode') or 'offline'), '实地看房')
     time_label = APPOINTMENT_TIME_LABELS.get(str(appt.get('time') or ''), str(appt.get('time') or '-'))
     subject_lines = ['🏠 <b>尚未确定房源</b>', '顾问会根据你的需求继续推荐。'] if is_general_request else [f"🏠 <b>{he(_title_layout_label(title, layout, '｜'))}</b>"]
-    return '\n'.join(['<b>📋 确认一下预约信息</b>', '', *subject_lines, f"📅 <b>{he(str(appt.get('date') or '-'))} · {he(time_label)}</b>", f'📍 {he(mode)}', '', '提交后，顾问会联系你确认具体安排。'])
+    return '\n'.join(['📅 <b>确认看房预约</b>', '', *subject_lines, f"📅 {he(str(appt.get('date') or '-'))}", f'🕐 {he(time_label)}', f'👀 {he(mode)}', '', '提交后，顾问会先确认房态和具体时间。'])
 
 def _appointment_confirm_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([[InlineKeyboardButton('✅ 确认预约', callback_data='apconfirm:yes')], [InlineKeyboardButton('✏️ 修改时间', callback_data='apedit:time')], [InlineKeyboardButton('⬅️ 返回', callback_data='appoint_back_time')]])
+    return InlineKeyboardMarkup([[InlineKeyboardButton('✅ 提交预约', callback_data='apconfirm:yes')], [InlineKeyboardButton('⬅️ 修改时间', callback_data='apedit:time')]])
 
 def _normalize_custom_date(value: str) -> str:
     """支持 0820 / 820 / 08-20 / 8月20日，统一展示为 8月20日。"""

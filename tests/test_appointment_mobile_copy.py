@@ -15,9 +15,9 @@ def _callbacks(markup):
 
 def test_appointment_success_copy_and_buttons():
     text = appoint_success_text()
-    assert '预约已提交' in text
+    assert '预约申请已提交' in text
     assert '无需重复提交' not in text
-    assert '<b>✅ 预约已提交</b>' in text
+    assert '✅ <b>预约申请已提交</b>' in text
     assert _labels(appointment_success_keyboard()) == ['📅 我的预约', '💬 联系中文顾问', '🏠 继续看房']
 
 
@@ -25,7 +25,7 @@ def test_appointment_submit_page_uses_compact_date_time_and_no_repeat_copy():
     source = Path('qiaolian_dual/appointment_flow.py').read_text(encoding='utf-8')
     assert "date_compact = _appointment_date_compact" in source
     assert "time_compact = _appointment_time_compact" in source
-    assert '<b>✅ 预约已提交</b>' in source
+    assert '预约申请已提交' in source
     assert '无需重复提交' not in source
 
 

@@ -46,18 +46,15 @@ def _caption_with_status(caption: str, status: str) -> str:
 
 
 def _keyboard(username: str, token: str, listing_id: str, status: str) -> InlineKeyboardMarkup:
-    base = f"https://t.me/{username}?start="
-    photos = InlineKeyboardButton("📸 更多实拍", url=f"{base}photos_{listing_id}")
-    helper = InlineKeyboardButton(
-        "🤖 侨联找房助手",
-        url=f"{base}view_{listing_id}",
-    )
+    base = f"https://t.me/{username}?start=property_{listing_id}_"
+    details = InlineKeyboardButton("📋 租赁详情", url=base + "details")
+    photos = InlineKeyboardButton("📸 更多实拍", url=base + "photos")
     if status in {"active", "reserved"}:
         return InlineKeyboardMarkup([
-            [InlineKeyboardButton("📅 预约看房", url=f"{base}book_{listing_id}"), photos],
-            [helper],
+            [details, photos],
+            [InlineKeyboardButton("📅 预约看房", url=base + "book")],
         ])
-    return InlineKeyboardMarkup([[photos], [helper]])
+    return InlineKeyboardMarkup([[details, photos]])
 
 
 async def sync_channel_listing_status(listing_id: str) -> bool:

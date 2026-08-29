@@ -2106,7 +2106,7 @@ def _caption_action_links(
     consult = f"https://t.me/{advisor}?text={quote(consult_text, safe='')}"
     return (
         f'<a href="{he(appoint, quote=True)}">📅 预约看房</a>'
-        f'　｜　<a href="{he(consult, quote=True)}">💬 问这套</a>'
+        f'｜<a href="{he(consult, quote=True)}">💬 问这套</a>'
     )
 
 
@@ -2218,14 +2218,14 @@ def build_discussion_detail_text(d: dict) -> str:
 
     fee_lines: list[str] = []
     if management or internet:
-        fee_lines.append("　·　".join(
+        fee_lines.append(" · ".join(
             part for part in (
                 f"管理费｜{he(management)}" if management else "",
                 f"网络｜{he(internet)}" if internet else "",
             ) if part
         ))
     if water or electric:
-        fee_lines.append("　·　".join(
+        fee_lines.append(" · ".join(
             part for part in (
                 f"水费｜{he(water)}" if water else "",
                 f"电费｜{he(electric)}" if electric else "",
@@ -2310,7 +2310,7 @@ def build_chinese_listing_post(
     current_value = _price_value(d)
     original_price = f"${original_value:,}" if original_value > 0 and original_value != current_value else ""
     price_markup = (
-        f"<s>{he(original_price)}</s>　<b>{he(price)}</b>"
+        f"<s>{he(original_price)}</s> <b>{he(price)}</b>"
         if original_price else f"<b>{he(price)}</b>"
     )
 
@@ -2398,7 +2398,7 @@ def build_chinese_listing_post(
     elif variant == "d":
         lines = [
             f"🏠 <b>{he(simple_heading or '金边实拍房源')}</b>",
-            f"{price_line}　<code>{he(qc_code)}</code>",
+            f"{price_line}｜<code>{he(qc_code)}</code>",
             " · ".join(he(part) for part in fact_parts),
             f"✨ {' · '.join(he(item) for item in caption_highlights[:2])}" if caption_highlights else "",
             "",
@@ -3094,7 +3094,7 @@ def build_keyboard(
     post_token: str = "",
     caption_variant: str | None = "a",
 ) -> InlineKeyboardMarkup:
-    """租客只需要两个明确动作：预约或咨询。"""
+    """频道主帖固定为详情、实拍、预约三个具体动作。"""
     if not BOT_USERNAME:
         return InlineKeyboardMarkup([])
     public_token = ""
@@ -3110,29 +3110,14 @@ def build_keyboard(
         public_token = str(row[0] or "").strip() if row else ""
     except Exception:
         logger.exception("读取公开房源 token 失败: %s", listing_id)
-    if public_token:
-        user_url = f"https://t.me/{BOT_USERNAME.lstrip('@')}?start="
-        return InlineKeyboardMarkup([[
-            InlineKeyboardButton("📅 预约看房", url=f"{user_url}book_{listing_id}"),
-            InlineKeyboardButton("💬 咨询这套", url=f"{user_url}consult__{public_token}"),
-        ]])
-    consult_payload = build_start_payload(
-        "q",
-        listing_id,
-        post_token=post_token,
-        caption_variant=caption_variant,
-    )
-    appoint_payload = build_start_payload(
-        "a",
-        listing_id,
-        post_token=post_token,
-        caption_variant=caption_variant,
-    )
     base_url = f"https://t.me/{BOT_USERNAME.lstrip('@')}?start="
-    return InlineKeyboardMarkup([[
-        InlineKeyboardButton("📅 预约看房", url=f"{base_url}{appoint_payload}"),
-        InlineKeyboardButton("💬 咨询这套", url=f"{base_url}{consult_payload}"),
-    ]])
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("📋 租赁详情", url=f"{base_url}property_{listing_id}_details"),
+            InlineKeyboardButton("📸 更多实拍", url=f"{base_url}property_{listing_id}_photos"),
+        ],
+        [InlineKeyboardButton("📅 预约看房", url=f"{base_url}property_{listing_id}_book")],
+    ])
 
 
 # ── 数据库工具 ────────────────────────────────────────────
@@ -3779,17 +3764,13 @@ async def _tg_publish(
 
     def _button_layout_keyboard(message_id: int, token: str) -> InlineKeyboardMarkup:
         user = BOT_USERNAME.lstrip("@")
-        appointment = f"https://t.me/{user}?start=book_{listing_id}"
-        # Photos use a stable listing deep-link so rebuilding the package queue
-        # cannot invalidate already-published channel buttons.
-        photos = f"https://t.me/{user}?start=photos_{listing_id}"
-        helper = f"https://t.me/{user}?start=view_{listing_id}"
+        base = f"https://t.me/{user}?start=property_{listing_id}_"
         return InlineKeyboardMarkup([
             [
-                InlineKeyboardButton("📅 预约看房", url=appointment),
-                InlineKeyboardButton("📸 更多实拍", url=photos),
+                InlineKeyboardButton("📋 租赁详情", url=base + "details"),
+                InlineKeyboardButton("📸 更多实拍", url=base + "photos"),
             ],
-            [InlineKeyboardButton("🤖 侨联找房助手", url=helper)],
+            [InlineKeyboardButton("📅 预约看房", url=base + "book")],
         ])
 
     def _prepare_channel_photo_buf(data: bytes, *, is_cover: bool, slot_index: int) -> io.BytesIO:

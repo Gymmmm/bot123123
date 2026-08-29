@@ -93,6 +93,17 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
         create_lead(user, action='photos_click', source=source, listing_id=listing_id, payload={**touch_payload, 'entry': 'photos'})
         await send_listing_photo_preview(context.bot, message.chat_id, listing_id)
         return MAIN
+    if action == 'details':
+        listing_id = target
+        is_available, availability_reason = listing_action_allowed(listing_id, 'detail')
+        if not is_available:
+            await message.reply_text(listing_unavailable_text(availability_reason), parse_mode=ParseMode.HTML, reply_markup=listing_unavailable_keyboard(listing_id))
+            return MAIN
+        context.user_data['contact_listing_id'] = listing_id
+        _store_active_entry(context, arg=arg, action=action, listing_id=listing_id, touch_payload=touch_payload)
+        create_lead(user, action='listing_detail_view', source=source, listing_id=listing_id, payload=touch_payload)
+        await message.reply_text(listing_cost_text(listing_id), parse_mode=ParseMode.HTML, reply_markup=listing_cost_keyboard(listing_id))
+        return MAIN
     if action == 'index_area':
         context.user_data['search_pref'] = {'source': 'channel_index', 'goal': 'any', 'touch_payload': touch_payload}
         await message.reply_text('📍 <b>按区域找房</b>\n\n请选择区域：', parse_mode=ParseMode.HTML, reply_markup=find_area_keyboard())

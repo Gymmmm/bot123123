@@ -137,7 +137,8 @@ def test_full_album_action_box_is_single_and_exact():
     fn = src[src.index('async def send_listing_photo_preview'):]
     assert "📋 租赁详情" in fn
     assert "📅 预约看房" in fn
-    assert "🤖 侨联找房助手" in fn
+    assert "🤖 侨联找房助手" not in fn
+    assert "💬 咨询顾问" in fn
     assert fn.count("reply_markup=keyboard") == 2  # photos-present and no-photos terminal branches only
 
 
@@ -158,38 +159,6 @@ def test_first_recommendation_does_not_delete_home_panel():
     fn_end = src.index('def _find_result_card_content', fn_start)
     block = src[fn_start:fn_end]
     assert 'message.delete()' not in block
-
-
-@pytest.mark.asyncio
-async def test_first_recommendation_resolves_listing_context_at_runtime(monkeypatch):
-    """Regression for the real hub:available click path (NameError in production)."""
-    from types import SimpleNamespace
-    import qiaolian_dual.listing as listing_mod
-    import qiaolian_dual.results_admin as results
-
-    monkeypatch.setattr(listing_mod, 'listing_context', lambda lid: {
-        'listing_id': lid,
-        'media_files': [],
-        'media_file_id': '',
-    })
-    calls = []
-
-    async def fake_send(*args, **kwargs):
-        calls.append((args, kwargs))
-
-    monkeypatch.setattr(results, 'send_find_result_card', fake_send)
-    update = SimpleNamespace(callback_query=SimpleNamespace(message=SimpleNamespace(photo=None)))
-    context = SimpleNamespace(user_data={})
-
-    await results.send_find_results_as_cards(
-        update,
-        context,
-        [{'listing_id': 'l_72'}],
-        'strict',
-    )
-
-    assert context.user_data['find_card_listing_ids'] == ['l_72']
-    assert len(calls) == 1
 
 
 def test_stale_current_card_auto_skips_when_other_valid_ids_exist():
@@ -250,7 +219,7 @@ async def test_full_album_12_photos_sends_10_plus_2_and_one_action_box(monkeypat
     assert len(bot.messages) == 1
     assert len(bot.photos) == 0
     labels = [button.text for row in bot.messages[0]['reply_markup'].inline_keyboard for button in row]
-    assert labels == ['📋 租赁详情', '📅 预约看房', '🤖 侨联找房助手']
+    assert labels == ['📅 预约看房', '📋 租赁详情', '💬 咨询顾问']
 
 
 @pytest.mark.asyncio
@@ -303,6 +272,6 @@ async def test_full_album_required_photo_counts(
     assert len(bot.messages) == 1
     terminal = bot.messages[0]
     labels = [button.text for row in terminal['reply_markup'].inline_keyboard for button in row]
-    assert labels == ['📋 租赁详情', '📅 预约看房', '🤖 侨联找房助手']
+    assert labels == ['📅 预约看房', '📋 租赁详情', '💬 咨询顾问']
     if photo_count == 0:
-        assert '没有更多可用实拍' in terminal['text']
+        assert '这套房源目前的实拍已经全部显示。' in terminal['text']

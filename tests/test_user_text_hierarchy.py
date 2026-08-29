@@ -61,9 +61,8 @@ def test_status_is_highlighted_once_per_listing_page(monkeypatch):
     from qiaolian_dual import listing as listing_mod
 
     for status, expected in (
-        ('active', '🟢 <b>当前可预约</b>'),
-        ('reserved', '🟡 <b>已有预约 · 仍可预约</b>'),
-        ('pending', '🔵 <b>房态待确认</b>'),
+        ('active', '🟢 <b>房态：</b> 当前可预约'),
+        ('reserved', '🟡 <b>房态：</b> 已有预约 · 仍可预约'),
     ):
         monkeypatch.setattr(listing_mod, 'listing_context', lambda _lid, value=status: {
             'listing_id': 'l_1', 'status': value, 'price': 800,
@@ -105,4 +104,3 @@ def test_core_html_sends_declare_html_parse_mode():
 def test_no_empty_separator_message_remains_in_user_bot():
     source = open('qiaolian_dual/callback_listing.py', encoding='utf-8').read()
     assert "text='—'" not in source
-

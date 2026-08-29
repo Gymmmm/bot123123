@@ -36,8 +36,8 @@ class SimplifiedAppointmentTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(state, user_bot.APPT_DATE)
         text = render.await_args.kwargs["text"]
-        self.assertIn("下一步：选择你方便的日期", text)
-        self.assertIn("重点核对房屋情况、费用和周边环境", text)
+        self.assertIn("请选择方便看房的日期", text)
+        self.assertIn("实时视频看房", text)
         self.assertNotIn("请选择你最关注的验房点", text)
         self.assertEqual(
             context.user_data["appt"]["focus_keys"],
@@ -74,6 +74,7 @@ class SimplifiedAppointmentTests(unittest.IsolatedAsyncioTestCase):
             context.user_data["appt"]["focus_keys"],
             list(user_bot.APPOINTMENT_FOCUS_ORDER),
         )
+        self.assertIn("请选择方便看房的日期", query.edit_message_text.await_args.args[0])
 
     async def test_stale_old_button_fails_closed_without_creating_empty_draft(self):
         query = SimpleNamespace(
@@ -117,6 +118,7 @@ class SimplifiedAppointmentTests(unittest.IsolatedAsyncioTestCase):
             patch.object(user_bot.db, "create_appointment", return_value=88) as create_appt,
             patch.object(user_bot, "create_lead", return_value=99) as create_lead,
             patch.object(user_bot, "_notify_admins", new=AsyncMock()) as notify,
+            patch("qiaolian_dual.listing.listing_is_available", return_value=(True, "active")),
         ):
             state = await user_bot.appoint_flow_cb(update, context)
 
@@ -132,8 +134,9 @@ class SimplifiedAppointmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["post_token"], "p1")
         self.assertEqual(payload["focus_keys"], list(user_bot.APPOINTMENT_FOCUS_ORDER))
         notify_lines = notify.await_args.kwargs["lines"]
-        self.assertTrue(any("房源：L_0315" in line for line in notify_lines))
-        self.assertTrue(any("方式：实地看房" in line for line in notify_lines))
+        self.assertTrue(any(line.startswith("🏠 ") for line in notify_lines))
+        self.assertTrue(any("实地看房" in line for line in notify_lines))
+        self.assertIn("预约申请已提交", query.edit_message_text.await_args.args[0])
         self.assertNotIn("appt", context.user_data)
 
 

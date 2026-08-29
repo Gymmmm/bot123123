@@ -34,8 +34,8 @@ async def appoint_flow_cb(update: Update, context: ContextTypes.DEFAULT_TYPE, *,
         appt['mode'] = data.split(':', 1)[1]
         appt['focus_keys'] = list(APPOINTMENT_FOCUS_ORDER)
         mode_label = APPOINTMENT_MODE_LABELS.get(appt['mode'], '预约看房')
-        text = f'<b>📅 预约看房</b>\n\n{he(mode_label)}\n<b>选一个方便的日期</b>'
-        await query.edit_message_text(text, reply_markup=_appointment_date_keyboard(), parse_mode=ParseMode.HTML)
+        text = f'🎥 <b>{he(mode_label)}</b>\n\n请选择方便视频看房的日期。'
+        await query.edit_message_text(text, reply_markup=_appointment_date_keyboard(show_video=False), parse_mode=ParseMode.HTML)
         return APPT_DATE
     if data.startswith('apfocus:toggle:'):
         key = data.split(':', 2)[2]
@@ -71,12 +71,18 @@ async def appoint_flow_cb(update: Update, context: ContextTypes.DEFAULT_TYPE, *,
         appt['date'] = chosen
         info = listing_context(str(appt.get('listing_id') or ''))
         title = str(info.get('project') or info.get('title') or info.get('area') or '这套房')
-        text = f'<b>📅 预约看房</b>\n\n📅 <b>{he(chosen)}</b>\n🏠 {he(title)}\n\n<b>请选择时间段</b>'
+        text = f'🕐 <b>{he(chosen)}什么时间方便？</b>\n\n🏠 {he(title)}'
         await query.edit_message_text(text, reply_markup=_appointment_time_keyboard(), parse_mode=ParseMode.HTML)
         return APPT_TIME
     if data == 'appoint_back_date':
-        query.data = 'apmode:' + appt.get('mode', 'offline')
-        return await appoint_flow_cb(update, context, create_lead_fn=create_lead, notify_admins_fn=_notify_admins)
+        mode = appt.get('mode', 'offline')
+        heading = '实时视频看房' if mode == 'video' else '预约看房'
+        await query.edit_message_text(
+            f"{'🎥' if mode == 'video' else '📅'} <b>{heading}</b>\n\n请选择方便看房的日期。",
+            reply_markup=_appointment_date_keyboard(show_video=(mode != 'video')),
+            parse_mode=ParseMode.HTML,
+        )
+        return APPT_DATE
     if data == 'apedit:date':
         info = listing_context(str(appt.get('listing_id') or ''))
         title = str(info.get('project') or info.get('title') or info.get('area') or '这套房')
@@ -175,12 +181,13 @@ async def appoint_flow_cb(update: Update, context: ContextTypes.DEFAULT_TYPE, *,
         subject_text = '🏠 <b>房源尚未确定</b>' if is_general_request else f"🏠 <b>{he(_title_layout_label(title, layout))}</b>"
         context.user_data.pop('appt', None)
         await query.edit_message_text(
-            f"<b>✅ 预约已提交</b>\n\n"
+            f"✅ <b>预约申请已提交</b>\n\n"
             f"{subject_text}\n"
             f"📅 <b>{he(date_compact)} · {he(time_compact)}</b>\n"
             f"📍 {he(mode_label)}\n\n"
-            "顾问确认房态和时间后，\n"
-            "会通过 Telegram 联系你。",
+            "顾问会确认房态和具体时间，\n"
+            "之后通过 Telegram 联系你。\n\n"
+            "房源信息已经带上，不用重复发送。",
             parse_mode=ParseMode.HTML,
             reply_markup=appointment_success_keyboard(),
         )

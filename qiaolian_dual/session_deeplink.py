@@ -49,6 +49,10 @@ def parse_start_arg_payload(arg: str) -> dict | None:
         return {'action': arg, 'target': '', 'post_token': '', 'channel_message_id': None}
     if arg == 'more':
         return {'action': 'more', 'target': '', 'post_token': '', 'channel_message_id': None}
+    property_match = re.fullmatch(r'property_(.+)_(details|photos|book)', arg)
+    if property_match:
+        target, action = property_match.groups()
+        return {'action': action, 'target': target, 'post_token': '', 'channel_message_id': None}
     if arg.startswith('t_bind_'):
         return {'action': 'tenant_bind', 'target': arg[len('t_bind_'):], 'post_token': '', 'channel_message_id': None}
     if arg.startswith('ch__'):

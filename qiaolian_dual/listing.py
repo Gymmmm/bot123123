@@ -67,7 +67,7 @@ def listing_context(listing_id: str) -> dict:
 
 # 详情页顾问核对语义保持一致：点“联系中文顾问”逐项核对。
 def listing_cost_text(listing_id: str) -> str:
-    """租赁详情只展示已有事实；缺失项统一明确标注待确认。"""
+    """租赁详情只展示已有决策事实；缺失字段整行隐藏。"""
     from .utils_formatting import _fmt_price
     item = listing_context(listing_id)
     normalized: dict = {}
@@ -83,12 +83,12 @@ def listing_cost_text(listing_id: str) -> str:
     def fact(*values) -> str:
         for value in values:
             value = str(value or '').strip()
-            if value:
+            if value and value not in {'待确认', '暂无', '[暂无]', '未知', '--', '-'}:
                 return value
-        return '待确认'
+        return ''
 
     price_raw = item.get('price')
-    price = _fmt_price(price_raw) if price_raw not in (None, '', 0, '0') else '待确认'
+    price = _fmt_price(price_raw) if price_raw not in (None, '', 0, '0') else ''
     deposit = fact(item.get('deposit'), item.get('deposit_rule'), normalized.get('deposit_payment_terms'))
     contract = fact(normalized.get('contract_term_display'), normalized.get('contract_term'), item.get('contract_term'))
     management = fact(normalized.get('management_fee'))
@@ -105,43 +105,40 @@ def listing_cost_text(listing_id: str) -> str:
     else:
         amenities = []
     amenities = list(dict.fromkeys(amenities))[:6]
-    amenities_text = ' · '.join(amenities) if amenities else '待确认'
-
-    lines = [
-        '<b>📋 租赁详情</b>',
-        '',
-        '💰 租赁',
-        f'月租｜<b>{he(price)}</b>',
-        f'押付｜{he(deposit)}',
-        f'租期｜{he(contract)}',
-        '',
-        '🧾 费用',
-        f'管理费｜{he(management)}',
-        f'网络｜{he(internet)}',
-    ]
-    known_optional = []
-    missing_optional = []
-    for label, value in (('水费', water), ('电费', electric), ('停车', parking)):
-        if value == '待确认':
-            missing_optional.append(label)
-        else:
-            known_optional.append(f'{label}｜{he(value)}')
-    lines.extend(known_optional)
-    if missing_optional:
-        lines.append(f"待确认｜{' · '.join(missing_optional)}")
-    lines.extend(['', '🏊 配套', he(amenities_text), ''])
+    project = fact(item.get('project'), item.get('community'), item.get('area'))
+    from .utils_formatting import _display_layout, _display_listing_id
+    layout = fact(_display_layout(item.get('layout') or item.get('property_type'), item.get('property_type')))
+    title = '｜'.join(value for value in (project, layout) if value)
+    size = fact(item.get('size_sqm'), item.get('size'))
+    floor = fact(item.get('floor'))
+    lines = ['📋 <b>租赁详情</b>']
+    if title:
+        lines.extend(['', f'🏠 <b>{he(title)}</b>'])
+    if price:
+        lines.append(f'💰 <b>租金：{he(price)}</b>')
+    fields = (
+        ('🔑', '押付', deposit), ('📅', '租期', contract), ('📐', '面积', size),
+        ('🏢', '楼层', floor), ('⚡', '电费', electric), ('💧', '水费', water),
+        ('🏢', '物业费', management), ('🌐', '网络费', internet), ('🚗', '停车费', parking),
+    )
+    field_lines = [f'{emoji} <b>{label}：</b> {he(value)}' for emoji, label, value in fields if value]
+    if field_lines:
+        lines.extend(['', *field_lines])
+    if amenities:
+        lines.extend(['', '✨ <b>房源亮点</b>', he(' · '.join(amenities))])
+    public_id = fact(_display_listing_id(listing_id))
+    if public_id:
+        lines.extend(['', f'<b>房源编号：</b> {he(public_id)}'])
     status = str(item.get('status') or '').strip().lower()
-    if status == 'reserved':
-        lines.append('🟡 <b>已有预约 · 仍可预约</b>')
-    elif status == 'active':
-        lines.append('🟢 <b>当前可预约</b>')
-    else:
-        lines.append('🔵 <b>房态待确认</b>')
+    status_text = {'active': '当前可预约', 'reserved': '已有预约 · 仍可预约'}.get(status, '')
+    if status_text:
+        lines.append(f"{'🟡' if status == 'reserved' else '🟢'} <b>房态：</b> {status_text}")
+    lines.extend(['', '📅 <b>想实地看看？</b>', '选择方便的时间即可。'])
     return '\n'.join(lines)
 
 def listing_cost_keyboard(listing_id: str) -> InlineKeyboardMarkup:
     from .keyboards_common import _advisor_listing_url
-    return InlineKeyboardMarkup([[InlineKeyboardButton('📅 预约看房', callback_data=f'listing:appoint:{listing_id}'), InlineKeyboardButton('💬 联系中文顾问', url=_advisor_listing_url(listing_id))]])
+    return InlineKeyboardMarkup([[InlineKeyboardButton('📅 预约看房', callback_data=f'listing:appoint:{listing_id}'), InlineKeyboardButton('📸 查看实拍', callback_data=f'listing:photos:{listing_id}')], [InlineKeyboardButton('💬 咨询顾问', url=_advisor_listing_url(listing_id))]])
 
 def listing_entry_text(listing_id: str) -> str:
     """频道具体房源进入 Bot 的首屏；只做识别和下一步选择。"""

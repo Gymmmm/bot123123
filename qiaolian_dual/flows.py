@@ -4,7 +4,7 @@ from __future__ import annotations
 from .common import *
 
 async def start_appointment(update: Update, context: ContextTypes.DEFAULT_TYPE, listing_id: str, *, source: str='user_bot', touch_payload: dict | None=None, initial_mode: str='', render_panel_fn=None) -> int:
-    from .appointment_ui import _appointment_date_keyboard, _appointment_mode_keyboard, _title_layout_label
+    from .appointment_ui import _appointment_date_keyboard, _title_layout_label
     from .listing import listing_context, listing_is_available, listing_unavailable_keyboard, listing_unavailable_text
     from .texts import render_panel as default_render_panel
     from .utils_formatting import _display_floor, _display_layout, _display_listing_id, _fmt_price
@@ -30,7 +30,7 @@ async def start_appointment(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     else:
         highlights = []
     home_facts = [value for value in (layout, f'{size}㎡' if size and '㎡' not in size else size, floor) if value]
-    summary_lines = [f'<b>🏠 {he(title)}</b>', f"💰 <b>{he(_fmt_price(info.get('price')))}</b>"]
+    summary_lines = [f'🏠 <b>{he(title)}</b>', f"💰 <b>租金：{he(_fmt_price(info.get('price')))}</b>"]
     if area:
         summary_lines.append(f'📍 位置：{he(area)}')
     if home_facts:
@@ -41,26 +41,21 @@ async def start_appointment(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         summary_lines.append(f"📌 编号：<code>{he(_display_listing_id(listing_id))}</code>")
     listing_summary = '\n'.join(summary_lines)
     context.user_data['appt'] = {'listing_id': listing_id, 'source': source, 'touch_payload': touch_payload, 'focus_keys': list(APPOINTMENT_FOCUS_ORDER), 'listing_summary': listing_summary}
-    mode = str(initial_mode or '').strip().lower()
-    if mode in APPOINTMENT_MODE_LABELS:
-        context.user_data['appt']['mode'] = mode
-        await render_panel(
-            update,
-            text=(
-                f"📅 <b>{he(APPOINTMENT_MODE_LABELS[mode])}</b>\n\n"
-                "下一步：选择你方便的日期。\n"
-                "看房时会帮你重点核对房屋情况、费用和周边环境。"
-            ),
-            reply_markup=_appointment_date_keyboard(),
-            parse_mode=ParseMode.HTML,
-            context=context,
-        )
-        return APPT_DATE
-    context.user_data['appt'].pop('mode', None)
-    subject = '还没指定具体房源' if is_general_request else _title_layout_label(title, layout, '｜')
-    intro = '先选看房方式，中文顾问会再帮你确认具体可预约房源。' if is_general_request else ''
-    await render_panel(update, text=f"<b>📅 预约看房</b>\n{he(subject)}\n\n{intro}\n<b>想怎么看？</b>".replace('\n\n\n', '\n\n'), reply_markup=_appointment_mode_keyboard(listing_id), parse_mode=ParseMode.HTML, context=context)
-    return APPT_MODE
+    mode = str(initial_mode or 'offline').strip().lower()
+    if mode not in APPOINTMENT_MODE_LABELS:
+        mode = 'offline'
+    context.user_data['appt']['mode'] = mode
+    subject = '尚未确定房源' if is_general_request else _title_layout_label(title, layout, '｜')
+    price_line = '' if is_general_request or info.get('price') in (None, '', 0, '0') else f"\n💰 <b>租金：{he(_fmt_price(info.get('price')))}</b>"
+    video_note = '' if mode == 'video' else '\n\n没时间到现场？\n也可以安排实时视频看房。'
+    await render_panel(
+        update,
+        text=f"📅 <b>{'实时视频看房' if mode == 'video' else '预约看房'}</b>\n\n🏠 <b>{he(subject)}</b>{price_line}\n\n请选择方便看房的日期。{video_note}",
+        reply_markup=_appointment_date_keyboard(show_video=(mode != 'video')),
+        parse_mode=ParseMode.HTML,
+        context=context,
+    )
+    return APPT_DATE
 
 async def show_search_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     from .keyboards_search import find_area_keyboard

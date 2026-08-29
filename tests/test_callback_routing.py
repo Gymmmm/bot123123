@@ -124,7 +124,7 @@ class CallbackRoutingTests(unittest.IsolatedAsyncioTestCase):
         keyboard = _appointment_date_keyboard()
         self.assertTrue(all(len(row) <= 2 for row in keyboard.inline_keyboard))
         self.assertEqual(["今天", "明天"], [button.text for button in keyboard.inline_keyboard[0]])
-        self.assertEqual(["后天", "其他日期"], [button.text for button in keyboard.inline_keyboard[1]])
+        self.assertEqual(["后天", "📅 其他日期"], [button.text for button in keyboard.inline_keyboard[1]])
 
     def test_handoff_buttons_use_plain_customer_language(self):
         keyboard = contact_handoff_keyboard()
@@ -328,10 +328,10 @@ class CallbackRoutingTests(unittest.IsolatedAsyncioTestCase):
                 await send_listing_photo_preview(bot, 88, "demo")
         self.assertEqual(1, len(bot.media_groups))
         self.assertEqual(1, len(bot.messages))
-        self.assertIn("想看房或确认费用", bot.messages[0][1])
+        self.assertIn("实拍已全部显示", bot.messages[0][1])
         self.assertNotIn("费用确认", bot.messages[0][1])
         labels = [button.text for row in bot.message_markups[0].inline_keyboard for button in row]
-        self.assertIn("📋 查看费用与房态", labels)
+        self.assertIn("📋 租赁详情", labels)
         self.assertNotIn("在频道查看原帖", labels)
 
     def test_cost_page_uses_one_fact_per_line_and_clear_followup(self):
@@ -341,11 +341,11 @@ class CallbackRoutingTests(unittest.IsolatedAsyncioTestCase):
         }
         with patch("qiaolian_dual.listing.listing_context", return_value=item):
             text = listing_cost_text("demo")
-        self.assertIn("费用确认", text)
-        self.assertIn("先看这两项", text)
-        self.assertIn("每月可能产生的费用", text)
-        self.assertIn("联系顾问", text)
-        self.assertIn("看房与交付保障", text)
+        self.assertIn("租赁详情", text)
+        self.assertIn("💰 <b>租金：$680/月</b>", text)
+        self.assertIn("🔑 <b>押付：</b> 押2付1", text)
+        self.assertIn("🏢 <b>物业费：</b> $20/月", text)
+        self.assertIn("📅 <b>想实地看看？</b>", text)
         self.assertNotIn("　·　", text)
 
     def test_contract_and_deposit_pages_use_short_grouped_sections(self):
