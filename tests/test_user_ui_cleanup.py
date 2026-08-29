@@ -1,10 +1,15 @@
+from pathlib import Path
+
+import discussion_map_store
+import publication_package
+from qiaolian_dual import search
 from qiaolian_dual.admin_contract import _contract_actions_keyboard
 from qiaolian_dual.common import LEASE_REMINDER_DAYS
 from qiaolian_dual.keyboards_common import main_keyboard, old_tenant_followup_keyboard
 from qiaolian_dual.keyboards_search import service_hub_keyboard
 from qiaolian_dual.listing import listing_entry_keyboard
 from qiaolian_dual.results_admin import _format_match_line
-from qiaolian_dual.utils_formatting import _display_layout
+from qiaolian_dual.utils_formatting import _display_floor, _display_layout
 
 
 def _labels(markup):
@@ -57,6 +62,71 @@ def test_residential_office_layout_is_display_only():
     line = _format_match_line({'listing_id': 'l_2', 'area': '永旺1', 'layout': '1房1办公2卫', 'property_type': '公寓', 'price': 1800})
     assert '1房＋书房｜2卫' in line
     assert '1房1办公2卫' not in line
+
+
+def test_floor_is_normalized_only_for_display():
+    assert _display_floor('23') == '23楼'
+    assert _display_floor('23楼') == '23楼'
+    assert _display_floor('高层') == '高层'
+    assert _display_floor('') == ''
+
+
+def test_publication_caption_uses_display_layout_and_floor():
+    item = {
+        'area': '永旺1',
+        'layout': '1房1办公2卫',
+        'property_type': '公寓',
+        'size': '96.3㎡',
+        'floor': '23',
+        'price': 1800,
+        'deal_type': 'rent',
+    }
+    text = publication_package.format_button_post_text(item, 'l_2', [])
+    assert '1房＋书房｜2卫' in text
+    assert '1房1办公2卫' not in text
+    assert '23楼' in text
+
+
+def test_no_match_never_falls_back_to_unrelated_recent_listing(monkeypatch):
+    monkeypatch.setattr(search, '_public_search_listings', lambda **kwargs: [])
+
+    def _must_not_run(*args, **kwargs):
+        raise AssertionError('strict public search must not silently return recent listings')
+
+    monkeypatch.setattr(search.db, 'list_recent_listings', _must_not_run)
+    matches, mode = search.search_listings_with_fallback(
+        property_type='公寓',
+        area='不存在区域',
+        budget_min=12345,
+        budget_max=13000,
+        limit=3,
+    )
+    assert matches == []
+    assert mode == 'no_match'
+
+
+def test_public_db_search_includes_reserved_status_source_rule():
+    source = Path('qiaolian_dual/db.py').read_text(encoding='utf-8')
+    assert "status IN ('active','reserved')" in source
+
+
+def test_discussion_mapping_prefers_posts_and_only_uses_legacy_as_fallback(monkeypatch):
+    monkeypatch.setattr(discussion_map_store, '_backend', lambda: 'auto')
+    monkeypatch.setattr(discussion_map_store, '_load_posts_sqlite', lambda: {'3054': 5140})
+    monkeypatch.setattr(discussion_map_store, '_load_legacy_sqlite', lambda: {'3054': 9999, '3055': 5143})
+    monkeypatch.setattr(discussion_map_store, '_load_json', lambda: {'3055': 8888, '3000': 4000})
+    assert discussion_map_store.load_discuss_map() == {
+        '3054': 5140,
+        '3055': 5143,
+        '3000': 4000,
+    }
+
+
+def test_historical_publication_package_fallback_is_preserved():
+    source = Path('qiaolian_dual/listing.py').read_text(encoding='utf-8')
+    assert 'posts.publication_package_id' in source
+    assert "media', 'publication_packages', package_id" in source
+    assert "publish_status IN ('published','success','ok')" in source
 
 
 def test_listing_entry_keeps_photo_detail_appointment_links():
