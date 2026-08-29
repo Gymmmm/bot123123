@@ -20,7 +20,7 @@ from qiaolian_dual.canonical_listing_materializer import (
     ensure_canonical_projection_schema, materialize_listing, canonical_projection_hash,
 )
 from qiaolian_dual.publishability_contract import evaluate_publishability
-from qiaolian_dual.utils_formatting import _display_layout
+from qiaolian_dual.utils_formatting import _display_layout, _display_floor
 
 ROOT = Path(__file__).resolve().parent
 PACKAGE_ROOT = ROOT / "media" / "publication_packages"
@@ -429,7 +429,7 @@ def _render_cover(d: dict, source: str, output: str, template: str) -> None:
     highlights = _json_list(d.get("highlights"))
     # Missing facts are represented explicitly, never as empty template separators.
     display_size = str(d.get("size") or "").strip() or ""
-    display_floor = str(d.get("floor") or "").strip() or ""
+    display_floor = _display_floor(d.get("floor"))
     display_highlights = highlights
     raw_price = str(d.get("price") or "").strip()
     if raw_price and not raw_price.startswith("$"):
@@ -627,7 +627,7 @@ def format_button_post_text(
     layout_text = clean(d.get("layout") or d.get("property_type") or "整租", 18)
     property_type = clean(d.get("property_type"), 12)
     size = clean(d.get("size"), 12)
-    floor = clean(d.get("floor"), 12)
+    floor = _display_floor(clean(d.get("floor"), 12))
     available = clean(d.get("available_date"), 16)
     deposit = clean(d.get("payment_terms") or d.get("deposit"), 16)
     try:
@@ -689,7 +689,7 @@ def format_link_post_text(
     layout_text = clean(d.get("layout") or d.get("property_type") or "整租", 18)
     property_type = clean(d.get("property_type"), 12)
     size = clean(d.get("size"), 12)
-    floor = clean(d.get("floor"), 12)
+    floor = _display_floor(clean(d.get("floor"), 12))
     deposit = clean(d.get("payment_terms") or d.get("deposit"), 16)
     contract = clean(d.get("contract_term"), 12)
     try:

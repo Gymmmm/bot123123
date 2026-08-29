@@ -396,7 +396,7 @@ class Database:
     ) -> list[dict[str, Any]]:
         if not {"drafts", "posts"}.issubset(self._table_names()):
             return []
-        clauses = ["status='active'", """EXISTS (
+        clauses = ["status IN ('active','reserved')", """EXISTS (
             SELECT 1 FROM drafts d JOIN posts p ON p.draft_id=d.draft_id
             WHERE d.listing_id=listings.listing_id AND d.review_status='published'
               AND p.platform='telegram' AND p.publish_status IN ('published','success','ok')
