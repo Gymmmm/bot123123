@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from .common import *
 
+
 def _fmt_price(price: object) -> str:
     if isinstance(price, (int, float)):
         return f'${int(price):,}/月' if price > 0 else '价格待确认'
@@ -19,11 +20,13 @@ def _fmt_price(price: object) -> str:
             return f'${value:,}/月'
     return '价格待确认'
 
+
 def _display_listing_id(listing_id: object) -> str:
     """客户统一看到 QCxxxx；内部数据库和深链继续使用 l_xxxx。"""
     raw = str(listing_id or '').strip()
     match = re.fullmatch('(?i)l[_-]?(\\d+)', raw)
     return f'QC{int(match.group(1)):04d}' if match else raw.upper()
+
 
 def _display_layout(layout: object, property_type: object='') -> str:
     """把内部户型写法转换成客户容易读的展示文案，不修改底层事实。"""
@@ -42,4 +45,17 @@ def _display_layout(layout: object, property_type: object='') -> str:
         if match:
             rooms, halls, baths = match.groups()
             return f'{rooms}房{halls}厅｜{baths}卫'
+    return raw.replace('|', '｜')
+
+
+def _display_floor(floor: object) -> str:
+    """楼层只在展示层规范化；数据库/冻结事实仍保留原值。"""
+    raw = str(floor or '').strip()
+    if not raw:
+        return ''
+    compact = re.sub(r'\s+', '', raw)
+    if re.fullmatch(r'\d+', compact):
+        return f'{int(compact)}楼'
+    if re.fullmatch(r'\d+楼', compact):
+        return compact
     return raw.replace('|', '｜')
