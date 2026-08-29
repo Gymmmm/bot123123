@@ -76,21 +76,17 @@ def _binding_days_left(binding: dict | None) -> int | None:
 def _contract_status_text(days_left: int | None) -> str:
     if days_left is None:
         return '资料待补全'
-    if days_left <= 3:
-        return '临近到期，请优先跟进'
     if days_left <= 7:
-        return '本周内建议确认续租/换房'
-    if days_left <= 30:
-        return '本月内可提前安排'
+        return '租约临近到期'
     return '租约状态稳定'
 
 def _lease_reminder_label(user_id: int | None) -> str:
     enabled = True if user_id is None else db.is_lease_reminder_enabled(user_id)
-    return '🔔 到期提醒：已开启' if enabled else '🔕 到期提醒：已关闭'
+    return '🔔 到期前7天提醒：已开启' if enabled else '🔕 到期前7天提醒：已关闭'
 
 def _binding_contract_text(binding: dict | None, user_id: int | None=None) -> str:
     if not binding:
-        return '📋 <b>我的租约</b>\n\n当前还没有绑定租约档案。\n请点「💬 联系我们」，我们会后台录入房号/交租日/到期日。'
+        return '📋 <b>我的租约</b>\n\n当前还没有绑定租约档案。\n请点「💬 联系中文顾问」，我们会后台录入房号、交租日和到期日。'
     property_name = str(binding.get('property_name') or '-')
     rent_day = binding.get('rent_day')
     rent_text = f'每月 {int(rent_day)} 号' if isinstance(rent_day, int) else '待确认'
@@ -126,6 +122,12 @@ def _binding_contract_text(binding: dict | None, user_id: int | None=None) -> st
     )
 
 def _contract_actions_keyboard(user_id: int | None=None) -> InlineKeyboardMarkup:
+    """新租约页不再生成续租/换房入口；旧回调继续兼容历史按钮。"""
     reminder_label = _lease_reminder_label(user_id)
-    rows: list[list[InlineKeyboardButton]] = [[InlineKeyboardButton('🔄 续租', callback_data='contract:renew'), InlineKeyboardButton('🏠 换房', callback_data='contract:change')], [InlineKeyboardButton('📅 我的预约', callback_data='appointment_menu:list'), InlineKeyboardButton('🛠 入住后服务', callback_data='service:hub')], [InlineKeyboardButton(reminder_label, callback_data='contract:toggle_reminder'), InlineKeyboardButton('💬 联系顾问', callback_data='appointment_menu:contact')], [InlineKeyboardButton('🏠 返回首页', callback_data='home')]]
+    rows: list[list[InlineKeyboardButton]] = [
+        [InlineKeyboardButton('📅 我的预约', callback_data='appointment_menu:list'), InlineKeyboardButton('🛠 入住后服务', callback_data='service:hub')],
+        [InlineKeyboardButton(reminder_label, callback_data='contract:toggle_reminder')],
+        [InlineKeyboardButton('💬 联系中文顾问', callback_data='appointment_menu:contact')],
+        [InlineKeyboardButton('🏠 返回首页', callback_data='home')],
+    ]
     return InlineKeyboardMarkup(rows)
