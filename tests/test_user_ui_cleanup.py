@@ -150,9 +150,23 @@ def test_publication_package_has_no_duplicate_floor_import():
 
 
 def test_customer_routes_do_not_leak_internal_listing_wording():
-    source = Path('qiaolian_dual/start_routes.py').read_text(encoding='utf-8')
+    customer_route_files = [
+        'qiaolian_dual/start_routes.py',
+        'qiaolian_dual/message_handlers.py',
+        'qiaolian_dual/listing.py',
+    ]
+    source = '\n'.join(Path(path).read_text(encoding='utf-8') for path in customer_route_files)
     assert '在架房源' not in source
     assert '请联系我们重新获取绑定码' not in source
+
+
+def test_binding_copy_only_promises_service_context_and_seven_day_reminder():
+    sources = '\n'.join(
+        Path(path).read_text(encoding='utf-8')
+        for path in ('qiaolian_dual/message_handlers.py', 'qiaolian_dual/admin_commands.py')
+    )
+    assert '到期前 7 天' in sources
+    assert '续租和换房时无需重复填写' not in sources
 
 
 def test_find_card_rechecks_listing_status_before_rendering():

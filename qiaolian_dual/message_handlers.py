@@ -34,7 +34,7 @@ async def handle_main_message(update: Update, context: ContextTypes.DEFAULT_TYPE
             return MAIN
         create_lead(user, action='repeat_tenant_details', source='service_hub', payload={'details': text[:500]})
         await _notify_admins(context, title='老客档案查询', lines=[f'用户：{_user_mention_html(user)}', f'联系方式：{he(_user_contact_text(user))}', f'查询信息：<code>{he(text[:500])}</code>'])
-        await render_panel(update, text='✅ <b>已提交租客档案绑定</b>\n\n顾问核实后，会把对应租约和房屋信息绑定到当前账号。\n之后报修、物业、续租和换房时无需重复填写。\n🔐 信息仅用于档案核实。', parse_mode=ParseMode.HTML, reply_markup=service_hub_keyboard(user.id), context=context)
+        await render_panel(update, text='✅ <b>租客档案已提交</b>\n\n顾问核实后，会把租约和房屋信息绑定到当前账号。\n之后报修或联系物业时，不用再重复填写；租约到期前 7 天也会提醒你。\n🔐 信息仅用于档案核实。', parse_mode=ParseMode.HTML, reply_markup=service_hub_keyboard(user.id), context=context)
         return MAIN
     service_request = context.user_data.pop('awaiting_service_request', None)
     if isinstance(service_request, dict):
@@ -64,7 +64,7 @@ async def handle_main_message(update: Update, context: ContextTypes.DEFAULT_TYPE
             notify_title = '找房需求（顾问协助）' if source == 'advisor_handoff' else '找房需求（普通线索）'
             await _notify_admins(context, title=notify_title, lines=[f'用户：{_user_mention_html(user)}', f'联系方式：{he(_user_contact_text(user))}', f'模式：{he(match_mode)}', f'需求：<code>{he(text[:700])}</code>', '说明：10 分钟内重复搜索仅记录，不重复提醒'])
         if source == 'advisor_handoff':
-            await update.effective_message.reply_text('✅ 已收到你的需求。我先为你匹配当前在架房源；顾问也会继续按这些条件帮你筛选。', reply_markup=main_keyboard())
+            await update.effective_message.reply_text('✅ 已收到你的需求。我先为你匹配当前可预约房源；顾问也会继续按这些条件帮你筛选。', reply_markup=main_keyboard())
         await send_find_results_as_cards(update, context, matches, match_mode)
         return MAIN
     normalized_text = text.lower()
@@ -91,7 +91,7 @@ async def handle_main_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         if matches:
             await send_find_results_as_cards(update, context, matches, match_mode)
         else:
-            await render_panel(update, text=_keyword_intro_text(area=area_use, room_type=room_type, budget_min=budget_min, budget_max=budget_max) + '\n\n当前还没有完全对上的在架房源，我可以继续帮你缩小条件，或者直接转中文顾问继续筛。', parse_mode=ParseMode.HTML, reply_markup=keyword_followup_keyboard(area=area_use, room_type=room_type), context=context, prefer_edit_anchor=True)
+            await render_panel(update, text=_keyword_intro_text(area=area_use, room_type=room_type, budget_min=budget_min, budget_max=budget_max) + '\n\n暂时没有完全符合条件、可以预约看房的房源。你可以换一个预算或位置，也可以让中文顾问继续帮你找。', parse_mode=ParseMode.HTML, reply_markup=keyword_followup_keyboard(area=area_use, room_type=room_type), context=context, prefer_edit_anchor=True)
         return MAIN
     if text in {'🏠 返回首页', '🏠 返回首页'}:
         clear_session_for_fresh_entry(context)

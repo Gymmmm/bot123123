@@ -41,7 +41,7 @@ async def cmd_deal_done(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     bind_kb = InlineKeyboardMarkup([[InlineKeyboardButton('🔗 绑定租后管家', url=deep_link)]])
     push_ok = True
     try:
-        await context.bot.send_message(chat_id=target_user_id, text='🎉 恭喜入住！\n\n入住后如需报修、续租或物业沟通，\n请点击下方按钮完成租后管家绑定（约 30 秒）。', reply_markup=bind_kb)
+        await context.bot.send_message(chat_id=target_user_id, text='🎉 恭喜入住！\n\n绑定租客档案后，报修和物业沟通会自动带上房屋信息；租约到期前 7 天，我们也会提醒你。\n\n点击下方按钮即可绑定（约 30 秒）。', reply_markup=bind_kb)
     except Exception:
         push_ok = False
         logger.exception('向用户推送 t_bind 链接失败: user_id=%s', target_user_id)

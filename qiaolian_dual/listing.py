@@ -322,7 +322,7 @@ def _video_tour_intro_text(*, area: str, budget: str, layout: str) -> str:
 def _video_tour_match_text(matches: list[dict], *, match_mode: str='strict') -> str:
     from .utils_formatting import _display_layout, _display_listing_id, _fmt_price
     if not matches:
-        return '暂时没有完全匹配的在架房源，我先把你接给顾问优先人工匹配。'
+        return '暂时没有完全符合条件、可以预约看房的房源。我先帮你联系中文顾问继续筛选。'
     lines = ['已为你先匹配 2 套：', '']
     for idx, item in enumerate(matches[:2], start=1):
         area = str(item.get('area') or '金边').strip() or '金边'
