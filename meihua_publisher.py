@@ -129,13 +129,10 @@ DETAIL_MAIN_TAG_TEXT = os.getenv("DETAIL_MAIN_TAG_TEXT", "实拍房源")
 DETAIL_FALLBACK_SUBTAG = os.getenv("DETAIL_FALLBACK_SUBTAG", "金边 · 精选房源")
 # 单帖可采集的实拍上限（需大于频道主帖张数，才有「溢出图」进讨论区）
 ALBUM_SOURCE_MAX = int(os.getenv("ALBUM_SOURCE_MAX", "30"))
-# 6 张相册比例：landscape=横向 3:2（不少客户端更接近「3 列×2 行」观感）；square=1:1 方图（常为 2 列×3 行）
-CHANNEL_ALBUM_SIX_ASPECT = os.getenv("CHANNEL_ALBUM_SIX_ASPECT", "landscape").strip().lower()
-# 组图排版：one_three=首张横图+后三张方图循环（Telegram 常见「上一横、下三格」）；classic=按张数统一方图/原逻辑
-CHANNEL_ALBUM_LAYOUT = os.getenv("CHANNEL_ALBUM_LAYOUT", "one_three").strip().lower()
-# 1+3 主图比例 16:9；方图边长
-ONE_THREE_HERO_BOX = (1280, 720)
-ONE_THREE_TILE = int(os.getenv("ONE_THREE_TILE", "1080"))
+# Telegram 手机端 grouped media 统一使用 4:5 竖图派生稿。
+# 原始素材永不覆盖；横图/方图使用模糊延展背景完整保留主体，不做硬裁切。
+CHANNEL_ALBUM_SIZE = (1080, 1350)
+CHANNEL_ALBUM_LAYOUT = "portrait_4_5"
 # 评论区版主帖固定为封面 + 3 张实拍；其余图片进入关联评论区。
 CHANNEL_MAIN_ALBUM_MAX = max(1, min(4, int(os.getenv("CHANNEL_MAIN_ALBUM_MAX", "4"))))
 CHANNEL_FORCE_FOUR_IMAGES = os.getenv("CHANNEL_FORCE_FOUR_IMAGES", "true").strip().lower() in (
@@ -1026,6 +1023,36 @@ def prepare_channel_photo_for_publish(
     return add_detail_logo_watermark(image_bytes, listing)
 
 
+def _fit_to_45_canvas(
+    image: Image.Image,
+    *,
+    canvas_size: tuple[int, int] = CHANNEL_ALBUM_SIZE,
+) -> Image.Image:
+    """生成 Telegram 4:5 发布派生图，同时完整保留原图主体。"""
+    src = image.convert("RGB")
+    cw, ch = canvas_size
+    bg = ImageOps.fit(src, (cw, ch), method=Image.Resampling.LANCZOS)
+    bg = bg.filter(ImageFilter.GaussianBlur(radius=max(18, int(min(cw, ch) * 0.025))))
+    bg = ImageEnhance.Brightness(bg).enhance(0.78)
+    bg = ImageEnhance.Color(bg).enhance(0.92)
+    fg = src.copy()
+    fg.thumbnail((cw, ch), Image.Resampling.LANCZOS)
+    x = (cw - fg.width) // 2
+    y = (ch - fg.height) // 2
+    canvas = bg.convert("RGBA")
+    shadow_pad = max(6, int(min(cw, ch) * 0.008))
+    shadow = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+    sd = ImageDraw.Draw(shadow)
+    sd.rounded_rectangle(
+        (x - shadow_pad, y - shadow_pad, x + fg.width + shadow_pad, y + fg.height + shadow_pad),
+        radius=max(10, int(min(cw, ch) * 0.012)),
+        fill=(0, 0, 0, 42),
+    )
+    canvas = Image.alpha_composite(canvas, shadow)
+    canvas.paste(fg, (x, y))
+    return canvas.convert("RGB")
+
+
 def normalize_album_image(
     image_bytes: bytes,
     *,
@@ -1033,62 +1060,22 @@ def normalize_album_image(
     force_square: bool = False,
     fit_box: tuple[int, int] | None = None,
 ) -> bytes:
-    """
-    统一相册图片尺寸。
-    fit_box=(w,h) 时按框居中裁切（如 6 张用 3:2 横图，部分客户端宫格更接近 3×2）。
-    force_square 时 1:1；否则仅等比缩放到最长边 ≤ target_size。
-    """
+    """统一 Telegram grouped media 为 1080x1350 (4:5) 派生图；旧参数仅兼容。"""
     im = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-    if fit_box:
-        im = ImageOps.fit(im, fit_box, method=Image.Resampling.LANCZOS)
-    elif force_square:
-        im = ImageOps.fit(im, (target_size, target_size), method=Image.Resampling.LANCZOS)
-    else:
-        # 非强制方图时仅限制最长边，避免超大图传输抖动
-        im.thumbnail((target_size, target_size), Image.Resampling.LANCZOS)
+    im = _fit_to_45_canvas(im)
     out = io.BytesIO()
-    im.save(out, "JPEG", quality=90)
+    im.save(out, "JPEG", quality=91, optimize=True)
     return out.getvalue()
 
 
 def _album_layout_is_one_three() -> bool:
-    return CHANNEL_ALBUM_LAYOUT in ("one_three", "1+3", "13", "true", "1", "yes")
+    """兼容旧调用；新发布布局固定为 portrait_4_5。"""
+    return False
 
 
 def _normalize_for_album_slot(image_bytes: bytes, *, index: int, total: int) -> bytes:
-    """
-    按槽位输出尺寸：one_three 模式下每 4 张为一组——组内第 1 张 16:9 主图，第 2～4 张方图；
-    2～3 张时首张主图、其余方图。classic 模式走原先按总张数的方图/6 张横图规则。
-    """
-    if _album_layout_is_one_three():
-        if total >= 4:
-            if index % 4 == 0:
-                return normalize_album_image(
-                    image_bytes, fit_box=ONE_THREE_HERO_BOX
-                )
-            return normalize_album_image(
-                image_bytes, target_size=ONE_THREE_TILE, force_square=False
-            )
-        if total == 3:
-            if index == 0:
-                return normalize_album_image(image_bytes, fit_box=ONE_THREE_HERO_BOX)
-            return normalize_album_image(
-                image_bytes, target_size=ONE_THREE_TILE, force_square=False
-            )
-        if total == 2:
-            if index == 0:
-                return normalize_album_image(image_bytes, fit_box=ONE_THREE_HERO_BOX)
-            return normalize_album_image(
-                image_bytes, target_size=ONE_THREE_TILE, force_square=False
-            )
-        return normalize_album_image(image_bytes, target_size=1280, force_square=False)
-
-    if total == 6 and CHANNEL_ALBUM_SIX_ASPECT in ("landscape", "3x2", "32"):
-        h32 = max(720, int(round(1280 * 2 / 3)))
-        return normalize_album_image(image_bytes, target_size=1280, fit_box=(1280, h32))
-
-    # 详情实拍不强制裁切；仅封面使用设计模板，避免切掉房屋主体。
-    return normalize_album_image(image_bytes, target_size=1280, force_square=False)
+    """所有频道主相册和评论区相册统一 4:5，不按槽位改变比例。"""
+    return normalize_album_image(image_bytes)
 
 
 # ── 文案构造 ──────────────────────────────────────────────
