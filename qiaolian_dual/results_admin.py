@@ -146,7 +146,7 @@ def _find_result_card_content(item: dict, index: int, total: int) -> tuple[str, 
     if nav:
         rows.append(nav)
     rows.append([InlineKeyboardButton('📋 租赁详情', callback_data=f'listing:open:{listing_id}'), InlineKeyboardButton('📅 预约看房', callback_data=f'listing:appoint:{listing_id}')])
-    rows.append([InlineKeyboardButton('📸 完整实拍', callback_data=f'listing:photos:{listing_id}'), InlineKeyboardButton('💬 咨询这套', callback_data=f'listing:consult:{listing_id}')])
+    rows.append([InlineKeyboardButton('📸 查看更多实拍', callback_data=f'listing:photos:{listing_id}'), InlineKeyboardButton('💬 咨询这套', callback_data=f'listing:consult:{listing_id}')])
     rows.append([InlineKeyboardButton('✏️ 换条件', callback_data='home_smart_search')])
     media_files = item.get('media_files') if isinstance(item.get('media_files'), list) else []
     photo_path = next((p for p in media_files if isinstance(p, str) and os.path.exists(p)), '')
