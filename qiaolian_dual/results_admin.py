@@ -107,15 +107,25 @@ async def send_find_results_as_cards(update: Update, context: ContextTypes.DEFAU
     context.user_data['find_card_listing_ids'] = ids
     context.user_data['find_card_match_mode'] = str(match_mode or 'strict')
     query = getattr(update, 'callback_query', None)
-    if query is not None:
+    # First render may need to replace a text-only panel with a photo card. In that
+    # case Telegram cannot edit text -> media, so remove the old panel once and send
+    # exactly one card. After that all previous/next navigation edits the same card.
+    first_item = listing_context(ids[0]) if ids else {}
+    first_media = first_item.get('media_files') if isinstance(first_item.get('media_files'), list) else []
+    first_photo = next((path for path in first_media if isinstance(path, str) and os.path.exists(path)), '')
+    if not first_photo:
+        candidate = str(first_item.get('media_file_id') or '')
+        first_photo = candidate if candidate and os.path.exists(candidate) else ''
+    replace = bool(query is not None and (getattr(query.message, 'photo', None) or not first_photo))
+    if query is not None and first_photo and not getattr(query.message, 'photo', None):
         try:
             await query.message.delete()
         except Exception:
-            logger.debug('旧筛选面板无法删除，继续发送单卡推荐', exc_info=True)
-    await send_find_result_card(update, context, 0, replace=False)
+            logger.debug('旧筛选面板无法删除，继续发送单张推荐卡', exc_info=True)
+    await send_find_result_card(update, context, 0, replace=replace)
 
 
-def _find_result_card_content(item: dict, index: int, total: int) -> tuple[str, InlineKeyboardMarkup, str]:
+def _find_result_card_content(item: dict, index: int, total: int, result_ids: list[str] | None=None) -> tuple[str, InlineKeyboardMarkup, str]:
     from .listing import listing_context
     from .text_utils import clean_inline_text
     from .utils_formatting import _display_layout, _fmt_price
@@ -141,11 +151,36 @@ def _find_result_card_content(item: dict, index: int, total: int) -> tuple[str, 
     lines.extend(['', status_text, f'第 {index + 1}/{total} 套'])
     nav = []
     if total > 1:
-        nav = [InlineKeyboardButton('⬅️ 上一套', callback_data=f'findcard:{(index - 1) % total}'), InlineKeyboardButton('下一套 ➡️', callback_data=f'findcard:{(index + 1) % total}')]
+        ids = list(result_ids or [])
+        prev_index = (index - 1) % total
+        next_index = (index + 1) % total
+        prev_id = ids[prev_index] if len(ids) == total else ''
+        next_id = ids[next_index] if len(ids) == total else ''
+
+        def nav_label(target_id: str, fallback: str, *, left: bool) -> str:
+            target = listing_context(target_id) if target_id else {}
+            nav_area = clean_inline_text(str(target.get('project') or target.get('community') or target.get('area') or ''))
+            nav_layout = _display_layout(clean_inline_text(str(target.get('layout') or target.get('property_type') or '')), target.get('property_type'))
+            core = '｜'.join(value for value in (nav_area, nav_layout) if value) or fallback
+            core = core[:22]
+            return f'⬅️ {core}' if left else f'{core} ➡️'
+
+        if len(ids) == total:
+            nav = [
+                InlineKeyboardButton(nav_label(prev_id, '上一套', left=True), callback_data=f'findcard:{prev_index}:{prev_id}'),
+                InlineKeyboardButton(nav_label(next_id, '下一套', left=False), callback_data=f'findcard:{next_index}:{next_id}'),
+            ]
+        else:
+            # Compatibility for callers that only provide index/total. Live cards
+            # always pass result_ids and therefore use the named navigation above.
+            nav = [
+                InlineKeyboardButton('⬅️ 上一套', callback_data=f'findcard:{prev_index}'),
+                InlineKeyboardButton('下一套 ➡️', callback_data=f'findcard:{next_index}'),
+            ]
     rows = []
     if nav:
         rows.append(nav)
-    rows.append([InlineKeyboardButton('📋 租赁详情', callback_data=f'listing:open:{listing_id}'), InlineKeyboardButton('📅 预约看房', callback_data=f'listing:appoint:{listing_id}')])
+    rows.append([InlineKeyboardButton('📋 租赁详情', callback_data=f'listing:detail:{listing_id}'), InlineKeyboardButton('📅 预约看房', callback_data=f'listing:appoint:{listing_id}')])
     rows.append([InlineKeyboardButton('📸 查看更多实拍', callback_data=f'listing:photos:{listing_id}'), InlineKeyboardButton('💬 咨询这套', callback_data=f'listing:consult:{listing_id}')])
     rows.append([InlineKeyboardButton('✏️ 换条件', callback_data='home_smart_search')])
     media_files = item.get('media_files') if isinstance(item.get('media_files'), list) else []
@@ -168,7 +203,7 @@ async def send_find_result_card(update: Update, context: ContextTypes.DEFAULT_TY
         context.user_data['find_card_listing_ids'] = [lid for lid in ids if lid != ids[index]]
         await update.effective_message.reply_text('这套推荐的房态已经变化，暂时不能继续预约。我可以继续为你筛选其他房源。', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('🔍 重新找房', callback_data='home_smart_search')], [InlineKeyboardButton('💬 联系中文顾问', callback_data='keyword:handoff')], [InlineKeyboardButton('🏠 返回首页', callback_data='home')]]))
         return
-    caption, keyboard, photo_path = _find_result_card_content(item, index, len(ids))
+    caption, keyboard, photo_path = _find_result_card_content(item, index, len(ids), ids)
     query = getattr(update, 'callback_query', None)
     if replace and query is not None and getattr(query.message, 'photo', None) and photo_path:
         from telegram import InputMediaPhoto
@@ -283,7 +318,7 @@ async def send_listing_photo_preview(bot, chat_id: int, listing_id: str) -> None
     caption_lines.append(f'以下是这套房的完整实拍，共 {len(photos)} 张。')
     caption_lines.append('点击图片查看大图。')
     caption = '\n'.join(caption_lines)
-    rows = [[InlineKeyboardButton('📋 租赁详情', callback_data=f'listing:detail:{listing_id}'), InlineKeyboardButton('📅 预约看房', callback_data=f'listing:appoint:{listing_id}')], [InlineKeyboardButton('🤖 侨联找房助手', callback_data='home_smart_search')]]
+    rows = [[InlineKeyboardButton('📋 租赁详情', callback_data=f'listing:detail:{listing_id}'), InlineKeyboardButton('📅 预约看房', callback_data=f'listing:appoint:{listing_id}')], [InlineKeyboardButton('💬 联系中文顾问', callback_data=f'listing:consult:{listing_id}')], [InlineKeyboardButton('⬅️ 返回这套房', callback_data=f'listing:open:{listing_id}')]]
     keyboard = InlineKeyboardMarkup(rows)
     followup_text = f'🏠 <b>{he(qc_id)}｜请选择下一步</b>'
     detail_text = listing_cost_text(str(listing_id or '').strip())

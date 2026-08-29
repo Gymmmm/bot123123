@@ -53,7 +53,7 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
         if not is_available:
             if availability_reason == 'missing':
                 create_lead(user, action='broken_link', source=source, listing_id=listing_id, payload={**touch_payload, 'reason': availability_reason})
-            await message.reply_text(listing_unavailable_text(availability_reason), reply_markup=listing_unavailable_keyboard(listing_id))
+            await message.reply_text(listing_unavailable_text(availability_reason), parse_mode=ParseMode.HTML, reply_markup=listing_unavailable_keyboard(listing_id))
             return MAIN
         initial_mode = str(target_meta.get('mode') or '').strip().lower()
         create_lead(user, action='appointment_click', source=source, listing_id=listing_id, payload={**touch_payload, 'preferred_mode': initial_mode, 'caption_variant': caption_variant})
@@ -66,7 +66,7 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
         if not is_available:
             if availability_reason == 'missing':
                 create_lead(user, action='broken_link', source=source, listing_id=listing_id, payload={**touch_payload, 'reason': availability_reason})
-            await message.reply_text(listing_unavailable_text(availability_reason), reply_markup=listing_unavailable_keyboard(listing_id))
+            await message.reply_text(listing_unavailable_text(availability_reason), parse_mode=ParseMode.HTML, reply_markup=listing_unavailable_keyboard(listing_id))
             return MAIN
         listing_info = listing_context(listing_id)
         caption_variant = _normalize_variant(target_meta.get('cv')) or str(listing_info.get('caption_variant') or 'a').lower()
@@ -85,7 +85,7 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
         if not is_available:
             if availability_reason == 'missing':
                 create_lead(user, action='broken_link', source=source, listing_id=listing_id, payload={**touch_payload, 'reason': availability_reason})
-            await message.reply_text(listing_unavailable_text(availability_reason), reply_markup=listing_unavailable_keyboard(listing_id))
+            await message.reply_text(listing_unavailable_text(availability_reason), parse_mode=ParseMode.HTML, reply_markup=listing_unavailable_keyboard(listing_id))
             return MAIN
         context.user_data['contact_listing_id'] = listing_id
         context.user_data['contact_touch_payload'] = {**touch_payload, 'entry': 'photos'}
@@ -144,7 +144,7 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
         listing_id = target
         is_available, availability_reason = listing_is_available(listing_id)
         if not is_available:
-            await message.reply_text(listing_unavailable_text(availability_reason), reply_markup=listing_unavailable_keyboard(listing_id))
+            await message.reply_text(listing_unavailable_text(availability_reason), parse_mode=ParseMode.HTML, reply_markup=listing_unavailable_keyboard(listing_id))
             return MAIN
         db.favorite_listing(user.id, listing_id, now_ts())
         create_lead(user, action='favorite_click', source=source, listing_id=listing_id, payload=touch_payload)
@@ -188,6 +188,7 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
         if not is_available:
             await message.reply_text(
                 listing_unavailable_text(availability_reason),
+                parse_mode=ParseMode.HTML,
                 reply_markup=listing_unavailable_keyboard(listing_id),
             )
             return MAIN
@@ -201,7 +202,7 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
         if not is_available:
             if availability_reason == 'missing':
                 create_lead(user, action='broken_link', source=source, listing_id=listing_id, payload={**touch_payload, 'reason': availability_reason})
-            await message.reply_text(listing_unavailable_text(availability_reason), reply_markup=listing_unavailable_keyboard(listing_id))
+            await message.reply_text(listing_unavailable_text(availability_reason), parse_mode=ParseMode.HTML, reply_markup=listing_unavailable_keyboard(listing_id))
             return MAIN
         listing_info = listing_context(listing_id)
         caption_variant = _normalize_variant(target_meta.get('cv')) or _normalize_variant(listing_info.get('caption_variant')) or 'a'

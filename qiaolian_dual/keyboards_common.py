@@ -9,7 +9,7 @@ def main_keyboard() -> InlineKeyboardMarkup:
         [
             [
                 InlineKeyboardButton('🔍 帮我找房', callback_data='home_smart_search'),
-                InlineKeyboardButton('🏠 可预约房源', callback_data='hub:latest'),
+                InlineKeyboardButton('🏠 可预约房源', callback_data='hub:available'),
             ],
             [
                 InlineKeyboardButton('📅 我的预约', callback_data='hub:appointments'),

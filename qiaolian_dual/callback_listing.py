@@ -21,19 +21,39 @@ async def handle_listing_callback(update: Update, context: ContextTypes.DEFAULT_
     from .start_routes import route_start_arg
     from .texts import advisor_handoff_text, advisor_text, brand_story_text, deposit_text, lead_capture_text, listing_detail_text, local_life_text, promise_text, render_panel, rfcity_text, service_hub_text, smart_search_text, want_home_ack_text, welcome_text
     if data.startswith('findcard:'):
-            value = data.split(':', 1)[1]
+            parts = data.split(':', 2)
+            value = parts[1] if len(parts) > 1 else ''
             if value == 'noop':
                 return MAIN
             try:
                 index = int(value)
             except (TypeError, ValueError):
-                await query.answer('这批推荐已失效，请重新找房。', show_alert=True)
                 return MAIN
+            # New callbacks carry both real index and target listing_id; old
+            # findcard:{index} callbacks remain compatible.
+            if len(parts) == 3 and parts[2] not in {'', 'unknown'}:
+                ids = list(context.user_data.get('find_card_listing_ids') or [])
+                if 0 <= index < len(ids) and ids[index] != parts[2]:
+                    return MAIN
             await send_find_result_card(update, context, index, replace=True)
             return MAIN
     if data.startswith('listing:photos:'):
             lid = data.split(':', 2)[2]
-            await send_listing_photo_preview(context.bot, update.effective_chat.id, lid)
+            context.user_data['contact_listing_id'] = lid
+            try:
+                await send_listing_photo_preview(context.bot, update.effective_chat.id, lid)
+            except Exception:
+                logger.exception('完整相册发送失败: listing_id=%s', lid)
+                await render_panel(
+                    update,
+                    text='<b>📸 完整实拍</b>\n\n这套房的实拍暂时无法加载。你可以稍后再试，或联系中文顾问补充图片。',
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton('💬 联系中文顾问', callback_data=f'listing:consult:{lid}')],
+                        [InlineKeyboardButton('⬅️ 返回这套房', callback_data=f'listing:open:{lid}')],
+                    ]),
+                    context=context,
+                )
             return MAIN
     if data == 'find:show_more':
             bot = context.bot
@@ -63,7 +83,7 @@ async def handle_listing_callback(update: Update, context: ContextTypes.DEFAULT_
             logger.info(f'[CALLBACK] listing:open triggered, listing_id={lid}')
             is_available, availability_reason = listing_is_available(lid)
             if not is_available:
-                await render_panel(update, text=listing_unavailable_text(availability_reason), reply_markup=listing_unavailable_keyboard(lid), context=context)
+                await render_panel(update, text=listing_unavailable_text(availability_reason), parse_mode=ParseMode.HTML, reply_markup=listing_unavailable_keyboard(lid), context=context)
                 return MAIN
             item = listing_context(lid)
             if not item or not item.get('listing_id'):
@@ -154,22 +174,19 @@ async def handle_listing_callback(update: Update, context: ContextTypes.DEFAULT_
             return await contact_management(update, context, source='listing_card', from_listing=lid)
     if data.startswith('listing:detail:'):
             lid = data.split(':', 2)[2]
-            is_available, availability_reason = listing_is_available(lid)
-            if not is_available:
-                await render_panel(update, text=listing_unavailable_text(availability_reason), reply_markup=listing_unavailable_keyboard(lid), context=context)
-                return MAIN
             item = db.get_listing(lid) if lid else None
             if not item:
-                await render_panel(update, text='未找到该房源详情，可能已下架。', reply_markup=main_keyboard())
+                await render_panel(update, text='未找到该房源详情，可能已下架。', reply_markup=main_keyboard(), context=context)
                 return MAIN
+            context.user_data['contact_listing_id'] = lid
             create_lead(user, action='listing_detail_view', source='listing_landing', listing_id=lid)
-            detail_rows = [[InlineKeyboardButton('📅 预约看房', callback_data=f'listing:appoint:{lid}'), InlineKeyboardButton('💬 联系顾问', callback_data=f'listing:consult:{lid}')]]
-            channel_url = _listing_channel_url(lid)
-            if channel_url:
-                detail_rows.append([InlineKeyboardButton('📸 全部实拍与留言区', url=channel_url)])
-            detail_rows.append([InlineKeyboardButton('⬅️ 返回', callback_data='home')])
-            detail_kb = InlineKeyboardMarkup(detail_rows)
-            await render_panel(update, text=listing_detail_text(item), parse_mode=ParseMode.HTML, reply_markup=detail_kb)
+            detail_kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton('📅 预约这套', callback_data=f'listing:appoint:{lid}')],
+                [InlineKeyboardButton('📸 查看更多实拍', callback_data=f'listing:photos:{lid}')],
+                [InlineKeyboardButton('💬 联系中文顾问', callback_data=f'listing:consult:{lid}')],
+                [InlineKeyboardButton('⬅️ 返回这套房', callback_data=f'listing:open:{lid}')],
+            ])
+            await render_panel(update, text=listing_cost_text(lid), parse_mode=ParseMode.HTML, reply_markup=detail_kb, context=context)
             return MAIN
     if data.startswith('listing:similar:'):
             lid = data.split(':', 2)[2]

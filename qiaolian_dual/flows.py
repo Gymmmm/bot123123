@@ -14,7 +14,7 @@ async def start_appointment(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     if not is_general_request:
         is_available, availability_reason = listing_is_available(listing_id)
         if not is_available:
-            await render_panel(update, text=listing_unavailable_text(availability_reason), reply_markup=listing_unavailable_keyboard(listing_id), context=context)
+            await render_panel(update, text=listing_unavailable_text(availability_reason), parse_mode=ParseMode.HTML, reply_markup=listing_unavailable_keyboard(listing_id), context=context)
             return MAIN
     info = listing_context(listing_id)
     title = str(info.get('title') or info.get('project') or info.get('community') or info.get('area') or '这套房').strip()

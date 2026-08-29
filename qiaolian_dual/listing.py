@@ -65,15 +65,11 @@ def listing_context(listing_id: str) -> dict:
         logger.debug('读取房源多图包失败: %s', listing_id, exc_info=True)
     return merged
 
+# 详情页顾问核对语义保持一致：点“联系中文顾问”逐项核对。
 def listing_cost_text(listing_id: str) -> str:
-    """费用页只展示数据库已有事实，不把缺失字段编成确定价格。"""
-    from .utils_formatting import _display_layout, _fmt_price
+    """租赁详情只展示已有事实；缺失项统一明确标注待确认。"""
+    from .utils_formatting import _fmt_price
     item = listing_context(listing_id)
-    title = str(item.get('project') or item.get('community') or item.get('title') or '这套房').strip()
-    layout = _display_layout(item.get('layout') or item.get('property_type'), item.get('property_type'))
-    price_value = item.get('price')
-    price_text = _fmt_price(price_value)
-    deposit = str(item.get('deposit') or item.get('deposit_rule') or '').strip()
     normalized: dict = {}
     raw_normalized = item.get('normalized_data')
     if isinstance(raw_normalized, dict):
@@ -83,66 +79,23 @@ def listing_cost_text(listing_id: str) -> str:
             normalized = json.loads(str(raw_normalized))
         except (TypeError, ValueError, json.JSONDecodeError):
             normalized = {}
-    deposit = deposit or str(normalized.get('deposit_payment_terms') or '').strip()
-    contract = str(normalized.get('contract_term_display') or normalized.get('contract_term') or item.get('contract_term') or '').strip()
-    electric = str(item.get('electric_rate') or normalized.get('electric_rate') or '').strip()
-    water = str(item.get('water_rate') or normalized.get('water_rate') or '').strip()
-    management = str(normalized.get('management_fee') or '').strip()
-    internet = str(normalized.get('internet_fee') or '').strip()
-    parking = str(normalized.get('parking_fee') or '').strip()
-    location = str(
-        normalized.get('public_location_display')
-        or item.get('project')
-        or item.get('community')
-        or item.get('area')
-        or ''
-    ).strip()
-    size = str(item.get('size_sqm') or item.get('size') or normalized.get('size_sqm') or '').strip()
-    title_line = title if not layout or layout in title else f'{title} · {layout}'
-    lines = ['<b>📋 租赁详情</b>', f'🏠 {he(title_line)}']
-    if size:
-        size_text = size if re.search(r'㎡|m²|sqm', size, flags=re.I) else f'{size}㎡'
-        lines.append(f'📐 {he(size_text)}')
 
-    lines.extend(['', '<b>先看这两项</b>', f'月租｜<b>{he(price_text)}</b>'])
-    if deposit:
-        lines.append(f'押付｜{he(deposit)}')
-    if contract:
-        lines.append(f'租期｜{he(contract)}')
-    missing_terms = []
-    if not deposit:
-        missing_terms.append('押付方式')
-    if not contract:
-        missing_terms.append('租期')
-    if missing_terms:
-        lines.append(f"还要确认｜{'、'.join(missing_terms)}")
+    def fact(*values) -> str:
+        for value in values:
+            value = str(value or '').strip()
+            if value:
+                return value
+        return '待确认'
 
-    lines.extend(['', '<b>每月可能产生的费用</b>'])
-    known_fees = []
-    if management:
-        known_fees.append(f'管理费｜{he(management)}')
-    if internet:
-        known_fees.append(f'网络｜{he(internet)}')
-    if water:
-        known_fees.append(f'水费｜{he(water)}')
-    if electric:
-        known_fees.append(f'电费｜{he(electric)}')
-    if parking:
-        known_fees.append(f'停车｜{he(parking)}')
-    lines.extend(known_fees)
-    missing_fees = []
-    if not management:
-        missing_fees.append('管理费')
-    if not internet:
-        missing_fees.append('网络')
-    if not water:
-        missing_fees.append('水费')
-    if not electric:
-        missing_fees.append('电费')
-    if not parking:
-        missing_fees.append('停车')
-    if missing_fees:
-        lines.append(f"还要确认｜{'、'.join(missing_fees)}")
+    price_raw = item.get('price')
+    price = _fmt_price(price_raw) if price_raw not in (None, '', 0, '0') else '待确认'
+    deposit = fact(item.get('deposit'), item.get('deposit_rule'), normalized.get('deposit_payment_terms'))
+    contract = fact(normalized.get('contract_term_display'), normalized.get('contract_term'), item.get('contract_term'))
+    management = fact(normalized.get('management_fee'))
+    internet = fact(normalized.get('internet_fee'))
+    water = fact(item.get('water_rate'), normalized.get('water_rate'))
+    electric = fact(item.get('electric_rate'), normalized.get('electric_rate'))
+    parking = fact(normalized.get('parking_fee'))
 
     amenities_raw = normalized.get('special_tags') or item.get('highlights') or []
     if isinstance(amenities_raw, str):
@@ -152,25 +105,38 @@ def listing_cost_text(listing_id: str) -> str:
     else:
         amenities = []
     amenities = list(dict.fromkeys(amenities))[:6]
-    if amenities:
-        lines.extend(['', '<b>配套</b>'])
-        lines.append('、'.join(he(value) for value in amenities))
-    availability_confirmed = str(
-        normalized.get('availability_confirmed_at')
-        or normalized.get('availability_confirmed_date')
-        or item.get('availability_confirmed_at')
-        or ''
-    ).strip()
-    today_text = datetime.now().strftime('%Y-%m-%d')
+    amenities_text = ' · '.join(amenities) if amenities else '待确认'
+
+    lines = [
+        '<b>📋 租赁详情</b>',
+        '',
+        '<b>💰 租赁</b>',
+        f'月租｜{he(price)}',
+        f'押付｜{he(deposit)}',
+        f'租期｜{he(contract)}',
+        '',
+        '<b>🧾 费用</b>',
+        f'管理费｜{he(management)}',
+        f'网络｜{he(internet)}',
+    ]
+    known_optional = []
+    missing_optional = []
+    for label, value in (('水费', water), ('电费', electric), ('停车', parking)):
+        if value == '待确认':
+            missing_optional.append(label)
+        else:
+            known_optional.append(f'{label}｜{he(value)}')
+    lines.extend(known_optional)
+    if missing_optional:
+        lines.append(f"待确认｜{' · '.join(missing_optional)}")
+    lines.extend(['', '<b>🏊 配套</b>', he(amenities_text), ''])
     status = str(item.get('status') or '').strip().lower()
     if status == 'reserved':
-        lines.extend(['', '<b>🟡 房源状态｜已有预约 · 仍可预约</b>'])
-    elif availability_confirmed.startswith(today_text):
-        lines.extend(['', '<b>🟢 房源状态｜今日确认可预约</b>'])
+        lines.append('<b>🟡 已有预约 · 仍可预约</b>')
     elif status == 'active':
-        lines.extend(['', '<b>🟢 房源状态｜当前可预约</b>'])
-    from .messages import viewing_delivery_assurance_text
-    lines.extend(['', viewing_delivery_assurance_text().strip(), '', '金额或收费方式不清楚，点“联系中文顾问”逐项核对。'])
+        lines.append('<b>🟢 当前可预约</b>')
+    else:
+        lines.append('<b>房态待确认</b>')
     return '\n'.join(lines)
 
 def listing_cost_keyboard(listing_id: str) -> InlineKeyboardMarkup:
@@ -219,23 +185,23 @@ def listing_is_available(listing_id: str) -> tuple[bool, str]:
     return (False, 'missing')
 
 def listing_unavailable_text(reason: str='') -> str:
-    """根据房态给用户准确提示，不把所有不可预约状态都说成已租出。"""
-    status = str(reason or '').strip().lower()
-    if status == 'rented':
-        return '<b>🔴 这套房源已租出</b>\n\n目前不能继续预约。可以看看同区域、同预算的类似房源，或者让顾问直接帮你匹配。'
-    if status == 'pending':
-        return '<b>🔵 这套房源正在确认房态</b>\n\n为了避免白跑一趟，暂时不直接接受预约。顾问确认后可以继续安排。'
-    if status in {'inactive', 'offline'}:
-        return '<b>⚫ 这套房源目前已下架</b>\n\n可以看看同区域、同预算的类似房源。'
-    return '<b>这套房暂时不能预约</b>\n\n房态正在确认。可以先看其他可预约房源，或者让中文顾问帮你确认。'
+    """统一不可预约页；具体内部状态不在客户页重复堆叠。"""
+    return (
+        '<b>🏠 这套房暂时不能预约</b>\n\n'
+        '房态正在确认。\n'
+        '你可以先看附近可预约房源，\n'
+        '也可以让中文顾问帮你确认。'
+    )
 
 def listing_unavailable_keyboard(listing_id: str='') -> InlineKeyboardMarkup:
     area = str(listing_context(listing_id).get('area') or '').strip()
-    rows: list[list[InlineKeyboardButton]] = [[InlineKeyboardButton('🔍 找相近房源', callback_data='findmode:guided')], [InlineKeyboardButton('💬 联系中文顾问', callback_data='appointment_menu:contact')]]
-    if area and area != '不限':
-        rows.append([InlineKeyboardButton('🏠 同区推荐', callback_data=f'unavail:more:{area}')])
-    rows.append([InlineKeyboardButton('🏠 返回首页', callback_data='home')])
-    return InlineKeyboardMarkup(rows)
+    area_token = area if area and area != '不限' else 'any'
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton('🔍 找附近房源', callback_data='findmode:guided')],
+        [InlineKeyboardButton('💬 联系中文顾问', callback_data='appointment_menu:contact')],
+        [InlineKeyboardButton('🏠 同区推荐', callback_data=f'unavail:more:{area_token}')],
+        [InlineKeyboardButton('⬅️ 返回上一页', callback_data='home')],
+    ])
 
 def _store_active_entry(context: ContextTypes.DEFAULT_TYPE, *, arg: str, action: str, listing_id: str='', touch_payload: dict | None=None) -> None:
     from .session_deeplink import now_ts

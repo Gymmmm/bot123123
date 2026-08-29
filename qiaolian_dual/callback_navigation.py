@@ -5,7 +5,7 @@ from .common import *
 
 
 def matches(data: str) -> bool:
-    return (data == 'home') or (data == 'home_smart_search') or (data == 'home_brand') or (data == 'home_appoint') or (data == 'home_consult') or (data == 'home_living') or (data == 'home_nearby') or (data == 'smart_project') or (data == 'smart_movein') or (data == 'keyword:handoff') or (data == 'hub:area') or (data == 'hub:budget') or (data == 'hub:layout') or (data == 'hub:latest') or (data == 'hub:find') or (data == 'hub:appoint') or (data == 'hub:video_tour') or (data == 'hub:advisor') or (data == 'hub:precise') or (data == 'hub:account') or (data == 'hub:favorites') or (data == 'hub:appointments') or (data == 'hub:contract') or (data == 'hub:service') or (data == 'hub:promise') or (data == 'hub:help') or (data.startswith('resume:'))
+    return (data == 'home') or (data == 'home_smart_search') or (data == 'home_brand') or (data == 'home_appoint') or (data == 'home_consult') or (data == 'home_living') or (data == 'home_nearby') or (data == 'smart_project') or (data == 'smart_movein') or (data == 'keyword:handoff') or (data == 'hub:area') or (data == 'hub:budget') or (data == 'hub:layout') or (data == 'hub:latest') or (data == 'hub:available') or (data == 'hub:find') or (data == 'hub:appoint') or (data == 'hub:video_tour') or (data == 'hub:advisor') or (data == 'hub:precise') or (data == 'hub:account') or (data == 'hub:favorites') or (data == 'hub:appointments') or (data == 'hub:contract') or (data == 'hub:service') or (data == 'hub:promise') or (data == 'hub:help') or (data.startswith('resume:'))
 
 
 async def handle_navigation_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, query, data: str, user) -> int | None:
@@ -70,12 +70,16 @@ async def handle_navigation_callback(update: Update, context: ContextTypes.DEFAU
     if data == 'hub:layout':
             await render_panel(update, text='🛏 <b>想找几房？</b>', parse_mode=ParseMode.HTML, reply_markup=room_type_keyboard())
             return MAIN
-    if data == 'hub:latest':
+    if data in {'hub:available', 'hub:latest'}:
+            # hub:latest is retained only as a compatibility alias for historical buttons.
+            # The customer-facing home entry is hub:available and always uses the same
+            # public active/reserved list + single recommendation-card renderer.
             matches = db.list_recent_listings(10)
+            matches = [item for item in matches if str(item.get('status') or '').strip().lower() in {'active', 'reserved'}]
             if matches:
                 await send_find_results_as_cards(update, context, matches, 'strict')
             else:
-                await render_panel(update, text='暂时没有可以安排看房的房源。\n可以换个条件，或让顾问继续帮你找。', parse_mode=ParseMode.HTML, reply_markup=no_match_followup_keyboard())
+                await render_panel(update, text='暂时没有可以安排看房的房源。\n可以换个条件，或让顾问继续帮你找。', parse_mode=ParseMode.HTML, reply_markup=no_match_followup_keyboard(), context=context)
             return MAIN
     if data == 'hub:find':
             return await show_search_entry(update, context)

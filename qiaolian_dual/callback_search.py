@@ -65,7 +65,7 @@ async def handle_search_callback(update: Update, context: ContextTypes.DEFAULT_T
     if data.startswith('unavail:more:'):
             area = detect_area(data.split(':', 2)[2])
             create_lead(user, action='unavailable_more_click', source='listing_unavailable', area=area, listing_id=str(context.user_data.get('contact_listing_id') or ''))
-            matches = db.search_listings(areas=[area] if area and area != '不限' else None, limit=3)
+            matches = db.search_listings(areas=[area] if area and area not in {'不限', 'any'} else None, limit=5)
             if matches:
                 await send_find_results_as_cards(update, context, matches, 'strict')
             else:
