@@ -32,7 +32,7 @@ async def handle_service_callback(update: Update, context: ContextTypes.DEFAULT_
             return await show_service_hub(update, context)
     if data == 'service:promise':
             await query.edit_message_text(
-                '🛡 <b>租期服务保障</b>\n\n'
+                '<b>🛡 租期服务保障</b>\n\n'
                 '绑定租客档案后：\n'
                 '• 租约到期前 <b>7 天</b>提醒你确认是否续租\n'
                 '• 报修提交即生成工单，处理进度会通知你\n'
@@ -56,7 +56,7 @@ async def handle_service_callback(update: Update, context: ContextTypes.DEFAULT_
                 from .callback_contract import handle_contract_callback
                 return await handle_contract_callback(update, context, query, 'contract:renew', user)
             await query.edit_message_text(
-                '🔁 <b>我要续租</b>\n\n如果你是侨联在租客户，可以先绑定租约，顾问核实后会自动带上当前房屋和到期日。\n\n暂时没有绑定也没关系，可以直接联系中文顾问。',
+                '<b>🔁 我要续租</b>\n\n如果你是侨联在租客户，可以先绑定租约，顾问核实后会自动带上当前房屋和到期日。\n\n暂时没有绑定也没关系，可以直接联系中文顾问。',
                 parse_mode=ParseMode.HTML,
                 reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton('🔗 绑定我的租约', callback_data='profile:repeat')],
@@ -71,15 +71,15 @@ async def handle_service_callback(update: Update, context: ContextTypes.DEFAULT_
     if data == 'service:renew_change':
             create_lead(user, action='service_renew_change_click', source='service_hub', listing_id=str(context.user_data.get('contact_listing_id') or ''))
             if not db.get_active_binding(user.id):
-                await query.edit_message_text('🔁 <b>续租 / 换房</b>\n\n需要续租当前房源，先绑定租客档案；想换房可以直接开始找。', parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('🔗 绑定租客档案', callback_data='profile:repeat'), InlineKeyboardButton('🔍 换房找新房', callback_data='contract:change')], [InlineKeyboardButton('💬 联系顾问', callback_data='service:contact')], [InlineKeyboardButton('⬅️ 返回入住后服务', callback_data='service:hub')]]))
+                await query.edit_message_text('<b>🔁 续租 / 换房</b>\n\n需要续租当前房源，先绑定租客档案；想换房可以直接开始找。', parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('🔗 绑定租客档案', callback_data='profile:repeat'), InlineKeyboardButton('🔍 换房找新房', callback_data='contract:change')], [InlineKeyboardButton('💬 联系顾问', callback_data='service:contact')], [InlineKeyboardButton('⬅️ 返回入住后服务', callback_data='service:hub')]]))
                 return MAIN
-            await query.edit_message_text('🔁 <b>续租 / 换房</b>\n\n选择你现在要办的事：', parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('📝 续租当前房源', callback_data='contract:renew'), InlineKeyboardButton('🔍 换房找新房', callback_data='contract:change')], [InlineKeyboardButton('💬 联系顾问', callback_data='service:contact')], [InlineKeyboardButton('⬅️ 返回入住后服务', callback_data='service:hub')]]))
+            await query.edit_message_text('<b>🔁 续租 / 换房</b>\n\n选择你现在要办的事：', parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('📝 续租当前房源', callback_data='contract:renew'), InlineKeyboardButton('🔍 换房找新房', callback_data='contract:change')], [InlineKeyboardButton('💬 联系顾问', callback_data='service:contact')], [InlineKeyboardButton('⬅️ 返回入住后服务', callback_data='service:hub')]]))
             return MAIN
     if data == 'service:terminate':
             binding = db.get_active_binding(user.id)
             create_lead(user, action='lease_terminate_request', source='service_hub', listing_id=str((binding or {}).get('property_name') or ''), payload={'binding_id': (binding or {}).get('id')})
             await _notify_admins(context, title='退租协助请求', lines=[f'用户：{_user_mention_html(user)}', f'联系方式：{he(_user_contact_text(user))}', f"当前房源：{he(str((binding or {}).get('property_name') or '-'))}", f"到期：{he(_binding_end_date(binding) or '-')}"])
-            await render_panel(update, text='🚪 <b>已收到你的退租安排</b>\n\n顾问会先和你核对到期日、提前通知期和押金相关事项，再帮你和房东或物业沟通。\n\n有新的时间安排，直接联系顾问告诉我们就行。', parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('💬 联系顾问', callback_data='service:contact'), InlineKeyboardButton('⬅️ 返回入住后服务', callback_data='service:hub')]]), context=context)
+            await render_panel(update, text='<b>🚪 已收到你的退租安排</b>\n\n顾问会先和你核对到期日、提前通知期和押金相关事项，再帮你和房东或物业沟通。\n\n有新的时间安排，直接联系顾问告诉我们就行。', parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('💬 联系顾问', callback_data='service:contact'), InlineKeyboardButton('⬅️ 返回入住后服务', callback_data='service:hub')]]), context=context)
             return MAIN
     if data == 'service:move':
             await query.edit_message_text('<b>📦 搬家协助</b>\n\n需要协调搬家时，顾问可帮你对接：\n• 车辆和人手\n• 搬家时间\n• 到达后的入住安排\n\n把你的时间发给顾问，我们一起定下来。', parse_mode=ParseMode.HTML, reply_markup=service_detail_keyboard())
@@ -110,7 +110,7 @@ async def handle_service_callback(update: Update, context: ContextTypes.DEFAULT_
             issue_key = data.split(':', 1)[1]
             issue_label = SERVICE_REQUEST_LABELS.get(issue_key, issue_key)
             context.user_data['awaiting_service_request'] = {'issue_key': issue_key, 'issue_label': issue_label}
-            await render_panel(update, text=f'🔧 <b>{he(issue_label)}</b>\n\n发一下位置和问题即可。\n例如：<code>空调开机不制冷</code> 或 <code>B栋3楼走廊灯坏了</code>', parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('💬 联系顾问', callback_data='service:contact'), InlineKeyboardButton('⬅️ 返回入住后服务', callback_data='service:hub')]]))
+            await render_panel(update, text=f'<b>🔧 {he(issue_label)}</b>\n\n发一下位置和问题即可。\n例如：<code>空调开机不制冷</code> 或 <code>B栋3楼走廊灯坏了</code>', parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('💬 联系顾问', callback_data='service:contact'), InlineKeyboardButton('⬅️ 返回入住后服务', callback_data='service:hub')]]))
             return MAIN
     if data.startswith('service_slot:'):
             _, issue_key, slot = data.split(':', 2)
@@ -136,7 +136,7 @@ async def handle_service_callback(update: Update, context: ContextTypes.DEFAULT_
                 ],
                 reply_markup=admin_repair_keyboard(ticket_id),
             )
-            await render_panel(update, text=f"✅ <b>报修已提交</b>\n\n工单｜<code>WX{ticket_id:05d}</code>\n问题｜{he(issue_label)}\n时间｜{he(slot_label)}\n\n处理进度会在这里通知你。", parse_mode=ParseMode.HTML, reply_markup=service_detail_keyboard())
+            await render_panel(update, text=f"<b>✅ 报修已提交</b>\n\n工单｜<code>WX{ticket_id:05d}</code>\n问题｜{he(issue_label)}\n时间｜<b>{he(slot_label)}</b>\n\n处理进度会在这里通知你。", parse_mode=ParseMode.HTML, reply_markup=service_detail_keyboard())
             return MAIN
     if data == 'local:rfcity':
             create_lead(user, action='local_area_click', source='local_life', area='rfcity', payload={'area': 'rfcity', 'category': 'overview'})

@@ -84,7 +84,6 @@ async def handle_listing_callback(update: Update, context: ContextTypes.DEFAULT_
                 await render_panel(update, text='这套房源可能已下架。我可以继续帮你找相近房源。', reply_markup=no_match_followup_keyboard(), context=context)
                 return MAIN
             context.user_data['contact_listing_id'] = lid
-            from telegram import InputMediaPhoto
             listing_id = item.get('listing_id', '')
             media_file = item.get('media_file_id', '')
             media_files = item.get('media_files', [])
@@ -117,28 +116,7 @@ async def handle_listing_callback(update: Update, context: ContextTypes.DEFAULT_
                 available_photos.append(media_file)
             # 房源详情只展示一张封面；完整相册由用户主动点击“全部实拍”查看。
             available_photos = available_photos[:1]
-            if len(available_photos) > 1:
-                media_group = []
-                for idx, photo_path in enumerate(available_photos[:10]):
-                    try:
-                        with open(photo_path, 'rb') as f:
-                            if idx == 0:
-                                media_group.append(InputMediaPhoto(media=f.read(), caption=detail_text, parse_mode=ParseMode.HTML))
-                            else:
-                                media_group.append(InputMediaPhoto(media=f.read()))
-                    except Exception as e:
-                        logger.warning(f'无法读取图片 {photo_path}: {e}')
-                        continue
-                if media_group:
-                    try:
-                        await bot.send_media_group(chat_id=chat_id, media=media_group)
-                        await bot.send_message(chat_id=chat_id, text='—', reply_markup=detail_keyboard)
-                    except Exception as e:
-                        logger.error(f'发送media group失败: {e}')
-                        await bot.send_message(chat_id=chat_id, text='📷 图片暂时无法显示，先看文字信息：\n\n' + detail_text, parse_mode=ParseMode.HTML, reply_markup=detail_keyboard)
-                else:
-                    await bot.send_message(chat_id=chat_id, text='📷 图片暂时无法显示，先看文字信息：\n\n' + detail_text, parse_mode=ParseMode.HTML, reply_markup=detail_keyboard)
-            elif len(available_photos) == 1:
+            if len(available_photos) == 1:
                 try:
                     with open(available_photos[0], 'rb') as photo:
                         await bot.send_photo(chat_id=chat_id, photo=photo, caption=detail_text, parse_mode=ParseMode.HTML, reply_markup=detail_keyboard)

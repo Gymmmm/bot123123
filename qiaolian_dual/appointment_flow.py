@@ -34,7 +34,7 @@ async def appoint_flow_cb(update: Update, context: ContextTypes.DEFAULT_TYPE, *,
         appt['mode'] = data.split(':', 1)[1]
         appt['focus_keys'] = list(APPOINTMENT_FOCUS_ORDER)
         mode_label = APPOINTMENT_MODE_LABELS.get(appt['mode'], '预约看房')
-        text = f'📅 <b>{he(mode_label)} · 选择日期</b>\n\n选择你方便的日期：'
+        text = f'<b>📅 预约看房</b>\n\n{he(mode_label)}\n<b>选一个方便的日期</b>'
         await query.edit_message_text(text, reply_markup=_appointment_date_keyboard(), parse_mode=ParseMode.HTML)
         return APPT_DATE
     if data.startswith('apfocus:toggle:'):
@@ -71,7 +71,7 @@ async def appoint_flow_cb(update: Update, context: ContextTypes.DEFAULT_TYPE, *,
         appt['date'] = chosen
         info = listing_context(str(appt.get('listing_id') or ''))
         title = str(info.get('project') or info.get('title') or info.get('area') or '这套房')
-        text = f'📅 <b>{he(chosen)} · {he(title)}</b>\n\n请选择时间段：'
+        text = f'<b>📅 预约看房</b>\n\n📅 <b>{he(chosen)}</b>\n🏠 {he(title)}\n\n<b>请选择时间段</b>'
         await query.edit_message_text(text, reply_markup=_appointment_time_keyboard(), parse_mode=ParseMode.HTML)
         return APPT_TIME
     if data == 'appoint_back_date':
@@ -177,7 +177,7 @@ async def appoint_flow_cb(update: Update, context: ContextTypes.DEFAULT_TYPE, *,
         await query.edit_message_text(
             f"<b>✅ 预约已提交</b>\n\n"
             f"{subject_text}\n"
-            f"📅 {he(date_compact)} · {he(time_compact)}\n"
+            f"📅 <b>{he(date_compact)} · {he(time_compact)}</b>\n"
             f"📍 {he(mode_label)}\n\n"
             "顾问确认房态和时间后，\n"
             "会通过 Telegram 联系你。",

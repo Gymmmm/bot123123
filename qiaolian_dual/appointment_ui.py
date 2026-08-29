@@ -41,7 +41,7 @@ def _appointment_confirm_text(appt: dict) -> str:
     mode = APPOINTMENT_MODE_LABELS.get(str(appt.get('mode') or 'offline'), '实地看房')
     time_label = APPOINTMENT_TIME_LABELS.get(str(appt.get('time') or ''), str(appt.get('time') or '-'))
     subject_lines = ['🏠 <b>尚未确定房源</b>', '顾问会根据你的需求继续推荐。'] if is_general_request else [f"🏠 <b>{he(_title_layout_label(title, layout, '｜'))}</b>"]
-    return '\n'.join(['📋 <b>确认一下</b>', '', *subject_lines, f"📅 {he(str(appt.get('date') or '-'))} · {he(time_label)}", f'📍 {he(mode)}', '', '提交后，顾问会联系你确认具体安排。'])
+    return '\n'.join(['<b>📋 确认一下预约信息</b>', '', *subject_lines, f"📅 <b>{he(str(appt.get('date') or '-'))} · {he(time_label)}</b>", f'📍 {he(mode)}', '', '提交后，顾问会联系你确认具体安排。'])
 
 def _appointment_confirm_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([[InlineKeyboardButton('✅ 确认预约', callback_data='apconfirm:yes')], [InlineKeyboardButton('✏️ 修改时间', callback_data='apedit:time')], [InlineKeyboardButton('⬅️ 返回', callback_data='appoint_back_time')]])
@@ -97,4 +97,4 @@ def _appointment_focus_prompt(mode: str, listing_id: str, selected: set[str]) ->
     from .utils_formatting import _display_listing_id
     mode_label = APPOINTMENT_MODE_LABELS.get(mode, '预约看房')
     safe_lid = listing_id if listing_id and listing_id != '待推荐' else '暂未指定'
-    return f'<b>📅 {mode_label}</b>\n房源：<code>{he(_display_listing_id(safe_lid))}</code>\n\n<b>第二步：请选择你最关注的验房点</b>\n默认 5 项全选，你只需点 <b>下一步</b> 就能继续。\n\n{_focus_summary_lines(selected)}'
+    return f'<b>📅 {he(mode_label)}</b>\n房源：<code>{he(_display_listing_id(safe_lid))}</code>\n\n<b>请选择你最关注的验房点</b>\n默认 5 项全选，你只需点“下一步”就能继续。\n\n{_focus_summary_lines(selected)}'

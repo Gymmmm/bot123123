@@ -59,7 +59,7 @@ async def start_appointment(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     context.user_data['appt'].pop('mode', None)
     subject = '还没指定具体房源' if is_general_request else _title_layout_label(title, layout, '｜')
     intro = '先选看房方式，中文顾问会再帮你确认具体可预约房源。' if is_general_request else ''
-    await render_panel(update, text=f"📅 <b>预约看房</b>\n{he(subject)}\n\n{intro}\n想怎么看？".replace('\n\n\n', '\n\n'), reply_markup=_appointment_mode_keyboard(listing_id), parse_mode=ParseMode.HTML, context=context)
+    await render_panel(update, text=f"<b>📅 预约看房</b>\n{he(subject)}\n\n{intro}\n<b>想怎么看？</b>".replace('\n\n\n', '\n\n'), reply_markup=_appointment_mode_keyboard(listing_id), parse_mode=ParseMode.HTML, context=context)
     return APPT_MODE
 
 async def show_search_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -96,10 +96,10 @@ async def show_service_hub(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     binding = db.get_active_binding(user_id) if user_id else None
     if binding:
         property_name = he(str(binding.get('property_name') or '当前租住房源'))
-        text = f"🛠 <b>入住后服务</b>\n\n🏠 {property_name}\n需要处理什么？"
+        text = f"<b>🛠 入住服务</b>\n\n🏠 {property_name}\n需要处理什么？"
     else:
         text = (
-            "🛠 <b>入住后服务</b>\n\n"
+            "<b>🛠 入住服务</b>\n\n"
             "入住后遇到什么问题？\n"
             "报修、物业沟通或周边生活，直接选一项。\n\n"
             "已在租的客户可先绑定租客档案，之后会自动带上租约和房屋信息；租约到期前 7 天会提醒你确认是否续租。"
@@ -111,7 +111,7 @@ async def show_favorites(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     from .appointments_view import list_favorites_text
     from .keyboards_common import main_keyboard
     from .texts import render_panel
-    await render_panel(update, text=list_favorites_text(update.effective_user.id), reply_markup=main_keyboard(), context=context)
+    await render_panel(update, text=list_favorites_text(update.effective_user.id), parse_mode=ParseMode.HTML, reply_markup=main_keyboard(), context=context)
     return MAIN
 
 async def show_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:

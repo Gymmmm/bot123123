@@ -137,7 +137,7 @@ def _find_result_card_content(item: dict, index: int, total: int, result_ids: li
     size = clean_inline_text(str(item.get('size_sqm') or item.get('size') or ''))
     deposit = clean_inline_text(str(item.get('deposit_rule') or item.get('deposit') or ''))
     status = str(item.get('status') or 'active').strip().lower()
-    status_text = '🟡 已有预约 · 仍可预约' if status == 'reserved' else '🟢 可预约'
+    status_text = '🟡 <b>已有预约 · 仍可预约</b>' if status == 'reserved' else '🟢 <b>当前可预约</b>'
     lines = [
         f'<b>🏠 {he(area)}｜{he(layout)}</b>',
         f'💰 <b>{he(price)}</b>' + (f'　·　📐 {he(size)}㎡' if size else ''),
@@ -357,7 +357,7 @@ async def send_listing_photo_preview(bot, chat_id: int, listing_id: str) -> None
     layout = _display_layout(clean_inline_text(str(info.get('layout') or '')), info.get('property_type'))
     qc_id = _display_listing_id(str(listing_id or '').strip())
     heading = f'{qc_id}｜{area}' if area else qc_id
-    caption_lines = [f'<b>📸 {he(heading)}</b>']
+    caption_lines = ['<b>📸 完整实拍</b>', '', f'🏠 <b>{he(heading)}</b>']
     if layout:
         caption_lines.append(he(layout))
     caption_lines.append(f'以下是这套房的完整实拍，共 {len(photos)} 张。')
@@ -379,11 +379,11 @@ async def send_listing_photo_preview(bot, chat_id: int, listing_id: str) -> None
                 await bot.send_photo(chat_id=chat_id, photo=media[0].media, caption=media[0].caption, parse_mode=ParseMode.HTML)
             else:
                 await bot.send_media_group(chat_id=chat_id, media=media)
-        await bot.send_message(chat_id=chat_id, text=f'🏠 <b>{he(qc_id)}｜请选择下一步</b>', parse_mode=ParseMode.HTML, reply_markup=keyboard)
+        await bot.send_message(chat_id=chat_id, text=f'🏠 <b>{he(qc_id)}</b>\n请选择下一步', parse_mode=ParseMode.HTML, reply_markup=keyboard)
     else:
         await bot.send_message(
             chat_id=chat_id,
-            text='<b>📸 这套房目前没有更多可用实拍。</b>\n需要补充图片时，可以联系中文顾问。',
+            text='<b>📸 完整实拍</b>\n\n这套房目前没有更多可用实拍。\n需要补充图片时，可以联系中文顾问。',
             parse_mode=ParseMode.HTML,
             reply_markup=keyboard,
         )

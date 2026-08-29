@@ -110,12 +110,12 @@ def listing_cost_text(listing_id: str) -> str:
     lines = [
         '<b>📋 租赁详情</b>',
         '',
-        '<b>💰 租赁</b>',
-        f'月租｜{he(price)}',
+        '💰 租赁',
+        f'月租｜<b>{he(price)}</b>',
         f'押付｜{he(deposit)}',
         f'租期｜{he(contract)}',
         '',
-        '<b>🧾 费用</b>',
+        '🧾 费用',
         f'管理费｜{he(management)}',
         f'网络｜{he(internet)}',
     ]
@@ -129,14 +129,14 @@ def listing_cost_text(listing_id: str) -> str:
     lines.extend(known_optional)
     if missing_optional:
         lines.append(f"待确认｜{' · '.join(missing_optional)}")
-    lines.extend(['', '<b>🏊 配套</b>', he(amenities_text), ''])
+    lines.extend(['', '🏊 配套', he(amenities_text), ''])
     status = str(item.get('status') or '').strip().lower()
     if status == 'reserved':
-        lines.append('<b>🟡 已有预约 · 仍可预约</b>')
+        lines.append('🟡 <b>已有预约 · 仍可预约</b>')
     elif status == 'active':
-        lines.append('<b>🟢 当前可预约</b>')
+        lines.append('🟢 <b>当前可预约</b>')
     else:
-        lines.append('<b>房态待确认</b>')
+        lines.append('🔵 <b>房态待确认</b>')
     return '\n'.join(lines)
 
 def listing_cost_keyboard(listing_id: str) -> InlineKeyboardMarkup:
@@ -201,8 +201,15 @@ def listing_action_allowed(listing_id: str, action: str) -> tuple[bool, str]:
 
 def listing_unavailable_text(reason: str='') -> str:
     """统一不可预约页；具体内部状态不在客户页重复堆叠。"""
+    normalized = str(reason or '').strip().lower()
+    status_line = {
+        'pending': '🔵 <b>房态待确认</b>',
+        'rented': '🔴 <b>已租出</b>',
+        'offline': '⚫ <b>已下架</b>',
+    }.get(normalized, '🔵 <b>房态待确认</b>')
     return (
         '<b>🏠 这套房暂时不能预约</b>\n\n'
+        f'{status_line}\n\n'
         '房态正在确认。\n'
         '你可以先看附近可预约房源，\n'
         '也可以让中文顾问帮你确认。'

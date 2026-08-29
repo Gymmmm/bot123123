@@ -67,16 +67,16 @@ def _appointment_summary_line(row: dict) -> list[str]:
     status = APPOINTMENT_STATUS_LABELS.get(str(row.get('status') or ''), str(row.get('status') or '待确认'))
     status_icon = {'待确认': '🟡', '已确认': '🟢', '顾问联系中': '🔵', '已完成': '✅', '已取消': '⚪', '未到场': '🔴'}.get(status, '🟡')
     listing = _appointment_listing_compact(row.get('listing_id'))
-    return [f"<b>{_appointment_date_compact(row.get('appointment_date'))} · {he(time_label)}</b>", f'{he(mode)}｜<b>{he(listing)}</b>', f'{status_icon} {he(status)}']
+    return [f"📅 <b>{he(_appointment_date_compact(row.get('appointment_date')))} · {he(time_label)}</b>", f'{he(mode)}｜<b>{he(listing)}</b>', f'{status_icon} <b>{he(status)}</b>']
 
 def list_recent_appointments(user_id: int) -> str:
     rows = db.list_appointments(user_id, limit=20)
     if not rows:
-        return '📅 <b>我的预约</b>\n\n你暂时还没有预约。\n看中具体房源后，点房源卡片里的「预约看房」，房源信息会自动带入。'
+        return '<b>📅 我的预约</b>\n\n你暂时还没有预约。\n看中具体房源后，点房源卡片里的「预约看房」，房源信息会自动带入。'
     rows = sorted(rows, key=_appointment_sort_key, reverse=True)
     upcoming = [row for row in rows if _appointment_is_upcoming(row)]
     history = [row for row in rows if row not in upcoming]
-    parts = ['📅 <b>我的预约</b>', '']
+    parts = ['<b>📅 我的预约</b>', '']
     if upcoming:
         parts.append('<b>即将进行</b>')
         for index, row in enumerate(upcoming[:2]):
@@ -130,14 +130,14 @@ def appointment_details_text(user_id: int) -> str:
     active_rows = [row for row in rows if _appointment_is_upcoming(row)]
     row = (active_rows or rows)[0]
     rows = [row]
-    parts = ['📋 <b>当前预约</b>', '']
+    parts = ['<b>📋 当前预约</b>', '']
     for index, row in enumerate(rows):
         mode = APPOINTMENT_MODE_LABELS.get(str(row.get('viewing_mode') or ''), str(row.get('viewing_mode') or '待确认'))
         time_label = _appointment_time_compact(row.get('appointment_time'))
         status = APPOINTMENT_STATUS_LABELS.get(str(row.get('status') or ''), str(row.get('status') or '待确认'))
         status_icon = {'待确认': '🟡', '已确认': '🟢', '顾问联系中': '🔵', '已完成': '✅', '已取消': '⚪', '未到场': '🔴'}.get(status, '🟡')
         listing = _appointment_listing_compact(row.get('listing_id'))
-        parts.extend([f"<b>{_appointment_date_compact(row.get('appointment_date'))} · {he(time_label)}</b>", f'房源：<b>{he(listing)}</b>', f'方式：{he(mode)}', f'状态：{status_icon} {he(status)}'])
+        parts.extend([f"📅 <b>{he(_appointment_date_compact(row.get('appointment_date')))} · {he(time_label)}</b>", f'房源：<b>{he(listing)}</b>', f'方式：{he(mode)}', f'状态：{status_icon} <b>{he(status)}</b>'])
         note = str(row.get('note') or '').strip()
         if note:
             parts.append('看房要求：空调、家电、采光、用水和费用')
