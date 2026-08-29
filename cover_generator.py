@@ -657,6 +657,76 @@ def _fit_single_line_text(
 
 
 # ── 新封面：实拍底图 + 暗色半透明遮罩（无图则 #1A1A1A），居中排版、无 emoji ──
+# ── 首页封面视觉规范：固定布局，按底图自动配色 ─────────────────
+COVER_W, COVER_H = 1280, 960
+COVER_LOGO_WIDTH_RATIO = 0.15
+COVER_LEFT_SHADE_WIDTH_RATIO = 0.40
+COVER_LEFT_SHADE_ALPHA = 138       # 54%
+COVER_BOTTOM_PANEL_ALPHA = 158     # 62%
+COVER_PRICE_PANEL_ALPHA = 222      # 87%
+COVER_BOTTOM_PANEL_BLUR = 8
+
+COVER_THEMES = {
+    "black_gold": {
+        "accent": (232, 190, 94),
+        "text": (255, 250, 239),
+        "panel": (10, 12, 16),
+        "price": (13, 14, 17),
+    },
+    "navy_gold": {
+        "accent": (225, 188, 98),
+        "text": (248, 251, 255),
+        "panel": (11, 28, 54),
+        "price": (9, 24, 48),
+    },
+    "warm_champagne": {
+        "accent": (224, 187, 122),
+        "text": (255, 248, 236),
+        "panel": (35, 24, 18),
+        "price": (31, 22, 17),
+    },
+}
+
+
+def _cover_image_stats(image: Image.Image) -> tuple[float, float, float]:
+    thumb = image.convert("RGB").resize((64, 64), Image.Resampling.LANCZOS)
+    px = list(thumb.getdata())
+    brightness = sum((r + g + b) / 3 for r, g, b in px) / len(px)
+    warmth = sum((r - b) for r, g, b in px) / len(px)
+    saturation = 0.0
+    for r, g, b in px:
+        mx, mn = max(r, g, b), min(r, g, b)
+        saturation += 0 if mx == 0 else (mx - mn) / mx
+    saturation /= len(px)
+    return brightness, warmth, saturation
+
+
+def choose_cover_theme(image: Image.Image) -> str:
+    """按首图自动选择主题；只变配色，不改变布局。"""
+    brightness, warmth, saturation = _cover_image_stats(image)
+    if warmth >= 10 and brightness >= 95:
+        return "warm_champagne"
+    if brightness >= 158 and saturation <= 0.34:
+        return "navy_gold"
+    return "black_gold"
+
+
+def _cover_contain_4_3(src: Image.Image, size: tuple[int, int]) -> Image.Image:
+    """封面保持 4:3；主体完整优先，必要时用同图轻模糊延展。"""
+    cw, ch = size
+    src = src.convert("RGB")
+    ratio_diff = abs((src.width / max(1, src.height)) - (cw / ch))
+    if ratio_diff <= 0.16:
+        return ImageOps.fit(src, (cw, ch), method=Image.Resampling.LANCZOS)
+    bg = ImageOps.fit(src, (cw, ch), method=Image.Resampling.LANCZOS)
+    bg = bg.filter(ImageFilter.GaussianBlur(18))
+    bg = ImageEnhance.Brightness(bg).enhance(0.88)
+    fg = src.copy()
+    fg.thumbnail((cw, ch), Image.Resampling.LANCZOS)
+    bg.paste(fg, ((cw - fg.width) // 2, (ch - fg.height) // 2))
+    return bg
+
+
 def _draw_new_cover(
     output_path: str,
     project: str,
@@ -670,189 +740,150 @@ def _draw_new_cover(
     source_type: str = "",
     source_name: str = "",
 ) -> None:
-    """频道封面：实拍主导，左侧决策信息，右下价格锚点。"""
-    # 频道默认的 one_three 首槽就是 16:9。直接按最终画布生成，
-    # 避免先做 4:3 信息封面、再居中裁切时把底部信息全部切掉。
-    W, H = 1280, 720
-
-    layout = (layout or "").strip() or ""
-    area = (area or "").strip() or ""
-
-    def _size_for_cover(value: str) -> str:
-        raw = str(value or "").strip()
-        if not raw:
-            return ""
-        if re.fullmatch(r"\d+(?:\.\d+)?", raw):
-            return f"{raw}㎡"
-        return raw.replace("m2", "㎡").replace("M2", "㎡")
-
-    def _floor_for_cover(value: str) -> str:
-        raw = str(value or "").strip()
-        if not raw:
-            return ""
-        return f"{raw}楼" if re.fullmatch(r"\d+", raw) else raw
-
-    size = _size_for_cover(size)
-    floor = _floor_for_cover(floor)
-    source_key = f"{source_type} {source_name}".strip().lower()
-    source_badge = "侨联实拍" if any(
-        marker in source_key for marker in ("wechat", "manual", "admin_upload")
-    ) else "侨联地产"
-    is_manual_source = source_badge == "侨联实拍"
+    """生产首页封面：左上品牌、左侧标题、右上价格、底部位置/面积/楼层。"""
+    W, H = COVER_W, COVER_H
+    project = str(project or "").strip()
+    layout = str(layout or "").strip()
+    area = str(area or "").strip()
+    size = str(size or "").strip().replace("m2", "㎡").replace("M2", "㎡")
+    if size and re.fullmatch(r"\d+(?:\.\d+)?", size):
+        size += "㎡"
+    floor = str(floor or "").strip()
+    if floor and re.fullmatch(r"\d+", floor):
+        floor += "楼"
 
     price_text = ""
     if price is not None and str(price).strip():
-        p_str = str(price).strip()
-        if p_str.endswith("/月"):
-            price_text = p_str
-        elif p_str.replace("$", "").replace(",", "").replace(".", "", 1).isdigit():
-            pv = float(p_str.replace("$", "").replace(",", ""))
-            price_text = f"${int(pv)}/月" if pv == int(pv) else f"${pv:.0f}/月"
-        else:
-            price_text = p_str if "月" in p_str else f"{p_str}/月"
+        raw = str(price).strip()
+        clean = raw.replace("$", "").replace(",", "")
+        try:
+            value = float(clean.replace("/月", ""))
+            price_text = f"${int(value):,}/月" if value.is_integer() else f"${value:,.0f}/月"
+        except Exception:
+            price_text = raw if "月" in raw else f"{raw}/月"
 
-    # 底图：实拍 fit + 轻微暗化；否则纯色 #1A1A1A
-    img: Image.Image
     if base_image_path and os.path.isfile(base_image_path):
         try:
-            bg = Image.open(base_image_path).convert("RGB")
-            bg = ImageOps.fit(bg, (W, H), method=Image.Resampling.LANCZOS)
-            if is_manual_source:
-                bg = ImageEnhance.Brightness(bg).enhance(1.035)
-                bg = ImageEnhance.Color(bg).enhance(1.055)
-                bg = Image.blend(bg, Image.new("RGB", bg.size, (255, 190, 105)), 0.035)
-            else:
-                bg = ImageEnhance.Contrast(bg).enhance(1.06)
-                bg = ImageEnhance.Color(bg).enhance(0.97)
-                bg = Image.blend(bg, Image.new("RGB", bg.size, (92, 158, 226)), 0.045)
-            base = bg.convert("RGBA")
-            img = _apply_cover_gradient(base)
-        except Exception as e:
-            log.warning("封面实拍底图失败，改用纯色底: %s", e)
-            img = Image.new("RGBA", (W, H), (26, 26, 26, 255))
+            src = Image.open(base_image_path).convert("RGB")
+            bg = _cover_contain_4_3(src, (W, H))
+        except Exception as exc:
+            log.warning("封面底图读取失败: %s", exc)
+            bg = Image.new("RGB", (W, H), (42, 42, 42))
     else:
-        img = Image.new("RGBA", (W, H), (26, 26, 26, 255))
+        bg = Image.new("RGB", (W, H), (42, 42, 42))
 
-    # 简洁版封面：照片是主角，只保留租客第一眼需要的区域、户型和价格。
-    # 不再叠大面积侧栏、卖点标签、楼层/面积堆栈或来源标记。
-    fade = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    fd = ImageDraw.Draw(fade)
-    for y in range(H):
-        top_alpha = int(95 * max(0.0, 1.0 - y / 155.0)) if y < 155 else 0
-        bottom_alpha = int(205 * max(0.0, (y - 420) / 300.0)) if y > 420 else 0
-        alpha = max(top_alpha, bottom_alpha)
-        if alpha:
-            fd.line([(0, y), (W, y)], fill=(0, 0, 0, alpha))
-    img = Image.alpha_composite(img, fade)
-    draw = ImageDraw.Draw(img)
+    # 只做轻度 P 图，不把房屋主体压黑。
+    brightness, _, _ = _cover_image_stats(bg)
+    if brightness < 112:
+        bg = ImageEnhance.Brightness(bg).enhance(1.10)
+    elif brightness > 205:
+        bg = ImageEnhance.Brightness(bg).enhance(0.96)
+    bg = ImageEnhance.Contrast(bg).enhance(1.035)
+    bg = ImageEnhance.Color(bg).enhance(1.025)
 
-    draw.text((42, 30), "侨联地产 · 实拍", font=_font(25, True), fill=(255, 255, 255, 245))
-    location = area or project or "金边"
-    headline = "｜".join(part for part in (location, layout) if part)
-    headline, headline_font = _fit_single_line_text(
-        draw, headline or "金边实拍房源", max_width=850, start_size=54, min_size=38
-    )
-    draw.text(
-        (42, H - 150), headline, font=headline_font,
-        fill=(255, 255, 255, 255), stroke_width=1, stroke_fill=(0, 0, 0, 120),
-    )
-    if price_text and price_text != "价格待确认":
-        price_font = _font(50, True)
-        box = draw.textbbox((0, 0), price_text, font=price_font)
-        draw.text(
-            (W - 42 - (box[2] - box[0]), H - 145), price_text,
-            font=price_font, fill=(255, 255, 255, 255),
-            stroke_width=1, stroke_fill=(0, 0, 0, 120),
-        )
-    draw.text((44, H - 62), "更多实拍见评论区", font=_font(20, False), fill=(238, 241, 245, 235))
-    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
-    img.convert("RGB").save(output_path, "JPEG", quality=94, optimize=True)
-    return
+    theme_name = choose_cover_theme(bg)
+    theme = COVER_THEMES[theme_name]
+    accent = theme["accent"]
+    text_color = theme["text"]
+    panel_rgb = theme["panel"]
+    price_rgb = theme["price"]
+    img = bg.convert("RGBA")
 
-    # 微信实拍封面要更亮、更像真实房源；自动采集源保留
-    # 稍深的冷色信息区，从颜色上就能区分两类来源。
+    # 左侧渐变：最大约 54% 黑度，覆盖 40% 宽度。
     shade = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     sd = ImageDraw.Draw(shade)
-    shade_width = W * (0.50 if is_manual_source else 0.62)
-    shade_peak = 118 if is_manual_source else 190
-    shade_rgb = (45, 25, 10) if is_manual_source else (5, 13, 30)
-    for x in range(int(shade_width)):
-        alpha = int(shade_peak * max(0.0, 1.0 - x / shade_width) ** 0.72)
-        sd.line([(x, 0), (x, H)], fill=(*shade_rgb, alpha))
+    shade_w = int(W * COVER_LEFT_SHADE_WIDTH_RATIO)
+    for x in range(shade_w):
+        t = x / max(1, shade_w - 1)
+        alpha = int(COVER_LEFT_SHADE_ALPHA * ((1 - t) ** 1.45))
+        sd.line((x, 0, x, H), fill=(8, 10, 13, alpha))
     img = Image.alpha_composite(img, shade)
+
+    # 底部半透明磨砂栏；仍能看见房屋。
+    panel_h = int(H * 0.19)
+    panel_box = (26, H - panel_h - 22, W - 26, H - 22)
+    img = _apply_frosted_panel(
+        img,
+        panel_box,
+        radius=22,
+        blur_radius=COVER_BOTTOM_PANEL_BLUR,
+        tint_rgb=panel_rgb,
+        tint_alpha=COVER_BOTTOM_PANEL_ALPHA,
+        outline=(*accent, 78),
+    )
     draw = ImageDraw.Draw(img)
 
-    left = 42
-    # 轻量品牌，不再使用大蓝底牌匾抢画面。
-    icon_w, _ = _draw_house_outline_mark(
-        draw, x=left, y=32, size=28, fill=(250, 252, 255, 255),
-        shadow=(0, 0, 0, 100),
+    # 品牌块：固定视觉宽度约 15% 画布，不随模板漂移。
+    logo_visual_w = int(W * COVER_LOGO_WIDTH_RATIO)
+    icon_size = max(30, int(logo_visual_w * 0.20))
+    brand_x, brand_y = 48, 42
+    _draw_house_outline_mark(
+        draw, x=brand_x, y=brand_y + 4, size=icon_size,
+        fill=(*accent, 255), shadow=(0, 0, 0, 90),
     )
-    draw.text((left + icon_w + 10, 28), "侨联地产", font=_font(30, True), fill=(255, 255, 255, 255))
-    draw.text((left + icon_w + 10, 61), "金边华人租房", font=_font(11, False), fill=(238, 239, 241, 235))
-    badge_font = _font(16, True)
-    badge_box = draw.textbbox((0, 0), source_badge, font=badge_font)
-    badge_w = badge_box[2] - badge_box[0] + 24
-    badge_h = badge_box[3] - badge_box[1] + 14
-    draw.rounded_rectangle(
-        (left, 88, left + badge_w, 88 + badge_h), radius=badge_h // 2,
-        fill=(211, 139, 45, 235) if is_manual_source else (18, 72, 142, 215),
-        outline=(220, 233, 255, 125), width=1,
-    )
-    draw.text((left + 12 - badge_box[0], 95 - badge_box[1]), source_badge, font=badge_font, fill=(255, 255, 255, 250))
+    brand_font = _font(max(30, int(logo_visual_w * 0.22)), True)
+    brand_sub_font = _font(max(10, int(logo_visual_w * 0.075)), False)
+    text_x = brand_x + icon_size + 12
+    draw.text((text_x, brand_y), "侨联地产", font=brand_font, fill=(*accent, 255))
+    draw.text((text_x, brand_y + 41), "QIAO LIAN PROPERTY", font=brand_sub_font, fill=(*accent, 224))
 
-    title_main = project.strip() if project else (area.strip() or "精选房源")
-    title, title_font = _fit_single_line_text(
-        draw, title_main, max_width=520, start_size=58, min_size=42
-    )
-    draw.text((left, 142), title, font=title_font, fill=(255, 255, 255, 255), stroke_width=1, stroke_fill=(0, 0, 0, 90))
-
-    info_y = 220
+    # 左侧标题 / 户型。
+    title = project or area or "精选房源"
+    title, title_font = _fit_single_line_text(draw, title, max_width=620, start_size=58, min_size=38)
+    title_y = 220
+    draw.text((48, title_y), title, font=title_font, fill=text_color, stroke_width=1, stroke_fill=(0, 0, 0, 100))
     if layout:
-        layout_value, layout_font = _fit_single_line_text(
-            draw, layout, max_width=260, start_size=30, min_size=24
-        )
-        lb = draw.textbbox((0, 0), layout_value, font=layout_font)
-        lw, lh = lb[2] - lb[0], lb[3] - lb[1]
-        draw.rounded_rectangle(
-            (left, info_y, left + lw + 30, info_y + lh + 18),
-            radius=22, fill=(247, 250, 255, 245),
-        )
-        draw.text((left + 15 - lb[0], info_y + 9 - lb[1]), layout_value, font=layout_font, fill=(25, 74, 164, 255))
-        info_y += lh + 44
+        layout_text, layout_font = _fit_single_line_text(draw, layout, max_width=310, start_size=30, min_size=22)
+        lb = draw.textbbox((0, 0), layout_text, font=layout_font)
+        lw, lh = lb[2]-lb[0], lb[3]-lb[1]
+        chip = (48, title_y + 78, 48 + lw + 28, title_y + 78 + lh + 16)
+        draw.rounded_rectangle(chip, radius=18, fill=(10, 12, 16, 176), outline=(*accent, 230), width=2)
+        draw.text((62-lb[0], title_y + 86-lb[1]), layout_text, font=layout_font, fill=text_color)
 
-    # 项目名与区域相同时不再重复一遍，给实拍画面留白。
-    if area and area.strip() != title_main.strip():
-        draw.ellipse((left + 3, info_y + 8, left + 15, info_y + 20), fill=(247, 70, 70, 255))
-        draw.text((left + 28, info_y), area, font=_font(24, True), fill=(246, 248, 252, 255))
-        info_y += 42
-    facts = [value for value in (size.strip(), floor.strip()) if value]
-    if facts:
-        draw.text((left, info_y), "  |  ".join(facts), font=_font(23, True), fill=(235, 240, 248, 245))
-        info_y += 48
-
-    # 最多三个真实卖点，做小标签，不让封面变成说明书。
-    chip_x = left
-    for raw in [str(v).strip() for v in (highlights or []) if str(v).strip()][:3]:
-        value, font = _fit_single_line_text(draw, raw, max_width=175, start_size=17, min_size=15)
-        box = draw.textbbox((0, 0), value, font=font)
-        cw, ch = box[2] - box[0] + 24, box[3] - box[1] + 14
-        if chip_x + cw > 560:
-            break
-        draw.rounded_rectangle((chip_x, info_y, chip_x + cw, info_y + ch), radius=8, fill=(8, 20, 42, 190), outline=(255, 255, 255, 65))
-        draw.text((chip_x + 12 - box[0], info_y + 7 - box[1]), value, font=font, fill=(245, 248, 253, 255))
-        chip_x += cw + 10
-
-    if price_text and price_text != "价格待确认":
-        label_font = _font(17, False)
-        price_font = _font(51, True)
+    # 右上租金锚点：深黑 87% + 金色描边。
+    if price_text:
+        price_font = _font(49, True)
+        label_font = _font(15, False)
         pb = draw.textbbox((0, 0), price_text, font=price_font)
-        pw, ph = pb[2] - pb[0], pb[3] - pb[1]
-        x2, y2 = W - 36, H - 34
-        x1, y1 = x2 - pw - 54, y2 - ph - 55
-        draw.rounded_rectangle((x1, y1, x2, y2), radius=20, fill=(17, 76, 190, 245), outline=(132, 176, 255, 190), width=2)
-        draw.text((x1 + 27, y1 + 11), "租金", font=label_font, fill=(209, 225, 255, 255))
-        draw.text((x1 + 27 - pb[0], y1 + 33 - pb[1]), price_text, font=price_font, fill=(255, 255, 255, 255))
+        pw, ph = pb[2]-pb[0], pb[3]-pb[1]
+        x2, y1 = W - 48, 46
+        box_w = max(255, pw + 54)
+        box_h = ph + 62
+        box = (x2 - box_w, y1, x2, y1 + box_h)
+        draw.rounded_rectangle(box, radius=18, fill=(*price_rgb, COVER_PRICE_PANEL_ALPHA), outline=(*accent, 235), width=2)
+        label = "Monthly Rent"
+        lb = draw.textbbox((0,0), label, font=label_font)
+        draw.text((box[0] + (box_w-(lb[2]-lb[0]))//2, y1+10), label, font=label_font, fill=(*text_color[:3], 230))
+        draw.text((box[0] + (box_w-pw)//2 - pb[0], y1+31-pb[1]), price_text, font=price_font, fill=(*accent, 255))
+
+    # 底栏：只保留位置、面积、楼层；最多三个短卖点。
+    pad_x = 36
+    py = panel_box[1] + 25
+    cols = [
+        ("位置", area or project or "金边"),
+        ("面积", size or "待确认"),
+        ("楼层", floor or "待确认"),
+    ]
+    col_w = (panel_box[2]-panel_box[0]-pad_x*2)//3
+    for i, (label, value) in enumerate(cols):
+        x = panel_box[0] + pad_x + i*col_w
+        if i:
+            draw.line((x-18, panel_box[1]+22, x-18, panel_box[3]-22), fill=(*accent, 105), width=1)
+        draw.text((x, py), label, font=_font(18, False), fill=(*accent, 250))
+        value, vf = _fit_single_line_text(draw, value, max_width=col_w-28, start_size=31, min_size=22)
+        draw.text((x, py+31), value, font=vf, fill=text_color)
+
+    chips = [str(v).strip() for v in (highlights or []) if str(v).strip()][:3]
+    if chips:
+        cx = panel_box[0] + pad_x
+        cy = panel_box[3] - 42
+        for raw in chips:
+            raw, cf = _fit_single_line_text(draw, raw, max_width=135, start_size=15, min_size=12)
+            cb = draw.textbbox((0,0), raw, font=cf)
+            cw, ch = cb[2]-cb[0]+22, cb[3]-cb[1]+12
+            draw.rounded_rectangle((cx, cy-ch, cx+cw, cy), radius=ch//2, fill=(20,20,20,125), outline=(*accent, 90))
+            draw.text((cx+11-cb[0], cy-ch+6-cb[1]), raw, font=cf, fill=(*accent, 245))
+            cx += cw+10
 
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
     img.convert("RGB").save(output_path, "JPEG", quality=94, optimize=True)
