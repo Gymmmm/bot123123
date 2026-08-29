@@ -142,39 +142,72 @@ DAILY_TEMPLATES: dict[int, tuple[str, str]] = {
     1: (
         "今日可看房源",
         f"<b>🏠 {BRAND_NAME}｜今日可看房源</b>\n\n"
-        "想找房，发给我们三项就够：\n"
-        "📍 区域\n"
-        "💰 月预算\n"
-        "🛏 户型 / 入住时间\n\n"
-        "中文顾问按实际可看的实拍房源，帮你收窄到 1–3 套。"
+        "正在找房，发三项就够：区域、月预算、户型 / 入住时间。\n"
+        "中文顾问只按当前可预约的实拍房源帮你筛选，不用先看一大堆无关房源。\n\n"
+        f"{BRAND_NAME}｜您在金边的自己人"
     ),
     2: (
         "看房前准备",
         "<b>📅 看房前，先确认这三件事</b>\n\n"
-        "1. 预算是否包含物业、水电、网络和停车\n"
+        "1. 月预算，以及是否包含物业、水电、网络、停车\n"
         "2. 最想住的区域和可接受通勤时间\n"
         "3. 预计入住日期\n\n"
-        "把这些告诉顾问，看房会更快、更准。"
+        "先把这三项定下来，看房会快很多。"
     ),
     3: (
-        "费用与交付保障",
-        f"<b>🛡️ {BRAND_NAME}｜看房不只看租金</b>\n\n"
-        "看中后，费用会逐项核对：月租、押金、水电、物业、网络和停车。\n"
-        "入住时，房屋现状、仪表读数和钥匙 / 门卡都会留档。\n\n"
-        "想了解一套房的实际费用，直接问顾问。"
+        "租房费用",
+        f"<b>💰 {BRAND_NAME}｜租房费用别只看月租</b>\n\n"
+        "看房前建议一起确认：押付方式、水费、电费、物业费、网络费、停车费。\n"
+        "没有明确写清的费用，我们会标为待确认，不替房东补答案。\n\n"
+        "看中具体房源后，可以直接让中文顾问逐项核对。"
     ),
     4: (
         "周末看房",
-        "<b>📹 周末正常看房</b>\n\n"
+        "<b>📹 周末看房安排</b>\n\n"
         "实地看房、视频代看都可以约。\n"
-        "发区域和预算，顾问先帮你找实际可看的房源。"
+        "如果准备周末集中看房，建议提前发：区域、预算、户型、方便时间。\n\n"
+        "顾问先确认房态，再排实际可看的房源。"
     ),
     5: (
         "金边今日信息",
         "<b>☀️ 金边今日信息</b>\n\n"
-        "天气和汇率将在预览或发送前实时更新。\n"
-        "准备看房，直接发区域和预算给顾问。",
+        "天气和 USD/KHR 参考汇率会在发送前实时更新。\n"
+        "数据仅作出行和换汇参考。"
     ),
+    6: (
+        "区域怎么选",
+        "<b>📍 金边租房｜区域怎么选</b>\n\n"
+        "先看每天最常去哪里，再看预算和户型，不必先追热门小区。\n"
+        "同样预算，在不同区域能换到的面积、楼龄和配套差很多。\n\n"
+        "不知道从哪选，可以把通勤地点和预算发给中文顾问。"
+    ),
+    7: (
+        "签约前确认",
+        f"<b>📝 {BRAND_NAME}｜签约前再确认一次</b>\n\n"
+        "签约前重点看：租期、押金退还条件、维修责任、提前退租约定、交房清单。\n"
+        "入住时建议把房屋现状、仪表读数、钥匙和门卡一起留档。\n\n"
+        "不清楚的条款先问清，再签。"
+    ),
+}
+
+WEEKLY_DAILY_PLAN: dict[int, int] = {
+    0: 5,
+    1: 1,
+    2: 6,
+    3: 3,
+    4: 4,
+    5: 2,
+    6: 7,
+}
+
+WEEKLY_DAILY_LABELS: dict[int, str] = {
+    0: "周一｜金边今日信息",
+    1: "周二｜今日可看房源",
+    2: "周三｜区域怎么选",
+    3: "周四｜租房费用",
+    4: "周五｜周末看房",
+    5: "周六｜看房前准备",
+    6: "周日｜签约前确认",
 }
 
 
@@ -1683,7 +1716,9 @@ async def cmd_send(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 def _daily_template_number() -> int:
-    raw = _get_setting(KEY_DAILY_TEMPLATE, "1").strip()
+    raw = _get_setting(KEY_DAILY_TEMPLATE, "weekly").strip().lower()
+    if raw == "weekly":
+        return WEEKLY_DAILY_PLAN.get(datetime.now(TZ).weekday(), 5)
     try:
         value = int(raw)
     except (TypeError, ValueError):
@@ -1691,40 +1726,47 @@ def _daily_template_number() -> int:
     return value if value in DAILY_TEMPLATES else 1
 
 
+def _daily_is_weekly() -> bool:
+    return _get_setting(KEY_DAILY_TEMPLATE, "weekly").strip().lower() == "weekly"
+
+
+def _daily_weekly_plan_text() -> str:
+    lines = ["🗓 <b>每周自动广播安排</b>", ""]
+    for weekday in range(7):
+        lines.append(WEEKLY_DAILY_LABELS[weekday])
+    lines.extend(["", "每天只发 1 条；时间统一在“每日广播”里设置。"])
+    return "\n".join(lines)
+
+
 def _ensure_daily_defaults() -> None:
     """首次打开或升级后保存一份可用内容，但绝不自动开启广播。"""
+    if not _get_setting(KEY_DAILY_TEMPLATE, "").strip():
+        _set_setting(KEY_DAILY_TEMPLATE, "weekly")
     template_no = _daily_template_number()
     if not _get_setting(KEY_DAILY_TEXT, "").strip():
         _set_setting(KEY_DAILY_TEXT, DAILY_TEMPLATES[template_no][1])
     if not _get_setting(KEY_DAILY_TIME, "").strip():
-        _set_setting(KEY_DAILY_TIME, "09:00")
-    if not _get_setting(KEY_DAILY_TEMPLATE, "").strip():
-        _set_setting(KEY_DAILY_TEMPLATE, str(template_no))
+        _set_setting(KEY_DAILY_TIME, "09:30")
     if not _get_setting(KEY_DAILY_DYNAMIC, "").strip():
         _set_setting(KEY_DAILY_DYNAMIC, "0")
 
 
 def _daily_keyboard(on: bool) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🗓 7天自动轮播", callback_data="daily:weekly")],
         [
-            InlineKeyboardButton("🏠 今日可看房源", callback_data="daily:tpl:1"),
-            InlineKeyboardButton("📅 看房前准备", callback_data="daily:tpl:2"),
+            InlineKeyboardButton("👀 预览今天", callback_data="daily:preview"),
+            InlineKeyboardButton("📋 查看7天安排", callback_data="daily:plan"),
         ],
         [
-            InlineKeyboardButton("🛡️ 费用与交付保障", callback_data="daily:tpl:3"),
-            InlineKeyboardButton("📹 周末看房", callback_data="daily:tpl:4"),
-        ],
-        [InlineKeyboardButton("☀️ 金边天气与汇率", callback_data="daily:tpl:5")],
-        [
-            InlineKeyboardButton("⏰ 09:00", callback_data="daily:time:0900"),
+            InlineKeyboardButton("⏰ 09:30", callback_data="daily:time:0930"),
             InlineKeyboardButton("⏰ 12:30", callback_data="daily:time:1230"),
         ],
         [
             InlineKeyboardButton("⏰ 18:30", callback_data="daily:time:1830"),
             InlineKeyboardButton("✏️ 其他时间", callback_data="daily:time:custom"),
         ],
-        [InlineKeyboardButton("👀 预览当前广播", callback_data="daily:preview")],
-        [InlineKeyboardButton("✏️ 自定义文案", callback_data="daily:custom")],
+        [InlineKeyboardButton("✏️ 临时改成固定文案", callback_data="daily:custom")],
         [InlineKeyboardButton("⏸ 暂停每日广播" if on else "▶️ 开启每日广播", callback_data="daily:off" if on else "daily:on")],
         [InlineKeyboardButton("⬅️ 返回首页", callback_data="cmd:quick_help")],
     ])
@@ -1736,15 +1778,20 @@ async def cmd_daily(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     _ensure_daily_defaults()
     on = _get_setting(KEY_DAILY_ON, "0").strip() in ("1", "true", "yes")
     tm = _get_setting(KEY_DAILY_TIME, "09:00")
-    template_raw = _get_setting(KEY_DAILY_TEMPLATE, "1").strip()
+    template_raw = _get_setting(KEY_DAILY_TEMPLATE, "weekly").strip().lower()
     template_no = _daily_template_number()
-    title = "自定义内容" if template_raw == "custom" else DAILY_TEMPLATES[template_no][0]
+    if template_raw == "weekly":
+        title = f"7天自动轮播 · 今天：{DAILY_TEMPLATES[template_no][0]}"
+    elif template_raw == "custom":
+        title = "固定自定义内容"
+    else:
+        title = DAILY_TEMPLATES[template_no][0]
     await update.effective_message.reply_text(
         "📢 <b>每日广播</b>\n\n"
         f"状态：<b>{'已开启' if on else '未开启'}</b>\n"
         f"发送时间：<b>{html.escape(tm)}</b>（{html.escape(TZ_NAME)}）\n"
-        f"当前内容：{html.escape(title)}\n\n"
-        "先选模板并预览。确认没问题后，再点“开启每日广播”。",
+        f"内容：{html.escape(title)}\n\n"
+        "默认按星期自动换内容，每天只发 1 条。先预览今天，再决定是否开启。",
         parse_mode=ParseMode.HTML,
         reply_markup=_daily_keyboard(on),
     )
@@ -1760,6 +1807,26 @@ async def on_daily_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     _ensure_daily_defaults()
     data = str(q.data or "")
     on = _get_setting(KEY_DAILY_ON, "0").strip() in ("1", "true", "yes")
+    if data == "daily:weekly":
+        _set_setting(KEY_DAILY_TEMPLATE, "weekly")
+        _set_setting(KEY_DAILY_DYNAMIC, "0")
+        template_no = _daily_template_number()
+        _set_setting(KEY_DAILY_TEXT, DAILY_TEMPLATES[template_no][1])
+        await q.edit_message_text(
+            "✅ <b>已设为 7 天自动轮播</b>\n\n"
+            f"今天：{html.escape(DAILY_TEMPLATES[template_no][0])}\n"
+            "每天只发 1 条，周一到周日内容自动切换。",
+            parse_mode=ParseMode.HTML,
+            reply_markup=_daily_keyboard(on),
+        )
+        return
+    if data == "daily:plan":
+        await q.message.reply_text(
+            _daily_weekly_plan_text(),
+            parse_mode=ParseMode.HTML,
+            reply_markup=_daily_keyboard(on),
+        )
+        return
     if data.startswith("daily:tpl:"):
         try:
             template_no = int(data.rsplit(":", 1)[1])
@@ -1782,7 +1849,10 @@ async def on_daily_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         )
         return
     if data == "daily:preview":
-        if _get_setting(KEY_DAILY_DYNAMIC, "0").strip() == "1":
+        template_no = _daily_template_number()
+        if _daily_is_weekly():
+            body = await asyncio.to_thread(_fetch_phnom_penh_daily_info) if template_no == 5 else DAILY_TEMPLATES[template_no][1]
+        elif _get_setting(KEY_DAILY_DYNAMIC, "0").strip() == "1":
             body = await asyncio.to_thread(_fetch_phnom_penh_daily_info)
             _set_setting(KEY_DAILY_TEXT, body)
         else:
@@ -3130,7 +3200,10 @@ async def scheduled_daily_broadcast(context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     if _get_setting(KEY_DAILY_ON, "0").strip() not in ("1", "true", "yes"):
         return
-    if _get_setting(KEY_DAILY_DYNAMIC, "0").strip() == "1":
+    template_no = _daily_template_number()
+    if _daily_is_weekly():
+        body = await asyncio.to_thread(_fetch_phnom_penh_daily_info) if template_no == 5 else DAILY_TEMPLATES[template_no][1]
+    elif _get_setting(KEY_DAILY_DYNAMIC, "0").strip() == "1":
         body = await asyncio.to_thread(_fetch_phnom_penh_daily_info)
         _set_setting(KEY_DAILY_TEXT, body)
     else:
