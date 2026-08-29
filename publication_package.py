@@ -20,7 +20,7 @@ from qiaolian_dual.canonical_listing_materializer import (
     ensure_canonical_projection_schema, materialize_listing, canonical_projection_hash,
 )
 from qiaolian_dual.publishability_contract import evaluate_publishability
-from qiaolian_dual.utils_formatting import _display_layout, _display_floor
+from qiaolian_dual.utils_formatting import _display_layout, _display_floor, _display_floor
 
 ROOT = Path(__file__).resolve().parent
 PACKAGE_ROOT = ROOT / "media" / "publication_packages"
@@ -624,7 +624,7 @@ def format_button_post_text(
         return text[:limit]
 
     location = clean(d.get("area") or d.get("public_location_display") or d.get("project") or "金边房源")
-    layout_text = clean(d.get("layout") or d.get("property_type") or "整租", 18)
+    layout_text = clean(_display_layout(d.get("layout") or d.get("property_type") or "整租", d.get("property_type")), 18)
     property_type = clean(d.get("property_type"), 12)
     size = clean(d.get("size"), 12)
     floor = _display_floor(clean(d.get("floor"), 12))
@@ -686,7 +686,7 @@ def format_link_post_text(
         return re.sub(r"\s+", " ", str(value or "").strip())[:limit]
 
     location = clean(d.get("area") or d.get("public_location_display") or d.get("project") or "金边房源")
-    layout_text = clean(d.get("layout") or d.get("property_type") or "整租", 18)
+    layout_text = clean(_display_layout(d.get("layout") or d.get("property_type") or "整租", d.get("property_type")), 18)
     property_type = clean(d.get("property_type"), 12)
     size = clean(d.get("size"), 12)
     floor = _display_floor(clean(d.get("floor"), 12))
