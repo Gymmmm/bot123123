@@ -30,6 +30,47 @@ def test_public_evidence_accepts_historical_post_and_frozen_package():
     assert "status not in {'active', 'reserved'}" in src
 
 
+def _create_listing(db, listing_id: str, status: str) -> None:
+    db.create_listing({
+        'listing_id': listing_id,
+        'title': listing_id,
+        'property_type': '公寓',
+        'area': 'BKK1',
+        'community': '测试公寓',
+        'price': 800,
+        'status': status,
+        'created_at': '2026-08-29 00:00:00',
+        'updated_at': '2026-08-29 00:00:00',
+    })
+
+
+def test_reserved_historical_post_stays_public_without_current_draft_row(tmp_path):
+    from qiaolian_dual.db import Database
+    db = Database(tmp_path / 'historical-post.db')
+    _create_listing(db, 'l_history', 'reserved')
+    with db.connect() as conn:
+        conn.execute('CREATE TABLE drafts (draft_id TEXT, listing_id TEXT, review_status TEXT)')
+        conn.execute('CREATE TABLE posts (draft_id TEXT, listing_id TEXT, platform TEXT, publish_status TEXT)')
+        conn.execute(
+            "INSERT INTO posts (draft_id, listing_id, platform, publish_status) VALUES ('old_draft','l_history','telegram','published')"
+        )
+    assert db.has_publication_evidence('l_history') is True
+    assert db.is_listing_public('l_history') is True
+    assert [item['listing_id'] for item in db.list_recent_listings(10)] == ['l_history']
+
+
+def test_active_frozen_package_stays_public_without_draft_or_post_row(tmp_path):
+    from qiaolian_dual.db import Database
+    db = Database(tmp_path / 'frozen-package.db')
+    _create_listing(db, 'l_package', 'active')
+    with db.connect() as conn:
+        conn.execute('CREATE TABLE publication_packages (property_id TEXT, status TEXT)')
+        conn.execute("INSERT INTO publication_packages (property_id, status) VALUES ('l_package','published')")
+    assert db.has_publication_evidence('l_package') is True
+    assert db.is_listing_public('l_package') is True
+    assert [item['listing_id'] for item in db.list_recent_listings(10)] == ['l_package']
+
+
 def test_home_and_search_use_canonical_public_db_methods():
     db_src = Path('qiaolian_dual/db.py').read_text(encoding='utf-8')
     nav_src = Path('qiaolian_dual/callback_navigation.py').read_text(encoding='utf-8')
@@ -104,7 +145,6 @@ def test_first_recommendation_does_not_delete_home_panel():
     fn_end = src.index('def _find_result_card_content', fn_start)
     block = src[fn_start:fn_end]
     assert 'message.delete()' not in block
-    assert "find_card_anchor" not in block or True
 
 
 def test_stale_current_card_auto_skips_when_other_valid_ids_exist():
