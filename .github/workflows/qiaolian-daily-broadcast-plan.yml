@@ -22,6 +22,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Fix patch escaping
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/patch_daily_broadcast.py')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace("    templates + '\\n\\n_WEATHER_LABELS = {',\n    text,", "    lambda _m: templates + '\\n\\n_WEATHER_LABELS = {',\n    text,")
+          s = s.replace("    helpers + '\\n\\nasync def cmd_daily(',\n    text,", "    lambda _m: helpers + '\\n\\nasync def cmd_daily(',\n    text,")
+          p.write_text(s, encoding='utf-8')
+          PY
       - name: Apply plan
         run: python scripts/patch_daily_broadcast.py
       - name: Install test dependencies
