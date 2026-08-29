@@ -2096,17 +2096,23 @@ def _caption_action_links(
             24,
         ) or "这套房"
     layout = _compact_copy(
-        normalize_room_type(_listing_value(facts, "room_type", "layout", default="")),
+        _display_layout(
+            normalize_room_type(_listing_value(facts, "room_type", "layout", default="")),
+            _resolved_property_type(facts),
+        ),
         18,
     )
     price = _price_compact_for_post(facts)
+    qc_code = _qc_code_from_draft({**facts, "listing_id": listing_id})
     summary = "｜".join(part for part in (project, layout, price) if part)
-    consult_text = f"你好，我想咨询这套房\n（✨{summary}✨）" if summary else "你好，我想咨询这套房"
+    consult_text = f"你好，我想咨询房源 {qc_code}"
+    if summary:
+        consult_text += f"\n（{summary}）"
     advisor = str(ADVISOR_TG or "@pengqingw").strip().lstrip("@") or "pengqingw"
     consult = f"https://t.me/{advisor}?text={quote(consult_text, safe='')}"
     return (
         f'<a href="{he(appoint, quote=True)}">📅 预约看房</a>'
-        f'　｜　<a href="{he(consult, quote=True)}">💬 咨询这套</a>'
+        f'　｜　<a href="{he(consult, quote=True)}">💬 问这套</a>'
     )
 
 

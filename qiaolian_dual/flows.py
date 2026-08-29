@@ -7,7 +7,7 @@ async def start_appointment(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     from .appointment_ui import _appointment_date_keyboard, _appointment_mode_keyboard, _title_layout_label
     from .listing import listing_context, listing_is_available, listing_unavailable_keyboard, listing_unavailable_text
     from .texts import render_panel as default_render_panel
-    from .utils_formatting import _display_layout, _display_listing_id, _fmt_price
+    from .utils_formatting import _display_floor, _display_layout, _display_listing_id, _fmt_price
     touch_payload = touch_payload or {}
     render_panel = render_panel_fn or default_render_panel
     is_general_request = bool(touch_payload.get('listing_unknown')) or str(listing_id or '') == '待推荐'
@@ -21,7 +21,7 @@ async def start_appointment(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     area = str(info.get('area') or '').strip()
     layout = _display_layout(info.get('layout') or info.get('property_type'), info.get('property_type'))
     size = str(info.get('size_sqm') or info.get('size') or '').strip()
-    floor = str(info.get('floor') or '').strip()
+    floor = _display_floor(info.get('floor'))
     highlights_raw = info.get('highlights') or ''
     if isinstance(highlights_raw, str):
         highlights = [part.strip() for part in re.split('[\\n｜,，]', highlights_raw) if part.strip()]

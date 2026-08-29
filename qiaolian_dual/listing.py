@@ -170,7 +170,7 @@ def listing_cost_text(listing_id: str) -> str:
     elif status == 'active':
         lines.extend(['', '<b>🟢 房源状态｜当前可预约</b>'])
     from .messages import viewing_delivery_assurance_text
-    lines.extend(['', viewing_delivery_assurance_text().strip(), '', '金额或收费方式不清楚，点“联系顾问”逐项核对。'])
+    lines.extend(['', viewing_delivery_assurance_text().strip(), '', '金额或收费方式不清楚，点“联系中文顾问”逐项核对。'])
     return '\n'.join(lines)
 
 def listing_cost_keyboard(listing_id: str) -> InlineKeyboardMarkup:

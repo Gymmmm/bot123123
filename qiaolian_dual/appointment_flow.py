@@ -9,12 +9,12 @@ async def appoint_flow_cb(update: Update, context: ContextTypes.DEFAULT_TYPE, *,
     from .appointments_view import _appointment_date_compact, _appointment_listing_compact, _appointment_time_compact
     from .flows import start_appointment
     from .keyboards_common import appointment_success_keyboard, main_keyboard
-    from .listing import listing_context
+    from .listing import listing_context, listing_is_available, listing_unavailable_keyboard, listing_unavailable_text
     from .results_admin import _notify_admins as default_notify_admins, admin_lead_keyboard
     from .search import create_lead as default_create_lead
     from .session_deeplink import clear_session_for_fresh_entry, now_ts, user_display_name
     from .texts import _personal_greeting, render_panel, welcome_text
-    from .utils_formatting import _display_listing_id
+    from .utils_formatting import _display_layout, _display_listing_id
     query = update.callback_query
     create_lead = create_lead_fn or default_create_lead
     _notify_admins = notify_admins_fn or default_notify_admins
@@ -103,6 +103,17 @@ async def appoint_flow_cb(update: Update, context: ContextTypes.DEFAULT_TYPE, *,
         return await appoint_flow_cb(update, context, create_lead_fn=create_lead, notify_admins_fn=_notify_admins)
     if data == 'apconfirm:yes':
         lid_submit = str(appt.get('listing_id') or '').strip()
+        is_general_request = lid_submit in {'', '待推荐'} or bool((appt.get('touch_payload') or {}).get('listing_unknown'))
+        if not is_general_request:
+            is_available, availability_reason = listing_is_available(lid_submit)
+            if not is_available:
+                context.user_data.pop('appt', None)
+                await query.edit_message_text(
+                    listing_unavailable_text(availability_reason),
+                    reply_markup=listing_unavailable_keyboard(lid_submit),
+                    parse_mode=ParseMode.HTML,
+                )
+                return MAIN
         if not appt.get('date') or not appt.get('time'):
             context.user_data.pop('appt', None)
             await query.edit_message_text('预约信息不完整或已过期。\n请从房源详情页的「预约看房」重新发起。', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('🏠 返回首页', callback_data='home')]]), parse_mode=ParseMode.HTML)
@@ -135,9 +146,8 @@ async def appoint_flow_cb(update: Update, context: ContextTypes.DEFAULT_TYPE, *,
         await _notify_admins(context, title=f'新预约 · 待处理 #{appointment_id}', lines=[f'用户：{_user_mention_html(user)}', f"房源：{he(str(appt.get('listing_id') or '待推荐'))}", f"时间：{he(_appointment_date_compact(appt.get('date') or '-'))} · {he(_appointment_time_compact(time_value))}", f'方式：{he(mode_label)}', f'联系：{he(_user_contact_text(user))}', f'关注：{he(focus_short)}', f"来源：{he(str(appt.get('source', 'user_bot')))} · 线索 #{lead_id or '-'}"], reply_markup=admin_lead_keyboard(lead_id=lead_id, appointment_id=appointment_id, user_id=int(user.id)) if lead_id is not None else None)
         item = listing_context(lid_submit)
         title = str(item.get('project') or item.get('title') or item.get('area') or '这套房').strip()
-        layout = str(item.get('layout') or item.get('property_type') or '').strip()
+        layout = _display_layout(item.get('layout') or item.get('property_type'), item.get('property_type'))
         contact = str(appt.get('contact_value') or _user_contact_text(user))
-        is_general_request = lid_submit in {'', '待推荐'} or bool((appt.get('touch_payload') or {}).get('listing_unknown'))
         subject_text = '🏠 <b>房源尚未确定</b>' if is_general_request else f"🏠 <b>{he(_title_layout_label(title, layout))}</b>"
         context.user_data.pop('appt', None)
         await query.edit_message_text(f"✅ <b>已收到你的预约申请</b>\n\n{subject_text}\n📅 {he(str(appt.get('date', '') or '-'))} · {he(time_label)}\n📍 {he(mode_label)}\n\n顾问会先确认房态和可看时间，再通过 Telegram 联系你。无需重复提交。", parse_mode=ParseMode.HTML, reply_markup=appointment_success_keyboard())
