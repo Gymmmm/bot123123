@@ -6,93 +6,85 @@ from .config import ADVISOR_PHONE, ADVISOR_TG, ADVISOR_WECHAT, BRAND_NAME, CHANN
 from .utils import compact_join, e
 
 
+def public_brand_name() -> str:
+    """用户可见品牌名不携开发环境标记。"""
+    return (BRAND_NAME or "侨联地产").replace("测试", "").strip() or "侨联地产"
+
+
 def listing_summary(item: dict) -> str:
     tags = compact_join(item.get("tags", []), " / ")
     lines = [
         f"🏠 <b>{e(item.get('title'))}</b>",
-        f"💰 ${e(item.get('price'))}/月",
-        f"📍 {e(item.get('area'))} · {e(item.get('community'))}",
+        f"<b>金额：</b><b>${e(item.get('price'))}/月</b>",
+        f"<b>区域：</b>{e(item.get('area'))} · {e(item.get('community'))}",
     ]
     if item.get("layout"):
-        lines.append(f"🛏 {e(item.get('layout'))}")
+        lines.append(f"<b>户型：</b>{e(item.get('layout'))}")
     if item.get("size_sqm"):
-        lines.append(f"📐 {e(item.get('size_sqm'))}㎡")
+        lines.append(f"<b>面积：</b>{e(item.get('size_sqm'))}㎡")
     if tags:
-        lines.append(f"✨ {e(tags)}")
+        lines.append(f"<b>标签：</b>{e(tags)}")
     return "\n".join(lines)
 
 
 def listing_detail(item: dict) -> str:
-    tags = compact_join(item.get("tags", []), " / ")
-    lines = [
-        f"🏠 <b>{e(item.get('title'))}</b>",
-        f"编号：<code>{e(item.get('listing_id'))}</code>",
-        f"💰 月租：<b>${e(item.get('price'))}</b>",
-        f"📍 区域：{e(item.get('area'))} · {e(item.get('community'))}",
-    ]
-    if item.get("layout"):
-        lines.append(f"🛏 户型：{e(item.get('layout'))}")
+    from .text_utils import clean_telegram_text, remove_test_markers, fix_duplicate_words
+    from .location_mapping import get_display_location
+    from .utils_formatting import _fmt_price
+
+    # 清理所有显示字段
+    title = remove_test_markers(item.get('title', ''))
+    listing_id = item.get('listing_id', '')
+    area_raw = item.get('area', '')
+    area = get_display_location(area_raw)
+    community = remove_test_markers(item.get('community', ''))
+    highlights = clean_telegram_text(item.get('highlights', ''))
+    hidden_costs = clean_telegram_text(item.get('hidden_costs', ''))
+    drawbacks = clean_telegram_text(item.get('drawbacks', ''))
+    available_date = fix_duplicate_words(item.get('available_date', ''))
+
+    # 同一楼盘在 area/community 中重复时，详情页只显示一次，避免“Vila Town · Vila Town”。
+    location_values: list[str] = []
+    for value in (area, community):
+        normalized = str(value or '').strip()
+        if normalized and normalized.casefold() not in {item.casefold() for item in location_values}:
+            location_values.append(normalized)
+    location = ' · '.join(location_values)
+    lines = [f"🏠 <b>{e(title)}</b>", f"💰 <b>{e(_fmt_price(item.get('price')))}</b>"]
+    if location and location not in title:
+        lines.append(f"📍 {e(location)}")
+    if item.get("layout") and str(item.get('layout')) not in title:
+        lines.append(f"🛏 {e(item.get('layout'))}")
     if item.get("size_sqm"):
-        lines.append(f"📐 面积：{e(item.get('size_sqm'))}㎡")
+        lines.append(f"📐 {e(item.get('size_sqm'))}㎡")
     if item.get("deposit_rule"):
-        lines.append(f"🔑 押金：{e(item.get('deposit_rule'))}")
-    if item.get("available_date"):
-        lines.append(f"📅 可入住：{e(item.get('available_date'))}")
-    if tags:
-        lines.append(f"✨ 标签：{e(tags)}")
-    if item.get("highlights"):
-        lines.append(f"\n<b>亮点</b>\n{e(item.get('highlights'))}")
-    if item.get("hidden_costs"):
-        lines.append(f"\n<b>费用说明</b>\n{e(item.get('hidden_costs'))}")
-    if item.get("drawbacks"):
-        lines.append(f"\n<b>顾问提醒</b>\n{e(item.get('drawbacks'))}")
-    lines.append(f"\n💬 看中这套，点下面按钮继续。")
+        lines.append(f"🔑 {e(item.get('deposit_rule'))}")
+    if available_date:
+        lines.append(f"📅 {e(available_date)}")
+    if highlights:
+        lines.append(f"✨ {e(highlights)}")
+    if hidden_costs:
+        lines.append(f"💡 {e(hidden_costs)}")
+    if drawbacks:
+        lines.append(f"⚠️ {e(drawbacks)}")
     return "\n".join(lines)
 
 
-def home_text() -> str:
-    advisor = (ADVISOR_TG or "").strip()
-    if advisor and not advisor.startswith("@"):
-        advisor = f"@{advisor}"
-    advisor = advisor or "@qiaolian_support"
+def viewing_delivery_assurance_text() -> str:
+    """房源详情与预约流程共用的成交交付保障短模块。"""
     return (
-        "🏠 <b>侨联地产 · 金边华人房产服务</b>\n\n"
-        "真实房源 · 实拍更新\n"
-        "公寓 · 别墅 · 商铺 · 土地\n\n"
-        "━━━━━━━━━━━━\n\n"
-        "在金边找房，找自己人\n\n"
-        f"📱 顾问：{e(advisor)}\n\n"
-        "👇 点按钮开始："
-    )
-
-
-def channel_welcome_text(first_name: str = "") -> str:
-    """首屏 /start 欢迎语（无深链参数）：精简版，保留核心动作按钮。"""
-    name_part = f" {e(first_name)}" if first_name else ""
-    return (
-        f"👋 欢迎{name_part}来到 <b>侨联找房助手</b>\n\n"
-        "找房、看房、视频代看、入住后的服务，我都可以帮你。\n\n"
-        "你可以直接告诉我需求，例如：\n\n"
-        "<code>富力800公寓</code>\n"
-        "<code>BKK一居</code>\n"
-        "<code>1000以内房子</code>\n\n"
-        "也可以点击下面入口开始："
+        "\n<b>🛡️ 看房与交付保障</b>\n"
+        "看中后：费用逐项核对。\n"
+        "入住时：验房、水电表和钥匙/门卡确认留档。"
     )
 
 
 def discussion_entry_welcome_text(first_name: str = "", listing_id: str = "") -> str:
-    """讨论区第三段深链进入后的承接欢迎语。"""
-    name_part = f" {e(first_name)}" if first_name else ""
-    listing_line = f"🏠 房源：<code>{e(listing_id)}</code>\n\n" if listing_id else ""
-    return (
-        f"🤖 <b>侨联找房助手{name_part}</b>\n\n"
-        f"{listing_line}"
-        "已同步讨论区线索到顾问后台，继续点按钮即可：\n\n"
-        "📅 预约实地看房 / 视频代看\n"
-        "📍 按区域继续找同类房源\n"
-        "💰 按预算收窄到 1–3 套\n\n"
-        "👇 先选一个继续"
-    )
+    """讨论区深链进入文案 - 精简版"""
+    from .text_utils import remove_test_markers
+
+    # 深链落地页已废弃，深链现在直达动作
+    return ""
 
 
 def lead_capture_text() -> str:
@@ -104,13 +96,11 @@ def lead_capture_text() -> str:
 
 
 def advisor_text() -> str:
+    """联系我们页面"""
     return (
-        "✅ 已收到你的需求\n\n"
-        "侨联顾问会直接通过 Telegram 联系你确认：\n"
-        "• 房源是否还在\n"
-        "• 看房时间安排\n"
-        "• 实地看房 / 视频看房方式\n\n"
-        "你也可以继续看其他房源。"
+        "✅ <b>顾问已收到</b>\n\n"
+        "中文顾问会通过 Telegram 联系你。\n"
+        "这套房的信息已带上，不用重复说明。"
     )
 
 
@@ -122,14 +112,14 @@ def advisor_contact_supplement_text() -> str:
 
 def deposit_text() -> str:
     return (
-        f"🔒 <b>{BRAND_NAME} 押金与费用说明</b>\n\n"
-        "带看与签约前，我们会把押付、起租、水电（<b>按表 / 包月 / 公摊</b>）、"
-        "网络是否需自装、<b>物业与停车</b>、常见隐性项先对齐。\n"
-        "入住前建议把全屋现状、<b>水电表读数</b>、家具家电状态留档，退租时更好对照。\n\n"
-        "<b>押金保障（方向性）：</b>在侨联经手的单子，退租时我们尽量作为<b>第三方协调与见证</b>，"
-        "推动押金按约定合理结算（具体边界以书面为准）。\n\n"
-        "<i>涉及具体权利义务、是否可提供见证工时与材料清单等，以在侨联签约时书面约定为准；"
-        "在侨联签约客户适用条款见合同附录。</i>"
+        f"🔒 <b>{BRAND_NAME} 费用与押金</b>\n\n"
+        "<b>看房和签约前</b>\n"
+        "我们会逐项核对：月租、押付、起租日、水电、网络、物业、停车。\n\n"
+        "<b>入住当天</b>\n"
+        "房屋现状、水电表和家具家电会留档，之后有事好对照。\n\n"
+        "<b>准备退租时</b>\n"
+        "如需，我们会协助和房东或物业沟通押金与交接事项。\n\n"
+        "具体金额、责任和协助范围，以签约材料和双方确认内容为准。"
     )
 
 
@@ -171,39 +161,68 @@ def brand_text() -> str:
     )
 
 
-def about_text() -> str:
+def home_text() -> str:
+    """首页只说明客户能做什么；具体房态放在各套房源里。"""
     return (
-        f"🏢 <b>关于{BRAND_NAME}</b>\n\n"
-        f"{BRAND_NAME}是金边华人社区专业租房平台，核心定位是<b>你在金边的自己人</b>。\n\n"
-        "<b>我们的工作方式</b>\n"
-        "• <b>房源先筛选</b>：按预算 + 区域 + 户型先收窄到 1–3 套，减少无效看房\n"
-        "• <b>费用先对齐</b>：押付、水电、物业、网络等关键项在看房前尽量摊开说\n"
-        "• <b>过程可追踪</b>：预约、咨询、入住、售后，统一由管理号持续跟进\n"
-        "• <b>实拍可验证</b>：所有帖子均含实拍编号，入住后与帖内状态可对照\n\n"
-        "你可以先从「智能找房」或「预约看房」开始，我们会一步步协助。"
+        "🏠 <b>侨联找房助手｜小彭</b>\n\n"
+        "金边中文租房。\n"
+        "可以直接找房、看实拍、预约或联系中文顾问。"
+    )
+
+
+def channel_welcome_text(first_name: str = "") -> str:
+    """带称呼的统一首页文案；不依赖易失效的字符串替换。"""
+    if not first_name:
+        return home_text()
+    return f"👋 你好 <b>{e(first_name)}</b>。\n\n{home_text()}"
+
+
+def about_text() -> str:
+    """关于侨联地产"""
+    return (
+        f"🏠 <b>{public_brand_name()}｜金边租房中介</b>\n\n"
+        "<b>我们的服务：</b>\n"
+        "✅ 看房透明 — 实拍更新，所见即所得\n"
+        "✅ 费用透明 — 无隐藏费用，提前说清\n"
+        "✅ 入住留档 — 全程记录，售后无忧\n"
+        "✅ 全程跟进 — 从看房到入住一条龙\n\n"
+        f"📱 联系我们：{ADVISOR_TG}\n"
+        f"📢 房源频道：{CHANNEL_URL}"
+    )
+
+
+def brand_text() -> str:
+    """关于侨联"""
+    return (
+        f"🏠 <b>{public_brand_name()}｜金边租房中介</b>\n\n"
+        "中文顾问帮你筛房、带看、确认费用、沟通条件并跟进签约入住。\n\n"
+        "✅ 房源先筛 — 按需求收窄到 1-3 套\n"
+        "✅ 费用透明 — 押付、水电提前说清\n"
+        "✅ 实地/视频看房\n"
+        "✅ 顾问全程跟进\n\n"
+        f"📱 联系：{ADVISOR_TG}\n"
+        f"📢 房源频道：{CHANNEL_URL}"
     )
 
 
 def want_home_text() -> str:
     return (
-        "<b>📍 条件筛选</b>（高意向入口）\n\n"
-        "这里默认走 <b>点击选择</b>，不让你反复打字。\n"
-        "勾选完条件后点「提交条件」，系统会同步推送管理号，人工收窄到 1-3 套。\n\n"
-        "可选条件包括：预算、区域、民水民电、停车、安静、采光、宠物、拎包、电梯/泳池等。"
+        "<b>📍 提交找房需求</b>\n\n"
+        "选出你最在意的条件即可。\n"
+        "顾问会据此帮你缩小到 1–3 套更值得看的房源。"
     )
 def service_promise_text() -> str:
+    """服务承诺"""
     return (
-        "<b>🛡️ 服务承诺（公开口径）</b>\n\n"
-        "<b>1）看房无忧</b>\n"
-        "免费安排看房是自然动作；没空到场，优先安排<b>实时视频代看</b>，您指到哪我们镜头跟到哪。\n\n"
-        "<b>2）隐性成本摊开说</b>\n"
-        "水电按表还是包、物业费谁出、网络是否需要自己拉、空调保养与停车等，"
-        "我们在售前尽量给您<b>说清楚 + 写入材料</b>，减少后续沟通成本。\n\n"
-        "<b>3）押金与留档</b>\n"
-        "为后续<b>可执行的协调/见证</b>做准备：入住留档模板（全屋、表数、家电清单）我们建议标配。\n\n"
-        "<b>4）管理号不断档</b>\n"
-        "咨询、预约、条件筛选、入住后报修与物业沟通，一律同步推送管理号。\n\n"
-        f"{deposit_text()}"
+        "<b>🛡️ 服务承诺</b>\n\n"
+        "<b>1. 看房无忧</b>\n"
+        "支持实地看房与实时视频代看，您指到哪里，我们拍到哪里。\n\n"
+        "<b>2. 费用透明</b>\n"
+        "水电、物业、网络、停车等隐性成本，我们会在售前尽量说明清楚。\n\n"
+        "<b>3. 入住交付有据可查</b>\n"
+        "入住交付时，会逐项记录房屋现状、水电表、家具家电与钥匙/门卡；双方确认后归档，后续需要时可调取。\n\n"
+        "<b>4. 全程跟进</b>\n"
+        "从咨询到售后，需求都会同步到顾问，确保不断档。"
     )
 
 
@@ -220,55 +239,36 @@ def appointment_hub_text() -> str:
     )
 def service_hub_text() -> str:
     return (
-        "⚡ <b>入住管家</b>\n\n"
-        "通过侨联租房后，如果遇到这些问题：\n\n"
-        "• 空调 / 家电故障\n"
-        "• 水管漏水 / 下水堵塞\n"
-        "• 门锁 / 灯具 / 电路问题\n"
-        "• 物业沟通\n"
-        "• 续租 / 换房 / 退租\n\n"
-        "可直接提交报修/物业/续租需求，顾问会跟进处理。\n\n"
-        "<b>签约不是结束，入住后有人接得住，才是真的省心。</b>"
+        "🛠 <b>入住服务</b>\n\n"
+        "房子有问题或需要物业沟通，直接点下面办理。\n"
+        "侨联在租客户绑定租约后，报修会自动带上房屋信息；租约到期前 7 天，我们也会贴心提醒你确认是否续租。"
     )
 
 
 def help_text() -> str:
     return (
-        "<b>📘 使用说明</b>\n\n"
-        "<b>常用命令</b>\n"
-        "<code>/start</code> — 回到首页\n"
-        "<code>/find</code> — 快速找房（按钮向导）\n"
-        "<code>/favorites</code> — 我的收藏\n"
-        "<code>/appointments</code> — 我的预约\n"
-        "<code>/contact</code> — 联系顾问\n"
-        "<code>/help</code> — 本页\n\n"
-        "<b>使用方式</b>\n"
-        "• 建议优先使用页面按钮导航\n"
-        "• 只有「🎲 一句话关键词找房」需要手动输入\n"
-        "• 从频道帖子进入时，咨询与预约会自动绑定对应房源\n\n"
-        "<b>补充说明</b>\n"
-        "• 合同、押付、入住时间等问题，可直接转顾问人工确认\n"
-        "• 看中频道房源，直接点帖内「咨询 / 预约」跟进最快\n"
-        "• 老客可点下面入口登记，便于换房、续租与售后衔接"
+        "❓ <b>怎么使用</b>\n\n"
+        "找房：点“帮我找房”，选择类型、位置和预算。\n"
+        "看房：打开一套房源，点“预约看房”。\n"
+        "咨询：点“咨询这套”，房源信息会自动带上。\n"
+        "入住后：报修、物业、续租和换房都在“入住服务”。"
     )
 
 
 def help_repeat_keyboard() -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = [
-        [InlineKeyboardButton("🏠 我以前在侨联租过（登记）", callback_data="profile:repeat")],
+        [InlineKeyboardButton("🏠 入住服务", callback_data="hub:service")],
     ]
     ch = (CHANNEL_URL or "").strip()
     if ch:
         rows.append([InlineKeyboardButton("📢 频道实拍上新", url=ch)])
+    rows.append([InlineKeyboardButton("🏠 返回首页", callback_data="home")])
     return InlineKeyboardMarkup(rows)
 
 
 def search_entry_intro_text() -> str:
     return (
-        "<b>🏠 开始找房</b>\n\n"
-        "你可以直接点按钮，也可以发一句话给我。\n"
-        "例如：<code>BKK1 500以内 一房</code>、<code>钻石岛 两房</code>、<code>视频看房</code>\n\n"
-        "如果想更稳一点，就走按钮筛选；如果想快一点，就直接发关键词。"
+        "🏠 <b>想找什么房？</b>\n\n选一个大概类型就行。"
     )
 
 
@@ -284,16 +284,14 @@ def smart_find_play_prompt_text() -> str:
 
 def smart_find_guided_header_text() -> str:
     return (
-        "<b>📍 按类型找</b>\n\n"
-        "按 <b>类型 → 区域 → 预算</b> 三步筛选。\n"
-        "下面直接点按钮即可，无需手动输入。"
+        "🏠 <b>想找什么房？</b>\n\n选一个大概类型就行。"
     )
 
 
 def smart_find_play_footer_hint_text(*, used_fallback: bool) -> str:
     if used_fallback:
         return (
-            "\n\n<i>以上先按近期在架房源推荐；可继续补充区域/预算/户型，我会再收窄结果。</i>"
+            "\n\n<i>先给你看接近的房源，还可以继续调整位置或预算。</i>"
         )
     return (
         "\n\n<i>如需更精准，可点菜单「🔍 智能找房」并走「按类型找」按钮流程。</i>"
@@ -305,7 +303,7 @@ def repeat_tenant_ack_text() -> str:
     ch_line = f"\n\n📢 实拍频道：<a href=\"{e(ch)}\">点这里关注上新</a>" if ch else ""
     return (
         "✅ <b>已登记为侨联老客回流</b>\n\n"
-        "后台会记一条线索，顾问侧换房 / 续租 / 升级户型会优先衔接。"
+        "收到，顾问会继续帮你处理换房、续租或升级户型。"
         + ch_line
     )
 
@@ -326,26 +324,23 @@ def listing_match_intro_text() -> str:
 
 def listing_match_footer_text() -> str:
     return (
-        "\n\n<b>下一步</b>：点菜单 <b>📅 预约看房</b> 直接约到场，或 <b>💬 联系顾问</b> 让管理号帮你对比决策。"
+        "\n\n<b>下一步</b>：点「📅 预约看房」安排到场，或点「💬 联系顾问」帮你对比选择。"
     )
 
 
 def find_no_match_text() -> str:
     return (
-        "这个条件暂时没有完全匹配的在架房源。\n\n"
-        "✅ <b>已通知顾问</b>，会优先为你盯新上的房\n\n"
-        "💡 同时你可以：\n"
-        "• 点「💬 联系顾问」，人工帮你扩一圈推荐\n"
-        "• 点「🎯 重新筛选」调整预算或区域，通常可以多出不少选项\n\n"
-        "<i>你的需求已同步管理号，有新房上架第一时间跟进。</i>"
+        "暂时没找到完全符合条件的房源。\n"
+        "可以换一个预算或位置，\n"
+        "也可以让顾问继续帮你找。"
     )
 
 
 def want_home_ack_text() -> str:
     return (
         "✅ <b>已收到你的找房条件</b>\n\n"
-        "顾问会<b>人工收窄</b>到 1–3 套，并提前标注每套的关键费用项，方便你对比决策。\n\n"
-        "💡 想加快：补一下预算上限、民水民电、电梯/泳池需求，或直接发截图。"
+        "顾问会按这些条件帮你筛出 1–3 套，并提前标注关键费用，方便你对比。\n\n"
+        "想更快收到推荐，也可以补充预算上限、民水民电、电梯/泳池需求，或直接发截图。"
     )
 
 
@@ -361,13 +356,11 @@ _RFCITY_FOOTER = (
 def local_life_text() -> str:
     return (
         "🧭 <b>周边服务</b>\n\n"
-        "侨联会逐步整理各区域常用生活信息：\n\n"
-        "• 中餐 / 川菜 / 夜宵\n"
-        "• 超市 / 送货 / 搬家\n"
-        "• 洗衣 / 保洁 / 维修\n"
-        "• 医院 / 药店\n"
-        "• 接机 / 签证 / 税务咨询\n\n"
-        "你可先点分类查看，也可直接让顾问按你所在区域推荐。"
+        "为方便已入住客户，我们会逐步整理各区域常用生活信息：\n\n"
+        "• 餐饮 / 超市 / 快递\n"
+        "• 物业 / 搬家 / 维修\n"
+        "• 医院 / 药店 / 日常服务\n\n"
+        "具体价格和服务以商家实际回复为准；需要时也可直接联系顾问。"
     )
 
 
@@ -499,26 +492,23 @@ def rfcity_property_text() -> str:
 
 def merchant_join_text() -> str:
     return (
-        "🤝 <b>富力商家合作 / 入驻</b>\n\n"
-        "如果你在富力周边做餐饮、超市、维修、搬家、快递、酒店、接机、签证、税务、生活服务，"
-        "可以联系侨联合作。\n\n"
-        "侨联客户多是正在找房、准备入住、已经入住富力的华人用户，需求很精准。\n\n"
-        "可以提交：\n"
-        "• 店名\n"
-        "• 类别\n"
+        "🤝 <b>富力商家信息补充</b>\n\n"
+        "如果你在富力周边提供餐饮、超市、维修、搬家、快递、酒店或其他日常服务，"
+        "可以联系侨联补充信息。\n\n"
+        "我们会优先整理对已入住客户有实际帮助的服务。\n\n"
+        "请提供：\n"
+        "• 店名和服务类别\n"
         "• Telegram / 电话\n"
-        "• 位置\n"
-        "• 优惠或服务说明"
+        "• 详细位置和营业时间\n"
+        "• 服务说明\n\n"
+        "信息核实后会逐步更新到周边导航。"
     )
 
 
 def smart_search_text() -> str:
     """智能找房页文案。"""
     return (
-        "<b>🔍 智能找房</b>\n\n"
-        "我来帮你一步步筛选合适的房源。\n\n"
-        "你可以先选择一个找房方向：\n\n"
-        "也可以直接发送需求，例如：<code>BKK 两房 700以内</code>"
+        "🏠 <b>想找什么房？</b>\n\n选一个大概类型就行。"
     )
 
 
@@ -542,9 +532,9 @@ def appoint_entry_text() -> str:
 def appoint_success_text() -> str:
     """预约成功文案。"""
     return (
-        "✅ <b>预约已提交</b>\n\n"
-        "侨联顾问会在看房前尽快\n"
-        "通过 Telegram 联系你确认。"
+        "✅ <b>已收到你的预约申请</b>\n\n"
+        "顾问会先确认房态和可看时间，\n"
+        "再通过 Telegram 联系你。"
     )
 
 
@@ -559,8 +549,35 @@ def advisor_notify_ok_text() -> str:
 def handoff_find_ok_text() -> str:
     """让顾问帮我找成功提示。"""
     return (
-        "✅ 找房需求已提交\n"
-        "顾问会按你的条件人工筛选并回你 1-3 套。"
+        "✅ 已收到你的找房需求\n"
+        "发区域、预算或户型中的任意一项即可，顾问会继续帮你缩小范围。"
+    )
+
+
+def repair_progress_text(issue_label: str, stage: str, note: str = "") -> str:
+    """报修进度通知：让客户知道事情到哪一步，也知道下一步怎么做。"""
+    stage_lines = {
+        "accepted": "已经有顾问接手，正在确认处理安排。",
+        "scheduled": "已经安排处理。时间有变化，我们会第一时间告诉你。",
+        "in_progress": "正在处理。处理完我们会再跟你说一声。",
+        "done": "已经处理完成。方便的话，帮忙确认一下现在是否正常。",
+        "need_info": "还需要你补充一点信息，顾问会在 Telegram 找你确认。",
+    }
+    detail = str(note or "").strip()
+    lines = ["🔧 <b>报修进度更新</b>", "", e(issue_label or "报修事项"), stage_lines.get(stage, "顾问正在跟进处理。")]
+    if detail:
+        lines.extend(["", f"补充：{e(detail)}"])
+    lines.extend(["", "有新的情况，直接回复这条消息告诉我们就行。"])
+    return "\n".join(lines)
+
+
+def advisor_response_notice_text() -> str:
+    """顾问接手或回复时的统一提醒。"""
+    return (
+        "💬 <b>顾问已经接手</b>\n\n"
+        "我们已把你的需求交给顾问。\n"
+        "顾问会通过 Telegram 和你确认细节。\n\n"
+        "时间或需求有变化，直接回复这条消息就行。"
     )
 
 

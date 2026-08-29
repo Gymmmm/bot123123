@@ -3,12 +3,13 @@ from __future__ import annotations
 import json
 import sqlite3
 from contextlib import contextmanager
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Iterable
 
 from .config import DB_PATH, logger
 
-LISTING_STATUSES = {"active", "rented", "inactive"}
+LISTING_STATUSES = {"active", "pending", "reserved", "rented", "inactive"}
 
 SCHEMA = '''
 PRAGMA journal_mode=WAL;
@@ -34,6 +35,14 @@ CREATE TABLE IF NOT EXISTS listings (
     channel_message_id INTEGER,
     source_post_url TEXT NOT NULL DEFAULT '',
     status TEXT NOT NULL DEFAULT 'active',
+    canonical_facts_hash TEXT,
+    canonical_facts_schema TEXT,
+    public_location_key TEXT,
+    public_location_display TEXT,
+    publication_location_level TEXT,
+    canonical_area_key TEXT,
+    property_subtype TEXT,
+    project_brand TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -229,6 +238,13 @@ class Database:
             rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
         return {str(row["name"]) for row in rows}
 
+    def _table_names(self) -> set[str]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        return {str(row["name"]) for row in rows}
+
     @staticmethod
     def _ensure_column(conn: sqlite3.Connection, table: str, column: str, ddl: str) -> None:
         cols = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
@@ -319,6 +335,25 @@ class Database:
             )
             return cur.rowcount > 0
 
+    def list_listings_by_status(self, status: str, limit: int = 20) -> list[dict[str, Any]]:
+        """管理员房态列表。status=all 时返回最近房源。"""
+        normalized = str(status or "").strip().lower()
+        with self.connect() as conn:
+            if normalized == "all":
+                rows = conn.execute(
+                    "SELECT * FROM listings ORDER BY updated_at DESC, created_at DESC LIMIT ?",
+                    (int(limit),),
+                ).fetchall()
+            elif normalized in LISTING_STATUSES:
+                rows = conn.execute(
+                    "SELECT * FROM listings WHERE status=? ORDER BY updated_at DESC, created_at DESC LIMIT ?",
+                    (normalized, int(limit)),
+                ).fetchall()
+            else:
+                return []
+        return [row_to_dict(row) or {} for row in rows]
+
+
     def get_listing(self, listing_id: str) -> dict[str, Any] | None:
         with self.connect() as conn:
             row = conn.execute("SELECT * FROM listings WHERE listing_id=?", (listing_id,)).fetchone()
@@ -328,9 +363,18 @@ class Database:
         return item
 
     def list_recent_listings(self, limit: int = 10) -> list[dict[str, Any]]:
+        if not {"drafts", "posts"}.issubset(self._table_names()):
+            return []
         with self.connect() as conn:
             rows = conn.execute(
-                "SELECT * FROM listings ORDER BY created_at DESC LIMIT ?",
+                """SELECT l.* FROM listings l
+                   WHERE l.status IN ('active','reserved')
+                     AND EXISTS (
+                       SELECT 1 FROM drafts d JOIN posts p ON p.draft_id=d.draft_id
+                       WHERE d.listing_id=l.listing_id AND d.review_status='published'
+                         AND p.platform='telegram' AND p.publish_status IN ('published','success','ok')
+                     )
+                   ORDER BY l.created_at DESC LIMIT ?""",
                 (limit,),
             ).fetchall()
         result = []
@@ -350,7 +394,13 @@ class Database:
         ilike_fragment: str | None = None,
         limit: int = 6,
     ) -> list[dict[str, Any]]:
-        clauses = ["status='active'"]
+        if not {"drafts", "posts"}.issubset(self._table_names()):
+            return []
+        clauses = ["status='active'", """EXISTS (
+            SELECT 1 FROM drafts d JOIN posts p ON p.draft_id=d.draft_id
+            WHERE d.listing_id=listings.listing_id AND d.review_status='published'
+              AND p.platform='telegram' AND p.publish_status IN ('published','success','ok')
+        )"""]
         params: list[Any] = []
         if property_type:
             clauses.append("property_type=?")
@@ -395,6 +445,17 @@ class Database:
             items.append(item)
         return items
 
+    def is_listing_public(self, listing_id: str) -> bool:
+        if not {"drafts", "posts"}.issubset(self._table_names()):
+            return False
+        with self.connect() as conn:
+            row = conn.execute("""SELECT 1 FROM listings l
+                JOIN drafts d ON d.listing_id=l.listing_id AND d.review_status='published'
+                JOIN posts p ON p.listing_id=l.listing_id
+                WHERE l.listing_id=? AND l.status='active'
+                  AND p.platform='telegram' AND p.publish_status IN ('published','success','ok')
+                LIMIT 1""", (str(listing_id or ''),)).fetchone()
+            return row is not None
     def favorite_listing(self, user_id: int, listing_id: str, created_at: str) -> None:
         with self.connect() as conn:
             conn.execute(
@@ -476,6 +537,11 @@ class Database:
             )
             return cur.rowcount > 0
 
+    def get_lead(self, lead_id: int) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            row = conn.execute("SELECT * FROM leads WHERE id=? LIMIT 1", (int(lead_id),)).fetchone()
+        return row_to_dict(row)
+
     def update_lead_workflow(
         self,
         lead_id: int,
@@ -534,7 +600,35 @@ class Database:
                     data["created_at"],
                 ),
             )
-            return int(cur.lastrowid)
+            appointment_id = int(cur.lastrowid)
+            self._sync_listing_appointment_state(conn, str(data.get("listing_id") or ""))
+            return appointment_id
+
+    @staticmethod
+    def _sync_listing_appointment_state(conn: sqlite3.Connection, listing_id: str) -> None:
+        """预约与房态联动；只在绿色/黄色之间自动切换，不覆盖人工待确认、已租出或下架。"""
+        listing_id = str(listing_id or "").strip()
+        if not listing_id:
+            return
+        row = conn.execute("SELECT status FROM listings WHERE listing_id=?", (listing_id,)).fetchone()
+        if not row or str(row[0] or "").strip().lower() not in {"active", "reserved"}:
+            return
+        active_count = int(conn.execute(
+            "SELECT COUNT(*) FROM appointments WHERE listing_id=? AND status IN ('pending','assigned','contacted','confirmed')",
+            (listing_id,),
+        ).fetchone()[0])
+        next_status = "reserved" if active_count > 0 else "active"
+        columns = {str(info[1]) for info in conn.execute("PRAGMA table_info(listings)").fetchall()}
+        if "availability_confirmed_at" in columns and next_status == "reserved":
+            conn.execute(
+                "UPDATE listings SET status=?, availability_confirmed_at=COALESCE(availability_confirmed_at, datetime('now','localtime')), updated_at=datetime('now','localtime') WHERE listing_id=?",
+                (next_status, listing_id),
+            )
+        else:
+            conn.execute(
+                "UPDATE listings SET status=?, updated_at=datetime('now','localtime') WHERE listing_id=?",
+                (next_status, listing_id),
+            )
 
     def list_appointments(self, user_id: int, limit: int = 10) -> list[dict[str, Any]]:
         with self.connect() as conn:
@@ -549,10 +643,13 @@ class Database:
         if status not in allowed:
             return False
         with self.connect() as conn:
+            row = conn.execute("SELECT listing_id FROM appointments WHERE id=?", (int(appointment_id),)).fetchone()
             cur = conn.execute(
                 "UPDATE appointments SET status=? WHERE id=?",
                 (status, int(appointment_id)),
             )
+            if cur.rowcount > 0 and row:
+                self._sync_listing_appointment_state(conn, str(row[0] or ""))
             return cur.rowcount > 0
 
     def create_binding(
@@ -564,6 +661,11 @@ class Database:
         rent_day: int | None,
         created_at: str,
         status: str = "active",
+        monthly_rent: float = 0,
+        contract_start_date: str = "",
+        contract_end_date: str = "",
+        deposit_months: int = 2,
+        contract_notes: str = "",
     ) -> int:
         with self.connect() as conn:
             cur = conn.execute(
@@ -573,11 +675,51 @@ class Database:
                     monthly_rent, contract_start_date, contract_end_date, deposit_months, contract_notes,
                     status, created_at
                 )
-                VALUES (?, ?, ?, ?, ?, 0, '', '', 2, '', ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''',
-                (user_id, binding_code, property_name, lease_end_date, rent_day, status, created_at),
+                (user_id, binding_code, property_name, lease_end_date, rent_day, monthly_rent, contract_start_date, contract_end_date, deposit_months, contract_notes, status, created_at),
             )
             return int(cur.lastrowid)
+
+    def find_user_by_reference(self, reference: str) -> dict[str, Any] | None:
+        value = str(reference or "").strip()
+        with self.connect() as conn:
+            if value.isdigit():
+                row = conn.execute("SELECT * FROM users WHERE user_id=? LIMIT 1", (int(value),)).fetchone()
+            else:
+                row = conn.execute("SELECT * FROM users WHERE lower(username)=lower(?) LIMIT 1", (value.lstrip("@"),)).fetchone()
+        return row_to_dict(row)
+
+    def list_bindings_expiring_within(self, days: int = 45) -> list[dict[str, Any]]:
+        today = datetime.now().date()
+        end = today + timedelta(days=max(1, int(days)))
+        with self.connect() as conn:
+            rows = conn.execute(
+                """SELECT * FROM tenant_bindings
+                   WHERE status='active' AND user_id>0
+                     AND date(COALESCE(NULLIF(contract_end_date,''), lease_end_date)) BETWEEN date(?) AND date(?)
+                   ORDER BY date(COALESCE(NULLIF(contract_end_date,''), lease_end_date)) ASC""",
+                (today.isoformat(), end.isoformat()),
+            ).fetchall()
+        return [row_to_dict(row) or {} for row in rows]
+
+    def list_open_renewal_tracking(self, limit: int = 20) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """SELECT r.*, b.property_name FROM renewal_tracking r
+                   LEFT JOIN tenant_bindings b ON b.id=r.binding_id
+                   WHERE COALESCE(NULLIF(r.renewal_status,''),'pending') NOT IN ('completed','cancelled','closed')
+                   ORDER BY r.id DESC LIMIT ?""", (max(1, int(limit)),),
+            ).fetchall()
+        return [row_to_dict(row) or {} for row in rows]
+
+    def list_open_repair_tickets(self, limit: int = 20) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """SELECT * FROM repair_tickets WHERE status NOT IN ('done','cancelled','closed')
+                   ORDER BY id DESC LIMIT ?""", (max(1, int(limit)),),
+            ).fetchall()
+        return [row_to_dict(row) or {} for row in rows]
 
     def get_active_binding(self, user_id: int) -> dict[str, Any] | None:
         with self.connect() as conn:
@@ -691,6 +833,31 @@ class Database:
                 (user_id, binding_id, issue_type, description, created_at),
             )
             return int(cur.lastrowid)
+
+    def get_repair_ticket(self, ticket_id: int) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM repair_tickets WHERE id=? LIMIT 1",
+                (int(ticket_id),),
+            ).fetchone()
+        return row_to_dict(row)
+
+    def update_repair_ticket_status(self, ticket_id: int, status: str) -> dict[str, Any] | None:
+        allowed = {"accepted", "scheduled", "in_progress", "done", "need_info"}
+        if status not in allowed:
+            return None
+        with self.connect() as conn:
+            cur = conn.execute(
+                "UPDATE repair_tickets SET status=? WHERE id=?",
+                (status, int(ticket_id)),
+            )
+            if cur.rowcount <= 0:
+                return None
+            row = conn.execute(
+                "SELECT * FROM repair_tickets WHERE id=? LIMIT 1",
+                (int(ticket_id),),
+            ).fetchone()
+        return row_to_dict(row)
 
     def create_renewal_tracking(
         self,

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1600, initial-scale=1">
+<title>Qiaolian Mono Editorial Cover</title>
+<style>
+:root{--paper:#f7f6f2;--ink:#17191b;--muted:#72777b;--accent:#c76b3d;--line:#d9d6cf}
+*{box-sizing:border-box}
+html,body{margin:0;width:1600px;height:1200px;background:#f7f6f2;font-family:"Noto Sans CJK SC","Microsoft YaHei",Arial,sans-serif;color:var(--ink)}
+.poster{position:relative;width:1600px;height:1200px;overflow:hidden;background:var(--paper)}
+.photo{position:absolute;left:0;top:0;width:1600px;height:790px;object-fit:cover;object-position:center}
+.photo-shade{position:absolute;inset:0 0 auto 0;height:790px;background:linear-gradient(180deg,rgba(0,0,0,.36),rgba(0,0,0,0) 34%,rgba(0,0,0,.04))}
+.photo-label{position:absolute;left:70px;top:60px;color:#fff;font-size:20px;letter-spacing:3px;font-weight:800}
+.photo-label:before{content:"";display:inline-block;width:38px;height:3px;background:#fff;vertical-align:middle;margin-right:14px}
+.qc{position:absolute;right:70px;top:54px;color:#fff;font-size:22px;font-weight:800;letter-spacing:1px;border-bottom:2px solid rgba(255,255,255,.8);padding:0 0 10px}
+.paper{position:absolute;left:0;right:0;bottom:0;height:450px;background:var(--paper);padding:54px 70px 42px}
+.rule{position:absolute;left:70px;right:70px;top:0;height:5px;background:var(--accent)}
+.header{display:flex;justify-content:space-between;align-items:flex-start;gap:40px}
+.title-wrap{min-width:0;max-width:1030px}
+.kicker{font-size:19px;color:var(--accent);font-weight:900;letter-spacing:2px;margin-bottom:13px}
+.title{font-size:62px;line-height:1.06;letter-spacing:-2px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.type{font-size:24px;color:var(--muted);font-weight:700;margin-top:12px}
+.price-wrap{text-align:right;min-width:330px;padding-top:11px}
+.price-label{font-size:17px;color:var(--muted);letter-spacing:3px;font-weight:800}
+.price{font-size:60px;line-height:1.08;color:var(--accent);font-weight:900;letter-spacing:-2px;white-space:nowrap}
+.facts{display:flex;align-items:stretch;margin-top:35px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);min-height:85px}
+.fact{padding:17px 32px 12px 0;margin-right:32px;border-right:1px solid var(--line);min-width:150px}
+.fact:last-child{border-right:0}
+.fact-label{font-size:15px;color:var(--muted);letter-spacing:2px;font-weight:800;margin-bottom:7px}
+.fact-value{font-size:25px;font-weight:900;white-space:nowrap}
+.bottom{display:flex;justify-content:space-between;align-items:flex-end;margin-top:26px}
+.brand{font-size:20px;font-weight:900;letter-spacing:2px}
+.brand small{display:block;color:var(--muted);font-size:13px;letter-spacing:3px;margin-top:6px}
+.note{font-size:17px;color:var(--muted);letter-spacing:.5px;text-align:right}
+.hide{display:none!important}
+</style>
+</head>
+<body>
+<div class="poster" id="poster">
+  <img class="photo" id="bg" src="" alt="">
+  <div class="photo-shade"></div>
+  <div class="photo-label">侨联实拍 · 中文顾问</div>
+  <div class="qc" id="t1">{{REF}}</div>
+  <section class="paper">
+    <div class="rule"></div>
+    <div class="header">
+      <div class="title-wrap">
+        <div class="kicker" id="t4">{{AREA}}</div>
+        <div class="title" id="t2">{{PROJECT}}</div>
+        <div class="type" id="t3">{{PROPERTY_TYPE}}</div>
+      </div>
+      <div class="price-wrap">
+        <div class="price-label">MONTHLY RENT</div>
+        <div class="price" id="price_text">{{PRICE_LINE}}</div>
+      </div>
+    </div>
+    <div class="facts">
+      <div class="fact" id="fact_layout"><div class="fact-label">户型</div><div class="fact-value" id="t5">{{LAYOUT}}</div></div>
+      <div class="fact" id="fact_size"><div class="fact-label">面积</div><div class="fact-value" id="t6">{{SIZE}}</div></div>
+      <div class="fact" id="fact_floor"><div class="fact-label">楼层</div><div class="fact-value" id="t7">{{FLOOR}}</div></div>
+    </div>
+    <div class="bottom">
+      <div class="brand">侨联地产<small>QIAO LIAN PROPERTY</small></div>
+      <div class="note">真实房源 · 可预约看房<br><span id="t8">{{REF}}</span></div>
+    </div>
+  </section>
+</div>
+</body>
+</html>

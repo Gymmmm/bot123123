@@ -53,9 +53,9 @@ def get_settings() -> Settings:
     if not admin_ids:
         raise RuntimeError("ADMIN_IDS 未配置")
 
-    sqlite_path = Path(os.getenv("SQLITE_PATH", "data/qiaolian_dual_bot.db"))
+    sqlite_path = Path(os.getenv("SQLITE_PATH", str(BASE_DIR.parent / "data" / "qiaolian_dual_bot.db")))
     if not sqlite_path.is_absolute():
-        sqlite_path = BASE_DIR / sqlite_path
+        sqlite_path = BASE_DIR.parent / sqlite_path
 
     deep_link_user = (
         _normalize_username(os.getenv("DEEPLINK_BOT_USERNAME", ""))

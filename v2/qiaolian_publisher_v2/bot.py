@@ -1,5 +1,6 @@
 from __future__ import annotations
 import asyncio
+import hashlib
 import logging
 import os
 import sys
@@ -31,7 +32,6 @@ from .formatters import (
     CHANNEL_BUTTON_PROMPT,
     TYPE_LABELS,
     build_post_text,
-    build_post_variants,
     build_preview_text,
     normalize_tags,
 )
@@ -41,7 +41,6 @@ from .keyboards import (
     edit_keyboard,
     main_menu,
     preview_keyboard,
-    publish_post_keyboard,
     skip_keyboard,
     type_keyboard,
 )
@@ -52,7 +51,8 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 from discussion_map_store import load_discuss_map, save_discuss_map
-from meihua_publisher import add_detail_logo_watermark, resolve_discussion_id
+from meihua_publisher import add_detail_logo_watermark, build_chinese_listing_post
+from db import DatabaseManager as CoreDatabaseManager
 
 for _cover_module_dir in (
     _REPO_ROOT / "v2_admin",
@@ -63,6 +63,10 @@ for _cover_module_dir in (
 from house_cover_v2 import generate_house_cover
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s: %(message)s')
+# httpx logs full Bot API URLs, which include Telegram credentials in the path.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("apscheduler.executors.default").setLevel(logging.WARNING)
+logging.getLogger("apscheduler.scheduler").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 DISCUSSION_BRIDGE_FILE = Path(
     os.getenv("DISCUSSION_BRIDGE_FILE", "/opt/qiaolian_dual_bots/data/discussion_bridge.json")
@@ -134,6 +138,8 @@ class Draft:
     available_date: str = ""
     media_type: str = ""
     media_file_id: str = ""
+    media_file_ids: list[str] = field(default_factory=list)
+    source_caption: str = ""
     cover_style: str = "minimal"  # classic | minimal | price_tag | vertical
     google_maps_url: str = ""  # 留接口：可手填精确链接，空则自动生成搜索链接
 
@@ -155,6 +161,8 @@ class Draft:
             "available_date": self.available_date,
             "media_type": self.media_type,
             "media_file_id": self.media_file_id,
+            "media_file_ids": list(self.media_file_ids),
+            "source_caption": self.source_caption,
             "created_by": user_id,
             "status": "active",
         }
@@ -179,11 +187,16 @@ class PublisherBot:
 
     async def _ensure_admin(self, update: Update) -> bool:
         user = update.effective_user
+        chat = update.effective_chat
         # 忽略机器人账号消息，避免在讨论组被机器人互相触发
         if user and user.is_bot:
             return False
-        if self._is_admin(update):
+        # 采集/发布向导只允许在管理员私聊中运行。公开讨论组只用于
+        # 捕获频道自动转发并建立映射，不回复任何后台流程文案。
+        if self._is_admin(update) and chat and chat.type == "private":
             return True
+        if chat and chat.type != "private":
+            return False
         target = update.effective_message or update.callback_query.message
         await target.reply_text("⛔ 你没有权限使用这个发布 Bot。")
         return False
@@ -243,7 +256,9 @@ class PublisherBot:
         if not msg or not getattr(msg, "is_automatic_forward", False):
             return
 
-        sender_chat = getattr(msg, "sender_chat", None)
+        # 新版 Telegram API 把自动转发来源放到 forward_origin；旧字段仍作兼容。
+        origin = getattr(msg, "forward_origin", None)
+        sender_chat = getattr(msg, "sender_chat", None) or getattr(origin, "chat", None)
         if not sender_chat:
             return
 
@@ -265,6 +280,8 @@ class PublisherBot:
             q.pop(0)
 
         channel_post_id = getattr(msg, "forward_from_message_id", None)
+        if channel_post_id is None:
+            channel_post_id = getattr(origin, "message_id", None)
         if channel_post_id is None:
             channel_post_id = getattr(msg, "message_thread_id", None)
 
@@ -348,7 +365,7 @@ class PublisherBot:
         context.user_data.pop("_mg_gen", None)
 
     async def _public_channel_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
-        """频道帖按钮深链：非管理员由本 Bot 承接（USER_BOT_USERNAME 指向 @meihua666bot 时）。"""
+        """频道帖按钮深链由 USER_BOT_USERNAME 指向面向租客的用户 Bot。"""
         if self._is_admin(update):
             return False
         args = context.args or []
@@ -430,14 +447,32 @@ class PublisherBot:
         if not await self._ensure_admin(update):
             return
         self._reset_draft(context)
-        await update.effective_message.reply_text(messages.WELCOME, reply_markup=admin_menu())
+        await update.effective_message.reply_text(
+            "🏠 <b>侨联发布助手</b>\n\n"
+            "采集或导入房源后，系统会自动清洗并生成封面、文案。\n\n"
+            "采集到合格房源后，我会主动提醒你。\n"
+            "点“房源队列”即可查看、修改并发布。\n\n"
+            "资料不完整的房源会自动留在后台，不会打断正常发布。",
+            parse_mode=ParseMode.HTML,
+            reply_markup=admin_menu(),
+        )
 
     async def admin_menu_action(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         query = update.callback_query
-        await query.answer()
+        if query is None:
+            return
+        # Telegram callback query 只能可靠地确认一次。旧实现在执行
+        # 命令前后各 answer() 一次，第二次会导致 BadRequest，
+        # 在客户端表现为按钮一直转圈或没有反馈。
+        await query.answer("正在处理…", show_alert=False)
         if not await self._ensure_admin(update):
             return
         action = (query.data or "").split(":", 1)[1] if query.data else ""
+        logger.info(
+            "管理面板按钮：user=%s action=%s",
+            getattr(update.effective_user, "id", None),
+            action,
+        )
         try:
             import autopilot_publish_bot as ap
         except Exception as e:
@@ -447,6 +482,7 @@ class PublisherBot:
         cmd_map = {
             "ops": ap.cmd_ops,
             "pending": ap.cmd_pending,
+            "queue": ap.cmd_queue,
             "status": ap.cmd_status,
             "stats": ap.cmd_stats,
             "slots": ap.cmd_slots,
@@ -454,7 +490,10 @@ class PublisherBot:
             "resume": ap.cmd_resume,
             "sources": ap.cmd_sources,
             "logs": ap.cmd_logs,
+            "quality": ap.cmd_check,
+            "dashboard": ap.cmd_analytics,
             "intake": ap.cmd_intake,
+            "batch_generate": ap.cmd_batch_generate,
             "intake_done": ap.cmd_intake_done,
             "intake_pending": ap.cmd_intake_pending,
             "post_menu": ap.cmd_post_menu,
@@ -462,12 +501,15 @@ class PublisherBot:
             "tpl": ap.cmd_tpl,
             "help": ap.cmd_help,
             "quick_help": self.cmd_quick_help,
+            "settings_hub": self.cmd_settings_hub,
             "send_help": self.cmd_send_help,
+            "send_queue": ap.cmd_send,
             "cover_test": self.cmd_cover_test,
+            "listing_states": self.cmd_listing_states,
         }
         func = cmd_map.get(action)
         if func is None:
-            await query.answer("未知按钮", show_alert=False)
+            await query.message.reply_text("⚠️ 这个按钮已失效，请发送 /start 刷新后再试。")
             return
 
         fake_update = SimpleNamespace(
@@ -477,20 +519,58 @@ class PublisherBot:
             message=query.message,
             callback_query=query,
         )
-        await func(fake_update, context)
-        await query.answer("已执行", show_alert=False)
+        try:
+            await func(fake_update, context)
+        except Exception:
+            logger.exception("管理面板按钮执行失败：action=%s", action)
+            await query.message.reply_text(
+                "❌ 这个操作刚才没有完成，已经记录故障。\n"
+                "请发送 /start 刷新面板后再试一次。",
+                reply_markup=admin_menu(),
+            )
+
+    async def cmd_settings_hub(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if not await self._ensure_admin(update):
+            return
+        await update.effective_message.reply_text(
+            "⚙️ <b>运营设置</b>\n\n"
+            "日常发布不需要改这里。只有调整广播、检查运行状态或测试封面时才使用。",
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("📢 每日广播", callback_data="cmd:daily"),
+                    InlineKeyboardButton("📊 运行状态", callback_data="cmd:status"),
+                ],
+                [InlineKeyboardButton("🎨 封面测试", callback_data="cmd:cover_test")],
+                [InlineKeyboardButton("⬅️ 返回首页", callback_data="cmd:quick_help")],
+            ]),
+        )
 
     async def cmd_send_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not await self._ensure_admin(update):
             return
         await update.effective_message.reply_text(
-            "🚀 <b>立即发布（最常用）</b>\n\n"
-            "<code>/send DRF_xxx</code> 或 <code>/publish DRF_xxx</code>\n"
-            "例如：<code>/send DRF_7a806f77-5451-49a4-90eb-be9c95ca95aa</code>\n\n"
-            "批量文案对比：<code>/send_variants DRF_xxx</code>\n\n"
-            "先用 <code>/pending</code> 看待审编号，再复制粘贴发布。\n\n"
-            "🎨 封面测试：<code>/cover_test DRF_xxx</code>（按真实草稿渲染 2 款精选）",
+            "📤 <b>审核与发布</b>\n\n"
+            "1) 点 <code>/pending</code> 查看房源\n"
+            "2) A/B/C 三版任选一版预览\n"
+            "3) 点“采用并审核”，系统冻结正文、封面与图片\n"
+            "4) 点 <code>/send</code> 打开已审核队列，一键发布\n\n"
+            "也可使用 <code>/approve QC0032 B</code> 和 <code>/send QC0032</code>。",
             parse_mode=ParseMode.HTML,
+            reply_markup=admin_menu(),
+        )
+
+    async def private_message_fallback(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ) -> None:
+        """管理员私聊中的贴纸/GIF/文件/视频等也必须有反馈。"""
+        if not await self._ensure_admin(update):
+            return
+        await update.effective_message.reply_text(
+            "✅ 侨联发布助手在线。\n\n"
+            "录入房源：点「➕ 录入房源」，再发文字和至少 4 张图片。\n"
+            "查看和发布：点「🏠 房源队列」。\n\n"
+            "贴纸、GIF 和其他文件不会被当作房源素材。",
             reply_markup=admin_menu(),
         )
 
@@ -547,57 +627,12 @@ class PublisherBot:
             }
 
     async def cmd_send_variants(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Legacy direct-to-channel variant publishing is intentionally disabled."""
         if not await self._ensure_admin(update):
             return
-        ch = self.settings.channel_id
-        if not ch:
-            await update.effective_message.reply_text("❌ CHANNEL_ID 未配置")
-            return
-        wanted = str(context.args[0]).strip() if context.args else ""
-        try:
-            post_dict = self._draft_post_dict_from_db(wanted)
-        except Exception as e:
-            logger.exception("读取草稿失败")
-            await update.effective_message.reply_text(f"❌ 读取草稿失败：{e}")
-            return
-        if not post_dict:
-            await update.effective_message.reply_text(
-                "❌ 未找到草稿。用法：/send_variants DRF_xxx（不带参数则取最近一条）"
-            )
-            return
-
-        listing_key = str(post_dict.get("listing_id") or "").strip()
-        _maps_url = self._build_maps_url(
-            str(post_dict.get("project") or post_dict.get("title") or ""),
-            str(post_dict.get("area") or ""),
-            str(post_dict.get("google_maps_url") or ""),
-        )
-        kb = publish_post_keyboard(
-            listing_key,
-            str(post_dict.get("area") or "").strip(),
-            self.settings.user_bot_username,
-            channel_username=self.settings.channel_username,
-            discussion_group_link=self.settings.discussion_group_link,
-            maps_url=_maps_url,
-        )
-        variants = build_post_variants(post_dict)
         await update.effective_message.reply_text(
-            f"🧪 开始挨个发布文案：{len(variants)} 条\n草稿：<code>{post_dict.get('draft_id') or '最近一条'}</code>\n编号：<code>{listing_key}</code>",
-            parse_mode=ParseMode.HTML,
-        )
-        sent_count = 0
-        for idx, (variant_name, variant_text) in enumerate(variants, start=1):
-            await context.bot.send_message(
-                chat_id=ch,
-                text=f"【文案{idx}/{len(variants)}｜{variant_name}】\n\n{variant_text}",
-                parse_mode=ParseMode.HTML,
-                disable_web_page_preview=True,
-                reply_markup=kb,
-            )
-            sent_count += 1
-            await asyncio.sleep(0.5)
-        await update.effective_message.reply_text(
-            f"✅ 已挨个发完：{sent_count} 条\n编号：<code>{listing_key}</code>",
+            "⚠️ 多文案现场直发已停用。\n\n"
+            "请使用 /pending 预览 A/B/C 三版，审核冻结后再用 /send 发布。",
             parse_mode=ParseMode.HTML,
         )
 
@@ -605,22 +640,12 @@ class PublisherBot:
         if not await self._ensure_admin(update):
             return
         await update.effective_message.reply_text(
-            "📘 <b>管理员命令（精简实用版）</b>\n\n"
-            "<b>高频主链（每天都用）</b>\n"
-            "1) <code>/pending</code> 查看待审草稿\n"
-            "2) <code>/send DRF_xxx</code> 立即发指定草稿\n"
-            "3) <code>/new</code> 手工补录并发布\n\n"
-            "<b>运行控制</b>\n"
-            "<code>/ops</code> 一屏总览（待审/队列/已发）\n"
-            "<code>/status</code> 检查采集与发布状态\n"
-            "<code>/slots</code> 查看/修改发帖时段\n"
-            "<code>/pause</code> / <code>/resume</code> 队列开关\n\n"
-            "<b>导入与排障</b>\n"
-            "<code>/intake</code> 开始微信导入\n"
-            "<code>/intake_done</code> 导入完成并入库\n"
-            "<code>/intake_pending</code> 查看导入待发草稿\n"
-            "<code>/logs</code> 最近发布日志\n"
-            "<code>/cover_test DRF_xxx</code> 封面回归测试",
+            "❓ <b>怎么使用</b>\n\n"
+            "1. 采集到合格房源后，机器人会主动提醒\n"
+            "2. 点“房源队列”查看封面和文案\n"
+            "3. 需要时点“修改文案”或重新选主图\n"
+            "4. 确认后直接发布\n\n"
+            "临时录入：点“录入房源”，发送文字和至少 4 张图片。",
             parse_mode=ParseMode.HTML,
             reply_markup=admin_menu(),
         )
@@ -630,10 +655,7 @@ class PublisherBot:
         if not await self._ensure_admin(update):
             return
         msg = update.effective_message
-        ch = self.settings.channel_id
-        if not ch:
-            await msg.reply_text("❌ CHANNEL_ID 未配置")
-            return
+        preview_chat_id = update.effective_chat.id
 
         wanted_draft_id = str(context.args[0]).strip() if context.args else ""
         test_data, bg_image_path, source_desc = self._cover_test_payload_from_db(wanted_draft_id)
@@ -650,7 +672,7 @@ class PublisherBot:
             ("price_tag", "精选B·价格角标"),
         ]
 
-        await msg.reply_text(f"正在生成 2 款精选封面并发送到频道...\n数据来源：{source_desc}")
+        await msg.reply_text(f"正在生成 2 款精选封面并发送到当前管理员私聊...\n数据来源：{source_desc}")
         try:
             out_dir = self._runtime_render_dir()
         except Exception as e:
@@ -673,7 +695,7 @@ class PublisherBot:
                 )
                 with open(output_path, "rb") as f:
                     await context.bot.send_photo(
-                        chat_id=ch,
+                        chat_id=preview_chat_id,
                         photo=f,
                         caption=f"🎨 封面模板测试：{name}\n风格代码：<code>{style}</code>\n来源：{source_desc}",
                         parse_mode=ParseMode.HTML,
@@ -759,7 +781,7 @@ class PublisherBot:
                     LIMIT 1
                     """,
                     (int(row["id"]),),
-                ).fetchone()
+                ).fetchone() if "id" in row.keys() else None
 
                 project = (str(row["project"] or "").strip() or str(row["title"] or "").strip() or "侨联地产")
                 room = (str(row["layout"] or "").strip() or str(row["property_type"] or "").strip() or "精选房源")
@@ -791,9 +813,11 @@ class PublisherBot:
         if not await self._ensure_admin(update):
             return
         await update.effective_message.reply_text(
-            "🧭 管理员面板（高频优先）\n\n"
-            "主链：待审 -> 立即发布 -> 运行监控\n"
-            "推荐顺序：/pending → /send DRF_xxx → /ops",
+            "🏠 侨联发布助手\n\n"
+            "只走三步：\n"
+            "1. 发文字和图片\n"
+            "2. 检查并确认\n"
+            "3. 发布到频道",
             reply_markup=admin_menu(),
         )
 
@@ -821,80 +845,157 @@ class PublisherBot:
         draft = self._draft(context)
         draft.media_type = ""
         draft.media_file_id = ""
+        draft.media_file_ids = []
         await update.message.reply_text("已跳过媒体。\n\n请选择房源类型：", reply_markup=type_keyboard())
         return ST_TYPE
 
     async def new_listing(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+        """兼容旧菜单入口：不再启动现场直发向导，统一转入待审 intake。"""
         if not await self._ensure_admin(update):
             return ConversationHandler.END
         self._reset_draft(context)
-        draft = self._draft(context)
-        text = f"新建房源编号：{draft.listing_id}\n\n{messages.HELP_NEW}"
+        text = (
+            "📥 <b>新建房源已统一进入待审流程</b>\n\n"
+            "请使用 <code>/intake</code> 导入房源文字和图片。\n"
+            "完成后系统会生成 draft 与 publication package，审核 approved 后再使用 <code>/send</code>。\n\n"
+            "当前不会从此入口现场生成封面或直接发布。"
+        )
+        target = update.callback_query.message if update.callback_query else update.effective_message
         if update.callback_query:
             await update.callback_query.answer()
-            await update.callback_query.edit_message_text(text)
-        else:
-            await update.effective_message.reply_text(text)
-        return ST_MEDIA
+        await target.reply_text(text, parse_mode=ParseMode.HTML)
+        return ConversationHandler.END
 
     def _merge_caption_into_draft(self, draft: Draft, caption: str) -> None:
-        cap = (caption or "").strip()
+        """Compatibility helper for album intake; extraction is advisory only."""
+        cap = str(caption or "").strip()
         if not cap:
             return
+        if cap not in draft.source_caption:
+            draft.source_caption = (draft.source_caption + "\n" + cap).strip()
         info = extract_house_info(cap)
-        if info["project"]:
+        if info.get("project"):
             draft.title = info["project"]
-        if info["price"]:
+        if info.get("price"):
             draft.price = info["price"]
-        if info["size"]:
+        if info.get("size"):
             draft.size_sqm = info["size"]
-        if info["floor"]:
+        if info.get("floor"):
             draft.fee_note = info["floor"]
-        if info["layout"]:
+        if info.get("layout"):
             draft.layout = info["layout"]
-        if info["highlights"]:
+        if info.get("highlights"):
             draft.highlights = list(info["highlights"])
+
+    def _store_album_messages(self, draft: Draft, messages: list[Message]) -> Message:
+        """Preserve one Telegram album in message order and choose its largest cover."""
+        ordered = sorted(
+            messages,
+            key=lambda message: int(getattr(message, "message_id", 0) or 0),
+        )
+        if not ordered:
+            raise ValueError("album is empty")
+        for message in ordered:
+            self._merge_caption_into_draft(
+                draft, getattr(message, "caption", "") or getattr(message, "text", "") or ""
+            )
+        draft.media_type = "photo"
+        draft.media_file_ids = [message.photo[-1].file_id for message in ordered]
+        best = max(
+            ordered,
+            key=lambda message: message.photo[-1].width * message.photo[-1].height,
+        )
+        draft.media_file_id = best.photo[-1].file_id
+        return best
+
+    @staticmethod
+    def _legacy_direct_new_enabled() -> bool:
+        """The legacy direct publisher is permanently disabled in production."""
+        return False
+
+    def _persist_new_as_pending(
+        self, draft: Draft, *, local_paths: list[str], operator_user_id: int
+    ) -> str:
+        """Persist admin intake, then canonicalize it through the shared parser."""
+        from ai_parser import AIParserModule
+        from source_sanitizer import sanitize_source_text
+
+        if len(draft.media_file_ids) != len(local_paths):
+            raise ValueError("admin album file-id/path counts do not match")
+        core = CoreDatabaseManager(self.settings.sqlite_path)
+        source_post_id = f"admin_new_{uuid.uuid4().hex}"
+        structured_lines = [
+            draft.source_caption.strip(),
+            f"项目：{draft.community or draft.title}" if (draft.community or draft.title) else "",
+            f"区域：{draft.area}" if draft.area else "",
+            f"物业类型：{TYPE_LABELS.get(draft.property_type, draft.property_type)}" if draft.property_type else "",
+            f"户型：{draft.layout}" if draft.layout else "",
+            f"面积：{draft.size_sqm}" if draft.size_sqm else "",
+            f"楼层：{draft.fee_note}" if draft.fee_note else "",
+            f"租金：${draft.price}/月" if draft.price else "",
+            f"押付：{draft.deposit_rule}" if draft.deposit_rule else "",
+        ]
+        raw_text = "\n".join(line for line in structured_lines if line)
+        sanitized = sanitize_source_text(raw_text)
+        raw_images = [
+            {"local_path": path, "telegram_file_id": file_id, "sort_order": index}
+            for index, (file_id, path) in enumerate(zip(draft.media_file_ids, local_paths))
+        ]
+        source_pk = core.save_source_post(
+            None, "telegram_admin_upload", "publisher_bot_new", source_post_id, "",
+            f"admin:{operator_user_id}", raw_text, raw_images, [], "",
+            {"ingest_kind": "admin_new", "sanitized_text": sanitized.text},
+            hashlib.sha256((source_post_id + raw_text).encode()).hexdigest(), "pending",
+        )
+        for index, item in enumerate(raw_images):
+            core.save_media_asset(
+                f"AST_{uuid.uuid4().hex[:16].upper()}", "source_post", source_pk, str(source_pk),
+                "photo", "telegram_admin_upload", "", item["telegram_file_id"], item["local_path"],
+                "", "", item["telegram_file_id"], "", "photo", 0, 0, index,
+            )
+        draft_id = AIParserModule(self.settings.sqlite_path).process_single_source_post(source_pk)
+        if not draft_id:
+            raise ValueError("admin intake could not produce a canonical draft")
+        return str(draft_id)
+
+    async def _download_new_album(
+        self, context: ContextTypes.DEFAULT_TYPE, draft: Draft
+    ) -> list[str]:
+        out_dir = _REPO_ROOT / "data" / "management_intake"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        paths: list[str] = []
+        for index, file_id in enumerate(draft.media_file_ids):
+            tg_file = await context.bot.get_file(file_id)
+            path = out_dir / f"{draft.listing_id}_{index + 1}_{uuid.uuid4().hex[:8]}.jpg"
+            await tg_file.download_to_drive(custom_path=str(path))
+            paths.append(str(path))
+        return paths
 
     async def _generate_and_reply_cover(
         self, reply_to: Message, draft: Draft, style: str | None = None
     ) -> str | None:
-        """生成封面并发送预览，返回生成的文件路径。"""
+        """Generate a private admin preview; this method never publishes."""
         try:
             out_dir = self._runtime_render_dir()
             output_path = str(out_dir / f"out_{draft.listing_id}_{style or draft.cover_style}.jpg")
             bg_path = await self._resolve_cover_background(reply_to, draft, out_dir)
-            hl = draft.highlights or ["实拍真房源", "中文顾问", "可预约看房"]
-            s = (style or draft.cover_style or "classic").lower().strip()
             generate_house_cover(
                 bg_path,
                 output_path,
-                project=(draft.title or "侨联地产").strip() or "侨联地产",
-                property_type=(draft.layout or "精选房源").strip() or "精选房源",
-                area=(draft.area or "金边").strip() or "金边",
-                size=(draft.size_sqm or "—").strip() or "—",
-                floor=(draft.fee_note or "—").strip() or "—",
-                price=(draft.price or "面议").strip() or "面议",
-                highlights=hl,
-                style=s,
+                project=(draft.title or "侨联地产").strip(),
+                property_type=(draft.layout or "精选房源").strip(),
+                area=(draft.area or "金边").strip(),
+                size=(draft.size_sqm or "—").strip(),
+                floor=(draft.fee_note or "—").strip(),
+                price=(draft.price or "面议").strip(),
+                highlights=draft.highlights or ["实拍真房源", "中文顾问", "可预约看房"],
+                style=(style or draft.cover_style or "minimal").lower().strip(),
             )
-            style_names = {
-                "classic": "经典蓝卡",
-                "minimal": "极简白条",
-                "price_tag": "右侧价签",
-                "vertical": "竖版视频",
-            }
-            style_name = style_names.get(s, s)
-            with open(output_path, "rb") as f:
-                await reply_to.reply_photo(
-                    f,
-                    caption=f"✨ 品牌封面预览（{style_name}）\n\n"
-                    f"底图：{'实拍图' if bg_path else '纯模板'}\n"
-                    f"项目：{draft.title or '未识别'}\n"
-                    f"价格：{draft.price or '未识别'}",
-                )
+            with open(output_path, "rb") as preview:
+                await reply_to.reply_photo(preview, caption="✨ 品牌封面预览（仅管理员可见）")
             return output_path
-        except Exception as e:
-            logger.error("Cover generation failed: %s", e)
+        except Exception as exc:
+            logger.error("Cover generation failed: %s", exc)
             return None
 
     async def capture_media(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -924,11 +1025,9 @@ class PublisherBot:
                 msgs = context.user_data.pop("_album_msgs", [])
                 if not msgs:
                     return ST_MEDIA
-                for m in msgs:
-                    self._merge_caption_into_draft(draft, m.caption or m.text or "")
-                best = max(msgs, key=lambda m: m.photo[-1].width * m.photo[-1].height)
-                draft.media_file_id = best.photo[-1].file_id
-                n = len(msgs)
+                # 保留整组相册的 file_id；media_file_id 仅作为封面候选的兼容字段。
+                best = self._store_album_messages(draft, msgs)
+                n = len(draft.media_file_ids)
                 await best.reply_text(
                     f"✅ 媒体已记录（相册共 <b>{n}</b> 张）\n\n请选择房源类型：",
                     reply_markup=type_keyboard(),
@@ -941,6 +1040,7 @@ class PublisherBot:
             context.user_data.pop("_mg_gen", None)
             self._merge_caption_into_draft(draft, msg.caption or msg.text or "")
             draft.media_file_id = msg.photo[-1].file_id
+            draft.media_file_ids = [draft.media_file_id]
             await msg.reply_text(
                 "✅ 媒体已记录\n\n请选择房源类型：",
                 reply_markup=type_keyboard()
@@ -1022,7 +1122,14 @@ class PublisherBot:
 
     async def show_preview(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         draft = self._draft(context)
-        text = build_preview_text(draft.to_dict(update.effective_user.id))
+        preview_data = draft.to_dict(update.effective_user.id)
+        preview_data.update({
+            "project": draft.community or draft.title,
+            "size": draft.size_sqm,
+            "deposit": draft.deposit_rule,
+            "available_date": draft.available_date,
+        })
+        text = "📋 <b>发布预览</b>\n\n" + build_chinese_listing_post(preview_data)
         await update.effective_message.reply_text(
             text,
             reply_markup=preview_keyboard(),
@@ -1034,292 +1141,32 @@ class PublisherBot:
         await query.answer()
         action = query.data.split(":", 1)[1]
 
-        if action == "compare_covers":
-            draft = self._draft(context)
-            await query.edit_message_text("⏳ 正在生成两款封面对比，请稍候…")
-            try:
-                out_dir = self._runtime_render_dir()
-            except Exception as e:
-                await query.edit_message_text(f"❌ 渲染目录不可写：{e}")
-                return ST_PREVIEW
-            bg_path = await self._resolve_cover_background(query.message, draft, out_dir)
-            hl = draft.highlights or ["实拍真房源", "中文顾问", "可预约看房"]
-            cover_kwargs = dict(
-                project=(draft.title or "侨联地产").strip() or "侨联地产",
-                property_type=(draft.layout or "精选房源").strip() or "精选房源",
-                area=(draft.area or "金边").strip() or "金边",
-                size=(draft.size_sqm or "—").strip() or "—",
-                floor=(draft.fee_note or "—").strip() or "—",
-                price=(draft.price or "面议").strip() or "面议",
-                highlights=hl,
-            )
-            styles = [
-                ("minimal", "🅰️ A款：清爽信息条"),
-                ("price_tag", "🅱️ B款：价格角标"),
-            ]
-            chat_id = query.message.chat_id
-            sent_any = False
-            for style_code, style_label in styles:
-                out_path = str(out_dir / f"compare_{draft.listing_id}_{style_code}.jpg")
-                try:
-                    generate_house_cover(bg_path, out_path, style=style_code, **cover_kwargs)
-                    with open(out_path, "rb") as f:
-                        await context.bot.send_photo(
-                            chat_id=chat_id,
-                            photo=f,
-                            caption=f"{style_label}\n\n点下方按钮选用此款：",
-                            reply_markup=InlineKeyboardMarkup([[
-                                InlineKeyboardButton(f"✅ 选用此款", callback_data=f"style:pick:{style_code}"),
-                            ]]),
-                        )
-                    sent_any = True
-                except Exception as e:
-                    logger.warning("compare_covers: 生成 %s 失败: %s", style_code, e)
-                    await context.bot.send_message(chat_id=chat_id, text=f"⚠️ {style_label} 生成失败：{e}")
-            if sent_any:
-                current = draft.cover_style or "minimal"
-                await context.bot.send_message(
-                    chat_id=chat_id,
-                    text=f"👆 对比两款后，点图片下方「✅ 选用此款」设定封面。\n当前选定款式：<code>{current}</code>",
-                    reply_markup=preview_keyboard(),
-                    parse_mode=ParseMode.HTML,
-                )
-            return ST_PREVIEW
-
         if action in {"publish", "publish_variants"}:
+            # 生产安全：/new 只能进入统一待审流水线，禁止现场重建正文/封面并直发。
             draft = self._draft(context)
-            uid = update.effective_user.id
-            listing_key = str(draft.listing_id)
-            ch = self.settings.channel_id
-            if not ch:
-                await query.edit_message_text("❌ CHANNEL_ID 未配置，无法发频道。")
-                return ST_PREVIEW
-
-            type_cn = TYPE_LABELS.get(draft.property_type, draft.property_type or "公寓")
-            self.db.save_listing(
-                {
-                    "listing_id": listing_key,
-                    "type": type_cn,
-                    "area": draft.area,
-                    "project": (draft.community or draft.title or "").strip(),
-                    "title": draft.title,
-                    "price": draft.price,
-                    "layout": draft.layout,
-                    "size": draft.size_sqm,
-                    "floor": draft.fee_note,
-                    "deposit": draft.deposit_rule or "押一付一",
-                    "available_date": draft.available_date or "随时入住",
-                    "tags": draft.tags,
-                    "highlights": draft.highlights,
-                    "cost_notes": "",
-                    "advisor_comment": draft.advisor_note,
-                    "drawbacks": [],
-                    "status": "published",
-                }
-            )
-
-            post_dict = dict(draft.to_dict(uid))
-            post_dict["listing_id"] = listing_key
-            post_dict["size"] = draft.size_sqm
-            post_dict["floor"] = draft.fee_note
-            post_dict["project"] = draft.community or draft.title
-            post_dict["advisor_comment"] = draft.advisor_note
-
-            contact = self.settings.default_contact_handle
-            body_variants = build_post_variants(post_dict)
-            # 默认发布按 A/B/C 权重抽样，避免长期只有单一文案。
-            abc_pool = body_variants[:3] if len(body_variants) >= 3 else body_variants
-            variant_code = random.choices(
-                ["a", "b", "c"][: len(abc_pool)],
-                weights=[0.4, 0.3, 0.3][: len(abc_pool)],
-                k=1,
-            )[0] if abc_pool else "a"
-            variant_index = {"a": 0, "b": 1, "c": 2}.get(variant_code, 0)
-            body_html = abc_pool[variant_index][1] if abc_pool else build_post_text(post_dict, contact)
-            _maps_url = self._build_maps_url(
-                draft.community or draft.title or "",
-                draft.area or "",
-                draft.google_maps_url or "",
-            )
-            kb = publish_post_keyboard(
-                listing_key,
-                draft.area or "",
-                self.settings.user_bot_username,
-                channel_username=self.settings.channel_username,
-                discussion_group_link=self.settings.discussion_group_link,
-                maps_url=_maps_url,
-            )
-
-            bot = context.bot
-            try:
-                if action == "publish_variants":
-                    await query.edit_message_text("🧪 正在批量发文案版本，请稍候…")
-                    sent_count = 0
-                    # 每个文案版本单独发一条，房源不变，便于频道内直观对比
-                    for idx, (variant_name, variant_text) in enumerate(body_variants, start=1):
-                        await bot.send_message(
-                            chat_id=ch,
-                            text=f"【文案{idx}/{len(body_variants)}｜{variant_name}】\n\n{variant_text}",
-                            parse_mode=ParseMode.HTML,
-                            disable_web_page_preview=True,
-                            reply_markup=kb,
-                        )
-                        sent_count += 1
-                        await asyncio.sleep(0.5)
-                    await query.edit_message_text(
-                        f"✅ 已发 {sent_count} 条文案对比帖\n编号：<code>{listing_key}</code>",
-                        parse_mode=ParseMode.HTML,
-                    )
-                    self._reset_draft(context)
-                    return ConversationHandler.END
-
-                # 1) 长文 HTML，不带按钮（与 MediaGroup 无法挂键盘的限制解耦）
-                text_msg = await bot.send_message(
-                    chat_id=ch,
-                    text=body_html,
-                    parse_mode=ParseMode.HTML,
-                    disable_web_page_preview=True,
-                )
-                await asyncio.sleep(0.4)
-
-                # 2) 生成品牌封面并上传
-                media_msg = None
-                out_dir = self._runtime_render_dir()
-                cover_path = str(out_dir / f"pub_cover_{draft.listing_id}_{draft.cover_style}.jpg")
-                bg_path = await self._resolve_cover_background(query.message, draft, out_dir)
-                generate_house_cover(
-                    bg_path,
-                    cover_path,
-                    project=(draft.title or "侨联地产").strip() or "侨联地产",
-                    property_type=(draft.layout or "精选房源").strip() or "精选房源",
-                    area=(draft.area or "金边").strip() or "金边",
-                    size=(draft.size_sqm or "—").strip() or "—",
-                    floor=(draft.fee_note or "—").strip() or "—",
-                    price=(draft.price or "面议").strip() or "面议",
-                    highlights=draft.highlights or ["实拍真房源", "中文顾问", "可预约看房"],
-                    style=draft.cover_style,
-                )
-                with open(cover_path, "rb") as f:
-                    media_msg = await bot.send_photo(
-                        chat_id=ch,
-                        photo=f,
-                        caption=CHANNEL_BUTTON_PROMPT,
-                        parse_mode=ParseMode.HTML,
-                        reply_markup=kb,
-                    )
-
-                # 发完封面图后立即更新按钮，注入真实 channel_message_id 以生成评论区链接
-                try:
-                    _channel_message_id = int(media_msg.message_id)
-                    _kb_with_detail = publish_post_keyboard(
-                        listing_key,
-                        draft.area or "",
-                        self.settings.user_bot_username,
-                        channel_username=self.settings.channel_username,
-                        channel_message_id=_channel_message_id,
-                        discussion_group_link=self.settings.discussion_group_link,
-                        maps_url=_maps_url,
-                    )
-                    await bot.edit_message_reply_markup(
-                        chat_id=ch,
-                        message_id=media_msg.message_id,
-                        reply_markup=_kb_with_detail,
-                    )
-                except Exception as _e:
-                    logger.warning("更新详情按钮失败（不影响发布）: %s", _e)
-
-                # 3) 如果用户上传了原图/视频，发讨论区而非频道主贴（主贴只保留封面+按钮，讨论区承载实拍）
-                if draft.media_file_id and draft.media_type in {"photo", "video"}:
-                    await asyncio.sleep(0.5)
-                    discuss_id = await resolve_discussion_id(bot)
-                    media_dest = discuss_id if discuss_id else ch
-                    if not discuss_id:
-                        logger.info("讨论组未配置，实拍图回退发频道主贴: listing=%s", listing_key)
-                    try:
-                        if draft.media_type == "photo":
-                            wm_photo = None
-                            try:
-                                tg_file = await bot.get_file(draft.media_file_id)
-                                raw = await tg_file.download_as_bytearray()
-                                wm_photo = add_detail_logo_watermark(bytes(raw))
-                            except Exception as e:
-                                logger.warning("原图加 logo 失败，回退原图发送: %s", e)
-                            await bot.send_photo(
-                                chat_id=media_dest,
-                                photo=wm_photo if wm_photo is not None else draft.media_file_id,
-                                caption="📷 实拍图",
-                            )
-                        else:
-                            await bot.send_video(
-                                chat_id=media_dest,
-                                video=draft.media_file_id,
-                                caption="🎥 实拍视频",
-                            )
-                    except Exception as e:
-                        logger.warning("Failed to send original %s: %s", draft.media_type, e)
-
-                post_id = f"v2_{uuid.uuid4().hex[:16]}"
-                try:
-                    bridge = load_discussion_bridge()
-                    bridge.setdefault("publish_queue", []).append(
-                        {"channel_post_id": int(text_msg.message_id), "t": time.time()}
-                    )
-                    if len(bridge["publish_queue"]) > 50:
-                        bridge["publish_queue"] = bridge["publish_queue"][-50:]
-                    save_discussion_bridge(bridge)
-
-                    self.db.create_post_record(
-                        {
-                            "post_id": post_id,
-                            "listing_id": listing_key,
-                            "draft_id": None,
-                            "platform": "telegram",
-                            "channel_chat_id": str(ch),
-                            "channel_message_id": str(text_msg.message_id),
-                            "media_group_id": str(media_msg.message_id) if media_msg else None,
-                            "caption_message_id": str(media_msg.message_id) if media_msg else None,
-                            "button_message_id": str(media_msg.message_id) if media_msg else str(text_msg.message_id),
-                            "post_text": body_html[:8000],
-                            "published_by": str(uid),
-                        }
-                    )
-                    with sqlite3.connect(self.settings.sqlite_path) as conn:
-                        conn.execute(
-                            """
-                            INSERT INTO publish_analytics
-                            (draft_id, post_id, message_id, listing_id, area, property_type,
-                             monthly_rent, caption_variant, publish_hour, publish_day_of_week, published_at)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                            """,
-                            (
-                                None,
-                                post_id,
-                                str(text_msg.message_id),
-                                listing_key,
-                                draft.area or "",
-                                type_cn,
-                                draft.price or "",
-                                variant_code,
-                                datetime.now().hour,
-                                datetime.now().weekday(),
-                                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                            ),
-                        )
-                        conn.commit()
-                except Exception as log_err:
-                    logger.warning("create_post_record: %s", log_err)
-
+            uid = int(update.effective_user.id)
+            if action == "publish_variants":
                 await query.edit_message_text(
-                    f"✅ 已发布到频道\n编号：<code>{listing_key}</code>",
+                    "⚠️ 多版本现场直发已停用。请先保存为待审草稿，审核 approved package 后使用 /send。"
+                )
+                self._reset_draft(context)
+                return ConversationHandler.END
+            try:
+                local_paths = await self._download_new_album(context, draft)
+                pending_id = self._persist_new_as_pending(
+                    draft, local_paths=local_paths, operator_user_id=uid
+                )
+                await query.edit_message_text(
+                    f"✅ 已保存到统一待审队列\n草稿：<code>{pending_id}</code>\n\n"
+                    "未发布到频道。请在生成并审核 approved package 后使用 /send。",
                     parse_mode=ParseMode.HTML,
                 )
-            except Exception as e:
-                logger.exception("v2 发频道失败")
-                await query.edit_message_text(f"❌ 发布失败：{e}")
+                self._reset_draft(context)
+                return ConversationHandler.END
+            except Exception as exc:
+                logger.exception("save /new into unified pipeline failed")
+                await query.edit_message_text(f"❌ 保存待审草稿失败：{exc}")
                 return ST_PREVIEW
-
-        self._reset_draft(context)
-        return ConversationHandler.END
 
     async def style_actions(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         """处理封面模板风格选择。"""
@@ -1328,14 +1175,6 @@ class PublisherBot:
         data = query.data
 
         if data == "style:back":
-            await self.show_preview(update, context)
-            return ST_PREVIEW
-
-        if data.startswith("style:pick:"):
-            # 来自「对比两款封面」图片下方的直接选款按钮（不尝试编辑图片消息为文字）
-            style = data.split(":", 2)[2]
-            draft = self._draft(context)
-            draft.cover_style = style
             await self.show_preview(update, context)
             return ST_PREVIEW
 
@@ -1360,6 +1199,190 @@ class PublisherBot:
 
         return ST_PREVIEW
 
+    @staticmethod
+    def _admin_listing_id(raw: str) -> str:
+        value = str(raw or "").strip()
+        if value.upper().startswith("QC") and value[2:].isdigit():
+            return f"l_{int(value[2:])}"
+        return value
+
+    def _is_admin(self, update: Update) -> bool:
+        user = getattr(update, "effective_user", None)
+        try:
+            return bool(user and int(user.id) in {int(x) for x in self.settings.admin_ids})
+        except (TypeError, ValueError):
+            return False
+
+    @staticmethod
+    def _display_listing_id(listing_id: str) -> str:
+        raw = str(listing_id or "").strip()
+        if raw.lower().startswith("l_") and raw[2:].isdigit():
+            return f"QC{int(raw[2:]):04d}"
+        return raw
+
+    async def cmd_listing_status(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if not self._is_admin(update):
+            await update.effective_message.reply_text("无权限。")
+            return
+        raw = (context.args or [""])[0]
+        if not raw:
+            await update.effective_message.reply_text("用法：/listing_status QC0032")
+            return
+        listing_id = self._admin_listing_id(raw)
+        with self.db._connect() as conn:
+            row = conn.execute("SELECT listing_id, community, area, layout, price, status, updated_at FROM listings WHERE listing_id=?", (listing_id,)).fetchone()
+        if not row:
+            await update.effective_message.reply_text("未找到这套房源。请检查 QC 编号。")
+            return
+        await update.effective_message.reply_text(
+            f"房源状态\n\n编号｜{self._display_listing_id(row['listing_id'])}\n项目｜{row['community'] or '-'}\n区域｜{row['area'] or '-'}\n户型｜{row['layout'] or '-'}\n租金｜${row['price'] or '-'} / 月\n状态｜{row['status'] or '-'}\n更新时间｜{row['updated_at'] or '-'}"
+        )
+
+    @staticmethod
+    def _listing_status_label(status: str) -> str:
+        return {
+            "active": "🟢 可预约",
+            "reserved": "🟡 已有预约",
+            "pending": "🔵 待确认",
+            "rented": "🔴 已租出",
+            "inactive": "⚫ 已下架",
+        }.get(str(status or "").strip().lower(), "⚪ 未知")
+
+    async def cmd_listing_states(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if not self._is_admin(update):
+            await update.effective_message.reply_text("无权限。")
+            return
+        with self.db._connect() as conn:
+            rows = conn.execute(
+                "SELECT listing_id, community, area, layout, status FROM listings "
+                "ORDER BY updated_at DESC, created_at DESC LIMIT 12"
+            ).fetchall()
+        buttons = []
+        for row in rows:
+            place = str(row["community"] or row["area"] or "房源").strip()
+            layout = str(row["layout"] or "").strip()
+            summary = "｜".join(x for x in (place, layout) if x)
+            label = f'{self._listing_status_label(row["status"])} {self._display_listing_id(row["listing_id"])}｜{summary}'
+            buttons.append([InlineKeyboardButton(label[:60], callback_data=f'listingpick:{row["listing_id"]}')])
+        buttons.append([InlineKeyboardButton("⬅️ 返回首页", callback_data="cmd:quick_help")])
+        await update.effective_message.reply_text(
+            "🏠 <b>房态管理</b>\n\n选择一套房源，再更新当前房态。",
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup(buttons),
+        )
+
+    async def listing_state_pick(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        query = update.callback_query
+        if query is None:
+            return
+        await query.answer()
+        if not self._is_admin(update):
+            return
+        listing_id = str(query.data or "").split(":", 1)[-1].strip()
+        with self.db._connect() as conn:
+            row = conn.execute(
+                "SELECT listing_id, community, area, layout, price, status, updated_at FROM listings WHERE listing_id=?",
+                (listing_id,),
+            ).fetchone()
+        if not row:
+            await query.message.reply_text("未找到这套房源。")
+            return
+        title = "｜".join(x for x in (str(row["community"] or row["area"] or "房源"), str(row["layout"] or "")) if x)
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🟢 可预约", callback_data=f"listingstate:{listing_id}:active"), InlineKeyboardButton("🟡 已有预约", callback_data=f"listingstate:{listing_id}:reserved")],
+            [InlineKeyboardButton("🔵 待确认", callback_data=f"listingstate:{listing_id}:pending"), InlineKeyboardButton("🔴 已租出", callback_data=f"listingstate:{listing_id}:rented")],
+            [InlineKeyboardButton("⚫ 下架", callback_data=f"listingstate:{listing_id}:inactive")],
+            [InlineKeyboardButton("⬅️ 返回房态列表", callback_data="cmd:listing_states")],
+        ])
+        await query.message.reply_text(
+            f"🏠 <b>{self._display_listing_id(listing_id)}｜{title}</b>\n"
+            f"💰 ${row['price'] or '-'} /月\n"
+            f"当前房态｜{self._listing_status_label(row['status'])}\n\n"
+            "请选择新的房态：",
+            parse_mode=ParseMode.HTML,
+            reply_markup=keyboard,
+        )
+
+    async def listing_state_set(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        query = update.callback_query
+        if query is None:
+            return
+        await query.answer("正在更新…")
+        if not self._is_admin(update):
+            return
+        parts = str(query.data or "").split(":")
+        if len(parts) != 3:
+            return
+        _, listing_id, status = parts
+        allowed = {"active", "pending", "reserved", "rented", "inactive"}
+        if status not in allowed:
+            return
+        with self.db._connect() as conn:
+            columns = {str(row[1]) for row in conn.execute("PRAGMA table_info(listings)").fetchall()}
+            if "availability_confirmed_at" not in columns:
+                conn.execute("ALTER TABLE listings ADD COLUMN availability_confirmed_at TEXT")
+            old = conn.execute("SELECT status FROM listings WHERE listing_id=?", (listing_id,)).fetchone()
+            if not old:
+                await query.message.reply_text("未找到这套房源。")
+                return
+            if status in {"active", "reserved"}:
+                conn.execute(
+                    "UPDATE listings SET status=?, availability_confirmed_at=datetime('now','localtime'), updated_at=datetime('now','localtime') WHERE listing_id=?",
+                    (status, listing_id),
+                )
+            else:
+                conn.execute(
+                    "UPDATE listings SET status=?, availability_confirmed_at=NULL, updated_at=datetime('now','localtime') WHERE listing_id=?",
+                    (status, listing_id),
+                )
+        await query.message.reply_text(
+            f"✅ 房态已更新\n\n{self._display_listing_id(listing_id)}｜{self._listing_status_label(status)}\n\n"
+            + ("当前可以继续预约看房。" if status in {"active", "reserved"} else "用户端会立即停止不适用的预约入口。"),
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ 返回房态列表", callback_data="cmd:listing_states")], [InlineKeyboardButton("🏠 返回首页", callback_data="cmd:quick_help")]]),
+        )
+
+    async def cmd_listing_area_set(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if not self._is_admin(update):
+            await update.effective_message.reply_text("无权限。")
+            return
+        args=list(context.args or [])
+        if len(args)<3:
+            await update.effective_message.reply_text("用法：/listing_area_set QC0032 炳发城 原文明确写有具体位置")
+            return
+        listing_id=self._admin_listing_id(args[0]); area=str(args[1]).strip(); reason=' '.join(args[2:]).strip()
+        try:
+            from qiaolian_dual.area_admin import set_canonical_area
+            from publication_package import build_package
+            result=set_canonical_area(self.db.db_path, listing_id, area, str(update.effective_user.id), reason)
+            package=build_package(self.db.db_path, result['draft_id'])
+            await update.effective_message.reply_text(f"已记录人工区域确认\n\n房源｜{self._display_listing_id(listing_id)}\n区域｜{result['old_area'] or '-'} → {result['new_area']}\n审核记录｜{result['audit_id']}\n新包｜{package.get('package_id')}\n状态｜pending，需重新审核后发布")
+        except Exception as exc:
+            await update.effective_message.reply_text(f"区域补录未执行：{exc}")
+
+    async def cmd_listing_set(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if not self._is_admin(update):
+            await update.effective_message.reply_text("无权限。")
+            return
+        args = list(context.args or [])
+        if len(args) < 2:
+            await update.effective_message.reply_text("用法：/listing_set QC0032 active|pending|reserved|rented|inactive")
+            return
+        listing_id = self._admin_listing_id(args[0])
+        status = str(args[1] or "").strip().lower()
+        allowed = {"active", "pending", "reserved", "rented", "inactive"}
+        if status not in allowed:
+            await update.effective_message.reply_text("状态只能是 active、pending、reserved、rented 或 inactive。")
+            return
+        with self.db._connect() as conn:
+            row = conn.execute("SELECT listing_id, status FROM listings WHERE listing_id=?", (listing_id,)).fetchone()
+            if not row:
+                await update.effective_message.reply_text("未找到这套房源。请检查 QC 编号。")
+                return
+            conn.execute("UPDATE listings SET status=?, updated_at=CURRENT_TIMESTAMP WHERE listing_id=?", (status, listing_id))
+        await update.effective_message.reply_text(
+            f"已更新房态\n\n{self._display_listing_id(listing_id)}｜{row['status'] or '-'} → {status}\n\n自动同步不会覆盖管理员手动设置。"
+        )
+
     async def start_polling(self):
         pass # Placeholder for actual run_polling if needed
 
@@ -1373,28 +1396,12 @@ def main() -> None:
     from autopilot_publish_bot import register_autopilot_features
 
     application = Application.builder().token(settings.publisher_bot_token).build()
-    register_autopilot_features(application, include_cancel=False)
+    register_autopilot_features(application, include_cancel=False, simple_mode=True)
 
     async def post_init(app):
-        # 仅暴露高频命令，减少管理员命令噪音。
+        # 只保留入口和取消；正常操作全部点按钮。
         commands = [
-            BotCommand("start", "打开后台面板"),
-            BotCommand("menu", "显示管理员面板"),
-            BotCommand("pending", "查看待审草稿"),
-            BotCommand("send", "立即发布：/send DRF_xxx"),
-            BotCommand("new", "手工新建并发布"),
-            BotCommand("send_variants", "多文案对比发布"),
-            BotCommand("ops", "一屏总览"),
-            BotCommand("status", "运行状态"),
-            BotCommand("slots", "发帖时段"),
-            BotCommand("pause", "暂停队列"),
-            BotCommand("resume", "恢复队列"),
-            BotCommand("intake", "开始微信导入"),
-            BotCommand("intake_done", "导入完成并入库"),
-            BotCommand("intake_pending", "查看导入草稿"),
-            BotCommand("logs", "最近发布日志"),
-            BotCommand("cover_test", "封面测试"),
-            BotCommand("quick", "命令速查"),
+            BotCommand("start", "打开发布助手"),
             BotCommand("cancel", "取消当前流程"),
         ]
         # 默认命令
@@ -1452,11 +1459,27 @@ def main() -> None:
     application.add_handler(CommandHandler("quick", bot.cmd_quick_help))
     application.add_handler(CommandHandler("send_variants", bot.cmd_send_variants))
     application.add_handler(CommandHandler("cover_test", bot.cmd_cover_test))
+    application.add_handler(CommandHandler("listing_status", bot.cmd_listing_status))
+    application.add_handler(CommandHandler("listing_set", bot.cmd_listing_set))
+    application.add_handler(CommandHandler("listing_area_set", bot.cmd_listing_area_set))
+    application.add_handler(CallbackQueryHandler(bot.listing_state_pick, pattern=r"^listingpick:"))
+    application.add_handler(CallbackQueryHandler(bot.listing_state_set, pattern=r"^listingstate:"))
     application.add_handler(CallbackQueryHandler(bot.admin_menu_action, pattern=r"^cmd:"))
     application.add_handler(conv)
     application.add_handler(
-        MessageHandler(filters.ALL & ~filters.COMMAND, bot.capture_discussion_forward),
+        MessageHandler(
+            filters.ChatType.PRIVATE
+            & filters.ALL
+            & ~filters.TEXT
+            & ~filters.PHOTO
+            & ~filters.COMMAND,
+            bot.private_message_fallback,
+        ),
         group=1,
+    )
+    application.add_handler(
+        MessageHandler(filters.ALL & ~filters.COMMAND, bot.capture_discussion_forward),
+        group=2,
     )
 
     async def _app_error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:

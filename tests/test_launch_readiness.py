@@ -6,14 +6,13 @@ from unittest.mock import patch
 
 
 class HomeKeyboardTests(unittest.TestCase):
-    def test_main_keyboard_has_3x2_layout(self):
-        """首页按钮应为 3 行 2 列。"""
+    def test_main_keyboard_keeps_one_primary_action_and_two_support_actions(self):
+        """首页只保留找房主入口和两个辅助入口。"""
         from qiaolian_dual.user_bot import main_keyboard
         kb = main_keyboard()
         rows = kb.inline_keyboard
-        self.assertEqual(len(rows), 3, f"Expected 3 rows, got {len(rows)}")
-        for i, row in enumerate(rows):
-            self.assertEqual(len(row), 2, f"Row {i} should have 2 buttons, got {len(row)}: {row}")
+        self.assertEqual([len(row) for row in rows], [1, 2])
+        self.assertEqual(rows[0][0].text, "🔍 智能找房")
 
     def test_main_keyboard_callback_data(self):
         """首页按钮 callback_data 是否正确。"""
@@ -21,8 +20,9 @@ class HomeKeyboardTests(unittest.TestCase):
         kb = main_keyboard()
         flat = [btn for row in kb.inline_keyboard for btn in row]
         data_set = {btn.callback_data for btn in flat}
-        for expected in ("home_smart_search", "home_brand", "home_appoint", "home_consult", "home_living", "home_nearby"):
+        for expected in ("home_smart_search", "home_brand", "home_consult"):
             self.assertIn(expected, data_set, f"Missing callback_data: {expected}")
+        self.assertEqual(len(data_set), 3)
 
     def test_main_keyboard_no_url_buttons(self):
         """首页按钮不应包含 URL（全部内部回调）。"""
@@ -33,6 +33,37 @@ class HomeKeyboardTests(unittest.TestCase):
                 self.assertIsNone(btn.url, f"Button '{btn.text}' should not have a URL on the home keyboard")
 
 
+class ListingCallbackRoutingTests(unittest.TestCase):
+    def test_listing_buttons_work_from_every_appointment_step(self):
+        """旧预约流程未结束时，房源卡片按钮仍须由主回调接住。"""
+        from unittest.mock import patch
+
+        from qiaolian_dual import user_bot
+
+        with patch.object(
+            user_bot,
+            "USER_BOT_TOKEN",
+            "123456:abcdefghijklmnopqrstuvwxyzABCDEFGH",
+        ):
+            app = user_bot.build_application()
+
+        conversation = app.handlers[0][0]
+        appointment_states = (
+            user_bot.APPT_MODE,
+            user_bot.APPT_FOCUS,
+            user_bot.APPT_DATE,
+            user_bot.APPT_TIME,
+            user_bot.APPT_CONFIRM,
+        )
+        for state in appointment_states:
+            patterns = [getattr(handler, "pattern", None) for handler in conversation.states[state]]
+            for callback_data in ("listing:open:l_100", "listing:appoint:l_100"):
+                self.assertTrue(
+                    any(pattern and pattern.match(callback_data) for pattern in patterns),
+                    f"state {state} does not accept {callback_data}",
+                )
+
+
 class BrandTextTests(unittest.TestCase):
     def test_brand_text_is_html(self):
         """brand_text() 应返回包含 HTML 标签的字符串。"""
@@ -40,13 +71,15 @@ class BrandTextTests(unittest.TestCase):
         text = brand_text()
         self.assertIn("<b>", text, "brand_text should contain HTML bold tags")
         self.assertIn("侨联地产", text)
-        self.assertIn("服务承诺", text)
+        self.assertIn("金边租房中介", text)
+        self.assertNotIn("侨联地产测试", text)
 
     def test_channel_welcome_text(self):
         """首页欢迎语含正确关键字。"""
         from qiaolian_dual.messages import channel_welcome_text
         text = channel_welcome_text()
-        self.assertIn("侨联找房助手", text)
+        self.assertIn("金边租房中介", text)
+        self.assertIn("签约入住", text)
         self.assertNotIn("您", text, "Should use '你' not '您'")
 
 
@@ -63,6 +96,10 @@ class ChannelKeyboardTests(unittest.TestCase):
         )
         flat = [btn for row in kb.inline_keyboard for btn in row]
         self.assertEqual(len(flat), 4, f"Expected 4 buttons, got {len(flat)}: {[b.text for b in flat]}")
+        self.assertEqual(
+            [button.text for button in flat],
+            ["📅 预约", "💬 问顾问", "🖼 更多实拍", "🔍 类似房源"],
+        )
 
     def test_comment_url_uses_channel_message_id(self):
         """评论区链接应包含 channel_username/channel_message_id?comment=1。"""

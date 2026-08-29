@@ -26,7 +26,8 @@ from dotenv import load_dotenv
 from telethon import TelegramClient, events
 from telethon.tl.types import MessageMediaDocument, MessageMediaPhoto
 
-from db import DatabaseManager
+from collector_db_compat import DatabaseManager
+from source_sanitizer import sanitize_source_text
 
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
@@ -44,6 +45,7 @@ SOURCES_CONFIG_PATH = Path(
 DOWNLOAD_DIR = Path(
     os.getenv("COLLECTOR_DOWNLOAD_DIR", str(BASE_DIR / "media" / "collector_downloads"))
 ).resolve()
+MIN_LISTING_IMAGES = max(4, int(os.getenv("COLLECTOR_MIN_IMAGES", "4") or 4))
 def _resolve_session_path() -> str:
     """优先 TELETHON_SESSION_PATH；否则 COLLECTOR_SESSION_NAME → telethon_sessions/<name>。"""
     explicit = (os.getenv("TELETHON_SESSION_PATH") or "").strip()
@@ -62,6 +64,35 @@ Path(SESSION_PATH).parent.mkdir(parents=True, exist_ok=True)
 
 db_manager = DatabaseManager(DB_PATH)
 RUN_STATS: Counter[str] = Counter()
+
+
+async def _classify_and_package(source_post_pk: int) -> dict[str, Any]:
+    """采集入库后立即解析、分类并生成发布包；失败不终止监听。"""
+    try:
+        from ai_parser import AIParserModule
+        from publication_package import build_package
+
+        active_db_path = str(db_manager.db_path)
+        parser = AIParserModule(active_db_path)
+        await asyncio.to_thread(parser.process_single_source_post, source_post_pk)
+        row = db_manager._fetch_one(
+            "SELECT draft_id FROM drafts WHERE source_post_id=? ORDER BY id DESC LIMIT 1",
+            (source_post_pk,),
+        )
+        if not row or not row[0]:
+            raise RuntimeError("draft_not_generated")
+        package = await asyncio.to_thread(build_package, active_db_path, str(row[0]))
+        _inc_stat("classified", 1)
+        logger.info(
+            "自动分类完成 source_post=%s draft=%s source_type=%s listing_type=%s template=%s",
+            source_post_pk, row[0], package["source_type"],
+            package["listing_type"], package["cover_template"],
+        )
+        return {"status": "package_ready", "draft_id": str(row[0]), "package": package}
+    except Exception as exc:
+        _inc_stat("classification_failed", 1)
+        logger.exception("采集后自动分类/发布包生成失败 source_post=%s", source_post_pk)
+        return {"status": "needs_review", "reason": type(exc).__name__}
 
 
 def _channel_slug(chat_id: int) -> str:
@@ -141,7 +172,7 @@ def _sender_label(message) -> str:
 async def _append_image_or_video(
     client: TelegramClient, message, raw_images: list, raw_videos: list
 ) -> str:
-    """处理单条 Message 的媒体，返回是否吃掉了 caption（清空主文案用）。"""
+    """只下载房源图片。视频由管理员主动发给发布 Bot，采集器永不下载。"""
     if message.photo:
         fp, fh, fid, fuq = await download_media(client, message)
         if fp:
@@ -156,18 +187,9 @@ async def _append_image_or_video(
             )
             return "strip_text"
     elif message.video:
-        fp, fh, fid, fuq = await download_media(client, message)
-        if fp:
-            raw_videos.append(
-                {
-                    "local_path": fp,
-                    "file_hash": fh,
-                    "telegram_file_id": fid,
-                    "telegram_file_unique_id": fuq,
-                    "message_id": message.id,
-                }
-            )
-            return "strip_text"
+        _inc_stat("video_skipped", 1)
+        logger.info("跳过视频 message_id=%s（视频仅接受管理员主动导入）", message.id)
+        return "skip_video"
     elif message.media and isinstance(message.media, MessageMediaDocument):
         doc = message.media.document
         if doc and doc.mime_type and "image" in doc.mime_type:
@@ -267,7 +289,24 @@ async def persist_source_post(
     source_author: str = "channel",
     ingest_kind: str = "single",
     message_count: int = 1,
+    classify_after_insert: bool = False,
 ) -> dict[str, Any]:
+    """Persist one immutable intake record.
+
+    Storage and classification are deliberately separate boundaries.  The live
+    Telegram handlers opt in to immediate classification, while imports,
+    recovery tools and tests can safely persist a ``pending`` source post and
+    run the parser explicitly.
+    """
+    source_kind = str(source_cfg.get("source_type") or "telegram_channel")
+    if source_kind == "telegram_channel" and len(raw_images) < MIN_LISTING_IMAGES:
+        _inc_stat("skipped_few_images", 1)
+        logger.info(
+            "跳过少图房源 source=%s post=%s images=%s min=%s",
+            source_cfg.get("source_name", ""), source_post_id,
+            len(raw_images), MIN_LISTING_IMAGES,
+        )
+        return {"status": "skipped", "reason": "fewer_than_min_images"}
     source_type = source_cfg.get("source_type", "telegram_channel")
     source_name = source_cfg["source_name"]
     source_db_id = source_cfg.get("source_db_id")
@@ -298,6 +337,7 @@ async def persist_source_post(
         _maybe_log_stats()
         return {"status": "duplicate", "reason": duplicate_reason, "post_id": existing_id}
 
+    sanitized = sanitize_source_text(raw_text)
     meta: dict[str, Any] = {
         "chat_id": str(chat_id),
         "grouped_id": grouped_id,
@@ -306,6 +346,12 @@ async def persist_source_post(
         "raw_image_count": len(raw_images),
         "raw_video_count": len(raw_videos),
         "anchor_message_id": int(anchor_message_id),
+        "sanitized_text": sanitized.text,
+        "source_contact_removed": bool(sanitized.contacts or sanitized.removed_lines),
+        "removed_contact_count": len(sanitized.contacts),
+        "removed_line_count": len(sanitized.removed_lines),
+        "visual_review_required": bool(raw_images),
+        "republish_policy": "facts_only_review_required",
     }
 
     try:
@@ -319,7 +365,7 @@ async def persist_source_post(
             raw_text=raw_text or "",
             raw_images_json=raw_images,
             raw_videos_json=raw_videos,
-            raw_contact="",
+            raw_contact=" | ".join(sanitized.contacts),
             raw_meta_json=meta,
             dedupe_hash=dedupe_hash,
             parse_status="pending",
@@ -338,8 +384,13 @@ async def persist_source_post(
             len(raw_images),
             len(raw_videos),
         )
+        classification = (
+            await _classify_and_package(post_pk)
+            if classify_after_insert
+            else {"status": "deferred"}
+        )
         _maybe_log_stats()
-        return {"status": "inserted", "post_id": post_pk}
+        return {"status": "inserted", "post_id": post_pk, "classification": classification}
     except Exception as e:
         _inc_stat("failed", 1)
         _inc_stat(f"source.{source_name}.failed", 1)
@@ -359,9 +410,15 @@ async def handle_single_message(event, source_cfg: dict) -> None:
     raw_videos: list = []
 
     if message.media:
-        mode = await _append_image_or_video(event.client, message, raw_images, raw_videos)
-        if mode == "strip_text":
-            raw_text = ""
+        # Telegram 单图房源通常把全部房源信息放在 caption 里。
+        # 媒体下载成功不应清空 caption，否则后续解析会把它当作空帖跳过。
+        media_mode = await _append_image_or_video(event.client, message, raw_images, raw_videos)
+        if media_mode == "skip_video":
+            return
+
+    # 自动采集只收“图片 + 房源文字”；纯文字和其他附件不进入草稿流。
+    if not raw_images:
+        return
 
     await persist_source_post(
         event.client,
@@ -376,6 +433,7 @@ async def handle_single_message(event, source_cfg: dict) -> None:
         source_author=_sender_label(message),
         ingest_kind="single",
         message_count=1,
+        classify_after_insert=True,
     )
 
 
@@ -398,6 +456,10 @@ async def handle_album(event, source_cfg: dict) -> None:
             continue
         await _append_image_or_video(event.client, msg, raw_images, raw_videos)
 
+    # 纯视频相册不采集；图片和视频混合时只保留图片。
+    if not raw_images:
+        return
+
     gid = getattr(anchor, "grouped_id", None)
     source_post_id = f"album_{gid}" if gid is not None else f"album_{anchor.id}"
 
@@ -414,6 +476,7 @@ async def handle_album(event, source_cfg: dict) -> None:
         source_author=_sender_label(anchor),
         ingest_kind="album",
         message_count=len(messages),
+        classify_after_insert=True,
     )
 
 

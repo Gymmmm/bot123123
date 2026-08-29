@@ -108,7 +108,7 @@ def _font(size: int, bold: bool = True) -> ImageFont.FreeTypeFont:
 # 核心方法：组内智能选最佳封面图
 # ══════════════════════════════════════════════════════════
 
-def _score_image(img_path: str) -> Tuple[float, str]:
+def _score_image(img_path: str, *, property_type: str = "") -> Tuple[float, str]:
     """
     对单张图片评分，返回 (score, reason_str)。
     分数越高越适合做封面。
@@ -198,7 +198,73 @@ def _score_image(img_path: str) -> Tuple[float, str]:
     except Exception:
         pass
 
-    # 6. 比例接近目标封面 4:3
+    # 6. 可解释的空间构图：客厅/客餐厅需要中央开阔、自然采光；降低餐桌局部、柜墙、床和卫生间常见的高密度局部构图。
+    try:
+        scene = img.resize((256, 256), Image.Resampling.LANCZOS).convert("L")
+        top = scene.crop((0, 0, scene.width, scene.height // 2))
+        lower = scene.crop((0, scene.height // 2, scene.width, scene.height))
+        center = scene.crop((scene.width // 4, scene.height // 4, scene.width * 3 // 4, scene.height * 3 // 4))
+        top_right = scene.crop((scene.width // 2, 0, scene.width * 98 // 100, scene.height * 55 // 100))
+        top_mean = sum(top.getdata()) / max(1, len(list(top.getdata())))
+        lower_mean = sum(lower.getdata()) / max(1, len(list(lower.getdata())))
+        center_edges = center.filter(ImageFilter.FIND_EDGES)
+        center_density = sum(1 for p in center_edges.getdata() if p > 25) / max(1, len(list(center_edges.getdata())))
+        lower_edges = lower.filter(ImageFilter.FIND_EDGES)
+        lower_density = sum(1 for p in lower_edges.getdata() if p > 25) / max(1, len(list(lower_edges.getdata())))
+        top_right_edges = top_right.filter(ImageFilter.FIND_EDGES)
+        top_right_density = sum(1 for p in top_right_edges.getdata() if p > 25) / max(1, len(list(top_right_edges.getdata())))
+        top_right_mean = sum(top_right.getdata()) / max(1, len(list(top_right.getdata())))
+        if top_mean >= 160:
+            score += 8
+            reasons.append("自然采光/窗景")
+        elif top_mean < 115:
+            score -= 5
+            reasons.append("上部偏暗-扣")
+        if center_density > 0.16:
+            score -= 10
+            reasons.append("中央局部/杂乱-扣")
+        elif center_density < 0.12:
+            score += 7
+            reasons.append("中央开阔")
+        if lower_mean < 112:
+            score -= 5
+            reasons.append("下部偏暗-扣")
+        if lower_density > 0.22:
+            score -= 6
+            reasons.append("下部细碎-扣")
+        kind = str(property_type or "").lower()
+        is_villa = "别墅" in kind or "villa" in kind
+        if not is_villa and aspect >= 1.20:
+            # 横向普通公寓：避免低边缘密度、偏暗的柜体/玄关击败带窗客餐厅。
+            if center_density < 0.14:
+                score -= 28
+                reasons.append("柜体/玄关低信息-扣")
+            if 0.15 <= center_density <= 0.22 and top_right_mean >= 135 and top_right_density < 0.18:
+                score += 20
+                reasons.append("客餐厅/窗景空间")
+            elif top_mean >= 135 and center_density >= 0.15:
+                score += 8
+                reasons.append("完整室内空间")
+            if center_density > 0.25:
+                score -= 8
+                reasons.append("阳台/局部过碎-扣")
+        if not is_villa and aspect < 1.20:
+            # 竖向公寓：降低餐桌/局部家具，优先明亮且下部不碎的客厅全景。
+            if center_density > 0.20:
+                score -= 12
+                reasons.append("餐桌/局部家具-扣")
+            if (top_mean + lower_mean) / 2 >= 150 and lower_density <= 0.17:
+                score += 18
+                reasons.append("明亮客厅全景")
+        if is_villa:
+            # 外立面通常有更高的天空/绿植色彩与横向完整建筑轮廓；室内图不因价格或分辨率误选。
+            if avg_sat >= 0.20 and top_mean >= 145:
+                score += 16
+                reasons.append("别墅外立面/庭院倾向")
+    except Exception:
+        pass
+
+    # 7. 比例接近目标封面 4:3
     target_ratio = CANVAS_W / CANVAS_H  # 1.333
     ratio_diff = abs(aspect - target_ratio)
     if ratio_diff < 0.12:
@@ -210,7 +276,7 @@ def _score_image(img_path: str) -> Tuple[float, str]:
     return score, " | ".join(reasons)
 
 
-def choose_best_cover_image(images: List[str]) -> Tuple[Optional[str], int, str]:
+def choose_best_cover_image(images: List[str], *, property_type: str = "") -> Tuple[Optional[str], int, str]:
     """
     从当前房源组的图片列表中选出最适合做封面的一张。
 
@@ -243,27 +309,10 @@ def choose_best_cover_image(images: List[str]) -> Tuple[Optional[str], int, str]
     if not valid:
         return None, -1, "所有图片路径无效或文件不存在，使用默认背景"
 
-    # 发布封面优先第一张横图；没有横图时，用最大图居中裁切。
-    largest: tuple[int, int, str, str] | None = None
-    for orig_idx, path in valid:
-        try:
-            with Image.open(path) as img:
-                w, h = img.size
-        except Exception:
-            continue
-        pixels = w * h
-        if w / max(h, 1) >= 1.25:
-            return path, orig_idx, f"第{orig_idx + 1}张（共{len(images)}张）| 第一张横图"
-        if largest is None or pixels > largest[0]:
-            largest = (pixels, orig_idx, path, f"{w}x{h}")
-    if largest:
-        _, orig_idx, path, size_desc = largest
-        return path, orig_idx, f"第{orig_idx + 1}张（共{len(images)}张）| 无横图，使用最大图居中裁切({size_desc})"
-
-    # 对每张图打分
+    # 对所有候选图打分；禁止“第一张横图”或“最大图”早退，避免餐厅/柜墙偶然胜出。
     scored = []
     for orig_idx, path in valid:
-        score, reason = _score_image(path)
+        score, reason = _score_image(path, property_type=property_type)
         scored.append((score, orig_idx, path, reason))
 
     # 按分数降序
@@ -530,7 +579,8 @@ def _draw_compact_brand_chip(base: Image.Image, x: int, y: int, *, scale: float 
     logo_gap = max(5, int(6 * scale))
     line_gap = max(1, int(2 * scale))
     brand_text = "侨联地产"
-    sub_text = "QIAO LIAN PROPERTY"
+    # 目标用户为中文租房用户，封面不再放无必要的英文副标。
+    sub_text = "金边租房"
     b_brand = draw.textbbox((0, 0), brand_text, font=font_cn, stroke_width=stroke_w)
     b_sub = draw.textbbox((0, 0), sub_text, font=font_sub)
     title_w = b_brand[2] - b_brand[0]
@@ -574,6 +624,38 @@ def _draw_compact_brand_chip(base: Image.Image, x: int, y: int, *, scale: float 
     return Image.alpha_composite(base, overlay)
 
 
+def _fit_single_line_text(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    *,
+    max_width: int,
+    start_size: int,
+    min_size: int,
+):
+    """中文封面标题单行自适应：先缩字号，仍放不下时才加省略号。"""
+    value = str(text or "").strip()
+    size = start_size
+    font = _font(size, bold=True)
+    while size > min_size:
+        bbox = draw.textbbox((0, 0), value, font=font)
+        if bbox[2] - bbox[0] <= max_width:
+            return value, font
+        size -= 2
+        font = _font(size, bold=True)
+
+    value_bbox = draw.textbbox((0, 0), value, font=font)
+    if value_bbox[2] - value_bbox[0] <= max_width:
+        return value, font
+    clipped = value
+    while clipped:
+        candidate = clipped + "…"
+        bbox = draw.textbbox((0, 0), candidate, font=font)
+        if bbox[2] - bbox[0] <= max_width:
+            return candidate, font
+        clipped = clipped[:-1]
+    return "…", font
+
+
 # ── 新封面：实拍底图 + 暗色半透明遮罩（无图则 #1A1A1A），居中排版、无 emoji ──
 def _draw_new_cover(
     output_path: str,
@@ -585,14 +667,40 @@ def _draw_new_cover(
     floor: str,
     highlights: list,
     base_image_path: Optional[str] = None,
+    source_type: str = "",
+    source_name: str = "",
 ) -> None:
-    """横向封面：ref 系品牌角标 + 底部信息卡 + 右侧价格牌。"""
-    W, H = 1280, 960
+    """频道封面：实拍主导，左侧决策信息，右下价格锚点。"""
+    # 频道默认的 one_three 首槽就是 16:9。直接按最终画布生成，
+    # 避免先做 4:3 信息封面、再居中裁切时把底部信息全部切掉。
+    W, H = 1280, 720
 
     layout = (layout or "").strip() or ""
     area = (area or "").strip() or ""
 
-    price_text = "价格待确认"
+    def _size_for_cover(value: str) -> str:
+        raw = str(value or "").strip()
+        if not raw:
+            return ""
+        if re.fullmatch(r"\d+(?:\.\d+)?", raw):
+            return f"{raw}㎡"
+        return raw.replace("m2", "㎡").replace("M2", "㎡")
+
+    def _floor_for_cover(value: str) -> str:
+        raw = str(value or "").strip()
+        if not raw:
+            return ""
+        return f"{raw}楼" if re.fullmatch(r"\d+", raw) else raw
+
+    size = _size_for_cover(size)
+    floor = _floor_for_cover(floor)
+    source_key = f"{source_type} {source_name}".strip().lower()
+    source_badge = "侨联实拍" if any(
+        marker in source_key for marker in ("wechat", "manual", "admin_upload")
+    ) else "侨联地产"
+    is_manual_source = source_badge == "侨联实拍"
+
+    price_text = ""
     if price is not None and str(price).strip():
         p_str = str(price).strip()
         if p_str.endswith("/月"):
@@ -609,6 +717,14 @@ def _draw_new_cover(
         try:
             bg = Image.open(base_image_path).convert("RGB")
             bg = ImageOps.fit(bg, (W, H), method=Image.Resampling.LANCZOS)
+            if is_manual_source:
+                bg = ImageEnhance.Brightness(bg).enhance(1.035)
+                bg = ImageEnhance.Color(bg).enhance(1.055)
+                bg = Image.blend(bg, Image.new("RGB", bg.size, (255, 190, 105)), 0.035)
+            else:
+                bg = ImageEnhance.Contrast(bg).enhance(1.06)
+                bg = ImageEnhance.Color(bg).enhance(0.97)
+                bg = Image.blend(bg, Image.new("RGB", bg.size, (92, 158, 226)), 0.045)
             base = bg.convert("RGBA")
             img = _apply_cover_gradient(base)
         except Exception as e:
@@ -617,65 +733,126 @@ def _draw_new_cover(
     else:
         img = Image.new("RGBA", (W, H), (26, 26, 26, 255))
 
+    # 简洁版封面：照片是主角，只保留租客第一眼需要的区域、户型和价格。
+    # 不再叠大面积侧栏、卖点标签、楼层/面积堆栈或来源标记。
+    fade = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    fd = ImageDraw.Draw(fade)
+    for y in range(H):
+        top_alpha = int(95 * max(0.0, 1.0 - y / 155.0)) if y < 155 else 0
+        bottom_alpha = int(205 * max(0.0, (y - 420) / 300.0)) if y > 420 else 0
+        alpha = max(top_alpha, bottom_alpha)
+        if alpha:
+            fd.line([(0, y), (W, y)], fill=(0, 0, 0, alpha))
+    img = Image.alpha_composite(img, fade)
     draw = ImageDraw.Draw(img)
 
-    img = _draw_compact_brand_chip(img, 18, 18, scale=0.92)
-    draw = ImageDraw.Draw(img)
-
-    panel_h = 176
-    px1, py1 = 22, H - panel_h - 20
-    px2, py2 = W - 22, H - 20
-    img = _apply_frosted_panel(
-        img,
-        (px1, py1, px2, py2),
-        radius=24,
-        blur_radius=14,
-        tint_rgb=(248, 251, 255),
-        tint_alpha=228,
-        outline=(198, 212, 236, 238),
+    draw.text((42, 30), "侨联地产 · 实拍", font=_font(25, True), fill=(255, 255, 255, 245))
+    location = area or project or "金边"
+    headline = "｜".join(part for part in (location, layout) if part)
+    headline, headline_font = _fit_single_line_text(
+        draw, headline or "金边实拍房源", max_width=850, start_size=54, min_size=38
     )
+    draw.text(
+        (42, H - 150), headline, font=headline_font,
+        fill=(255, 255, 255, 255), stroke_width=1, stroke_fill=(0, 0, 0, 120),
+    )
+    if price_text and price_text != "价格待确认":
+        price_font = _font(50, True)
+        box = draw.textbbox((0, 0), price_text, font=price_font)
+        draw.text(
+            (W - 42 - (box[2] - box[0]), H - 145), price_text,
+            font=price_font, fill=(255, 255, 255, 255),
+            stroke_width=1, stroke_fill=(0, 0, 0, 120),
+        )
+    draw.text((44, H - 62), "更多实拍见评论区", font=_font(20, False), fill=(238, 241, 245, 235))
+    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+    img.convert("RGB").save(output_path, "JPEG", quality=94, optimize=True)
+    return
+
+    # 微信实拍封面要更亮、更像真实房源；自动采集源保留
+    # 稍深的冷色信息区，从颜色上就能区分两类来源。
+    shade = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    sd = ImageDraw.Draw(shade)
+    shade_width = W * (0.50 if is_manual_source else 0.62)
+    shade_peak = 118 if is_manual_source else 190
+    shade_rgb = (45, 25, 10) if is_manual_source else (5, 13, 30)
+    for x in range(int(shade_width)):
+        alpha = int(shade_peak * max(0.0, 1.0 - x / shade_width) ** 0.72)
+        sd.line([(x, 0), (x, H)], fill=(*shade_rgb, alpha))
+    img = Image.alpha_composite(img, shade)
     draw = ImageDraw.Draw(img)
 
-    title_main = project.strip() if project else area
-    title_tail = layout.strip() if layout else "精选房源"
-    title = f"{title_main}｜{title_tail}" if title_main else title_tail
-    meta = "｜".join([x for x in [area, size, floor] if str(x).strip()]) or "实拍房源"
-    hs = [str(h).strip() for h in (highlights or []) if str(h).strip()]
-    hline = hs[0] if hs else "中文顾问｜可预约看房"
+    left = 42
+    # 轻量品牌，不再使用大蓝底牌匾抢画面。
+    icon_w, _ = _draw_house_outline_mark(
+        draw, x=left, y=32, size=28, fill=(250, 252, 255, 255),
+        shadow=(0, 0, 0, 100),
+    )
+    draw.text((left + icon_w + 10, 28), "侨联地产", font=_font(30, True), fill=(255, 255, 255, 255))
+    draw.text((left + icon_w + 10, 61), "金边华人租房", font=_font(11, False), fill=(238, 239, 241, 235))
+    badge_font = _font(16, True)
+    badge_box = draw.textbbox((0, 0), source_badge, font=badge_font)
+    badge_w = badge_box[2] - badge_box[0] + 24
+    badge_h = badge_box[3] - badge_box[1] + 14
+    draw.rounded_rectangle(
+        (left, 88, left + badge_w, 88 + badge_h), radius=badge_h // 2,
+        fill=(211, 139, 45, 235) if is_manual_source else (18, 72, 142, 215),
+        outline=(220, 233, 255, 125), width=1,
+    )
+    draw.text((left + 12 - badge_box[0], 95 - badge_box[1]), source_badge, font=badge_font, fill=(255, 255, 255, 250))
 
-    f_title = _font(54, bold=True)
-    f_meta = _font(28, bold=False)
-    f_hint = _font(25, bold=False)
-    draw.text((px1 + 24, py1 + 22), title[:20], font=f_title, fill=(18, 46, 95, 255))
-    draw.text((px1 + 24, py1 + 88), meta[:28], font=f_meta, fill=(68, 96, 145, 245))
-    draw.text((px1 + 24, py1 + 126), hline[:34], font=f_hint, fill=(52, 82, 132, 236))
+    title_main = project.strip() if project else (area.strip() or "精选房源")
+    title, title_font = _fit_single_line_text(
+        draw, title_main, max_width=520, start_size=58, min_size=42
+    )
+    draw.text((left, 142), title, font=title_font, fill=(255, 255, 255, 255), stroke_width=1, stroke_fill=(0, 0, 0, 90))
 
-    # 右侧价格牌（贴近 ref 视觉锚点）
+    info_y = 220
+    if layout:
+        layout_value, layout_font = _fit_single_line_text(
+            draw, layout, max_width=260, start_size=30, min_size=24
+        )
+        lb = draw.textbbox((0, 0), layout_value, font=layout_font)
+        lw, lh = lb[2] - lb[0], lb[3] - lb[1]
+        draw.rounded_rectangle(
+            (left, info_y, left + lw + 30, info_y + lh + 18),
+            radius=22, fill=(247, 250, 255, 245),
+        )
+        draw.text((left + 15 - lb[0], info_y + 9 - lb[1]), layout_value, font=layout_font, fill=(25, 74, 164, 255))
+        info_y += lh + 44
+
+    # 项目名与区域相同时不再重复一遍，给实拍画面留白。
+    if area and area.strip() != title_main.strip():
+        draw.ellipse((left + 3, info_y + 8, left + 15, info_y + 20), fill=(247, 70, 70, 255))
+        draw.text((left + 28, info_y), area, font=_font(24, True), fill=(246, 248, 252, 255))
+        info_y += 42
+    facts = [value for value in (size.strip(), floor.strip()) if value]
+    if facts:
+        draw.text((left, info_y), "  |  ".join(facts), font=_font(23, True), fill=(235, 240, 248, 245))
+        info_y += 48
+
+    # 最多三个真实卖点，做小标签，不让封面变成说明书。
+    chip_x = left
+    for raw in [str(v).strip() for v in (highlights or []) if str(v).strip()][:3]:
+        value, font = _fit_single_line_text(draw, raw, max_width=175, start_size=17, min_size=15)
+        box = draw.textbbox((0, 0), value, font=font)
+        cw, ch = box[2] - box[0] + 24, box[3] - box[1] + 14
+        if chip_x + cw > 560:
+            break
+        draw.rounded_rectangle((chip_x, info_y, chip_x + cw, info_y + ch), radius=8, fill=(8, 20, 42, 190), outline=(255, 255, 255, 65))
+        draw.text((chip_x + 12 - box[0], info_y + 7 - box[1]), value, font=font, fill=(245, 248, 253, 255))
+        chip_x += cw + 10
+
     if price_text and price_text != "价格待确认":
-        f_price = _font(50, bold=True)
-        bbox = draw.textbbox((0, 0), price_text, font=f_price)
-        tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
-        pad_x, pad_y = 26, 16
-        x2, y2 = W - 34, H - 40
-        x1, y1 = x2 - tw - pad_x * 2, y2 - th - pad_y * 2
-        img = _apply_frosted_panel(
-            img,
-            (x1, y1, x2, y2),
-            radius=18,
-            blur_radius=10,
-            tint_rgb=(10, 31, 68),
-            tint_alpha=244,
-            outline=(146, 176, 228, 200),
-        )
-        draw = ImageDraw.Draw(img)
-        f_label = _font(19, bold=False)
-        draw.text((x1 + 18, y1 + 12), "租金", font=f_label, fill=(207, 222, 248, 235))
-        draw.text(
-            (x1 + pad_x - bbox[0], y1 + pad_y + 8 - bbox[1]),
-            price_text,
-            font=f_price,
-            fill=(243, 248, 255, 255),
-        )
+        label_font = _font(17, False)
+        price_font = _font(51, True)
+        pb = draw.textbbox((0, 0), price_text, font=price_font)
+        pw, ph = pb[2] - pb[0], pb[3] - pb[1]
+        x2, y2 = W - 36, H - 34
+        x1, y1 = x2 - pw - 54, y2 - ph - 55
+        draw.rounded_rectangle((x1, y1, x2, y2), radius=20, fill=(17, 76, 190, 245), outline=(132, 176, 255, 190), width=2)
+        draw.text((x1 + 27, y1 + 11), "租金", font=label_font, fill=(209, 225, 255, 255))
+        draw.text((x1 + 27 - pb[0], y1 + 33 - pb[1]), price_text, font=price_font, fill=(255, 255, 255, 255))
 
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
     img.convert("RGB").save(output_path, "JPEG", quality=94, optimize=True)
@@ -693,6 +870,8 @@ def generate_house_cover(
     layout: str = "",
     highlights: list = None,
     base_image_path: str = None,
+    source_type: str = "",
+    source_name: str = "",
 ) -> str:
     """生成标准1280×960封面图，返回 output_path。"""
     if highlights is None:
@@ -708,6 +887,8 @@ def generate_house_cover(
         floor=floor,
         highlights=highlights,
         base_image_path=base_image_path,
+        source_type=source_type,
+        source_name=source_name,
     )
     return output_path
 
@@ -947,115 +1128,32 @@ class CoverGenerator:
         source_name: str = "",
     ) -> Tuple[bool, str]:
         """
-        使用 tools/render_blue_card_template.py 生成首页封面。
-        kind=hero_collage 时传入 --hero-img / --thumb1~3。
+        生成手机验收版首页封面：单张实拍为主体，只叠项目、户型和月租。
         返回 (ok, report)。
         """
         if os.getenv("AUTO_HOME_COVER_ENABLED", "1").strip().lower() not in {"1", "true", "yes"}:
             return False, "home_cover_disabled"
-
-        render_script = os.path.join(BASE_DIR, "tools", "render_blue_card_template.py")
-        if not os.path.isfile(render_script):
-            return False, "render_script_missing"
-
-        py_exec = os.path.join(BASE_DIR, ".venv", "bin", "python")
-        if not os.path.isfile(py_exec):
-            py_exec = shutil.which("python3") or "python3"
-
-        clean_hl = [
-            str(x).strip()
-            for x in (highlights or [])
-            if str(x).strip() and not self._is_missing_text(str(x))
-        ]
-        while len(clean_hl) < 3:
-            clean_hl.append(["实拍房源", "中文顾问", "可预约看房"][len(clean_hl)])
         project_display = self._normalize_home_project(project, area)
         layout_display  = self._normalize_home_layout(layout)
-        size_display    = self._normalize_home_size(size)
-        floor_display   = self._normalize_home_floor(floor)
-        kind = self._pick_home_template_kind(
-            draft_id=draft_id,
-            source_post_id=source_post_id,
-            source_type=source_type or "",
-            source_name=source_name or "",
-            layout=layout_display,
-            price=price,
-            property_type=property_type,
-            project=project_display,
-        )
-
-        # 锁死 hero_collage 默认尺寸 1280×960
         try:
-            default_w = 1280
-            default_h = 960
-            viewport_w = int(os.getenv("HOME_COVER_W", str(default_w)))
-            viewport_h = int(os.getenv("HOME_COVER_H", str(default_h)))
-        except Exception:
-            viewport_w, viewport_h = 1280, 960
-
-        price_arg = "面议"
-        try:
-            raw_price = str(price or "").replace("$", "").replace(",", "").replace("/月", "").strip()
-            if raw_price:
-                price_num = float(raw_price)
-                if price_num > 0:
-                    price_arg = str(int(price_num) if price_num.is_integer() else price_num)
-        except Exception:
-            if str(price or "").strip():
-                price_arg = str(price).strip()
-
-        cmd = [
-            py_exec,
-            render_script,
-            "--kind",    kind,
-            "--w",       str(viewport_w),
-            "--h",       str(viewport_h),
-            "--project", (project_display or "精选房源"),
-            "--layout",  (layout_display  or "户型可咨询"),
-            "--area",    (area            or "金边"),
-            "--size",    (size_display    or "面积可咨询"),
-            "--floor",   (floor_display   or "条件可沟通"),
-            "--price",   price_arg,
-            "--h1",      clean_hl[0],
-            "--h2",      clean_hl[1],
-            "--h3",      clean_hl[2],
-            "--out",     output_path,
-        ]
-
-        if kind == "hero_collage":
-            # 主图：bg_local_path（组内最佳图）
-            if bg_local_path and os.path.isfile(bg_local_path):
-                cmd.extend(["--hero-img", bg_local_path])
-
-            # thumb1/2/3：从 source_images 中取不同于主图的其他图
-            imgs = [p for p in (source_images or []) if p and os.path.isfile(p)]
-            # 排除主图，保留其他；不足时重复使用主图兜底
-            other_imgs = [p for p in imgs if p != bg_local_path] or imgs
-            fallback   = bg_local_path or (imgs[0] if imgs else None)
-            for flag, idx in [("--thumb1", 0), ("--thumb2", 1), ("--thumb3", 2)]:
-                src = other_imgs[idx] if idx < len(other_imgs) else fallback
-                if src and os.path.isfile(src):
-                    cmd.extend([flag, src])
-        elif bg_local_path and os.path.isfile(bg_local_path):
-            cmd.extend(["--bg-local", bg_local_path])
-
-        try:
-            proc = subprocess.run(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                timeout=60,
-                check=False,
+            _draw_new_cover(
+                output_path=output_path,
+                project=project_display,
+                layout=layout_display,
+                area=area,
+                price=price,
+                size=size,
+                floor=floor,
+                highlights=highlights,
+                base_image_path=bg_local_path,
+                source_type=source_type,
+                source_name=source_name,
             )
         except Exception as exc:
             return False, f"render_exec_error:{exc}"
-
-        if proc.returncode != 0 or not os.path.isfile(output_path):
-            tail = (proc.stderr or proc.stdout or "").strip().replace("\n", " ")
-            tail = tail[:180] if tail else "unknown"
-            return False, f"render_failed:{kind}:{tail}"
-        return True, f"render_ok:{kind}"
+        if not os.path.isfile(output_path):
+            return False, "render_failed:acceptance_cover"
+        return True, "render_ok:acceptance_cover"
 
 
     def generate_for_draft(self, draft_id: str, base_image_path: str = None) -> tuple:
@@ -1112,13 +1210,20 @@ class CoverGenerator:
         if not chosen_image:
             group_images = self._get_source_post_images(source_post_id)
             if group_images:
+                # 人工导入可能同时包含一张旧“封面”和若干“原图”。生成新模板时
+                # 优先从原图选，避免旧价格、旧底栏或旧 Logo 被二次叠加。
+                original_images = [
+                    path for path in group_images
+                    if "原图" in os.path.basename(str(path or ""))
+                ]
+                cover_candidates = original_images or group_images
                 # 别墅封面固定使用组内第一张（通常是大门/外立面），保持“宏伟”第一印象。
                 if self._is_villa_cover(
                     property_type=property_type or "",
                     layout=layout or "",
                     project=project or "",
                 ):
-                    first = group_images[0]
+                    first = cover_candidates[0]
                     if first and os.path.isfile(first):
                         chosen_image = first
                         selection_report = (
@@ -1126,13 +1231,13 @@ class CoverGenerator:
                             f"组内共{len(group_images)}张 | 第1张（别墅固定首图）"
                         )
                     else:
-                        chosen_image, chosen_idx, selection_reason = choose_best_cover_image(group_images)
+                        chosen_image, chosen_idx, selection_reason = choose_best_cover_image(cover_candidates)
                         selection_report = (
                             f"source_post_id={source_post_id} | "
                             f"组内共{len(group_images)}张 | 首图缺失，回退：{selection_reason}"
                         )
                 else:
-                    chosen_image, chosen_idx, selection_reason = choose_best_cover_image(group_images)
+                    chosen_image, chosen_idx, selection_reason = choose_best_cover_image(cover_candidates)
                     selection_report = (
                         f"source_post_id={source_post_id} | "
                         f"组内共{len(group_images)}张 | {selection_reason}"
@@ -1179,6 +1284,8 @@ class CoverGenerator:
                     layout=layout or "",
                     highlights=highlights,
                     base_image_path=chosen_image,
+                    source_type=source_type or "",
+                    source_name=source_name or "",
                 )
             selection_report = f"{selection_report} | {render_report}".strip(" |")
         except Exception as e:
@@ -1189,6 +1296,8 @@ class CoverGenerator:
         asset_id  = f"AST_{uuid.uuid4()}"
         file_hash = self._calc_hash(output_path)
         file_size = os.path.getsize(output_path)
+        with Image.open(output_path) as generated_image:
+            generated_width, generated_height = generated_image.size
 
         conn = self._get_conn()
         try:
@@ -1210,7 +1319,7 @@ class CoverGenerator:
                     "image", "generated", output_path,
                     f"/media/covers/{file_name}", file_hash,
                     "photo", 1, 1, 0,
-                    CANVAS_W, CANVAS_H, file_size, "image/jpeg",
+                    generated_width, generated_height, file_size, "image/jpeg",
                     json.dumps({
                         "generated_from_draft_id": draft_id,
                         "source_post_id": source_post_id,

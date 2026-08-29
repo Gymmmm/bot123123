@@ -1239,14 +1239,9 @@ async def _run(args: argparse.Namespace) -> int:
     token = _first_non_empty(args.bot_token, os.getenv("PUBLISHER_BOT_TOKEN", ""), os.getenv("BOT_TOKEN", ""))
     channel_id = _first_non_empty(args.channel_id, os.getenv("CHANNEL_ID", ""))
     if not args.dry_run and not args.prepare_only:
-        if os.getenv("CONFIRM_CHANNEL_PUBLISH", "").strip().lower() != "yes":
-            print("ERROR: Direct channel publish requires CONFIRM_CHANNEL_PUBLISH=yes env var.")
-            print("This prevents accidental bulk publishing. Set it explicitly if you are sure.")
-            sys.exit(1)
-        if not token:
-            raise RuntimeError("missing bot token: set --bot-token or PUBLISHER_BOT_TOKEN")
-        if not channel_id:
-            raise RuntimeError("missing channel id: set --channel-id or CHANNEL_ID")
+        print("BLOCKED: CSV direct publishing is disabled.")
+        print("Import CSV through intake, approve its frozen publication package, then publish with MeihuaPublisher.")
+        return 4
 
     csv_path = Path(args.csv).expanduser().resolve()
     if not csv_path.is_file():

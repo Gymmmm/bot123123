@@ -1,365 +1,236 @@
-"""
-AI 解析：source_posts(pending) → drafts(pending)。
+"""Canonical intake orchestrator: source_posts -> canonical facts -> drafts.
 
-当前默认走规则解析，先把「采集 -> 频道运营」主链打通。
-后续如接 OpenRouter / OpenAI，可在本文件上继续切换为模型抽取。
+No template, caption, package or review-note text is a fact input.  New intake
+and every later refresh call the same canonicalization function.
 """
 from __future__ import annotations
 
 import json
-import re
 import uuid
 from collections import Counter
+from typing import Any
 
-from db import DatabaseManager
-from qiaolian_pipeline.parser import RuleBasedListingParser, non_rental_source_reasons
+from collector_db_compat import DatabaseManager
+from qiaolian_dual.canonical_facts import canonicalize_source, draft_projection
+from qiaolian_dual.canonical_listing_materializer import materialize_draft_facts
 
 
 class LLMClient:
-    def parse_text_with_llm(self, raw_text: str) -> dict:
-        """
-        第一阶段先用规则抽取，解决现网大量空 project / price=0 的占位问题。
-        方法名保留不变，减少对现有流水线的侵入。
-        """
-        return RuleBasedListingParser().parse(raw_text)
+    """Compatibility seam; any future model output is only a candidate source."""
+
+    def parse_text_with_llm(self, raw_text: str) -> dict[str, Any]:
+        return canonicalize_source(raw_text)
 
 
 class AIParserModule:
+    _SOURCE_COLUMNS = (
+        "id", "source_id", "source_type", "source_post_id", "raw_text",
+        "raw_meta_json", "raw_images_json", "raw_videos_json",
+    )
+
     def __init__(self, db_path: str):
         self.db_manager = DatabaseManager(db_path)
         self.llm_client = LLMClient()
 
     @staticmethod
-    def _build_review_note(parsed_data: dict) -> str:
-        flags = parsed_data.get("quality_flags") or []
-        if not flags:
-            return "quality:ok"
-        return "quality:" + ",".join(str(flag) for flag in flags)
+    def _as_mapping(row: Any, columns: tuple[str, ...]) -> dict[str, Any]:
+        if hasattr(row, "keys"):
+            return {key: row[key] for key in row.keys()}
+        return {key: value for key, value in zip(columns, row)}
 
     @staticmethod
-    def _price_from_parsed(parsed_data: dict) -> int:
-        raw = parsed_data.get("price")
-        if raw in (None, ""):
-            return 0
+    def _json_object(value: object) -> dict[str, Any]:
         try:
-            return int(float(str(raw).replace("$", "").replace(",", "").strip()))
-        except Exception:
-            pass
-        txt = str(raw)
-        m = re.search(r"(\d{2,6})", txt)
-        if m:
-            try:
-                return int(m.group(1))
-            except Exception:
-                return 0
-        return 0
+            decoded = json.loads(str(value or "{}"))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return {}
+        return decoded if isinstance(decoded, dict) else {}
 
     @staticmethod
-    def _price_from_raw_text(raw_text: str) -> int:
-        text = str(raw_text or "")
-        # 优先匹配显式货币/租金表达，避免把面积误识别为价格。
-        patterns = [
-            r"([1-9]\d?(?:\.\d+)?)\s*k\s*(?:/month|per month|/月|每月|usd|USD|美金|刀)",
-            r"(?:\$|usd|USD|美金|刀|租金[:：]?)\s*([1-9]\d{1,5})",
-            r"([1-9]\d{1,5})\s*(?:\$|usd|USD|美金|刀|/月|每月)",
-        ]
-        for pat in patterns:
-            m = re.search(pat, text)
-            if not m:
-                continue
-            try:
-                value = float(m.group(1))
-                if "k" in m.group(0).lower():
-                    value *= 1000
-                return int(value)
-            except Exception:
-                continue
-        return 0
+    def _json_list_count(value: object) -> int:
+        if isinstance(value, list):
+            return len(value)
+        try:
+            decoded = json.loads(str(value or "[]"))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return 0
+        return len(decoded) if isinstance(decoded, list) else 0
 
-    def _resolve_price_value(self, parsed_data: dict, raw_text: str) -> int:
-        p = self._price_from_parsed(parsed_data)
-        if p > 0:
-            return p
-        return self._price_from_raw_text(raw_text)
-
-    @staticmethod
-    def _extract_non_rental_reasons(parsed_data: dict, raw_text: str) -> list[str]:
-        reasons: list[str] = []
-        flags = [str(flag) for flag in (parsed_data.get("quality_flags") or [])]
-        for flag in flags:
-            if not flag.startswith("non_rental_"):
-                continue
-            reason = flag.replace("non_rental_", "", 1)
-            if reason in {"source", "commercial_waste"}:
-                continue
-            reasons.append(reason)
-        if not reasons:
-            reasons = non_rental_source_reasons(raw_text or "")
-        seen: list[str] = []
-        for item in reasons:
-            if item and item not in seen:
-                seen.append(item)
-        return seen
+    @classmethod
+    def _inputs(cls, row: dict[str, Any]) -> tuple[int, str, str, str, dict[str, Any], dict[str, Any]]:
+        source_meta = cls._json_object(row.get("raw_meta_json"))
+        raw_text = str(row.get("raw_text") or "")
+        sanitized_text = str(source_meta.get("sanitized_text") or raw_text)
+        image_count = int(source_meta.get("raw_image_count") or 0) or cls._json_list_count(row.get("raw_images_json"))
+        video_count = int(source_meta.get("raw_video_count") or 0) or cls._json_list_count(row.get("raw_videos_json"))
+        media_summary = {
+            "image_count": image_count,
+            "video_count": video_count,
+            "media_type": "mixed" if image_count and video_count else ("video" if video_count else ("image" if image_count else "none")),
+            "visual_review_required": bool(source_meta.get("visual_review_required")),
+        }
+        identity = {
+            "source_post_id": int(row["id"]),
+            "source_id": str(row.get("source_id") or ""),
+            "source_type": str(row.get("source_type") or ""),
+            "source_post_identity": str(row.get("source_post_id") or ""),
+        }
+        return int(row["id"]), str(row.get("source_type") or ""), raw_text, sanitized_text, identity, media_summary
 
     @staticmethod
-    def _is_manual_intake_source(source_type: str) -> bool:
-        st = str(source_type or "").strip().lower()
-        return st in {"csv_intake", "wechat_note", "excel_intake"}
+    def _review_note(facts: dict[str, Any]) -> str:
+        quality = dict(facts.get("quality") or {})
+        flags = ",".join(str(flag) for flag in (quality.get("all_flags") or [])) or "ok"
+        level = str(facts.get("publication_location_level") or "unknown")
+        return f"quality:{flags} | location_level:{level}"[:500]
 
     def _mark_source_post(self, post_id: int, status: str, error: str = "") -> None:
         self.db_manager._execute_query(
-            "UPDATE source_posts SET parse_status = ?, parse_error = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            "UPDATE source_posts SET parse_status=?, parse_error=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
             (status, error[:500], post_id),
         )
 
-    def _apply_parsed_data_to_draft(self, draft_id: str, parsed_data: dict) -> None:
-        price_value = self._price_from_parsed(parsed_data)
-        parsed_data["price"] = price_value if price_value > 0 else None
-        self.db_manager.update_draft(
-            draft_id,
-            title=parsed_data.get("title"),
-            project=parsed_data.get("project"),
-            community=parsed_data.get("community"),
-            area=parsed_data.get("area"),
-            property_type=parsed_data.get("property_type"),
-            price=parsed_data.get("price"),
-            layout=parsed_data.get("layout"),
-            size=parsed_data.get("size"),
-            floor=parsed_data.get("floor"),
-            deposit=parsed_data.get("deposit"),
-            available_date=parsed_data.get("available_date"),
-            highlights=parsed_data.get("highlights", []),
-            drawbacks=parsed_data.get("drawbacks", []),
-            advisor_comment=parsed_data.get("advisor_comment"),
-            cost_notes=parsed_data.get("cost_notes"),
-            water_rate=parsed_data.get("water_rate"),
-            electric_rate=parsed_data.get("electric_rate"),
-            extracted_data=json.dumps(parsed_data, ensure_ascii=False),
-            normalized_data=json.dumps(parsed_data, ensure_ascii=False),
-            queue_score=parsed_data.get("quality_score", 0),
-            review_note=self._build_review_note(parsed_data),
+    def _canonicalize(self, source_row: dict[str, Any]) -> tuple[int, dict[str, Any], dict[str, Any]]:
+        post_id, _source_type, raw_text, sanitized_text, identity, media_summary = self._inputs(source_row)
+        facts = canonicalize_source(
+            raw_text=raw_text,
+            sanitized_text=sanitized_text,
+            source_identity=identity,
+            media_summary=media_summary,
         )
+        return post_id, facts, draft_projection(facts)
+
+    def _write_existing_draft(self, draft_id: str, facts: dict[str, Any], projection: dict[str, Any]) -> None:
+        """Replace the complete legacy projection from canonical facts.
+
+        A non-empty legacy column is not evidence of a manual override. Audited
+        overrides must be represented in facts[manual_overrides], otherwise a
+        source reparse would silently create projection drift.
+        """
+        conn = self.db_manager._get_connection()
+        materialize_draft_facts(conn, draft_id=draft_id, facts=facts)
+        conn.execute(
+            "UPDATE drafts SET review_note=?, updated_at=CURRENT_TIMESTAMP WHERE draft_id=?",
+            (self._review_note(facts), draft_id),
+        )
+        conn.commit()
+
+    def _create_draft(self, source_post_id: int, facts: dict[str, Any], projection: dict[str, Any]) -> str:
+        facts_json = json.dumps(facts, ensure_ascii=False, sort_keys=True)
+        draft_id = f"DRF_{uuid.uuid4()}"
+        cost_notes = str(projection.get("cost_notes") or "")
+        self.db_manager.create_draft(
+            draft_id=draft_id,
+            source_post_id=source_post_id,
+            title=projection["title"],
+            project=projection["project"],
+            community=projection["community"],
+            area=projection["area"],
+            property_type=projection["property_type"],
+            price=projection["price"],
+            layout=projection["layout"],
+            size=projection["size"],
+            floor=projection["floor"],
+            deposit=projection["deposit"],
+            available_date=projection.get("available_date", ""),
+            highlights=projection["highlights"],
+            drawbacks=[],
+            advisor_comment="",
+            cost_notes=cost_notes,
+            extracted_data=facts_json,
+            normalized_data=facts_json,
+            review_status="pending",
+            queue_score=projection["quality_score"],
+            review_note=self._review_note(facts),
+            water_rate=projection.get("water_rate") or None,
+            electric_rate=projection.get("electric_rate") or None,
+        )
+        conn = self.db_manager._get_connection()
+        materialize_draft_facts(conn, draft_id=draft_id, facts=facts)
+        conn.commit()
+        return draft_id
 
     def _process_single_source_post_with_status(self, source_post_db_id: int) -> tuple[str, str | None]:
-        source_post = self.db_manager._fetch_one(
-            "SELECT id, source_id, source_type, raw_text FROM source_posts WHERE id = ? AND parse_status = ?",
-            (source_post_db_id, "pending"),
+        raw = self.db_manager._fetch_one(
+            """
+            SELECT id, source_id, source_type, source_post_id, raw_text,
+                   raw_meta_json, raw_images_json, raw_videos_json
+            FROM source_posts WHERE id=? AND parse_status='pending'
+            """,
+            (source_post_db_id,),
         )
-        if not source_post:
+        if not raw:
             return "not_pending", None
-
-        post_id, _source_id, source_type, raw_text = source_post
-        existing_draft = self.db_manager._fetch_one(
-            "SELECT draft_id FROM drafts WHERE source_post_id = ? ORDER BY id DESC LIMIT 1",
-            (post_id,),
-        )
-        if existing_draft:
-            self._mark_source_post(post_id, "parsed", "")
-            return "already_parsed", existing_draft[0]
+        source = self._as_mapping(raw, self._SOURCE_COLUMNS)
+        post_id = int(source["id"])
         try:
-            text = (raw_text or "").strip()
-            if not text:
-                self._mark_source_post(post_id, "skipped_empty_text", "empty_raw_text")
-                return "skipped_empty_text", None
-            parsed_data = self.llm_client.parse_text_with_llm(raw_text or "")
-            non_rental_reasons = self._extract_non_rental_reasons(parsed_data, raw_text or "")
-            if non_rental_reasons:
-                self._mark_source_post(
-                    post_id,
-                    "skipped_non_rental",
-                    "non_rental:" + ",".join(non_rental_reasons),
-                )
+            _post_id, facts, projection = self._canonicalize(source)
+            hard_flags = set((facts.get("quality") or {}).get("hard_flags") or [])
+            if "non_rental_source" in hard_flags:
+                self._mark_source_post(post_id, "skipped_non_rental", "non_rental_source")
                 return "skipped_non_rental", None
-            price_value = self._resolve_price_value(parsed_data, raw_text or "")
-            if price_value <= 0:
-                if self._is_manual_intake_source(source_type):
-                    # 手工导入允许无价格入草稿，发布端统一展示“面议”。
-                    parsed_data["price"] = None
-                    flags = [str(f) for f in (parsed_data.get("quality_flags") or [])]
-                    if "missing_price_manual_consult" not in flags:
-                        flags.append("missing_price_manual_consult")
-                    parsed_data["quality_flags"] = flags
-                else:
-                    # 自动采集保持硬规则：无价格不入 drafts。
-                    self._mark_source_post(post_id, "skipped_no_price", "missing_price")
-                    return "skipped_no_price", None
-            else:
-                parsed_data["price"] = price_value
-            extracted_data_json = json.dumps(parsed_data, ensure_ascii=False)
-            normalized_data_json = extracted_data_json
-
-            draft_id = f"DRF_{uuid.uuid4()}"
-            self.db_manager.create_draft(
-                draft_id=draft_id,
-                source_post_id=post_id,
-                title=parsed_data.get("title"),
-                project=parsed_data.get("project"),
-                community=parsed_data.get("community"),
-                area=parsed_data.get("area"),
-                property_type=parsed_data.get("property_type"),
-                price=parsed_data.get("price"),
-                layout=parsed_data.get("layout"),
-                size=parsed_data.get("size"),
-                floor=parsed_data.get("floor"),
-                deposit=parsed_data.get("deposit"),
-                available_date=parsed_data.get("available_date"),
-                highlights=parsed_data.get("highlights", []),
-                drawbacks=parsed_data.get("drawbacks", []),
-                advisor_comment=parsed_data.get("advisor_comment"),
-                cost_notes=parsed_data.get("cost_notes"),
-                extracted_data=extracted_data_json,
-                normalized_data=normalized_data_json,
-                review_status="pending",
-                water_rate=parsed_data.get("water_rate"),
-                electric_rate=parsed_data.get("electric_rate"),
-                queue_score=parsed_data.get("quality_score", 0),
-                review_note=self._build_review_note(parsed_data),
+            if "missing_price" in hard_flags:
+                self._mark_source_post(post_id, "skipped_no_price", "missing_price")
+                return "skipped_no_price", None
+            existing = self.db_manager._fetch_one(
+                "SELECT draft_id FROM drafts WHERE source_post_id=? ORDER BY id DESC LIMIT 1", (post_id,)
             )
-
+            if existing:
+                draft_id = str(existing[0])
+                self._write_existing_draft(draft_id, facts, projection)
+                status = "recanonicalized"
+            else:
+                draft_id = self._create_draft(post_id, facts, projection)
+                status = "parsed"
             self._mark_source_post(post_id, "parsed", "")
-            return "parsed", draft_id
-        except Exception as e:
-            self._mark_source_post(post_id, "failed", str(e))
+            return status, draft_id
+        except Exception as exc:
+            self._mark_source_post(post_id, "failed", str(exc))
             return "failed", None
 
-    def process_single_source_post(self, source_post_db_id: int):
+    def process_single_source_post(self, source_post_db_id: int) -> str | None:
         _status, draft_id = self._process_single_source_post_with_status(source_post_db_id)
         return draft_id
 
     def process_pending_source_posts(self) -> dict[str, int]:
-        pending_posts = self.db_manager._fetch_all(
-            "SELECT id FROM source_posts WHERE parse_status = ?",
-            ("pending",),
-        )
+        rows = self.db_manager._fetch_all("SELECT id FROM source_posts WHERE parse_status='pending'")
         stats: Counter[str] = Counter()
-        for (post_id,) in pending_posts or []:
-            status, _draft_id = self._process_single_source_post_with_status(post_id)
+        for (post_id,) in rows or []:
+            status, _draft_id = self._process_single_source_post_with_status(int(post_id))
             stats[status] += 1
-        stats["total_pending"] = len(pending_posts or [])
+        stats["total_pending"] = len(rows or [])
         return dict(stats)
 
-    def refresh_low_quality_drafts(self, limit: int = 50) -> int:
+    def _recanonicalize_pending_drafts(self, limit: int) -> int:
         rows = self.db_manager._fetch_all(
             """
-            SELECT d.draft_id, sp.raw_text
-            FROM drafts d
-            JOIN source_posts sp ON sp.id = d.source_post_id
-            WHERE d.review_status = 'pending'
-              AND (
-                    d.project IS NULL OR d.project = ''
-                 OR d.price IS NULL OR d.price = 0
-                 OR d.queue_score IS NULL OR d.queue_score = 0
-              )
-            ORDER BY d.id DESC
-            LIMIT ?
+            SELECT d.draft_id, sp.id, sp.source_id, sp.source_type, sp.source_post_id,
+                   sp.raw_text, sp.raw_meta_json, sp.raw_images_json, sp.raw_videos_json
+            FROM drafts d JOIN source_posts sp ON sp.id=d.source_post_id
+            WHERE d.review_status='pending'
+            ORDER BY d.id DESC LIMIT ?
             """,
-            (limit,),
+            (int(limit),),
         )
+        columns = ("draft_id",) + self._SOURCE_COLUMNS
         count = 0
-        for draft_id, raw_text in rows or []:
-            parsed_data = self.llm_client.parse_text_with_llm(raw_text or "")
-            non_rental_reasons = self._extract_non_rental_reasons(parsed_data, raw_text or "")
-            if non_rental_reasons:
-                flags = [str(f) for f in (parsed_data.get("quality_flags") or [])]
-                for reason in non_rental_reasons:
-                    marker = f"non_rental_{reason}"
-                    if marker not in flags:
-                        flags.append(marker)
-                parsed_data["quality_flags"] = flags
-                parsed_data["quality_score"] = 0
-            self._apply_parsed_data_to_draft(draft_id, parsed_data)
+        for raw in rows or []:
+            row = self._as_mapping(raw, columns)
+            source = {key: row[key] for key in self._SOURCE_COLUMNS}
+            _post_id, facts, projection = self._canonicalize(source)
+            self._write_existing_draft(str(row["draft_id"]), facts, projection)
             count += 1
         return count
+
+    def refresh_low_quality_drafts(self, limit: int = 50) -> int:
+        return self._recanonicalize_pending_drafts(limit)
 
     def refresh_pending_drafts(self, limit: int = 200) -> int:
-        """重跑所有 pending 草稿解析，用于规则升级后的批量回填。"""
-        rows = self.db_manager._fetch_all(
-            """
-            SELECT d.draft_id, sp.raw_text
-            FROM drafts d
-            JOIN source_posts sp ON sp.id = d.source_post_id
-            WHERE d.review_status = 'pending'
-            ORDER BY d.id DESC
-            LIMIT ?
-            """,
-            (limit,),
-        )
-        count = 0
-        for draft_id, raw_text in rows or []:
-            parsed_data = self.llm_client.parse_text_with_llm(raw_text or "")
-            non_rental_reasons = self._extract_non_rental_reasons(parsed_data, raw_text or "")
-            if non_rental_reasons:
-                flags = [str(f) for f in (parsed_data.get("quality_flags") or [])]
-                for reason in non_rental_reasons:
-                    marker = f"non_rental_{reason}"
-                    if marker not in flags:
-                        flags.append(marker)
-                parsed_data["quality_flags"] = flags
-                parsed_data["quality_score"] = 0
-            self._apply_parsed_data_to_draft(draft_id, parsed_data)
-            count += 1
-        return count
+        return self._recanonicalize_pending_drafts(limit)
+
+    def repair_pending_drafts(self, limit: int = 200) -> int:
+        return self._recanonicalize_pending_drafts(limit)
 
     def normalize_pending_area_labels(self, limit: int = 500) -> int:
-        """修正 pending 中明显异常的 area 值，回退为“金边”并记录备注。"""
-        rows = self.db_manager._fetch_all(
-            """
-            SELECT draft_id, area, review_note
-            FROM drafts
-            WHERE review_status='pending'
-              AND area IS NOT NULL
-              AND TRIM(area) <> ''
-            ORDER BY id DESC
-            LIMIT ?
-            """,
-            (limit,),
-        )
-        if not rows:
-            return 0
-
-        valid_tokens = (
-            "bkk",
-            "金边",
-            "chamkar",
-            "mon",
-            "tonle",
-            "bassac",
-            "daun",
-            "penh",
-            "sen sok",
-            "kork",
-            "makara",
-            "russian",
-            "市场",
-            "大道",
-            "区",
-            "钻石岛",
-            "一号公路",
-            "永旺",
-        )
-        noisy_tokens = ("啊雷莎", "阿雷莎")
-
-        fixed = 0
-        for draft_id, area, review_note in rows:
-            area_text = str(area or "").strip()
-            area_lower = area_text.lower()
-            if not area_text:
-                continue
-            is_valid = any(tok in area_lower or tok in area_text for tok in valid_tokens)
-            is_noisy = any(tok in area_text for tok in noisy_tokens)
-            if is_valid and not is_noisy:
-                continue
-
-            old_note = str(review_note or "").strip()
-            marker = f"area_normalized:{area_text}->金边"
-            merged_note = old_note
-            if marker not in old_note:
-                merged_note = f"{old_note} | {marker}".strip(" |")[:500]
-
-            self.db_manager.update_draft(
-                draft_id,
-                area="金边",
-                review_note=merged_note,
-            )
-            fixed += 1
-        return fixed
+        """Deprecated compatibility entry point; canonical reparse is the only repair."""
+        return self._recanonicalize_pending_drafts(limit)
