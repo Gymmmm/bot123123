@@ -7,14 +7,12 @@ def welcome_text() -> str:
     return copy_channel_welcome_text()
 
 def channel_welcome_text(first_name: str='') -> str:
-    """首屏 /start 欢迎语，压缩版：一屏内展示核心动作按钮。"""
     return copy_channel_welcome_text(first_name=first_name)
 
 def discussion_entry_welcome_text(first_name: str='', listing_id: str='') -> str:
     return copy_discussion_entry_welcome_text(first_name=first_name, listing_id=listing_id)
 
 def lead_capture_text() -> str:
-    """留资触发节点文案：在关键行为后请求联系方式。"""
     return copy_lead_capture_text()
 
 def _channel_index_action(action: str) -> dict | None:
@@ -22,7 +20,6 @@ def _channel_index_action(action: str) -> dict | None:
     return mapping.get(action)
 
 def _personal_greeting(update: Update) -> str:
-    """按金边时间生成简短称呼，用于各主要功能页。"""
     user = getattr(update, 'effective_user', None)
     name = getattr(user, 'first_name', '') or getattr(user, 'full_name', '') or getattr(user, 'username', '') or '您'
     hour = datetime.now(ZoneInfo('Asia/Phnom_Penh')).hour
@@ -35,8 +32,6 @@ def _personal_greeting(update: Update) -> str:
     return f'👋 <b>{he(str(name))}</b>，{salutation}'
 
 async def render_panel(update: Update, *, text: str, reply_markup: InlineKeyboardMarkup | None=None, parse_mode: str | None=None, context: ContextTypes.DEFAULT_TYPE | None=None, prefer_edit_anchor: bool=False) -> None:
-    """统一面板渲染：优先就地编辑，其次回退新消息。"""
-    # 称呼只放首页。二级页面直接显示当前任务，避免每次点击都重复问候。
     query = getattr(update, 'callback_query', None)
     if query is not None and query.message is not None:
         kwargs: dict[str, object] = {'text': text, 'reply_markup': reply_markup}
@@ -76,45 +71,74 @@ async def render_panel(update: Update, *, text: str, reply_markup: InlineKeyboar
         context.user_data[PANEL_ANCHOR_KEY] = {'chat_id': int(sent.chat_id), 'message_id': int(sent.message_id)}
 
 def promise_text() -> str:
-    return copy_service_promise_text()
+    return (
+        '🛡 <b>租期服务保障</b>\n\n'
+        '绑定租客档案后：\n'
+        '• 租约到期前 <b>7 天</b>提醒你确认是否续租\n'
+        '• 报修提交即生成工单，处理进度会通知你\n\n'
+        '每一项都有记录，不只是口头跟进。'
+    )
 
 def deposit_text() -> str:
     return copy_deposit_text()
 
 def advisor_text() -> str:
-    return copy_advisor_text()
+    return (
+        '✅ <b>中文顾问已收到</b>\n\n'
+        '中文顾问会通过 Telegram 联系你。\n'
+        '如果是具体房源，房源信息会自动带上，不用重复说明。'
+    )
 
 def advisor_handoff_text(*, listing_id: str='', user_id: int | None=None) -> str:
     from .admin_contract import _binding_end_date
     from .listing import listing_context
-    from .utils_formatting import _fmt_price
+    from .utils_formatting import _display_layout, _fmt_price
     listing_id = str(listing_id or '').strip()
     if listing_id:
         item = listing_context(listing_id)
         area = str(item.get('area') or '金边')
-        layout = str(item.get('layout') or item.get('property_type') or '房源')
+        layout = _display_layout(item.get('layout') or item.get('property_type'), item.get('property_type')) or '房源'
         price_text = _fmt_price(item.get('price'))
-        return f"✅ <b>收到，我帮你联系顾问</b>\n\n🏠 {he(area)}｜{he(layout)}\n💰 <b>{he(price_text)}</b>\n\n房源信息已经带上，不用再重复发送。"
+        return f"✅ <b>收到，我帮你联系中文顾问</b>\n\n🏠 {he(area)}｜{he(layout)}\n💰 <b>{he(price_text)}</b>\n\n房源信息已经带上，不用再重复发送。"
     if user_id:
         binding = db.get_active_binding(user_id)
         if binding:
-            return f"✅ <b>顾问已收到</b>\n\n🏠 当前房源：<b>{he(str(binding.get('property_name') or '待确认'))}</b>\n📅 到期：<b>{he(_binding_end_date(binding) or '待确认')}</b>\n\n中文顾问会按你当前的租约继续跟进。"
-    return copy_advisor_text()
+            return f"✅ <b>中文顾问已收到</b>\n\n🏠 当前房源：<b>{he(str(binding.get('property_name') or '待确认'))}</b>\n📅 到期：<b>{he(_binding_end_date(binding) or '待确认')}</b>\n\n中文顾问会按你当前的租约继续跟进。"
+    return advisor_text()
 
 def smart_search_text() -> str:
     return copy_smart_search_text()
 
 def about_text() -> str:
-    return copy_about_text()
+    return (
+        f'🏠 <b>{copy_about_text().__class__ and (BRAND_NAME or "侨联地产").replace("测试", "").strip() or "侨联地产"}｜金边租房中介</b>\n\n'
+        '✅ 实拍房源\n'
+        '✅ 中文顾问\n'
+        '✅ 费用核对\n'
+        '✅ 看房、签约、入住后继续跟进\n\n'
+        f'📱 联系中文顾问：{ADVISOR_TG}\n'
+        f'📢 房源频道：{CHANNEL_URL}'
+    )
 
 def brand_story_text() -> str:
     return copy_brand_text()
 
 def help_text() -> str:
-    return copy_help_text()
+    return (
+        '❓ <b>怎么使用</b>\n\n'
+        '找房：点“帮我找房”，选择类型、位置和预算。\n'
+        '看房：打开一套可预约房源，点“预约看房”。\n'
+        '咨询：点“联系中文顾问”，具体房源会自动带上。\n'
+        '入住后：报修、物业沟通和周边生活都在“入住服务”。\n'
+        '租约：可在“我的租约”查看，到期前 7 天可开启提醒。'
+    )
 
 def service_hub_text() -> str:
-    return copy_service_hub_text()
+    return (
+        '🛠 <b>入住服务</b>\n\n'
+        '房子有问题或需要物业沟通，直接点下面办理。\n'
+        '侨联在租客户绑定租约后，报修会自动带上房屋信息；租约到期前 7 天会提醒你确认是否续租。'
+    )
 
 def local_life_text() -> str:
     return copy_local_life_text()
