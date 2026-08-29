@@ -71,7 +71,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 return MAIN
             action = parts[1]
             lead_id, appointment_id, customer_id = map(int, parts[2:])
-            status_map = {'claim': ('claimed', 'assigned', '顾问已接手'), 'contacted': ('contacted', 'contacted', '顾问跟进中'), 'invalid': ('invalid', 'cancelled', '已标记无效')}
+            status_map = {'claim': ('claimed', 'assigned', '🟢 顾问跟进中'), 'contacted': ('contacted', 'contacted', '🟢 顾问跟进中'), 'invalid': ('invalid', 'cancelled', '⚪ 已结束跟进')}
             if action not in status_map:
                 return MAIN
             lead_status, appointment_status, label = status_map[action]
@@ -88,13 +88,27 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 await query.answer('线索不存在或已失效', show_alert=True)
                 return MAIN
             original = str(getattr(query.message, 'text_html', '') or getattr(query.message, 'text', '') or '')
-            status_line = f'\n\n<b>处理状态：</b>{he(label)} · {he(advisor_name)}'
-            await query.edit_message_text(original + status_line, parse_mode=ParseMode.HTML, reply_markup=admin_lead_keyboard(lead_id=lead_id, appointment_id=appointment_id, user_id=customer_id) if action == 'claim' else None)
+            status_line = f'<b>当前状态｜{he(label)}</b>\n跟进顾问｜{he(advisor_name)}'
+            status_pattern = re.compile(r'(?:<b>)?当前状态｜[^\n<]*(?:</b>)?(?:\n跟进顾问｜[^\n<]*)?')
+            if status_pattern.search(original):
+                updated = status_pattern.sub(status_line, original, count=1)
+            else:
+                updated = original.rstrip() + '\n\n' + status_line
+            updated = re.sub(r'\n\n<b>处理状态：</b>[^\n]*', '', updated)
+            await query.edit_message_text(updated, parse_mode=ParseMode.HTML, reply_markup=admin_lead_keyboard(lead_id=lead_id, appointment_id=appointment_id, user_id=customer_id) if action == 'claim' else None)
             if action in {'claim', 'contacted'}:
                 from .messages import advisor_response_notice_text
                 user_text = advisor_response_notice_text()
                 try:
-                    await context.bot.send_message(chat_id=customer_id, text=user_text, parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('📋 查看我的预约', callback_data='appointment_menu:list')], [InlineKeyboardButton('🏠 返回首页', callback_data='home')]]))
+                    await context.bot.send_message(
+                        chat_id=customer_id,
+                        text=user_text,
+                        parse_mode=ParseMode.HTML,
+                        reply_markup=InlineKeyboardMarkup([
+                            [InlineKeyboardButton('📅 查看我的预约', callback_data='appointment_menu:list')],
+                            [InlineKeyboardButton('🏠 继续看房', callback_data='hub:latest')],
+                        ]),
+                    )
                 except Exception:
                     logger.exception('预约状态通知用户失败: user_id=%s', customer_id)
             return MAIN

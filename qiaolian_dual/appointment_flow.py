@@ -143,14 +143,47 @@ async def appoint_flow_cb(update: Update, context: ContextTypes.DEFAULT_TYPE, *,
         focus_short = '、'.join(focus_labels[:3]) if focus_labels else '默认全项'
         if len(focus_labels) > 3:
             focus_short += '等'
-        await _notify_admins(context, title=f'新预约 · 待处理 #{appointment_id}', lines=[f'用户：{_user_mention_html(user)}', f"房源：{he(str(appt.get('listing_id') or '待推荐'))}", f"时间：{he(_appointment_date_compact(appt.get('date') or '-'))} · {he(_appointment_time_compact(time_value))}", f'方式：{he(mode_label)}', f'联系：{he(_user_contact_text(user))}', f'关注：{he(focus_short)}', f"来源：{he(str(appt.get('source', 'user_bot')))} · 线索 #{lead_id or '-'}"], reply_markup=admin_lead_keyboard(lead_id=lead_id, appointment_id=appointment_id, user_id=int(user.id)) if lead_id is not None else None)
         item = listing_context(lid_submit)
         title = str(item.get('project') or item.get('title') or item.get('area') or '这套房').strip()
         layout = _display_layout(item.get('layout') or item.get('property_type'), item.get('property_type'))
-        contact = str(appt.get('contact_value') or _user_contact_text(user))
+        property_type = str(item.get('property_type') or '').strip()
+        area = str(item.get('project') or item.get('community') or item.get('area') or title or '金边').strip()
+        listing_facts = []
+        for value in (area, layout, property_type):
+            if value and value not in listing_facts:
+                listing_facts.append(value)
+        advisor_listing = '｜'.join(listing_facts[:3]) or '房源待确认'
+        date_compact = _appointment_date_compact(appt.get('date') or '-')
+        time_compact = _appointment_time_compact(time_value)
+        await _notify_admins(
+            context,
+            title=f'📅 新预约 #{appointment_id}',
+            lines=[
+                f'🏠 <b>{he(advisor_listing)}</b>',
+                f'🕐 {he(date_compact)} · {he(time_compact)}',
+                f'📍 {he(mode_label)}',
+                '',
+                f'👤 客户｜{_user_mention_html(user)}',
+                f'💬 Telegram｜{he(_user_contact_text(user))}',
+                f'📝 关注｜{he(focus_short)}',
+                '',
+                '<b>当前状态｜🟡 待联系</b>',
+            ],
+            reply_markup=admin_lead_keyboard(lead_id=lead_id, appointment_id=appointment_id, user_id=int(user.id)) if lead_id is not None else None,
+            show_bell=False,
+        )
         subject_text = '🏠 <b>房源尚未确定</b>' if is_general_request else f"🏠 <b>{he(_title_layout_label(title, layout))}</b>"
         context.user_data.pop('appt', None)
-        await query.edit_message_text(f"✅ <b>已收到你的预约申请</b>\n\n{subject_text}\n📅 {he(str(appt.get('date', '') or '-'))} · {he(time_label)}\n📍 {he(mode_label)}\n\n顾问会先确认房态和可看时间，再通过 Telegram 联系你。无需重复提交。", parse_mode=ParseMode.HTML, reply_markup=appointment_success_keyboard())
+        await query.edit_message_text(
+            f"<b>✅ 预约已提交</b>\n\n"
+            f"{subject_text}\n"
+            f"📅 {he(date_compact)} · {he(time_compact)}\n"
+            f"📍 {he(mode_label)}\n\n"
+            "顾问确认房态和时间后，\n"
+            "会通过 Telegram 联系你。",
+            parse_mode=ParseMode.HTML,
+            reply_markup=appointment_success_keyboard(),
+        )
         return MAIN
     if data == 'home':
         clear_session_for_fresh_entry(context)

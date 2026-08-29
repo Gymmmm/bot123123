@@ -223,7 +223,7 @@ def search_results_keyboard(matches: list[dict]) -> InlineKeyboardMarkup:
     rows.append([InlineKeyboardButton('🏠 返回首页', callback_data='home')])
     return InlineKeyboardMarkup(rows)
 
-async def _notify_admins(context: ContextTypes.DEFAULT_TYPE, *, title: str, lines: list[str], reply_markup: InlineKeyboardMarkup | None=None) -> None:
+async def _notify_admins(context: ContextTypes.DEFAULT_TYPE, *, title: str, lines: list[str], reply_markup: InlineKeyboardMarkup | None=None, show_bell: bool=True) -> None:
     from .admin_contract import _all_user_admin_ids
     admin_ids = _all_user_admin_ids()
     if not admin_ids:
@@ -232,7 +232,8 @@ async def _notify_admins(context: ContextTypes.DEFAULT_TYPE, *, title: str, line
     source_labels = {'channel_deeplink': '频道帖子', 'channel_post': '频道帖子', 'channel_index': '频道首页', 'channel_topic': '频道专题', 'user_search': '用户找房', 'home_layout': '按户型找房', 'listing_card': '房源详情页', 'listing_landing': '房源详情', 'appointment_hub': '预约中心', 'smart_find_play': '智能找房', 'help_inline': '帮助页', 'service_hub': '入住服务'}
     for raw, label in source_labels.items():
         body = body.replace(raw, label)
-    text = f'🔔 <b>{he(title)}</b>\n\n{body}'.strip()
+    prefix = '🔔 ' if show_bell else ''
+    text = f'{prefix}<b>{he(title)}</b>\n\n{body}'.strip()
     for admin_id in sorted(admin_ids):
         try:
             await context.bot.send_message(chat_id=admin_id, text=text, parse_mode=ParseMode.HTML, disable_web_page_preview=True, reply_markup=reply_markup)
@@ -240,8 +241,12 @@ async def _notify_admins(context: ContextTypes.DEFAULT_TYPE, *, title: str, line
             logger.exception('发送管理号消息失败: admin_id=%s title=%s', admin_id, title)
 
 def admin_lead_keyboard(*, lead_id: int, appointment_id: int, user_id: int) -> InlineKeyboardMarkup:
+    """顾问预约跟进按钮；callback 保持兼容，仅优化手机端措辞。"""
     suffix = f'{lead_id}:{appointment_id}:{user_id}'
-    return InlineKeyboardMarkup([[InlineKeyboardButton('✅ 我来接单', callback_data=f'adminlead:claim:{suffix}'), InlineKeyboardButton('💬 已联系', callback_data=f'adminlead:contacted:{suffix}')], [InlineKeyboardButton('❌ 无效线索', callback_data=f'adminlead:invalid:{suffix}')]])
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton('✅ 我来跟进', callback_data=f'adminlead:claim:{suffix}')],
+        [InlineKeyboardButton('📞 已联系客户', callback_data=f'adminlead:contacted:{suffix}'), InlineKeyboardButton('🚫 结束跟进', callback_data=f'adminlead:invalid:{suffix}')],
+    ])
 
 def admin_repair_keyboard(ticket_id: int) -> InlineKeyboardMarkup:
     ticket = int(ticket_id or 0)

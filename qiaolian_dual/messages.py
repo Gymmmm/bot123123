@@ -530,11 +530,11 @@ def appoint_entry_text() -> str:
 
 
 def appoint_success_text() -> str:
-    """预约成功文案。"""
+    """预约提交后的统一标题/跟进说明。"""
     return (
-        "✅ <b>已收到你的预约申请</b>\n\n"
-        "顾问会先确认房态和可看时间，\n"
-        "再通过 Telegram 联系你。"
+        "<b>✅ 预约已提交</b>\n\n"
+        "顾问确认房态和时间后，\n"
+        "会通过 Telegram 联系你。"
     )
 
 
@@ -572,12 +572,13 @@ def repair_progress_text(issue_label: str, stage: str, note: str = "") -> str:
 
 
 def advisor_response_notice_text() -> str:
-    """顾问接手或回复时的统一提醒。"""
+    """顾问接手预约后的统一提醒。"""
     return (
-        "💬 <b>顾问已经接手</b>\n\n"
-        "我们已把你的需求交给顾问。\n"
-        "顾问会通过 Telegram 和你确认细节。\n\n"
-        "时间或需求有变化，直接回复这条消息就行。"
+        "<b>💬 顾问已接手</b>\n\n"
+        "你的预约和房源信息已经一起发给顾问。\n"
+        "顾问会通过 Telegram 联系你确认。\n\n"
+        "时间或需求有变化，\n"
+        "直接回复这条消息就可以。"
     )
 
 
