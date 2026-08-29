@@ -6,6 +6,7 @@ on:
       - codex/qiaolian-ui-cleanup-20260829
     paths:
       - scripts/second_batch_runtime_patch.py
+      - scripts/second_batch_runtime_fix.py
       - .github/workflows/qiaolian-second-batch-runtime.yml
 
 permissions:
@@ -24,7 +25,9 @@ jobs:
         with:
           python-version: '3.12'
       - name: Apply second batch patch
-        run: python scripts/second_batch_runtime_patch.py
+        run: |
+          python scripts/second_batch_runtime_patch.py
+          python scripts/second_batch_runtime_fix.py
       - name: Install dependencies
         run: python -m pip install -r requirements.txt pytest pytest-asyncio
       - name: Syntax and import checks
@@ -58,7 +61,7 @@ jobs:
         run: |
           git config user.name "Gymmmm"
           git config user.email "73370798+Gymmmm@users.noreply.github.com"
-          git add qiaolian_dual tests/test_second_batch_runtime_contract.py
+          git add qiaolian_dual tests/test_second_batch_runtime_contract.py tests/test_callback_route_repair.py tests/test_user_ui_cleanup.py
           git diff --cached --quiet && exit 0
           git commit -m "unify listing availability and callback runtime"
           git pull --rebase origin codex/qiaolian-ui-cleanup-20260829
