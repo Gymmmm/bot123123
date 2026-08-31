@@ -1,3 +1,79 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>侨联经典蓝卡</title><style>
-*{box-sizing:border-box}html,body{margin:0;background:#0b2048;font-family:"Noto Sans CJK SC","Noto Sans SC",sans-serif}.poster{position:relative;width:1600px;height:1200px;overflow:hidden;background:#0b2048;color:#fff}.bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(3,20,55,.5),transparent 60%),linear-gradient(0deg,rgba(3,20,55,.38),transparent 55%)}.brand{position:absolute;left:0;top:0;width:520px;padding:34px 42px 30px;background:linear-gradient(135deg,rgba(10,47,122,.98),rgba(17,71,178,.82))}.brand .cn{font-size:68px;font-weight:900;line-height:1}.brand .en{margin-top:10px;font-size:22px;letter-spacing:1.5px;color:rgba(255,255,255,.9)}.card{position:absolute;left:36px;right:36px;bottom:34px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px 34px;align-items:center;padding:28px 34px;background:linear-gradient(135deg,rgba(12,61,158,.96),rgba(18,63,147,.9));border:1px solid rgba(255,255,255,.2)}.title{min-width:0;font-size:64px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.layout-part{margin-left:18px;padding-left:18px;border-left:3px solid currentColor}.price{font-size:72px;font-weight:900;color:#ffd65a;white-space:nowrap}.price small{font-size:34px;color:#fff}.meta{display:flex;gap:22px;font-size:30px;font-weight:750;white-space:nowrap;overflow:hidden}.meta>span+span{padding-left:22px;border-left:2px solid rgba(255,255,255,.4)}.highlights{display:flex;justify-content:flex-end;gap:12px;max-width:720px}.chip{max-width:220px;padding:9px 16px;border:1px solid rgba(255,255,255,.25);background:rgba(2,20,55,.24);font-size:24px;font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-</style></head><body><div class="poster"><img id="bg" class="bg" src="{{BG_SRC}}" alt=""><div class="shade"></div><div class="brand"><div class="cn">侨联地产</div><div class="en">QIAO LIAN PROPERTY</div></div><div class="card"><div class="title"><span id="t1">{{PROJECT}}</span><span class="layout-part" data-field="t2"><span id="t2">{{LAYOUT}}</span></span></div><div class="price"><span id="t5">{{PRICE}}</span><small>{{PRICE_SUFFIX}}</small></div><div class="meta"><span data-field="t3" id="t3">{{SIZE}}</span><span data-field="t4" id="t4">{{FLOOR}}</span></div><div class="highlights"><span class="chip" data-field="t6" id="t6">{{H1}}</span><span class="chip" data-field="t7" id="t7">{{H2}}</span><span class="chip" data-field="t8" id="t8">{{H3}}</span></div></div></div></body></html>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1600,initial-scale=1">
+<title>侨联经典蓝卡</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:1600px;height:1200px;background:#0b2048;font-family:"Noto Sans CJK SC","Noto Sans SC",sans-serif}
+.poster{position:relative;width:1600px;height:1200px;overflow:hidden;background:#d7dde5;color:#fff}
+.bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center}
+.brand-veil{position:absolute;left:0;top:0;width:760px;height:220px;background:linear-gradient(90deg,rgba(4,28,96,.96) 0%,rgba(12,48,132,.86) 60%,rgba(12,48,132,.18) 92%,rgba(12,48,132,0) 100%)}
+.brand{position:absolute;left:60px;top:42px;display:flex;align-items:center;gap:20px;text-shadow:0 2px 12px rgba(0,0,0,.16)}
+.brand-mark{width:94px;height:94px;flex:0 0 94px}
+.brand-copy{min-width:0}
+.brand .cn{font-size:62px;font-weight:900;line-height:1;letter-spacing:1px;white-space:nowrap}
+.brand .en{margin-top:10px;font-size:22px;font-weight:700;letter-spacing:3px;color:rgba(255,255,255,.9);white-space:nowrap}
+.card{position:absolute;left:36px;bottom:36px;width:850px;min-height:300px;padding:30px 38px 28px;border-radius:30px;background:linear-gradient(135deg,rgba(12,57,154,.91),rgba(20,64,158,.84));box-shadow:0 18px 45px rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(8px)}
+.row{display:flex;align-items:center;min-width:0}
+.row1{font-size:55px;line-height:1.12;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.house-icon{width:48px;height:48px;flex:0 0 48px;margin-right:16px}
+.project{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.layout-sep{margin:0 14px;color:rgba(255,255,255,.92)}
+.layout{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.row2{margin-top:20px;font-size:34px;font-weight:700;white-space:nowrap}
+.row2 .fact{display:flex;align-items:center;min-width:0}
+.row2 .sep{height:36px;width:2px;margin:0 20px;background:rgba(255,255,255,.46)}
+.fact-icon{width:31px;height:31px;flex:0 0 31px;margin-right:10px}
+.price{margin-left:2px;font-size:51px;font-weight:900;color:#ffd75f;letter-spacing:.5px}
+.price small{font-size:32px;color:#fff;font-weight:700}
+.rule{height:1px;margin:18px 0 16px;background:rgba(255,255,255,.18)}
+.row3{font-size:27px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row3 .sep{margin:0 16px;color:rgba(255,255,255,.62)}
+.highlight{display:inline;white-space:nowrap}
+</style>
+</head>
+<body>
+<div class="poster">
+  <img id="bg" class="bg" src="{{BG_SRC}}" alt="">
+  <div class="brand-veil"></div>
+  <div class="brand">
+    <svg class="brand-mark" viewBox="0 0 120 120" aria-hidden="true">
+      <path d="M14 62L60 28L106 62" fill="none" stroke="white" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M24 57V91H44V68H76V91H96V57" fill="none" stroke="white" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M16 96C34 87 49 84 60 84C71 84 86 87 104 96" fill="none" stroke="white" stroke-width="9" stroke-linecap="round"/>
+    </svg>
+    <div class="brand-copy">
+      <div class="cn">侨联地产</div>
+      <div class="en">QIAO LIAN PROPERTY</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row row1">
+      <svg class="house-icon" viewBox="0 0 64 64" aria-hidden="true"><path d="M8 31L32 13L56 31V54H39V38H25V54H8Z" fill="white"/></svg>
+      <span class="project" id="t1">{{PROJECT}}</span><span class="layout-sep">·</span><span class="layout" data-field="t2" id="t2">{{LAYOUT}}</span>
+    </div>
+
+    <div class="row row2">
+      <span class="fact" data-field="t3">
+        <svg class="fact-icon" viewBox="0 0 64 64" aria-hidden="true"><path d="M8 31L32 13L56 31V54H39V38H25V54H8Z" fill="white"/></svg>
+        <span id="t3">{{SIZE}}</span>
+      </span>
+      <span class="sep"></span>
+      <span class="fact" data-field="t4"><span id="t4">{{FLOOR}}</span></span>
+      <span class="sep"></span>
+      <span class="price"><span id="t5">{{PRICE}}</span><small>{{PRICE_SUFFIX}}</small></span>
+    </div>
+
+    <div class="rule"></div>
+    <div class="row row3" data-fields="t6,t7,t8">
+      <span class="highlight" data-field="t6" id="t6">{{H1}}</span>
+      <span class="sep" data-field="t7">|</span><span class="highlight" data-field="t7" id="t7">{{H2}}</span>
+      <span class="sep" data-field="t8">/</span><span class="highlight" data-field="t8" id="t8">{{H3}}</span>
+    </div>
+  </div>
+</div>
+</body>
+</html>
