@@ -48,3 +48,16 @@ def test_canonical_pillow_renderer_never_falls_back_to_non_noto_font():
     for forbidden in ("PingFang", "STHeiti", "DejaVu", "Microsoft YaHei", "load_default"):
         assert forbidden not in font_block
     assert "noto_sans_cjk_sc_font_missing" in font_block
+
+
+def test_classic_blue_matches_reference_structure():
+    text = Path("templates/property/01_经典蓝卡模板.html").read_text(encoding="utf-8")
+    assert 'width:1600px;height:1200px' in text
+    assert '.brand-veil' in text
+    assert 'width:850px' in text
+    assert 'border-radius:30px' in text
+    assert 'rgba(12,57,154,.91)' in text
+    assert '#ffd75f' in text
+    for token in ('{{PROJECT}}', '{{LAYOUT}}', '{{SIZE}}', '{{FLOOR}}', '{{PRICE}}', '{{H1}}', '{{H2}}', '{{H3}}'):
+        assert token in text
+    assert 'id="t1"' in text and 'id="t8"' in text
