@@ -53,8 +53,6 @@ def _canonical_cover_fields(data: dict[str, Any]) -> dict[str, Any]:
         facts.get("property_type_display"), facts.get("property_type"), data.get("property_type")
     )
     if not project:
-        # 项目未确认时只展示真实物业类型；不伪造项目名，也不添加
-        # “房源”这类弱信息后缀，避免封面标题显得廉价和重复。
         project = property_type or first(data.get("project"), "优质房源")
     deal_type = str(first(facts.get("deal_type"), data.get("deal_type"), "rent")).lower()
     price_value = first(
@@ -82,8 +80,6 @@ def _canonical_cover_fields(data: dict[str, Any]) -> dict[str, Any]:
     listing_match = re.fullmatch(r"(?i)l[_-]?(\d+)", ref)
     if listing_match:
         ref = f"QC{int(listing_match.group(1)):04d}"
-    # Internal draft UUIDs are never human-facing. If no canonical listing key
-    # was supplied, leave the field blank instead of leaking an implementation ID.
     if ref.upper().startswith("DRF_"):
         ref = ""
     return {
@@ -121,7 +117,7 @@ def render_html_cover(
     """Inject listing data into a template and capture the unscaled `.poster`."""
     try:
         from playwright.sync_api import sync_playwright
-    except ImportError as exc:  # fail closed: never silently fall back to Pillow
+    except ImportError as exc:
         raise RuntimeError("html_cover_renderer_requires_playwright") from exc
 
     template = Path(template_path).resolve()
@@ -142,9 +138,6 @@ def render_html_cover(
         explicit_browser = str(os.getenv("PLAYWRIGHT_CHROMIUM_EXECUTABLE", "")).strip()
         if explicit_browser and Path(explicit_browser).is_file():
             launch_options["executable_path"] = explicit_browser
-        # Let Playwright use its matching headless-shell bundle by default.
-        # Forcing the full Chrome binary made the systemd service start
-        # crashpad under a nologin account and immediately exit with SIGTRAP.
         browser = playwright.chromium.launch(**launch_options)
         try:
             page = browser.new_page(
@@ -212,9 +205,6 @@ def render_html_cover(
                 update_button = page.locator("#updateBtn")
                 if update_button.count():
                     update_button.click()
-            # Interactive legacy templates may append "/月" in their button
-            # script. Correct the rendered nodes from the canonical deal type
-            # after that script runs, so a sale preview can never say rent/month.
             if str(fields["deal_type"]).lower() != "rent":
                 for selector in (
                     "#price_text",
@@ -227,7 +217,6 @@ def render_html_cover(
                 price_label = page.locator(".pricebox .label")
                 if price_label.count():
                     price_label.first.evaluate("el => el.textContent = '售价'")
-            # 品牌视觉不依赖 emoji；只清理海报节点，不改编辑面板。
             poster_node = page.locator(".poster")
             poster_node.evaluate(
                 r"""root => {
@@ -243,7 +232,6 @@ def render_html_cover(
                             .replace(/[🏠🏡📍📐🏢✨🛏💰🛋🏊🏋️🏋]/gu, '')
                             .replace(/\s*[·|｜/]\s*(?=($|\s))/g, '');
                     }
-                    // New production templates mark each optional row explicitly.
                     for (const row of root.querySelectorAll('[data-field], [data-fields]')) {
                         const fields = (row.getAttribute('data-fields') || row.getAttribute('data-field') || '')
                             .split(',').map(x => x.trim()).filter(Boolean);
@@ -253,7 +241,6 @@ def render_html_cover(
                         });
                         if (!hasValue) row.style.display = 'none';
                     }
-                    // Backward-compatible cleanup for the previous templates.
                     const hideIfEmpty = id => {
                         const el = root.querySelector('#' + id);
                         if (!el) return;
@@ -261,9 +248,6 @@ def render_html_cover(
                         if (row && empty(el.textContent)) row.style.display = 'none';
                     };
                     ['t3','t4','t5','t6','t7','t8','t9'].forEach(hideIfEmpty);
-                    // Black-gold/right-price templates may use the confirmed
-                    // public location as the main title. Do not repeat the
-                    // same text again in their explicit 区域 row.
                     const mainTitle = root.querySelector('.title#t1');
                     const areaValue = root.querySelector('#t3');
                     const norm = value => String(value || '').replace(/[^0-9a-z\u4e00-\u9fff]+/gi, '').toLowerCase();
@@ -287,8 +271,8 @@ def render_html_cover(
                     animation: none !important;
                     transition: none !important;
                 }
-                html, body, input, button, .poster {
-                    font-family: "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif !important;
+                html, body, input, button, select, textarea, .poster, .poster * {
+                    font-family: "Noto Sans CJK SC", "Noto Sans SC", sans-serif !important;
                 }
                 .poster {
                     transform: none !important;
