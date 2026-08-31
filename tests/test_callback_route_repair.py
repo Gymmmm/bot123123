@@ -172,7 +172,7 @@ async def test_reserved_listing_is_allowed_by_real_appointment_flow(monkeypatch)
     update, _ = make_update('listing:appoint:l_2')
     context = DummyContext()
     state = await start_appointment(update, context, 'l_2')
-    assert state == common.APPT_MODE
+    assert state == common.APPT_DATE
     assert context.user_data['appt']['listing_id'] == 'l_2'
     assert '预约看房' in seen['text']
 
