@@ -69,20 +69,24 @@ def _safe_property_id(value: str) -> str:
     return raw
 
 
-def _font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+def _font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
+    """Load Noto Sans CJK SC only; never silently switch cover typography."""
+    env_key = "QIAOLIAN_NOTO_BOLD_FONT" if bold else "QIAOLIAN_NOTO_REGULAR_FONT"
+    configured = str(os.getenv(env_key, "")).strip()
     candidates = [
-        "/System/Library/Fonts/PingFang.ttc",
-        "/System/Library/Fonts/STHeiti Medium.ttc" if bold else "/System/Library/Fonts/STHeiti Light.ttc",
+        configured,
         "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc" if bold else "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc" if bold else "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJKsc-Bold.otf" if bold else "/usr/share/fonts/opentype/noto/NotoSansCJKsc-Regular.otf",
+        "/usr/share/fonts/truetype/noto/NotoSansCJKsc-Bold.otf" if bold else "/usr/share/fonts/truetype/noto/NotoSansCJKsc-Regular.otf",
     ]
     for candidate in candidates:
-        if Path(candidate).is_file():
+        if candidate and Path(candidate).is_file():
             try:
                 return ImageFont.truetype(candidate, size=size, index=0)
             except OSError:
                 continue
-    return ImageFont.load_default()
+    raise RuntimeError(f"noto_sans_cjk_sc_font_missing:{env_key}")
 
 
 def _open_source(path: Path) -> Image.Image:
@@ -177,7 +181,7 @@ def _atomic_jpeg(image: Image.Image, target: Path) -> None:
 def render_listing_images(*, property_id: str, canonical_facts: dict[str, Any], source_images: Iterable[str | Path], output_root: str | Path = "rendered", template: str = "A") -> RenderResult:
     """Render cover and detail photos while isolating per-image failures."""
     safe_id = _safe_property_id(property_id)
-    theme = get_template(template)  # validate before creating output
+    theme = get_template(template)
     del theme
     root = Path(output_root).expanduser().resolve()
     output_dir = (root / safe_id).resolve()
