@@ -9,299 +9,51 @@
     body {
       margin: 0;
       padding: 20px;
-      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+      font-family: "Noto Sans CJK SC", "Noto Sans SC", sans-serif;
       background:
         radial-gradient(circle at 8% 12%, rgba(59, 130, 246, 0.2), transparent 30%),
         radial-gradient(circle at 90% 88%, rgba(14, 165, 233, 0.12), transparent 34%),
         #0f172a;
       color: #fff;
     }
-    .wrap {
-      max-width: 1500px;
-      margin: 0 auto;
-      display: grid;
-      grid-template-columns: 360px 1fr;
-      gap: 20px;
-    }
-    .panel, .stage {
-      background: rgba(17, 24, 39, 0.92);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 18px;
-      padding: 18px;
-      backdrop-filter: blur(10px);
-    }
-    .panel {
-      position: sticky;
-      top: 20px;
-      height: fit-content;
-    }
-    h2 {
-      font-size: 20px;
-      margin: 0 0 12px;
-    }
-    .sub {
-      font-size: 12px;
-      color: #93c5fd;
-      margin: 0 0 12px;
-      line-height: 1.6;
-    }
-    .hint {
-      font-size: 12px;
-      color: #94a3b8;
-      margin: -2px 0 10px;
-    }
-    .field {
-      margin-bottom: 10px;
-    }
-    label {
-      display: block;
-      font-size: 13px;
-      color: #cbd5e1;
-      margin-bottom: 6px;
-    }
-    input, select {
-      width: 100%;
-      height: 42px;
-      border: none;
-      border-radius: 10px;
-      background: #1f2937;
-      color: #fff;
-      padding: 0 12px;
-      font-size: 14px;
-      outline: none;
-    }
-    .drop {
-      border: 2px dashed rgba(255, 255, 255, 0.18);
-      border-radius: 12px;
-      padding: 16px;
-      text-align: center;
-      cursor: pointer;
-      background: rgba(255, 255, 255, 0.03);
-      transition: 0.18s;
-      margin-bottom: 8px;
-      font-size: 13px;
-      color: #e5e7eb;
-    }
-    .drop.dragover {
-      border-color: #60a5fa;
-      background: rgba(96, 165, 250, 0.12);
-    }
-    button {
-      width: 100%;
-      height: 44px;
-      border: none;
-      border-radius: 10px;
-      background: linear-gradient(135deg, #1d4ed8, #2563eb);
-      color: #fff;
-      font-size: 14px;
-      font-weight: 700;
-      cursor: pointer;
-      margin-top: 8px;
-    }
-    .stage h3 {
-      margin: 0 0 10px;
-      font-size: 18px;
-    }
-    .poster-stage {
-      border-radius: 14px;
-      background: #020617;
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      padding: 12px;
-      overflow: auto;
-    }
-    .poster-holder {
-      position: relative;
-      min-height: 420px;
-    }
-    .poster {
-      position: absolute;
-      left: 0;
-      top: 0;
-      width: 1080px;
-      height: 1920px;
-      border-radius: 28px;
-      overflow: hidden;
-      transform-origin: top left;
-      box-shadow: 0 24px 68px rgba(0, 0, 0, 0.42);
-      background: #0b2048;
-    }
-    .bg {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-    .overlay-top {
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(
-        180deg,
-        rgba(10, 20, 38, 0.18) 0%,
-        rgba(10, 20, 38, 0.44) 50%,
-        rgba(10, 20, 38, 0.78) 100%
-      );
-    }
-    .overlay-bottom {
-      position: absolute;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      height: 54%;
-      background: linear-gradient(180deg, transparent 0%, rgba(7, 14, 28, 0.85) 72%, rgba(7, 14, 28, 0.97) 100%);
-    }
-    .brand {
-      position: absolute;
-      left: 34px;
-      top: 34px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      background: rgba(20, 56, 146, 0.9);
-      border: 1px solid rgba(255, 255, 255, 0.18);
-      border-radius: 16px;
-      padding: 12px 16px;
-      z-index: 3;
-    }
-    .logo {
-      width: 42px;
-      height: 42px;
-      flex: 0 0 42px;
-    }
-    .brand .cn {
-      font-size: 30px;
-      line-height: 1;
-      font-weight: 900;
-      letter-spacing: 1px;
-    }
-    .brand .en {
-      margin-top: 3px;
-      font-size: 11px;
-      letter-spacing: 1.3px;
-      opacity: 0.95;
-    }
-    .chips {
-      position: absolute;
-      top: 132px;
-      left: 34px;
-      display: flex;
-      gap: 10px;
-      z-index: 3;
-    }
-    .chip {
-      border-radius: 999px;
-      padding: 8px 14px;
-      font-size: 20px;
-      font-weight: 700;
-      color: #e0f2fe;
-      border: 1px solid rgba(255, 255, 255, 0.22);
-      background: rgba(15, 23, 42, 0.34);
-      backdrop-filter: blur(5px);
-    }
-    .play-wrap {
-      position: absolute;
-      left: 50%;
-      top: 43%;
-      transform: translate(-50%, -50%);
-      text-align: center;
-      z-index: 2;
-    }
-    .play-ring {
-      width: 190px;
-      height: 190px;
-      border-radius: 50%;
-      border: 3px solid rgba(255, 255, 255, 0.76);
-      display: grid;
-      place-items: center;
-      background: rgba(15, 23, 42, 0.32);
-      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
-    }
-    .play {
-      width: 142px;
-      height: 142px;
-      border-radius: 50%;
-      display: grid;
-      place-items: center;
-      background: rgba(255, 255, 255, 0.9);
-      color: #1147b2;
-      font-size: 66px;
-      font-weight: 900;
-      padding-left: 10px;
-    }
-    .play-label {
-      margin-top: 14px;
-      font-size: 25px;
-      font-weight: 700;
-      color: rgba(255, 255, 255, 0.94);
-      letter-spacing: 0.8px;
-    }
-    .bottom {
-      position: absolute;
-      left: 28px;
-      right: 28px;
-      bottom: 28px;
-      border-radius: 24px;
-      border: 1px solid rgba(255, 255, 255, 0.18);
-      background: linear-gradient(140deg, rgba(17, 71, 178, 0.9), rgba(22, 95, 216, 0.76));
-      backdrop-filter: blur(10px);
-      padding: 26px 28px 24px;
-      z-index: 3;
-    }
-    .eyebrow {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 24px;
-      font-weight: 700;
-      color: rgba(255, 255, 255, 0.95);
-      margin-bottom: 10px;
-    }
-    .title {
-      font-size: 58px;
-      line-height: 1.1;
-      font-weight: 900;
-      text-wrap: balance;
-    }
-    .meta {
-      margin-top: 10px;
-      font-size: 29px;
-      color: rgba(255, 255, 255, 0.95);
-      font-weight: 700;
-    }
-    .price {
-      margin-top: 14px;
-      font-size: 72px;
-      line-height: 1;
-      font-weight: 900;
-      color: #f8cc59;
-      text-shadow: 0 6px 22px rgba(0, 0, 0, 0.28);
-    }
-    .highlights {
-      margin-top: 16px;
-      display: grid;
-      gap: 8px;
-      font-size: 24px;
-      font-weight: 700;
-      color: #f8fafc;
-    }
-    .signature {
-      margin-top: 16px;
-      padding-top: 14px;
-      border-top: 1px solid rgba(255, 255, 255, 0.18);
-      font-size: 20px;
-      color: rgba(255, 255, 255, 0.94);
-      letter-spacing: 0.4px;
-    }
-    .note {
-      margin-top: 10px;
-      font-size: 12px;
-      color: #94a3b8;
-      line-height: 1.7;
-    }
-    @media (max-width: 1100px) {
-      .wrap { grid-template-columns: 1fr; }
-      .panel { position: static; }
-    }
+    .wrap { max-width: 1500px; margin: 0 auto; display: grid; grid-template-columns: 360px 1fr; gap: 20px; }
+    .panel, .stage { background: rgba(17, 24, 39, 0.92); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 18px; padding: 18px; backdrop-filter: blur(10px); }
+    .panel { position: sticky; top: 20px; height: fit-content; }
+    h2 { font-size: 20px; margin: 0 0 12px; }
+    .sub { font-size: 12px; color: #93c5fd; margin: 0 0 12px; line-height: 1.6; }
+    .hint { font-size: 12px; color: #94a3b8; margin: -2px 0 10px; }
+    .field { margin-bottom: 10px; }
+    label { display: block; font-size: 13px; color: #cbd5e1; margin-bottom: 6px; }
+    input, select { width: 100%; height: 42px; border: none; border-radius: 10px; background: #1f2937; color: #fff; padding: 0 12px; font-size: 14px; outline: none; font-family: inherit; }
+    .drop { border: 2px dashed rgba(255, 255, 255, 0.18); border-radius: 12px; padding: 16px; text-align: center; cursor: pointer; background: rgba(255, 255, 255, 0.03); transition: 0.18s; margin-bottom: 8px; font-size: 13px; color: #e5e7eb; }
+    .drop.dragover { border-color: #60a5fa; background: rgba(96, 165, 250, 0.12); }
+    button { width: 100%; height: 44px; border: none; border-radius: 10px; background: linear-gradient(135deg, #1d4ed8, #2563eb); color: #fff; font-size: 14px; font-weight: 700; cursor: pointer; margin-top: 8px; font-family: inherit; }
+    .stage h3 { margin: 0 0 10px; font-size: 18px; }
+    .poster-stage { border-radius: 14px; background: #020617; border: 1px solid rgba(255, 255, 255, 0.06); padding: 12px; overflow: auto; }
+    .poster-holder { position: relative; min-height: 420px; }
+    .poster { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; border-radius: 28px; overflow: hidden; transform-origin: top left; box-shadow: 0 24px 68px rgba(0, 0, 0, 0.42); background: #0b2048; }
+    .bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .overlay-top { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(10, 20, 38, 0.18) 0%, rgba(10, 20, 38, 0.44) 50%, rgba(10, 20, 38, 0.78) 100%); }
+    .overlay-bottom { position: absolute; left: 0; right: 0; bottom: 0; height: 54%; background: linear-gradient(180deg, transparent 0%, rgba(7, 14, 28, 0.85) 72%, rgba(7, 14, 28, 0.97) 100%); }
+    .brand { position: absolute; left: 34px; top: 34px; display: flex; align-items: center; gap: 12px; background: rgba(20, 56, 146, 0.9); border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 16px; padding: 12px 16px; z-index: 3; }
+    .logo { width: 42px; height: 42px; flex: 0 0 42px; }
+    .brand .cn { font-size: 30px; line-height: 1; font-weight: 900; letter-spacing: 1px; }
+    .brand .en { margin-top: 3px; font-size: 11px; letter-spacing: 1.3px; opacity: 0.95; }
+    .chips { position: absolute; top: 132px; left: 34px; display: flex; gap: 10px; z-index: 3; }
+    .chip { border-radius: 999px; padding: 8px 14px; font-size: 20px; font-weight: 700; color: #e0f2fe; border: 1px solid rgba(255, 255, 255, 0.22); background: rgba(15, 23, 42, 0.34); backdrop-filter: blur(5px); }
+    .play-wrap { position: absolute; left: 50%; top: 43%; transform: translate(-50%, -50%); text-align: center; z-index: 2; }
+    .play-ring { width: 190px; height: 190px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.76); display: grid; place-items: center; background: rgba(15, 23, 42, 0.32); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28); }
+    .play { width: 142px; height: 142px; border-radius: 50%; display: grid; place-items: center; background: rgba(255, 255, 255, 0.9); color: #1147b2; font-size: 66px; font-weight: 900; padding-left: 10px; }
+    .play-label { margin-top: 14px; font-size: 25px; font-weight: 700; color: rgba(255, 255, 255, 0.94); letter-spacing: 0.8px; }
+    .bottom { position: absolute; left: 28px; right: 28px; bottom: 28px; border-radius: 24px; border: 1px solid rgba(255, 255, 255, 0.18); background: linear-gradient(140deg, rgba(17, 71, 178, 0.9), rgba(22, 95, 216, 0.76)); backdrop-filter: blur(10px); padding: 26px 28px 24px; z-index: 3; }
+    .eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 24px; font-weight: 700; color: rgba(255, 255, 255, 0.95); margin-bottom: 10px; }
+    .title { font-size: 58px; line-height: 1.1; font-weight: 900; text-wrap: balance; }
+    .meta { margin-top: 10px; font-size: 29px; color: rgba(255, 255, 255, 0.95); font-weight: 700; }
+    .price { margin-top: 14px; font-size: 72px; line-height: 1; font-weight: 900; color: #f8cc59; text-shadow: 0 6px 22px rgba(0, 0, 0, 0.28); }
+    .highlights { margin-top: 16px; display: grid; gap: 8px; font-size: 24px; font-weight: 700; color: #f8fafc; }
+    .signature { margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.18); font-size: 20px; color: rgba(255, 255, 255, 0.94); letter-spacing: 0.4px; }
+    .note { margin-top: 10px; font-size: 12px; color: #94a3b8; line-height: 1.7; }
+    @media (max-width: 1100px) { .wrap { grid-template-columns: 1fr; } .panel { position: static; } }
   </style>
 </head>
 <body>
@@ -309,204 +61,33 @@
     <div class="panel">
       <h2>模板4 · 竖版视频封面（新版）</h2>
       <p class="sub">更顺眼的信息层级，默认 9:16 适合视频封面，也可切到 4:5 发图文频道。</p>
-
-      <div class="field">
-        <label for="listing_id">房源编号（仅入库，不上图）</label>
-        <input id="listing_id" placeholder="例如 QL-2026-001">
-      </div>
-      <div class="field">
-        <label for="ratio">导出比例</label>
-        <select id="ratio">
-          <option value="9:16" selected>9:16（1080×1920，视频封面）</option>
-          <option value="4:5">4:5（1080×1350，频道发图）</option>
-        </select>
-      </div>
-      <div class="field">
-        <label for="project">项目名</label>
-        <input id="project" value="富力城">
-      </div>
-      <div class="field">
-        <label for="layout">户型</label>
-        <input id="layout" value="1房1卫">
-      </div>
-      <div class="field">
-        <label for="area">区域</label>
-        <input id="area" value="BKK1">
-      </div>
-      <div class="field">
-        <label for="price">价格</label>
-        <input id="price" value="$680/月">
-      </div>
-      <div class="field">
-        <label for="h1">亮点1</label>
-        <input id="h1" value="✅ 家具家电齐全">
-      </div>
-      <div class="field">
-        <label for="h2">亮点2</label>
-        <input id="h2" value="✅ 中文顾问可约看房">
-      </div>
-
-      <div class="drop" id="drop">点击或拖拽上传背景图</div>
-      <input id="file" type="file" accept="image/*" style="display:none">
-      <div class="hint">建议用实拍图，人物或户型主体放中间偏上更好看。</div>
-
-      <button id="btn">更新预览</button>
+      <div class="field"><label for="listing_id">房源编号（仅入库，不上图）</label><input id="listing_id" placeholder="例如 QL-2026-001"></div>
+      <div class="field"><label for="ratio">导出比例</label><select id="ratio"><option value="9:16" selected>9:16（1080×1920，视频封面）</option><option value="4:5">4:5（1080×1350，频道发图）</option></select></div>
+      <div class="field"><label for="project">项目名</label><input id="project" value="富力城"></div>
+      <div class="field"><label for="layout">户型</label><input id="layout" value="1房1卫"></div>
+      <div class="field"><label for="area">区域</label><input id="area" value="BKK1"></div>
+      <div class="field"><label for="price">价格</label><input id="price" value="$680/月"></div>
+      <div class="field"><label for="h1">亮点1</label><input id="h1" value="✅ 家具家电齐全"></div>
+      <div class="field"><label for="h2">亮点2</label><input id="h2" value="✅ 中文顾问可约看房"></div>
+      <div class="drop" id="drop">点击或拖拽上传背景图</div><input id="file" type="file" accept="image/*" style="display:none"><div class="hint">建议用实拍图，人物或户型主体放中间偏上更好看。</div><button id="btn">更新预览</button>
     </div>
-
-    <div class="stage">
-      <h3>竖版预览</h3>
-      <div class="poster-stage" id="stage">
-        <div class="poster-holder" id="poster_holder">
-          <div class="poster" id="poster">
-            <img
-              id="bg"
-              class="bg"
-              src="https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?q=80&w=2000&auto=format&fit=crop"
-              alt="背景图"
-            >
-            <div class="overlay-top"></div>
-            <div class="overlay-bottom"></div>
-
-            <div class="brand">
-              <svg class="logo" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M14 62L60 30L106 62" stroke="white" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M24 58V88H44V68H76V88H96V58" stroke="white" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M16 92C33 84 49 81 60 81C71 81 87 84 104 92" stroke="white" stroke-width="8" stroke-linecap="round"/>
-              </svg>
-              <div>
-                <div class="cn">侨联地产</div>
-                <div class="en">QIAO LIAN PROPERTY</div>
-              </div>
-            </div>
-
-            <div class="chips">
-              <span class="chip" id="layout_chip">1房1卫</span>
-              <span class="chip" id="area_chip">BKK1</span>
-            </div>
-
-            <div class="play-wrap">
-              <div class="play-ring">
-                <div class="play">▶</div>
-              </div>
-              <div class="play-label">实拍视频看房</div>
-            </div>
-
-            <div class="bottom">
-              <div class="eyebrow">🏠 热门房源</div>
-              <div class="title">
-                <span id="project_text">富力城</span> · <span id="layout_text">1房1卫</span>
-              </div>
-              <div class="meta">📍 <span id="area_text">BKK1</span></div>
-              <div class="price" id="price_text">$680/月</div>
-              <div class="highlights">
-                <div id="h1_text">✅ 家具家电齐全</div>
-                <div id="h2_text">✅ 中文顾问可约看房</div>
-              </div>
-              <div class="signature">💎 侨联地产｜您在金边的自己人</div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="note">
-        视觉建议：9:16 适合视频封面；如果只发图片到频道，用 4:5 更紧凑。
-      </div>
-    </div>
+    <div class="stage"><h3>竖版预览</h3><div class="poster-stage" id="stage"><div class="poster-holder" id="poster_holder"><div class="poster" id="poster">
+      <img id="bg" class="bg" src="https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?q=80&w=2000&auto=format&fit=crop" alt="背景图"><div class="overlay-top"></div><div class="overlay-bottom"></div>
+      <div class="brand"><svg class="logo" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 62L60 30L106 62" stroke="white" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M24 58V88H44V68H76V88H96V58" stroke="white" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 92C33 84 49 81 60 81C71 81 87 84 104 92" stroke="white" stroke-width="8" stroke-linecap="round"/></svg><div><div class="cn">侨联地产</div><div class="en">QIAO LIAN PROPERTY</div></div></div>
+      <div class="chips"><span class="chip" id="layout_chip">1房1卫</span><span class="chip" id="area_chip">BKK1</span></div><div class="play-wrap"><div class="play-ring"><div class="play">▶</div></div><div class="play-label">实拍视频看房</div></div>
+      <div class="bottom"><div class="eyebrow">🏠 热门房源</div><div class="title"><span id="project_text">富力城</span> · <span id="layout_text">1房1卫</span></div><div class="meta">📍 <span id="area_text">BKK1</span></div><div class="price" id="price_text">$680/月</div><div class="highlights"><div id="h1_text">✅ 家具家电齐全</div><div id="h2_text">✅ 中文顾问可约看房</div></div><div class="signature">💎 侨联地产｜您在金边的自己人</div></div>
+    </div></div></div><div class="note">视觉建议：9:16 适合视频封面；如果只发图片到频道，用 4:5 更紧凑。</div></div>
   </div>
-
   <script>
-    const ratioPreset = {
-      "9:16": { width: 1080, height: 1920 },
-      "4:5": { width: 1080, height: 1350 }
-    };
-
-    const file = document.getElementById("file");
-    const drop = document.getElementById("drop");
-    const bg = document.getElementById("bg");
-    const poster = document.getElementById("poster");
-    const stage = document.getElementById("stage");
-    const holder = document.getElementById("poster_holder");
-    const ratio = document.getElementById("ratio");
-
-    const project = document.getElementById("project");
-    const layout = document.getElementById("layout");
-    const area = document.getElementById("area");
-    const price = document.getElementById("price");
-    const h1 = document.getElementById("h1");
-    const h2 = document.getElementById("h2");
-    const listingId = document.getElementById("listing_id");
-
-    function genListingId() {
-      return "QL-" + Math.random().toString(36).slice(2, 6).toUpperCase() + Math.floor(1000 + Math.random() * 9000);
-    }
-
-    function normalizePrice(raw) {
-      const text = (raw || "").trim();
-      if (!text) return "";
-      if (text.includes("/月")) return text;
-      return text + "/月";
-    }
-
-    function applyRatio() {
-      const preset = ratioPreset[ratio.value];
-      poster.style.width = preset.width + "px";
-      poster.style.height = preset.height + "px";
-      fitPreview();
-    }
-
-    function fitPreview() {
-      const posterWidth = poster.offsetWidth || 1080;
-      const posterHeight = poster.offsetHeight || 1920;
-      const availableWidth = Math.max(stage.clientWidth - 24, 320);
-      const scale = Math.min(1, availableWidth / posterWidth);
-      poster.style.transform = "scale(" + scale + ")";
-      holder.style.height = Math.ceil(posterHeight * scale + 24) + "px";
-    }
-
-    function updateText() {
-      let lid = listingId.value.trim();
-      if (!lid) {
-        lid = genListingId();
-        listingId.value = lid;
-      }
-      document.getElementById("project_text").textContent = project.value.trim() || "";
-      document.getElementById("layout_text").textContent = layout.value.trim() || "";
-      document.getElementById("area_text").textContent = area.value.trim() || "";
-      document.getElementById("price_text").textContent = normalizePrice(price.value);
-      document.getElementById("layout_chip").textContent = layout.value.trim() || "";
-      document.getElementById("area_chip").textContent = area.value.trim() || "";
-      document.getElementById("h1_text").textContent = h1.value.trim() || "";
-      document.getElementById("h2_text").textContent = h2.value.trim() || "";
-    }
-
-    drop.addEventListener("click", () => file.click());
-    drop.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      drop.classList.add("dragover");
-    });
-    drop.addEventListener("dragleave", () => drop.classList.remove("dragover"));
-    drop.addEventListener("drop", (e) => {
-      e.preventDefault();
-      drop.classList.remove("dragover");
-      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-        bg.src = URL.createObjectURL(e.dataTransfer.files[0]);
-      }
-    });
-    file.addEventListener("change", (e) => {
-      if (e.target.files && e.target.files[0]) {
-        bg.src = URL.createObjectURL(e.target.files[0]);
-      }
-    });
-
-    document.getElementById("btn").addEventListener("click", () => {
-      updateText();
-      applyRatio();
-    });
-
-    ratio.addEventListener("change", applyRatio);
-    window.addEventListener("resize", fitPreview);
-
-    updateText();
-    applyRatio();
+    const ratioPreset = {"9:16": { width: 1080, height: 1920 }, "4:5": { width: 1080, height: 1350 }};
+    const file = document.getElementById("file"), drop = document.getElementById("drop"), bg = document.getElementById("bg"), poster = document.getElementById("poster"), stage = document.getElementById("stage"), holder = document.getElementById("poster_holder"), ratio = document.getElementById("ratio");
+    const project = document.getElementById("project"), layout = document.getElementById("layout"), area = document.getElementById("area"), price = document.getElementById("price"), h1 = document.getElementById("h1"), h2 = document.getElementById("h2"), listingId = document.getElementById("listing_id");
+    function genListingId(){return "QL-"+Math.random().toString(36).slice(2,6).toUpperCase()+Math.floor(1000+Math.random()*9000)}
+    function normalizePrice(raw){const text=(raw||"").trim();if(!text)return "";if(text.includes("/月"))return text;return text+"/月"}
+    function applyRatio(){const preset=ratioPreset[ratio.value];poster.style.width=preset.width+"px";poster.style.height=preset.height+"px";fitPreview()}
+    function fitPreview(){const posterWidth=poster.offsetWidth||1080,posterHeight=poster.offsetHeight||1920,availableWidth=Math.max(stage.clientWidth-24,320),scale=Math.min(1,availableWidth/posterWidth);poster.style.transform="scale("+scale+")";holder.style.height=Math.ceil(posterHeight*scale+24)+"px"}
+    function updateText(){let lid=listingId.value.trim();if(!lid){lid=genListingId();listingId.value=lid}document.getElementById("project_text").textContent=project.value.trim()||"";document.getElementById("layout_text").textContent=layout.value.trim()||"";document.getElementById("area_text").textContent=area.value.trim()||"";document.getElementById("price_text").textContent=normalizePrice(price.value);document.getElementById("layout_chip").textContent=layout.value.trim()||"";document.getElementById("area_chip").textContent=area.value.trim()||"";document.getElementById("h1_text").textContent=h1.value.trim()||"";document.getElementById("h2_text").textContent=h2.value.trim()||""}
+    drop.addEventListener("click",()=>file.click());drop.addEventListener("dragover",e=>{e.preventDefault();drop.classList.add("dragover")});drop.addEventListener("dragleave",()=>drop.classList.remove("dragover"));drop.addEventListener("drop",e=>{e.preventDefault();drop.classList.remove("dragover");if(e.dataTransfer.files&&e.dataTransfer.files[0])bg.src=URL.createObjectURL(e.dataTransfer.files[0])});file.addEventListener("change",e=>{if(e.target.files&&e.target.files[0])bg.src=URL.createObjectURL(e.target.files[0])});document.getElementById("btn").addEventListener("click",()=>{updateText();applyRatio()});ratio.addEventListener("change",applyRatio);window.addEventListener("resize",fitPreview);updateText();applyRatio();
   </script>
 </body>
 </html>
