@@ -37,10 +37,10 @@ def test_album_is_clean_white_4_3_and_keeps_both_sides():
 
 def test_publish_routing_matches_product_contract():
     assert _default_publish_layout_for_scope('manual') == 'buttons'
-    assert _default_publish_layout_for_scope('collected') == 'links'
-    assert _main_album_limit(property_type='公寓', price=700, scope='collected', publish_layout='links') == 4
-    assert _main_album_limit(property_type='排屋', price=1000, scope='collected', publish_layout='links') == 6
-    assert _main_album_limit(property_type='公寓', price=1800, scope='collected', publish_layout='links') == 6
+    assert _default_publish_layout_for_scope('collected') == 'buttons'
+    assert _main_album_limit(property_type='公寓', price=700, scope='collected', publish_layout='buttons') == 1
+    assert _main_album_limit(property_type='排屋', price=1000, scope='collected', publish_layout='buttons') == 1
+    assert _main_album_limit(property_type='公寓', price=1800, scope='collected', publish_layout='buttons') == 1
     assert _main_album_limit(property_type='别墅', price=5000, scope='manual', publish_layout='buttons') == 1
     routed = classify(source_type='telegram', source_name='collector', property_type='排屋', project='Vila Town', price=1200)
     assert routed['listing_type'] == 'townhouse'

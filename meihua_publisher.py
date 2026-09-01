@@ -3745,7 +3745,7 @@ async def _tg_publish(
     caption_variant: str | None = "a",
     frozen_caption: str | None = None,
     frozen_discussion_text: str | None = None,
-    publish_layout: str = "links",
+    publish_layout: str = "buttons",
     publish_cover: str = "cover",
 ) -> dict:
     """
@@ -3765,7 +3765,7 @@ async def _tg_publish(
     gate = gate or evaluate_publish_gate(d, cover_path, DB_PATH)
     if not gate.get("is_publishable", True):
         raise ValueError("publish_blocked:" + ",".join(gate.get("reasons") or []))
-    publish_layout = "links" if str(publish_layout).lower() == "links" else "buttons"
+    publish_layout = "buttons"
     publish_cover = "none" if str(publish_cover).lower() == "none" else "cover"
     # 管理员可独立选择行动按钮和封面。未使用封面时，以冻结实拍首图作为频道首图。
     album_all = gate.get("album_all") or _album_paths_for_draft(d, cover_path, DB_PATH)
@@ -3981,7 +3981,7 @@ def tg_publish(
     caption_variant: str | None = "a",
     frozen_caption: str | None = None,
     frozen_discussion_text: str | None = None,
-    publish_layout: str = "links",
+    publish_layout: str = "buttons",
     publish_cover: str = "cover",
 ) -> dict:
     return asyncio.run(
@@ -4316,7 +4316,7 @@ class MeihuaPublisher:
         d["_frozen_post_text"] = frozen_package.get("post_text") or ""
         d["_frozen_discussion_text"] = frozen_package.get("discussion_text") or ""
         d["_frozen_public_token"] = frozen_package.get("public_token") or ""
-        d["_frozen_publish_layout"] = str(frozen_snapshot.get("publish_layout") or "links")
+        d["_frozen_publish_layout"] = "buttons"
         d["_frozen_publish_cover"] = str(frozen_snapshot.get("publish_cover") or "cover")
         expected_qc = _qc_code_from_draft(d)
         if expected_qc not in d["_frozen_post_text"]:
@@ -4479,7 +4479,7 @@ class MeihuaPublisher:
                 caption_variant=caption_variant,
                 frozen_caption=d.get("_frozen_post_text"),
                 frozen_discussion_text=d.get("_frozen_discussion_text"),
-                publish_layout=d.get("_frozen_publish_layout") or "links",
+                publish_layout="buttons",
                 publish_cover=d.get("_frozen_publish_cover") or "cover",
             )
             channel_message_id = tg_result["media_message_ids"][0]

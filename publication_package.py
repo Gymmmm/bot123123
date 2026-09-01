@@ -114,8 +114,9 @@ def _source_style_scope(source_type: str, source_name: str = "") -> str:
 
 
 def _default_publish_layout_for_scope(scope: str) -> str:
-    """管理员自录默认单图按钮；采集房源默认原生相册+评论区。"""
-    return "buttons" if str(scope or "").strip().lower() == "manual" else "links"
+    """频道主帖统一为单图三按钮；完整相册由用户 Bot 承接。"""
+    _ = scope
+    return "buttons"
 
 
 def _main_album_limit(*, property_type: str, price: Any, scope: str, publish_layout: str) -> int:
@@ -828,8 +829,8 @@ def build_package(
         selected_variant = saved.group(1).lower() if saved else styles["caption_variant"]
     styles["caption_variant"] = selected_variant
     review_note = str(d.get("review_note") or "")
-    layout_match = re.search(r"publish_layout:(buttons|links)", review_note, flags=re.I)
-    publish_layout = layout_match.group(1).lower() if layout_match else _default_publish_layout_for_scope(styles["scope"])
+    # 最终频道合同：无论来源或旧 review_note 如何，均只发一张封面并挂三个按钮。
+    publish_layout = "buttons"
     cover_match = re.search(r"publish_cover:(cover|none)", review_note, flags=re.I)
     publish_cover = cover_match.group(1).lower() if cover_match else "cover"
     template = template_override or styles["cover_template"] or routing["cover_template"]
