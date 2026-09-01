@@ -2284,7 +2284,7 @@ def build_chinese_listing_post(
     if size and re.fullmatch(r"\d+(?:\.\d+)?", size):
         size = f"{size}㎡"
     deposit = _confirmed_public_detail(
-        _normalize_deposit_text(_listing_value(d, "payment_terms", "deposit", default=""))
+        _normalize_deposit_text(_listing_value(d, "payment_terms", "deposit", "deposit_rule", default=""))
     )
     contract = _confirmed_public_detail(
         _normalize_contract_term(_listing_value(d, "contract_term", default=""))
@@ -2299,8 +2299,8 @@ def build_chinese_listing_post(
     room_type = _display_layout(room_type, heading_type)
     # 所有公开外显统一使用 QC 编号；内部 listing_id 不直接展示。
     qc_code = _qc_code_from_draft(d)
-    title_room_match = re.search(r"\d{1,2}(?:\s*\+\s*\d{1,2})?房", room_type)
-    title_room = re.sub(r"\s+", "", title_room_match.group(0)) if title_room_match else room_type
+    # 频道标题保留完整户型（例如“2房2卫”），不再只截取房数。
+    title_room = re.sub(r"\s+", "", room_type)
     floor = _display_floor(_listing_value(d, "floor", default=""))
     raw_original = _listing_value(d, "original_price", "original_monthly_rent_usd", default="")
     try:
@@ -2429,20 +2429,46 @@ def build_chinese_listing_post(
     compact_heading = "｜".join(
         dict.fromkeys(part for part in (project or area_display, title_room) if part)
     )
-    compact_type = "｜".join(part for part in (heading_type, public_size) if part)
-    compact_rental = "｜".join(part for part in (deposit, contract) if part)
+    compact_type = "｜".join(part for part in (heading_type, public_size, public_floor) if part)
+    compact_rental = "｜".join(
+        part for part in (
+            deposit,
+            f"租期{contract}" if contract and not contract.startswith("租期") else contract,
+        ) if part
+    )
+    status = str(d.get("status") or normalized.get("status") or "").strip().lower()
+    status_line = {
+        "active": "🟢 当前可预约",
+        "reserved": "🟡 已有预约 · 仍可预约",
+    }.get(status, "")
+    area_tag = re.sub(r"[^0-9A-Za-z\u4e00-\u9fff]+", "", area_display or project or "")
+    rent_value = _price_value(d)
+    if rent_value <= 0:
+        rent_tag = ""
+    elif rent_value < 500:
+        rent_tag = "#租金500以下"
+    elif rent_value < 1000:
+        rent_tag = "#租金500至1000"
+    elif rent_value < 1200:
+        rent_tag = "#租金1000至1200"
+    elif rent_value < 2000:
+        rent_tag = "#租金1200至2000"
+    elif rent_value < 3000:
+        rent_tag = "#租金2000至3000"
+    else:
+        rent_tag = "#租金3000以上"
+    tags = [f"#{area_tag}" if area_tag else "", "#金边租房", rent_tag]
     unified_lines = [
-        f"#{public_tag} #金边租房",
-        "",
         f"🏠 <b>{he(compact_heading or '金边实拍房源')}</b>",
         f"💰 <b>{he(price)}</b>/月" if price and "/月" not in price else (f"💰 <b>{he(price)}</b>" if price else ""),
-        f"📍 {he(area_display)}" if area_display and area_display != project else "",
-        f"🛏 {he(room_type)}" if room_type else "",
+        "",
         f"🏢 {he(compact_type)}" if compact_type else "",
         f"🔑 {he(compact_rental)}" if compact_rental else "",
         f"✨ {' · '.join(he(item) for item in caption_highlights[:2])}" if caption_highlights else "",
-        verified_line,
-        f"📸 <code>{he(qc_code)}</code>｜{he(comment_line.replace('👇', ''))}",
+        "",
+        f"📸 实拍房源｜<code>{he(qc_code)}</code>",
+        status_line,
+        " ".join(tag for tag in tags if tag),
     ]
     lines = unified_lines
     # 频道主帖只保留下方三个固定按钮作为 CTA；正文不再重复旧的预约/顾问文字链接。

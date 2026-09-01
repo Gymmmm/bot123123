@@ -79,6 +79,37 @@ def test_channel_caption_has_no_legacy_inline_action_links():
     assert "💬 问这套" not in text
 
 
+def test_channel_caption_uses_confirmed_compact_post_format():
+    text = meihua_publisher.build_chinese_listing_post({
+        "listing_id": "l_5",
+        "project": "钻石岛",
+        "area": "钻石岛",
+        "layout": "2房2卫",
+        "property_type": "公寓",
+        "size_sqm": 75,
+        "floor": "18/35楼",
+        "price": 680,
+        "deposit_rule": "押2付1",
+        "contract_term": "1年",
+        "highlights": ["家具家电齐全", "含物业"],
+        "status": "reserved",
+    })
+    assert text.splitlines() == [
+        "🏠 <b>钻石岛｜2房2卫</b>",
+        "💰 <b>$680/月</b>",
+        "",
+        "🏢 公寓｜75㎡｜18/35楼",
+        "🔑 押2付1｜租期1年",
+        "✨ 家具家电齐全 · 含物业",
+        "",
+        "📸 实拍房源｜<code>QC0005</code>",
+        "🟡 已有预约 · 仍可预约",
+        "#钻石岛 #金边租房 #租金500至1000",
+    ]
+    assert "　" not in text
+    assert "\n\n\n" not in text
+
+
 def test_detail_hides_empty_fields_and_uses_required_weights(monkeypatch):
     monkeypatch.setattr(listing, "listing_context", lambda _lid: {
         "listing_id": "QC0002", "project": "永旺1", "layout": "1房",
