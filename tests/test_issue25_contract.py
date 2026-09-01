@@ -92,19 +92,19 @@ def test_channel_caption_uses_confirmed_compact_post_format():
         "deposit_rule": "押2付1",
         "contract_term": "1年",
         "highlights": ["家具家电齐全", "含物业"],
+        "available_date": "随时入住",
         "status": "reserved",
     })
     assert text.splitlines() == [
         "🏠 <b>钻石岛｜2房2卫</b>",
-        "💰 <b>$680/月</b>",
         "",
-        "🏢 公寓｜75㎡｜18/35楼",
-        "🔑 押2付1｜租期1年",
-        "✨ 家具家电齐全 · 含物业",
+        "💰 <b>$680/月</b> 📐 <b>75㎡｜18/35楼</b>",
+        "📄 <b>押付/合同：押2付1｜1年</b>",
+        "📅 <b>可入住：随时入住</b>",
         "",
-        "📸 实拍房源｜<code>QC0005</code>",
-        "🟡 已有预约 · 仍可预约",
-        "#钻石岛 #金边租房 #租金500至1000",
+        "🟡 <b>已有预约 · 仍可预约</b> 🆔 <b>QJ0005</b>",
+        "",
+        "<b>#钻石岛 #两房 #金边租房</b>",
     ]
     assert "　" not in text
     assert "\n\n\n" not in text

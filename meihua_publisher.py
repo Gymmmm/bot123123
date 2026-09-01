@@ -2302,6 +2302,7 @@ def build_chinese_listing_post(
     room_type = _display_layout(room_type, heading_type)
     # 所有公开外显统一使用 QC 编号；内部 listing_id 不直接展示。
     qc_code = _qc_code_from_draft(d)
+    qj_code = re.sub(r"^QC", "QJ", qc_code)
     # 频道标题保留完整户型（例如“2房2卫”），不再只截取房数。
     title_room = re.sub(r"\s+", "", room_type)
     floor = _display_floor(_listing_value(d, "floor", default=""))
@@ -2446,34 +2447,32 @@ def build_chinese_listing_post(
         "active": "🟢 当前可预约",
         "reserved": "🟡 已有预约 · 仍可预约",
     }.get(status, "")
+    available = _confirmed_public_detail(_listing_value(d, "available_date", default=""), 16)
+    if available and not available.endswith("入住"):
+        available = f"{available}入住"
+    room_tag = ""
+    room_match = re.search(r"(\d{1,2})\s*房", room_type)
+    if room_match:
+        room_names = {"1": "一房", "2": "两房", "3": "三房", "4": "四房", "5": "五房", "6": "六房"}
+        room_tag = f"#{room_names.get(room_match.group(1), room_match.group(1) + '房')}"
     area_tag = re.sub(r"[^0-9A-Za-z\u4e00-\u9fff]+", "", area_display or project or "")
-    rent_value = _price_value(d)
-    if rent_value <= 0:
-        rent_tag = ""
-    elif rent_value < 500:
-        rent_tag = "#租金500以下"
-    elif rent_value < 1000:
-        rent_tag = "#租金500至1000"
-    elif rent_value < 1200:
-        rent_tag = "#租金1000至1200"
-    elif rent_value < 2000:
-        rent_tag = "#租金1200至2000"
-    elif rent_value < 3000:
-        rent_tag = "#租金2000至3000"
-    else:
-        rent_tag = "#租金3000以上"
-    tags = [f"#{area_tag}" if area_tag else "", "#金边租房", rent_tag]
+    tags = [f"#{area_tag}" if area_tag else "", room_tag, "#金边租房"]
+    size_floor = "｜".join(part for part in (public_size, public_floor) if part)
     unified_lines = [
         f"🏠 <b>{he(compact_heading or '金边实拍房源')}</b>",
-        f"💰 <b>{he(price)}</b>/月" if price and "/月" not in price else (f"💰 <b>{he(price)}</b>" if price else ""),
         "",
-        f"🏢 {he(compact_type)}" if compact_type else "",
-        f"🔑 {he(compact_rental)}" if compact_rental else "",
-        f"✨ {' · '.join(he(item) for item in caption_highlights[:2])}" if caption_highlights else "",
+        (
+            f"💰 <b>{he(price if '/月' in price else price + '/月')}</b> 📐 <b>{he(size_floor)}</b>"
+            if price and size_floor else
+            (f"💰 <b>{he(price if '/月' in price else price + '/月')}</b>" if price else
+             (f"📐 <b>{he(size_floor)}</b>" if size_floor else ""))
+        ),
+        f"📄 <b>押付/合同：{he(deposit)}｜{he(contract)}</b>" if deposit and contract else (f"📄 <b>押付/合同：{he(deposit or contract)}</b>" if deposit or contract else ""),
+        f"📅 <b>可入住：{he(available)}</b>" if available else "",
         "",
-        f"📸 实拍房源｜<code>{he(qc_code)}</code>",
-        status_line,
-        " ".join(tag for tag in tags if tag),
+        f"{status_line.split(' ', 1)[0]} <b>{he(status_line.split(' ', 1)[1])}</b> 🆔 <b>{he(qj_code)}</b>" if status_line else f"🆔 <b>{he(qj_code)}</b>",
+        "",
+        f"<b>{' '.join(tag for tag in tags if tag)}</b>",
     ]
     lines = unified_lines
     # 频道主帖只保留下方三个固定按钮作为 CTA；正文不再重复旧的预约/顾问文字链接。
