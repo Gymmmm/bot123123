@@ -28,6 +28,13 @@ def _display_listing_id(listing_id: object) -> str:
     return f'QC{int(match.group(1)):04d}' if match else raw.upper()
 
 
+def _internal_listing_id(listing_id: object) -> str:
+    """把公开 QCxxxx 编号还原为内部 l_x，其他 ID 原样保留。"""
+    raw = str(listing_id or '').strip()
+    match = re.fullmatch(r'(?i)QC[_-]?(\d+)', raw)
+    return f'l_{int(match.group(1))}' if match else raw
+
+
 def _display_layout(layout: object, property_type: object='') -> str:
     """把内部户型写法转换成客户容易读的展示文案，不修改底层事实。"""
     raw = re.sub(r'\s+', '', str(layout or '').strip())

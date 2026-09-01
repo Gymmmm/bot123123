@@ -13,7 +13,7 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
     from .search import create_lead as default_create_lead, detect_area
     from .session_deeplink import _normalize_variant, _split_target_meta, build_source_label, now_ts, parse_start_arg_payload, resolve_public_token
     from .texts import about_text, advisor_text, brand_story_text, discussion_entry_welcome_text, service_hub_text, want_home_prompt_text
-    from .utils_formatting import _display_listing_id
+    from .utils_formatting import _display_listing_id, _internal_listing_id
     user = update.effective_user
     create_lead = create_lead_fn or default_create_lead
     message = update.effective_message
@@ -31,6 +31,8 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
         target, target_meta = _split_target_meta(raw_target)
     if not target:
         target = raw_target
+    if action in {'appoint', 'consult', 'photos', 'details', 'book', 'similar', 'video', 'fav', 'discussion_entry'}:
+        target = _internal_listing_id(target)
     post_token = payload.get('post_token', '')
     channel_message_id = payload.get('channel_message_id')
     source = build_source_label(post_token)

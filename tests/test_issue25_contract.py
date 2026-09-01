@@ -16,6 +16,8 @@ from qiaolian_dual.texts import advisor_handoff_text, advisor_text
 from qiaolian_dual.flows import start_appointment
 from qiaolian_dual.results_admin import send_listing_photo_preview
 from qiaolian_dual.session_deeplink import parse_start_arg_payload
+from qiaolian_dual.start_routes import route_start_arg
+from qiaolian_dual.utils_formatting import _internal_listing_id
 
 
 def _labels(markup):
@@ -27,6 +29,26 @@ def test_property_deep_links_keep_id_and_direct_action():
         payload = parse_start_arg_payload(f"property_QC0002_{suffix}")
         assert payload["target"] == "QC0002"
         assert payload["action"] == action
+        assert _internal_listing_id(payload["target"]) == "l_2"
+
+
+@pytest.mark.asyncio
+async def test_public_qc_detail_route_resolves_to_internal_listing_id():
+    reply = AsyncMock()
+    update = SimpleNamespace(
+        effective_user=SimpleNamespace(id=7, username="tester", first_name="Test"),
+        effective_message=SimpleNamespace(reply_text=reply),
+    )
+    context = SimpleNamespace(user_data={})
+    seen = []
+    with (
+        patch("qiaolian_dual.listing.listing_action_allowed", side_effect=lambda lid, action: (seen.append((lid, action)) or (True, "reserved"))),
+        patch("qiaolian_dual.listing.listing_cost_text", side_effect=lambda lid: f"details:{lid}"),
+        patch("qiaolian_dual.listing.listing_cost_keyboard", return_value=None),
+    ):
+        await route_start_arg(update, context, "property_QC0002_details", create_lead_fn=lambda *args, **kwargs: 1)
+    assert seen == [("l_2", "detail")]
+    assert reply.await_args.args[0] == "details:l_2"
 
 
 def test_channel_cta_is_fixed_and_has_no_helper(monkeypatch):
