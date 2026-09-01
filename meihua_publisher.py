@@ -673,7 +673,8 @@ def _listing_highlight_pills(listing: dict, max_n: int = 3) -> list[str]:
             raw = [raw] if raw.strip() else []
     if not isinstance(raw, list):
         return []
-    out = [str(x).strip() for x in raw if str(x).strip()]
+    generic = {"侨联精选", "拎包入住", "精选房源", "优选房源"}
+    out = [str(x).strip() for x in raw if str(x).strip() and str(x).strip() not in generic]
     return out[:max_n]
 
 
@@ -1433,6 +1434,8 @@ def _project_label_for_post(d: dict) -> str:
     # it when callers already decoded a draft without normalized_data.
     primary = normalized.get("project_name") or d.get("project_name") or d.get("project") or ""
     primary = str(primary or "").strip()
+    if primary in {"侨联地产", "侨联精选", "精选房源", "金边房源"}:
+        primary = ""
     return _compact_copy(primary, 24) if primary else ""
 
 
@@ -2317,6 +2320,8 @@ def build_chinese_listing_post(
     raw_highlights = _as_list(normalized.get("highlights")) + _as_list(d.get("highlights"))
     caption_highlights: list[str] = []
     for item in raw_highlights:
+        if str(item or "").strip() in {"侨联精选", "拎包入住", "精选房源", "优选房源"}:
+            continue
         cleaned = _canonical_highlight_phrase(_normalize_fact_fragment(item, 18))
         if _is_noisy_highlight(cleaned) or cleaned in {"实拍房源", "可预约看房", "中文顾问"}:
             continue
@@ -2554,8 +2559,11 @@ def build_chinese_listing_post(
 
 def build_cover_listing_data(d: dict) -> dict:
     normalized = _parsed_normalized(d)
+    project = normalized.get("project_name") or d.get("project_name") or d.get("project") or ""
+    if str(project or "").strip() in {"侨联地产", "侨联精选", "精选房源", "金边房源"}:
+        project = normalized.get("public_location_display") or d.get("public_location_display") or d.get("area") or ""
     return {
-        "project": normalized.get("project_name") or d.get("project_name") or d.get("project") or "",
+        "project": project,
         "project_alias": normalized.get("project_alias") or d.get("project_alias") or "",
         "property_type": normalized.get("property_type_display") or d.get("property_type_display") or d.get("property_type") or "",
         "layout": normalized.get("layout") or d.get("layout") or d.get("room_type") or "",

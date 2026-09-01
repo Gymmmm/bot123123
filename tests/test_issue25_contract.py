@@ -110,6 +110,25 @@ def test_channel_caption_uses_confirmed_compact_post_format():
     assert "\n\n\n" not in text
 
 
+def test_channel_and_cover_hide_generic_marketing_labels():
+    listing = {
+        "listing_id": "l_38",
+        "project": "侨联地产",
+        "area": "洪森大道",
+        "layout": "4房",
+        "price": 1300,
+        "highlights": ["侨联精选", "拎包入住"],
+        "status": "reserved",
+    }
+    caption = meihua_publisher.build_chinese_listing_post(listing)
+    cover = meihua_publisher.build_cover_listing_data(listing)
+    assert "🏠 <b>洪森大道｜4房</b>" in caption
+    assert "侨联精选" not in caption
+    assert "拎包入住" not in caption
+    assert cover["project"] == "洪森大道"
+    assert cover["highlights"] == []
+
+
 def test_detail_hides_empty_fields_and_uses_required_weights(monkeypatch):
     monkeypatch.setattr(listing, "listing_context", lambda _lid: {
         "listing_id": "QC0002", "project": "永旺1", "layout": "1房",
