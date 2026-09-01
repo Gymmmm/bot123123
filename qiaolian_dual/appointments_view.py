@@ -72,11 +72,11 @@ def _appointment_summary_line(row: dict) -> list[str]:
 def list_recent_appointments(user_id: int) -> str:
     rows = db.list_appointments(user_id, limit=20)
     if not rows:
-        return '<b>📅 我的预约</b>\n\n你暂时还没有预约。\n看中具体房源后，点房源卡片里的「预约看房」，房源信息会自动带入。'
+        return '📅 <b>我的预约</b>\n\n你暂时还没有预约。\n看中具体房源后，点房源卡片里的「预约看房」，房源信息会自动带入。'
     rows = sorted(rows, key=_appointment_sort_key, reverse=True)
     upcoming = [row for row in rows if _appointment_is_upcoming(row)]
     history = [row for row in rows if row not in upcoming]
-    parts = ['<b>📅 我的预约</b>', '']
+    parts = ['📅 <b>我的预约</b>', '']
     if upcoming:
         parts.append('<b>即将进行</b>')
         for index, row in enumerate(upcoming[:2]):
@@ -130,7 +130,7 @@ def appointment_details_text(user_id: int) -> str:
     active_rows = [row for row in rows if _appointment_is_upcoming(row)]
     row = (active_rows or rows)[0]
     rows = [row]
-    parts = ['<b>📋 当前预约</b>', '']
+    parts = ['📋 <b>当前预约</b>', '']
     for index, row in enumerate(rows):
         mode = APPOINTMENT_MODE_LABELS.get(str(row.get('viewing_mode') or ''), str(row.get('viewing_mode') or '待确认'))
         time_label = _appointment_time_compact(row.get('appointment_time'))

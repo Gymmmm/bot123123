@@ -77,7 +77,7 @@ def deposit_text() -> str:
     return copy_deposit_text()
 
 def advisor_text() -> str:
-    return ('✅ <b>中文顾问已收到</b>\n\n中文顾问会通过 Telegram 联系你。\n如果是具体房源，房源信息会自动带上，不用重复说明。')
+    return ('✅ <b>顾问已收到</b>\n\n顾问会通过 Telegram 联系你。\n如果是具体房源，房源信息会自动带上，不用重复说明。')
 
 def advisor_handoff_text(*, listing_id: str='', user_id: int | None=None) -> str:
     from .admin_contract import _binding_end_date
@@ -89,11 +89,19 @@ def advisor_handoff_text(*, listing_id: str='', user_id: int | None=None) -> str
         area = str(item.get('area') or '金边')
         layout = _display_layout(item.get('layout') or item.get('property_type'), item.get('property_type')) or '房源'
         price_text = _fmt_price(item.get('price'))
-        return f"✅ <b>收到，我帮你联系中文顾问</b>\n\n🏠 {he(area)}｜{he(layout)}\n💰 <b>{he(price_text)}</b>\n\n房源信息已经带上，不用再重复发送。"
+        return f"✅ <b>顾问已收到</b>\n\n🏠 <b>{he(area)}｜{he(layout)}</b>\n💰 <b>租金：{he(price_text)}</b>\n\n房源信息已经带上，不用再重复发送。"
     if user_id:
         binding = db.get_active_binding(user_id)
         if binding:
-            return f"✅ <b>中文顾问已收到</b>\n\n🏠 当前房源：<b>{he(str(binding.get('property_name') or '待确认'))}</b>\n📅 到期：<b>{he(_binding_end_date(binding) or '待确认')}</b>\n\n中文顾问会按你当前的租约继续跟进。"
+            property_name = str(binding.get('property_name') or '').strip()
+            end_date = str(_binding_end_date(binding) or '').strip()
+            facts = []
+            if property_name:
+                facts.append(f"🏠 <b>当前房源：</b> {he(property_name)}")
+            if end_date:
+                facts.append(f"📅 <b>到期：</b> {he(end_date)}")
+            details = ('\n\n' + '\n'.join(facts)) if facts else ''
+            return f"✅ <b>顾问已收到</b>{details}\n\n顾问会按你当前的租约继续跟进。"
     return advisor_text()
 
 def smart_search_text() -> str:
@@ -109,7 +117,7 @@ def help_text() -> str:
     return ('❓ <b>怎么使用</b>\n\n找房：点“帮我找房”，选择类型、位置和预算。\n看房：打开一套可预约房源，点“预约看房”。\n咨询：点“联系中文顾问”，具体房源会自动带上。\n入住后：报修、物业沟通和周边生活都在“入住服务”。\n租约：可在“我的租约”查看，到期前 7 天可开启提醒。')
 
 def service_hub_text() -> str:
-    return ('<b>🛠 入住服务</b>\n\n房子有问题或需要物业沟通，直接点下面办理。\n侨联在租客户绑定租约后，报修会自动带上房屋信息；租约到期前 7 天会提醒你确认是否续租。')
+    return ('🛠 <b>入住服务</b>\n\n房子有问题或需要物业沟通，直接点下面办理。\n已绑定租约时会自动带上房屋信息，不用重复说明。')
 
 def local_life_text() -> str:
     return copy_local_life_text()

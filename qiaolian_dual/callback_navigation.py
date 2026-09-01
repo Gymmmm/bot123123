@@ -48,15 +48,15 @@ async def handle_navigation_callback(update: Update, context: ContextTypes.DEFAU
             await render_panel(update, text=local_life_text(), parse_mode=ParseMode.HTML, reply_markup=local_life_keyboard())
             return MAIN
     if data == 'smart_project':
-            await render_panel(update, text='<b>🏢 按公寓/楼盘找</b>\n\n发一个楼盘或公寓名称即可，也可以顺手带上预算和户型。\n例如：<code>富力 800 一房</code>', parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('🏠 返回首页', callback_data='home')]]))
+            await render_panel(update, text='🏢 <b>按公寓/楼盘找</b>\n\n发一个楼盘或公寓名称即可，也可以顺手带上预算和户型。\n例如：<code>富力 800 一房</code>', parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('🏠 返回首页', callback_data='home')]]))
             context.user_data['awaiting_keyword_find'] = {'source': 'smart_project'}
             return MAIN
     if data == 'smart_movein':
-            await render_panel(update, text='<b>📅 按入住时间找</b>\n\n告诉我大概什么时候入住；也可以把区域和预算一起发来。\n例如：<code>下月初 BKK1 700以内</code>', parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('🏠 返回首页', callback_data='home')]]))
+            await render_panel(update, text='📅 <b>按入住时间找</b>\n\n告诉我大概什么时候入住；也可以把区域和预算一起发来。\n例如：<code>下月初 BKK1 700以内</code>', parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('🏠 返回首页', callback_data='home')]]))
             context.user_data['awaiting_keyword_find'] = {'source': 'smart_movein'}
             return MAIN
     if data == 'keyword:handoff':
-            await render_panel(update, text='<b>💬 让顾问帮你找</b>\n\n把最在意的 2–3 个条件发给我即可，例如：<code>BKK1 · 700以内 · 一房 · 下月入住</code>。\n\n顾问会按这份需求继续帮你筛选；你不需要重复填写联系方式。', parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('🏠 返回首页', callback_data='home')]]))
+            await render_panel(update, text='💬 <b>让顾问帮你找</b>\n\n把最在意的 2–3 个条件发给我即可，例如：<code>BKK1 · 700以内 · 一房 · 下月入住</code>。\n\n顾问会按这份需求继续帮你筛选；你不需要重复填写联系方式。', parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('🏠 返回首页', callback_data='home')]]))
             context.user_data['awaiting_keyword_find'] = {'source': 'advisor_handoff'}
             return MAIN
     if data == 'hub:area':

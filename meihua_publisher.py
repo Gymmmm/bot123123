@@ -2496,7 +2496,7 @@ def build_chinese_listing_post(
     else:
         heading = "｜".join(dict.fromkeys(part for part in (project, title_room) if part))
         lines = [
-            f"<b>🏠 {he(heading or area_display or '金边房源')}</b>",
+            f"🏠 <b>{he(heading or area_display or '金边房源')}</b>",
             f"<code>侨联 #{he(qc_code)}</code>",
             section_break,
             f"💰 月租｜{price_markup}",

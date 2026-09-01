@@ -98,7 +98,7 @@ async def handle_main_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         await render_panel(update, text=welcome_text(), reply_markup=main_keyboard(), parse_mode=ParseMode.HTML, context=context, prefer_edit_anchor=True)
         return MAIN
     if any((token in normalized_text for token in ('找房', '租房', '房子', '公寓', '别墅'))):
-        await render_panel(update, text='<b>🔍 我来帮你找</b>\n\n直接发一句需求就可以，例如：\n<code>BKK1 800以内 一房</code>\n<code>钻石岛 两房 下月入住</code>\n\n不想打字，也可以点按钮选择。', parse_mode=ParseMode.HTML, reply_markup=search_entry_keyboard(), context=context, prefer_edit_anchor=True)
+        await render_panel(update, text='🔍 <b>我来帮你找</b>\n\n直接发一句需求就可以，例如：\n<code>BKK1 800以内 一房</code>\n<code>钻石岛 两房 下月入住</code>\n\n不想打字，也可以点按钮选择。', parse_mode=ParseMode.HTML, reply_markup=search_entry_keyboard(), context=context, prefer_edit_anchor=True)
         return MAIN
     contact_listing_id = str(context.user_data.get('contact_listing_id') or '').strip()
     if contact_listing_id:

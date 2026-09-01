@@ -39,10 +39,7 @@ class SimplifiedAppointmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("请选择方便看房的日期", text)
         self.assertIn("实时视频看房", text)
         self.assertNotIn("请选择你最关注的验房点", text)
-        self.assertEqual(
-            context.user_data["appt"]["focus_keys"],
-            list(user_bot.APPOINTMENT_FOCUS_ORDER),
-        )
+        self.assertEqual(context.user_data["appt"]["focus_keys"], [])
 
     async def test_back_paths_preserve_listing_source_and_default_checks(self):
         query = SimpleNamespace(

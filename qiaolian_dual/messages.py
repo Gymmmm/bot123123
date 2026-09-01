@@ -73,7 +73,7 @@ def listing_detail(item: dict) -> str:
 def viewing_delivery_assurance_text() -> str:
     """房源详情与预约流程共用的成交交付保障短模块。"""
     return (
-        "\n<b>🛡️ 看房与交付保障</b>\n"
+        "\n🛡️ <b>看房与交付保障</b>\n"
         "看中后：费用逐项核对。\n"
         "入住时：验房、水电表和钥匙/门卡确认留档。"
     )
@@ -99,7 +99,7 @@ def advisor_text() -> str:
     """联系我们页面"""
     return (
         "✅ <b>顾问已收到</b>\n\n"
-        "中文顾问会通过 Telegram 联系你。\n"
+        "顾问会通过 Telegram 联系你。\n"
         "这套房的信息已带上，不用重复说明。"
     )
 
@@ -126,9 +126,8 @@ def deposit_text() -> str:
 def home_text() -> str:
     """首页只说明客户能做什么；具体房态放在各套房源里。"""
     return (
-        "<b>🏠 侨联找房助手｜小彭</b>\n\n"
-        "金边中文租房。\n"
-        "可以直接找房、看实拍、预约或联系中文顾问。"
+        "🏠 <b>侨联找房助手｜小彭</b>\n\n"
+        "金边租房，先选你现在要做的事。"
     )
 
 
@@ -169,14 +168,14 @@ def brand_text() -> str:
 
 def want_home_text() -> str:
     return (
-        "<b>📍 提交找房需求</b>\n\n"
+        "📍 <b>提交找房需求</b>\n\n"
         "选出你最在意的条件即可。\n"
         "顾问会据此帮你缩小到 1–3 套更值得看的房源。"
     )
 def service_promise_text() -> str:
     """服务承诺"""
     return (
-        "<b>🛡️ 服务承诺</b>\n\n"
+        "🛡️ <b>服务承诺</b>\n\n"
         "<b>1. 看房无忧</b>\n"
         "支持实地看房与实时视频代看，您指到哪里，我们拍到哪里。\n\n"
         "<b>2. 费用透明</b>\n"
@@ -190,20 +189,15 @@ def service_promise_text() -> str:
 
 def appointment_hub_text() -> str:
     return (
-        "<b>📅 预约实拍 / 视频看房</b>\n\n"
-        "看中某套房，点帖子里的预约按钮会自动带上房源。\n"
-        "还没定房，也可以先约视频代看或实地看房，我来帮你继续收窄。\n\n"
-        "流程很短：\n"
-        "1）选方式\n"
-        "2）选关注点\n"
-        "3）选日期和时段\n"
-        "4）提交给顾问跟进"
+        "📅 <b>预约看房</b>\n\n"
+        "看中具体房源后，直接点「预约看房」选择日期和时间。\n"
+        "还没选好房源，可以先联系顾问。"
     )
 def service_hub_text() -> str:
     return (
-        "<b>🛠 入住服务</b>\n\n"
+        "🛠 <b>入住服务</b>\n\n"
         "房子有问题或需要物业沟通，直接点下面办理。\n"
-        "侨联在租客户绑定租约后，报修会自动带上房屋信息；租约到期前 7 天，我们也会贴心提醒你确认是否续租。"
+        "已绑定租约时会自动带上房屋信息，不用重复说明。"
     )
 
 
@@ -236,7 +230,7 @@ def search_entry_intro_text() -> str:
 
 def smart_find_play_prompt_text() -> str:
     return (
-        "<b>🎲 一句话关键词</b>\n\n"
+        "🎲 <b>一句话关键词</b>\n\n"
         "请直接发一句需求，无需固定格式。\n"
         "例如：<code>BKK1 预算800内 1房</code>\n"
         "也可以只发：<code>钻石岛</code>、<code>500以内</code>、<code>两房</code>、<code>视频看房</code>\n\n"
@@ -252,12 +246,8 @@ def smart_find_guided_header_text() -> str:
 
 def smart_find_play_footer_hint_text(*, used_fallback: bool) -> str:
     if used_fallback:
-        return (
-            "\n\n<i>先给你看接近的房源，还可以继续调整位置或预算。</i>"
-        )
-    return (
-        "\n\n<i>如需更精准，可点菜单「🔍 智能找房」并走「按类型找」按钮流程。</i>"
-    )
+        return "\n\n先给你看接近的房源，还可以继续调整位置或预算。"
+    return "\n\n如需更精准，可点菜单「🔍 智能找房」并走「按类型找」按钮流程。"
 
 
 def repeat_tenant_ack_text() -> str:
@@ -536,7 +526,7 @@ def repair_progress_text(issue_label: str, stage: str, note: str = "") -> str:
 def advisor_response_notice_text() -> str:
     """顾问接手预约后的统一提醒。"""
     return (
-        "<b>💬 顾问已接手</b>\n\n"
+        "💬 <b>顾问已接手</b>\n\n"
         "你的预约和房源信息已经一起发给顾问。\n"
         "顾问会通过 Telegram 联系你确认。\n\n"
         "时间或需求有变化，\n"

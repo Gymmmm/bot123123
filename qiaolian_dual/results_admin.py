@@ -139,7 +139,7 @@ def _find_result_card_content(item: dict, index: int, total: int, result_ids: li
     status = str(item.get('status') or 'active').strip().lower()
     status_text = '🟡 <b>已有预约 · 仍可预约</b>' if status == 'reserved' else '🟢 <b>当前可预约</b>'
     lines = [
-        f'<b>🏠 {he(area)}｜{he(layout)}</b>',
+        f'🏠 <b>{he(area)}｜{he(layout)}</b>',
         f'💰 <b>{he(price)}</b>' + (f' · 📐 {he(size)}㎡' if size else ''),
     ]
     extras = [value for value in (property_type, deposit) if value and value not in {layout, area}]

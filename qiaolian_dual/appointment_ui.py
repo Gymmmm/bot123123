@@ -40,10 +40,14 @@ def _appointment_confirm_text(appt: dict) -> str:
     title = str(item.get('project') or item.get('title') or item.get('area') or '这套房').strip()
     from .utils_formatting import _display_layout
     layout = _display_layout(item.get('layout') or item.get('property_type'), item.get('property_type'))
+    from .utils_formatting import _fmt_price
     mode = APPOINTMENT_MODE_LABELS.get(str(appt.get('mode') or 'offline'), '实地看房')
     time_label = APPOINTMENT_TIME_LABELS.get(str(appt.get('time') or ''), str(appt.get('time') or '-'))
     subject_lines = ['🏠 <b>尚未确定房源</b>', '顾问会根据你的需求继续推荐。'] if is_general_request else [f"🏠 <b>{he(_title_layout_label(title, layout, '｜'))}</b>"]
-    return '\n'.join(['📅 <b>确认看房预约</b>', '', *subject_lines, f"📅 {he(str(appt.get('date') or '-'))}", f'🕐 {he(time_label)}', f'👀 {he(mode)}', '', '提交后，顾问会先确认房态和具体时间。'])
+    if not is_general_request and item.get('price') not in (None, '', 0, '0'):
+        subject_lines.append(f"💰 <b>租金：{he(_fmt_price(item.get('price')))}</b>")
+    heading = '🎥 <b>确认视频看房</b>' if mode == '视频看房' else '📅 <b>确认看房预约</b>'
+    return '\n'.join([heading, '', *subject_lines, '', f"📅 <b>日期：</b> {he(str(appt.get('date') or '-'))}", f'🕐 <b>时间：</b> {he(time_label)}', f'👀 <b>方式：</b> {he(mode)}', '', '提交后，顾问会先确认房态和具体时间。'])
 
 def _appointment_confirm_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([[InlineKeyboardButton('✅ 提交预约', callback_data='apconfirm:yes')], [InlineKeyboardButton('⬅️ 修改时间', callback_data='apedit:time')]])
@@ -79,24 +83,10 @@ def _focus_summary_lines(keys: list[str] | set[str] | tuple[str, ...]) -> str:
     return '\n'.join((f'• {he(APPOINTMENT_FOCUS_LABELS[k])}' for k in picked))
 
 def _appointment_focus_keyboard(selected: set[str]) -> InlineKeyboardMarkup:
-    btn_rows: list[list[InlineKeyboardButton]] = []
-    labels = APPOINTMENT_FOCUS_LABELS
-    order = APPOINTMENT_FOCUS_ORDER
-    row: list[InlineKeyboardButton] = []
-    for idx, key in enumerate(order, start=1):
-        checked = '✅' if key in selected else '▫️'
-        row.append(InlineKeyboardButton(f'{checked} {labels[key]}', callback_data=f'apfocus:toggle:{key}'))
-        if idx % 2 == 0:
-            btn_rows.append(row)
-            row = []
-    if row:
-        btn_rows.append(row)
-    btn_rows.append([InlineKeyboardButton('✅ 下一步（选日期）', callback_data='apfocus:next')])
-    btn_rows.append([InlineKeyboardButton('⬅️ 返回方式', callback_data='apfocus:back_mode'), InlineKeyboardButton('🏠 返回首页', callback_data='home')])
-    return InlineKeyboardMarkup(btn_rows)
+    """历史关注点回调的兼容落点；新 UI 只继续到日期。"""
+    return _appointment_date_keyboard()
 
 def _appointment_focus_prompt(mode: str, listing_id: str, selected: set[str]) -> str:
-    from .utils_formatting import _display_listing_id
+    """历史关注点回调的兼容文案；不再生成关注点页面。"""
     mode_label = APPOINTMENT_MODE_LABELS.get(mode, '预约看房')
-    safe_lid = listing_id if listing_id and listing_id != '待推荐' else '暂未指定'
-    return f'<b>📅 {he(mode_label)}</b>\n房源：<code>{he(_display_listing_id(safe_lid))}</code>\n\n<b>请选择你最关注的验房点</b>\n默认 5 项全选，你只需点“下一步”就能继续。\n\n{_focus_summary_lines(selected)}'
+    return f'📅 <b>{he(mode_label)}</b>\n\n请选择方便看房的日期。'

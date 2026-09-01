@@ -32,33 +32,20 @@ async def appoint_flow_cb(update: Update, context: ContextTypes.DEFAULT_TYPE, *,
             await query.edit_message_text('无法识别这套房源。\n\n请从房源详情页的「预约看房」重新进入。', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('🏠 返回首页', callback_data='home')]]), parse_mode=ParseMode.HTML)
             return MAIN
         appt['mode'] = data.split(':', 1)[1]
-        appt['focus_keys'] = list(APPOINTMENT_FOCUS_ORDER)
+        appt['focus_keys'] = []
         mode_label = APPOINTMENT_MODE_LABELS.get(appt['mode'], '预约看房')
         text = f'🎥 <b>{he(mode_label)}</b>\n\n请选择方便视频看房的日期。'
         await query.edit_message_text(text, reply_markup=_appointment_date_keyboard(show_video=False), parse_mode=ParseMode.HTML)
         return APPT_DATE
     if data.startswith('apfocus:toggle:'):
-        key = data.split(':', 2)[2]
-        if key not in APPOINTMENT_FOCUS_LABELS:
-            return APPT_FOCUS
-        selected = set((str(k) for k in appt.get('focus_keys') or APPOINTMENT_FOCUS_ORDER))
-        if key in selected:
-            selected.remove(key)
-        else:
-            selected.add(key)
-        appt['focus_keys'] = [k for k in APPOINTMENT_FOCUS_ORDER if k in selected]
-        text = _appointment_focus_prompt(appt.get('mode', 'offline'), appt.get('listing_id', ''), selected)
-        await query.edit_message_text(text, reply_markup=_appointment_focus_keyboard(selected), parse_mode=ParseMode.HTML)
-        return APPT_FOCUS
+        appt['focus_keys'] = []
+        await query.edit_message_text('📅 <b>预约看房</b>\n\n请选择方便看房的日期。', reply_markup=_appointment_date_keyboard(), parse_mode=ParseMode.HTML)
+        return APPT_DATE
     if data == 'apfocus:back_mode':
         return await start_appointment(update, context, appt.get('listing_id', '未知'), source=appt.get('source', 'user_bot'), touch_payload=appt.get('touch_payload'))
     if data == 'apfocus:next':
-        selected = set((str(k) for k in appt.get('focus_keys') or []))
-        if not selected:
-            await answer_callback_once(query, '至少保留 1 个关注点', show_alert=True)
-            return APPT_FOCUS
-        text = '第三步：请选择预约日期。'
-        await query.edit_message_text(text, reply_markup=_appointment_date_keyboard(), parse_mode=ParseMode.HTML)
+        appt['focus_keys'] = []
+        await query.edit_message_text('📅 <b>预约看房</b>\n\n请选择方便看房的日期。', reply_markup=_appointment_date_keyboard(), parse_mode=ParseMode.HTML)
         return APPT_DATE
     if data == 'appoint_back_mode':
         return await start_appointment(update, context, appt.get('listing_id', '未知'), source=appt.get('source', 'user_bot'), touch_payload=appt.get('touch_payload'))
@@ -92,8 +79,8 @@ async def appoint_flow_cb(update: Update, context: ContextTypes.DEFAULT_TYPE, *,
         await query.edit_message_text(f"⏰ <b>改预约时间</b>\n\n已选日期：{he(str(appt.get('date') or '-'))}", parse_mode=ParseMode.HTML, reply_markup=_appointment_time_keyboard())
         return APPT_TIME
     if data == 'apedit:contact':
-        appt['awaiting_contact'] = True
-        await query.edit_message_text('📞 <b>留一个方便联系的号码</b>\n\n请直接发送手机号或微信号。', parse_mode=ParseMode.HTML)
+        appt.pop('awaiting_contact', None)
+        await query.edit_message_text(_appointment_confirm_text(appt), reply_markup=_appointment_confirm_keyboard(), parse_mode=ParseMode.HTML)
         return APPT_CONFIRM
     if data.startswith('aptime:'):
         chosen_time = data.split(':', 1)[1]
@@ -128,7 +115,7 @@ async def appoint_flow_cb(update: Update, context: ContextTypes.DEFAULT_TYPE, *,
         time_value = str(appt.get('time') or '')
         time_label = APPOINTMENT_TIME_LABELS.get(time_value, time_value)
         mode_label = APPOINTMENT_MODE_LABELS.get(appt.get('mode'), str(appt.get('mode') or '-'))
-        focus_keys = [k for k in APPOINTMENT_FOCUS_ORDER if k in set(appt.get('focus_keys') or APPOINTMENT_FOCUS_ORDER)]
+        focus_keys = [k for k in APPOINTMENT_FOCUS_ORDER if k in set(appt.get('focus_keys') or [])]
         focus_labels = [APPOINTMENT_FOCUS_LABELS[k] for k in focus_keys]
         focus_text = '；'.join(focus_labels)
         listing_value = appt.get('listing_id', '') if appt.get('listing_id') else '待推荐'
@@ -146,7 +133,7 @@ async def appoint_flow_cb(update: Update, context: ContextTypes.DEFAULT_TYPE, *,
         if listing_value not in {'', '待推荐'}:
             from .channel_status_sync import sync_channel_listing_status
             await sync_channel_listing_status(str(listing_value))
-        focus_short = '、'.join(focus_labels[:3]) if focus_labels else '默认全项'
+        focus_short = '、'.join(focus_labels[:3]) if focus_labels else '未填写'
         if len(focus_labels) > 3:
             focus_short += '等'
         item = listing_context(lid_submit)
@@ -178,13 +165,13 @@ async def appoint_flow_cb(update: Update, context: ContextTypes.DEFAULT_TYPE, *,
             reply_markup=admin_lead_keyboard(lead_id=lead_id, appointment_id=appointment_id, user_id=int(user.id)) if lead_id is not None else None,
             show_bell=False,
         )
-        subject_text = '🏠 <b>房源尚未确定</b>' if is_general_request else f"🏠 <b>{he(_title_layout_label(title, layout))}</b>"
+        subject_text = '🏠 <b>房源尚未确定</b>' if is_general_request else f"🏠 <b>{he(_title_layout_label(title, layout, '｜'))}</b>"
         context.user_data.pop('appt', None)
         await query.edit_message_text(
             f"✅ <b>预约申请已提交</b>\n\n"
             f"{subject_text}\n"
-            f"📅 <b>{he(date_compact)} · {he(time_compact)}</b>\n"
-            f"📍 {he(mode_label)}\n\n"
+            f"📅 <b>日期：</b> {he(date_compact)} · {he(time_compact)}\n"
+            f"👀 <b>方式：</b> {he(mode_label)}\n\n"
             "顾问会确认房态和具体时间，\n"
             "之后通过 Telegram 联系你。\n\n"
             "房源信息已经带上，不用重复发送。",
@@ -227,11 +214,6 @@ async def handle_appointment_text(update: Update, context: ContextTypes.DEFAULT_
         await update.effective_message.reply_text(_appointment_confirm_text(appt), parse_mode=ParseMode.HTML, reply_markup=_appointment_confirm_keyboard())
         return APPT_CONFIRM
     if appt.pop('awaiting_contact', False):
-        if len(value) < 4:
-            appt['awaiting_contact'] = True
-            await update.effective_message.reply_text('这个联系方式太短了，请重新发送手机号或微信号。')
-            return APPT_CONFIRM
-        appt['contact_value'] = value
         await update.effective_message.reply_text(_appointment_confirm_text(appt), parse_mode=ParseMode.HTML, reply_markup=_appointment_confirm_keyboard())
         return APPT_CONFIRM
     await update.effective_message.reply_text('请点击页面上的日期或时间按钮。')

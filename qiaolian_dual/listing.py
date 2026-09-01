@@ -158,7 +158,7 @@ def listing_entry_keyboard(listing_id: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton('📸 更多实拍', callback_data=f'listing:photos:{listing_id}'), InlineKeyboardButton('📋 租赁详情', callback_data=f'listing:detail:{listing_id}')],
         [InlineKeyboardButton('📅 预约看房', callback_data=f'listing:appoint:{listing_id}')],
-        [InlineKeyboardButton('🤖 找其他房源', callback_data='home_smart_search')],
+        [InlineKeyboardButton('🔍 找其他房源', callback_data='home_smart_search')],
     ])
 
 def listing_is_available(listing_id: str) -> tuple[bool, str]:
@@ -205,7 +205,7 @@ def listing_unavailable_text(reason: str='') -> str:
         'offline': '⚫ <b>已下架</b>',
     }.get(normalized, '🔵 <b>房态待确认</b>')
     return (
-        '<b>🏠 这套房暂时不能预约</b>\n\n'
+        '🏠 <b>这套房暂时不能预约</b>\n\n'
         f'{status_line}\n\n'
         '房态正在确认。\n'
         '你可以先看附近可预约房源，\n'

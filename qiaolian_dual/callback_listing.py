@@ -50,7 +50,7 @@ async def handle_listing_callback(update: Update, context: ContextTypes.DEFAULT_
                 logger.exception('完整相册发送失败: listing_id=%s', lid)
                 await render_panel(
                     update,
-                    text='<b>📸 完整实拍</b>\n\n这套房的实拍暂时无法加载。你可以稍后再试，或联系中文顾问补充图片。',
+                    text='📸 <b>完整实拍</b>\n\n这套房的实拍暂时无法加载。你可以稍后再试，或联系中文顾问补充图片。',
                     parse_mode=ParseMode.HTML,
                     reply_markup=InlineKeyboardMarkup([
                         [InlineKeyboardButton('💬 联系中文顾问', callback_data=f'listing:consult:{lid}')],

@@ -32,15 +32,15 @@ async def start_appointment(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     home_facts = [value for value in (layout, f'{size}㎡' if size and '㎡' not in size else size, floor) if value]
     summary_lines = [f'🏠 <b>{he(title)}</b>', f"💰 <b>租金：{he(_fmt_price(info.get('price')))}</b>"]
     if area:
-        summary_lines.append(f'📍 位置：{he(area)}')
+        summary_lines.append(f'📍 <b>位置：</b> {he(area)}')
     if home_facts:
-        summary_lines.append(f"📐 户型：{he(' · '.join(home_facts))}")
+        summary_lines.append(f"📐 <b>户型：</b> {he(' · '.join(home_facts))}")
     if highlights:
-        summary_lines.append(f"✨ 亮点：{he(' · '.join(highlights[:2]))}")
+        summary_lines.append(f"✨ <b>亮点：</b> {he(' · '.join(highlights[:2]))}")
     if not is_general_request:
-        summary_lines.append(f"📌 编号：<code>{he(_display_listing_id(listing_id))}</code>")
+        summary_lines.append(f"📌 <b>编号：</b> <code>{he(_display_listing_id(listing_id))}</code>")
     listing_summary = '\n'.join(summary_lines)
-    context.user_data['appt'] = {'listing_id': listing_id, 'source': source, 'touch_payload': touch_payload, 'focus_keys': list(APPOINTMENT_FOCUS_ORDER), 'listing_summary': listing_summary}
+    context.user_data['appt'] = {'listing_id': listing_id, 'source': source, 'touch_payload': touch_payload, 'focus_keys': [], 'listing_summary': listing_summary}
     mode = str(initial_mode or 'offline').strip().lower()
     if mode not in APPOINTMENT_MODE_LABELS:
         mode = 'offline'
@@ -71,7 +71,7 @@ async def show_precise_filter(update: Update, context: ContextTypes.DEFAULT_TYPE
     context.user_data.pop('awaiting_keyword_find', None)
     context.user_data.pop('awaiting_want_home', None)
     context.user_data['pref_select'] = {'source': 'menu_precise', 'selected': []}
-    await render_panel(update, text='<b>📍 提交找房需求</b>\n\n选出你最在意的条件即可。提交后，顾问会据此帮你筛出 1–3 套更值得看的房源。', parse_mode=ParseMode.HTML, reply_markup=precise_filter_keyboard(set()), context=context)
+    await render_panel(update, text='📍 <b>提交找房需求</b>\n\n选出你最在意的条件即可。提交后，顾问会据此帮你筛出 1–3 套更值得看的房源。', parse_mode=ParseMode.HTML, reply_markup=precise_filter_keyboard(set()), context=context)
     return MAIN
 
 async def show_appointment_hub(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -91,13 +91,12 @@ async def show_service_hub(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     binding = db.get_active_binding(user_id) if user_id else None
     if binding:
         property_name = he(str(binding.get('property_name') or '当前租住房源'))
-        text = f"<b>🛠 入住服务</b>\n\n🏠 {property_name}\n需要处理什么？"
+        text = f"🛠 <b>入住服务</b>\n\n🏠 <b>当前房源：</b> {property_name}\n需要处理什么？"
     else:
         text = (
-            "<b>🛠 入住服务</b>\n\n"
-            "入住后遇到什么问题？\n"
-            "报修、物业沟通或周边生活，直接选一项。\n\n"
-            "已在租的客户可先绑定租客档案，之后会自动带上租约和房屋信息；租约到期前 7 天会提醒你确认是否续租。"
+            "🛠 <b>入住服务</b>\n\n"
+            "房子有问题，帮你跟进报修；需要物业沟通或周边生活服务，也可以直接选。\n\n"
+            "已在租的客户可先绑定租客档案，之后会自动带上租约和房屋信息。"
         )
     await render_panel(update, text=text, parse_mode=ParseMode.HTML, reply_markup=service_hub_keyboard(user_id), context=context)
     return MAIN
@@ -139,6 +138,6 @@ async def contact_management(update: Update, context: ContextTypes.DEFAULT_TYPE,
     if listing_id or binding:
         response_text = advisor_handoff_text(listing_id=listing_id, user_id=update.effective_user.id)
     else:
-        response_text = '✅ <b>中文顾问已收到你的咨询</b>\n\n把最在意的区域、预算或户型发给我即可；如果暂时说不清，也可以直接说「想找两房」「下月入住」这类需求。\n\n中文顾问会通过 Telegram 继续跟进，无需重复填写联系方式。'
+        response_text = '✅ <b>顾问已收到</b>\n\n把最在意的区域、预算或户型发给我即可；如果暂时说不清，也可以直接说「想找两房」「下月入住」这类需求。\n\n顾问会通过 Telegram 继续跟进，无需重复填写联系方式。'
     await render_panel(update, text=response_text, parse_mode=ParseMode.HTML, reply_markup=contact_handoff_keyboard(listing_id=listing_id), context=context)
     return MAIN

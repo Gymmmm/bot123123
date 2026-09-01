@@ -235,7 +235,7 @@ async def test_each_listing_callback_answers_query(monkeypatch, data):
 
 def test_unavailable_page_is_html_and_has_all_real_callbacks():
     text = listing_unavailable_text('pending')
-    assert '<b>🏠 这套房暂时不能预约</b>' in text
+    assert '🏠 <b>这套房暂时不能预约</b>' in text
     kb = listing_unavailable_keyboard('')
     assert labels(kb) == ['🔍 找附近房源', '💬 联系中文顾问', '🏠 同区推荐', '⬅️ 返回上一页']
     assert callbacks(kb) == ['findmode:guided', 'appointment_menu:contact', 'unavail:more:any', 'home']

@@ -10,6 +10,9 @@ import pytest
 from qiaolian_dual import listing
 from qiaolian_dual.common import APPT_DATE
 from qiaolian_dual.appointment_ui import _appointment_date_keyboard
+from qiaolian_dual.keyboards_common import appointment_success_keyboard
+from qiaolian_dual.messages import advisor_response_notice_text
+from qiaolian_dual.texts import advisor_handoff_text, advisor_text
 from qiaolian_dual.flows import start_appointment
 from qiaolian_dual.results_admin import send_listing_photo_preview
 from qiaolian_dual.session_deeplink import parse_start_arg_payload
@@ -116,3 +119,35 @@ async def test_album_empty_copy_keeps_actions():
 def test_date_keyboard_has_video_branch_without_mode_gate():
     labels = _labels(_appointment_date_keyboard())
     assert labels == [["今天", "明天"], ["后天", "📅 其他日期"], ["🎥 实时视频看房"]]
+
+
+def test_new_appointment_ui_has_no_focus_or_contact_entry():
+    callback_values = [
+        button.callback_data
+        for row in _appointment_date_keyboard().inline_keyboard
+        for button in row
+    ]
+    assert not any((value or "").startswith("apfocus:") for value in callback_values)
+    assert "apedit:contact" not in callback_values
+
+
+def test_submit_and_advisor_states_are_distinct_and_consistent(monkeypatch):
+    monkeypatch.setattr("qiaolian_dual.listing.listing_context", lambda _lid: {
+        "area": "永旺1", "layout": "1房", "price": 1800,
+    })
+    assert "顾问已收到" in advisor_text()
+    assert "顾问已收到" in advisor_handoff_text(listing_id="QC0002")
+    assert "顾问已接手" in advisor_response_notice_text()
+    assert "顾问已收到" not in advisor_response_notice_text()
+
+
+def test_action_buttons_are_plain_text_without_html():
+    markups = [
+        _appointment_date_keyboard(),
+        appointment_success_keyboard(),
+        listing.listing_cost_keyboard("QC0002"),
+    ]
+    for markup in markups:
+        for row in markup.inline_keyboard:
+            for button in row:
+                assert all(tag not in button.text for tag in ("<b>", "</b>", "<code>", "</code>"))

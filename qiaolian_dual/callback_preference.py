@@ -25,7 +25,7 @@ async def handle_preference_callback(update: Update, context: ContextTypes.DEFAU
             return MAIN
     if data == 'pref:clear':
             context.user_data['pref_select'] = {'source': 'menu_precise', 'selected': []}
-            await query.edit_message_text('<b>📍 条件筛选</b>\n\n已清空，继续点选后提交即可。', parse_mode=ParseMode.HTML, reply_markup=precise_filter_keyboard(set()))
+            await query.edit_message_text('📍 <b>条件筛选</b>\n\n已清空，继续点选后提交即可。', parse_mode=ParseMode.HTML, reply_markup=precise_filter_keyboard(set()))
             return MAIN
     if data.startswith('pref:toggle:'):
             key = data.split(':', 2)[2]
@@ -40,7 +40,7 @@ async def handle_preference_callback(update: Update, context: ContextTypes.DEFAU
                 selected_set.add(key)
             pref_ctx['selected'] = list(selected_set)
             summary = '、'.join((PREF_CONDITION_LABELS[k] for k in pref_ctx['selected'][:6])) or '未选择'
-            await query.edit_message_text(f'<b>📍 条件筛选</b>\n\n当前已选：{he(summary)}\n选完点 <b>提交条件</b>，无需手动打字。', parse_mode=ParseMode.HTML, reply_markup=precise_filter_keyboard(set(pref_ctx['selected'])))
+            await query.edit_message_text(f'📍 <b>条件筛选</b>\n\n当前已选：{he(summary)}\n选完点 <b>提交条件</b>，无需手动打字。', parse_mode=ParseMode.HTML, reply_markup=precise_filter_keyboard(set(pref_ctx['selected'])))
             return MAIN
     if data == 'pref:submit':
             pref_ctx = context.user_data.pop('pref_select', {'source': 'menu_precise', 'selected': []})
