@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
+import meihua_publisher
 
 from qiaolian_dual import listing
 from qiaolian_dual.common import APPT_DATE
@@ -63,6 +64,19 @@ def test_channel_cta_is_fixed_and_has_no_helper(monkeypatch):
         "https://t.me/QiaolianBot?start=property_QC0002_photos",
         "https://t.me/QiaolianBot?start=property_QC0002_book",
     ]
+
+
+def test_channel_caption_has_no_legacy_inline_action_links():
+    text = meihua_publisher.build_chinese_listing_post({
+        "listing_id": "l_2",
+        "area": "永旺1",
+        "project": "永旺一",
+        "layout": "1房1办公2卫",
+        "property_type": "公寓",
+        "price": 1800,
+    })
+    assert "<a href=" not in text
+    assert "💬 问这套" not in text
 
 
 def test_detail_hides_empty_fields_and_uses_required_weights(monkeypatch):

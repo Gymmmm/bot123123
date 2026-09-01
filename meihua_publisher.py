@@ -2445,9 +2445,7 @@ def build_chinese_listing_post(
         f"📸 <code>{he(qc_code)}</code>｜{he(comment_line.replace('👇', ''))}",
     ]
     lines = unified_lines
-    if action_links and action_links not in lines:
-        insert_at = len(lines) - 1 if lines and str(lines[-1]).startswith("#") else len(lines)
-        lines[insert_at:insert_at] = ["──────────────", action_links, "──────────────"]
+    # 频道主帖只保留下方三个固定按钮作为 CTA；正文不再重复旧的预约/顾问文字链接。
     compact: list[str] = []
     for line in lines:
         if not line:
