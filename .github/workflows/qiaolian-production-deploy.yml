@@ -19,6 +19,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 concurrency:
   group: qiaolian-production
@@ -96,9 +97,14 @@ jobs:
           PROD_SSH_KNOWN_HOSTS: '${{ secrets.PROD_SSH_KNOWN_HOSTS }}'
         run: |
           set -Eeuo pipefail
-          test -n "$PROD_SSH_USER"
-          test -n "$PROD_SSH_PRIVATE_KEY"
-          test -n "$PROD_SSH_KNOWN_HOSTS"
+          missing_secret=0
+          for secret_name in PROD_SSH_USER PROD_SSH_PRIVATE_KEY PROD_SSH_KNOWN_HOSTS; do
+            if [ -z "${!secret_name:-}" ]; then
+              echo "::error title=缺少 GitHub Actions Secret::请配置 $secret_name"
+              missing_secret=1
+            fi
+          done
+          test "$missing_secret" -eq 0
           install -d -m 700 "$HOME/.ssh"
           printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
           printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
@@ -258,3 +264,12 @@ jobs:
           root_cmd rm -f "$BUNDLE_PATH"
           echo "DEPLOYMENT_OK sha=$EXPECTED_SHA backup=$BACKUP"
           REMOTE
+
+      - name: Disarm production trigger
+        if: always() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method DELETE \
+            "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/assignees" \
+            -f "assignees[]=${{ github.repository_owner }}"
