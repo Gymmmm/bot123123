@@ -6,6 +6,7 @@ from PIL import Image
 
 from media_pipeline_v1_1 import _resolve_ranked_path, get_source_order_files
 from photo_formatter_v1_1 import format_gallery_photo, ordered_source_files
+from publication_package import _finalize_detail_image
 
 
 def _make(path: Path, size: tuple[int, int], color=(24, 32, 48)) -> None:
@@ -95,3 +96,30 @@ def test_ranker_relative_file_resolves_against_listing_folder(tmp_path: Path):
     _make(source, (800, 600))
     resolved = _resolve_ranked_path("2.jpg", tmp_path)
     assert resolved == source.resolve()
+
+
+def test_formal_publication_package_uses_v11_orientation_canvases(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("QIAOLIAN_GALLERY_LOGO_POSITION", "top_left")
+    cases = [
+        ((1600, 900), (1200, 900)),
+        ((900, 1600), (900, 1200)),
+        ((1000, 1000), (1080, 1080)),
+    ]
+    for index, (source_size, expected) in enumerate(cases, start=1):
+        source = tmp_path / f"formal_source_{index}.jpg"
+        target = tmp_path / f"formal_target_{index}.jpg"
+        _make(source, source_size, color=(40, 54, 72))
+        returned = _finalize_detail_image(str(source), str(target))
+        assert returned == str(target)
+        with Image.open(target) as rendered:
+            assert rendered.size == expected
+
+
+def test_formal_publication_logo_position_rejects_invalid_env(tmp_path: Path, monkeypatch):
+    source = tmp_path / "formal_portrait.jpg"
+    target = tmp_path / "formal_portrait_out.jpg"
+    _make(source, (700, 1500), color=(40, 54, 72))
+    monkeypatch.setenv("QIAOLIAN_GALLERY_LOGO_POSITION", "not-a-position")
+    _finalize_detail_image(str(source), str(target))
+    with Image.open(target) as rendered:
+        assert rendered.size == (900, 1200)
