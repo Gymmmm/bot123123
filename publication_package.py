@@ -438,13 +438,23 @@ def _json_list(value: Any) -> list[str]:
 
 
 def _finalize_detail_image(source_path: str, target_path: str) -> str:
-    """Create the exact detail bytes that Telegram will receive, without cropping or tinting."""
-    from meihua_publisher import add_detail_logo_watermark, normalize_album_image
-    raw = Path(source_path).read_bytes()
-    resized = normalize_album_image(raw, target_size=1600, force_square=False)
-    branded = add_detail_logo_watermark(resized, {})
-    Path(target_path).parent.mkdir(parents=True, exist_ok=True)
-    Path(target_path).write_bytes(branded.getvalue())
+    """Freeze the exact gallery bytes Telegram receives using media V1.1 rules.
+
+    Source watermarks stay untouched. The whole photo is contained without crop
+    or stretch; landscape/portrait/square sources keep their own target canvas.
+    Qiaolian branding is anchored inside the real photo box, not the white edge.
+    """
+    from photo_formatter_v1_1 import format_gallery_photo
+
+    position = str(os.getenv("QIAOLIAN_GALLERY_LOGO_POSITION", "top_left") or "top_left").strip().lower()
+    if position not in {"top_left", "top_right", "bottom_left", "bottom_right"}:
+        position = "top_left"
+    format_gallery_photo(
+        input_path=source_path,
+        output_path=target_path,
+        logo_path=None,
+        logo_position=position,
+    )
     return target_path
 
 
