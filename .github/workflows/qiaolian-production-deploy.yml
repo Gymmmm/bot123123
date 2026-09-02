@@ -90,6 +90,14 @@ jobs:
           git bundle create "$RELEASE_BUNDLE" refs/heads/actions-production
           git bundle verify "$RELEASE_BUNDLE"
 
+      - name: Probe production SSH host key
+        run: |
+          set -Eeuo pipefail
+          ssh-keyscan -T 10 -p "$PROD_PORT" -t ed25519 "$PROD_HOST" \
+            | tee "$RUNNER_TEMP/qiaolian_known_hosts"
+          test -s "$RUNNER_TEMP/qiaolian_known_hosts"
+          ssh-keygen -lf "$RUNNER_TEMP/qiaolian_known_hosts"
+
       - name: Configure production SSH
         env:
           PROD_SSH_USER: '${{ secrets.PROD_SSH_USER }}'
