@@ -25,11 +25,14 @@ from qiaolian_dual.utils_formatting import _display_layout, _display_floor
 ROOT = Path(__file__).resolve().parent
 PACKAGE_ROOT = ROOT / "media" / "publication_packages"
 COVER_TEMPLATE_MAP = {
+    # Three final horizontal styles. Legacy keys remain readable below so
+    # already-frozen packages and old settings do not break.
+    "blue_banner": ROOT / "templates" / "property" / "02_蓝色横幅模板.html",
+    "left_info": ROOT / "templates" / "property" / "01_经典蓝卡模板.html",
+    "black_gold": ROOT / "templates" / "property" / "04_黑金高级感_右侧价格牌模板.html",
     "classic_blue": ROOT / "templates" / "property" / "01_经典蓝卡模板.html",
     "minimal_white": ROOT / "templates" / "property" / "02_极简白条模板.html",
     "right_price": ROOT / "templates" / "property" / "03_右侧价格牌模板.html",
-    "left_info": ROOT / "templates" / "property" / "03_右侧价格牌模板.html",
-    "black_gold": ROOT / "templates" / "property" / "04_黑金高级感_右侧价格牌模板.html",
     "villa_premium": ROOT / "templates" / "12_别墅高级风_template_render.html",
     "video_vertical": ROOT / "templates" / "property" / "04_竖版视频封面模板.html",
     "editorial_mobile": ROOT / "templates" / "property" / "09_readable_card.html",
@@ -101,9 +104,25 @@ _DEFAULT_STYLE_KEYS = {
 }
 _ALLOWED_CAPTION_VARIANTS = {"a", "b", "c", "d"}
 _ALLOWED_COVER_TEMPLATES = {
-    "minimal_white", "right_price", "classic_blue", "black_gold",
+    "blue_banner", "left_info", "black_gold",
+    # Compatibility-only names for old settings and frozen packages.
+    "minimal_white", "right_price", "classic_blue",
     "villa_premium", "video_vertical", "premium_4image",
 }
+
+_COVER_TEMPLATE_ALIASES = {
+    "minimal_white": "blue_banner",
+    "classic_blue": "left_info",
+    "right_price": "left_info",
+    "villa_premium": "black_gold",
+    "premium_4image": "blue_banner",
+}
+
+
+def _canonical_cover_template(value: str) -> str:
+    normalized = str(value or "").strip().lower()
+    normalized = _COVER_TEMPLATE_ALIASES.get(normalized, normalized)
+    return normalized if normalized in {"blue_banner", "left_info", "black_gold", "video_vertical"} else "blue_banner"
 
 
 def _source_style_scope(source_type: str, source_name: str = "") -> str:
@@ -172,9 +191,9 @@ def classify(*, source_type: str, source_name: str, property_type: str,
     Routing priority:
       video -> video_vertical
       villa/high price -> black_gold
-      special promotion -> right_price
-      rich/manual source -> classic_blue
-      normal listing -> minimal_white
+      special promotion -> left_info
+      rich/manual source -> left_info
+      normal listing -> blue_banner
 
     `listing_type` reflects the actual property type; a high-priced apartment
     may use the black-gold template but must remain an apartment.
@@ -225,25 +244,22 @@ def classify(*, source_type: str, source_name: str, property_type: str,
             "source_type": normalized_source,
             "listing_type": listing_type,
             "media_type": "image",
-            "cover_template": "right_price",
+            "cover_template": "left_info",
         }
 
-    # There is currently no independent left_info HTML file. Route rich-info
-    # listings to the real right-price template instead of maintaining a fake
-    # alias that points at the same HTML.
     if highlight_count >= 3 or normalized_source == "wechat":
         return {
             "source_type": normalized_source,
             "listing_type": listing_type,
             "media_type": "image",
-            "cover_template": "classic_blue",
+            "cover_template": "left_info",
         }
 
     return {
         "source_type": normalized_source,
         "listing_type": listing_type,
         "media_type": "image",
-        "cover_template": "minimal_white",
+        "cover_template": "blue_banner",
     }
 
 
@@ -410,6 +426,7 @@ def ensure_source_media_assets(conn: sqlite3.Connection, source_post_id: Any) ->
 
 def _render_cover(d: dict, source: str, output: str, template: str) -> None:
     from html_cover_renderer import render_html_cover
+    template = _canonical_cover_template(template)
     try:
         normalized = json.loads(d.get("normalized_data") or "{}")
     except Exception:
@@ -457,8 +474,8 @@ def _render_cover(d: dict, source: str, output: str, template: str) -> None:
     if not raw_price:
         raw_price = "售价面议" if deal_type == "sale" else "租金面议"
     price_suffix = "/月" if deal_type == "rent" else ""
-    # 经典蓝卡的 HTML 使用独立 PRICE_SUFFIX；其余模板把单位放入价格行。
-    display_price = raw_price if template == "classic_blue" else (
+    # 左下信息卡使用独立 PRICE_SUFFIX；其余模板把单位放入价格行。
+    display_price = raw_price if template == "left_info" else (
         f"{raw_price}{price_suffix}" if raw_price and price_suffix and "/月" not in raw_price else raw_price
     )
     selected_template = COVER_TEMPLATE_MAP.get(template)
@@ -833,7 +850,15 @@ def build_package(
     publish_layout = "buttons"
     cover_match = re.search(r"publish_cover:(cover|none)", review_note, flags=re.I)
     publish_cover = cover_match.group(1).lower() if cover_match else "cover"
-    template = template_override or styles["cover_template"] or routing["cover_template"]
+    cover_note = re.search(
+        r"cover_template:(blue_banner|left_info|black_gold|classic_blue|minimal_white|right_price)",
+        review_note,
+        flags=re.I,
+    )
+    saved_template = cover_note.group(1).lower() if cover_note else ""
+    template = _canonical_cover_template(
+        template_override or saved_template or styles["cover_template"] or routing["cover_template"]
+    )
     version = int(conn.execute("SELECT COALESCE(MAX(package_version),0)+1 FROM publication_packages WHERE draft_id=?", (draft_id,)).fetchone()[0])
     package_id = f"PKG_{re.sub(r'[^A-Za-z0-9]+','',draft_id)[-12:]}_v{version}"
     out = PACKAGE_ROOT / package_id; out.mkdir(parents=True, exist_ok=True)
@@ -1040,7 +1065,7 @@ def render_cover_preview(db_path: str, draft_id: str, output_path: str, *, templ
                            property_type=d.get("property_type") or "", project=d.get("project") or "",
                            price=d.get("price"), highlights=d.get("highlights"),
                            is_special=bool(d.get("is_special") or d.get("is_urgent")))
-        template = template_override or routing["cover_template"]
+        template = _canonical_cover_template(template_override or routing["cover_template"])
         source = _select_cover_source(originals, property_type=str(d.get("property_type") or ""))
         _render_cover(d, source, output_path, template)
         preview_images = [output_path]
