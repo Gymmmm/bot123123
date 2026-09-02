@@ -19,7 +19,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
 
 concurrency:
   group: qiaolian-production
@@ -29,6 +28,9 @@ env:
   DEPLOY_BRANCH: codex/qiaolian-ui-cleanup-20260829
   PROD_HOST: 50.114.74.120
   PROD_PORT: '22'
+  PROD_SSH_USER: root
+  PROD_SSH_KNOWN_HOSTS: '50.114.74.120 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILuFtkSn5SJKY7mZ52Lc/QydPRTvHFpsj87M/HcIkb/L'
+  PROD_SSH_HOST_FINGERPRINT: 'SHA256:sgqLYOUAZ482H3y5jREQ6q2BVvNFPXYiOg4ruyFVnsA'
 
 jobs:
   verify-and-deploy:
@@ -90,29 +92,29 @@ jobs:
           git bundle create "$RELEASE_BUNDLE" refs/heads/actions-production
           git bundle verify "$RELEASE_BUNDLE"
 
-      - name: Probe production SSH host key
+      - name: Verify production SSH host key
         run: |
           set -Eeuo pipefail
-          ssh-keyscan -T 10 -p "$PROD_PORT" -t ed25519 "$PROD_HOST" \
-            | tee "$RUNNER_TEMP/qiaolian_known_hosts"
-          test -s "$RUNNER_TEMP/qiaolian_known_hosts"
-          ssh-keygen -lf "$RUNNER_TEMP/qiaolian_known_hosts"
+          ssh-keyscan -T 10 -p "$PROD_PORT" -t ed25519 "$PROD_HOST" 2>/dev/null \
+            | grep -v '^#' > "$RUNNER_TEMP/qiaolian_observed_known_hosts"
+          test -s "$RUNNER_TEMP/qiaolian_observed_known_hosts"
+          ssh-keygen -lf "$RUNNER_TEMP/qiaolian_observed_known_hosts" \
+            | grep -F "$PROD_SSH_HOST_FINGERPRINT"
+          printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" \
+            > "$RUNNER_TEMP/qiaolian_expected_known_hosts"
+          diff -u \
+            "$RUNNER_TEMP/qiaolian_expected_known_hosts" \
+            "$RUNNER_TEMP/qiaolian_observed_known_hosts"
 
       - name: Configure production SSH
         env:
-          PROD_SSH_USER: '${{ secrets.PROD_SSH_USER }}'
           PROD_SSH_PRIVATE_KEY: '${{ secrets.PROD_SSH_PRIVATE_KEY }}'
-          PROD_SSH_KNOWN_HOSTS: '${{ secrets.PROD_SSH_KNOWN_HOSTS }}'
         run: |
           set -Eeuo pipefail
-          missing_secret=0
-          for secret_name in PROD_SSH_USER PROD_SSH_PRIVATE_KEY PROD_SSH_KNOWN_HOSTS; do
-            if [ -z "${!secret_name:-}" ]; then
-              echo "::error title=缺少 GitHub Actions Secret::请配置 $secret_name"
-              missing_secret=1
-            fi
-          done
-          test "$missing_secret" -eq 0
+          if [ -z "$PROD_SSH_PRIVATE_KEY" ]; then
+            echo "::error title=缺少 GitHub Actions Secret::请配置 PROD_SSH_PRIVATE_KEY"
+            exit 1
+          fi
           install -d -m 700 "$HOME/.ssh"
           printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
           printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
@@ -272,12 +274,3 @@ jobs:
           root_cmd rm -f "$BUNDLE_PATH"
           echo "DEPLOYMENT_OK sha=$EXPECTED_SHA backup=$BACKUP"
           REMOTE
-
-      - name: Disarm production trigger
-        if: always() && github.event_name == 'pull_request'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh api --method DELETE \
-            "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/assignees" \
-            -f "assignees[]=${{ github.repository_owner }}"
