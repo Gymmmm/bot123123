@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import logging
@@ -42,7 +41,6 @@ def admin_menu() -> InlineKeyboardMarkup:
             ],
         ]
     )
-
 
 
 def type_keyboard() -> InlineKeyboardMarkup:
@@ -122,36 +120,24 @@ def publish_post_keyboard(
     discussion_group_link: str = "",
     post_token: str = "",
 ) -> InlineKeyboardMarkup:
-    """频道房源帖统一四动作，并为“更多实拍”提供可靠降级。"""
+    """频道房源帖固定三个动作：租赁详情、更多实拍、预约看房。"""
+    _ = (area, detail_url, maps_url, channel_username, channel_message_id, discussion_group_link)
+
     def payload(action: str) -> str:
         if post_token:
             return f"{action}__{post_token}__{listing_id}"
         return f"{action}_{listing_id}"
 
-    book_url = deep_link(user_bot_username, payload("book"))
-    consult_url = deep_link(user_bot_username, payload("consult"))
-    similar_url = deep_link(user_bot_username, payload("similar"))
-    photos_url = deep_link(user_bot_username, f"photos_{listing_id}")
-    clean_channel = str(channel_username or "").strip().lstrip("@")
-    if clean_channel and channel_message_id:
-        media_url = f"https://t.me/{clean_channel}/{int(channel_message_id)}?comment=1"
-    elif str(discussion_group_link or "").strip():
-        media_url = str(discussion_group_link).strip()
-    else:
-        media_url = photos_url
-        log.warning(
-            "频道评论链接未配置，更多实拍已降级到同房源 Bot 相册：listing_id=%s",
-            listing_id,
-        )
+    detail_link = deep_link(user_bot_username, payload("detail"))
+    photos_link = deep_link(user_bot_username, payload("photos"))
+    book_link = deep_link(user_bot_username, payload("book"))
+
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("📅 预约", url=book_url),
-                InlineKeyboardButton("💬 问顾问", url=consult_url),
+                InlineKeyboardButton("📋 租赁详情", url=detail_link),
+                InlineKeyboardButton("📸 更多实拍", url=photos_link),
             ],
-            [
-                InlineKeyboardButton("🖼 更多实拍", url=media_url),
-                InlineKeyboardButton("🔍 类似房源", url=similar_url),
-            ],
+            [InlineKeyboardButton("📅 预约看房", url=book_link)],
         ]
     )
