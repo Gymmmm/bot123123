@@ -59,6 +59,8 @@ BASE_DIR = Path(__file__).resolve().parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
+from qiaolian_dual.cover_styles import STYLE_LABELS, normalize_cover_style
+
 load_dotenv(BASE_DIR / ".env")
 
 logging.basicConfig(
@@ -94,6 +96,12 @@ DEEPLINK_BOT_USERNAME = (
 BRAND_NAME = os.getenv("BRAND_NAME", "侨联地产")
 ADVISOR_TG = os.getenv("ADVISOR_TG", "@pengqingw").strip()
 PREVIEW_MIN_SCORE = int(os.getenv("PREVIEW_MIN_SCORE", "60"))
+
+_COVER_ACTIONS = {
+    "tc": "classic_blue",
+    "tr": "right_price",
+    "tg": "black_gold",
+}
 
 # Avoid flooding the admin chat when a scheduler/callback retries the same failed
 # draft several times in a short window. The failure remains in publish_logs.
@@ -576,7 +584,12 @@ def _formal_preview_cover(row: sqlite3.Row) -> str | None:
         draft_id = str(row["draft_id"])
         output = render_dir / f"admin_preview_cover_{draft_id}.png"
         # Caller runs this helper in a worker thread.
-        render_cover_preview(DB_PATH, draft_id, str(output))
+        render_cover_preview(
+            DB_PATH,
+            draft_id,
+            str(output),
+            template_override=_cover_template_from_note(row["review_note"]),
+        )
         return str(output) if output.is_file() else None
     except Exception:
         logger.exception("formal admin preview cover failed for %s", row["draft_id"] if row else "-")
@@ -597,25 +610,28 @@ def _cover_path_for_draft(row: sqlite3.Row) -> str | None:
     return str(p) if p.is_file() else None
 
 
-def _publish_options_from_note(note: str | None) -> tuple[str, str]:
-    """返回客户可理解的发布选择：行动按钮和封面是否展示。"""
-    raw = str(note or "")
-    actions = "buttons" if re.search(r"publish_layout:buttons", raw, flags=re.I) else "none"
-    cover = "none" if re.search(r"publish_cover:none", raw, flags=re.I) else "cover"
-    return actions, cover
+def _cover_template_from_note(note: str | None) -> str:
+    match = re.search(r"cover_template:([a-z0-9_]+)", str(note or ""), flags=re.I)
+    return normalize_cover_style(match.group(1) if match else "")
 
 
-def _save_publish_cover_for_draft(draft_id: str, cover: str) -> None:
-    cover = "none" if cover == "none" else "cover"
+def _save_cover_template_for_draft(draft_id: str, style: str) -> None:
+    canonical = normalize_cover_style(style)
     with _conn() as c:
         row = c.execute("SELECT review_note FROM drafts WHERE draft_id=?", (draft_id,)).fetchone()
         if not row:
             return
         note = str(row["review_note"] or "").strip()
-        if re.search(r"publish_cover:(cover|none)", note, flags=re.I):
-            note = re.sub(r"publish_cover:(cover|none)", f"publish_cover:{cover}", note, count=1, flags=re.I)
+        if re.search(r"cover_template:[a-z0-9_]+", note, flags=re.I):
+            note = re.sub(
+                r"cover_template:[a-z0-9_]+",
+                f"cover_template:{canonical}",
+                note,
+                count=1,
+                flags=re.I,
+            )
         else:
-            note = f"{note} | publish_cover:{cover}".strip(" |")
+            note = f"{note} | cover_template:{canonical}".strip(" |")
         c.execute(
             "UPDATE drafts SET review_note=?,updated_at=CURRENT_TIMESTAMP WHERE draft_id=?",
             (note, draft_id),
@@ -624,28 +640,31 @@ def _save_publish_cover_for_draft(draft_id: str, cover: str) -> None:
 
 
 def _kb_preview(draft_pk: int, selected_variant: str = "a") -> InlineKeyboardMarkup:
-    """顾问只需选四种发布组合，再确认；文案版本由系统保留默认选择。"""
+    """正式审核只选择封面；发布形态固定为封面 + 三个行动按钮。"""
     _ = selected_variant
     p = str(draft_pk)
-    actions, cover = "buttons", "cover"
+    selected_style = "classic_blue"
     try:
         with _conn() as c:
             row = c.execute("SELECT review_note FROM drafts WHERE id=?", (int(draft_pk),)).fetchone()
-        actions, cover = _publish_options_from_note(row["review_note"] if row else "")
+        selected_style = _cover_template_from_note(row["review_note"] if row else "")
     except Exception:
-        logger.exception("read publish options failed for draft pk=%s", draft_pk)
+        logger.exception("read cover template failed for draft pk=%s", draft_pk)
+
+    def label(style: str) -> str:
+        return ("✅ " if selected_style == style else "") + STYLE_LABELS[style]
+
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton(("✅ " if actions == "buttons" else "") + "带行动按钮", callback_data=f"ap:pb:{p}"),
-                InlineKeyboardButton(("✅ " if actions == "none" else "") + "不带行动按钮", callback_data=f"ap:pl:{p}"),
+                InlineKeyboardButton(label("classic_blue"), callback_data=f"ap:tc:{p}"),
+                InlineKeyboardButton(label("right_price"), callback_data=f"ap:tr:{p}"),
             ],
             [
-                InlineKeyboardButton(("✅ " if cover == "cover" else "") + "使用封面", callback_data=f"ap:pc:{p}"),
-                InlineKeyboardButton(("✅ " if cover == "none" else "") + "不使用封面", callback_data=f"ap:pn:{p}"),
+                InlineKeyboardButton(label("black_gold"), callback_data=f"ap:tg:{p}"),
             ],
-            [InlineKeyboardButton("👀 按当前选择刷新预览", callback_data=f"ap:u:{p}")],
-            [InlineKeyboardButton("✅ 确认当前方式，生成发布键", callback_data=f"ap:r:{p}")],
+            [InlineKeyboardButton("👀 刷新正式预览", callback_data=f"ap:u:{p}")],
+            [InlineKeyboardButton("✅ 确认封面，生成发布键", callback_data=f"ap:r:{p}")],
             [
                 InlineKeyboardButton("✏️ 修改文案", callback_data=f"ap:e:{p}"),
                 InlineKeyboardButton("🖼 重新生成封面", callback_data=f"ap:c:{p}"),
@@ -758,7 +777,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     await update.message.reply_text(
         "📘 <b>怎么操作</b>\n\n"
-        "导入房源 → 四种成品预览 → 确认 → 发布。\n\n"
+        "导入房源 → 选择封面 → 确认 → 发布。\n\n"
         "大多数时候只需要点击下面的按钮。\n"
         "如果发布失败，不要重复点击，先点“检查问题”。",
         parse_mode=ParseMode.HTML,
@@ -1284,7 +1303,7 @@ async def cmd_approve(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         await update.effective_message.reply_text(
             "用法：<code>/approve QC0001 A</code>\n"
             "A=标准信息，B=亮点价格，C=专业参数。省略版本时按物业类型自动选择。\n"
-            "更推荐直接点 <code>/pending</code> 中的四种成品预览按钮。",
+            "更推荐直接点 <code>/pending</code> 中的封面预览按钮。",
             parse_mode=ParseMode.HTML,
         )
         return
@@ -1350,16 +1369,21 @@ async def cmd_approve(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         _save_caption_variant_for_draft(draft_id, variant)
 
         package_variant = ""
+        package_template = ""
         if pkg and pkg[4]:
             try:
-                package_variant = str(json.loads(pkg[4]).get("caption_variant") or "").lower()
+                package_snapshot = json.loads(pkg[4])
+                package_variant = str(package_snapshot.get("caption_variant") or "").lower()
+                package_template = normalize_cover_style(package_snapshot.get("cover_template"))
             except (TypeError, ValueError, json.JSONDecodeError):
                 package_variant = ""
+                package_template = ""
         reusable = bool(
             pkg
             and str(pkg[2] or "").lower() == "package_ready"
             and re.fullmatch(r"(?i)l_\d+", str(pkg[3] or ""))
             and package_variant == variant
+            and package_template == _cover_template_from_note(draft["review_note"])
         )
         if not reusable:
             await asyncio.to_thread(
@@ -2106,7 +2130,7 @@ async def cmd_intake_done(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                         desired_cover_w, desired_cover_h, desired_cover_kind,
                         ingestion_status, validation_errors, normalized_data, source_post_id, draft_id, publish_status,
                         created_at, updated_at
-                    ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 800, 600, 'right_price_fixed', 'imported', '', ?, ?, '', 'pending', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 800, 600, 'classic_blue', 'imported', '', ?, ?, '', 'pending', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                     """,
                     (
                         row_id,
@@ -2524,25 +2548,6 @@ def _save_caption_variant_for_draft(draft_id: str, variant: str) -> None:
         c.commit()
 
 
-def _save_publish_layout_for_draft(draft_id: str, layout: str) -> None:
-    # legacy storage token：links 表示不带行动按钮，buttons 表示带行动按钮。
-    layout = "links" if layout == "links" else "buttons"
-    with _conn() as c:
-        row = c.execute("SELECT review_note FROM drafts WHERE draft_id=?", (draft_id,)).fetchone()
-        if not row:
-            return
-        note = str(row["review_note"] or "").strip()
-        if re.search(r"publish_layout:(buttons|links)", note):
-            note = re.sub(r"publish_layout:(buttons|links)", f"publish_layout:{layout}", note, count=1)
-        else:
-            note = f"{note} | publish_layout:{layout}".strip(" |")
-        c.execute(
-            "UPDATE drafts SET review_note=?,updated_at=CURRENT_TIMESTAMP WHERE draft_id=?",
-            (note, draft_id),
-        )
-        c.commit()
-
-
 def _return_publish_blocked_to_pending(draft_id: str) -> None:
     with _conn() as c:
         row = c.execute("SELECT review_note FROM drafts WHERE draft_id=?", (draft_id,)).fetchone()
@@ -2596,26 +2601,16 @@ async def _send_visual_preview(
         )
         return
 
-    publish_actions, publish_cover = _publish_options_from_note(str(row["review_note"] or ""))
-    publish_layout = "buttons" if publish_actions == "buttons" else "links"
-    if publish_cover == "none":
-        album_all = [path for path in album_all if os.path.abspath(path) != os.path.abspath(cover)]
-    if publish_layout == "buttons":
-        album_all = album_all[:1]
-    else:
-        album_all = album_all[:4]
+    # 频道主帖合同固定：一张正式封面 + 三个行动按钮。
+    album_all = [cover]
     caption_variant = _variant_from_action(f"v{caption_variant}")
     caption = build_channel_caption(d, album_all, caption_variant=caption_variant)
     lines = caption.splitlines()
     tags = [line for line in lines if line.strip().startswith("#")]
-    body = [line for line in lines if not line.strip().startswith("#")]
-    if publish_layout == "buttons":
-        from publication_package import format_button_post_text
-        caption = format_button_post_text(
-            d, str(d.get("listing_id") or row["draft_id"]), tags, caption_variant
-        )
-    else:
-        caption = "\n".join(tags + ([""] if tags else []) + body).strip()
+    from publication_package import format_button_post_text
+    caption = format_button_post_text(
+        d, str(d.get("listing_id") or row["draft_id"]), tags, caption_variant
+    )
     # The second preview message must represent the discussion/comment detail,
     # not repeat the channel caption. It is generated from the same canonical
     # draft projection used by the frozen publication package.
@@ -2655,8 +2650,8 @@ async def _send_visual_preview(
         chat_id=update.effective_chat.id,
         text=(
             f"{head}\n\n"
-            f"发布方式：{'带行动按钮' if publish_actions == 'buttons' else '不带行动按钮'}｜{'使用封面' if publish_cover == 'cover' else '不使用封面'}\n"
-            "📌 评论区详情预览（发布后会回复主帖）\n\n"
+            "发布方式：一张正式封面 + 三个行动按钮\n"
+            "📌 评论区：更多实拍与补充说明（独立入口）\n\n"
             f"{detail}"
         ),
         parse_mode=ParseMode.HTML,
@@ -2696,34 +2691,27 @@ async def on_preview_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     if act == "u":
         selected = _selected_variant_for_draft(row)
         await q.edit_message_reply_markup(reply_markup=_kb_preview(pk_s, selected))
-        return
-
-    if act in {"la", "lb", "ba", "bb"}:
-        layout = "links" if act[0] == "l" else "buttons"
-        variant = act[1]
-        _save_publish_layout_for_draft(draft_id, layout)
-        _save_caption_variant_for_draft(draft_id, variant)
-        row = _draft_row_by_pk(pk_s) or row
-        await q.edit_message_reply_markup(reply_markup=_kb_preview(pk_s, variant))
         await _send_visual_preview(
             update=update,
             context=context,
             row=row,
-            caption_variant=variant,
+            caption_variant=selected,
         )
         return
 
-    if act in {"pb", "pl"}:
-        layout = "buttons" if act == "pb" else "links"
-        _save_publish_layout_for_draft(draft_id, layout)
+    if act in _COVER_ACTIONS:
+        style = _COVER_ACTIONS[act]
+        _save_cover_template_for_draft(draft_id, style)
+        _log_action(update.effective_user.id, f"cover_{style}", draft_id)
         row = _draft_row_by_pk(pk_s) or row
-        await q.edit_message_reply_markup(reply_markup=_kb_preview(pk_s, _selected_variant_for_draft(row)))
-        return
-
-    if act in {"pc", "pn"}:
-        _save_publish_cover_for_draft(draft_id, "cover" if act == "pc" else "none")
-        row = _draft_row_by_pk(pk_s) or row
-        await q.edit_message_reply_markup(reply_markup=_kb_preview(pk_s, _selected_variant_for_draft(row)))
+        selected = _selected_variant_for_draft(row)
+        await q.edit_message_reply_markup(reply_markup=_kb_preview(pk_s, selected))
+        await _send_visual_preview(
+            update=update,
+            context=context,
+            row=row,
+            caption_variant=selected,
+        )
         return
 
     if act.startswith("v"):
@@ -2817,16 +2805,21 @@ async def on_preview_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
                 )
                 return
             package_variant = ""
+            package_template = ""
             if pkg and pkg[2]:
                 try:
-                    package_variant = str(json.loads(pkg[2]).get("caption_variant") or "").lower()
+                    package_snapshot = json.loads(pkg[2])
+                    package_variant = str(package_snapshot.get("caption_variant") or "").lower()
+                    package_template = normalize_cover_style(package_snapshot.get("cover_template"))
                 except (TypeError, ValueError, json.JSONDecodeError):
                     package_variant = ""
+                    package_template = ""
             reusable = bool(
                 pkg
                 and str(pkg[1] or "").lower() == "package_ready"
                 and re.fullmatch(r"(?i)l_\d+", str(pkg[0] or ""))
                 and package_variant == variant
+                and package_template == _cover_template_from_note(row["review_note"])
             )
             if not reusable:
                 await asyncio.to_thread(

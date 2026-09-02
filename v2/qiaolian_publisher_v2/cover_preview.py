@@ -1,39 +1,14 @@
-"""Tracked admin-only previews for the three production cover styles."""
+"""Thin admin-preview adapter for the single production cover registry."""
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Iterable
 
 from html_cover_renderer import render_html_cover
-
-_REPO_ROOT = Path(__file__).resolve().parents[2]
-
-STYLE_LABELS = {
-    "blue_banner": "蓝色横幅",
-    "left_info": "左下信息卡",
-    "black_gold": "黑金价格牌",
-}
-
-_STYLE_TEMPLATE_PATHS = {
-    "blue_banner": _REPO_ROOT / "templates" / "property" / "02_蓝色横幅模板.html",
-    "left_info": _REPO_ROOT / "templates" / "property" / "01_经典蓝卡模板.html",
-    "black_gold": _REPO_ROOT / "templates" / "property" / "04_黑金高级感_右侧价格牌模板.html",
-}
-
-_STYLE_ALIASES = {
-    "classic": "left_info",
-    "classic_blue": "left_info",
-    "minimal": "blue_banner",
-    "minimal_white": "blue_banner",
-    "price_tag": "black_gold",
-    "right_price": "black_gold",
-}
-
-
-def normalize_cover_style(style: str | None) -> str:
-    value = str(style or "blue_banner").strip().lower()
-    value = _STYLE_ALIASES.get(value, value)
-    return value if value in STYLE_LABELS else "blue_banner"
+from qiaolian_dual.cover_styles import (
+    STYLE_LABELS,
+    cover_template_path,
+    normalize_cover_style,
+)
 
 
 def generate_house_cover(
@@ -47,14 +22,14 @@ def generate_house_cover(
     floor: str = "",
     price: str = "",
     highlights: Iterable[str] | None = None,
-    style: str = "blue_banner",
+    style: str = "classic_blue",
     **_: object,
 ) -> str:
     """Render a private preview with the same HTML templates used by packages."""
     normalized_style = normalize_cover_style(style)
     values = [str(value).strip() for value in (highlights or []) if str(value).strip()]
     render_html_cover(
-        template_path=str(_STYLE_TEMPLATE_PATHS[normalized_style]),
+        template_path=str(cover_template_path(normalized_style, allow_video=False)),
         source_image=str(bg_image_path),
         output_path=str(output_path),
         data={

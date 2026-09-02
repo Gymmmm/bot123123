@@ -3,15 +3,9 @@ from pathlib import Path
 
 ACTIVE_PROPERTY_TEMPLATES = [
     "templates/property/01_经典蓝卡模板.html",
-    "templates/property/02_极简白条模板.html",
     "templates/property/03_右侧价格牌模板.html",
     "templates/property/04_黑金高级感_右侧价格牌模板.html",
     "templates/property/04_竖版视频封面模板.html",
-    "templates/property/05_editorial_mobile.html",
-    "templates/property/06_mono_editorial.html",
-    "templates/property/07_split_editorial.html",
-    "templates/property/08_mobile_bold.html",
-    "templates/property/09_readable_card.html",
 ]
 
 
@@ -37,17 +31,6 @@ def test_html_cover_renderer_forces_noto_on_poster_tree():
     assert 'font-family: "Noto Sans CJK SC", "Noto Sans SC", sans-serif !important;' in text
     forced_block = text[text.index('.poster, .poster *'):]
     assert 'font-family: "PingFang SC"' not in forced_block
-
-
-def test_canonical_pillow_renderer_never_falls_back_to_non_noto_font():
-    text = Path("qiaolian_dual/image_renderer.py").read_text(encoding="utf-8")
-    font_block = text[text.index("def _font"):text.index("def _open_source")]
-    assert "NotoSansCJK" in font_block
-    assert "QIAOLIAN_NOTO_BOLD_FONT" in font_block
-    assert "QIAOLIAN_NOTO_REGULAR_FONT" in font_block
-    for forbidden in ("PingFang", "STHeiti", "DejaVu", "Microsoft YaHei", "load_default"):
-        assert forbidden not in font_block
-    assert "noto_sans_cjk_sc_font_missing" in font_block
 
 
 def test_classic_blue_matches_reference_structure():

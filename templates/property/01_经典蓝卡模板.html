@@ -53,22 +53,22 @@ html,body{margin:0;width:1600px;height:1200px;background:#0b2048;font-family:"No
   <div class="card">
     <div class="row row1">
       <svg class="house-icon" viewBox="0 0 64 64" aria-hidden="true"><path d="M8 31L32 13L56 31V54H39V38H25V54H8Z" fill="white"/></svg>
-      <span class="project" id="t1">{{PROJECT}}</span><span class="layout-sep">·</span><span class="layout" data-field="t2" id="t2">{{LAYOUT}}</span>
+      <span class="project" data-autofit="36" id="t1">{{PROJECT}}</span><span class="layout-sep">·</span><span class="layout" data-field="t2" data-autofit="30" id="t2">{{LAYOUT}}</span>
     </div>
 
-    <div class="row row2">
+    <div class="row row2" data-autofit="20">
       <span class="fact" data-field="t3">
         <svg class="fact-icon" viewBox="0 0 64 64" aria-hidden="true"><path d="M8 31L32 13L56 31V54H39V38H25V54H8Z" fill="white"/></svg>
-        <span id="t3">{{SIZE}}</span>
+        <span data-autofit="24" id="t3">{{SIZE}}</span>
       </span>
       <span class="sep"></span>
-      <span class="fact" data-field="t4"><span id="t4">{{FLOOR}}</span></span>
+      <span class="fact" data-field="t4"><span data-autofit="24" id="t4">{{FLOOR}}</span></span>
       <span class="sep"></span>
-      <span class="price"><span id="t5">{{PRICE}}</span><small>{{PRICE_SUFFIX}}</small></span>
+      <span class="price" data-autofit="34"><span id="t5">{{PRICE}}</span><small>{{PRICE_SUFFIX}}</small></span>
     </div>
 
     <div class="rule"></div>
-    <div class="row row3" data-fields="t6,t7,t8">
+    <div class="row row3" data-fields="t6,t7,t8" data-autofit="20">
       <span class="highlight" data-field="t6" id="t6">{{H1}}</span>
       <span class="sep" data-field="t7">|</span><span class="highlight" data-field="t7" id="t7">{{H2}}</span>
       <span class="sep" data-field="t8">/</span><span class="highlight" data-field="t8" id="t8">{{H3}}</span>

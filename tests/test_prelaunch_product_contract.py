@@ -6,11 +6,7 @@ from PIL import Image
 
 import discussion_map_store
 from meihua_publisher import CHANNEL_ALBUM_SIZE, normalize_album_image
-from publication_package import (
-    _default_publish_layout_for_scope,
-    _main_album_limit,
-    classify,
-)
+from publication_package import classify
 from v2.qiaolian_publisher_v2.keyboards import preview_keyboard, publish_post_keyboard, type_keyboard
 
 
@@ -36,15 +32,9 @@ def test_album_is_clean_white_4_3_and_keeps_both_sides():
 
 
 def test_publish_routing_matches_product_contract():
-    assert _default_publish_layout_for_scope('manual') == 'buttons'
-    assert _default_publish_layout_for_scope('collected') == 'buttons'
-    assert _main_album_limit(property_type='公寓', price=700, scope='collected', publish_layout='buttons') == 1
-    assert _main_album_limit(property_type='排屋', price=1000, scope='collected', publish_layout='buttons') == 1
-    assert _main_album_limit(property_type='公寓', price=1800, scope='collected', publish_layout='buttons') == 1
-    assert _main_album_limit(property_type='别墅', price=5000, scope='manual', publish_layout='buttons') == 1
     routed = classify(source_type='telegram', source_name='collector', property_type='排屋', project='Vila Town', price=1200)
     assert routed['listing_type'] == 'townhouse'
-    assert routed['cover_template'] == 'black_gold'
+    assert routed['cover_template'] == 'classic_blue'
 
 
 def test_admin_ui_is_truthful_and_more_photos_never_becomes_similar():

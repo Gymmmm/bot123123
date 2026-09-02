@@ -6,7 +6,6 @@ import html
 import json
 import os
 import re
-import shutil
 import sqlite3
 from datetime import datetime
 from pathlib import Path
@@ -21,21 +20,18 @@ from qiaolian_dual.canonical_listing_materializer import (
 )
 from qiaolian_dual.publishability_contract import evaluate_publishability
 from qiaolian_dual.utils_formatting import _display_layout, _display_floor
+from qiaolian_dual.cover_styles import (
+    ACCEPTED_COVER_STYLE_KEYS,
+    FINAL_COVER_STYLES,
+    cover_template_path,
+    normalize_cover_style,
+)
 
 ROOT = Path(__file__).resolve().parent
 PACKAGE_ROOT = ROOT / "media" / "publication_packages"
 COVER_TEMPLATE_MAP = {
-    # Three final horizontal styles. Legacy keys remain readable below so
-    # already-frozen packages and old settings do not break.
-    "blue_banner": ROOT / "templates" / "property" / "02_蓝色横幅模板.html",
-    "left_info": ROOT / "templates" / "property" / "01_经典蓝卡模板.html",
-    "black_gold": ROOT / "templates" / "property" / "04_黑金高级感_右侧价格牌模板.html",
-    "classic_blue": ROOT / "templates" / "property" / "01_经典蓝卡模板.html",
-    "minimal_white": ROOT / "templates" / "property" / "02_极简白条模板.html",
-    "right_price": ROOT / "templates" / "property" / "03_右侧价格牌模板.html",
-    "villa_premium": ROOT / "templates" / "12_别墅高级风_template_render.html",
-    "video_vertical": ROOT / "templates" / "property" / "04_竖版视频封面模板.html",
-    "editorial_mobile": ROOT / "templates" / "property" / "09_readable_card.html",
+    key: cover_template_path(key)
+    for key in (*FINAL_COVER_STYLES, "video_vertical")
 }
 
 PACKAGE_ADDITIVE_COLUMNS = {
@@ -103,26 +99,11 @@ _DEFAULT_STYLE_KEYS = {
     "manual": ("publish_default_manual_caption", "publish_default_manual_cover"),
 }
 _ALLOWED_CAPTION_VARIANTS = {"a", "b", "c", "d"}
-_ALLOWED_COVER_TEMPLATES = {
-    "blue_banner", "left_info", "black_gold",
-    # Compatibility-only names for old settings and frozen packages.
-    "minimal_white", "right_price", "classic_blue",
-    "villa_premium", "video_vertical", "premium_4image",
-}
-
-_COVER_TEMPLATE_ALIASES = {
-    "minimal_white": "blue_banner",
-    "classic_blue": "left_info",
-    "right_price": "left_info",
-    "villa_premium": "black_gold",
-    "premium_4image": "blue_banner",
-}
+_ALLOWED_COVER_TEMPLATES = ACCEPTED_COVER_STYLE_KEYS
 
 
 def _canonical_cover_template(value: str) -> str:
-    normalized = str(value or "").strip().lower()
-    normalized = _COVER_TEMPLATE_ALIASES.get(normalized, normalized)
-    return normalized if normalized in {"blue_banner", "left_info", "black_gold", "video_vertical"} else "blue_banner"
+    return normalize_cover_style(value, allow_video=True)
 
 
 def _source_style_scope(source_type: str, source_name: str = "") -> str:
@@ -130,25 +111,6 @@ def _source_style_scope(source_type: str, source_name: str = "") -> str:
     # wechat_note/admin/manual are explicit operator imports; all collector
     # sources use the collected defaults. This is routing metadata only.
     return "manual" if any(token in raw for token in ("wechat_note", "manual", "admin_import", "手工", "管理导入")) else "collected"
-
-
-def _default_publish_layout_for_scope(scope: str) -> str:
-    """频道主帖统一为单图三按钮；完整相册由用户 Bot 承接。"""
-    _ = scope
-    return "buttons"
-
-
-def _main_album_limit(*, property_type: str, price: Any, scope: str, publish_layout: str) -> int:
-    """频道主相册张数：普通公寓4张，别墅/排屋或高价房6张；按钮帖只发首图。"""
-    if str(publish_layout or "").lower() == "buttons" or str(scope or "").lower() == "manual":
-        return 1
-    kind = str(property_type or "").lower()
-    landed = any(token in kind for token in ("别墅", "排屋", "联排", "双拼", "townhouse", "villa"))
-    try:
-        monthly = float(re.sub(r"[^0-9.]", "", str(price or "0")) or 0)
-    except (TypeError, ValueError):
-        monthly = 0
-    return 6 if landed or monthly >= 1500 else 4
 
 
 def _default_publish_styles(
@@ -186,17 +148,11 @@ def ensure_schema(db_path: str) -> None:
 def classify(*, source_type: str, source_name: str, property_type: str,
              project: str, media_type: str = "image", price: Any = None,
              highlights: Any = None, is_special: bool = False) -> dict[str, str]:
-    """Choose the visual template without corrupting the real property type.
+    """Return stable listing metadata and one deterministic default cover.
 
-    Routing priority:
-      video -> video_vertical
-      villa/high price -> black_gold
-      special promotion -> left_info
-      rich/manual source -> left_info
-      normal listing -> blue_banner
-
-    `listing_type` reflects the actual property type; a high-priced apartment
-    may use the black-gold template but must remain an apartment.
+    Still-image listings always start with the classic blue card. Operators can
+    explicitly choose right-price or black-gold before approval. This removes
+    the old price/source/highlight routing that made previews unpredictable.
     """
     media = str(media_type or "image").lower()
     source = f"{source_type or ''} {source_name or ''}".lower()
@@ -216,50 +172,12 @@ def classify(*, source_type: str, source_name: str, property_type: str,
     is_townhouse = any(token in listing for token in ("排屋", "联排", "townhouse"))
     listing_type = "villa" if is_villa else ("townhouse" if is_townhouse else "apartment")
 
-    try:
-        numeric_price = float(re.sub(r"[^0-9.]", "", str(price or "0")) or 0)
-    except (TypeError, ValueError):
-        numeric_price = 0
-
-    highlight_count = len(_json_list(highlights))
-
-    if is_villa or is_townhouse:
-        return {
-            "source_type": normalized_source,
-            "listing_type": listing_type,
-            "media_type": "image",
-            "cover_template": "black_gold",
-        }
-
-    if numeric_price >= 1200:
-        return {
-            "source_type": normalized_source,
-            "listing_type": listing_type,
-            "media_type": "image",
-            "cover_template": "black_gold",
-        }
-
-    if is_special or any(word in listing for word in ("特价", "急租", "优惠", "活动")):
-        return {
-            "source_type": normalized_source,
-            "listing_type": listing_type,
-            "media_type": "image",
-            "cover_template": "left_info",
-        }
-
-    if highlight_count >= 3 or normalized_source == "wechat":
-        return {
-            "source_type": normalized_source,
-            "listing_type": listing_type,
-            "media_type": "image",
-            "cover_template": "left_info",
-        }
-
+    _ = (price, highlights, is_special)
     return {
         "source_type": normalized_source,
         "listing_type": listing_type,
         "media_type": "image",
-        "cover_template": "blue_banner",
+        "cover_template": "classic_blue",
     }
 
 
@@ -474,8 +392,8 @@ def _render_cover(d: dict, source: str, output: str, template: str) -> None:
     if not raw_price:
         raw_price = "售价面议" if deal_type == "sale" else "租金面议"
     price_suffix = "/月" if deal_type == "rent" else ""
-    # 左下信息卡使用独立 PRICE_SUFFIX；其余模板把单位放入价格行。
-    display_price = raw_price if template == "left_info" else (
+    # 经典蓝卡使用独立 PRICE_SUFFIX；其余模板把单位放入价格行。
+    display_price = raw_price if template == "classic_blue" else (
         f"{raw_price}{price_suffix}" if raw_price and price_suffix and "/月" not in raw_price else raw_price
     )
     selected_template = COVER_TEMPLATE_MAP.get(template)
@@ -711,60 +629,6 @@ def format_button_post_text(
     return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()[:1024]
 
 
-def format_link_post_text(
-    d: dict,
-    listing_id: str,
-    tag_lines: list[str],
-    public_token: str,
-    caption_variant: str = "a",
-) -> str:
-    """评论区版：1+3 图、正文文字入口、剩余实拍与详情进入评论区。"""
-    def clean(value: object, limit: int = 24) -> str:
-        return re.sub(r"\s+", " ", str(value or "").strip())[:limit]
-
-    location = clean(d.get("area") or d.get("public_location_display") or d.get("project") or "金边房源")
-    layout_text = clean(_display_layout(d.get("layout") or d.get("property_type") or "整租", d.get("property_type")), 18)
-    property_type = clean(d.get("property_type"), 12)
-    size = clean(d.get("size"), 12)
-    floor = _display_floor(clean(d.get("floor"), 12))
-    deposit = clean(d.get("payment_terms") or d.get("deposit"), 16)
-    contract = clean(d.get("contract_term"), 12)
-    try:
-        numeric_price = int(float(d.get("price")))
-    except (TypeError, ValueError):
-        numeric_price = 0
-    deal_type = str(d.get("deal_type") or "rent").lower()
-    price = f"${numeric_price:,}" if numeric_price > 0 else ("售价面议" if deal_type == "sale" else "租金面议")
-    suffix = "" if deal_type == "sale" or price.endswith("面议") else "/月"
-    number = re.search(r"(\d+)", str(listing_id))
-    qc_code = f"QC{int(number.group(1)):04d}" if number else listing_id
-    facts = [value for value in (property_type, size, floor) if value]
-    rental = [value for value in (deposit, contract) if value]
-
-    from meihua_publisher import _caption_action_links
-    action_links = _caption_action_links(
-        listing_id,
-        listing=d,
-        post_token=public_token,
-        caption_variant=caption_variant,
-    )
-    tag_text = _normalized_tag_text(tag_lines, d.get("price"), d.get("deal_type"))
-    lines = [
-        tag_text,
-        "" if tag_text else "",
-        f"🏠 <b>{html.escape(location)}｜{html.escape(layout_text)}</b>",
-        f"💰 <b>{html.escape(price)}{suffix}</b>",
-        "🏢 " + "｜".join(html.escape(value) for value in facts) if facts else "",
-        "🔑 " + "｜".join(html.escape(value) for value in rental) if rental else "",
-        f"📸 实拍房源｜<code>{html.escape(qc_code)}</code>",
-        "",
-        action_links,
-        "",
-        "📸 更多实拍、租赁详情与预约入口在评论区👇",
-    ]
-    return re.sub(r"\n{3,}", "\n\n", "\n".join(line for line in lines if line is not None)).strip()[:1024]
-
-
 def build_package(
     db_path: str,
     draft_id: str,
@@ -847,14 +711,7 @@ def build_package(
     styles["caption_variant"] = selected_variant
     review_note = str(d.get("review_note") or "")
     # 最终频道合同：无论来源或旧 review_note 如何，均只发一张封面并挂三个按钮。
-    publish_layout = "buttons"
-    cover_match = re.search(r"publish_cover:(cover|none)", review_note, flags=re.I)
-    publish_cover = cover_match.group(1).lower() if cover_match else "cover"
-    cover_note = re.search(
-        r"cover_template:(blue_banner|left_info|black_gold|classic_blue|minimal_white|right_price)",
-        review_note,
-        flags=re.I,
-    )
+    cover_note = re.search(r"cover_template:([a-z0-9_]+)", review_note, flags=re.I)
     saved_template = cover_note.group(1).lower() if cover_note else ""
     template = _canonical_cover_template(
         template_override or saved_template or styles["cover_template"] or routing["cover_template"]
@@ -873,12 +730,7 @@ def build_package(
         target = out / f"image_{index:02d}.jpg"
         # Package 阶段生成最终详情字节；Publisher 之后只读取并发送，不再加 Logo/调色/裁切。
         _finalize_detail_image(path, str(target)); processed.append(str(target))
-    max_main_images = _main_album_limit(
-        property_type=d.get("property_type") or "",
-        price=d.get("price"),
-        scope=styles["scope"],
-        publish_layout=publish_layout,
-    )
+    max_main_images = 1
     main = [str(cover)] + processed[: max_main_images - 1]
     discussion = processed[max_main_images - 1 :]
     from meihua_publisher import (
@@ -893,25 +745,13 @@ def build_package(
     post_lines = post_text.splitlines()
     tag_lines = [line for line in post_lines if line.strip().startswith("#")]
     body_lines = [line for line in post_lines if not line.strip().startswith("#")]
-    if publish_layout == "buttons":
-        post_text = format_button_post_text(d, listing_id, tag_lines, styles["caption_variant"])
-    else:
-        post_text = format_link_post_text(
-            d,
-            listing_id,
-            tag_lines,
-            public_token,
-            styles["caption_variant"],
-        )
+    post_text = format_button_post_text(d, listing_id, tag_lines, styles["caption_variant"])
     listing_number = re.search(r"(\d+)", str(listing_id))
     qc_code = f"QC{int(listing_number.group(1)):04d}" if listing_number else ""
     if qc_code and qc_code not in post_text:
         lines = post_text.splitlines()
-        if publish_layout == "links" and lines and lines[0].startswith("#"):
-            lines.insert(1, qc_code)
-        else:
-            tag_at = next((i for i, line in enumerate(lines) if line.startswith("#")), len(lines))
-            lines.insert(tag_at, qc_code)
+        tag_at = next((i for i, line in enumerate(lines) if line.startswith("#")), len(lines))
+        lines.insert(tag_at, qc_code)
         post_text = "\n".join(lines).strip()
     discussion_text = build_discussion_detail_text(d)
 
@@ -975,9 +815,9 @@ def build_package(
     snapshot["quality_json"] = facts.get("quality") or {}
     snapshot["publish_style_scope"] = styles["scope"]
     snapshot["caption_variant"] = styles["caption_variant"]
-    snapshot["publish_layout"] = publish_layout
-    snapshot["publish_actions"] = "buttons" if publish_layout == "buttons" else "none"
-    snapshot["publish_cover"] = publish_cover
+    snapshot["publish_layout"] = "buttons"
+    snapshot["publish_actions"] = "buttons"
+    snapshot["publish_cover"] = "cover"
     snapshot["cover_template"] = template
     # FREEZE_V2 binds the exact bytes that will be sent, not only asset IDs/paths.
     frozen_paths = list(dict.fromkeys(main + discussion))
@@ -1065,15 +905,15 @@ def render_cover_preview(db_path: str, draft_id: str, output_path: str, *, templ
                            property_type=d.get("property_type") or "", project=d.get("project") or "",
                            price=d.get("price"), highlights=d.get("highlights"),
                            is_special=bool(d.get("is_special") or d.get("is_urgent")))
-        template = _canonical_cover_template(template_override or routing["cover_template"])
+        cover_note = re.search(
+            r"cover_template:([a-z0-9_]+)", str(d.get("review_note") or ""), flags=re.I
+        )
+        saved_template = cover_note.group(1).lower() if cover_note else ""
+        template = _canonical_cover_template(
+            template_override or saved_template or routing["cover_template"]
+        )
         source = _select_cover_source(originals, property_type=str(d.get("property_type") or ""))
         _render_cover(d, source, output_path, template)
-        preview_images = [output_path]
-        preview_stem = Path(output_path).stem
-        for index, path in enumerate([p for p in originals if p != source][:3], start=2):
-            target = str(Path(output_path).with_name(f"{preview_stem}_detail_{index:02d}.jpg"))
-            _finalize_detail_image(path, target)
-            preview_images.append(target)
         return {
             "draft_id": draft_id,
             "template": template,
@@ -1084,7 +924,7 @@ def render_cover_preview(db_path: str, draft_id: str, output_path: str, *, templ
             "layout": d.get("layout") or "",
             "price": d.get("price") or "",
             "output_path": output_path,
-            "final_images": preview_images,
+            "final_images": [output_path],
         }
     finally:
         conn.close()

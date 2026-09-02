@@ -46,21 +46,14 @@ from .keyboards import (
 )
 from . import messages
 from .extractor import extract_house_info
-# v2 手搓封面单独模块，避免占用 cover_generator 包名（与 meihua CoverGenerator 冲突）
+from .cover_preview import generate_house_cover
+
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 from discussion_map_store import load_discuss_map, save_discuss_map
 from meihua_publisher import add_detail_logo_watermark, build_chinese_listing_post
 from db import DatabaseManager as CoreDatabaseManager
-
-for _cover_module_dir in (
-    _REPO_ROOT / "v2_admin",
-    Path("/opt/qiaolian_dual_bots/v2_admin"),
-):
-    if _cover_module_dir.exists():
-        sys.path.append(str(_cover_module_dir))
-from house_cover_v2 import generate_house_cover
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s: %(message)s')
 # httpx logs full Bot API URLs, which include Telegram credentials in the path.
@@ -140,7 +133,6 @@ class Draft:
     media_file_id: str = ""
     media_file_ids: list[str] = field(default_factory=list)
     source_caption: str = ""
-    cover_style: str = "minimal"  # classic | minimal | price_tag | vertical
     google_maps_url: str = ""  # 留接口：可手填精确链接，空则自动生成搜索链接
 
     def to_dict(self, user_id: int) -> dict[str, Any]:
@@ -651,7 +643,7 @@ class PublisherBot:
         )
 
     async def cmd_cover_test(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """测试 2 款精选封面模板。支持 /cover_test DRF_xxx 使用真实草稿数据。"""
+        """测试三款最终封面。支持 /cover_test DRF_xxx 使用真实草稿数据。"""
         if not await self._ensure_admin(update):
             return
         msg = update.effective_message
@@ -666,13 +658,13 @@ class PublisherBot:
                 parse_mode=ParseMode.HTML,
             )
 
-        # 旧的 classic / vertical 视觉稳定性一般，已下线测试入口，仅保留可上线模板。
         styles = [
-            ("minimal", "精选A·清爽信息条"),
-            ("price_tag", "精选B·价格角标"),
+            ("classic_blue", "经典蓝卡"),
+            ("right_price", "右侧价格牌"),
+            ("black_gold", "黑金高级感"),
         ]
 
-        await msg.reply_text(f"正在生成 2 款精选封面并发送到当前管理员私聊...\n数据来源：{source_desc}")
+        await msg.reply_text(f"正在生成 3 款最终封面并发送到当前管理员私聊...\n数据来源：{source_desc}")
         try:
             out_dir = self._runtime_render_dir()
         except Exception as e:
@@ -712,7 +704,7 @@ class PublisherBot:
                 f"失败项：{', '.join(failed)}"
             )
         else:
-            await msg.reply_text("✅ 2 款精选封面已发送到频道，请查看对比效果。")
+            await msg.reply_text("✅ 3 款最终封面已发送到当前私聊，请查看对比效果。")
 
     @staticmethod
     def _coerce_highlights(raw: Any) -> list[str]:
@@ -971,33 +963,6 @@ class PublisherBot:
             paths.append(str(path))
         return paths
 
-    async def _generate_and_reply_cover(
-        self, reply_to: Message, draft: Draft, style: str | None = None
-    ) -> str | None:
-        """Generate a private admin preview; this method never publishes."""
-        try:
-            out_dir = self._runtime_render_dir()
-            output_path = str(out_dir / f"out_{draft.listing_id}_{style or draft.cover_style}.jpg")
-            bg_path = await self._resolve_cover_background(reply_to, draft, out_dir)
-            generate_house_cover(
-                bg_path,
-                output_path,
-                project=(draft.title or "侨联地产").strip(),
-                property_type=(draft.layout or "精选房源").strip(),
-                area=(draft.area or "金边").strip(),
-                size=(draft.size_sqm or "—").strip(),
-                floor=(draft.fee_note or "—").strip(),
-                price=(draft.price or "面议").strip(),
-                highlights=draft.highlights or ["实拍真房源", "中文顾问", "可预约看房"],
-                style=(style or draft.cover_style or "minimal").lower().strip(),
-            )
-            with open(output_path, "rb") as preview:
-                await reply_to.reply_photo(preview, caption="✨ 品牌封面预览（仅管理员可见）")
-            return output_path
-        except Exception as exc:
-            logger.error("Cover generation failed: %s", exc)
-            return None
-
     async def capture_media(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         msg = update.message
         assert msg is not None
@@ -1167,37 +1132,6 @@ class PublisherBot:
                 logger.exception("save /new into unified pipeline failed")
                 await query.edit_message_text(f"❌ 保存待审草稿失败：{exc}")
                 return ST_PREVIEW
-
-    async def style_actions(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-        """处理封面模板风格选择。"""
-        query = update.callback_query
-        await query.answer()
-        data = query.data
-
-        if data == "style:back":
-            await self.show_preview(update, context)
-            return ST_PREVIEW
-
-        if data.startswith("style:set:"):
-            style = data.split(":", 2)[2]
-            draft = self._draft(context)
-            draft.cover_style = style
-
-            # 重新生成并发送预览（不依赖原图）
-            try:
-                await query.edit_message_text(f"正在生成 {style} 风格封面...")
-                await self._generate_and_reply_cover(
-                    query.message, draft, style=style
-                )
-            except Exception as e:
-                logger.error("Style preview failed: %s", e)
-                await query.edit_message_text(f"⚠️ 预览生成失败：{e}")
-
-            await asyncio.sleep(0.5)
-            await self.show_preview(update, context)
-            return ST_PREVIEW
-
-        return ST_PREVIEW
 
     @staticmethod
     def _admin_listing_id(raw: str) -> str:
@@ -1446,7 +1380,6 @@ def main() -> None:
             ],
             ST_PREVIEW: [
                 CallbackQueryHandler(bot.preview_actions, pattern=r"^preview:"),
-                CallbackQueryHandler(bot.style_actions, pattern=r"^style:"),
                 CallbackQueryHandler(bot.cancel, pattern="^pub:cancel$"),
             ],
         },

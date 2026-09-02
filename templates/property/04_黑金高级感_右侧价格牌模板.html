@@ -30,15 +30,15 @@ html,body{margin:0;width:1600px;height:1200px;background:#080808;font-family:"No
   <div class="shade"></div><div class="grain"></div>
   <div class="brand"><div class="cn">侨联地产</div><div class="en">QIAO LIAN PROPERTY</div></div>
   <div class="main">
-    <div class="title" id="t1">{{PROJECT}}</div>
-    <div class="sub" data-field="t2" id="t2">{{LAYOUT}}</div>
+    <div class="title" data-autofit="48" id="t1">{{PROJECT}}</div>
+    <div class="sub" data-field="t2" data-autofit="30" id="t2">{{LAYOUT}}</div>
     <div class="info">
-      <div data-field="t3">位置 · <span id="t3">{{AREA}}</span></div>
-      <div data-fields="t4,t5"><span data-field="t4">面积 · <span id="t4">{{SIZE}}</span></span><span data-field="t5">　｜　楼层 · <span id="t5">{{FLOOR}}</span></span></div>
-      <div data-fields="t7,t8,t9">亮点 · <span data-field="t7" id="t7">{{H1}}</span><span data-field="t8"> / <span id="t8">{{H2}}</span></span><span data-field="t9"> / <span id="t9">{{H3}}</span></span></div>
+      <div data-field="t3" data-autofit="22">位置 · <span id="t3">{{AREA}}</span></div>
+      <div data-fields="t4,t5" data-autofit="22"><span data-field="t4">面积 · <span id="t4">{{SIZE}}</span></span><span data-field="t5">　｜　楼层 · <span id="t5">{{FLOOR}}</span></span></div>
+      <div data-fields="t7,t8,t9" data-autofit="22">亮点 · <span data-field="t7" id="t7">{{H1}}</span><span data-field="t8"> / <span id="t8">{{H2}}</span></span><span data-field="t9"> / <span id="t9">{{H3}}</span></span></div>
     </div>
   </div>
-  <div class="pricebox" data-field="t6"><div class="label" id="price_label">租金</div><div class="price" id="price_text">{{PRICE_LINE}}</div></div>
+  <div class="pricebox" data-field="t6"><div class="label" id="price_label">租金</div><div class="price" data-autofit="48" id="price_text">{{PRICE_LINE}}</div></div>
 </div>
 </body>
 </html>

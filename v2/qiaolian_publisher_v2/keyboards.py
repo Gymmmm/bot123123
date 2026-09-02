@@ -83,7 +83,6 @@ def preview_keyboard() -> InlineKeyboardMarkup:
                 InlineKeyboardButton("✅ 保存到待审", callback_data="preview:publish"),
                 InlineKeyboardButton("✏️ 修改字段", callback_data="preview:edit"),
             ],
-            [InlineKeyboardButton("🎨 切换封面模板", callback_data="preview:style")],
             [InlineKeyboardButton("❌ 取消", callback_data="pub:cancel")],
         ]
     )

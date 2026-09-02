@@ -292,6 +292,20 @@ def render_html_cover(
             page.evaluate("document.fonts.ready")
             poster = page.locator(".poster")
             poster.wait_for(state="visible")
+            poster.evaluate(
+                r"""root => {
+                    const overflows = el =>
+                        el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1;
+                    for (const el of root.querySelectorAll('[data-autofit]')) {
+                        const minimum = Number(el.getAttribute('data-autofit')) || 20;
+                        let size = Number.parseFloat(getComputedStyle(el).fontSize) || minimum;
+                        while (overflows(el) && size > minimum) {
+                            size = Math.max(minimum, size - 2);
+                            el.style.fontSize = `${size}px`;
+                        }
+                    }
+                }"""
+            )
             rendered_text = poster.evaluate("el => el.innerText || el.textContent || \"\"")
             unresolved = re.search(r"(?:\{\{[^{}]+\}\}|\$\{[^{}]+\})", str(rendered_text or ""))
             forbidden_placeholder = re.search(r"(?i)(?:待确认|未知|未提供|暂无|\bN/A\b|\bNone\b)", str(rendered_text or ""))
