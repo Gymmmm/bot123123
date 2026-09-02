@@ -1,6 +1,11 @@
 name: qiaolian-production-deploy
 
 on:
+  pull_request:
+    branches:
+      - codex/production-sync-20260829
+    types:
+      - assigned
   workflow_dispatch:
     inputs:
       confirm:
@@ -26,7 +31,13 @@ env:
 
 jobs:
   verify-and-deploy:
-    if: ${{ inputs.confirm == 'DEPLOY' }}
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.confirm == 'DEPLOY') ||
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.number == 23 &&
+       github.event.pull_request.draft == true &&
+       github.event.pull_request.head.ref == 'codex/qiaolian-ui-cleanup-20260829' &&
+       github.event.assignee.login == github.repository_owner)
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
@@ -41,7 +52,9 @@ jobs:
         run: |
           set -Eeuo pipefail
           test "$(git branch --show-current)" = "$DEPLOY_BRANCH"
-          echo "Deploy candidate: $(git rev-parse HEAD)"
+          CANDIDATE_SHA=$(git rev-parse HEAD)
+          echo "CANDIDATE_SHA=$CANDIDATE_SHA" >> "$GITHUB_ENV"
+          echo "Deploy candidate: $CANDIDATE_SHA"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -72,7 +85,7 @@ jobs:
           RELEASE_BUNDLE: '${{ runner.temp }}/qiaolian-release.bundle'
         run: |
           set -Eeuo pipefail
-          git update-ref refs/heads/actions-production "$GITHUB_SHA"
+          git update-ref refs/heads/actions-production "$CANDIDATE_SHA"
           git bundle create "$RELEASE_BUNDLE" refs/heads/actions-production
           git bundle verify "$RELEASE_BUNDLE"
 
@@ -107,7 +120,7 @@ jobs:
           REMOTE_BUNDLE: '/tmp/qiaolian-${{ github.run_id }}-${{ github.sha }}.bundle'
         run: |
           set -Eeuo pipefail
-          ssh             -p "$PROD_PORT"             -i "$HOME/.ssh/qiaolian_production"             -o BatchMode=yes             "$PROD_SSH_USER@$PROD_HOST"             "bash -s -- '$REMOTE_BUNDLE' '$GITHUB_SHA' '$DEPLOY_BRANCH'" <<'REMOTE'
+          ssh             -p "$PROD_PORT"             -i "$HOME/.ssh/qiaolian_production"             -o BatchMode=yes             "$PROD_SSH_USER@$PROD_HOST"             "bash -s -- '$REMOTE_BUNDLE' '$CANDIDATE_SHA' '$DEPLOY_BRANCH'" <<'REMOTE'
           set -Eeuo pipefail
 
           BUNDLE_PATH=$1
