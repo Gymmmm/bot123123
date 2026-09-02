@@ -52,6 +52,24 @@ def test_logo_is_anchored_inside_actual_photo_not_white_border(tmp_path: Path):
     assert logo_box["y"] + logo_box["height"] <= image_box["y"] + image_box["height"]
 
 
+def test_gallery_logo_is_visible_medium_large_not_tiny_corner_bug(tmp_path: Path):
+    source = tmp_path / "landscape.jpg"
+    logo = tmp_path / "logo.png"
+    output = tmp_path / "landscape_out.jpg"
+    _make(source, (1600, 900), color=(35, 45, 60))
+    # Mimic the repository's small 120px corner-mark asset. Formatter must upscale it.
+    Image.new("RGBA", (120, 40), (255, 255, 255, 235)).save(logo)
+
+    info = format_gallery_photo(source, output, logo_path=logo, logo_position="top_left")
+    image_box = info["image_box"]
+    logo_box = info["logo_box"]
+    assert logo_box is not None
+    assert logo_box["width"] >= 300
+    assert logo_box["width"] >= int(image_box["width"] * 0.25)
+    assert logo_box["width"] <= int(image_box["width"] * 0.42) + 1
+    assert logo_box["height"] <= int(image_box["height"] * 0.18) + 1
+
+
 def test_logo_can_switch_to_top_right_without_leaving_photo(tmp_path: Path):
     source = tmp_path / "wide.jpg"
     logo = tmp_path / "logo.png"
