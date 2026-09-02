@@ -4,7 +4,7 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Sequence
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
@@ -14,15 +14,20 @@ PADDING = 24
 LANDSCAPE_THRESHOLD = 1.10
 PORTRAIT_THRESHOLD = 0.90
 
+# Gallery branding is intentionally visible, not a tiny corner bug.
+# Width is relative to the target canvas, then clamped to the actual photo box
+# so portrait/ultra-wide images never push the logo into the white border.
 CANVAS_PRESETS = {
-    "landscape": {"size": (1200, 900), "logo_width_ratio": 0.20},
-    "portrait": {"size": (900, 1200), "logo_width_ratio": 0.22},
-    "square": {"size": (1080, 1080), "logo_width_ratio": 0.20},
+    "landscape": {"size": (1200, 900), "logo_width_ratio": 0.30},
+    "portrait": {"size": (900, 1200), "logo_width_ratio": 0.32},
+    "square": {"size": (1080, 1080), "logo_width_ratio": 0.30},
 }
 
 LOGO_MARGIN_X_RATIO = 0.03
 LOGO_MARGIN_Y_RATIO = 0.03
 LOGO_OPACITY = 0.92
+LOGO_MAX_PHOTO_WIDTH_RATIO = 0.42
+LOGO_MAX_PHOTO_HEIGHT_RATIO = 0.18
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 
 ROOT = Path(__file__).resolve().parent
@@ -98,18 +103,18 @@ def _load_font(size: int) -> ImageFont.ImageFont:
 
 
 def _fallback_brand_logo(canvas_width: int) -> Image.Image:
-    """Create a small transparent white brand mark when no logo asset is present."""
-    font = _load_font(max(22, int(canvas_width * 0.035)))
+    """Create a transparent white brand mark when no logo asset is present."""
+    font = _load_font(max(26, int(canvas_width * 0.044)))
     text = "侨联地产"
-    tmp = Image.new("RGBA", (canvas_width, max(64, int(canvas_width * 0.09))), (0, 0, 0, 0))
+    tmp = Image.new("RGBA", (canvas_width, max(72, int(canvas_width * 0.11))), (0, 0, 0, 0))
     draw = ImageDraw.Draw(tmp)
     box = draw.textbbox((0, 0), text, font=font, stroke_width=1)
     tw = max(1, box[2] - box[0])
     th = max(1, box[3] - box[1])
-    out = Image.new("RGBA", (tw + 20, th + 16), (0, 0, 0, 0))
+    out = Image.new("RGBA", (tw + 24, th + 18), (0, 0, 0, 0))
     d = ImageDraw.Draw(out)
-    d.text((11, 9), text, font=font, fill=(0, 0, 0, 115), stroke_width=1, stroke_fill=(0, 0, 0, 90))
-    d.text((9, 7), text, font=font, fill=(255, 255, 255, 245), stroke_width=1, stroke_fill=(0, 0, 0, 75))
+    d.text((13, 10), text, font=font, fill=(0, 0, 0, 115), stroke_width=1, stroke_fill=(0, 0, 0, 90))
+    d.text((11, 8), text, font=font, fill=(255, 255, 255, 245), stroke_width=1, stroke_fill=(0, 0, 0, 75))
     return out
 
 
@@ -160,12 +165,40 @@ def paste_logo(
     """Place logo inside the actual photo area, never on the white border."""
     x, y = _logo_anchor(image_box, logo.size, position)
     image_x, image_y, image_w, image_h = image_box
-    # Clamp for very small/narrow source boxes.
     x = max(image_x, min(x, image_x + image_w - logo.width))
     y = max(image_y, min(y, image_y + image_h - logo.height))
     overlay = canvas.convert("RGBA")
     overlay.alpha_composite(logo, (x, y))
     return overlay.convert("RGB"), (x, y, logo.width, logo.height)
+
+
+def _resize_gallery_logo(
+    logo: Image.Image,
+    *,
+    canvas_width: int,
+    image_box: tuple[int, int, int, int],
+    width_ratio: float,
+) -> Image.Image:
+    """Resize brand mark to a visible medium-large size, including upscaling.
+
+    The former implementation used min(1.0, scale), so the 120px corner-mark
+    asset could never grow and looked tiny on 900-1200px gallery canvases.
+    """
+    image_w = max(1, image_box[2])
+    image_h = max(1, image_box[3])
+    target_w = min(
+        max(1, int(canvas_width * width_ratio)),
+        max(1, int(image_w * LOGO_MAX_PHOTO_WIDTH_RATIO)),
+    )
+    target_h_cap = max(1, int(image_h * LOGO_MAX_PHOTO_HEIGHT_RATIO))
+    scale = min(
+        target_w / max(1, logo.width),
+        target_h_cap / max(1, logo.height),
+    )
+    return logo.resize(
+        (max(1, int(round(logo.width * scale))), max(1, int(round(logo.height * scale)))),
+        Image.Resampling.LANCZOS,
+    )
 
 
 def format_gallery_photo(
@@ -190,15 +223,11 @@ def format_gallery_photo(
     logo_box = None
     if add_logo:
         logo = resolve_logo(logo_path, canvas_size[0])
-        # Never let the mark consume an excessive portion of a narrow portrait photo.
-        max_logo_w = min(
-            int(canvas_size[0] * preset["logo_width_ratio"]),
-            max(48, int(image_box[2] * 0.36)),
-        )
-        scale = min(1.0, max_logo_w / max(1, logo.width))
-        logo = logo.resize(
-            (max(1, int(logo.width * scale)), max(1, int(logo.height * scale))),
-            Image.Resampling.LANCZOS,
+        logo = _resize_gallery_logo(
+            logo,
+            canvas_width=canvas_size[0],
+            image_box=image_box,
+            width_ratio=preset["logo_width_ratio"],
         )
         logo = apply_logo_opacity(logo)
         canvas, logo_box = paste_logo(canvas, logo, image_box, position=logo_position)
@@ -281,8 +310,6 @@ def ordered_source_files(
         if fallback and fallback not in ordered:
             ordered.append(fallback)
 
-    # Files not represented in the collector manifest are retained at the end,
-    # using natural numeric sorting (1,2,10) rather than lexical (1,10,2).
     for path in sorted(available, key=_natural_key):
         if path not in ordered:
             ordered.append(path)
