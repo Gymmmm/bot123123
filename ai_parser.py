@@ -11,8 +11,7 @@ from collections import Counter
 from typing import Any
 
 from collector_db_compat import DatabaseManager
-from qiaolian_dual.canonical_facts import draft_projection
-from qiaolian_dual.canonical_enrichment_v12 import canonicalize_source_v12
+from qiaolian_dual.canonical_facts import canonicalize_source, draft_projection
 from qiaolian_dual.canonical_listing_materializer import materialize_draft_facts
 
 
@@ -20,7 +19,7 @@ class LLMClient:
     """Compatibility seam; any future model output is only a candidate source."""
 
     def parse_text_with_llm(self, raw_text: str) -> dict[str, Any]:
-        return canonicalize_source_v12(raw_text)
+        return canonicalize_source(raw_text)
 
 
 class AIParserModule:
@@ -93,7 +92,7 @@ class AIParserModule:
 
     def _canonicalize(self, source_row: dict[str, Any]) -> tuple[int, dict[str, Any], dict[str, Any]]:
         post_id, _source_type, raw_text, sanitized_text, identity, media_summary = self._inputs(source_row)
-        facts = canonicalize_source_v12(
+        facts = canonicalize_source(
             raw_text=raw_text,
             sanitized_text=sanitized_text,
             source_identity=identity,
