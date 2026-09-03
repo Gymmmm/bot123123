@@ -96,8 +96,10 @@ async def test_gallery_sends_source_photos_then_one_operation_box(tmp_path):
     with patch("qiaolian_dual.listing.listing_context", return_value={"media_files": paths}):
         await send_listing_photo_preview(bot, 123, "l_42")
 
-    assert bot.send_media_group.await_count == 2
-    assert bot.send_photo.await_count == 0
+    # Telegram groups up to ten media. The remaining single photo is sent as a
+    # normal photo, then the flow emits exactly one operation box.
+    assert bot.send_media_group.await_count == 1
+    assert bot.send_photo.await_count == 1
     assert bot.send_message.await_count == 1
     kwargs = bot.send_message.await_args.kwargs
     assert kwargs["text"] == "📸 <b>实拍已全部显示</b>\n\n请选择下一步。"
