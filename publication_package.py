@@ -148,11 +148,15 @@ def ensure_schema(db_path: str) -> None:
 def classify(*, source_type: str, source_name: str, property_type: str,
              project: str, media_type: str = "image", price: Any = None,
              highlights: Any = None, is_special: bool = False) -> dict[str, str]:
-    """Return stable listing metadata and one deterministic default cover.
+    """Return stable listing metadata and the launch-default cover.
 
-    Still-image listings always start with the classic blue card. Operators can
-    explicitly choose right-price or black-gold before approval. This removes
-    the old price/source/highlight routing that made previews unpredictable.
+    Launch contract:
+      - ordinary still listings -> classic blue
+      - villa / townhouse / monthly rent >= 1200 -> black gold
+      - right-price remains operator-selectable only; it is never auto-routed
+      - video keeps the dedicated vertical template
+
+    Property classification never changes just because the visual template does.
     """
     media = str(media_type or "image").lower()
     source = f"{source_type or ''} {source_name or ''}".lower()
@@ -171,13 +175,20 @@ def classify(*, source_type: str, source_name: str, property_type: str,
     is_villa = "别墅" in listing or "villa" in listing
     is_townhouse = any(token in listing for token in ("排屋", "联排", "townhouse"))
     listing_type = "villa" if is_villa else ("townhouse" if is_townhouse else "apartment")
+    try:
+        numeric_price = float(re.sub(r"[^0-9.]", "", str(price or "0")) or 0)
+    except (TypeError, ValueError):
+        numeric_price = 0
 
-    _ = (price, highlights, is_special)
+    # `highlights` and `is_special` remain accepted for compatibility, but they
+    # do not silently switch the visual style. Right-price is manual-only.
+    _ = (highlights, is_special)
+    cover_template = "black_gold" if (is_villa or is_townhouse or numeric_price >= 1200) else "classic_blue"
     return {
         "source_type": normalized_source,
         "listing_type": listing_type,
         "media_type": "image",
-        "cover_template": "classic_blue",
+        "cover_template": cover_template,
     }
 
 

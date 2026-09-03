@@ -34,7 +34,7 @@ def test_album_is_clean_white_4_3_and_keeps_both_sides():
 def test_publish_routing_matches_product_contract():
     routed = classify(source_type='telegram', source_name='collector', property_type='排屋', project='Vila Town', price=1200)
     assert routed['listing_type'] == 'townhouse'
-    assert routed['cover_template'] == 'classic_blue'
+    assert routed['cover_template'] == 'black_gold'
 
 
 def test_admin_ui_is_truthful_and_more_photos_never_becomes_similar():

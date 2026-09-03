@@ -23,8 +23,15 @@ def test_legacy_names_collapse_into_final_styles():
     assert normalize_cover_style("unknown") == "classic_blue"
 
 
-def test_still_listings_have_one_deterministic_default():
-    for property_type, price in (("公寓", 600), ("排屋", 1200), ("别墅", 5000)):
+def test_launch_default_cover_routing_is_deterministic():
+    cases = (
+        ("公寓", 600, "classic_blue"),
+        ("公寓", 1199, "classic_blue"),
+        ("公寓", 1200, "black_gold"),
+        ("排屋", 600, "black_gold"),
+        ("别墅", 5000, "black_gold"),
+    )
+    for property_type, price, expected in cases:
         routed = classify(
             source_type="telegram",
             source_name="collector",
@@ -32,7 +39,20 @@ def test_still_listings_have_one_deterministic_default():
             project="示例房源",
             price=price,
         )
-        assert routed["cover_template"] == "classic_blue"
+        assert routed["cover_template"] == expected
+
+
+def test_right_price_is_manual_only():
+    routed = classify(
+        source_type="telegram",
+        source_name="collector",
+        property_type="公寓",
+        project="特价房源",
+        price=600,
+        is_special=True,
+    )
+    assert routed["cover_template"] == "classic_blue"
+    assert normalize_cover_style("right_price") == "right_price"
 
 
 def test_admin_publish_shape_is_fixed_to_cover_and_buttons():
