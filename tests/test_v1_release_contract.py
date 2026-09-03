@@ -35,20 +35,24 @@ def test_channel_post_has_exact_three_locked_ctas_and_listing_context():
         ["📅 预约看房"],
     ]
     urls = [unquote(button.url or "") for button in _buttons(keyboard)]
-    assert any("start=detail__qlabc123__l_42" in url for url in urls)
-    assert any("start=photos__qlabc123__l_42" in url for url in urls)
-    assert any("start=book__qlabc123__l_42" in url for url in urls)
+    assert any("start=property_QC0042_details" in url for url in urls)
+    assert any("start=property_QC0042_photos" in url for url in urls)
+    assert any("start=property_QC0042_book" in url for url in urls)
+    assert all("l_42" not in url for url in urls)
     assert all("侨联找房助手" not in button.text for button in _buttons(keyboard))
 
 
 def test_channel_detail_photos_book_payloads_resolve_to_expected_actions():
-    detail = parse_start_arg_payload("detail__qlabc123__l_42")
-    photos = parse_start_arg_payload("photos__qlabc123__l_42")
-    book = parse_start_arg_payload("book__qlabc123__l_42")
+    detail = parse_start_arg_payload("property_QC0042_details")
+    photos = parse_start_arg_payload("property_QC0042_photos")
+    book = parse_start_arg_payload("property_QC0042_book")
 
-    assert detail and detail["action"] == "details" and detail["post_token"] == "qlabc123"
-    assert photos and photos["action"] == "photos" and photos["post_token"] == "qlabc123"
-    assert book and book["action"] == "appoint" and book["post_token"] == "qlabc123"
+    assert detail and detail["action"] == "details"
+    assert photos and photos["action"] == "photos"
+    assert book and book["action"] == "appoint"
+    assert detail["listing_id"] == "l_42"
+    assert photos["listing_id"] == "l_42"
+    assert book["listing_id"] == "l_42"
 
 
 def test_listing_detail_hides_unknown_or_empty_rows():
@@ -96,8 +100,6 @@ async def test_gallery_sends_source_photos_then_one_operation_box(tmp_path):
     with patch("qiaolian_dual.listing.listing_context", return_value={"media_files": paths}):
         await send_listing_photo_preview(bot, 123, "l_42")
 
-    # Telegram groups up to ten media. The remaining single photo is sent as a
-    # normal photo, then the flow emits exactly one operation box.
     assert bot.send_media_group.await_count == 1
     assert bot.send_photo.await_count == 1
     assert bot.send_message.await_count == 1
