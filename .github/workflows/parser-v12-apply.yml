@@ -37,15 +37,6 @@ jobs:
           text = text.replace(r'(\d+(?:\.\d+)?\s*k?)', r'(\d[\d,]*(?:\.\d+)?\s*k?)')
           text = text.replace(r'(\d+(?:\.\d+)?\s*(?:万|w|k)?)', r'(\d[\d,]*(?:\.\d+)?\s*(?:万|w|k)?)')
           canonical.write_text(text, encoding='utf-8')
-
-          path = Path('.github/workflows/qiaolian-ui-check.yml')
-          ci = path.read_text(encoding='utf-8')
-          if 'tests/test_parser_v12_regressions.py' not in ci:
-              needle = '            tests/test_parser_v2_safe.py \\\n            tests/test_media_pipeline_v11.py'
-              replacement = '            tests/test_parser_v2_safe.py \\\n            tests/test_parser_v12_regressions.py \\\n            tests/test_media_pipeline_v11.py'
-              if needle not in ci:
-                  raise SystemExit('cannot locate parser CI insertion point')
-              path.write_text(ci.replace(needle, replacement, 1), encoding='utf-8')
           PY
       - name: Install test dependencies
         run: |
@@ -72,7 +63,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git rm tools/apply_parser_v12_patch.py .github/workflows/parser-v12-apply.yml
-          git add qiaolian_dual/canonical_facts.py qiaolian_dual/listing_taxonomy.py tests/test_parser_v12_regressions.py .github/workflows/qiaolian-ui-check.yml
+          git add qiaolian_dual/canonical_facts.py qiaolian_dual/listing_taxonomy.py tests/test_parser_v12_regressions.py
           git commit -m "fix: harden canonical parser v1.2 recognition"
           git push origin HEAD:codex/qiaolian-ui-cleanup-20260829
