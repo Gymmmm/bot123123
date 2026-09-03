@@ -11,6 +11,7 @@ import sqlite3
 
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 
+from .channel_links import channel_action_url
 from .config import DB_PATH, USER_BOT_USERNAME
 
 logger = logging.getLogger(__name__)
@@ -31,15 +32,37 @@ def _active_appointment_count(conn: sqlite3.Connection, listing_id: str) -> int:
     return int(row[0] if row else 0)
 
 
-def _apply_appointment_lock(conn: sqlite3.Connection, listing_id: str, status: str, appointment_count: int) -> str:
+def _apply_appointment_lock(
+    conn: sqlite3.Connection,
+    listing_id: str,
+    status: str,
+    appointment_count: int,
+) -> str:
+    """Derive the bookable channel state from active appointment count.
+
+    Terminal/manual hold states stay authoritative. For a bookable listing the
+    public state is deterministic: 0 -> active, 1-4 -> reserved, >=5 -> pending.
+    """
     status = str(status or "").strip().lower()
-    if status in {"active", "reserved"} and appointment_count >= APPOINTMENT_LOCK_COUNT:
+    if status in {"pending", "rented", "inactive", "offline"}:
+        return status
+    if status not in {"active", "reserved"}:
+        return status or "pending"
+
+    if appointment_count >= APPOINTMENT_LOCK_COUNT:
+        target = "pending"
+    elif appointment_count >= 1:
+        target = "reserved"
+    else:
+        target = "active"
+
+    if target != status:
         conn.execute(
-            "UPDATE listings SET status='pending', updated_at=datetime('now','localtime') WHERE listing_id=? AND status IN ('active','reserved')",
-            (listing_id,),
+            "UPDATE listings SET status=?, updated_at=datetime('now','localtime') "
+            "WHERE listing_id=? AND status IN ('active','reserved')",
+            (target, listing_id),
         )
-        return "pending"
-    return status
+    return target
 
 
 def _status_label(status: str, appointment_count: int = 0) -> str:
@@ -52,6 +75,7 @@ def _status_label(status: str, appointment_count: int = 0) -> str:
         "pending": "🔵 房态待确认",
         "rented": "🔴 已租出",
         "inactive": "⚫ 已下架",
+        "offline": "⚫ 已下架",
     }.get(status, "🔵 房态待确认")
 
 
@@ -71,13 +95,19 @@ def _caption_with_status(caption: str, status: str, appointment_count: int = 0) 
 
 
 def _keyboard(username: str, token: str, listing_id: str, status: str) -> InlineKeyboardMarkup:
-    base = f"https://t.me/{username}?start=property_{listing_id}_"
-    details = InlineKeyboardButton("📋 租赁详情", url=base + "details")
-    photos = InlineKeyboardButton("📸 更多实拍", url=base + "photos")
+    _ = token  # public token is retained in package evidence; channel CTA shape is canonical QC.
+    details = InlineKeyboardButton(
+        "📋 租赁详情", url=channel_action_url(username, listing_id, "details")
+    )
+    photos = InlineKeyboardButton(
+        "📸 更多实拍", url=channel_action_url(username, listing_id, "photos")
+    )
     if status in {"active", "reserved"}:
         return InlineKeyboardMarkup([
             [details, photos],
-            [InlineKeyboardButton("📅 预约看房", url=base + "book")],
+            [InlineKeyboardButton(
+                "📅 预约看房", url=channel_action_url(username, listing_id, "book")
+            )],
         ])
     return InlineKeyboardMarkup([[details, photos]])
 
