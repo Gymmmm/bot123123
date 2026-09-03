@@ -201,7 +201,6 @@ class PublicationDeliveryRepository:
             ).fetchone()
             if row is None:
                 raise DeliveryBlocked("delivery attempt does not exist")
-            # A durable sent receipt always wins over a later local commit error.
             if str(row["state"]) in {"sent", "committed"} and str(
                 row["telegram_result_json"] or ""
             ).strip():
@@ -312,7 +311,12 @@ class PublicationDeliveryRepository:
                     raise DeliveryBlocked("approved publication package is missing during commit")
             if self._table_exists(conn, "listings"):
                 conn.execute(
-                    """UPDATE listings SET status='active',updated_at=CURRENT_TIMESTAMP
+                    """UPDATE listings
+                       SET status=CASE
+                             WHEN status IN ('','pending','draft') THEN 'active'
+                             ELSE status
+                           END,
+                           updated_at=CURRENT_TIMESTAMP
                        WHERE listing_id=?""",
                     (str(listing_id),),
                 )
