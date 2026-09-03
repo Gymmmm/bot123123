@@ -174,22 +174,28 @@ async def coverpick_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             (draft["source_post_id"], draft["source_post_id"]),
         )
         conn.execute("UPDATE media_assets SET is_cover=1 WHERE id=?", (asset_pk,))
-        chosen_path = str(chosen["local_path"] or "")
-        conn.execute(
-            """UPDATE media_assets SET is_cover=CASE WHEN local_path=? THEN 1 ELSE 0 END
-               WHERE owner_type='draft' AND owner_ref_key=?""",
-            (chosen_path, draft["draft_id"]),
-        )
         conn.commit()
 
     package_message = ""
     try:
+        # Critical bridge: source-photo selection alone is not a publishable cover.
+        # Regenerate the canonical HTML cover and register it as the draft's
+        # cover asset before rebuilding the frozen package.
+        from cover_generator import CoverGenerator
         from publication_package import build_package
 
+        generator = CoverGenerator(settings.sqlite_path)
+        cover_asset_id, cover_path = generator.generate_for_draft(str(draft["draft_id"]))
+        if not cover_asset_id or not cover_path or not Path(cover_path).is_file():
+            raise RuntimeError("cover_regeneration_failed")
+
         package = build_package(settings.sqlite_path, str(draft["draft_id"]))
-        package_message = f"\n新预览包：{package.get('package_id', '-')}"
+        package_message = (
+            f"\n封面已重生成：{Path(cover_path).name}"
+            f"\n新预览包：{package.get('package_id', '-')}"
+        )
     except Exception as exc:
-        package_message = f"\n主图已保存；预览包暂未重建：{exc}"
+        package_message = f"\n主图已保存；正式封面暂未重建：{exc}"
 
     await query.message.reply_text(
         f"✅ 已设为主图｜{_display_qc(draft['listing_id'])}"
