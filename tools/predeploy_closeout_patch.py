@@ -48,8 +48,12 @@ replace_once(
 )
 
 text = test_file.read_text(encoding="utf-8")
+if "from pathlib import Path" not in text:
+    text = "from pathlib import Path\n\n" + text
 append = '''\n\ndef test_cover_source_remains_in_complete_gallery():\n    source = Path("publication_package.py").read_text(encoding="utf-8")\n    assert "detail_sources = list(originals)" in source\n    assert "path for path in originals if path != cover_source" not in source\n\n\ndef test_under_four_photos_are_retained_as_insufficient_media():\n    source = Path("collector_bot.py").read_text(encoding="utf-8")\n    assert 'parse_status="insufficient_media" if insufficient_media else "pending"' in source\n    assert '"media_status": "insufficient_media" if insufficient_media else "sufficient_media"' in source\n    assert 'return {"status": "skipped", "reason": "fewer_than_min_images"}' not in source\n\n\ndef test_deploy_gate_covers_current_launch_suite_and_browser_runtime():\n    workflow = Path(".github/workflows/qiaolian-production-deploy.yml").read_text(encoding="utf-8")\n    for required in (\n        "tests/test_launch_readiness_contract.py",\n        "tests/test_parser_v12_regressions.py",\n        "tests/test_parser_v2_safe.py",\n        "tests/test_media_pipeline_v11.py",\n        "PLAYWRIGHT_BROWSERS_PATH",\n        "playwright install chromium",\n    ):\n        assert required in workflow\n    assert "PROD_SSH_USER: '${{ secrets.PROD_SSH_USER }}'" not in workflow\n'''
 if "test_cover_source_remains_in_complete_gallery" not in text:
     test_file.write_text(text.rstrip() + append.rstrip() + "\n", encoding="utf-8")
+else:
+    test_file.write_text(text.rstrip() + "\n", encoding="utf-8")
 
 print("predeploy closeout patch applied")
