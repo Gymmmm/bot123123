@@ -15,24 +15,38 @@ from .config import DB_PATH, USER_BOT_USERNAME
 
 logger = logging.getLogger(__name__)
 
+APPOINTMENT_LOCK_COUNT = 5
+_ACTIVE_APPOINTMENT_STATUSES = ("pending", "assigned", "contacted", "confirmed")
+
 _STATUS_RE = re.compile(
     r"(?m)^[🟢🟡🔵🔴⚫]️?\s*(?:房源状态｜)?[^\n]*(?:\n+)?"
 )
 
 
-def _status_label(status: str) -> str:
+def _active_appointment_count(conn: sqlite3.Connection, listing_id: str) -> int:
+    row = conn.execute(
+        "SELECT COUNT(*) FROM appointments WHERE listing_id=? AND status IN (?,?,?,?)",
+        (listing_id, *_ACTIVE_APPOINTMENT_STATUSES),
+    ).fetchone()
+    return int(row[0] if row else 0)
+
+
+def _status_label(status: str, appointment_count: int = 0) -> str:
+    status = str(status or "").strip().lower()
+    if status == "pending" and appointment_count >= APPOINTMENT_LOCK_COUNT:
+        return "🔵 已有5份预约看房，房态待确认"
     return {
         "active": "🟢 当前可预约",
         "reserved": "🟡 已有预约 · 仍可预约",
         "pending": "🔵 房态待确认",
         "rented": "🔴 已租出",
         "inactive": "⚫ 已下架",
-    }.get(str(status or "").strip().lower(), "🔵 房态待确认")
+    }.get(status, "🔵 房态待确认")
 
 
-def _caption_with_status(caption: str, status: str) -> str:
+def _caption_with_status(caption: str, status: str, appointment_count: int = 0) -> str:
     cleaned = _STATUS_RE.sub("", str(caption or "").strip()).strip()
-    label = _status_label(status)
+    label = _status_label(status, appointment_count)
     lines = cleaned.splitlines()
     tag_index = next((i for i, line in enumerate(lines) if line.lstrip().startswith("#")), len(lines))
     before = lines[:tag_index]
@@ -82,7 +96,8 @@ async def sync_channel_listing_status(listing_id: str) -> bool:
                 return False
             message_id = int(row["channel_message_id"])
             status = str(row["status"] or "pending").strip().lower()
-            caption = _caption_with_status(str(row["post_text"] or ""), status)
+            appointment_count = _active_appointment_count(conn, listing_id)
+            caption = _caption_with_status(str(row["post_text"] or ""), status, appointment_count)
             markup = _keyboard(username, str(row["public_token"]), listing_id, status)
             await Bot(token=token).edit_message_caption(
                 chat_id=channel_id,
