@@ -140,4 +140,11 @@ def want_home_ack_text() -> str:
     return copy_want_home_ack_text()
 
 def listing_detail_text(item: dict) -> str:
-    return copy_listing_detail(item)
+    from .talk_engine import generate_talk
+
+    base = copy_listing_detail(item)
+    talk = generate_talk(item, max_points=2, allow_empty=True).strip()
+    if not talk:
+        return base
+    safe_talk = '\n'.join(he(line) for line in talk.splitlines() if line.strip())
+    return f"{base}\n\n💬 <b>侨联说</b>\n{safe_talk}"
