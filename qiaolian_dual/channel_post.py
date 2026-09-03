@@ -18,7 +18,7 @@ _STATUS_LABELS = {
 }
 _GENERIC_HEADINGS = {"侨联地产", "侨联精选", "精选房源", "优质房源", "房源", "金边房源"}
 _EMPTY_FACTS = {"", "—", "-", "--", "暂无", "[暂无]", "未知", "待确认", "待定", "面议", "租金面议", "售价面议", "价格待确认", "随时入住", "即起", "现在", "立即"}
-_ROOM_TAG_RE = re.compile(r"^#(?:\d+|[一二三四五六七八九十]+)房$")
+_ROOM_TAG_RE = re.compile(r"^#(?:\d+|[一二两三四五六七八九十]+)房$")
 
 
 def _clean(value: Any, limit: int = 32) -> str:
