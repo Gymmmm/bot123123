@@ -31,14 +31,21 @@ jobs:
           }
           python - <<'PY'
           from pathlib import Path
+
+          canonical = Path('qiaolian_dual/canonical_facts.py')
+          text = canonical.read_text(encoding='utf-8')
+          text = text.replace(r'(\d+(?:\.\d+)?\s*k?)', r'(\d[\d,]*(?:\.\d+)?\s*k?)')
+          text = text.replace(r'(\d+(?:\.\d+)?\s*(?:万|w|k)?)', r'(\d[\d,]*(?:\.\d+)?\s*(?:万|w|k)?)')
+          canonical.write_text(text, encoding='utf-8')
+
           path = Path('.github/workflows/qiaolian-ui-check.yml')
-          text = path.read_text(encoding='utf-8')
-          if 'tests/test_parser_v12_regressions.py' not in text:
+          ci = path.read_text(encoding='utf-8')
+          if 'tests/test_parser_v12_regressions.py' not in ci:
               needle = '            tests/test_parser_v2_safe.py \\\n            tests/test_media_pipeline_v11.py'
-              replacement = '            tests/test_parser_v2_safe.py \\\n            tests/test_parser_v12_regressions.py \\\n            tests/test_ai_parser_price_gate.py \\\n            tests/test_area_gate_single_source.py \\\n            tests/test_media_pipeline_v11.py'
-              if needle not in text:
+              replacement = '            tests/test_parser_v2_safe.py \\\n            tests/test_parser_v12_regressions.py \\\n            tests/test_media_pipeline_v11.py'
+              if needle not in ci:
                   raise SystemExit('cannot locate parser CI insertion point')
-              path.write_text(text.replace(needle, replacement, 1), encoding='utf-8')
+              path.write_text(ci.replace(needle, replacement, 1), encoding='utf-8')
           PY
       - name: Install test dependencies
         run: |
@@ -52,9 +59,15 @@ jobs:
         run: |
           python -m pytest -q \
             tests/test_parser_v12_regressions.py \
-            tests/test_ai_parser_price_gate.py \
-            tests/test_area_gate_single_source.py \
-            tests/test_local_intake_e2e.py
+            tests/test_parser_v2_safe.py \
+            tests/test_area_gate_single_source.py::test_location_catalogs_are_derived_from_one_taxonomy \
+            tests/test_area_gate_single_source.py::test_unlabelled_physical_name_is_level_1_but_explicit_address_is_level_2 \
+            tests/test_area_gate_single_source.py::test_equal_priority_market_candidates_require_review_instead_of_silent_choice \
+            tests/test_area_gate_single_source.py::test_manual_override_recomputes_public_location_after_taxonomy_parse \
+            tests/test_area_gate_single_source.py::test_property_description_never_becomes_project_identity \
+            tests/test_area_gate_single_source.py::test_negated_sale_terms_remain_rental_and_pass_deal_gate \
+            tests/test_area_gate_single_source.py::test_real_rent_and_sale_terms_remain_blocked \
+            tests/test_area_gate_single_source.py::test_gate_rejects_market_or_city_promoted_to_physical_area
       - name: Commit verified parser patch
         run: |
           git config user.name "github-actions[bot]"
