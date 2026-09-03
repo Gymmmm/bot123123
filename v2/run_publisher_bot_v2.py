@@ -7,8 +7,11 @@ import sys
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
-if str(BASE_DIR) not in sys.path:
-    sys.path.insert(0, str(BASE_DIR))
+REPO_ROOT = BASE_DIR.parent
+for path in (REPO_ROOT, BASE_DIR):
+    path_s = str(path)
+    if path_s not in sys.path:
+        sys.path.insert(0, path_s)
 
 from qiaolian_publisher_v2.bot import main
 
