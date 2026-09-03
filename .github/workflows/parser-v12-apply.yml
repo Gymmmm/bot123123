@@ -24,7 +24,22 @@ jobs:
         with:
           python-version: '3.12'
       - name: Apply parser v1.2 patch
-        run: python tools/apply_parser_v12_patch.py
+        run: |
+          python tools/apply_parser_v12_patch.py || {
+            grep -q 'PARSER_REVISION = "v1.2"' qiaolian_dual/canonical_facts.py
+            test -f tests/test_parser_v12_regressions.py
+          }
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('.github/workflows/qiaolian-ui-check.yml')
+          text = path.read_text(encoding='utf-8')
+          if 'tests/test_parser_v12_regressions.py' not in text:
+              needle = '            tests/test_parser_v2_safe.py \\\n            tests/test_media_pipeline_v11.py'
+              replacement = '            tests/test_parser_v2_safe.py \\\n            tests/test_parser_v12_regressions.py \\\n            tests/test_ai_parser_price_gate.py \\\n            tests/test_area_gate_single_source.py \\\n            tests/test_media_pipeline_v11.py'
+              if needle not in text:
+                  raise SystemExit('cannot locate parser CI insertion point')
+              path.write_text(text.replace(needle, replacement, 1), encoding='utf-8')
+          PY
       - name: Install test dependencies
         run: |
           python -m pip install --upgrade pip
