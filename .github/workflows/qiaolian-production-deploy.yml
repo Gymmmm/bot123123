@@ -184,7 +184,7 @@ jobs:
             -o IdentitiesOnly=yes \
             -o ConnectTimeout=20 \
             "$PROD_SSH_USER@$PROD_HOST" \
-            'export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"; ls -ld /opt/qiaolian_dual_bots /opt/qiaolian_dual_bots/.git /opt/qiaolian_dual_bots/.venv/bin/python /opt/qiaolian_dual_bots/.env /opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db 2>&1 || true; command -v git; command -v sqlite3; systemctl is-active qiaolian-user-bot.service qiaolian-publisher-bot.service qiaolian-collector.service || true'
+            'export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"; ls -ld /opt/qiaolian_dual_bots /opt/qiaolian_dual_bots/.git /opt/qiaolian_dual_bots/.venv/bin/python /opt/qiaolian_dual_bots/.env 2>&1 || true; systemctl is-active qiaolian-user-bot.service qiaolian-publisher-bot.service qiaolian-collector.service || true'
 
       - name: Deploy, restart, verify, and rollback on failure
         env:
@@ -266,7 +266,7 @@ jobs:
             git -c safe.directory="$APP" -C "$APP" init
           fi
           step "bundle verify"
-          git bundle verify "$BUNDLE_PATH"
+          git -c safe.directory="$APP" -C "$APP" bundle verify "$BUNDLE_PATH"
 
           step "working tree"
           if git_app rev-parse --verify HEAD >/dev/null 2>&1; then
@@ -286,7 +286,6 @@ jobs:
 
           OLD_SHA=$(git_app rev-parse --verify HEAD 2>/dev/null || echo none)
           OLD_BRANCH=$(git_app symbolic-ref --quiet --short HEAD || true)
-          OLD_TARGET_SHA=$(git_app rev-parse --verify "refs/heads/$DEPLOY_BRANCH" 2>/dev/null || true)
           SHORT_SHA=$(printf '%s' "$EXPECTED_SHA" | cut -c1-12)
           STAMP=$(date -u +%Y%m%d-%H%M%S)
           BACKUP="/opt/backups/qiaolian-actions-$STAMP-$SHORT_SHA"
@@ -299,16 +298,11 @@ jobs:
             set +e
             echo "ROLLBACK rc=$rc" >&2
             if [ "$ACTIVATION_STARTED" -eq 1 ]; then
-              root_cmd systemctl stop "${SERVICES[@]}"
+              root_cmd systemctl stop "${SERVICES[@]}" || true
               if [ "$OLD_SHA" != "none" ]; then
                 git_app checkout --detach "$OLD_SHA" || true
-                if [ -n "$OLD_BRANCH" ]; then
-                  git_app branch -f "$OLD_BRANCH" "$OLD_SHA" || true
-                  git_app checkout "$OLD_BRANCH" || true
-                fi
               fi
               root_cmd systemctl start "${SERVICES[@]}" || true
-              root_cmd systemctl --no-pager --full status "${SERVICES[@]}" || true
             fi
             root_cmd rm -f "$BUNDLE_PATH"
             echo "Deployment failed; rolled back to $OLD_SHA. Database backup: $BACKUP" >&2
@@ -319,7 +313,6 @@ jobs:
           step "backup"
           root_cmd install -d -m 0700 "$BACKUP"
           printf '%s\n' "$OLD_SHA" | root_cmd tee "$BACKUP/previous_git_sha" >/dev/null
-          printf '%s\n' "$OLD_BRANCH" | root_cmd tee "$BACKUP/previous_git_branch" >/dev/null
           root_cmd cp -a "$APP/.env" "$BACKUP/.env"
 
           ACTIVATION_STARTED=1
