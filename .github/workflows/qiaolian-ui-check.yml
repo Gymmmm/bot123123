@@ -35,7 +35,7 @@ jobs:
           python -m compileall -q qiaolian_dual v2/qiaolian_publisher_v2 meihua_publisher.py cover_generator.py autopilot_publish_bot.py publication_package.py publication_delivery.py discussion_map_store.py parser_v2_safe.py tools/run_parser_v2_safe.py photo_formatter_v1_1.py photo_ranker.py media_pipeline_v1_1.py tests
           python -c "import qiaolian_dual.user_bot"
           python -c "from qiaolian_dual.user_bot import build_application; assert build_application() is not None"
-      - name: V1 current-runtime non-outbound release suite
+      - name: Current-runtime non-outbound launch suite
         env:
           PYTHONPATH: '${{ github.workspace }}'
           USER_BOT_TOKEN: '123456:TESTTOKEN'
@@ -44,6 +44,7 @@ jobs:
         run: |
           python -m pytest -q \
             tests/test_v1_release_contract.py \
+            tests/test_launch_readiness_contract.py \
             tests/test_user_start_payload.py \
             tests/test_appointment_simplified.py \
             tests/test_appointment_mobile_copy.py \
@@ -60,5 +61,6 @@ jobs:
             tests/test_cover_consolidation.py \
             tests/test_prelaunch_product_contract.py \
             tests/test_user_bot_runtime_guards.py \
+            tests/test_parser_v12_regressions.py \
             tests/test_parser_v2_safe.py \
             tests/test_media_pipeline_v11.py
