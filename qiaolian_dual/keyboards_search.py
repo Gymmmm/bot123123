@@ -54,7 +54,12 @@ def _decode_budget_choice(goal: str, code: str) -> tuple[str, int | None, int | 
     return ('不限', None, None)
 
 def appointment_menu_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([[InlineKeyboardButton('📍 实地看房', callback_data='appointment_menu:offline'), InlineKeyboardButton('📹 视频看房', callback_data='appointment_menu:video')], [InlineKeyboardButton('📅 我的预约', callback_data='appointment_menu:list'), InlineKeyboardButton('💬 联系中文顾问', callback_data='appointment_menu:contact')], [InlineKeyboardButton('⬅️ 返回首页', callback_data='home')]])
+    """新预约入口只生成默认实地看房；视频在日期页内切换。"""
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton('📅 预约看房', callback_data='appointment_menu:offline')],
+        [InlineKeyboardButton('📅 我的预约', callback_data='appointment_menu:list'), InlineKeyboardButton('💬 联系中文顾问', callback_data='appointment_menu:contact')],
+        [InlineKeyboardButton('⬅️ 返回首页', callback_data='home')],
+    ])
 
 def precise_filter_keyboard(selected: set[str] | None=None) -> InlineKeyboardMarkup:
     picked = selected or set()
