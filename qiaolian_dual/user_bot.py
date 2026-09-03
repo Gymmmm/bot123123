@@ -18,6 +18,7 @@ from .listing import listing_context, listing_cost_text, listing_cost_keyboard, 
 from .search import parse_budget_range, detect_area, detect_room_type, detect_property_type, search_listings_with_fallback, upsert_user_profile, create_lead
 from .admin_contract import _user_mention_html, _user_contact_text, _is_admin_user, _extra_user_admin_ids, _all_user_admin_ids, _save_extra_user_admin_ids, _budget_text, _parse_date_safe, _binding_end_date, _binding_days_left, _contract_status_text, _lease_reminder_label, _binding_contract_text, _contract_actions_keyboard
 from .results_admin import send_listing_card, send_find_results_as_cards, _format_match_line, _format_listing_choice_lines, search_results_keyboard, _notify_admins, admin_lead_keyboard, _allow_admin_notify
+from . import results_admin as _results_admin_module
 from .appointments_view import old_tenant_binding_text, _appointment_date_compact, _appointment_time_compact, _appointment_listing_compact, _appointment_card_keyboard, _appointment_sort_key, _appointment_is_upcoming, _appointment_summary_line, list_recent_appointments, _appointment_details_keyboard, _find_user_appointment, appointment_details_text, list_favorites_text
 from .start_routes import route_start_arg as _route_start_arg_impl, start as _start_impl
 from .appointment_ui import _appointment_date_keyboard, _appointment_mode_keyboard, _appointment_time_keyboard, _title_layout_label, _appointment_confirm_text, _appointment_confirm_keyboard, _normalize_custom_date, _focus_summary_lines, _appointment_focus_keyboard, _appointment_focus_prompt
@@ -29,6 +30,11 @@ from .jobs import lease_reminder_job
 from .appointment_flow import appoint_flow_cb as _appoint_flow_cb_impl, handle_appointment_text
 from .app import cancel, error_handler, build_application as _build_application_impl, main
 from .detail_runtime_patch import install_detail_runtime_patch
+
+# results_admin was split out of the old monolith but one search-card path still
+# resolves listing_context from its module globals. Bind the canonical helper
+# explicitly so the customer-facing "available listings" flow cannot NameError.
+_results_admin_module.listing_context = listing_context
 
 install_detail_runtime_patch()
 
