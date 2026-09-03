@@ -184,7 +184,7 @@ jobs:
             -o IdentitiesOnly=yes \
             -o ConnectTimeout=20 \
             "$PROD_SSH_USER@$PROD_HOST" \
-            'export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"; command -v git; command -v sqlite3 || echo MISSING_sqlite3; command -v fc-match; systemctl is-active qiaolian-user-bot.service qiaolian-publisher-bot.service qiaolian-collector.service || true'
+            'export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"; ls -ld /opt/qiaolian_dual_bots /opt/qiaolian_dual_bots/.git /opt/qiaolian_dual_bots/.venv/bin/python /opt/qiaolian_dual_bots/.env /opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db 2>&1 || true; command -v git; command -v sqlite3; systemctl is-active qiaolian-user-bot.service qiaolian-publisher-bot.service qiaolian-collector.service || true'
 
       - name: Deploy, restart, verify, and rollback on failure
         env:
@@ -214,7 +214,6 @@ jobs:
           }
           install_if_missing git git
           install_if_missing sqlite3 sqlite3
-          echo "PATH=$PATH git=$(command -v git || echo none) sqlite3=$(command -v sqlite3 || echo none)"
 
           step() { echo "CHECK: $*"; }
 
@@ -255,34 +254,37 @@ jobs:
           require_cmd sqlite3
           require_cmd runuser
           require_cmd fc-match
-          if [ "$(id -u)" -ne 0 ]; then
-            require_cmd sudo
-            sudo -n true
-          fi
 
           step "app paths"
-          root_cmd test -d "$APP/.git" || { echo "MISSING $APP/.git" >&2; exit 1; }
+          root_cmd test -d "$APP" || { echo "MISSING $APP" >&2; exit 1; }
           root_cmd test -x "$APP/.venv/bin/python" || { echo "MISSING venv python" >&2; exit 1; }
           root_cmd test -f "$APP/.env" || { echo "MISSING .env" >&2; exit 1; }
           root_cmd test -f "$DB" || { echo "MISSING $DB" >&2; exit 1; }
           root_cmd test -f "$BUNDLE_PATH" || { echo "MISSING bundle $BUNDLE_PATH" >&2; exit 1; }
+          if ! git -c safe.directory="$APP" -C "$APP" rev-parse --git-dir >/dev/null 2>&1; then
+            echo "CHECK: git init $APP"
+            git -c safe.directory="$APP" -C "$APP" init
+          fi
           step "bundle verify"
           git bundle verify "$BUNDLE_PATH"
 
           step "working tree"
-          if ! git_app diff --quiet || ! git_app diff --cached --quiet; then
-            echo "WARN dirty tracked files; resetting tracked tree"
-            git_app status --short || true
-            git_app reset --hard HEAD
+          if git_app rev-parse --verify HEAD >/dev/null 2>&1; then
+            if ! git_app diff --quiet || ! git_app diff --cached --quiet; then
+              echo "WARN dirty tracked files; resetting tracked tree"
+              git_app status --short || true
+              git_app reset --hard HEAD
+            fi
+          else
+            echo "WARN fresh repo, no HEAD"
           fi
-          git_app status --short || true
 
           step "fetch bundle"
           git_app fetch "$BUNDLE_PATH" refs/heads/actions-production
           FETCHED_SHA=$(git_app rev-parse FETCH_HEAD)
           test "$FETCHED_SHA" = "$EXPECTED_SHA"
 
-          OLD_SHA=$(git_app rev-parse HEAD)
+          OLD_SHA=$(git_app rev-parse --verify HEAD 2>/dev/null || echo none)
           OLD_BRANCH=$(git_app symbolic-ref --quiet --short HEAD || true)
           OLD_TARGET_SHA=$(git_app rev-parse --verify "refs/heads/$DEPLOY_BRANCH" 2>/dev/null || true)
           SHORT_SHA=$(printf '%s' "$EXPECTED_SHA" | cut -c1-12)
@@ -298,19 +300,18 @@ jobs:
             echo "ROLLBACK rc=$rc" >&2
             if [ "$ACTIVATION_STARTED" -eq 1 ]; then
               root_cmd systemctl stop "${SERVICES[@]}"
-              git_app checkout --detach "$OLD_SHA"
-              if [ -n "$OLD_BRANCH" ]; then
-                git_app branch -f "$OLD_BRANCH" "$OLD_SHA"
-                git_app checkout "$OLD_BRANCH"
+              if [ "$OLD_SHA" != "none" ]; then
+                git_app checkout --detach "$OLD_SHA" || true
+                if [ -n "$OLD_BRANCH" ]; then
+                  git_app branch -f "$OLD_BRANCH" "$OLD_SHA" || true
+                  git_app checkout "$OLD_BRANCH" || true
+                fi
               fi
-              if [ -n "$OLD_TARGET_SHA" ] && [ "$OLD_BRANCH" != "$DEPLOY_BRANCH" ]; then
-                git_app update-ref "refs/heads/$DEPLOY_BRANCH" "$OLD_TARGET_SHA"
-              fi
-              root_cmd systemctl start "${SERVICES[@]}"
+              root_cmd systemctl start "${SERVICES[@]}" || true
               root_cmd systemctl --no-pager --full status "${SERVICES[@]}" || true
             fi
             root_cmd rm -f "$BUNDLE_PATH"
-            echo "Deployment failed; code rolled back to $OLD_SHA. Database backup: $BACKUP" >&2
+            echo "Deployment failed; rolled back to $OLD_SHA. Database backup: $BACKUP" >&2
             exit "$rc"
           }
           trap rollback ERR
@@ -328,23 +329,13 @@ jobs:
           root_cmd sha256sum "$BACKUP/qiaolian_dual_bot.db" | root_cmd tee "$BACKUP/qiaolian_dual_bot.db.sha256" >/dev/null
 
           step "checkout release"
-          if [ -n "$OLD_TARGET_SHA" ]; then
-            if git_app merge-base --is-ancestor "$OLD_TARGET_SHA" "$EXPECTED_SHA"; then
-              git_app checkout "$DEPLOY_BRANCH"
-              git_app merge --ff-only "$EXPECTED_SHA"
-            else
-              echo "WARN $DEPLOY_BRANCH is not an ancestor; hard reset to $EXPECTED_SHA"
-              git_app checkout -B "$DEPLOY_BRANCH" "$EXPECTED_SHA"
-            fi
-          else
-            git_app checkout -b "$DEPLOY_BRANCH" "$EXPECTED_SHA"
-          fi
+          git_app checkout -B "$DEPLOY_BRANCH" "$EXPECTED_SHA"
           test "$(git_app rev-parse HEAD)" = "$EXPECTED_SHA"
 
           step "pip + chromium"
           as_bot "$APP/.venv/bin/pip" install --disable-pip-version-check -r "$APP/requirements.txt"
           root_cmd install -d -m 0755 "$APP/.playwright-browsers"
-          root_cmd chown qiaolianbot "$APP/.playwright-browsers"
+          root_cmd chown qiaolianbot "$APP/.playwright-browsers" || true
           as_bot env PLAYWRIGHT_BROWSERS_PATH="$APP/.playwright-browsers" \
             "$APP/.venv/bin/python" -m playwright install chromium
           step "compileall"
