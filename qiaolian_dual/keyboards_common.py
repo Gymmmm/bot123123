@@ -39,7 +39,8 @@ def keyword_followup_keyboard(*, area: str='', room_type: str='') -> InlineKeybo
         rows.append([InlineKeyboardButton('📍 补一个区域', callback_data='hub:area'), InlineKeyboardButton('💰 补一个预算', callback_data='hub:budget')])
     else:
         rows.append([InlineKeyboardButton('📍 按区域继续找', callback_data='hub:area'), InlineKeyboardButton('💰 按预算继续找', callback_data='hub:budget')])
-    rows.append([InlineKeyboardButton('🎥 视频看房', callback_data='appointment_menu:video'), InlineKeyboardButton('💬 联系中文顾问', callback_data='appointment_menu:contact')])
+    # 视频看房只作为“预约看房”日期页里的分支，不在找房结果页另开入口。
+    rows.append([InlineKeyboardButton('💬 联系中文顾问', callback_data='appointment_menu:contact')])
     rows.append([InlineKeyboardButton('🏠 返回首页', callback_data='home')])
     return InlineKeyboardMarkup(rows)
 
@@ -76,11 +77,15 @@ def _listing_channel_url(listing_id: str) -> str:
     return f'{base}/{mid}' if base and mid > 0 else ''
 
 def contact_handoff_keyboard(*, listing_id: str='') -> InlineKeyboardMarkup:
-    """咨询交接按钮；有房源上下文时，直达顾问链接自动预填房源摘要。"""
+    """咨询交接按钮；视频看房统一从预约日期页切换，不重复暴露入口。"""
     listing_id = str(listing_id or '').strip()
     advisor_url = _advisor_listing_url(listing_id) if listing_id else _advisor_tg_url()
     chat_btn = InlineKeyboardButton('💬 联系中文顾问', url=advisor_url) if advisor_url else InlineKeyboardButton('💬 联系中文顾问', callback_data='appointment_menu:contact')
-    return InlineKeyboardMarkup([[chat_btn], [InlineKeyboardButton('📅 预约看房', callback_data='appointment_menu:offline'), InlineKeyboardButton('🎥 视频看房', callback_data='appointment_menu:video')], [InlineKeyboardButton('🏠 继续看房', callback_data='hub:latest')]])
+    return InlineKeyboardMarkup([
+        [chat_btn],
+        [InlineKeyboardButton('📅 预约看房', callback_data='appointment_menu:offline')],
+        [InlineKeyboardButton('🏠 继续看房', callback_data='hub:latest')],
+    ])
 
 def appointment_success_keyboard() -> InlineKeyboardMarkup:
     """提交后给出查看、顾问与继续看房三个明确去向。"""
