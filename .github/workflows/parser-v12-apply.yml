@@ -1,4 +1,4 @@
-name: parser-v12-apply
+name: launch-closeout-apply
 
 on:
   push:
@@ -23,46 +23,36 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Apply parser v1.2 patch
-        run: |
-          python tools/apply_parser_v12_patch.py || {
-            grep -q 'PARSER_REVISION = "v1.2"' qiaolian_dual/canonical_facts.py
-            test -f tests/test_parser_v12_regressions.py
-          }
-          python - <<'PY'
-          from pathlib import Path
-
-          canonical = Path('qiaolian_dual/canonical_facts.py')
-          text = canonical.read_text(encoding='utf-8')
-          text = text.replace(r'(\d+(?:\.\d+)?\s*k?)', r'(\d[\d,]*(?:\.\d+)?\s*k?)')
-          text = text.replace(r'(\d+(?:\.\d+)?\s*(?:万|w|k)?)', r'(\d[\d,]*(?:\.\d+)?\s*(?:万|w|k)?)')
-          canonical.write_text(text, encoding='utf-8')
-          PY
+      - name: Apply final launch closeout patch
+        run: python tools/apply_parser_v12_patch.py
       - name: Install test dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt pytest pytest-asyncio
-      - name: Parser syntax check
+      - name: Launch syntax check
         run: |
-          python -m compileall -q qiaolian_dual ai_parser.py tests/test_parser_v12_regressions.py
+          python -m compileall -q qiaolian_dual v2/qiaolian_publisher_v2 publication_package.py tests/test_launch_readiness_contract.py
           git diff --check
-      - name: Parser regression suite
+      - name: Launch regression suite
+        env:
+          USER_BOT_TOKEN: '123456:TESTTOKEN'
+          PUBLISHER_BOT_TOKEN: '123456:TESTTOKEN'
+          PYTHONPATH: '${{ github.workspace }}'
         run: |
           python -m pytest -q \
+            tests/test_launch_readiness_contract.py \
+            tests/test_cover_consolidation.py \
+            tests/test_prelaunch_product_contract.py \
             tests/test_parser_v12_regressions.py \
-            tests/test_parser_v2_safe.py \
-            tests/test_area_gate_single_source.py::test_location_catalogs_are_derived_from_one_taxonomy \
-            tests/test_area_gate_single_source.py::test_unlabelled_physical_name_is_level_1_but_explicit_address_is_level_2 \
-            tests/test_area_gate_single_source.py::test_equal_priority_market_candidates_require_review_instead_of_silent_choice \
-            tests/test_area_gate_single_source.py::test_manual_override_recomputes_public_location_after_taxonomy_parse \
-            tests/test_area_gate_single_source.py::test_property_description_never_becomes_project_identity \
-            tests/test_area_gate_single_source.py::test_negated_sale_terms_remain_rental_and_pass_deal_gate \
-            tests/test_area_gate_single_source.py::test_real_rent_and_sale_terms_remain_blocked \
-            tests/test_area_gate_single_source.py::test_gate_rejects_market_or_city_promoted_to_physical_area
-      - name: Commit verified parser patch
+            tests/test_user_start_payload.py \
+            tests/test_appointment_simplified.py \
+            tests/test_customer_path_regression.py \
+            tests/test_callback_route_repair.py \
+            tests/test_user_ui_cleanup.py
+      - name: Commit verified launch code
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add qiaolian_dual/canonical_facts.py qiaolian_dual/listing_taxonomy.py tests/test_parser_v12_regressions.py
-          git commit -m "fix: harden canonical parser v1.2 recognition"
+          git add publication_package.py tests/test_cover_consolidation.py tests/test_prelaunch_product_contract.py tests/test_launch_readiness_contract.py
+          git commit -m "fix: close out launch cover and route contracts"
           git push origin HEAD:codex/qiaolian-ui-cleanup-20260829
