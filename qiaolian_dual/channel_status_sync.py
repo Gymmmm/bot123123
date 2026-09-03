@@ -11,7 +11,7 @@ import sqlite3
 
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 
-from .channel_links import channel_action_url
+from .channel_links import channel_action_url, public_qc_code
 from .config import DB_PATH, USER_BOT_USERNAME
 
 logger = logging.getLogger(__name__)
@@ -20,8 +20,9 @@ APPOINTMENT_LOCK_COUNT = 5
 _ACTIVE_APPOINTMENT_STATUSES = ("pending", "assigned", "contacted", "confirmed")
 
 _STATUS_RE = re.compile(
-    r"(?m)^[🟢🟡🔵🔴⚫]️?\s*(?:房源状态｜)?[^\n]*(?:\n+)?"
+    r"(?m)^[🟢🟡🔵🔴⚫]️?\s*(?:房源状态｜)?[^\n]*"
 )
+_QC_RE = re.compile(r"\bQC\d{3,8}\b", re.I)
 
 
 def _active_appointment_count(conn: sqlite3.Connection, listing_id: str) -> int:
@@ -44,9 +45,11 @@ def _apply_appointment_lock(
     public state is deterministic: 0 -> active, 1-4 -> reserved, >=5 -> pending.
     """
     status = str(status or "").strip().lower()
-    if status in {"pending", "rented", "inactive", "offline"}:
+    if status in {"rented", "inactive", "offline"}:
         return status
-    if status not in {"active", "reserved"}:
+    if status == "pending" and appointment_count < APPOINTMENT_LOCK_COUNT:
+        return status
+    if status not in {"active", "reserved", "pending"}:
         return status or "pending"
 
     if appointment_count >= APPOINTMENT_LOCK_COUNT:
@@ -59,7 +62,7 @@ def _apply_appointment_lock(
     if target != status:
         conn.execute(
             "UPDATE listings SET status=?, updated_at=datetime('now','localtime') "
-            "WHERE listing_id=? AND status IN ('active','reserved')",
+            "WHERE listing_id=? AND status IN ('active','reserved','pending')",
             (target, listing_id),
         )
     return target
@@ -79,23 +82,45 @@ def _status_label(status: str, appointment_count: int = 0) -> str:
     }.get(status, "🔵 房态待确认")
 
 
-def _caption_with_status(caption: str, status: str, appointment_count: int = 0) -> str:
-    cleaned = _STATUS_RE.sub("", str(caption or "").strip()).strip()
+def _caption_with_status(
+    caption: str,
+    status: str,
+    appointment_count: int = 0,
+    listing_id: str = "",
+) -> str:
+    raw = str(caption or "").strip()
     label = _status_label(status, appointment_count)
-    lines = cleaned.splitlines()
+    found = _QC_RE.search(raw)
+    qc = found.group(0).upper() if found else public_qc_code(listing_id)
+    status_line = f"{label}　{qc}" if qc else label
+
+    if _STATUS_RE.search(raw):
+        replaced = False
+        lines: list[str] = []
+        for line in raw.splitlines():
+            if _STATUS_RE.match(line):
+                if replaced:
+                    continue
+                lines.append(status_line)
+                replaced = True
+            else:
+                lines.append(line)
+        return "\n".join(lines).strip()[:1024]
+
+    lines = raw.splitlines()
     tag_index = next((i for i, line in enumerate(lines) if line.lstrip().startswith("#")), len(lines))
     before = lines[:tag_index]
     after = lines[tag_index:]
     while before and not before[-1].strip():
         before.pop()
-    parts = before + ["", label]
+    parts = before + ["", status_line]
     if after:
         parts += [""] + after
     return "\n".join(parts).strip()[:1024]
 
 
 def _keyboard(username: str, token: str, listing_id: str, status: str) -> InlineKeyboardMarkup:
-    _ = token  # public token is retained in package evidence; channel CTA shape is canonical QC.
+    _ = token
     details = InlineKeyboardButton(
         "📋 租赁详情", url=channel_action_url(username, listing_id, "details")
     )
@@ -133,7 +158,7 @@ async def sync_channel_listing_status(listing_id: str) -> bool:
                    ORDER BY CAST(p.channel_message_id AS INTEGER) DESC LIMIT 1""",
                 (listing_id,),
             ).fetchone()
-            if not row or not str(row["public_token"] or "").startswith("ql"):
+            if not row:
                 return False
             message_id = int(row["channel_message_id"])
             appointment_count = _active_appointment_count(conn, listing_id)
@@ -143,8 +168,13 @@ async def sync_channel_listing_status(listing_id: str) -> bool:
                 str(row["status"] or "pending").strip().lower(),
                 appointment_count,
             )
-            caption = _caption_with_status(str(row["post_text"] or ""), status, appointment_count)
-            markup = _keyboard(username, str(row["public_token"]), listing_id, status)
+            caption = _caption_with_status(
+                str(row["post_text"] or ""),
+                status,
+                appointment_count,
+                listing_id,
+            )
+            markup = _keyboard(username, str(row["public_token"] or ""), listing_id, status)
             await Bot(token=token).edit_message_caption(
                 chat_id=channel_id,
                 message_id=message_id,
