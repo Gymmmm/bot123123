@@ -59,6 +59,18 @@ def parse_start_arg_payload(arg: str) -> dict | None:
         return {'action': 'channel_topic', 'target': arg[len('ch__'):], 'post_token': '', 'channel_message_id': None}
     if arg.startswith('ch_'):
         return {'action': 'channel_topic', 'target': arg[len('ch_'):], 'post_token': '', 'channel_message_id': None}
+    if arg.startswith('detail__'):
+        parts = arg.split('__', 2)
+        token = parts[1] if len(parts) >= 2 else ''
+        if token.startswith('ql'):
+            return {'action': 'details', 'target': '', 'post_token': token, 'opaque_token': token, 'channel_message_id': None}
+        if len(parts) == 3 and parts[2]:
+            return {
+                'action': 'details',
+                'target': parts[2],
+                'post_token': token,
+                'channel_message_id': _base36_decode(token),
+            }
     if arg.startswith('book__'):
         token = arg[len('book__'):].split('__', 1)[0]
         if token.startswith('ql'):
@@ -100,11 +112,11 @@ def parse_start_arg_payload(arg: str) -> dict | None:
                 return {'action': mapped_action, 'target': target, 'post_token': '', 'channel_message_id': None}
     # Stable listing links do not depend on an ephemeral publication-package
     # token. Keep them for channel actions that must survive queue rebuilds.
-    _new_prefix_actions = ('book', 'ask', 'similar', 'video', 'photos', 'view')
+    _new_prefix_actions = ('detail', 'book', 'ask', 'similar', 'video', 'photos', 'view')
     for action in _new_prefix_actions:
         prefix = f'{action}_'
         if arg.startswith(prefix):
-            mapped_action = {'ask': 'consult', 'view': 'discussion_entry'}.get(action, action)
+            mapped_action = {'detail': 'details', 'ask': 'consult', 'view': 'discussion_entry'}.get(action, action)
             return {'action': mapped_action, 'target': arg[len(prefix):], 'post_token': '', 'channel_message_id': None}
     if re.match('^l_\\d+$', arg):
         return {'action': 'consult', 'target': arg, 'post_token': '', 'channel_message_id': None}
@@ -204,7 +216,7 @@ def resolve_public_token(token: str) -> str:
         with sqlite3.connect(DB_PATH) as conn:
             row = conn.execute("""SELECT pp.property_id
                 FROM publication_packages pp
-                JOIN listings l ON l.listing_id=pp.property_id AND l.status='active'
+                JOIN listings l ON l.listing_id=pp.property_id AND l.status IN ('active','reserved')
                 JOIN drafts d ON d.listing_id=l.listing_id AND d.review_status='published'
                 JOIN posts p ON p.listing_id=l.listing_id
                     AND p.platform='telegram' AND p.publish_status IN ('published','success','ok')
@@ -235,7 +247,7 @@ def resolve_public_token(token: str) -> str:
                    FROM leads le
                    JOIN listings l ON l.listing_id=le.listing_id
                    WHERE le.post_token=?
-                     AND le.action IN ('photos_click','appointment_click','consult_click')
+                     AND le.action IN ('photos_click','appointment_click','consult_click','listing_detail_view')
                      AND l.status IN ('active','reserved')
                    ORDER BY le.id DESC LIMIT 1""",
                 (token,),
