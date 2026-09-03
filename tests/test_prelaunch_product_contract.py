@@ -24,7 +24,6 @@ def test_album_is_clean_white_4_3_and_keeps_both_sides():
     out = normalize_album_image(_jpeg((1800, 900)))
     with Image.open(io.BytesIO(out)).convert('RGB') as im:
         assert im.size == (1200, 900) == CHANNEL_ALBUM_SIZE
-        # canvas corners stay white; the contained photo keeps both red and green sides.
         assert min(im.getpixel((4, 4))) > 235
         y = im.height // 2
         assert im.getpixel((30, y))[0] > im.getpixel((30, y))[1]
@@ -46,7 +45,8 @@ def test_admin_ui_is_truthful_and_more_photos_never_becomes_similar():
     kb = publish_post_keyboard('l_2', '永旺1', 'QiaolianBot')
     buttons = [b for row in kb.inline_keyboard for b in row]
     media = next(b for b in buttons if '更多实拍' in b.text)
-    assert 'photos_l_2' in media.url
+    assert 'start=property_QC0002_photos' in media.url
+    assert 'l_2' not in media.url
     assert 'similar' not in media.url
 
 
