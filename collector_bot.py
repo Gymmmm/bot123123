@@ -299,14 +299,9 @@ async def persist_source_post(
     run the parser explicitly.
     """
     source_kind = str(source_cfg.get("source_type") or "telegram_channel")
-    if source_kind == "telegram_channel" and len(raw_images) < MIN_LISTING_IMAGES:
-        _inc_stat("skipped_few_images", 1)
-        logger.info(
-            "跳过少图房源 source=%s post=%s images=%s min=%s",
-            source_cfg.get("source_name", ""), source_post_id,
-            len(raw_images), MIN_LISTING_IMAGES,
-        )
-        return {"status": "skipped", "reason": "fewer_than_min_images"}
+    insufficient_media = (
+        source_kind == "telegram_channel" and len(raw_images) < MIN_LISTING_IMAGES
+    )
     source_type = source_cfg.get("source_type", "telegram_channel")
     source_name = source_cfg["source_name"]
     source_db_id = source_cfg.get("source_db_id")
@@ -352,6 +347,8 @@ async def persist_source_post(
         "removed_line_count": len(sanitized.removed_lines),
         "visual_review_required": bool(raw_images),
         "republish_policy": "facts_only_review_required",
+        "media_status": "insufficient_media" if insufficient_media else "sufficient_media",
+        "min_listing_images": MIN_LISTING_IMAGES,
     }
 
     try:
@@ -368,7 +365,7 @@ async def persist_source_post(
             raw_contact=" | ".join(sanitized.contacts),
             raw_meta_json=meta,
             dedupe_hash=dedupe_hash,
-            parse_status="pending",
+            parse_status="insufficient_media" if insufficient_media else "pending",
         )
         if raw_images:
             written = _write_media_assets(post_pk, raw_images)
@@ -384,11 +381,22 @@ async def persist_source_post(
             len(raw_images),
             len(raw_videos),
         )
-        classification = (
-            await _classify_and_package(post_pk)
-            if classify_after_insert
-            else {"status": "deferred"}
-        )
+        if insufficient_media:
+            _inc_stat("skipped_few_images", 1)
+            _inc_stat(f"source.{source_name}.insufficient_media", 1)
+            logger.info(
+                "少图房源已保留 RAW，暂不成包 source=%s post=%s images=%s min=%s",
+                source_name, source_post_id, len(raw_images), MIN_LISTING_IMAGES,
+            )
+            classification = {
+                "status": "insufficient_media",
+                "image_count": len(raw_images),
+                "min_images": MIN_LISTING_IMAGES,
+            }
+        elif classify_after_insert:
+            classification = await _classify_and_package(post_pk)
+        else:
+            classification = {"status": "deferred"}
         _maybe_log_stats()
         return {"status": "inserted", "post_id": post_pk, "classification": classification}
     except Exception as e:

@@ -746,8 +746,10 @@ def build_package(
     cover = out / "cover.jpg"; _render_cover(d, cover_source, str(cover), template)
     processed = []
     badge = "微信实拍" if routing["source_type"] == "wechat" else ""
-    detail_sources = [path for path in originals if path != cover_source]
-    for index, path in enumerate(detail_sources, start=2):
+    # 封面是从同一套原图生成的衍生资产，不应吞掉那张原始实拍。
+    # 完整实拍始终按去重后的来源顺序保留全部原图；封面单独作为频道主图。
+    detail_sources = list(originals)
+    for index, path in enumerate(detail_sources, start=1):
         target = out / f"image_{index:02d}.jpg"
         # Package 阶段生成最终详情字节；Publisher 之后只读取并发送，不再加 Logo/调色/裁切。
         _finalize_detail_image(path, str(target)); processed.append(str(target))
