@@ -48,6 +48,14 @@ def test_locked_caption_is_four_discovery_lines():
     assert "✨" not in text
 
 
+def test_first_freeze_treats_empty_and_draft_status_as_active():
+    for status in ("", "draft"):
+        listing = dict(DIAMOND, status=status)
+        text = format_button_post_text(listing, "l_89", [])
+        assert "🟢 当前可预约　QC0089" in text
+        assert "🔵 房态待确认" not in text
+
+
 def test_missing_price_does_not_write_mianyi():
     listing = dict(DIAMOND)
     listing["price"] = 0
@@ -74,3 +82,10 @@ def test_commit_success_sql_does_not_force_every_listing_active():
     src = Path("publication_delivery.py").read_text(encoding="utf-8")
     assert "WHEN status IN ('','pending','draft') THEN 'active'" in src
     assert "UPDATE listings SET status='active',updated_at=CURRENT_TIMESTAMP" not in src
+
+
+def test_publication_package_exposes_builder_entrypoints():
+    import publication_package as pkg
+    assert callable(getattr(pkg, "build_package", None))
+    assert callable(getattr(pkg, "approve_package", None))
+    assert callable(getattr(pkg, "render_cover_preview", None))
