@@ -2,7 +2,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from publication_package import format_button_post_text
+from publication_package import (
+    _render_cover,
+    approve_package,
+    approved_package,
+    build_package,
+    ensure_source_media_assets,
+    format_button_post_text,
+    render_cover_preview,
+)
 from qiaolian_dual.channel_post import format_channel_listing_post
 from qiaolian_dual.channel_status_sync import (
     APPOINTMENT_LOCK_COUNT,
@@ -27,6 +35,18 @@ DIAMOND = {
     "highlights": ["家具家电齐全", "含物业"],
     "status": "pending",
 }
+
+
+def test_publication_package_lifecycle_surface_is_restored():
+    for fn in (
+        build_package,
+        approve_package,
+        approved_package,
+        render_cover_preview,
+        _render_cover,
+        ensure_source_media_assets,
+    ):
+        assert callable(fn)
 
 
 def test_locked_caption_is_four_discovery_lines():
