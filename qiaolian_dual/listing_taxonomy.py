@@ -82,7 +82,9 @@ _MARKET_LOCATIONS_EXPLICIT: tuple[MarketLocation, ...] = (
     MarketLocation("TK/7月区", "堆谷", "district", ("堆谷", "tuol kork", "toul kork", "7月区", "七月区")),
     MarketLocation("洪森大道", "洪森大道", "corridor", ("洪森大道", "60米大道", "60米路", "hun sen boulevard", "hun sen blvd", "ph60m")),
     # Source-backed low-precision public label; do not promote to a physical area.
-    MarketLocation("一号路", "一号路附近", "corridor", ("一号路附近", "一号路", "1号路", "one road")),
+    MarketLocation("一号路", "一号路附近", "corridor", ("一号路附近", "一号路", "1号路", "一号公路", "1号公路", "one road")),
+    MarketLocation("598路", "598路附近", "corridor", ("598路附近", "598路", "598公路")),
+    MarketLocation("50米路", "50米路附近", "corridor", ("50米路附近", "50米路", "50米大道")),
     # Source-backed low-precision label; do not promote road/market wording to a physical area.
     MarketLocation("集茂", "集茂", "nearby", ("598路集茂", "集茂", "chip mong", "chipmong")),
     MarketLocation("永旺商圈", "永旺1", "nearby", ("永旺1", "永旺一", "aeon1", "aeon 1")),
@@ -126,6 +128,9 @@ PROJECT_IDENTITIES: tuple[ProjectIdentity, ...] = (
     ProjectIdentity("the_pinnacle", "The Pinnacle 幸福广场", "project", ("the pinnacle", "太子幸福广场", "幸福广场", "prince happiness plaza")),
     ProjectIdentity("rf_city", "富力城", "project", ("富力城", "富力中心城", "r&f city", "rf city")),
     ProjectIdentity("chip_mong", "Chip Mong", "brand", ("chip mong land", "chip mong", "chipmong", "集茂")),
+    # “炳发城” is an explicit project token; the broader Peng Huoth developer
+    # name remains a brand and is not promoted to a specific project.
+    ProjectIdentity("peng_huoth_city", "炳发城", "project", ("炳发城",)),
     ProjectIdentity("peng_huoth", "Peng Huoth", "brand", ("borey peng huoth", "peng huoth", "炳发")),
 )
 
@@ -371,34 +376,112 @@ def _extract_project(text: str) -> tuple[str | None, str | None, str | None, str
     )
 
 
-def _extract_property(text: str) -> tuple[str, str | None, str, str, list[dict[str, Any]], list[str]]:
+_INVENTORY_MENU_MARKER = re.compile(
+    r"(?:户型选择|房型选择|可选户型|可选房型|户型可选|房型可选|库存户型|其他户型|更多户型|大量房源|房源充足)",
+    flags=re.I,
+)
+
+
+def _strip_inventory_menu_segments(text: str) -> tuple[str, list[str]]:
+    current: list[str] = []
+    inventory: list[str] = []
+    for raw_line in str(text or "").splitlines() or [str(text or "")]:
+        line = clean_text(raw_line)
+        if not line:
+            continue
+        marker = _INVENTORY_MENU_MARKER.search(line)
+        if marker:
+            prefix = line[:marker.start()].strip(" ，,；;｜|")
+            if prefix:
+                current.append(prefix)
+            inventory.append(line[marker.start():])
+            continue
+        choice_list = bool(
+            re.search(r"(?:单间|studio|\d{1,2}\s*房)\s*[／/|、,，]\s*(?:单间|studio|\d{1,2}\s*房)", line, flags=re.I)
+            and re.search(r"(?:都有|均有|可选|任选|选择)", line, flags=re.I)
+        )
+        if choice_list:
+            inventory.append(line)
+            continue
+        current.append(line)
+    return "\n".join(current), inventory
+
+
+def _property_matches(text: str) -> list[tuple[PropertyRule, str, int]]:
     matches: list[tuple[PropertyRule, str, int]] = []
     for rule in PROPERTY_RULES:
         hit = _find_alias(text, rule.aliases)
         if hit:
             alias, position = hit
             matches.append((rule, alias, position))
+    return matches
+
+
+def _resolve_property_matches(
+    matches: list[tuple[PropertyRule, str, int]],
+    *,
+    evidence_source: str = "raw_property_alias",
+    confidence: str = "high",
+) -> tuple[str, str | None, str, str, list[dict[str, Any]], list[str]]:
     if not matches:
         return "未知", None, "未知", "unknown", [], ["unknown_property_type"]
     # A generic alias embedded in a longer explicit type (e.g. "别墅" inside
-    # "联排别墅") must not manufacture a contradiction.  Retain independent
-    # type mentions such as "排屋/别墅" as an ambiguity.
+    # "联排别墅") must not manufacture a contradiction. Retain independent
+    # current-listing type mentions such as "排屋/别墅" as an ambiguity.
     specific_hits = [item for item in matches if len(item[1]) > 2]
-    filtered = []
+    filtered: list[tuple[PropertyRule, str, int]] = []
     for candidate in matches:
-        rule, alias, position = candidate
-        if len(alias) <= 2 and any(alias in other_alias and rule.family != other_rule.family for other_rule, other_alias, _ in specific_hits):
+        rule, alias, _position = candidate
+        if len(alias) <= 2 and any(
+            alias in other_alias and rule.family != other_rule.family
+            for other_rule, other_alias, _ in specific_hits
+        ):
             continue
         filtered.append(candidate)
     matches = filtered
     families = {rule.family for rule, _alias, _position in matches}
-    evidence = [_evidence(rule.display, "raw_property_alias", "high", alias) for rule, alias, _position in matches]
+    evidence = [
+        _evidence(rule.display, evidence_source, confidence, alias)
+        for rule, alias, _position in matches
+    ]
     if len(families) > 1:
-        # Independent marketing alternatives such as "排屋/别墅" remain unsafe.
         return "未知", None, "未知", "ambiguous", evidence, ["ambiguous_property_type"]
     matches.sort(key=lambda item: (-len(item[1]), item[2]))
     rule = matches[0][0]
     return rule.family, rule.subtype or None, rule.display, "confirmed", evidence, []
+
+
+def _extract_property(text: str) -> tuple[str, str | None, str, str, list[dict[str, Any]], list[str]]:
+    current_text, inventory_segments = _strip_inventory_menu_segments(text)
+
+    # Explicit current-listing type fields are authoritative over descriptive
+    # mentions elsewhere in the post. Inventory/menu lines are excluded first.
+    explicit_scopes = [
+        line for line in current_text.splitlines()
+        if re.search(r"(?:房源类型|物业类型|房屋类型|房产类型)\s*[:：]", line, flags=re.I)
+    ]
+    explicit_matches = _property_matches("\n".join(explicit_scopes))
+    if explicit_matches:
+        return _resolve_property_matches(
+            explicit_matches, evidence_source="raw_explicit_property_type", confidence="high"
+        )
+
+    current_matches = _property_matches(current_text)
+    if current_matches:
+        return _resolve_property_matches(current_matches)
+
+    # A type seen only in a stock/menu list is not the current listing's type.
+    # Preserve evidence for review, but never turn it into a confirmed fact.
+    inventory_matches = _property_matches("\n".join(inventory_segments))
+    if inventory_matches:
+        evidence = [
+            _evidence(rule.display, "raw_inventory_property_alias", "medium", alias)
+            for rule, alias, _position in inventory_matches
+        ]
+        return "未知", None, "未知", "unknown", evidence, [
+            "unknown_property_type", "property_type_only_in_inventory"
+        ]
+    return "未知", None, "未知", "unknown", [], ["unknown_property_type"]
 
 
 def classify_listing_taxonomy(raw_text: str) -> TaxonomyResult:

@@ -15,6 +15,7 @@ from typing import Any
 from qiaolian_dual.listing_taxonomy import classify_listing_taxonomy, public_location_from_fields
 
 SCHEMA_VERSION = "canonical_facts.v1"
+PARSER_REVISION = "v1.2"
 CITY_KEY = "phnom_penh"
 CITY_DISPLAY = "金边"
 
@@ -144,8 +145,8 @@ def _extract_monthly_rent(text: str) -> tuple[int | None, str, list[dict[str, An
     # violate the canonical-fact contract.
     current_candidates: list[tuple[int, str, int, int]] = []
     current_pattern = (
-        r"(?:现价|现租金|现月租|优惠价|特价|促销价)\s*[:：]?\s*"
-        r"(?:\$|usd|美金|美元|💵|💰)?\s*(\d+(?:\.\d+)?\s*k?)"
+        r"(?:现价|现租金|现月租|优惠价|优惠出租|特价(?:出租|招租)|特价(?!出售|销售|售卖)|促销价)\s*[:：]?\s*"
+        r"(?:\$|usd|美金|美元|💵|💰)?\s*(\d[\d,]*(?:\.\d+)?\s*k?)"
         r"\s*(?:美元|美金|usd|\$|/月|每月|/month|per month)?"
     )
     for match in re.finditer(current_pattern, text, flags=re.I):
@@ -167,12 +168,12 @@ def _extract_monthly_rent(text: str) -> tuple[int | None, str, list[dict[str, An
         return next(iter(current_unique)), "confirmed", evidence, []
 
     candidates: list[tuple[int, str, int, int]] = []
-    # Only a rental label or a monthly currency context constitutes rent.  Sale
-    # prices are intentionally not candidates.
+    # Only a rental label or a monthly currency context constitutes rent. Sale,
+    # deposits and utility amounts are intentionally not candidates.
     patterns = (
-        r"(?:月租|租金价格|租金|出租情况|出租价格|房间价格|租赁价格)\s*[:：]?\s*(?:\$|usd|美金|美元|💵|💰)?\s*(\d+(?:\.\d+)?\s*k?)\s*(?:美元|美金|usd|\$|/月|每月|[a-z])?",
-        r"(?:\$|usd|美金|美元|💵|💰)\s*(\d+(?:\.\d+)?\s*k?)\s*(?:/月|每月|/month|per month)",
-        r"(\d+(?:\.\d+)?\s*k?)\s*(?:美元|美金|usd|\$)\s*(?:每月|/月|/month|per month)",
+        r"(?:月租|租金价格|租金|出租情况|出租价格|出租价|房间价格|租赁价格)\s*[:：]?\s*(?:\$|usd|美金|美元|💵|💰)?\s*(\d[\d,]*(?:\.\d+)?\s*k?)\s*(?:美元|美金|usd|\$|/月|每月|[a-z])?",
+        r"(?:\$|usd|美金|美元|💵|💰)\s*(\d[\d,]*(?:\.\d+)?\s*k?)\s*(?:/月|每月|/month|per month)",
+        r"(\d[\d,]*(?:\.\d+)?\s*k?)\s*(?:美元|美金|usd|\$)\s*(?:每月|/月|/month|per month)",
     )
     for pattern in patterns:
         for m in re.finditer(pattern, text, flags=re.I):
@@ -194,7 +195,7 @@ def _extract_original_monthly_rent(text: str, current_rent: int | None) -> tuple
     candidates: list[tuple[int, str, int, int]] = []
     pattern = (
         r"(?:原价|原租金|原月租|旧价|之前租金)\s*[:：]?\s*"
-        r"(?:\$|usd|美金|美元|💵|💰)?\s*(\d+(?:\.\d+)?\s*k?)"
+        r"(?:\$|usd|美金|美元|💵|💰)?\s*(\d[\d,]*(?:\.\d+)?\s*k?)"
         r"\s*(?:美元|美金|usd|\$|/月|每月|/month|per month)?"
     )
     for match in re.finditer(pattern, text, flags=re.I):
@@ -212,6 +213,42 @@ def _extract_original_monthly_rent(text: str, current_rent: int | None) -> tuple
     if current_rent is None or original == current_rent:
         return None, evidence
     return original, evidence
+
+
+def _to_usd_sale(raw: str) -> int | None:
+    value = str(raw or "").replace(",", "").strip().lower()
+    m = re.search(r"(\d+(?:\.\d+)?)\s*(万|w|k)?", value, flags=re.I)
+    if not m:
+        return None
+    unit = (m.group(2) or "").lower()
+    multiplier = 10000 if unit in {"万", "w"} else (1000 if unit == "k" else 1)
+    number = float(m.group(1)) * multiplier
+    if number < 500 or number > 100000000:
+        return None
+    return int(number)
+
+
+def _extract_sale_price(text: str) -> tuple[int | None, str, list[dict[str, Any]], list[str]]:
+    candidates: list[tuple[int, str, int, int]] = []
+    pattern = (
+        r"(?:售价|出售价格|销售价格|销售价|卖价|sale\s*price)\s*[:：]?\s*"
+        r"(?:\$|usd|美金|美元)?\s*(\d[\d,]*(?:\.\d+)?\s*(?:万|w|k)?)"
+        r"\s*(?:美元|美金|usd|\$)?"
+    )
+    for match in re.finditer(pattern, text, flags=re.I):
+        parsed = _to_usd_sale(match.group(1))
+        if parsed is not None:
+            candidates.append((parsed, match.group(0), match.start(1), match.end(1)))
+    unique = {value for value, _excerpt, _start, _end in candidates}
+    evidence = [
+        _evidence(value, "raw_explicit_sale_price", "high", excerpt, start, end)
+        for value, excerpt, start, end in candidates
+    ]
+    if len(unique) > 1:
+        return None, "conflict", evidence, ["conflicting_sale_price"]
+    if unique:
+        return next(iter(unique)), "confirmed", evidence, []
+    return None, "missing", [], []
 
 
 def _extract_terms(text: str) -> tuple[dict[str, Any], dict[str, list[dict[str, Any]]]]:
@@ -442,10 +479,17 @@ def _quality(facts: dict[str, Any]) -> dict[str, Any]:
         hard.append("missing_public_location")
     if not facts.get("canonical_area_key"):
         info.append("geo_precision_unconfirmed")
-    if not facts.get("monthly_rent_usd"):
+    deal_type = str(facts.get("deal_type") or "unknown")
+    if deal_type in {"rent", "mixed"} and not facts.get("monthly_rent_usd"):
+        hard.append("missing_price")
+    elif deal_type == "sale" and not facts.get("sale_price_usd"):
+        hard.append("missing_sale_price")
+    elif deal_type == "unknown" and not facts.get("monthly_rent_usd") and not facts.get("sale_price_usd"):
         hard.append("missing_price")
     if facts.get("price_status") == "conflict":
         hard.append("conflicting_rental_price")
+    if facts.get("sale_price_status") == "conflict":
+        hard.append("conflicting_sale_price")
     if not facts.get("layout"):
         hard.append("missing_layout")
     if facts.get("property_type") == "未知":
@@ -458,7 +502,6 @@ def _quality(facts: dict[str, Any]) -> dict[str, Any]:
         review.append("ambiguous_market_location")
     if "project_brand_only" in candidate_flags:
         info.append("project_brand_only")
-    deal_type = facts.get("deal_type")
     if deal_type == "sale":
         hard.append("non_rental_source")
     elif deal_type == "mixed":
@@ -525,6 +568,7 @@ def canonicalize_source(
     floor, floor_evidence = _extract_floor(parse_text)
     rent, price_status, price_evidence, price_flags = _extract_monthly_rent(parse_text)
     original_rent, original_price_evidence = _extract_original_monthly_rent(parse_text, rent)
+    sale_price, sale_price_status, sale_price_evidence, sale_price_flags = _extract_sale_price(parse_text)
     terms, terms_evidence = _extract_terms(parse_text)
     details, details_evidence = _extract_listing_details(parse_text)
     sizes, sizes_evidence = _extract_sizes(parse_text)
@@ -534,6 +578,7 @@ def canonicalize_source(
 
     facts: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
+        "parser_revision": PARSER_REVISION,
         "source_identity": dict(source_identity or {}),
         "raw_text_sha256": _source_hash(raw),
         "sanitized_text_sha256": _source_hash(sanitized),
@@ -561,6 +606,8 @@ def canonicalize_source(
         "monthly_rent_usd": rent,
         "original_monthly_rent_usd": original_rent,
         "price_status": price_status,
+        "sale_price_usd": sale_price,
+        "sale_price_status": sale_price_status,
         **sizes,
         "floor": floor,
         **terms,
@@ -579,11 +626,12 @@ def canonicalize_source(
             "floor": floor_evidence,
             "monthly_rent_usd": price_evidence,
             "original_monthly_rent_usd": original_price_evidence,
+            "sale_price_usd": sale_price_evidence,
             **terms_evidence,
             **details_evidence,
             **sizes_evidence,
         },
-        "candidate_flags": list(dict.fromkeys(list(taxonomy.flags) + price_flags)),
+        "candidate_flags": list(dict.fromkeys(list(taxonomy.flags) + price_flags + sale_price_flags)),
         "manual_overrides": [],
         "_source_text": parse_text,
     }
@@ -652,6 +700,7 @@ def draft_projection(facts: dict[str, Any]) -> dict[str, Any]:
         "property_type_display": facts.get("property_type_display") or facts.get("property_type") or "未知",
         "price": facts.get("monthly_rent_usd"),
         "original_price": facts.get("original_monthly_rent_usd"),
+        "sale_price": facts.get("sale_price_usd"),
         "layout": facts.get("layout") or "",
         "size": (f"{facts['size_sqm']}㎡" if facts.get("size_sqm") is not None else ""),
         "land_size": facts.get("land_dimension") or (f"{facts['land_size_sqm']}㎡" if facts.get("land_size_sqm") is not None else ""),
@@ -689,4 +738,4 @@ def has_confirmed_physical_area(facts: dict[str, Any]) -> bool:
     return bool(facts.get("canonical_area_key")) and facts.get("publication_location_level") == "level_2_physical_confirmed"
 
 
-__all__ = ["SCHEMA_VERSION", "canonicalize_source", "draft_projection", "is_buildable", "has_confirmed_physical_area"]
+__all__ = ["SCHEMA_VERSION", "PARSER_REVISION", "canonicalize_source", "draft_projection", "is_buildable", "has_confirmed_physical_area"]
