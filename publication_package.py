@@ -1,4 +1,3 @@
-"""侨联房源发布包：加工在审核前完成，批准后冻结，发布只读成品。"""
 from __future__ import annotations
 
 import hashlib
@@ -29,11 +28,7 @@ from qiaolian_dual.cover_styles import (
 
 ROOT = Path(__file__).resolve().parent
 PACKAGE_ROOT = ROOT / "media" / "publication_packages"
-COVER_TEMPLATE_MAP = {
-    key: cover_template_path(key)
-    for key in (*FINAL_COVER_STYLES, "video_vertical")
-}
-
+COVER_TEMPLATE_MAP = {key: cover_template_path(key) for key in (*FINAL_COVER_STYLES, "video_vertical")}
 PACKAGE_ADDITIVE_COLUMNS = {
     "discussion_text": "TEXT NOT NULL DEFAULT ''",
     "source_identity_json": "TEXT",
@@ -47,8 +42,6 @@ PACKAGE_ADDITIVE_COLUMNS = {
     "canonical_provenance_json": "TEXT",
     "quality_json": "TEXT",
 }
-
-
 DDL = """
 CREATE TABLE IF NOT EXISTS publication_packages (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -70,21 +63,59 @@ CREATE TABLE IF NOT EXISTS publication_packages (
   advice_text TEXT NOT NULL DEFAULT '',
   snapshot_json TEXT NOT NULL,
   content_hash TEXT NOT NULL,
-  source_identity_json TEXT,
-  source_identity_hash TEXT,
-  source_identity_migrated_at TEXT,
-  public_token TEXT,
-  approved_by TEXT,
-  approved_at TEXT,
-  published_at TEXT,
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(draft_id, package_version)
 );
-CREATE UNIQUE INDEX IF NOT EXISTS idx_publication_packages_one_approved
-ON publication_packages(draft_id) WHERE status='approved';
-CREATE UNIQUE INDEX IF NOT EXISTS idx_publication_packages_package_id
-ON publication_packages(package_id);
-CREATE INDEX IF NOT EXISTS idx_publication_packages_status
-ON publication_packages(status, id);
 """
+
+def now_utc() -> str:
+    return datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+
+def _canonical_cover_template(value: str) -> str:
+    return normalize_cover_style(value, allow_video=True)
+
+def classify(*, source_type: str, source_name: str, property_type: str,
+             project: str, media_type: str = "image", price: Any = None,
+             highlights: Any = None, is_special: bool = False) -> dict[str, str]:
+    media = str(media_type or "image").lower()
+    source = f"{source_type or ''} {source_name or ''}".lower()
+    listing = f"{property_type or ''} {project or ''}".lower()
+    normalized_source = "wechat" if ("wechat" in source or "微信" in source) else "telegram"
+    if "video" in media:
+        return {"source_type": normalized_source, "listing_type": "video", "media_type": "video", "cover_template": "video_vertical"}
+    is_villa = "别墅" in listing or "villa" in listing
+    is_townhouse = any(token in listing for token in ("排屋", "联排", "townhouse"))
+    listing_type = "villa" if is_villa else ("townhouse" if is_townhouse else "apartment")
+    try:
+        numeric_price = float(re.sub(r"[^0-9.]", "", str(price or "0") or "0") or 0)
+    except (TypeError, ValueError):
+        numeric_price = 0
+    _ = (highlights, is_special)
+    cover_template = "black_gold" if (is_villa or is_townhouse or numeric_price >= 1200) else "classic_blue"
+    return {"source_type": normalized_source, "listing_type": listing_type, "media_type": "image", "cover_template": cover_template}
+
+def ensure_schema(db_path: str) -> None:
+    with sqlite3.connect(db_path) as conn:
+        conn.executescript(DDL)
+        ensure_canonical_projection_schema(conn)
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(publication_packages)")}
+        for name, sql_type in PACKAGE_ADDITIVE_COLUMNS.items():
+            if name not in cols:
+                conn.execute(f"ALTER TABLE publication_packages ADD COLUMN {name} {sql_type}")
+
+def format_button_post_text(
+    d: dict, listing_id: str, tag_lines: list[str], caption_variant: str = "a"
+) -> str:
+    """Locked 4-line channel caption. A/B/C variants no longer change public copy."""
+    from qiaolian_dual.channel_post import format_channel_listing_post
+    _ = caption_variant
+    payload = dict(d or {})
+    raw_status = str(payload.get("status") or "").strip().lower()
+    if raw_status in {"", "pending", "draft"}:
+        payload["status"] = "active"
+    extra = [str(line).strip() for line in (tag_lines or []) if str(line).strip().startswith("#")]
+    return format_channel_listing_post(
+        payload,
+        listing_id=str(listing_id or payload.get("listing_id") or ""),
+        status=payload.get("status"),
+        extra_tags=extra,
+    )
