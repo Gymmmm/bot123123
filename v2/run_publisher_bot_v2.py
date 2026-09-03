@@ -13,7 +13,10 @@ for path in (REPO_ROOT, BASE_DIR):
     if path_s not in sys.path:
         sys.path.insert(0, path_s)
 
+from qiaolian_publisher_v2.cover_picker_patch import install_cover_picker
 from qiaolian_publisher_v2.bot import main
+
+install_cover_picker()
 
 _LOCK_FH = None
 
