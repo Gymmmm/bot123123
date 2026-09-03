@@ -274,7 +274,7 @@ jobs:
 
           ACTIVATION_STARTED=1
           root_cmd systemctl stop "${SERVICES[@]}"
-          as_bot sqlite3 "$DB" ".backup '$BACKUP/qiaolian_dual_bot.db'"
+          root_cmd sqlite3 "$DB" ".backup '$BACKUP/qiaolian_dual_bot.db'"
           root_cmd sha256sum "$BACKUP/qiaolian_dual_bot.db" | root_cmd tee "$BACKUP/qiaolian_dual_bot.db.sha256" >/dev/null
 
           if [ -n "$OLD_TARGET_SHA" ]; then
@@ -287,6 +287,8 @@ jobs:
           test "$(git_app rev-parse HEAD)" = "$EXPECTED_SHA"
 
           as_bot "$APP/.venv/bin/pip" install --disable-pip-version-check -r "$APP/requirements.txt"
+          root_cmd install -d -m 0755 "$APP/.playwright-browsers"
+          root_cmd chown qiaolianbot "$APP/.playwright-browsers"
           as_bot env PLAYWRIGHT_BROWSERS_PATH="$APP/.playwright-browsers" \
             "$APP/.venv/bin/python" -m playwright install chromium
           root_cmd "$APP/.venv/bin/python" -m compileall -q \
