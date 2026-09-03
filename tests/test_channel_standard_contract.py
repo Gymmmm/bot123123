@@ -49,16 +49,20 @@ def test_publication_package_lifecycle_surface_is_restored():
         assert callable(fn)
 
 
-def test_locked_caption_is_four_discovery_lines():
+def test_locked_caption_is_compact_mobile_layout():
     text = format_button_post_text(DIAMOND, "l_89", ["#钻石岛", "#两房", "#金边租房"])
     assert text.splitlines() == [
         "🏠 <b>钻石岛｜2房2卫</b>",
-        "💰 <b>$680/月</b>　75㎡｜18/35楼",
+        "💰 <b>$680/月</b>",
+        "",
+        "🏢 公寓｜75㎡｜18/35楼",
         "🔑 押2付1｜1年",
+        "",
         "🟢 当前可预约　QC0089",
         "",
-        "#钻石岛 #两房 #金边租房 #租金500至800",
+        "#钻石岛 #金边租房 #租金500至1000",
     ]
+    assert "#两房" not in text
     assert "面议" not in text
     assert "随时入住" not in text
     assert "家具家电" not in text
