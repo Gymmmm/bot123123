@@ -18,6 +18,7 @@ _STATUS_LABELS = {
 }
 _GENERIC_HEADINGS = {"侨联地产", "侨联精选", "精选房源", "优质房源", "房源", "金边房源"}
 _EMPTY_FACTS = {"", "—", "-", "--", "暂无", "[暂无]", "未知", "待确认", "待定", "面议", "租金面议", "售价面议", "价格待确认", "随时入住", "即起", "现在", "立即"}
+_ROOM_TAG_RE = re.compile(r"^#(?:\d+|[一二三四五六七八九十]+)房$")
 
 
 def _clean(value: Any, limit: int = 32) -> str:
@@ -47,7 +48,6 @@ def _price_bucket(price: Any, deal_type: str) -> str:
         return ""
     if amount <= 0:
         return ""
-    # Public channel uses broad search buckets.
     if amount < 500:
         return "#租金500以下"
     if amount < 1000:
@@ -77,21 +77,26 @@ def _dedupe(values: Iterable[str]) -> list[str]:
     return out
 
 
+def _compact_public_tags(values: Iterable[str]) -> list[str]:
+    return [
+        tag for tag in _dedupe(values)
+        if tag not in {"#公寓", "#金边"} and not _ROOM_TAG_RE.fullmatch(tag)
+    ]
+
+
 def _factual_tags(d: dict, *, heading: str, deal_type: str) -> list[str]:
     existing = d.get("tags") if isinstance(d.get("tags"), list) else []
     existing = [str(tag).strip() for tag in existing if str(tag).strip().startswith("#")]
     location_tag = _safe_hashtag(heading) if heading and heading not in _GENERIC_HEADINGS else ""
     rent_market_tag = "#金边租房" if deal_type == "rent" else ""
-    # Keep the public feed intentionally compact: project, market and rent bucket only.
-    return _dedupe([location_tag, rent_market_tag, _price_bucket(d.get("price"), deal_type), *existing])
+    return _compact_public_tags([location_tag, rent_market_tag, _price_bucket(d.get("price"), deal_type), *existing])
 
 
 def _normalize_contract(value: Any) -> str:
     text = _clean(value, 14)
     if not text:
         return ""
-    text = re.sub(r"^租期\s*", "", text)
-    return text
+    return re.sub(r"^租期\s*", "", text)
 
 
 def format_channel_listing_post(
@@ -119,8 +124,7 @@ def format_channel_listing_post(
 
     size = _display_size(d.get("size") or d.get("size_sqm"))
     floor = _display_floor(_clean(d.get("floor"), 16))
-    property_bits = [value for value in (property_type, size, floor) if value]
-    property_line = "｜".join(property_bits)
+    property_line = "｜".join(value for value in (property_type, size, floor) if value)
 
     deposit = _clean(d.get("payment_terms") or d.get("deposit") or d.get("deposit_rule"), 18)
     contract = _normalize_contract(d.get("contract_term"))
@@ -145,9 +149,10 @@ def format_channel_listing_post(
 
     tags = _factual_tags(d, heading=heading, deal_type=deal_type)
     if extra_tags:
-        tags = _dedupe([*tags, *(str(tag).strip() for tag in extra_tags if str(tag).strip().startswith("#"))])
-    # Do not duplicate room count in hashtags; it is already prominent in the title.
-    tags = [tag for tag in tags if tag not in {"#公寓", "#金边"} and not re.fullmatch(r"#[一二三四五六七八九十\d]+房", tag)]
+        tags = _compact_public_tags([
+            *tags,
+            *(str(tag).strip() for tag in extra_tags if str(tag).strip().startswith("#")),
+        ])
     if tags:
         lines.extend(["", " ".join(tags)])
     return "\n".join(lines).strip()[:1024]
