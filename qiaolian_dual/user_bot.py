@@ -28,6 +28,9 @@ from .callbacks import handle_ui_callback as _handle_ui_callback_impl
 from .jobs import lease_reminder_job
 from .appointment_flow import appoint_flow_cb as _appoint_flow_cb_impl, handle_appointment_text
 from .app import cancel, error_handler, build_application as _build_application_impl, main
+from .detail_runtime_patch import install_detail_runtime_patch
+
+install_detail_runtime_patch()
 
 
 def build_application():
