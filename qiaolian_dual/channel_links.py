@@ -1,9 +1,8 @@
 """Canonical Telegram Deep Links for channel listing actions.
 
-Every publisher/status edit uses one payload builder. Public QC ids stay QC;
-canonical internal ``l_`` ids stay ``l_`` so a status refresh never changes the
-link identity that was originally published. The User Bot accepts both and
-resolves them to the same listing context.
+All channel publishers and status edits use the same public QC payload. Internal
+``l_`` ids stay server-side; the User Bot resolves QC back to the same listing
+context.
 """
 from __future__ import annotations
 
@@ -18,7 +17,7 @@ _ACTION_SUFFIX = {
 
 
 def public_qc_code(listing_id: str) -> str:
-    """Return the stable public QC display identifier for a listing id."""
+    """Return the stable public QC identifier for an internal/public listing id."""
     raw = str(listing_id or "").strip()
     match = re.search(r"(\d{1,8})", raw)
     if not match:
@@ -27,11 +26,8 @@ def public_qc_code(listing_id: str) -> str:
 
 
 def channel_target(listing_id: str) -> str:
-    """Keep canonical l_ ids canonical; normalize other public ids to QC."""
-    raw = str(listing_id or "").strip()
-    if re.fullmatch(r"(?i)l_\d+", raw):
-        return raw.lower()
-    return public_qc_code(raw)
+    """Channel links always expose QC; internal l_ ids never leave the server."""
+    return public_qc_code(listing_id)
 
 
 def channel_start_payload(listing_id: str, action: str) -> str:
