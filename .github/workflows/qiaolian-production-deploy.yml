@@ -1,1 +1,395 @@
-PLACEHOLDER
+name: qiaolian-production-deploy
+
+on:
+  pull_request:
+    branches:
+      - codex/production-sync-20260829
+    types:
+      - assigned
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: '选择 DEPLOY 才会部署生产服务器'
+        required: true
+        default: CANCEL
+        type: choice
+        options:
+          - CANCEL
+          - DEPLOY
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qiaolian-production
+  cancel-in-progress: false
+
+env:
+  DEPLOY_BRANCH: codex/qiaolian-ui-cleanup-20260829
+  PROD_HOST: 50.114.74.120
+  PROD_PORT: '22'
+  PROD_SSH_USER: root
+  PROD_SSH_KNOWN_HOSTS: '50.114.74.120 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILuFtkSn5SJKY7mZ52Lc/QydPRTvHFpsj87M/HcIkb/L'
+  PROD_SSH_HOST_FINGERPRINT: 'SHA256:sgqLYOUAZ482H3y5jREQ6q2BVvNFPXYiOg4ruyFVnsA'
+
+jobs:
+  verify-and-deploy:
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.confirm == 'DEPLOY') ||
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.number == 23 &&
+       github.event.pull_request.draft == true &&
+       github.event.pull_request.head.ref == 'codex/qiaolian-ui-cleanup-20260829' &&
+       github.event.assignee.login == github.repository_owner)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout approved deployment branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_BRANCH }}
+          fetch-depth: 0
+
+      - name: Verify checked-out commit
+        run: |
+          set -Eeuo pipefail
+          test "$(git branch --show-current)" = "$DEPLOY_BRANCH"
+          CANDIDATE_SHA=$(git rev-parse HEAD)
+          echo "CANDIDATE_SHA=$CANDIDATE_SHA" >> "$GITHUB_ENV"
+          echo "Deploy candidate: $CANDIDATE_SHA"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install test dependencies
+        run: |
+          set -Eeuo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pytest pytest-asyncio
+
+      - name: Full launch regression gate
+        env:
+          USER_BOT_TOKEN: '123456:TESTTOKEN'
+          PUBLISHER_BOT_TOKEN: '123456:TESTTOKEN'
+          DB_PATH: '${{ runner.temp }}/qiaolian-production-check.db'
+          PYTHONPATH: '${{ github.workspace }}'
+        run: |
+          set -Eeuo pipefail
+          git diff --check
+          python -m compileall -q \
+            qiaolian_dual \
+            v2/qiaolian_publisher_v2 \
+            meihua_publisher.py \
+            cover_generator.py \
+            autopilot_publish_bot.py \
+            publication_package.py \
+            publication_delivery.py \
+            discussion_map_store.py \
+            parser_v2_safe.py \
+            tools/run_parser_v2_safe.py \
+            photo_formatter_v1_1.py \
+            photo_ranker.py \
+            media_pipeline_v1_1.py \
+            tests
+          python -c "import qiaolian_dual.user_bot"
+          python -c "from qiaolian_dual.user_bot import build_application; assert build_application() is not None"
+          python -m pytest -q \
+            tests/test_v1_release_contract.py \
+            tests/test_launch_readiness_contract.py \
+            tests/test_user_start_payload.py \
+            tests/test_appointment_simplified.py \
+            tests/test_appointment_mobile_copy.py \
+            tests/test_customer_path_regression.py \
+            tests/test_issue25_contract.py \
+            tests/test_noto_font_contract.py \
+            tests/test_user_text_hierarchy.py \
+            tests/test_second_batch_runtime_contract.py \
+            tests/test_callback_route_repair.py \
+            tests/test_callback_route_static_guards.py \
+            tests/test_user_ui_cleanup.py \
+            tests/test_daily_broadcast_rotation.py \
+            tests/test_tg_album_45.py \
+            tests/test_cover_consolidation.py \
+            tests/test_prelaunch_product_contract.py \
+            tests/test_user_bot_runtime_guards.py \
+            tests/test_parser_v12_regressions.py \
+            tests/test_parser_v2_safe.py \
+            tests/test_media_pipeline_v11.py
+
+      - name: Build authenticated Git bundle
+        env:
+          RELEASE_BUNDLE: '${{ runner.temp }}/qiaolian-release.bundle'
+        run: |
+          set -Eeuo pipefail
+          git update-ref refs/heads/actions-production "$CANDIDATE_SHA"
+          git bundle create "$RELEASE_BUNDLE" refs/heads/actions-production
+          git bundle verify "$RELEASE_BUNDLE"
+
+      - name: Verify production SSH host key
+        run: |
+          set -Eeuo pipefail
+          test -n "$PROD_SSH_USER"
+          ssh-keyscan -T 10 -p "$PROD_PORT" -t ed25519 "$PROD_HOST" 2>/dev/null \
+            | grep -v '^#' > "$RUNNER_TEMP/qiaolian_observed_known_hosts"
+          test -s "$RUNNER_TEMP/qiaolian_observed_known_hosts"
+          ssh-keygen -lf "$RUNNER_TEMP/qiaolian_observed_known_hosts" \
+            | grep -F "$PROD_SSH_HOST_FINGERPRINT"
+          printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" \
+            > "$RUNNER_TEMP/qiaolian_expected_known_hosts"
+          diff -u \
+            "$RUNNER_TEMP/qiaolian_expected_known_hosts" \
+            "$RUNNER_TEMP/qiaolian_observed_known_hosts"
+
+      - name: Configure production SSH
+        env:
+          PROD_SSH_PRIVATE_KEY: '${{ secrets.PROD_SSH_PRIVATE_KEY }}'
+        run: |
+          set -Eeuo pipefail
+          if [ -z "$PROD_SSH_PRIVATE_KEY" ]; then
+            echo "::error title=缺少 GitHub Actions Secret::请配置 PROD_SSH_PRIVATE_KEY"
+            exit 1
+          fi
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
+          printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
+          ssh-keygen -F "$PROD_HOST" -f "$HOME/.ssh/known_hosts" >/dev/null
+
+      - name: Upload verified release bundle
+        env:
+          RELEASE_BUNDLE: '${{ runner.temp }}/qiaolian-release.bundle'
+          REMOTE_BUNDLE: '/tmp/qiaolian-${{ github.run_id }}-${{ github.sha }}.bundle'
+        run: |
+          set -Eeuo pipefail
+          test -n "$PROD_SSH_USER"
+          scp \
+            -P "$PROD_PORT" \
+            -i "$HOME/.ssh/qiaolian_production" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o ConnectTimeout=20 \
+            "$RELEASE_BUNDLE" \
+            "$PROD_SSH_USER@$PROD_HOST:$REMOTE_BUNDLE"
+
+      - name: Probe production host
+        run: |
+          set -Eeuo pipefail
+          ssh \
+            -p "$PROD_PORT" \
+            -i "$HOME/.ssh/qiaolian_production" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o ConnectTimeout=20 \
+            "$PROD_SSH_USER@$PROD_HOST" \
+            'echo PROBE_USER=$(id -un); echo PROBE_HOST=$(hostname); ls -ld /opt/qiaolian_dual_bots /opt/qiaolian_dual_bots/.git /opt/qiaolian_dual_bots/.venv/bin/python /opt/qiaolian_dual_bots/.env /opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db; echo ---tools---; command -v git; command -v systemctl; command -v sqlite3; command -v runuser; command -v fc-match || echo MISSING_fc-match; echo ---git---; git -c safe.directory=/opt/qiaolian_dual_bots -C /opt/qiaolian_dual_bots status -sb || true; git -c safe.directory=/opt/qiaolian_dual_bots -C /opt/qiaolian_dual_bots rev-parse --abbrev-ref HEAD || true; git -c safe.directory=/opt/qiaolian_dual_bots -C /opt/qiaolian_dual_bots rev-parse HEAD || true; echo ---svc---; systemctl is-active qiaolian-user-bot.service qiaolian-publisher-bot.service qiaolian-collector.service || true'
+
+      - name: Deploy, restart, verify, and rollback on failure
+        env:
+          REMOTE_BUNDLE: '/tmp/qiaolian-${{ github.run_id }}-${{ github.sha }}.bundle'
+        run: |
+          set -Eeuo pipefail
+          test -n "$PROD_SSH_USER"
+          ssh \
+            -p "$PROD_PORT" \
+            -i "$HOME/.ssh/qiaolian_production" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o ConnectTimeout=20 \
+            "$PROD_SSH_USER@$PROD_HOST" \
+            "bash -s -- '$REMOTE_BUNDLE' '$CANDIDATE_SHA' '$DEPLOY_BRANCH'" <<'REMOTE'
+          set -Eeuo pipefail
+
+          step() { echo "CHECK: $*"; }
+
+          BUNDLE_PATH=$1
+          EXPECTED_SHA=$2
+          DEPLOY_BRANCH=$3
+          APP=/opt/qiaolian_dual_bots
+          DB="$APP/data/qiaolian_dual_bot.db"
+          SERVICES=(
+            qiaolian-user-bot.service
+            qiaolian-publisher-bot.service
+            qiaolian-collector.service
+          )
+
+          root_cmd() {
+            if [ "$(id -u)" -eq 0 ]; then
+              "$@"
+            else
+              sudo -n "$@"
+            fi
+          }
+
+          git_app() {
+            root_cmd git -c safe.directory="$APP" -C "$APP" "$@"
+          }
+
+          as_bot() {
+            root_cmd runuser -u qiaolianbot -- "$@"
+          }
+
+          require_cmd() {
+            step "command $1"
+            command -v "$1" >/dev/null || { echo "MISSING command: $1" >&2; exit 1; }
+          }
+
+          require_cmd git
+          require_cmd systemctl
+          require_cmd sqlite3
+          require_cmd runuser
+          require_cmd fc-match
+          if [ "$(id -u)" -ne 0 ]; then
+            require_cmd sudo
+            sudo -n true
+          fi
+
+          step "app paths"
+          root_cmd test -d "$APP/.git" || { echo "MISSING $APP/.git" >&2; exit 1; }
+          root_cmd test -x "$APP/.venv/bin/python" || { echo "MISSING venv python" >&2; exit 1; }
+          root_cmd test -f "$APP/.env" || { echo "MISSING .env" >&2; exit 1; }
+          root_cmd test -f "$DB" || { echo "MISSING $DB" >&2; exit 1; }
+          root_cmd test -f "$BUNDLE_PATH" || { echo "MISSING bundle $BUNDLE_PATH" >&2; exit 1; }
+          step "bundle verify"
+          git bundle verify "$BUNDLE_PATH"
+
+          step "working tree"
+          if ! git_app diff --quiet || ! git_app diff --cached --quiet; then
+            echo "WARN dirty tracked files; resetting tracked tree"
+            git_app status --short || true
+            git_app reset --hard HEAD
+          fi
+          git_app status --short || true
+
+          step "fetch bundle"
+          git_app fetch "$BUNDLE_PATH" refs/heads/actions-production
+          FETCHED_SHA=$(git_app rev-parse FETCH_HEAD)
+          test "$FETCHED_SHA" = "$EXPECTED_SHA"
+
+          OLD_SHA=$(git_app rev-parse HEAD)
+          OLD_BRANCH=$(git_app symbolic-ref --quiet --short HEAD || true)
+          OLD_TARGET_SHA=$(git_app rev-parse --verify "refs/heads/$DEPLOY_BRANCH" 2>/dev/null || true)
+          SHORT_SHA=$(printf '%s' "$EXPECTED_SHA" | cut -c1-12)
+          STAMP=$(date -u +%Y%m%d-%H%M%S)
+          BACKUP="/opt/backups/qiaolian-actions-$STAMP-$SHORT_SHA"
+          ACTIVATION_STARTED=0
+          echo "OLD_SHA=$OLD_SHA OLD_BRANCH=$OLD_BRANCH"
+
+          rollback() {
+            rc=$?
+            trap - ERR
+            set +e
+            echo "ROLLBACK rc=$rc" >&2
+            if [ "$ACTIVATION_STARTED" -eq 1 ]; then
+              root_cmd systemctl stop "${SERVICES[@]}"
+              git_app checkout --detach "$OLD_SHA"
+              if [ -n "$OLD_BRANCH" ]; then
+                git_app branch -f "$OLD_BRANCH" "$OLD_SHA"
+                git_app checkout "$OLD_BRANCH"
+              fi
+              if [ -n "$OLD_TARGET_SHA" ] && [ "$OLD_BRANCH" != "$DEPLOY_BRANCH" ]; then
+                git_app update-ref "refs/heads/$DEPLOY_BRANCH" "$OLD_TARGET_SHA"
+              fi
+              root_cmd systemctl start "${SERVICES[@]}"
+              root_cmd systemctl --no-pager --full status "${SERVICES[@]}" || true
+            fi
+            root_cmd rm -f "$BUNDLE_PATH"
+            echo "Deployment failed; code rolled back to $OLD_SHA. Database backup: $BACKUP" >&2
+            exit "$rc"
+          }
+          trap rollback ERR
+
+          step "backup"
+          root_cmd install -d -m 0700 "$BACKUP"
+          printf '%s\n' "$OLD_SHA" | root_cmd tee "$BACKUP/previous_git_sha" >/dev/null
+          printf '%s\n' "$OLD_BRANCH" | root_cmd tee "$BACKUP/previous_git_branch" >/dev/null
+          root_cmd cp -a "$APP/.env" "$BACKUP/.env"
+
+          ACTIVATION_STARTED=1
+          step "stop services"
+          root_cmd systemctl stop "${SERVICES[@]}"
+          root_cmd sqlite3 "$DB" ".backup '$BACKUP/qiaolian_dual_bot.db'"
+          root_cmd sha256sum "$BACKUP/qiaolian_dual_bot.db" | root_cmd tee "$BACKUP/qiaolian_dual_bot.db.sha256" >/dev/null
+
+          step "checkout release"
+          if [ -n "$OLD_TARGET_SHA" ]; then
+            if git_app merge-base --is-ancestor "$OLD_TARGET_SHA" "$EXPECTED_SHA"; then
+              git_app checkout "$DEPLOY_BRANCH"
+              git_app merge --ff-only "$EXPECTED_SHA"
+            else
+              echo "WARN $DEPLOY_BRANCH is not an ancestor; hard reset to $EXPECTED_SHA"
+              git_app checkout -B "$DEPLOY_BRANCH" "$EXPECTED_SHA"
+            fi
+          else
+            git_app checkout -b "$DEPLOY_BRANCH" "$EXPECTED_SHA"
+          fi
+          test "$(git_app rev-parse HEAD)" = "$EXPECTED_SHA"
+
+          step "pip + chromium"
+          as_bot "$APP/.venv/bin/pip" install --disable-pip-version-check -r "$APP/requirements.txt"
+          root_cmd install -d -m 0755 "$APP/.playwright-browsers"
+          root_cmd chown qiaolianbot "$APP/.playwright-browsers"
+          as_bot env PLAYWRIGHT_BROWSERS_PATH="$APP/.playwright-browsers" \
+            "$APP/.venv/bin/python" -m playwright install chromium
+          step "compileall"
+          root_cmd "$APP/.venv/bin/python" -m compileall -q \
+            "$APP/qiaolian_dual" \
+            "$APP/v2/qiaolian_publisher_v2" \
+            "$APP/meihua_publisher.py" \
+            "$APP/cover_generator.py" \
+            "$APP/autopilot_publish_bot.py" \
+            "$APP/publication_package.py" \
+            "$APP/publication_delivery.py" \
+            "$APP/discussion_map_store.py" \
+            "$APP/parser_v2_safe.py" \
+            "$APP/tools/run_parser_v2_safe.py" \
+            "$APP/photo_formatter_v1_1.py" \
+            "$APP/photo_ranker.py" \
+            "$APP/media_pipeline_v1_1.py"
+          as_bot env PYTHONPATH="$APP" "$APP/.venv/bin/python" -c \
+            "import qiaolian_dual.user_bot; import publication_package; import html_cover_renderer; from qiaolian_dual.user_bot import build_application; assert build_application() is not None"
+          as_bot env PYTHONPATH="$APP" PLAYWRIGHT_BROWSERS_PATH="$APP/.playwright-browsers" \
+            "$APP/.venv/bin/python" -c \
+            "from playwright.sync_api import sync_playwright; p=sync_playwright().start(); b=p.chromium.launch(headless=True, args=['--no-sandbox']); b.close(); p.stop()"
+          fc-match -f '%{family}\n' 'Noto Sans CJK SC' | grep -qi 'Noto Sans CJK'
+
+          ACTIVATED_AT=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          step "start services"
+          root_cmd systemctl start qiaolian-user-bot.service
+          root_cmd systemctl start qiaolian-publisher-bot.service
+          root_cmd systemctl start qiaolian-collector.service
+
+          for _attempt in $(seq 1 12); do
+            all_active=1
+            for service in "${SERVICES[@]}"; do
+              if ! root_cmd systemctl is-active --quiet "$service"; then
+                all_active=0
+                break
+              fi
+            done
+            [ "$all_active" -eq 1 ] && break
+            sleep 2
+          done
+
+          for service in "${SERVICES[@]}"; do
+            root_cmd systemctl is-active --quiet "$service"
+          done
+
+          printf '%s\n' "$EXPECTED_SHA" | root_cmd tee "$APP/.deployed_sha" >/dev/null
+          root_cmd chmod 0644 "$APP/.deployed_sha"
+          root_cmd systemctl --no-pager --full status "${SERVICES[@]}"
+          root_cmd journalctl \
+            -u qiaolian-user-bot.service \
+            -u qiaolian-publisher-bot.service \
+            -u qiaolian-collector.service \
+            --since "$ACTIVATED_AT" \
+            -n 120 \
+            --no-pager
+
+          ACTIVATION_STARTED=0
+          trap - ERR
+          root_cmd rm -f "$BUNDLE_PATH"
+          echo "DEPLOYMENT_OK sha=$EXPECTED_SHA backup=$BACKUP"
+          REMOTE
