@@ -22,6 +22,16 @@ class SimplifiedAppointmentTests(unittest.IsolatedAsyncioTestCase):
         for callback in callbacks:
             self.assertIsNotNone(re.match(user_bot._APPT_CB_PATTERN, callback), callback)
 
+    def test_video_entry_only_lives_on_appointment_date_page(self):
+        date_keyboard = user_bot._appointment_date_keyboard()
+        date_buttons = [button.text for row in date_keyboard.inline_keyboard for button in row]
+        self.assertIn("🎥 实时视频看房", date_buttons)
+
+        handoff = user_bot.contact_handoff_keyboard()
+        handoff_buttons = [button.text for row in handoff.inline_keyboard for button in row]
+        self.assertNotIn("🎥 视频看房", handoff_buttons)
+        self.assertIn("📅 预约看房", handoff_buttons)
+
     async def test_known_viewing_mode_skips_customer_focus_form(self):
         context = SimpleNamespace(user_data={})
 
@@ -88,6 +98,75 @@ class SimplifiedAppointmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("appt", context.user_data)
         text = query.edit_message_text.await_args.args[0]
         self.assertIn("预约已失效", text)
+
+    async def test_time_button_submits_directly_without_new_confirm_page(self):
+        query = SimpleNamespace(
+            data="aptime:pm",
+            answer=AsyncMock(),
+            edit_message_text=AsyncMock(),
+        )
+        user = SimpleNamespace(id=1002, username="tenant2", full_name="Tenant 2")
+        update = SimpleNamespace(callback_query=query, effective_user=user)
+        context = SimpleNamespace(
+            user_data={
+                "appt": {
+                    "listing_id": "待推荐",
+                    "source": "user_bot",
+                    "touch_payload": {"listing_unknown": True},
+                    "mode": "offline",
+                    "date": "08-12",
+                    "focus_keys": [],
+                }
+            }
+        )
+
+        with (
+            patch.object(user_bot.db, "create_appointment", return_value=89) as create_appt,
+            patch.object(user_bot, "create_lead", return_value=100),
+            patch.object(user_bot, "_notify_admins", new=AsyncMock()),
+        ):
+            state = await user_bot.appoint_flow_cb(update, context)
+
+        self.assertEqual(state, user_bot.MAIN)
+        self.assertEqual(create_appt.call_args.args[0]["appointment_time"], "pm")
+        text = query.edit_message_text.await_args.args[0]
+        self.assertIn("预约申请已提交", text)
+        self.assertNotIn("确认看房预约", text)
+        self.assertNotIn("提交预约", text)
+        self.assertNotIn("appt", context.user_data)
+
+    async def test_custom_time_submits_directly_without_new_confirm_page(self):
+        message = SimpleNamespace(text="晚上8点", reply_text=AsyncMock())
+        user = SimpleNamespace(id=1003, username="tenant3", full_name="Tenant 3")
+        update = SimpleNamespace(effective_message=message, effective_user=user, callback_query=None)
+        context = SimpleNamespace(
+            user_data={
+                "appt": {
+                    "listing_id": "待推荐",
+                    "source": "user_bot",
+                    "touch_payload": {"listing_unknown": True},
+                    "mode": "offline",
+                    "date": "8月20日",
+                    "focus_keys": [],
+                    "awaiting_custom_time": True,
+                }
+            }
+        )
+
+        with (
+            patch.object(user_bot.db, "create_appointment", return_value=90) as create_appt,
+            patch("qiaolian_dual.search.create_lead", return_value=101),
+            patch("qiaolian_dual.results_admin._notify_admins", new=AsyncMock()),
+        ):
+            state = await user_bot.handle_appointment_text(update, context)
+
+        self.assertEqual(state, user_bot.MAIN)
+        self.assertEqual(create_appt.call_args.args[0]["appointment_time"], "晚上8点")
+        text = message.reply_text.await_args.args[0]
+        self.assertIn("预约申请已提交", text)
+        self.assertNotIn("确认看房预约", text)
+        self.assertNotIn("提交预约", text)
+        self.assertNotIn("appt", context.user_data)
 
     async def test_submit_keeps_full_context_and_notifies_advisor(self):
         query = SimpleNamespace(
