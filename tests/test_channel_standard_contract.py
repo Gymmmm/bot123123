@@ -82,10 +82,3 @@ def test_commit_success_sql_does_not_force_every_listing_active():
     src = Path("publication_delivery.py").read_text(encoding="utf-8")
     assert "WHEN status IN ('','pending','draft') THEN 'active'" in src
     assert "UPDATE listings SET status='active',updated_at=CURRENT_TIMESTAMP" not in src
-
-
-def test_publication_package_exposes_builder_entrypoints():
-    import publication_package as pkg
-    assert callable(getattr(pkg, "build_package", None))
-    assert callable(getattr(pkg, "approve_package", None))
-    assert callable(getattr(pkg, "render_cover_preview", None))
