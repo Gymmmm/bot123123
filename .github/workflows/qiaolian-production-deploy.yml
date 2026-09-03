@@ -184,7 +184,7 @@ jobs:
             -o IdentitiesOnly=yes \
             -o ConnectTimeout=20 \
             "$PROD_SSH_USER@$PROD_HOST" \
-            'export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"; echo PATH=$PATH; ls -l /usr/bin/git /usr/local/bin/git 2>/dev/null || true; command -v git || echo MISSING_git; command -v fc-match; systemctl is-active qiaolian-user-bot.service qiaolian-publisher-bot.service qiaolian-collector.service || true'
+            'export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"; command -v git; command -v sqlite3 || echo MISSING_sqlite3; command -v fc-match; systemctl is-active qiaolian-user-bot.service qiaolian-publisher-bot.service qiaolian-collector.service || true'
 
       - name: Deploy, restart, verify, and rollback on failure
         env:
@@ -203,18 +203,18 @@ jobs:
           set -Eeuo pipefail
           export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
           hash -r
-          if ! command -v git >/dev/null 2>&1; then
-            for git_bin in /usr/bin/git /usr/local/bin/git /usr/libexec/git-core/git; do
-              if [ -x "$git_bin" ]; then PATH="$(dirname "$git_bin"):$PATH"; break; fi
-            done
-            hash -r
-          fi
-          if ! command -v git >/dev/null 2>&1 && command -v apt-get >/dev/null 2>&1; then
-            echo "CHECK: apt-get install git"
-            DEBIAN_FRONTEND=noninteractive apt-get install -y git
-            hash -r
-          fi
-          echo "PATH=$PATH git=$(command -v git || echo none)"
+          install_if_missing() {
+            bin=$1
+            pkg=${2:-$1}
+            if ! command -v "$bin" >/dev/null 2>&1; then
+              echo "CHECK: apt-get install $pkg"
+              DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg"
+              hash -r
+            fi
+          }
+          install_if_missing git git
+          install_if_missing sqlite3 sqlite3
+          echo "PATH=$PATH git=$(command -v git || echo none) sqlite3=$(command -v sqlite3 || echo none)"
 
           step() { echo "CHECK: $*"; }
 
