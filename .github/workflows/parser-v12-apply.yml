@@ -1,0 +1,50 @@
+name: parser-v12-apply
+
+on:
+  push:
+    branches:
+      - codex/qiaolian-ui-cleanup-20260829
+    paths:
+      - tools/apply_parser_v12_patch.py
+      - .github/workflows/parser-v12-apply.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply parser v1.2 patch
+        run: python tools/apply_parser_v12_patch.py
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pytest pytest-asyncio
+      - name: Parser syntax check
+        run: |
+          python -m compileall -q qiaolian_dual ai_parser.py tests/test_parser_v12_regressions.py
+          git diff --check
+      - name: Parser regression suite
+        run: |
+          python -m pytest -q \
+            tests/test_parser_v12_regressions.py \
+            tests/test_ai_parser_price_gate.py \
+            tests/test_area_gate_single_source.py \
+            tests/test_local_intake_e2e.py
+      - name: Commit verified parser patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm tools/apply_parser_v12_patch.py .github/workflows/parser-v12-apply.yml
+          git add qiaolian_dual/canonical_facts.py qiaolian_dual/listing_taxonomy.py tests/test_parser_v12_regressions.py .github/workflows/qiaolian-ui-check.yml
+          git commit -m "fix: harden canonical parser v1.2 recognition"
+          git push origin HEAD:codex/qiaolian-ui-cleanup-20260829
