@@ -71,7 +71,7 @@ async def render_panel(update: Update, *, text: str, reply_markup: InlineKeyboar
         context.user_data[PANEL_ANCHOR_KEY] = {'chat_id': int(sent.chat_id), 'message_id': int(sent.message_id)}
 
 def promise_text() -> str:
-    return ('🛡 <b>租期服务保障</b>\n\n绑定租客档案后：\n• 租约到期前 <b>7 天</b>提醒你确认是否续租\n• 报修提交即生成工单，处理进度会通知你\n\n每一项都有记录，不只是口头跟进。')
+    return ('🛡 <b>租期服务保障</b>\n\n绑定租客档案后：\n• 租约到期前 <b>7 天</b>提醒你查看租约并联系顾问\n• 报修提交即生成工单，处理进度会通知你\n\n每一项都有记录，不只是口头跟进。')
 
 def deposit_text() -> str:
     return copy_deposit_text()
@@ -114,7 +114,15 @@ def brand_story_text() -> str:
     return copy_brand_text()
 
 def help_text() -> str:
-    return ('❓ <b>怎么使用</b>\n\n找房：点“帮我找房”，选择类型、位置和预算。\n看房：打开一套可预约房源，点“预约看房”。\n咨询：点“联系中文顾问”，具体房源会自动带上。\n入住后：报修、物业沟通和周边生活都在“入住服务”。\n租约：可在“我的租约”查看，到期前 7 天可开启提醒。')
+    return (
+        '❓ <b>怎么使用</b>\n\n'
+        '找房：点“帮我找房”，选择类型、位置和预算。\n'
+        '看房：打开一套可预约房源，点“预约看房”，选择日期和时间后直接提交。\n'
+        '视频：进入预约日期页后，可切换“实时视频看房”。\n'
+        '咨询：点“联系中文顾问”，具体房源会自动带上。\n'
+        '入住后：报修、物业沟通和周边生活都在“入住服务”。\n'
+        '租约：已绑定租客档案的客户，会在到期前 7 天收到提醒。'
+    )
 
 def service_hub_text() -> str:
     return ('🛠 <b>入住服务</b>\n\n房子有问题或需要物业沟通，直接点下面办理。\n已绑定租约时会自动带上房屋信息，不用重复说明。')
