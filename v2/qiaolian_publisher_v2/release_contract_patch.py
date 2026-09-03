@@ -46,24 +46,17 @@ class _ContextProxy:
 
 
 def install_release_contract_patch() -> None:
-    """Lock the production flow to current QC/button-layout contracts.
-
-    This patch is intentionally small and sits on top of the existing publisher:
-    - admin previews never display legacy QJ public ids;
-    - confirmation copy no longer describes discussion/comment publishing;
-    - approving a non-frozen draft always rebuilds a fresh package with the
-      current channel formatter, so an old package_ready row cannot reintroduce
-      stale captions/tags/comment-layout copy.
-    """
+    """Lock the production flow to current QC/button-layout contracts."""
     global _INSTALLED
     if _INSTALLED:
         return
     _INSTALLED = True
 
     import autopilot_publish_bot as ap
+    import meihua_publisher as publisher
     import publication_package as package
 
-    original_build_caption = ap.build_caption
+    original_build_caption = publisher.build_caption
 
     def patched_build_caption(*args, **kwargs):
         import re
@@ -72,7 +65,7 @@ def install_release_contract_patch() -> None:
             text = re.sub(r"\bQJ[-_]?(\d{1,8})\b", lambda m: f"QC{int(m.group(1)):04d}", text)
         return text
 
-    ap.build_caption = patched_build_caption
+    publisher.build_caption = patched_build_caption
 
     original_visual_preview = ap._send_visual_preview
 
