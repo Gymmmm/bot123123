@@ -1,0 +1,57 @@
+name: predeploy-closeout-apply
+
+on:
+  push:
+    branches:
+      - codex/qiaolian-ui-cleanup-20260829
+    paths:
+      - tools/predeploy_closeout_patch.py
+      - .github/workflows/predeploy-closeout-apply.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply predeploy closeout patch
+        run: python tools/predeploy_closeout_patch.py
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pytest pytest-asyncio
+      - name: Verify patch syntax
+        run: |
+          python -m compileall -q collector_bot.py publication_package.py tests/test_launch_readiness_contract.py
+          git diff --check
+      - name: Verify predeploy contracts
+        env:
+          PYTHONPATH: '${{ github.workspace }}'
+          USER_BOT_TOKEN: '123456:TESTTOKEN'
+          PUBLISHER_BOT_TOKEN: '123456:TESTTOKEN'
+          DB_PATH: '${{ runner.temp }}/qiaolian-predeploy-check.db'
+        run: |
+          python -m pytest -q \
+            tests/test_launch_readiness_contract.py \
+            tests/test_parser_v12_regressions.py \
+            tests/test_parser_v2_safe.py \
+            tests/test_media_pipeline_v11.py \
+            tests/test_prelaunch_product_contract.py \
+            tests/test_user_start_payload.py \
+            tests/test_appointment_simplified.py
+      - name: Commit verified closeout
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add collector_bot.py publication_package.py tests/test_launch_readiness_contract.py
+          git commit -m "fix: close final predeploy media intake gaps"
+          git push origin HEAD:codex/qiaolian-ui-cleanup-20260829
