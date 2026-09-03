@@ -14,9 +14,11 @@ for path in (REPO_ROOT, BASE_DIR):
         sys.path.insert(0, path_s)
 
 from qiaolian_publisher_v2.cover_picker_patch import install_cover_picker
+from qiaolian_publisher_v2.review_queue_patch import install_review_queue_patch
 from qiaolian_publisher_v2.bot import main
 
 install_cover_picker()
+install_review_queue_patch()
 
 _LOCK_FH = None
 
