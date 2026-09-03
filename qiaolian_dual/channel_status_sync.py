@@ -31,6 +31,17 @@ def _active_appointment_count(conn: sqlite3.Connection, listing_id: str) -> int:
     return int(row[0] if row else 0)
 
 
+def _apply_appointment_lock(conn: sqlite3.Connection, listing_id: str, status: str, appointment_count: int) -> str:
+    status = str(status or "").strip().lower()
+    if status in {"active", "reserved"} and appointment_count >= APPOINTMENT_LOCK_COUNT:
+        conn.execute(
+            "UPDATE listings SET status='pending', updated_at=datetime('now','localtime') WHERE listing_id=? AND status IN ('active','reserved')",
+            (listing_id,),
+        )
+        return "pending"
+    return status
+
+
 def _status_label(status: str, appointment_count: int = 0) -> str:
     status = str(status or "").strip().lower()
     if status == "pending" and appointment_count >= APPOINTMENT_LOCK_COUNT:
@@ -95,8 +106,13 @@ async def sync_channel_listing_status(listing_id: str) -> bool:
             if not row or not str(row["public_token"] or "").startswith("ql"):
                 return False
             message_id = int(row["channel_message_id"])
-            status = str(row["status"] or "pending").strip().lower()
             appointment_count = _active_appointment_count(conn, listing_id)
+            status = _apply_appointment_lock(
+                conn,
+                listing_id,
+                str(row["status"] or "pending").strip().lower(),
+                appointment_count,
+            )
             caption = _caption_with_status(str(row["post_text"] or ""), status, appointment_count)
             markup = _keyboard(username, str(row["public_token"]), listing_id, status)
             await Bot(token=token).edit_message_caption(
