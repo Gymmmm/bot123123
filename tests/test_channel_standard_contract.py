@@ -48,6 +48,14 @@ def test_locked_caption_is_four_discovery_lines():
     assert "✨" not in text
 
 
+def test_first_freeze_treats_empty_and_draft_status_as_active():
+    for status in ("", "draft"):
+        listing = dict(DIAMOND, status=status)
+        text = format_button_post_text(listing, "l_89", [])
+        assert "🟢 当前可预约　QC0089" in text
+        assert "🔵 房态待确认" not in text
+
+
 def test_missing_price_does_not_write_mianyi():
     listing = dict(DIAMOND)
     listing["price"] = 0
