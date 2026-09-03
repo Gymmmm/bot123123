@@ -1,0 +1,39 @@
+"""Canonical public Telegram Deep Links for channel listing actions.
+
+All channel publishers and status edits must use the same public QC payload.
+Internal ``l_`` ids stay server-side; the User Bot resolves QC back to the same
+listing context.
+"""
+from __future__ import annotations
+
+import re
+
+_ACTION_SUFFIX = {
+    "detail": "details",
+    "details": "details",
+    "photos": "photos",
+    "book": "book",
+}
+
+
+def public_qc_code(listing_id: str) -> str:
+    """Return the stable public QC identifier for an internal/public listing id."""
+    raw = str(listing_id or "").strip()
+    match = re.search(r"(\d{1,8})", raw)
+    if not match:
+        return raw.upper()
+    return f"QC{int(match.group(1)):04d}"
+
+
+def channel_start_payload(listing_id: str, action: str) -> str:
+    suffix = _ACTION_SUFFIX.get(str(action or "").strip().lower())
+    if not suffix:
+        raise ValueError(f"unsupported_channel_action:{action}")
+    return f"property_{public_qc_code(listing_id)}_{suffix}"
+
+
+def channel_action_url(username: str, listing_id: str, action: str) -> str:
+    user = str(username or "").strip().lstrip("@")
+    if not user:
+        return ""
+    return f"https://t.me/{user}?start={channel_start_payload(listing_id, action)}"
