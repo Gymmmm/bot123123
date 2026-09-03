@@ -197,7 +197,19 @@ def render_html_cover(
             for element_id, value in fields.items():
                 locator = page.locator(f"#{element_id}")
                 if locator.count():
-                    locator.fill(str(value or ""))
+                    locator.first.evaluate(
+                        """(el, value) => {
+                            const tag = String(el.tagName || '').toLowerCase();
+                            if (tag === 'input' || tag === 'textarea' || tag === 'select') {
+                                el.value = value;
+                                el.dispatchEvent(new Event('input', {bubbles: true}));
+                                el.dispatchEvent(new Event('change', {bubbles: true}));
+                            } else {
+                                el.textContent = value;
+                            }
+                        }""",
+                        str(value or ""),
+                    )
             button = page.locator("#btn")
             if button.count():
                 button.click()
