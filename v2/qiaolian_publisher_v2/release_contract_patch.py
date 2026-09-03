@@ -93,6 +93,13 @@ def install_release_contract_patch() -> None:
             ).fetchone()
         if not frozen:
             package.build_package(db_path, draft_id)
-        return original_approve(db_path, draft_id, approved_by)
+        try:
+            return original_approve(db_path, draft_id, approved_by)
+        except ValueError as exc:
+            # Reuse the publisher's existing human-readable error mapping instead
+            # of surfacing this expected gate result as an opaque/unknown failure.
+            if str(exc) == "package_publishability_blocked:insufficient_media":
+                raise ValueError("canonical_package_gate_blocked:insufficient_media") from exc
+            raise
 
     package.approve_package = patched_approve_package
