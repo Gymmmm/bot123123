@@ -3142,12 +3142,13 @@ def build_keyboard(
     except Exception:
         logger.exception("读取公开房源 token 失败: %s", listing_id)
     base_url = f"https://t.me/{BOT_USERNAME.lstrip('@')}?start="
+    public_listing_id = display_listing_id(listing_id)
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("📋 租赁详情", url=f"{base_url}property_{listing_id}_details"),
-            InlineKeyboardButton("📸 更多实拍", url=f"{base_url}property_{listing_id}_photos"),
+            InlineKeyboardButton("📋 租赁详情", url=f"{base_url}property_{public_listing_id}_details"),
+            InlineKeyboardButton("📸 更多实拍", url=f"{base_url}property_{public_listing_id}_photos"),
         ],
-        [InlineKeyboardButton("📅 预约看房", url=f"{base_url}property_{listing_id}_book")],
+        [InlineKeyboardButton("📅 预约看房", url=f"{base_url}property_{public_listing_id}_book")],
     ])
 
 
@@ -3794,15 +3795,13 @@ async def _tg_publish(
     reply_markup = None
 
     def _button_layout_keyboard(message_id: int, token: str) -> InlineKeyboardMarkup:
-        user = BOT_USERNAME.lstrip("@")
-        base = f"https://t.me/{user}?start=property_{listing_id}_"
-        return InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton("📋 租赁详情", url=base + "details"),
-                InlineKeyboardButton("📸 更多实拍", url=base + "photos"),
-            ],
-            [InlineKeyboardButton("📅 预约看房", url=base + "book")],
-        ])
+        _ = message_id
+        return build_keyboard(
+            listing_id,
+            area=area,
+            post_token=token,
+            caption_variant=caption_variant,
+        )
 
     def _prepare_channel_photo_buf(data: bytes, *, is_cover: bool, slot_index: int) -> io.BytesIO:
         """Return the frozen final bytes unchanged; package build owns every pixel transform."""
