@@ -33,14 +33,14 @@ def test_html_cover_renderer_forces_noto_on_poster_tree():
     assert 'font-family: "PingFang SC"' not in forced_block
 
 
-def test_classic_blue_matches_reference_structure():
+def test_classic_blue_matches_approved_structure():
     text = Path("templates/property/01_经典蓝卡模板.html").read_text(encoding="utf-8")
     assert 'width:1600px;height:1200px' in text
     assert '.brand-veil' in text
-    assert 'width:850px' in text
-    assert 'border-radius:30px' in text
-    assert 'rgba(12,57,154,.91)' in text
-    assert '#ffd75f' in text
+    assert 'width:860px' in text
+    assert 'border-radius:28px' in text
+    assert 'rgba(17,71,178,.92)' in text
+    assert '#f6c948' in text
     for token in ('{{PROJECT}}', '{{LAYOUT}}', '{{SIZE}}', '{{FLOOR}}', '{{PRICE}}', '{{H1}}', '{{H2}}', '{{H3}}'):
         assert token in text
     assert 'id="t1"' in text and 'id="t8"' in text
