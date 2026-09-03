@@ -42,17 +42,14 @@ def test_channel_post_has_exact_three_locked_ctas_and_listing_context():
     assert all("侨联找房助手" not in button.text for button in _buttons(keyboard))
 
 
-def test_channel_detail_photos_book_payloads_resolve_to_expected_actions():
+def test_channel_detail_photos_book_payloads_preserve_public_qc_target():
     detail = parse_start_arg_payload("property_QC0042_details")
     photos = parse_start_arg_payload("property_QC0042_photos")
     book = parse_start_arg_payload("property_QC0042_book")
 
-    assert detail and detail["action"] == "details"
-    assert photos and photos["action"] == "photos"
-    assert book and book["action"] == "appoint"
-    assert detail["listing_id"] == "l_42"
-    assert photos["listing_id"] == "l_42"
-    assert book["listing_id"] == "l_42"
+    assert detail == {"action": "details", "target": "QC0042", "post_token": "", "channel_message_id": None}
+    assert photos == {"action": "photos", "target": "QC0042", "post_token": "", "channel_message_id": None}
+    assert book == {"action": "book", "target": "QC0042", "post_token": "", "channel_message_id": None}
 
 
 def test_listing_detail_hides_unknown_or_empty_rows():
