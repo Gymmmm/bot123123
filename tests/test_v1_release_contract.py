@@ -42,6 +42,28 @@ def test_channel_post_has_exact_three_locked_ctas_and_listing_context():
     assert all("侨联找房助手" not in button.text for button in _buttons(keyboard))
 
 
+def test_meihua_publisher_keyboard_uses_same_public_qc_contract():
+    import meihua_publisher
+
+    with patch.object(meihua_publisher, "BOT_USERNAME", "@QiaolianTestBot"):
+        keyboard = meihua_publisher.build_keyboard(
+            "l_42",
+            area="BKK1",
+            post_token="qlabc123",
+            caption_variant="a",
+        )
+
+    assert [[button.text for button in row] for row in keyboard.inline_keyboard] == [
+        ["📋 租赁详情", "📸 更多实拍"],
+        ["📅 预约看房"],
+    ]
+    urls = [unquote(button.url or "") for button in _buttons(keyboard)]
+    assert any("start=property_QC0042_details" in url for url in urls)
+    assert any("start=property_QC0042_photos" in url for url in urls)
+    assert any("start=property_QC0042_book" in url for url in urls)
+    assert all("l_42" not in url for url in urls)
+
+
 def test_channel_detail_photos_book_payloads_preserve_public_qc_target():
     detail = parse_start_arg_payload("property_QC0042_details")
     photos = parse_start_arg_payload("property_QC0042_photos")
