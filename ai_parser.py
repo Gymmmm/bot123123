@@ -13,6 +13,7 @@ from typing import Any
 from collector_db_compat import DatabaseManager
 from qiaolian_dual.canonical_facts import canonicalize_source, draft_projection
 from qiaolian_dual.canonical_listing_materializer import materialize_draft_facts
+from qiaolian_dual.v2_safe_adapter import enrich_authoritative_facts
 
 
 class LLMClient:
@@ -98,6 +99,10 @@ class AIParserModule:
             source_identity=identity,
             media_summary=media_summary,
         )
+        # V2 SAFE is additive only.  It runs after the authoritative parser and
+        # before projection, and its adapter asserts that existing facts remain
+        # byte-for-byte semantically unchanged.
+        facts = enrich_authoritative_facts(sanitized_text, facts)
         return post_id, facts, draft_projection(facts)
 
     def _write_existing_draft(self, draft_id: str, facts: dict[str, Any], projection: dict[str, Any]) -> None:
