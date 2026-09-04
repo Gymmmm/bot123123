@@ -1,0 +1,26 @@
+name: dispatch-production-once
+
+on:
+  push:
+    branches:
+      - ops/gpt-production-control
+    paths:
+      - .github/workflows/dispatch-production-once.yml
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch existing production deployment workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -Eeuo pipefail
+          gh workflow run qiaolian-production-deploy.yml \
+            --repo Gymmmm/bot123123 \
+            --ref codex/qiaolian-ui-cleanup-20260829 \
+            -f confirm=DEPLOY
