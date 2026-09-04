@@ -1,0 +1,28 @@
+name: apply-wechat-parser-fix-once
+
+on:
+  push:
+    branches:
+      - codex/qiaolian-ui-cleanup-20260829
+    paths:
+      - tools/apply_wechat_parser_fix_once.py
+      - .github/workflows/apply-wechat-parser-fix-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/qiaolian-ui-cleanup-20260829
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install test dependencies
+        run: pip install -r requirements.txt
+      - name: Apply fix, run focused regression, commit and push
+        run: python tools/apply_wechat_parser_fix_once.py
