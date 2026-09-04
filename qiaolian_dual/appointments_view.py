@@ -41,6 +41,7 @@ def _appointment_listing_compact(value: object) -> str:
 def _appointment_card_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton('🔎 查看详情', callback_data='appointment_menu:details'), InlineKeyboardButton('💬 联系我们', callback_data='appointment_menu:contact')],
+        [InlineKeyboardButton('🔍 继续找房', callback_data='home_smart_search'), InlineKeyboardButton('🏠 返回首页', callback_data='home')],
     ])
 
 
@@ -142,7 +143,8 @@ def _appointment_details_keyboard(user_id: int) -> InlineKeyboardMarkup:
                         InlineKeyboardButton('💬 联系我们', callback_data=f'listing:consult:{listing_id}'),
                     ])
                 break
-    buttons.append([InlineKeyboardButton('⬅️ 返回', callback_data='appointment_menu:list')])
+    buttons.append([InlineKeyboardButton('⬅️ 返回预约列表', callback_data='appointment_menu:list')])
+    buttons.append([InlineKeyboardButton('🔍 继续找房', callback_data='home_smart_search'), InlineKeyboardButton('🏠 返回首页', callback_data='home')])
     return InlineKeyboardMarkup(buttons)
 
 
