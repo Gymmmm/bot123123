@@ -1,49 +1,7 @@
-<!doctype html>
-<html lang="zh-CN">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=1600,initial-scale=1">
-<title>模板4-黑金V4</title>
-<style>
-*{box-sizing:border-box}html,body{margin:0;width:1600px;height:1200px;background:#080808;font-family:"Noto Sans CJK SC","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif}.poster{position:relative;width:1600px;height:1200px;overflow:hidden;background:#111;color:#fff}.bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:saturate(1.03) contrast(1.03)}.topShade{position:absolute;left:0;top:0;width:100%;height:600px;background:linear-gradient(180deg,rgba(0,0,0,.32),rgba(0,0,0,.08) 52%,rgba(0,0,0,0))}.leftShade{position:absolute;left:0;top:0;width:900px;height:880px;background:linear-gradient(90deg,rgba(0,0,0,.25),rgba(0,0,0,0))}.brand{position:absolute;left:48px;top:42px;color:#e5c56d}.brand-row{display:flex;align-items:center;gap:16px}.logo{position:relative;width:52px;height:48px}.logo:before{content:"";position:absolute;left:6px;top:7px;width:38px;height:28px;border-left:5px solid #e5c56d;border-right:5px solid #e5c56d;border-bottom:5px solid #e5c56d}.logo:after{content:"";position:absolute;left:4px;top:0;width:34px;height:34px;border-left:5px solid #e5c56d;border-top:5px solid #e5c56d;transform:rotate(45deg);transform-origin:center}.brand .cn{font-size:42px;font-weight:900;letter-spacing:.5px;line-height:1}.brand .en{margin-left:68px;margin-top:6px;font-size:13px;font-weight:500;letter-spacing:2px;color:rgba(238,211,137,.84)}.main{position:absolute;left:48px;top:290px;max-width:1030px}.title{font-size:80px;font-weight:900;line-height:1.08;color:#fff;text-shadow:0 4px 14px rgba(0,0,0,.72);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.layout-tag{display:inline-block;margin-top:24px;padding:10px 20px 11px;border-radius:4px;background:rgba(14,14,14,.84);font-size:38px;font-weight:900;color:#fff;white-space:nowrap;max-width:520px;overflow:hidden;text-overflow:ellipsis}.pricebox{position:absolute;right:65px;top:96px;width:370px;min-height:170px;padding:28px 24px;border-radius:12px;text-align:center;background:linear-gradient(180deg,rgba(21,21,21,.92),rgba(9,9,9,.92));box-shadow:0 14px 28px rgba(0,0,0,.42)}.pricebox .label{font-size:23px;font-weight:600;color:rgba(255,255,255,.82)}.pricebox .price{margin-top:10px;font-size:64px;font-weight:900;line-height:1.05;color:#e5c56d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.bottom{position:absolute;left:0;right:0;bottom:0;height:190px;padding:32px 75px;background:linear-gradient(180deg,rgba(4,4,4,.70),rgba(3,3,3,.90));border-top:2px solid rgba(229,197,109,.28);display:grid;grid-template-columns:1.15fr .95fr .9fr;column-gap:70px}.cell{position:relative;min-width:0}.cell+.cell:before{content:"";position:absolute;left:-35px;top:0;bottom:0;width:1px;background:rgba(255,255,255,.13)}.kicker{font-size:17px;font-weight:600;color:rgba(255,255,255,.68)}.value{margin-top:10px;font-size:40px;font-weight:900;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.highlights{margin-top:14px;font-size:18px;font-weight:600;color:rgba(233,213,162,.86);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-</style>
-</head>
-<body>
-<div class="poster">
-  <img id="bg" class="bg" src="{{BG_SRC}}" alt="">
-  <div class="topShade"></div>
-  <div class="leftShade"></div>
-
-  <div class="brand">
-    <div class="brand-row"><div class="logo"></div><div class="cn">侨联地产</div></div>
-    <div class="en">QIAO LIAN PROPERTY</div>
-  </div>
-
-  <div class="main">
-    <div class="title" data-autofit="48"><span id="t1">{{PROJECT}}</span>｜<span id="t2">{{LAYOUT}}</span></div>
-    <div class="layout-tag" data-field="t2" data-autofit="28">{{LAYOUT}}</div>
-  </div>
-
-  <div class="pricebox">
-    <div class="label" id="price_label">月租</div>
-    <div class="price" data-autofit="42" id="price_text">{{PRICE_LINE}}</div>
-  </div>
-
-  <div class="bottom">
-    <div class="cell">
-      <div class="kicker">项目 / 区域</div>
-      <div class="value" data-field="t3" data-autofit="28" id="t3">{{AREA}}</div>
-      <div class="highlights" data-fields="t7,t8,t9" data-autofit="14"><span data-field="t7" id="t7">{{H1}}</span><span data-field="t8"> · <span id="t8">{{H2}}</span></span><span data-field="t9"> · <span id="t9">{{H3}}</span></span></div>
-    </div>
-    <div class="cell">
-      <div class="kicker">面积</div>
-      <div class="value" data-field="t4" data-autofit="28" id="t4">{{SIZE}}</div>
-    </div>
-    <div class="cell">
-      <div class="kicker">楼层</div>
-      <div class="value" data-field="t5" data-autofit="28" id="t5">{{FLOOR}}</div>
-    </div>
-  </div>
-</div>
-</body>
-</html>
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=1600,initial-scale=1"><title>模板4-黑金高级感</title><style>
+*{box-sizing:border-box}html,body{margin:0;width:1600px;height:1200px;background:#080808;font-family:"Noto Sans CJK SC","Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif}.poster{position:relative;width:1600px;height:1200px;overflow:hidden;background:#111;color:#fff}.bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:saturate(1.01) contrast(1.04) brightness(.98)}.topShade{position:absolute;left:0;right:0;top:0;height:430px;background:linear-gradient(180deg,rgba(0,0,0,.46),rgba(0,0,0,.07) 72%,transparent)}.bottomShade{position:absolute;left:0;right:0;bottom:0;height:320px;background:linear-gradient(180deg,transparent,rgba(0,0,0,.28) 36%,rgba(0,0,0,.88))}
+.brand{position:absolute;left:50px;top:42px;color:#e4c66f}.brand-row{display:flex;align-items:center;gap:14px}.logo{width:48px;height:48px;flex:0 0 48px}.brand .cn{font-size:39px;font-weight:850;line-height:1;letter-spacing:.2px}.brand .en{margin-left:62px;margin-top:7px;font-family:Arial,"Noto Sans",sans-serif;font-size:13px;font-weight:600;letter-spacing:1.8px;color:rgba(229,199,112,.78)}
+.main{position:absolute;left:52px;top:294px;width:1060px}.title{font-size:78px;font-weight:900;line-height:1.08;color:#fff;text-shadow:0 4px 18px rgba(0,0,0,.66);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.title .divider{color:rgba(229,198,109,.86);font-weight:500;margin:0 12px}.accent-line{width:92px;height:5px;margin-top:24px;background:#e4c66f;border-radius:4px;box-shadow:0 0 18px rgba(228,198,111,.20)}
+.pricebox{position:absolute;right:58px;top:66px;min-width:330px;max-width:470px;padding:18px 26px 21px;border-radius:12px;background:linear-gradient(180deg,rgba(20,20,20,.94),rgba(8,8,8,.94));border:1px solid rgba(229,198,111,.40);box-shadow:0 14px 30px rgba(0,0,0,.38)}.pricebox .label{font-family:Arial,"Noto Sans",sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;color:rgba(255,255,255,.68)}.pricebox .price{margin-top:6px;font-family:Arial,"Noto Sans",sans-serif;font-size:59px;font-weight:900;line-height:1;color:#e4c66f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bottom{position:absolute;left:0;right:0;bottom:0;height:162px;padding:27px 54px 25px;display:flex;align-items:stretch;background:rgba(5,5,5,.80);border-top:1px solid rgba(229,198,111,.30);backdrop-filter:blur(3px)}.meta{position:relative;min-width:220px;padding:0 34px}.meta:first-child{padding-left:0}.meta+.meta:before{content:"";position:absolute;left:0;top:7px;bottom:7px;width:1px;background:rgba(255,255,255,.13)}.meta .k{font-size:17px;font-weight:650;color:rgba(229,211,164,.62)}.meta .v{margin-top:9px;font-size:34px;font-weight:850;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.meta.area{min-width:320px}.meta.high{flex:1;min-width:0}.meta.high .v{padding-top:5px;font-size:27px;font-weight:650;color:rgba(239,222,176,.90)}
+</style></head><body><div class="poster"><img id="bg" class="bg" src="{{BG_SRC}}" alt=""><div class="topShade"></div><div class="bottomShade"></div><div class="brand"><div class="brand-row"><svg class="logo" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 62L60 30L106 62" stroke="#e4c66f" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M24 58V88H44V68H76V88H96V58" stroke="#e4c66f" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 92C33 84 49 81 60 81C71 81 87 84 104 92" stroke="#e4c66f" stroke-width="8" stroke-linecap="round"/></svg><div class="cn">侨联地产</div></div><div class="en">QIAO LIAN PROPERTY</div></div><div class="main"><div class="title" data-autofit="46"><span id="t1">{{PROJECT}}</span><span class="divider" data-field="t2">｜</span><span id="t2" data-field="t2">{{LAYOUT}}</span></div><div class="accent-line"></div></div><div class="pricebox"><div class="label" id="price_label">MONTHLY RENT</div><div class="price" data-autofit="40" id="price_text">{{PRICE_LINE}}</div></div><div class="bottom"><div class="meta area" data-field="t3"><div class="k">区域</div><div class="v" id="t3" data-autofit="25">{{AREA}}</div></div><div class="meta" data-field="t4"><div class="k">面积</div><div class="v" id="t4" data-autofit="25">{{SIZE}}</div></div><div class="meta" data-field="t5"><div class="k">楼层</div><div class="v" id="t5" data-autofit="25">{{FLOOR}}</div></div><div class="meta high" data-fields="t7,t8,t9"><div class="k">房源特点</div><div class="v" data-autofit="18"><span data-field="t7" id="t7">{{H1}}</span><span data-field="t8"> · <span id="t8">{{H2}}</span></span><span data-field="t9"> · <span id="t9">{{H3}}</span></span></div></div></div></div></body></html>
