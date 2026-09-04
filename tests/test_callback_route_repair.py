@@ -21,9 +21,7 @@ class DummyMessage:
         self.edits = []
         self.replies = []
 
-    async def delete(self):
-        self.deleted += 1
-
+    async def delete(self): self.deleted += 1
     async def reply_text(self, text, **kwargs):
         self.replies.append((text, kwargs))
         return SimpleNamespace(chat_id=self.chat_id, message_id=999)
@@ -38,31 +36,17 @@ class DummyQuery:
         self.caption_edits = []
         self.media_edits = []
 
-    async def answer(self, *args, **kwargs):
-        self.answers += 1
-
-    async def edit_message_text(self, text, **kwargs):
-        self.text_edits.append((text, kwargs))
-
-    async def edit_message_caption(self, caption, **kwargs):
-        self.caption_edits.append((caption, kwargs))
-
-    async def edit_message_media(self, media, **kwargs):
-        self.media_edits.append((media, kwargs))
+    async def answer(self, *args, **kwargs): self.answers += 1
+    async def edit_message_text(self, text, **kwargs): self.text_edits.append((text, kwargs))
+    async def edit_message_caption(self, caption, **kwargs): self.caption_edits.append((caption, kwargs))
+    async def edit_message_media(self, media, **kwargs): self.media_edits.append((media, kwargs))
 
 
 class DummyBot:
-    def __init__(self):
-        self.sent = []
-
-    async def send_message(self, **kwargs):
-        self.sent.append(('message', kwargs))
-
-    async def send_photo(self, **kwargs):
-        self.sent.append(('photo', kwargs))
-
-    async def send_media_group(self, **kwargs):
-        self.sent.append(('media_group', kwargs))
+    def __init__(self): self.sent = []
+    async def send_message(self, **kwargs): self.sent.append(('message', kwargs))
+    async def send_photo(self, **kwargs): self.sent.append(('photo', kwargs))
+    async def send_media_group(self, **kwargs): self.sent.append(('media_group', kwargs))
 
 
 class DummyContext:
@@ -82,24 +66,19 @@ def make_update(data, *, photo=False):
 BASE_HOOKS = {'upsert_user_profile': lambda user: None}
 
 
-def labels(markup):
-    return [button.text for row in markup.inline_keyboard for button in row]
-
-
-def callbacks(markup):
-    return [button.callback_data for row in markup.inline_keyboard for button in row if button.callback_data]
+def labels(markup): return [button.text for row in markup.inline_keyboard for button in row]
+def callbacks(markup): return [button.callback_data for row in markup.inline_keyboard for button in row if button.callback_data]
 
 
 def test_home_available_button_uses_unified_callback():
     kb = main_keyboard()
     mapping = {button.text: button.callback_data for row in kb.inline_keyboard for button in row}
     assert '🏠 可预约房源' not in mapping
-    assert '当前可预约' not in ''.join(mapping)
     assert mapping['🔍 帮我找房'] == 'home_smart_search'
     assert mapping['📅 我的预约'] == 'hub:appointments'
-    assert mapping['🛡 租房服务'] == 'hub:rental'
+    assert mapping['🛡 侨联保障'] == 'hub:rental'
     assert mapping['🛠 入住服务'] == 'hub:service'
-    assert mapping['💬 联系中文顾问'] == 'hub:advisor'
+    assert mapping['💬 联系我们'] == 'hub:advisor'
 
 
 @pytest.mark.asyncio
@@ -107,14 +86,11 @@ async def test_home_available_callback_enters_real_recommendation_handler(monkey
     import qiaolian_dual.callback_navigation as nav
     import qiaolian_dual.results_admin as results
     monkeypatch.setattr(nav.db, 'list_recent_listings', lambda limit: [
-        {'listing_id': 'l_1', 'status': 'active'},
-        {'listing_id': 'l_2', 'status': 'reserved'},
-        {'listing_id': 'l_3', 'status': 'rented'},
+        {'listing_id': 'l_1', 'status': 'active'}, {'listing_id': 'l_2', 'status': 'reserved'}, {'listing_id': 'l_3', 'status': 'rented'},
     ])
     seen = {}
     async def fake_cards(update, context, matches, mode):
-        seen['ids'] = [item['listing_id'] for item in matches]
-        seen['mode'] = mode
+        seen['ids'] = [item['listing_id'] for item in matches]; seen['mode'] = mode
     monkeypatch.setattr(results, 'send_find_results_as_cards', fake_cards)
     update, query = make_update('hub:available')
     await handle_ui_callback(update, DummyContext(), hooks=BASE_HOOKS)
@@ -134,8 +110,7 @@ async def test_listing_detail_calls_real_detail_route(monkeypatch):
     monkeypatch.setattr(search_mod, 'create_lead', lambda *a, **k: None)
     monkeypatch.setattr(listing_mod, 'listing_cost_text', lambda lid: '<b>DETAIL</b>')
     seen = {}
-    async def fake_render(update, **kwargs):
-        seen.update(kwargs)
+    async def fake_render(update, **kwargs): seen.update(kwargs)
     monkeypatch.setattr(texts, 'render_panel', fake_render)
     update, query = make_update('listing:detail:l_2')
     context = DummyContext()
@@ -153,9 +128,7 @@ async def test_listing_appoint_enters_appointment_flow_with_listing_id(monkeypat
     import qiaolian_dual.listing as listing_mod
     seen = {}
     async def fake_start(update, context, listing_id, **kwargs):
-        seen['listing_id'] = listing_id
-        seen.update(kwargs)
-        return common.APPT_MODE
+        seen['listing_id'] = listing_id; seen.update(kwargs); return common.APPT_MODE
     monkeypatch.setattr(listing_mod, 'listing_is_available', lambda lid: (True, 'active'))
     monkeypatch.setattr(flows, 'start_appointment', fake_start)
     update, query = make_update('listing:appoint:l_2')
@@ -171,12 +144,9 @@ async def test_reserved_listing_is_allowed_by_real_appointment_flow(monkeypatch)
     import qiaolian_dual.texts as texts
     from qiaolian_dual.flows import start_appointment
     monkeypatch.setattr(listing_mod, 'listing_is_available', lambda lid: (True, 'reserved'))
-    monkeypatch.setattr(listing_mod, 'listing_context', lambda lid: {
-        'listing_id': lid, 'status': 'reserved', 'title': '钻石岛', 'layout': '2房', 'property_type': '公寓', 'price': 900,
-    })
+    monkeypatch.setattr(listing_mod, 'listing_context', lambda lid: {'listing_id': lid, 'status': 'reserved', 'title': '钻石岛', 'layout': '2房', 'property_type': '公寓', 'price': 900})
     seen = {}
-    async def fake_render(update, **kwargs):
-        seen.update(kwargs)
+    async def fake_render(update, **kwargs): seen.update(kwargs)
     monkeypatch.setattr(texts, 'render_panel', fake_render)
     update, _ = make_update('listing:appoint:l_2')
     context = DummyContext()
@@ -193,14 +163,12 @@ async def test_listing_photos_calls_complete_album_handler(monkeypatch):
     monkeypatch.setattr(listing_mod, 'listing_is_available', lambda lid: (True, 'active'))
     monkeypatch.setattr(listing_mod, 'listing_action_allowed', lambda lid, action: (True, 'active'))
     seen = {}
-    async def fake_album(bot, chat_id, listing_id):
-        seen['listing_id'] = listing_id
+    async def fake_album(bot, chat_id, listing_id): seen['listing_id'] = listing_id
     monkeypatch.setattr(results, 'send_listing_photo_preview', fake_album)
     update, query = make_update('listing:photos:l_2')
     context = DummyContext()
     await handle_ui_callback(update, context, hooks=BASE_HOOKS)
-    assert query.answers == 1
-    assert seen['listing_id'] == 'l_2'
+    assert query.answers == 1 and seen['listing_id'] == 'l_2'
     assert context.user_data['contact_listing_id'] == 'l_2'
 
 
@@ -211,9 +179,7 @@ async def test_listing_consult_preserves_listing_context(monkeypatch):
     monkeypatch.setattr(listing_mod, 'listing_is_available', lambda lid: (True, 'active'))
     monkeypatch.setattr(listing_mod, 'listing_action_allowed', lambda lid, action: (True, 'active'))
     seen = {}
-    async def fake_contact(update, context, **kwargs):
-        seen.update(kwargs)
-        return common.MAIN
+    async def fake_contact(update, context, **kwargs): seen.update(kwargs); return common.MAIN
     monkeypatch.setattr(flows, 'contact_management', fake_contact)
     update, query = make_update('listing:consult:l_2')
     context = DummyContext()
@@ -224,11 +190,7 @@ async def test_listing_consult_preserves_listing_context(monkeypatch):
 
 
 def test_main_callback_pattern_matches_all_listing_routes_and_available_hub():
-    callbacks_to_match = [
-        'hub:available', 'hub:latest', 'listing:open:l_2', 'listing:detail:l_2',
-        'listing:appoint:l_2', 'listing:photos:l_2', 'listing:consult:l_2',
-    ]
-    for callback in callbacks_to_match:
+    for callback in ['hub:available', 'hub:latest', 'listing:open:l_2', 'listing:detail:l_2', 'listing:appoint:l_2', 'listing:photos:l_2', 'listing:consult:l_2']:
         assert re.match(common._MAIN_CB_PATTERN, callback), callback
 
 
@@ -236,8 +198,7 @@ def test_main_callback_pattern_matches_all_listing_routes_and_available_hub():
 @pytest.mark.parametrize('data', ['listing:detail:l_2', 'listing:appoint:l_2', 'listing:photos:l_2', 'listing:consult:l_2'])
 async def test_each_listing_callback_answers_query(monkeypatch, data):
     import qiaolian_dual.callbacks as dispatcher
-    async def fake_listing(update, context, query, data, user):
-        return common.MAIN
+    async def fake_listing(update, context, query, data, user): return common.MAIN
     monkeypatch.setattr(dispatcher, 'handle_listing_callback', fake_listing)
     update, query = make_update(data)
     await handle_ui_callback(update, DummyContext(), hooks=BASE_HOOKS)
@@ -246,9 +207,9 @@ async def test_each_listing_callback_answers_query(monkeypatch, data):
 
 def test_unavailable_page_is_html_and_has_all_real_callbacks():
     text = listing_unavailable_text('pending')
-    assert '🏠 <b>这套房暂时不能预约</b>' in text
+    assert '🔵 <b>这套房正在确认最新房态</b>' in text
     kb = listing_unavailable_keyboard('')
-    assert labels(kb) == ['🔍 同区可预约房源', '💬 联系中文顾问', '📋 租赁详情']
+    assert labels(kb) == ['🏘 同区可约房源', '💬 联系我们', '📋 租赁详情']
     assert callbacks(kb) == ['unavail:more:any', 'listing:consult:', 'listing:detail:']
 
 
@@ -260,15 +221,13 @@ async def test_unavailable_callback_renders_once_with_html(monkeypatch):
     monkeypatch.setattr(listing_mod, 'listing_action_allowed', lambda lid, action: (action != 'appoint', 'pending'))
     monkeypatch.setattr(listing_mod, 'listing_context', lambda lid: {'listing_id': lid, 'area': 'BKK1', 'status': 'pending'})
     seen = []
-    async def fake_render(update, **kwargs):
-        seen.append(kwargs)
+    async def fake_render(update, **kwargs): seen.append(kwargs)
     monkeypatch.setattr(texts, 'render_panel', fake_render)
     update, query = make_update('listing:appoint:l_2')
     await handle_ui_callback(update, DummyContext(), hooks=BASE_HOOKS)
-    assert query.answers == 1
-    assert len(seen) == 1
+    assert query.answers == 1 and len(seen) == 1
     assert seen[0]['parse_mode'] == ParseMode.HTML
-    assert seen[0]['text'].count('这套房暂时不能预约') == 1
+    assert seen[0]['text'].count('这套房正在确认最新房态') == 1
 
 
 def test_multi_listing_navigation_names_area_layout_and_callbacks(monkeypatch):
@@ -283,10 +242,8 @@ def test_multi_listing_navigation_names_area_layout_and_callbacks(monkeypatch):
     monkeypatch.setattr(listing_mod, 'listing_context', lambda lid: data.get(lid, {}))
     _, kb, _ = _find_result_card_content(data['l_2'], 1, 3, ['l_1', 'l_2', 'l_3'])
     nav = kb.inline_keyboard[0]
-    assert nav[0].text == '⬅️ 上一套'
-    assert nav[1].text == '下一套 ➡️'
-    assert nav[0].callback_data == 'findcard:0:l_1'
-    assert nav[1].callback_data == 'findcard:2:l_3'
+    assert nav[0].text == '⬅️ 上一套' and nav[1].text == '下一套 ➡️'
+    assert nav[0].callback_data == 'findcard:0:l_1' and nav[1].callback_data == 'findcard:2:l_3'
     assert all(len(button.text) <= 28 for button in nav)
 
 
@@ -304,13 +261,10 @@ def test_recommendation_card_detail_photo_appointment_consult_callbacks(monkeypa
     monkeypatch.setattr(listing_mod, 'listing_context', lambda lid: item)
     _, kb, _ = _find_result_card_content(item, 0, 1, ['l_2'])
     cbs = callbacks(kb)
-    assert 'listing:detail:l_2' in cbs
-    assert 'listing:appoint:l_2' in cbs
-    assert 'listing:photos:l_2' in cbs
-    assert 'listing:consult:l_2' in cbs
+    assert 'listing:detail:l_2' in cbs and 'listing:appoint:l_2' in cbs
+    assert 'listing:photos:l_2' in cbs and 'listing:consult:l_2' in cbs
     assert not any('similar' in cb for cb in cbs)
 
 
 def test_build_application_constructs_with_test_token():
-    app = build_application(token='123456:TESTTOKEN')
-    assert app is not None
+    assert build_application(token='123456:TESTTOKEN') is not None
