@@ -22,9 +22,10 @@ def _callbacks(markup):
 
 def test_customer_wording_is_unified():
     labels = _labels(main_keyboard())
-    assert '🏠 可预约房源' in labels
-    assert '💬 联系中文顾问' in labels
+    assert labels == ['🔍 帮我找房', '📅 我的预约', '🛡 租房服务', '🛠 入住服务', '💬 联系中文顾问']
     joined = ' '.join(labels)
+    assert '可预约房源' not in joined
+    assert '当前可预约' not in joined
     assert '在架房源' not in joined
     assert '联系我们' not in joined
     assert '管理号' not in joined
@@ -135,6 +136,7 @@ def test_listing_entry_keeps_photo_detail_appointment_links():
         'listing:photos:l_2',
         'listing:detail:l_2',
         'listing:appoint:l_2',
+        'listing:consult:l_2',
         'home_smart_search',
     ]
 
@@ -182,5 +184,5 @@ def test_find_card_keeps_navigation_and_more_photos_cta():
     source = Path('qiaolian_dual/results_admin.py').read_text(encoding='utf-8')
     assert "InlineKeyboardButton('⬅️ 上一套'" in source
     assert "InlineKeyboardButton('下一套 ➡️'" in source
-    assert "InlineKeyboardButton('📸 查看更多实拍'" in source
+    assert "InlineKeyboardButton('📸 更多实拍'" in source
     assert "callback_data=f'listing:photos:{listing_id}'" in source
