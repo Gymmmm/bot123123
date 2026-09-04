@@ -53,6 +53,7 @@ jobs:
             tests/test_channel_standard_contract.py \
             tests/test_listing_detail_status_contract.py \
             tests/test_package_approval_media_count.py \
+            tests/test_wechat_canonical_regressions.py \
             tests/test_noto_font_contract.py \
             tests/test_user_text_hierarchy.py \
             tests/test_second_batch_runtime_contract.py \
