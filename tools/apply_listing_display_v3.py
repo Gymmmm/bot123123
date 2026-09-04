@@ -3,7 +3,7 @@ import re
 
 
 def replace_once(text: str, pattern: str, replacement: str, label: str) -> str:
-    out, n = re.subn(pattern, replacement, text, count=1, flags=re.S)
+    out, n = re.subn(pattern, lambda _m: replacement, text, count=1, flags=re.S)
     if n != 1:
         raise SystemExit(f'{label}: replacement count={n}')
     return out
