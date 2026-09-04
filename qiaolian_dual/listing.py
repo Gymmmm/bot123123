@@ -87,7 +87,7 @@ def _critical_fee(value: str) -> str:
 
 
 def listing_cost_text(listing_id: str) -> str:
-    """决策页：房子 → 租金/租约 → 关键费用 → 侨联说 → 房态。"""
+    """决策页：房子 → 租金/租约 → 侨联说 → 房态。水电进入住服务/租约，不进详情。"""
     from .talk_engine import generate_talk
     from .utils_formatting import _display_floor, _display_layout, _display_listing_id, _fmt_price
 
@@ -105,12 +105,6 @@ def listing_cost_text(listing_id: str) -> str:
     deposit = _known_value(item.get('deposit'), item.get('deposit_rule'), normalized.get('deposit_payment_terms'))
     contract = _known_value(normalized.get('contract_term_display'), normalized.get('contract_term'), item.get('contract_term'))
 
-    electric = _critical_fee(_known_value(item.get('electric_rate'), normalized.get('electric_rate'), normalized.get('electric_fee')))
-    water = _critical_fee(_known_value(item.get('water_rate'), normalized.get('water_rate'), normalized.get('water_fee')))
-    management = _critical_fee(_known_value(normalized.get('management_fee'), normalized.get('property_fee')))
-    internet = _critical_fee(_known_value(normalized.get('internet_fee'), normalized.get('network_fee')))
-    parking = _critical_fee(_known_value(normalized.get('parking_fee')))
-
     lines = [f'📋 <b>租赁详情｜{he(qc)}</b>', '', f'🏠 <b>{he(title)}</b>', f'💰 <b>{he(price)}</b>']
     if size:
         lines.extend(['', f'📐 {he(size)}'])
@@ -119,15 +113,6 @@ def listing_cost_text(listing_id: str) -> str:
     rent_bits = [value for value in (deposit, contract) if value]
     if rent_bits:
         lines.append(f"🔑 {he('｜'.join(rent_bits))}")
-
-    lines.extend([
-        '',
-        f'⚡ 电费：{he(electric)}',
-        f'💧 水费：{he(water)}',
-        f'🏢 物业：{he(management)}',
-        f'🌐 网络：{he(internet)}',
-        f'🚗 停车：{he(parking)}',
-    ])
 
     talk = generate_talk(item, max_points=2, allow_empty=True).strip()
     if talk:
@@ -317,7 +302,7 @@ def _latest_listing_text(limit: int=5) -> str:
     matches = [item for item in db.list_recent_listings(limit) if str(item.get('status') or '').strip().lower() in {'active', 'reserved'}]
     if not matches:
         return '暂时没有可以安排看房的房源。'
-    return '🏘 <b>当前可预约</b>\n\n' + '\n'.join(_daily_listing_line(item) for item in matches[:limit])
+    return '🋡 <b>当前可预约</b>\n\n' + '\n'.join(_daily_listing_line(item) for item in matches[:limit])
 
 
 def _resolve_video_pref_snapshot(context: ContextTypes.DEFAULT_TYPE) -> dict[str, object]:
