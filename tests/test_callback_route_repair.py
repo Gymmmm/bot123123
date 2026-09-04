@@ -130,6 +130,7 @@ async def test_listing_detail_calls_real_detail_route(monkeypatch):
     import qiaolian_dual.search as search_mod
     monkeypatch.setattr(listing_cb.db, 'get_listing', lambda lid: {'listing_id': lid, 'status': 'active'})
     monkeypatch.setattr(listing_mod, 'listing_is_available', lambda lid: (True, 'active'))
+    monkeypatch.setattr(listing_mod, 'listing_action_allowed', lambda lid, action: (True, 'active'))
     monkeypatch.setattr(search_mod, 'create_lead', lambda *a, **k: None)
     monkeypatch.setattr(listing_mod, 'listing_cost_text', lambda lid: '<b>DETAIL</b>')
     seen = {}
@@ -149,11 +150,13 @@ async def test_listing_detail_calls_real_detail_route(monkeypatch):
 @pytest.mark.asyncio
 async def test_listing_appoint_enters_appointment_flow_with_listing_id(monkeypatch):
     import qiaolian_dual.flows as flows
+    import qiaolian_dual.listing as listing_mod
     seen = {}
     async def fake_start(update, context, listing_id, **kwargs):
         seen['listing_id'] = listing_id
         seen.update(kwargs)
         return common.APPT_MODE
+    monkeypatch.setattr(listing_mod, 'listing_is_available', lambda lid: (True, 'active'))
     monkeypatch.setattr(flows, 'start_appointment', fake_start)
     update, query = make_update('listing:appoint:l_2')
     state = await handle_ui_callback(update, DummyContext(), hooks=BASE_HOOKS)
@@ -188,6 +191,7 @@ async def test_listing_photos_calls_complete_album_handler(monkeypatch):
     import qiaolian_dual.results_admin as results
     import qiaolian_dual.listing as listing_mod
     monkeypatch.setattr(listing_mod, 'listing_is_available', lambda lid: (True, 'active'))
+    monkeypatch.setattr(listing_mod, 'listing_action_allowed', lambda lid, action: (True, 'active'))
     seen = {}
     async def fake_album(bot, chat_id, listing_id):
         seen['listing_id'] = listing_id
@@ -205,6 +209,7 @@ async def test_listing_consult_preserves_listing_context(monkeypatch):
     import qiaolian_dual.flows as flows
     import qiaolian_dual.listing as listing_mod
     monkeypatch.setattr(listing_mod, 'listing_is_available', lambda lid: (True, 'active'))
+    monkeypatch.setattr(listing_mod, 'listing_action_allowed', lambda lid, action: (True, 'active'))
     seen = {}
     async def fake_contact(update, context, **kwargs):
         seen.update(kwargs)
@@ -243,8 +248,8 @@ def test_unavailable_page_is_html_and_has_all_real_callbacks():
     text = listing_unavailable_text('pending')
     assert '🏠 <b>这套房暂时不能预约</b>' in text
     kb = listing_unavailable_keyboard('')
-    assert labels(kb) == ['🔍 找附近房源', '💬 联系中文顾问', '🏠 同区推荐', '⬅️ 返回上一页']
-    assert callbacks(kb) == ['findmode:guided', 'appointment_menu:contact', 'unavail:more:any', 'home']
+    assert labels(kb) == ['🔍 同区可预约房源', '💬 联系中文顾问', '📋 租赁详情']
+    assert callbacks(kb) == ['unavail:more:any', 'listing:consult:', 'listing:detail:']
 
 
 @pytest.mark.asyncio
@@ -252,12 +257,13 @@ async def test_unavailable_callback_renders_once_with_html(monkeypatch):
     import qiaolian_dual.listing as listing_mod
     import qiaolian_dual.texts as texts
     monkeypatch.setattr(listing_mod, 'listing_is_available', lambda lid: (False, 'pending'))
+    monkeypatch.setattr(listing_mod, 'listing_action_allowed', lambda lid, action: (action != 'appoint', 'pending'))
     monkeypatch.setattr(listing_mod, 'listing_context', lambda lid: {'listing_id': lid, 'area': 'BKK1', 'status': 'pending'})
     seen = []
     async def fake_render(update, **kwargs):
         seen.append(kwargs)
     monkeypatch.setattr(texts, 'render_panel', fake_render)
-    update, query = make_update('listing:open:l_2')
+    update, query = make_update('listing:appoint:l_2')
     await handle_ui_callback(update, DummyContext(), hooks=BASE_HOOKS)
     assert query.answers == 1
     assert len(seen) == 1
@@ -273,13 +279,12 @@ def test_multi_listing_navigation_names_area_layout_and_callbacks(monkeypatch):
         'l_3': {'listing_id': 'l_3', 'area': '永旺1', 'layout': '1房', 'property_type': '公寓', 'status': 'active', 'price': 700},
     }
     monkeypatch.setattr(results, 'listing_context', lambda lid: data.get(lid, {}), raising=False)
-    # _find_result_card_content imports listing_context locally; patch source module too.
     import qiaolian_dual.listing as listing_mod
     monkeypatch.setattr(listing_mod, 'listing_context', lambda lid: data.get(lid, {}))
     _, kb, _ = _find_result_card_content(data['l_2'], 1, 3, ['l_1', 'l_2', 'l_3'])
     nav = kb.inline_keyboard[0]
-    assert 'BKK1' in nav[0].text and '1房' in nav[0].text
-    assert '永旺1' in nav[1].text and '1房' in nav[1].text
+    assert nav[0].text == '⬅️ 上一套'
+    assert nav[1].text == '下一套 ➡️'
     assert nav[0].callback_data == 'findcard:0:l_1'
     assert nav[1].callback_data == 'findcard:2:l_3'
     assert all(len(button.text) <= 28 for button in nav)
