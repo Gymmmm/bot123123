@@ -8,11 +8,13 @@ def _search_type_button_rows() -> list[list[InlineKeyboardButton]]:
 def search_entry_keyboard() -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
     rows.extend(_search_type_button_rows())
+    rows.append([InlineKeyboardButton('🊘 当前可预约', callback_data='hub:available')])
     rows.append([InlineKeyboardButton('🏠 返回首页', callback_data='home')])
     return InlineKeyboardMarkup(rows)
 
 def guided_search_keyboard() -> InlineKeyboardMarkup:
     rows = list(_search_type_button_rows())
+    rows.append([InlineKeyboardButton('🊘 当前可预约', callback_data='hub:available')])
     rows.append([InlineKeyboardButton('🏠 返回首页', callback_data='home')])
     return InlineKeyboardMarkup(rows)
 
@@ -106,7 +108,7 @@ def rfcity_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([[InlineKeyboardButton('🍴 餐厅小吃', callback_data='rfcity:restaurant'), InlineKeyboardButton('🔥 烧烤夜宵', callback_data='rfcity:bbq')], [InlineKeyboardButton('🥤 奶茶饮品', callback_data='rfcity:drinks'), InlineKeyboardButton('🛒 超市便利', callback_data='rfcity:supermarket')], [InlineKeyboardButton('🏨 酒店租房', callback_data='rfcity:hotel'), InlineKeyboardButton('🏋️ 休闲生活', callback_data='rfcity:recreation')], [InlineKeyboardButton('🚛 快递物流', callback_data='rfcity:logistics'), InlineKeyboardButton('👨‍💻 富力物业', callback_data='rfcity:property')], [InlineKeyboardButton('⬅️ 返回周边生活', callback_data='service:local_life')]])
 
 def rfcity_back_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([[InlineKeyboardButton('🏙 返回富力周边', callback_data='local:rfcity')]])
+    return InlineKeyboardMarkup([[InlineKeyboardButton('🎙 返回富力周边', callback_data='local:rfcity')]])
 
 def merchant_join_keyboard() -> InlineKeyboardMarkup:
     from .keyboards_common import _advisor_tg_url
@@ -118,5 +120,5 @@ def merchant_join_keyboard() -> InlineKeyboardMarkup:
     else:
         rows.append([InlineKeyboardButton('📩 提交商家信息', callback_data='service:contact')])
         rows.append([InlineKeyboardButton('💬 联系侨联合作', callback_data='service:contact')])
-    rows.append([InlineKeyboardButton('🏙 返回富力周边', callback_data='local:rfcity')])
+    rows.append([InlineKeyboardButton('🎙 返回富力周边', callback_data='local:rfcity')])
     return InlineKeyboardMarkup(rows)
