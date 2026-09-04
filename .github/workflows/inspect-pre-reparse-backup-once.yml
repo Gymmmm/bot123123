@@ -42,11 +42,11 @@ jobs:
           for label,path in DBS:
               conn=sqlite3.connect(f'file:{path}?mode=ro', uri=True)
               totals=collections.Counter(); locations=collections.Counter()
-              tables=[r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")]
+              tables=[r[0] for r in conn.execute('SELECT name FROM sqlite_master WHERE type=? AND name NOT LIKE ?',('table','sqlite_%'))]
               for table in tables:
-                  cols=[r[1] for r in conn.execute(f'PRAGMA table_info("{table}")')]
+                  cols=[r[1] for r in conn.execute('PRAGMA table_info('+table+')')]
                   if not cols: continue
-                  try: rows=conn.execute(f'SELECT * FROM "{table}"')
+                  try: rows=conn.execute('SELECT * FROM '+table)
                   except sqlite3.Error: continue
                   for row in rows:
                       for col,val in zip(cols,row):
