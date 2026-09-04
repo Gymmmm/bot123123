@@ -12,6 +12,7 @@ from .callback_search import handle_search_callback, matches as matches_search
 from .callback_contract import handle_contract_callback, matches as matches_contract
 from .callback_appointment import handle_appointment_callback, matches as matches_appointment
 from .callback_preference import handle_preference_callback, matches as matches_preference
+from .callback_rental import handle_rental_callback, matches as matches_rental
 from .callback_service import handle_service_callback, matches as matches_service
 from .callback_listing import handle_listing_callback, matches as matches_listing
 from .admin_contract_ui import handle_callback as handle_admin_contract_callback, matches as matches_admin_contract
@@ -36,6 +37,9 @@ async def handle_ui_callback(update: Update, context: ContextTypes.DEFAULT_TYPE,
             (matches_contract, handle_contract_callback),
             (matches_appointment, handle_appointment_callback),
             (matches_preference, handle_preference_callback),
+            # Rental service comes before legacy service so old
+            # service:handover/service:deposit buttons resolve to the new flow.
+            (matches_rental, handle_rental_callback),
             (matches_service, handle_service_callback),
             (matches_listing, handle_listing_callback),
         )
