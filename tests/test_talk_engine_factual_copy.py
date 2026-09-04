@@ -46,9 +46,9 @@ def test_fee_summary_leaves_room_for_one_real_service_point():
     }
     lines = generate_talk(listing, max_points=2).splitlines()
     assert len(lines) == 2
-    assert "物业包了" in lines[0]
-    assert "电费$0.25/度" in lines[0]
-    assert "灭虫" in lines[1]
+    assert "灭虫" in lines[0]
+    assert "保洁" in lines[1]
+    assert "电费$0.25/度" not in lines[0]
 
 
 def test_no_supported_fact_means_no_automatic_talk():

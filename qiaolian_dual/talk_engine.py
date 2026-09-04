@@ -280,15 +280,15 @@ def generate_talk(listing: dict[str, Any], max_points: int = 2, allow_empty: boo
     listing_id = str(listing.get("listing_id") or listing.get("id") or listing.get("title") or "listing")
     lines: list[str] = []
 
-    cost_line = _cost_talk_line(listing)
-    if cost_line:
-        lines.append(cost_line)
-
-    remaining = max(0, max_points - len(lines))
-    selected = choose_talk_tags(detect_talk_tags(listing), max_points=remaining)
+    selected = choose_talk_tags(detect_talk_tags(listing), max_points=max_points)
     for tag in selected:
         if TALK_LIBRARY.get(tag):
             lines.append(_stable_choice(TALK_LIBRARY[tag], listing_id, tag))
+
+    if len(lines) < max_points:
+        cost_line = _cost_talk_line(listing)
+        if cost_line:
+            lines.append(cost_line)
 
     if not lines:
         return "" if allow_empty else "具体条件按上面的房源资料来，有合适的再约现场看。"

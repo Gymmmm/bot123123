@@ -2647,6 +2647,65 @@ def build_detail_text(d: dict, caption_variant: str | None = None) -> str:
     return build_chinese_listing_post(d, caption_variant=caption_variant)
 
 
+def build_channel_caption(d: dict, album_paths: list[str], caption_variant: str | None = "a") -> str:
+    """频道主帖 V3：字段多分层，字段少自动压缩；标签继续沿用生产规则。"""
+    from qiaolian_dual.channel_links import public_qc_code
+
+    legacy = _build_channel_caption_legacy(d, album_paths, caption_variant=caption_variant)
+    hashtag_lines = [line.strip() for line in str(legacy or '').splitlines() if line.strip().startswith('#')]
+
+    def val(*keys):
+        for key in keys:
+            value = str(d.get(key) or '').strip()
+            if value and value not in {'待确认','暂无','未知','-','--'}:
+                return value
+        return ''
+
+    project = val('project','community','area') or '金边房源'
+    layout = _display_layout(val('layout','room_type','property_type'), val('property_type'))
+    title = '｜'.join(x for x in (project, layout) if x)
+    raw_price = d.get('price') or d.get('rent') or d.get('monthly_rent')
+    try:
+        number = float(str(raw_price).replace('$','').replace(',',''))
+        price = f"${number:,.0f}/月"
+    except Exception:
+        price = f"${raw_price}/月" if raw_price else ''
+
+    property_type = val('property_type')
+    size = val('size_sqm','size','area_sqm')
+    if size and '㎡' not in size: size += '㎡'
+    floor = val('floor')
+    floor_display = floor if not floor or '楼' in floor else floor + '楼'
+    deposit = val('deposit','deposit_rule')
+    lease = val('contract_term','lease_term','lease')
+
+    basic = [x for x in (property_type, size, floor_display) if x]
+    rental = [x for x in (deposit, (f'租期{lease}' if lease else '')) if x]
+    lines = [f'🏠 {title}']
+    if price: lines.append(f'💰 {price}')
+
+    if len(basic) + len(rental) <= 2:
+        compact = basic + rental
+        if compact: lines.extend(['', '🏢 ' + '｜'.join(compact)])
+    else:
+        if basic: lines.extend(['', '🏢 ' + '｜'.join(basic)])
+        if rental: lines.append('🔑 ' + '｜'.join(rental))
+
+    status = val('status').lower()
+    status_map = {
+        'active': ('🟢','当前可预约'), 'reserved': ('🟡','已有预约 · 仍可预约'),
+        'pending': ('🔵','房态确认中'), 'rented': ('🔴','已租出'),
+        'inactive': ('⚫','已下架'), 'offline': ('⚫','已下架'),
+    }
+    icon, status_text = status_map.get(status, ('🟢', val('status_text') or '当前可预约'))
+    code = public_qc_code(val('listing_id','id','code'))
+    lines.extend(['', f'{icon} {status_text}' + (f'　{code}' if code else '')])
+
+    if hashtag_lines:
+        lines.extend(['', hashtag_lines[-1]])
+    return '\n'.join(lines)[:1024]
+
+
 def build_rich_album_caption(d: dict, caption_variant: str | None = None) -> str:
     """频道主帖文案：固定中文租房结构，不展示内部编号或模板名。"""
     return build_chinese_listing_post(d, caption_variant=caption_variant)
@@ -3103,7 +3162,7 @@ async def send_discussion_three_segments(
 
     return sent_any, sent_extra_photos
 
-def build_channel_caption(
+def _build_channel_caption_legacy(
     d: dict,
     album_paths: list[str],
     caption_variant: str | None = None,
@@ -3145,7 +3204,7 @@ def build_keyboard(
     public_listing_id = display_listing_id(listing_id)
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("📋 租赁详情", url=f"{base_url}property_{public_listing_id}_details"),
+            InlineKeyboardButton("🏠 房源详情", url=f"{base_url}property_{public_listing_id}_details"),
             InlineKeyboardButton("📸 更多实拍", url=f"{base_url}property_{public_listing_id}_photos"),
         ],
         [InlineKeyboardButton("📅 预约看房", url=f"{base_url}property_{public_listing_id}_book")],

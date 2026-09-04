@@ -87,50 +87,45 @@ def _critical_fee(value: str) -> str:
 
 
 def listing_cost_text(listing_id: str) -> str:
-    """房源决策页：基础信息 → 侨联说 → 房态。"""
+    """房源详情：有事实才显示；信息少也保持紧凑，不用“待确认”撑版面。"""
     from .talk_engine import generate_talk
-    from .utils_formatting import _display_floor, _display_layout, _fmt_price
+    from .utils_formatting import _display_floor, _display_layout, _display_listing_id, _fmt_price
 
     item = listing_context(listing_id)
     normalized = _normalized_facts(item)
-    project = _known_value(item.get('project'), item.get('community'), item.get('area'))
+    area = _known_value(item.get('area'), item.get('community'))
     layout = _known_value(_display_layout(item.get('layout') or item.get('property_type'), item.get('property_type')))
-    title = '｜'.join(value for value in (project, layout) if value) or '这套房'
-    price = _fmt_price(item.get('price')) if item.get('price') not in (None, '', 0, '0') else '待确认'
+    price = _fmt_price(item.get('price')) if item.get('price') not in (None, '', 0, '0') else ''
     size = _known_value(item.get('size_sqm'), item.get('size'))
     if size and '㎡' not in size:
         size += '㎡'
     floor = _display_floor(item.get('floor'))
     deposit = _known_value(item.get('deposit'), item.get('deposit_rule'), normalized.get('deposit_payment_terms'))
     contract = _known_value(normalized.get('contract_term_display'), normalized.get('contract_term'), item.get('contract_term'))
+    lease = ' · '.join(v for v in (deposit, contract) if v)
+    qc = _display_listing_id(listing_id)
+    status = str(item.get('status') or 'pending').strip().lower()
+    status_text = {
+        'active': '当前可预约', 'reserved': '已有预约 · 仍可预约', 'pending': '房态确认中',
+        'rented': '已租出', 'inactive': '已下架', 'offline': '已下架',
+    }.get(status, '房态确认中')
+    status_icon = {'active':'🟢','reserved':'🟡','pending':'🔵','rented':'🔴','inactive':'⚫','offline':'⚫'}.get(status, '🔵')
 
-    lines = ['🏠 <b>房源详情</b>', '', f'<b>{he(title)}</b>', f'💰 租金：<b>{he(price)}</b>']
-    if size:
-        lines.append(f'📐 面积：{he(size)}')
-    if floor:
-        lines.append(f'🏢 楼层：{he(floor)}')
-    if contract:
-        lines.append(f'📅 租期：{he(contract)}')
-    if deposit:
-        lines.append(f'🔐 押金：{he(deposit)}')
+    lines = ['🏠 <b>房源详情</b>', '']
+    if area: lines.append(f'🏠 区域：{he(area)}')
+    if layout: lines.append(f'🛏 户型：{he(layout)}')
+    if price: lines.append(f'💰 租金：{he(price)}')
+    if size: lines.append(f'📐 面积：{he(size)}')
+    if floor: lines.append(f'🏢 楼层：{he(floor)}')
+    if lease: lines.append(f'🔑 租约：{he(lease)}')
+    lines.append(f'{status_icon} 房态：{he(status_text)}')
+    if qc: lines.append(f'📸 实拍：{he(qc)}')
 
     talk = generate_talk(item, max_points=2, allow_empty=True).strip()
     if talk:
         safe_talk = '\n'.join(he(line) for line in talk.splitlines() if line.strip())
-        lines.extend(['', '💬 <b>侨联说</b>', safe_talk])
-
-    status = str(item.get('status') or 'pending').strip().lower()
-    status_text = {
-        'active': '🟢 当前可预约',
-        'reserved': '🟡 已有预约 · 仍可预约',
-        'pending': '🔵 房态确认中',
-        'rented': '🔴 已租出',
-        'inactive': '⚫ 已下架',
-        'offline': '⚫ 已下架',
-    }.get(status, '🔵 房态确认中')
-    lines.extend(['', '<b>房态</b>', status_text])
+        lines.extend(['', '💬 <b>侨联说</b>', '', safe_talk])
     return '\n'.join(lines)
-
 
 def listing_cost_keyboard(listing_id: str) -> InlineKeyboardMarkup:
     status = str(listing_context(listing_id).get('status') or 'pending').strip().lower()
@@ -158,7 +153,7 @@ def listing_entry_text(listing_id: str) -> str:
 def listing_entry_keyboard(listing_id: str) -> InlineKeyboardMarkup:
     status = str(listing_context(listing_id).get('status') or 'active').strip().lower()
     rows = [[
-        InlineKeyboardButton('📋 租赁详情', callback_data=f'listing:detail:{listing_id}'),
+        InlineKeyboardButton('🏠 房源详情', callback_data=f'listing:detail:{listing_id}'),
         InlineKeyboardButton('📸 更多实拍', callback_data=f'listing:photos:{listing_id}'),
     ]]
     if status in {'active', 'reserved'}:
@@ -225,7 +220,7 @@ def listing_unavailable_keyboard(listing_id: str='') -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton('🏘 同区可约房源', callback_data=f'unavail:more:{area_token}')],
         [InlineKeyboardButton('💬 联系我们', callback_data=f'listing:consult:{listing_id}')],
-        [InlineKeyboardButton('📋 租赁详情', callback_data=f'listing:detail:{listing_id}')],
+        [InlineKeyboardButton('🏠 房源详情', callback_data=f'listing:detail:{listing_id}')],
     ])
 
 
@@ -318,7 +313,7 @@ def _video_match_keyboard(matches: list[dict]) -> InlineKeyboardMarkup:
     for item in matches[:2]:
         listing_id = str(item.get('listing_id') or '').strip()
         if listing_id:
-            rows.append([InlineKeyboardButton('📋 租赁详情', callback_data=f'listing:detail:{listing_id}')])
+            rows.append([InlineKeyboardButton('🏠 房源详情', callback_data=f'listing:detail:{listing_id}')])
     rows.append([InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')])
     rows.append([InlineKeyboardButton('🔍 继续找房', callback_data='home_smart_search')])
     return InlineKeyboardMarkup(rows)
