@@ -5,20 +5,21 @@ from .common import *
 
 def welcome_text() -> str:
     return (
-        '👋 你好，我是侨联小管家\n\n'
-        '想找房、约看房，或者已经入住了，\n'
-        '有需要直接找我就可以。'
+        '🏠 <b>侨联地产｜您在金边的自己人</b>\n\n'
+        '在金边租房，找到房子只是第一步。\n\n'
+        '房子怎么样？费用怎么算？押金怎么退？住进去以后谁来帮？\n\n'
+        '这些容易踩坑的地方，侨联先帮您看清楚。\n\n'
+        '您可以直接告诉我需求：\n\n'
+        '「BKK1 两房，$800以内」\n'
+        '「富力城一房，要能做饭」\n'
+        '「想住安静一点，高楼层」\n'
+        '「先帮我看看房子视频」\n\n'
+        '您说需求，我们帮您筛。\n\n'
+        '👇 也可以直接选择'
     )
 
 def channel_welcome_text(first_name: str='') -> str:
-    name = str(first_name or '').strip()
-    if not name:
-        return welcome_text()
-    return (
-        f'👋 你好 <b>{he(name)}</b>，我是侨联小管家\n\n'
-        '想找房、约看房，或者已经入住了，\n'
-        '有需要直接找我就可以。'
-    )
+    return welcome_text()
 
 def discussion_entry_welcome_text(first_name: str='', listing_id: str='') -> str:
     return copy_discussion_entry_welcome_text(first_name=first_name, listing_id=listing_id)
@@ -82,13 +83,13 @@ async def render_panel(update: Update, *, text: str, reply_markup: InlineKeyboar
         context.user_data[PANEL_ANCHOR_KEY] = {'chat_id': int(sent.chat_id), 'message_id': int(sent.message_id)}
 
 def promise_text() -> str:
-    return ('🛡 <b>租期服务保障</b>\n\n绑定租客档案后：\n• 租约到期前 <b>7 天</b>提醒你查看租约并联系顾问\n• 报修提交即生成工单，处理进度会通知你\n\n每一项都有记录，不只是口头跟进。')
+    return ('🛡 <b>侨联保障</b>\n\n重要的事，先帮您看清楚。\n费用、入住留档和退租核对，都尽量提前说清。')
 
 def deposit_text() -> str:
     return copy_deposit_text()
 
 def advisor_text() -> str:
-    return ('✅ <b>顾问已收到</b>\n\n顾问会通过 Telegram 联系你。\n如果是具体房源，房源信息会自动带上，不用重复说明。')
+    return ('💬 <b>联系我们</b>\n\n有什么需要，直接告诉我们。\n具体房源会自动带上，不用重复说明。')
 
 def advisor_handoff_text(*, listing_id: str='', user_id: int | None=None) -> str:
     from .admin_contract import _binding_end_date
@@ -100,7 +101,7 @@ def advisor_handoff_text(*, listing_id: str='', user_id: int | None=None) -> str
         area = str(item.get('area') or '金边')
         layout = _display_layout(item.get('layout') or item.get('property_type'), item.get('property_type')) or '房源'
         price_text = _fmt_price(item.get('price'))
-        return f"✅ <b>顾问已收到</b>\n\n🏠 <b>{he(area)}｜{he(layout)}</b>\n💰 <b>租金：{he(price_text)}</b>\n\n房源信息已经带上，不用再重复发送。"
+        return f"💬 <b>已记录您咨询的房源</b>\n\n🏠 <b>{he(area)}｜{he(layout)}</b>\n💰 <b>{he(price_text)}</b>\n\n房源信息已经带上，不用重新说明。"
     if user_id:
         binding = db.get_active_binding(user_id)
         if binding:
@@ -112,31 +113,39 @@ def advisor_handoff_text(*, listing_id: str='', user_id: int | None=None) -> str
             if end_date:
                 facts.append(f"📅 <b>到期：</b> {he(end_date)}")
             details = ('\n\n' + '\n'.join(facts)) if facts else ''
-            return f"✅ <b>顾问已收到</b>{details}\n\n顾问会按你当前的租约继续跟进。"
+            return f"💬 <b>联系我们</b>{details}\n\n我们会按您当前的租约继续跟进。"
     return advisor_text()
 
 def smart_search_text() -> str:
     return copy_smart_search_text()
 
 def about_text() -> str:
-    return copy_about_text().replace('联系我们：', '联系中文顾问：')
+    return (
+        '🏠 <b>关于侨联</b>\n\n'
+        '来到金边，很多事情都需要重新熟悉。\n\n'
+        '从住哪里、怎么租，到签约、入住，再到日常生活中遇到的问题。\n\n'
+        '侨联想做的，不只是给您发几套房源。\n\n'
+        '找房时，帮您多看一步；\n'
+        '签约时，帮您多问一句；\n'
+        '住下以后，有事还能找到人。\n\n'
+        '认识侨联 · 选择侨联 · 信赖侨联\n\n'
+        '我们希望成为您在金边，愿意长期联系的那个自己人。'
+    )
 
 def brand_story_text() -> str:
-    return copy_brand_text()
+    return about_text()
 
 def help_text() -> str:
     return (
         '❓ <b>怎么使用</b>\n\n'
-        '找房：点“帮我找房”，选择类型、位置和预算。\n'
-        '看房：打开一套可预约房源，点“预约看房”，选择日期和时间后直接提交。\n'
-        '视频：进入预约日期页后，可切换“实时视频看房”。\n'
-        '咨询：点“联系中文顾问”，具体房源会自动带上。\n'
-        '入住后：报修、物业沟通和周边生活都在“入住服务”。\n'
-        '租约：已绑定租客档案的客户，会在到期前 7 天收到提醒。'
+        '找房：点“帮我找房”，也可以直接发区域、预算和户型。\n'
+        '看房：从具体房源点“预约看房”，日期页可切换实地/视频。\n'
+        '咨询：所有页面统一点“联系我们”。\n'
+        '入住后：报修、物业和生活服务都在“入住服务”。'
     )
 
 def service_hub_text() -> str:
-    return ('🛠 <b>入住服务</b>\n\n房子有问题或需要物业沟通，直接点下面办理。\n已绑定租约时会自动带上房屋信息，不用重复说明。')
+    return ('🛠 <b>入住服务</b>\n\n住下以后，有事也可以找侨联。\n住房或生活上的问题，都可以先问问我们。')
 
 def local_life_text() -> str:
     return copy_local_life_text()
