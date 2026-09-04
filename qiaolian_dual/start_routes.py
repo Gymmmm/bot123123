@@ -54,12 +54,7 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
     post_token = str(payload.get('post_token') or '')
     channel_message_id = payload.get('channel_message_id')
     source = build_source_label(post_token)
-    touch_payload = {
-        'start_arg': arg,
-        'post_token': post_token,
-        'channel_message_id': channel_message_id,
-        'first_touch_action': action,
-    }
+    touch_payload = {'start_arg': arg, 'post_token': post_token, 'channel_message_id': channel_message_id, 'first_touch_action': action}
     if target_meta:
         touch_payload['target_meta'] = target_meta
 
@@ -122,14 +117,14 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
 
     if action in {'index_area', 'area_index'}:
         context.user_data['search_pref'] = {'source': 'channel_index', 'goal': 'any', 'touch_payload': touch_payload}
-        await message.reply_text('📍 <b>想住哪里？</b>\n\n选一个大概位置就行。', parse_mode=ParseMode.HTML, reply_markup=find_area_keyboard())
+        await message.reply_text('📍 <b>想住在哪个区域？</b>', parse_mode=ParseMode.HTML, reply_markup=find_area_keyboard())
         return FIND_AREA
     if action == 'index_budget':
         context.user_data['search_pref'] = {'source': 'channel_index', 'goal': 'any', 'area': '', 'touch_payload': touch_payload}
-        await message.reply_text('💰 <b>每月预算大概多少？</b>\n\n单位：USD / 月', parse_mode=ParseMode.HTML, reply_markup=find_budget_keyboard('any'))
+        await message.reply_text('💰 <b>您的月租预算是多少？</b>', parse_mode=ParseMode.HTML, reply_markup=find_budget_keyboard('any'))
         return FIND_BUDGET
     if action == 'index_layout':
-        await message.reply_text('🛏 <b>想要什么户型？</b>', parse_mode=ParseMode.HTML, reply_markup=room_type_keyboard())
+        await message.reply_text('🏠 <b>需要几房？</b>', parse_mode=ParseMode.HTML, reply_markup=room_type_keyboard())
         return MAIN
     if action in {'index_latest', 'latest'}:
         await message.reply_text(_latest_listing_text(), parse_mode=ParseMode.HTML, reply_markup=latest_listing_keyboard())
@@ -143,10 +138,9 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
         return await show_service_hub(update, context)
 
     if action == 'tenant_bind':
-        # 历史深链仍可由顾问发给客户完成后台核实绑定；首页不再暴露自助绑定按钮。
         binding = db.bind_by_code(user.id, target)
         if not binding:
-            await message.reply_text('这个绑定链接已失效或已使用过。\n请联系中文顾问核对。', reply_markup=contact_handoff_keyboard())
+            await message.reply_text('这个绑定链接已失效或已使用过。\n请联系我们核对。', reply_markup=contact_handoff_keyboard())
             return MAIN
         create_lead(user, action='tenant_bind_success', source='tenant_bind', listing_id=str(binding.get('property_name') or ''), payload={'binding_code': target, 'binding_id': binding.get('id')})
         await message.reply_text('✅ <b>租约档案已核对</b>\n\n' + _binding_contract_text(binding, user.id), parse_mode=ParseMode.HTML, reply_markup=_contract_actions_keyboard(user.id))
@@ -172,7 +166,6 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
         context.user_data['contact_listing_id'] = listing_id
         create_lead(user, action='discussion_entry_click', source='discussion_entry', listing_id=listing_id, payload=touch_payload)
         await _notify_admins(context, title='讨论区入口点击', lines=[f'用户：{_user_mention_html(user)}', f'联系方式：{he(_user_contact_text(user))}', f'房源：{he(_display_listing_id(listing_id))}'])
-        # 讨论区进入仍展示当前房源上下文；预约是否可用由按钮层按房态决定。
         if not db.get_listing(listing_id):
             await message.reply_text('这套房源目前无法找到。', reply_markup=no_match_followup_keyboard())
             return MAIN
@@ -185,7 +178,7 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
             return None
         db.favorite_listing(user.id, listing_id, now_ts())
         create_lead(user, action='favorite_click', source=source, listing_id=listing_id, payload=touch_payload)
-        await message.reply_text('❤️ 这套先帮你记下了。', reply_markup=listing_entry_keyboard(listing_id))
+        await message.reply_text('❤️ 这套先帮您记下了。', reply_markup=listing_entry_keyboard(listing_id))
         return MAIN
 
     if action in {'more', 'similar'}:
@@ -198,7 +191,7 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
             from .results_admin import send_find_results_as_cards
             await send_find_results_as_cards(update, context, matches_found, 'strict')
         else:
-            await message.reply_text('当前同区域暂时没有可预约房源。\n可以调整条件，或联系中文顾问继续留意。', reply_markup=no_match_followup_keyboard())
+            await message.reply_text('当前同区域暂时没有可预约房源。\n可以调整条件，或联系我们继续留意。', reply_markup=no_match_followup_keyboard())
         return MAIN
 
     if action == 'video':
@@ -206,7 +199,6 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
         info = listing_context(listing_id)
         area = str(info.get('area') or '')
         create_lead(user, action='video_click', source=source, listing_id=listing_id, area=area, payload=touch_payload)
-        # 视频不是独立产品，最终仍回到具体房源预约链路。
         if listing_id and listing_is_available(listing_id)[0]:
             return await start_appointment(update, context, listing_id, source=source, touch_payload=touch_payload, initial_mode='video')
         return await start_video_tour_flow(update, context, source=source, area=area)
@@ -214,7 +206,6 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
     if action == 'find_home':
         return await show_search_entry(update, context)
 
-    # 旧品牌/关于深链只保留兼容，不影响首页；明确请求时仍可查看内容。
     if action in {'brand', 'about', 'want_home', 'ask'}:
         create_lead(user, action=f'{action}_click', source=source, payload=touch_payload)
         if action == 'brand':
@@ -249,10 +240,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE, *, upsert_us
         if state is not None:
             return state
         clear_session_for_fresh_entry(context)
-        await update.effective_message.reply_text('这个房源入口已经失效。\n\n可以返回找房，或联系中文顾问确认。', parse_mode=ParseMode.HTML, reply_markup=no_match_followup_keyboard())
+        await update.effective_message.reply_text('这个链接已经失效或房源信息已更新。\n\n您可以重新找房，或直接联系我们。', parse_mode=ParseMode.HTML, reply_markup=no_match_followup_keyboard())
         return MAIN
 
-    # 无论是否已绑定租约，直接打开 Bot 都先进入统一五键首页。
     clear_session_for_fresh_entry(context)
     context.user_data.clear()
     await update.effective_message.reply_text(
