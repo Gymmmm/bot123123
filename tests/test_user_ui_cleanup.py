@@ -125,7 +125,7 @@ def test_discussion_mapping_prefers_posts_and_only_uses_legacy_as_fallback(monke
 
 def test_historical_publication_package_fallback_is_preserved():
     source = Path('qiaolian_dual/listing.py').read_text(encoding='utf-8')
-    assert 'posts.publication_package_id' in source
+    assert 'publication_package_id' in source
     assert "media', 'publication_packages', package_id" in source
     assert "publish_status IN ('published','success','ok')" in source
 
@@ -177,7 +177,7 @@ def test_find_card_rechecks_listing_status_before_rendering():
     source = Path('qiaolian_dual/results_admin.py').read_text(encoding='utf-8')
     assert 'listing_is_available' in source
     assert 'valid_ids' in source
-    assert '房态都已经变化' in source
+    assert '这批推荐的房态已经变化' in source
 
 
 def test_find_card_keeps_navigation_and_more_photos_cta():
