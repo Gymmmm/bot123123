@@ -18,4 +18,5 @@ jobs:
       - name: Dispatch guarded production deploy
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run qiaolian-production-deploy.yml --ref codex/qiaolian-ui-cleanup-20260829 -f confirm=DEPLOY
+          GH_REPO: Gymmmm/bot123123
+        run: gh workflow run qiaolian-production-deploy.yml --repo "$GH_REPO" --ref codex/qiaolian-ui-cleanup-20260829 -f confirm=DEPLOY
