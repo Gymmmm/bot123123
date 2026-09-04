@@ -8,7 +8,7 @@ def old_tenant_binding_text(user_id: int) -> tuple[str, dict | None]:
     from .admin_contract import _binding_contract_text
     binding = db.get_active_binding(user_id)
     if not binding:
-        return ('目前还没有绑定租约档案。\n\n如果是通过侨联入住的房源，联系中文顾问核对房号后即可补上。', None)
+        return ('目前还没有绑定租约档案。\n\n如果是通过侨联入住的房源，联系我们核对房号后即可补上。', None)
     return ('✅ 已识别侨联租约档案\n\n' + _binding_contract_text(binding), binding)
 
 
@@ -40,8 +40,7 @@ def _appointment_listing_compact(value: object) -> str:
 
 def _appointment_card_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton('🔎 查看预约', callback_data='appointment_menu:details')],
-        [InlineKeyboardButton('💬 联系中文顾问', callback_data='appointment_menu:contact')],
+        [InlineKeyboardButton('🔎 查看详情', callback_data='appointment_menu:details'), InlineKeyboardButton('💬 联系我们', callback_data='appointment_menu:contact')],
     ])
 
 
@@ -75,15 +74,23 @@ def _appointment_summary_line(row: dict) -> list[str]:
     from .utils_formatting import _display_layout
     mode = APPOINTMENT_MODE_LABELS.get(str(row.get('viewing_mode') or ''), str(row.get('viewing_mode') or '待确认'))
     time_label = _appointment_time_compact(row.get('appointment_time'))
-    status = APPOINTMENT_STATUS_LABELS.get(str(row.get('status') or ''), str(row.get('status') or '待确认'))
-    status_icon = {'待确认': '🟡', '已确认': '🟢', '顾问联系中': '🔵', '已完成': '✅', '已取消': '⚪', '未到场': '🔴'}.get(status, '🟡')
+    raw_status = str(row.get('status') or 'pending')
+    status_map = {
+        'pending': ('🟡', '等待确认'),
+        'assigned': ('🟡', '等待确认'),
+        'contacted': ('🟡', '等待确认'),
+        'confirmed': ('🟢', '预约已确认'),
+        'done': ('🔵', '看房已完成'),
+        'cancelled': ('⚪', '已取消'),
+    }
+    status_icon, status = status_map.get(raw_status, ('🟡', APPOINTMENT_STATUS_LABELS.get(raw_status, '等待确认')))
     listing_id = str(row.get('listing_id') or '')
     item = listing_context(listing_id) if listing_id else {}
     project = str(item.get('project') or item.get('community') or item.get('area') or '').strip()
     layout = _display_layout(item.get('layout') or item.get('property_type'), item.get('property_type')) if item else ''
     subject = '｜'.join(value for value in (project, layout) if value) or _appointment_listing_compact(listing_id)
     qc = _appointment_listing_compact(listing_id)
-    mode_icon = '🎥' if str(row.get('viewing_mode') or '') == 'video' else '👀'
+    mode_icon = '🎥' if str(row.get('viewing_mode') or '') == 'video' else '🚶'
     return [
         f'{status_icon} <b>{he(status)}</b>',
         f'🏠 <b>{he(subject)}</b>',
@@ -97,10 +104,8 @@ def list_recent_appointments(user_id: int) -> str:
     rows = db.list_appointments(user_id, limit=20)
     if not rows:
         return (
-            '📅 <b>我的预约</b>\n\n'
-            '目前还没有看房预约。\n\n'
-            '看到合适的房源后，\n'
-            '点「预约看房」就可以直接选时间。'
+            '📅 <b>目前还没有看房预约</b>\n\n'
+            '看到喜欢的房源，点击「预约看房」就可以提交。'
         )
     rows = sorted(rows, key=_appointment_sort_key, reverse=True)
     upcoming = [row for row in rows if _appointment_is_upcoming(row)]
@@ -115,7 +120,6 @@ def list_recent_appointments(user_id: int) -> str:
         if upcoming:
             parts.append('')
         parts.append(f'📁 历史预约 · {len(history)} 条')
-        parts.append('已完成和已取消的记录不显示修改或取消动作。')
     return '\n'.join(parts)
 
 
@@ -134,8 +138,8 @@ def _appointment_details_keyboard(user_id: int) -> InlineKeyboardMarkup:
                 listing_id = str(row.get('listing_id') or '')
                 if listing_id:
                     buttons.append([
-                        InlineKeyboardButton('📋 租赁详情', callback_data=f'listing:detail:{listing_id}'),
-                        InlineKeyboardButton('💬 联系中文顾问', callback_data=f'listing:consult:{listing_id}'),
+                        InlineKeyboardButton('📋 查看房源', callback_data=f'listing:detail:{listing_id}'),
+                        InlineKeyboardButton('💬 联系我们', callback_data=f'listing:consult:{listing_id}'),
                     ])
                 break
     buttons.append([InlineKeyboardButton('⬅️ 返回', callback_data='appointment_menu:list')])
@@ -164,7 +168,7 @@ def list_favorites_text(user_id: int) -> str:
     rows = db.list_favorites(user_id)
     if not rows:
         return '⭐ 暂无收藏房源。'
-    parts = ['⭐ 你收藏过的房源：']
+    parts = ['⭐ 您收藏过的房源：']
     for item in rows[:8]:
         detail = []
         if item.get('layout'):
@@ -173,5 +177,5 @@ def list_favorites_text(user_id: int) -> str:
             detail.append(f"{item.get('size_sqm')}㎡")
         detail_text = f" | {' · '.join(detail)}" if detail else ''
         parts.append(f"• {item.get('listing_id', '-')} | {item.get('area', '金边')} | {_fmt_price(item.get('price'))}{detail_text}")
-    parts.append('\n需要继续咨询时，点「💬 联系中文顾问」。')
+    parts.append('\n需要继续咨询时，点「💬 联系我们」。')
     return '\n'.join(parts)
