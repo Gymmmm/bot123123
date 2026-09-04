@@ -6,8 +6,17 @@ import asyncio
 import json
 import os
 import sqlite3
+import sys
 import unicodedata
+from pathlib import Path
 from types import SimpleNamespace
+
+ROOT = Path(__file__).resolve().parents[1]
+V2 = ROOT / "v2"
+for path in (ROOT, V2):
+    value = str(path)
+    if value not in sys.path:
+        sys.path.insert(0, value)
 
 from qiaolian_dual.canonical_facts import canonicalize_source
 from qiaolian_dual.canonical_listing_materializer import materialize_draft_facts
@@ -93,6 +102,7 @@ def reparse(db_path: str, draft_id: str, source_post_id: int) -> dict:
         raise RuntimeError(f"unexpected_review_status_after_reparse:{refreshed['review_status']}")
     if (normalized.get("quality") or {}).get("blocking_flags"):
         raise RuntimeError("materialized_blockers_remain")
+    conn.close()
     return {"noise": noise, "facts": facts}
 
 
@@ -107,6 +117,16 @@ class _Bot:
 
 
 async def approve_and_publish(draft_id: str) -> None:
+    # Mirror v2/run_publisher_bot_v2.py so this operator path executes the same
+    # production runtime contracts as the live publisher process.
+    from qiaolian_publisher_v2.cover_picker_patch import install_cover_picker
+    from qiaolian_publisher_v2.review_queue_patch import install_review_queue_patch
+    from qiaolian_publisher_v2.release_contract_patch import install_release_contract_patch
+
+    install_cover_picker()
+    install_review_queue_patch()
+    install_release_contract_patch()
+
     import autopilot_publish_bot as ap
 
     if not ap.ADMIN_IDS:
