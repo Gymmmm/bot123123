@@ -1,9 +1,9 @@
 """Rule-based rental-detail voice for the public User Bot.
 
-The engine never invents facts: it only talks about tags detected from fields
-already present on the listing. Manual talk always wins. Automatic output is
-kept to one or two short points and may be empty when nothing distinctive is
-supported.
+The engine never invents facts: it only talks about fields already present on
+the listing/canonical payload. Manual talk always wins. Automatic output uses
+fixed copy plus factual fee/service values and may be empty when nothing useful
+is supported.
 """
 from __future__ import annotations
 
@@ -14,71 +14,68 @@ from typing import Any
 
 TALK_LIBRARY: dict[str, tuple[str, ...]] = {
     "pickleball": (
-        "这边居然还有匹克球😂 没玩过的可以下来试试。",
-        "楼下有匹克球，这个在公寓里还挺少见。",
-        "健身房泳池先不说，这边还有匹克球😂",
+        "这边居然还有匹克球😂 没玩过的也可以下来试试。",
+        "楼里有匹克球场，想玩的话下楼就行。",
     ),
     "pest_control": (
-        "怕虫的可以多看一眼，这边灭虫服务也包含了。",
-        "灭虫这块有人处理，对怕虫的人算个实用点。",
+        "怕虫的可以看过来了😂 这边灭虫也有人处理。",
         "这边有安排灭虫服务，不用自己再单独找。",
     ),
     "cleaning_3x": (
-        "一周三次保洁，这个频率确实比较少见。",
-        "平时工作忙的话会省不少事，一周有人来三次。",
+        "一周有三次保洁，房间会有人定期来收拾。",
+        "这边保洁是一周三次，日常不用全靠自己打扫。",
     ),
     "cleaning_2x": (
-        "平时工作忙的，这边一周有人来收拾两次。",
-        "一周两次保洁，卫生这块能少操点心。",
-        "有包每周两次保洁，属于挺实际的配置。",
+        "一周有两次保洁，房间会有人定期来收拾。",
+        "这边保洁是一周两次，平时有人帮着打扫。",
     ),
     "cleaning_1x": (
-        "每周会有人来打扫一次，日常维持够用。",
-        "有每周一次保洁，自己能少收拾一点。",
+        "每周有一次保洁，会有人定期来打扫。",
+        "这边是一周一次保洁，基础卫生有人处理。",
     ),
     "linen_weekly": (
-        "床品这边每周也会换一次，住进去省事不少。",
-        "每周保洁还会处理床品，这个对嫌麻烦的人挺友好。",
+        "床品这边每周也会换一次。",
+        "每周会更换一次床品，这项也包含在服务里。",
     ),
     "never_lived": (
-        "全新没住过的，比较介意使用痕迹的可以多看两眼。",
-        "这套是未入住状态，喜欢新房的可以留一下。",
+        "这套目前是未入住状态，还没人住过。",
+        "这套是全新未住，之前没有入住记录。",
     ),
     "pet_allowed": (
-        "有宠物的可以留意，这套允许带宠物入住。",
-        "宠物友好，这个在筛房时还是挺重要的。",
+        "带宠物的可以看，这套允许宠物入住。",
+        "这套可以带宠物住，有猫狗的话不用先排除。",
     ),
     "management_wifi": (
-        "物业和网络都算在里面了，住进去以后少算两笔。",
-        "物业、Wi‑Fi 都包着，平时交费用会省事一点。",
+        "物业和网络都包着，这两项不用另外交。",
+        "物业费、网络费都包含在里面了。",
     ),
     "river_view": (
-        "窗外能看到河，比较在意视野的可以看看照片。",
-        "这套有河景，景观这一项算比较明确。",
+        "这套能看到河，照片里可以直接看景观。",
+        "窗外有河景，想看视野的话直接看实拍。",
     ),
     "coworking": (
-        "楼里有共享办公区，在家办公的人会比较方便。",
-        "不想一直窝在房间办公的话，楼里还有共享工作区。",
+        "楼里有共享办公区，不想在房间办公也可以下楼。",
+        "这边有共享办公区，在楼里就能找地方办公。",
     ),
     "kids_area": (
-        "带孩子住的话可以留意，楼里有儿童活动区。",
-        "有儿童活动区，家庭住会更方便一点。",
+        "楼里有儿童活动区，带孩子住可以直接用。",
+        "这边有儿童活动区，小朋友有地方活动。",
     ),
     "balcony": (
-        "有阳台，晾晒和透气都方便一点。",
-        "这套带阳台，属于日常挺实用的配置。",
+        "这套带阳台，晾晒、通风都能用上。",
+        "房子有阳台，日常晾东西会方便一点。",
     ),
     "large_layout": (
-        "这套空间感比较足，东西多或者家庭住会舒服一点。",
-        "户型偏宽敞，不喜欢住得挤的可以多看两眼。",
+        "这套面积比较大，实际空间可以直接看完整实拍。",
+        "面积在120㎡以上，属于大户型。",
     ),
     "owner_direct": (
-        "这套是业主直接放出来的，沟通链路比较简单。",
-        "房东本人放租，信息确认起来会更直接一点。",
+        "这套是房东本人放租，房源信息直接跟业主确认。",
+        "这是业主直租的房源，确认条件时直接对房东信息。",
     ),
     "new_condition": (
-        "整体房况看着比较新，介意旧装修的可以多看两眼。",
-        "喜欢新一点房子的，这套可以留一下。",
+        "资料里写的是新装修，具体房况可以看实拍。",
+        "这套标注了装修较新，现场状态以实拍和看房为准。",
     ),
 }
 
@@ -101,6 +98,9 @@ PRIORITY = {
     "cleaning_1x": 55,
 }
 
+_EMPTY_FACTS = {"", "待确认", "暂无", "[暂无]", "未知", "--", "-", "null", "none"}
+_INCLUDED_FACTS = {"包含", "已包含", "包", "included", "include", "免费", "免"}
+
 
 def _as_text(value: Any) -> str:
     if value is None:
@@ -113,15 +113,79 @@ def _as_text(value: Any) -> str:
     return str(value)
 
 
-def _contains(value: Any, *keywords: str) -> bool:
-    text = _as_text(value).lower()
-    return any(str(k).lower() in text for k in keywords)
+def _json_mapping(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return value
+    if not value:
+        return {}
+    try:
+        parsed = json.loads(str(value))
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _fact_mappings(listing: dict[str, Any]) -> tuple[dict[str, Any], ...]:
+    return (
+        listing,
+        _json_mapping(listing.get("canonical_facts")),
+        _json_mapping(listing.get("normalized_data")),
+        _json_mapping(listing.get("extracted_data")),
+    )
+
+
+def _fact_value(listing: dict[str, Any], key: str) -> str:
+    for mapping in _fact_mappings(listing):
+        raw = mapping.get(key)
+        value = str(raw or "").strip()
+        if value and value.lower() not in _EMPTY_FACTS:
+            return value
+    return ""
+
+
+def _service_facts(listing: dict[str, Any]) -> dict[str, Any]:
+    merged: dict[str, Any] = {}
+    for mapping in _fact_mappings(listing):
+        services = mapping.get("services")
+        if isinstance(services, dict):
+            for key, value in services.items():
+                if key not in merged or merged.get(key) in (None, ""):
+                    merged[key] = value
+    return merged
+
+
+def _is_included(value: str) -> bool:
+    normalized = str(value or "").strip().lower().replace(" ", "")
+    if normalized in _INCLUDED_FACTS:
+        return True
+    return any(token in normalized for token in ("包含", "已包", "包物业", "包网络", "included"))
+
+
+def _cost_talk_line(listing: dict[str, Any]) -> str:
+    """Turn known recurring-cost fields into one plain-language factual line."""
+    management = _fact_value(listing, "management_fee")
+    internet = _fact_value(listing, "internet_fee")
+    electric = _fact_value(listing, "electric_rate") or _fact_value(listing, "electricity_rate")
+    water = _fact_value(listing, "water_rate")
+    parking = _fact_value(listing, "parking_fee")
+
+    bits: list[str] = []
+    if management:
+        bits.append("物业包了" if _is_included(management) else f"物业费按{management}")
+    if internet:
+        bits.append("网络包了" if _is_included(internet) else f"网络费按{internet}")
+    if electric:
+        bits.append(f"电费{electric}")
+    if water:
+        bits.append(f"水费{water}")
+    if parking:
+        bits.append("停车包了" if _is_included(parking) else f"停车费{parking}")
+    if not bits:
+        return ""
+    return "，".join(bits) + "。"
 
 
 def _combined_listing_text(listing: dict[str, Any]) -> str:
-    # Some production rows expose normalized/extracted payloads as JSON strings.
-    # Include them for detection, but never create a fact that is not literally
-    # present somewhere in the listing payload.
     values = [listing]
     for key in ("normalized_data", "extracted_data", "canonical_facts"):
         raw = listing.get(key)
@@ -132,6 +196,7 @@ def _combined_listing_text(listing: dict[str, Any]) -> str:
 
 def detect_talk_tags(listing: dict[str, Any]) -> list[str]:
     text = _combined_listing_text(listing).lower()
+    services = _service_facts(listing)
     tags: list[str] = []
 
     def has(*words: str) -> bool:
@@ -139,10 +204,18 @@ def detect_talk_tags(listing: dict[str, Any]) -> list[str]:
 
     if has("匹克球", "pickleball"):
         tags.append("pickleball")
-    if has("灭虫", "除虫", "pest control", "pest_control"):
+    if has("灭虫", "除虫", "pest control", "pest_control") or str(services.get("pest_control") or "").strip():
         tags.append("pest_control")
 
-    if has("每周3次", "每周三次", "一周3次", "一周三次") and has("保洁", "清洁", "打扫"):
+    cleaning = str(services.get("cleaning") or "").strip()
+    if cleaning:
+        if any(token in cleaning for token in ("每周3次", "每周三次", "一周3次", "一周三次")):
+            tags.append("cleaning_3x")
+        elif any(token in cleaning for token in ("每周2次", "每周两次", "一周2次", "一周两次")):
+            tags.append("cleaning_2x")
+        elif any(token in cleaning for token in ("每周1次", "每周一次", "一周1次", "一周一次")):
+            tags.append("cleaning_1x")
+    elif has("每周3次", "每周三次", "一周3次", "一周三次") and has("保洁", "清洁", "打扫"):
         tags.append("cleaning_3x")
     elif has("每周2次", "每周两次", "一周2次", "一周两次") and has("保洁", "清洁", "打扫"):
         tags.append("cleaning_2x")
@@ -181,7 +254,6 @@ def detect_talk_tags(listing: dict[str, Any]) -> list[str]:
     if size >= 120:
         tags.append("large_layout")
 
-    # Stable de-duplication.
     return list(dict.fromkeys(tags))
 
 
@@ -205,12 +277,21 @@ def generate_talk(listing: dict[str, Any], max_points: int = 2, allow_empty: boo
         if values:
             return "\n".join(values)
 
-    selected = choose_talk_tags(detect_talk_tags(listing), max_points=max_points)
-    if not selected:
-        return "" if allow_empty else "这套我就不硬夸了😂 大家主要看照片，合眼缘再约现场。"
-
     listing_id = str(listing.get("listing_id") or listing.get("id") or listing.get("title") or "listing")
-    lines = [_stable_choice(TALK_LIBRARY[tag], listing_id, tag) for tag in selected if TALK_LIBRARY.get(tag)]
+    lines: list[str] = []
+
+    cost_line = _cost_talk_line(listing)
+    if cost_line:
+        lines.append(cost_line)
+
+    remaining = max(0, max_points - len(lines))
+    selected = choose_talk_tags(detect_talk_tags(listing), max_points=remaining)
+    for tag in selected:
+        if TALK_LIBRARY.get(tag):
+            lines.append(_stable_choice(TALK_LIBRARY[tag], listing_id, tag))
+
+    if not lines:
+        return "" if allow_empty else "具体条件按上面的房源资料来，有合适的再约现场看。"
     return "\n".join(line for line in lines if line)
 
 
