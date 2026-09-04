@@ -51,6 +51,7 @@ jobs:
             tests/test_customer_path_regression.py \
             tests/test_issue25_contract.py \
             tests/test_channel_standard_contract.py \
+            tests/test_listing_detail_status_contract.py \
             tests/test_noto_font_contract.py \
             tests/test_user_text_hierarchy.py \
             tests/test_second_batch_runtime_contract.py \
