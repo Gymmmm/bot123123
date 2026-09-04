@@ -27,10 +27,15 @@ class SimplifiedAppointmentTests(unittest.IsolatedAsyncioTestCase):
         date_buttons = [button.text for row in date_keyboard.inline_keyboard for button in row]
         self.assertIn("🎥 改为视频看房", date_buttons)
 
-        handoff = user_bot.contact_handoff_keyboard()
-        handoff_buttons = [button.text for row in handoff.inline_keyboard for button in row]
-        self.assertNotIn("🎥 视频看房", handoff_buttons)
-        self.assertIn("📅 预约看房", handoff_buttons)
+        general = user_bot.contact_handoff_keyboard()
+        general_buttons = [button.text for row in general.inline_keyboard for button in row]
+        self.assertNotIn("🎥 视频看房", general_buttons)
+        self.assertNotIn("🎥 改为视频看房", general_buttons)
+
+        listing = user_bot.contact_handoff_keyboard(listing_id="l_2")
+        listing_buttons = [button.text for row in listing.inline_keyboard for button in row]
+        self.assertIn("📅 预约看房", listing_buttons)
+        self.assertNotIn("🎥 改为视频看房", listing_buttons)
 
     async def test_known_viewing_mode_skips_customer_focus_form(self):
         context = SimpleNamespace(user_data={})
