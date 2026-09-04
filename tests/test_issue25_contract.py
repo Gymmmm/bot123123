@@ -111,20 +111,20 @@ def test_channel_caption_uses_confirmed_compact_post_format():
 
 
 def test_channel_and_cover_hide_generic_marketing_labels():
-    listing = {
+    listing_item = {
         "listing_id": "l_38",
         "project": "侨联地产",
         "area": "洪森大道",
         "layout": "4房",
         "price": 1300,
-        "highlights": ["侨联精选", "拎包入住"],
+        "highlights": ["侨联精选", "拢包入住"],
         "status": "reserved",
     }
-    caption = meihua_publisher.build_chinese_listing_post(listing)
-    cover = meihua_publisher.build_cover_listing_data(listing)
+    caption = meihua_publisher.build_chinese_listing_post(listing_item)
+    cover = meihua_publisher.build_cover_listing_data(listing_item)
     assert "🏠 <b>洪森大道｜4房</b>" in caption
     assert "侨联精选" not in caption
-    assert "拎包入住" not in caption
+    assert "拢包入住" not in caption
     assert cover["project"] == "洪森大道"
     assert cover["highlights"] == []
 
@@ -136,10 +136,10 @@ def test_detail_hides_empty_fields_and_uses_required_weights(monkeypatch):
         "electric_rate": "--", "floor": "23楼", "status": "reserved",
     })
     text = listing.listing_cost_text("QC0002")
-    assert "📋 <b>租赁详情</b>" in text
-    assert "💰 <b>租金：$1,800/月</b>" in text
-    assert "🏢 <b>楼层：</b> 23楼" in text
-    assert "<b>房态：</b> 已有预约 · 仍可预约" in text
+    assert "📋 <b>租赁详情｜QC0002</b>" in text
+    assert "💰 <b>$1,800/月</b>" in text
+    assert "🏢 23楼" in text
+    assert "<b>🟡 已有预约 · 仍可预约</b>" in text
     assert "押付" not in text and "水费" not in text and "电费" not in text
     assert all(token not in text for token in ("[暂无]", "未知", "--"))
 
@@ -155,8 +155,10 @@ async def test_appointment_starts_at_date_and_video_goes_to_video_date():
     ):
         state = await start_appointment(SimpleNamespace(), context, "QC0002", render_panel_fn=render)
     assert state == APPT_DATE
-    assert "请选择方便看房的日期" in render.await_args.kwargs["text"]
-    assert _labels(render.await_args.kwargs["reply_markup"])[-1] == ["🎥 实时视频看房"]
+    assert "哪天方便看房？" in render.await_args.kwargs["text"]
+    assert "📅 <b>预约看房｜QC0002</b>" in render.await_args.kwargs["text"]
+    labels = sum(_labels(render.await_args.kwargs["reply_markup"]), [])
+    assert "🎥 改为视频看房" in labels
     assert context.user_data["appt"]["mode"] == "offline"
 
     video_context = SimpleNamespace(user_data={})
@@ -167,9 +169,10 @@ async def test_appointment_starts_at_date_and_video_goes_to_video_date():
     ):
         video_state = await start_appointment(SimpleNamespace(), video_context, "QC0002", initial_mode="video", render_panel_fn=video_render)
     assert video_state == APPT_DATE
-    assert "请选择方便看房的日期" in video_render.await_args.kwargs["text"]
-    assert "实时视频看房" in video_render.await_args.kwargs["text"]
-    assert "🎥 实时视频看房" not in sum(_labels(video_render.await_args.kwargs["reply_markup"]), [])
+    assert "哪天方便视频看房？" in video_render.await_args.kwargs["text"]
+    video_labels = sum(_labels(video_render.await_args.kwargs["reply_markup"]), [])
+    assert "🎥 改为视频看房" not in video_labels
+    assert "👀 改为实地看房" in video_labels
 
 
 @pytest.mark.asyncio
@@ -181,7 +184,7 @@ async def test_album_has_no_summary_and_one_action_box():
             path = Path(directory) / name
             path.write_bytes(b"x")
             paths.append(str(path))
-        with patch("qiaolian_dual.listing.listing_context", return_value={"media_files": paths, "project": "不应重复"}):
+        with patch("qiaolian_dual.listing.listing_context", return_value={"media_files": paths, "project": "不应重复", "status": "active"}):
             await send_listing_photo_preview(bot, 1, "QC0002")
     assert bot.send_media_group.await_count == 1
     media = bot.send_media_group.await_args.kwargs["media"]
@@ -189,7 +192,7 @@ async def test_album_has_no_summary_and_one_action_box():
     assert bot.send_message.await_count == 1
     text = bot.send_message.await_args.kwargs["text"]
     assert "不应重复" not in text
-    assert _labels(bot.send_message.await_args.kwargs["reply_markup"]) == [["📅 预约看房", "📋 租赁详情"], ["💬 咨询顾问"]]
+    assert _labels(bot.send_message.await_args.kwargs["reply_markup"]) == [["📋 租赁详情", "📅 预约看房"], ["💬 联系中文顾问"]]
 
 
 @pytest.mark.asyncio
@@ -198,13 +201,14 @@ async def test_album_empty_copy_keeps_actions():
     with patch("qiaolian_dual.listing.listing_context", return_value={"media_files": []}):
         await send_listing_photo_preview(bot, 1, "QC0002")
     assert bot.send_message.await_count == 1
-    assert "这套房源目前的实拍已经全部显示。" in bot.send_message.await_args.kwargs["text"]
+    assert "这套房的实拍暂时没有加载出来。" in bot.send_message.await_args.kwargs["text"]
     assert bot.send_message.await_args.kwargs["reply_markup"] is not None
+    assert _labels(bot.send_message.await_args.kwargs["reply_markup"]) == [["📋 租赁详情", "📅 预约看房"], ["💬 联系中文顾问"]]
 
 
 def test_date_keyboard_has_video_branch_without_mode_gate():
     labels = _labels(_appointment_date_keyboard())
-    assert labels == [["今天", "明天"], ["后天", "📅 其他日期"], ["🎥 实时视频看房"]]
+    assert labels == [["今天", "明天"], ["后天", "📅 其他日期"], ["🎥 改为视频看房"], ["⬅️ 返回房源"]]
 
 
 def test_new_appointment_ui_has_no_focus_or_contact_entry():
