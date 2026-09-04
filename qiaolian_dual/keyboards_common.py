@@ -37,7 +37,7 @@ def rental_service_keyboard() -> InlineKeyboardMarkup:
 
 
 def no_match_followup_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([[InlineKeyboardButton('✏️ 修改条件', callback_data='findmode:guided'), InlineKeyboardButton('💬 联系中文顾问', callback_data='appointment_menu:contact')], [InlineKeyboardButton('🇨🇦 当前可预约', callback_data='hub:available')]])
+    return InlineKeyboardMarkup([[InlineKeyboardButton('✏️ 修改条件', callback_data='findmode:guided'), InlineKeyboardButton('💬 联系中文顾问', callback_data='appointment_menu:contact')], [InlineKeyboardButton('🏘 当前可预约', callback_data='hub:available')]])
 
 def quick_start_keyboard() -> InlineKeyboardMarkup:
     return main_keyboard()
