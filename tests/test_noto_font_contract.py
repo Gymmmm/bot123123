@@ -39,10 +39,11 @@ def test_classic_blue_matches_approved_structure():
     assert '.top-brand' in text
     assert '.brand-inner' in text
     assert '.bottom-card' in text
-    assert 'width:920px' in text
-    assert 'border-radius:28px' in text
-    assert 'rgba(17,71,178,.92)' in text
-    assert '#f6c948' in text
+    assert 'width:885px' in text
+    assert 'height:305px' in text
+    assert 'border-radius:38px' in text
+    assert 'rgba(21,61,154,.91)' in text
+    assert '#f7d769' in text
     for token in ('{{PROJECT}}', '{{LAYOUT}}', '{{SIZE}}', '{{FLOOR}}', '{{PRICE}}', '{{H1}}', '{{H2}}', '{{H3}}'):
         assert token in text
     assert 'id="t1"' in text and 'id="t8"' in text
