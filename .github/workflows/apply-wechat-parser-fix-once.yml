@@ -5,7 +5,7 @@ on:
     branches:
       - codex/qiaolian-ui-cleanup-20260829
     paths:
-      - tools/apply_wechat_parser_fix_once.py
+      - tools/apply_wechat_parser_fix_once_v2.py
       - .github/workflows/apply-wechat-parser-fix-once.yml
 
 permissions:
@@ -25,4 +25,4 @@ jobs:
       - name: Install test dependencies
         run: pip install -r requirements.txt pytest
       - name: Apply fix, run focused regression, commit and push
-        run: python tools/apply_wechat_parser_fix_once.py
+        run: python tools/apply_wechat_parser_fix_once_v2.py
