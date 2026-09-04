@@ -125,13 +125,13 @@ class UserStartPayloadTests(unittest.TestCase):
         rows = keyboard.inline_keyboard
         labels = [button.text for row in rows for button in row]
         callbacks = [button.callback_data for row in rows for button in row]
-        self.assertEqual(labels[:4], ["📸 更多实拍", "📋 租赁详情", "📅 预约看房", "💬 联系中文顾问"])
+        self.assertEqual(labels[:4], ["📋 租赁详情", "📸 更多实拍", "📅 预约看房", "💬 联系我们"])
         self.assertIn("listing:photos:l_1024", callbacks)
         self.assertIn("listing:detail:l_1024", callbacks)
         self.assertIn("listing:appoint:l_1024", callbacks)
         self.assertIn("listing:consult:l_1024", callbacks)
         self.assertNotIn("listing:similar:l_1024", callbacks)
-        self.assertNotIn("咨询顾问", " ".join(labels))
+        self.assertNotIn("联系中文顾问", " ".join(labels))
 
     def test_tenant_bind_and_channel_topic_payloads_are_supported(self):
         payload = parse_start_arg_payload("t_bind_ABC123")
