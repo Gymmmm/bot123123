@@ -56,9 +56,9 @@ def _display_layout(layout: object, property_type: object='') -> str:
 
 
 def _display_floor(floor: object) -> str:
-    """楼层只在展示层规范化；数据库/冻结事实仍保留原值。"""
+    """楼层未知就隐藏；已知楼层只在展示层规范化。"""
     raw = str(floor or '').strip()
-    if not raw:
+    if not raw or raw in {'未知', '待确认', '暂无', '[暂无]', '-', '--'}:
         return ''
     compact = re.sub(r'\s+', '', raw)
     if re.fullmatch(r'\d+', compact):
