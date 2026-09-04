@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass
 
 
@@ -21,6 +22,14 @@ _PROMO = re.compile(
 )
 
 
+def strip_unicode_noise(value: str) -> str:
+    """Strip source-app formatting/private-use noise, including WeChat U+F003."""
+    return "".join(
+        ch for ch in str(value or "")
+        if unicodedata.category(ch) not in {"Cf", "Co"}
+    )
+
+
 @dataclass(frozen=True)
 class SanitizedSourceText:
     text: str
@@ -33,7 +42,8 @@ def sanitize_source_text(raw_text: str) -> SanitizedSourceText:
     contacts: list[str] = []
     kept: list[str] = []
     removed: list[str] = []
-    for original in str(raw_text or "").replace("\r\n", "\n").split("\n"):
+    cleaned_source = strip_unicode_noise(str(raw_text or "")).replace("\r\n", "\n")
+    for original in cleaned_source.split("\n"):
         line = original.strip()
         if not line:
             continue

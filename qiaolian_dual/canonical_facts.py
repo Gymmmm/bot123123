@@ -429,7 +429,7 @@ def _special_tags(text: str) -> list[str]:
 
 def _has_rental_intent(text: str) -> bool:
     return bool(re.search(
-        r"出租|招租|租金|月租|租赁|仅租|只租|for rent|only for rent|rent(?:al)? only|per month|/month|每月|/月",
+        r"出租|招租|租金|月租|租赁|房间价格|仅租|只租|for rent|only for rent|rent(?:al)? only|per month|/month|每月|/月",
         text,
         flags=re.I,
     ))

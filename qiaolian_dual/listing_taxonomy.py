@@ -32,6 +32,7 @@ class ProjectIdentity:
     display: str
     kind: str  # project or brand
     aliases: tuple[str, ...]
+    property_family: str | None = None
 
 
 @dataclass(frozen=True)
@@ -125,7 +126,7 @@ MANUAL_MARKET_ALIASES: dict[str, tuple[str, ...]] = {
 PROJECT_IDENTITIES: tuple[ProjectIdentity, ...] = (
     ProjectIdentity("aeon1", "永旺一", "project", ("Aeon1", "永旺一", "永旺1", "aeon 1")),
     ProjectIdentity("vila_town", "Vila Town", "project", ("vila town",)),
-    ProjectIdentity("the_pinnacle", "The Pinnacle 幸福广场", "project", ("the pinnacle", "太子幸福广场", "幸福广场", "prince happiness plaza")),
+    ProjectIdentity("the_pinnacle", "The Pinnacle 幸福广场", "project", ("the pinnacle", "太子幸福广场", "幸福广场", "prince happiness plaza"), property_family="公寓"),
     ProjectIdentity("rf_city", "富力城", "project", ("富力城", "富力中心城", "r&f city", "rf city")),
     ProjectIdentity("chip_mong", "Chip Mong", "brand", ("chip mong land", "chip mong", "chipmong", "集茂")),
     # “炳发城” is an explicit project token; the broader Peng Huoth developer
@@ -490,6 +491,17 @@ def classify_listing_taxonomy(raw_text: str) -> TaxonomyResult:
     market_keys, market_displays, market_evidence, market_flags = _extract_markets(text)
     project_key, project_name, project_alias, brand_key, brand_name, project_evidence, project_flags = _extract_project(text)
     family, subtype, property_display, property_status, property_evidence, property_flags = _extract_property(text)
+    if family == "未知" and project_key:
+        project_meta = next((item for item in PROJECT_IDENTITIES if item.key == project_key), None)
+        if project_meta and project_meta.kind == "project" and project_meta.property_family:
+            family = project_meta.property_family
+            subtype = None
+            property_display = project_meta.property_family
+            property_status = "inferred"
+            property_evidence = [
+                _evidence(project_meta.property_family, "project_property_metadata", "high", project_name or project_key)
+            ]
+            property_flags = [flag for flag in property_flags if flag != "unknown_property_type"]
     project_alias_evidence = ([_evidence(project_alias, "raw_project_alias", "high", project_alias)] if project_alias else [])
     return TaxonomyResult(
         canonical_area_key=area_key,
