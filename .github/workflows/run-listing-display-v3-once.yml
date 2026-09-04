@@ -22,6 +22,7 @@ jobs:
           python-version: '3.12'
       - name: Apply V3
         run: |
+          echo RUN_LISTING_DISPLAY_V3
           python tools/apply_listing_display_v3.py
           python -m compileall -q qiaolian_dual meihua_publisher.py tests
           python -m pytest -q tests/test_talk_engine_factual_copy.py tests/test_channel_three_entry_contract.py
