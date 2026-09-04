@@ -7,11 +7,16 @@ from .common import *
 
 
 def parse_budget_range(text: str) -> tuple[int | None, int | None]:
-    values = [int(x) for x in re.findall(r'\d{2,5}', text or '')]
+    raw = str(text or '')
+    values = [int(x) for x in re.findall(r'\d{2,5}', raw)]
     if not values:
         return (None, None)
     if len(values) == 1:
         value = values[0]
+        if re.search(r'(以内|以下|不超过|最多)', raw):
+            return (None, value)
+        if re.search(r'(以上|起|至少)', raw):
+            return (value, None)
         return (max(0, value - 200), value + 200)
     low, high = (min(values[0], values[1]), max(values[0], values[1]))
     return (low, high)
@@ -70,11 +75,7 @@ def _public_search_listings(
     ilike_fragment: str | None = None,
     limit: int = 6,
 ) -> list[dict]:
-    """面向租客的公开房源查询。
-
-    公开可预约房态统一为 active + reserved。pending/rented/inactive 等状态
-    不进入找房结果。只返回已经真实发布到 Telegram 的房源。
-    """
+    """面向租客的公开房源查询，只返回真实发布且可预约的房源。"""
     table_names = db._table_names()
     if not {'drafts', 'posts'}.issubset(table_names):
         return []
@@ -138,6 +139,20 @@ def _public_search_listings(
     return result
 
 
+def _area_aliases(area: str | None) -> list[str] | None:
+    """把客户侧组合区域投影成数据库可查询的 canonical aliases。"""
+    raw = str(area or '').strip()
+    if not raw or raw == '不限':
+        return None
+    from .location_mapping import get_all_location_aliases
+    if raw in {'BKK2 / BKK3', 'BKK2/BKK3'}:
+        return list(dict.fromkeys([
+            *get_all_location_aliases('BKK2'),
+            *get_all_location_aliases('BKK3'),
+        ]))
+    return get_all_location_aliases(raw)
+
+
 def search_listings_with_fallback(
     *,
     property_type: str | None,
@@ -147,22 +162,11 @@ def search_listings_with_fallback(
     text_fragment: str = '',
     limit: int = 3,
 ) -> tuple[list[dict], str]:
-    """执行严格公开搜索，不再把无关最近房源伪装成匹配结果。
-
-    保留旧函数名以兼容调用方，但默认不自动删除类型/区域/预算条件。
-    没有严格匹配时返回 ([], 'no_match')，由 UI 明确让用户修改条件、
-    联系中文顾问或主动选择查看其他可预约房源。
-    """
-    del text_fragment  # 旧参数兼容；严格搜索不再偷偷用全文模糊兜底。
-    if area and area != '不限':
-        from .location_mapping import get_all_location_aliases
-        area_arg = get_all_location_aliases(area)
-    else:
-        area_arg = None
-
+    """执行严格公开搜索；没有严格匹配时不自动放宽条件。"""
+    del text_fragment
     matches = _public_search_listings(
         property_type=property_type or None,
-        areas=area_arg,
+        areas=_area_aliases(area),
         budget_min=budget_min,
         budget_max=budget_max,
         limit=limit,
@@ -180,13 +184,8 @@ def search_similar_listings(
     budget_max: int | None,
     limit: int = 3,
 ) -> tuple[list[dict], str]:
-    """仅供用户主动选择“看相近房源”后调用的显式放宽搜索。"""
-    if area and area != '不限':
-        from .location_mapping import get_all_location_aliases
-        area_arg = get_all_location_aliases(area)
-    else:
-        area_arg = None
-
+    """仅供用户主动点“看类似房源”后进行显式放宽。"""
+    area_arg = _area_aliases(area)
     attempts = [
         ('no_type', dict(areas=area_arg, budget_min=budget_min, budget_max=budget_max)),
         ('no_area', dict(property_type=property_type or None, budget_min=budget_min, budget_max=budget_max)),
