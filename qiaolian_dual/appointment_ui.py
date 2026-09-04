@@ -19,7 +19,7 @@ def _appointment_date_keyboard(*, show_video: bool = True) -> InlineKeyboardMark
         rows.append([InlineKeyboardButton('🎥 改为视频看房', callback_data='apmode:video')])
     else:
         rows.append([InlineKeyboardButton('🚶 改为实地看房', callback_data='apmode:offline')])
-    rows.append([InlineKeyboardButton('⬅️ 返回房源', callback_data='appoint_back_mode')])
+    rows.append([InlineKeyboardButton('⬅️ 返回房源', callback_data='appoint_back_mode'), InlineKeyboardButton('🏠 返回首页', callback_data='home')])
     return InlineKeyboardMarkup(rows)
 
 
@@ -28,7 +28,7 @@ def _appointment_mode_keyboard(listing_id: str) -> InlineKeyboardMarkup:
     back_target = 'home' if str(listing_id or '').strip() in {'', '待推荐'} else f'listing:detail:{listing_id}'
     return InlineKeyboardMarkup([
         [InlineKeyboardButton('🚶 实地看房', callback_data='apmode:offline'), InlineKeyboardButton('🎥 视频看房', callback_data='apmode:video')],
-        [InlineKeyboardButton('⬅️ 返回房源', callback_data=back_target)],
+        [InlineKeyboardButton('⬅️ 返回房源', callback_data=back_target), InlineKeyboardButton('🏠 返回首页', callback_data='home')],
     ])
 
 
@@ -38,7 +38,7 @@ def _appointment_time_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton('下午 14:00–17:00', callback_data='aptime:pm')],
         [InlineKeyboardButton('晚上 17:00–19:00', callback_data='aptime:evening')],
         [InlineKeyboardButton('✍️ 其他时间', callback_data='aptime:other')],
-        [InlineKeyboardButton('⬅️ 修改日期', callback_data='appoint_back_date')],
+        [InlineKeyboardButton('⬅️ 修改日期', callback_data='appoint_back_date'), InlineKeyboardButton('🏠 返回首页', callback_data='home')],
     ])
 
 
@@ -83,7 +83,7 @@ def _appointment_confirm_text(appt: dict) -> str:
 def _appointment_confirm_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton('✅ 提交预约', callback_data='apconfirm:yes')],
-        [InlineKeyboardButton('⬅️ 修改时间', callback_data='apedit:time')],
+        [InlineKeyboardButton('⬅️ 修改时间', callback_data='apedit:time'), InlineKeyboardButton('🏠 返回首页', callback_data='home')],
     ])
 
 
