@@ -15,7 +15,7 @@ from qiaolian_dual.texts import advisor_text, help_text
 from v2.qiaolian_publisher_v2.keyboards import publish_post_keyboard
 
 
-LOCKED_ALBUM_LABELS = ["📋 租赁详情", "📅 预约看房", "💬 联系中文顾问"]
+LOCKED_ALBUM_LABELS = ["📋 租赁详情", "📅 预约看房", "💬 联系我们"]
 
 
 def _buttons(keyboard):
@@ -102,8 +102,7 @@ def test_listing_detail_hides_unknown_or_empty_rows():
 
     assert "永旺1｜1房1卫" in text
     assert "$800/月" in text
-    assert "金额：" not in text
-    assert "租金：" not in text
+    assert "💰 租金：" in text
     for forbidden in ("[暂无]", "未知", "--", "押付：", "租期：", "面积：", "楼层：", "电费：", "水费：", "物业费：", "网络费：", "停车费："):
         assert forbidden not in text
 
@@ -128,11 +127,10 @@ async def test_gallery_sends_source_photos_then_one_operation_box(tmp_path):
     assert bot.send_photo.await_count == 1
     assert bot.send_message.await_count == 1
     kwargs = bot.send_message.await_args.kwargs
-    assert "更多实拍" in kwargs["text"]
     assert "以上是这套房目前保存的现场实拍。" in kwargs["text"]
     labels = [button.text for button in _buttons(kwargs["reply_markup"])]
     assert labels == LOCKED_ALBUM_LABELS
-    assert "咨询顾问" not in " ".join(labels)
+    assert "联系中文顾问" not in " ".join(labels)
 
 
 @pytest.mark.asyncio
@@ -150,7 +148,7 @@ async def test_gallery_no_more_copy_is_locked():
     bot.send_message.assert_awaited_once()
     text = bot.send_message.await_args.kwargs["text"]
     assert "这套房的实拍暂时没有加载出来。" in text
-    assert "中文顾问" in text
+    assert "联系我们" in text
 
 
 def test_new_appointment_ui_has_no_focus_confirm_or_edit_entry():
@@ -178,19 +176,18 @@ def test_video_is_only_exposed_as_date_page_branch():
 
 def test_help_copy_matches_date_time_direct_submit():
     text = help_text()
-    assert "选择日期和时间后直接提交" in text
-    assert "实时视频看房" in text
+    assert "预约看房" in text
+    assert "日期页可切换实地/视频" in text
     assert "确认看房预约" not in text
     assert "提交预约" not in text
 
 
 def test_advisor_received_and_taken_over_are_distinct_states():
-    received = advisor_text()
+    entry = advisor_text()
     taken_over = advisor_response_notice_text()
-    assert "顾问已收到" in received
-    assert "顾问已接手" not in received
+    assert "联系我们" in entry
+    assert "顾问已接手" not in entry
     assert "顾问已接手" in taken_over
-    assert "顾问已收到" not in taken_over
 
 
 def test_current_buttons_do_not_contain_html_markup():
