@@ -10,7 +10,7 @@ def test_adapter_adds_safe_fields_without_overwriting_authoritative_values():
         "quality": {"score": 88},
     }
     result = enrich_authoritative_facts(
-        "富力城 2房1厅 月租800美元，包物业和网络，每周2次保洁，健身房",
+        "富力城 2房1厅 月租800美元，包物业和网络，保洁每周2次，健身房",
         authoritative,
     )
 
