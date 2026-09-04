@@ -117,18 +117,21 @@ class UserStartPayloadTests(unittest.TestCase):
         self.assertEqual(payload["action"], "consult")
         self.assertEqual(payload["target"], "l_99")
 
-    def test_listing_landing_keyboard_has_four_actions_in_two_rows(self):
+    def test_listing_landing_keyboard_has_locked_four_ctas(self):
         with patch("qiaolian_dual.user_bot.USER_BOT_USERNAME", "TestBot"):
-            with patch("qiaolian_dual.user_bot.listing_context", return_value={}):
+            with patch("qiaolian_dual.listing.listing_context", return_value={"status": "active"}):
                 keyboard = listing_landing_keyboard("l_1024", area="BKK1")
 
         rows = keyboard.inline_keyboard
-        self.assertEqual(len(rows), 2, f"Expected 2 rows, got {len(rows)}: {rows}")
-        self.assertEqual([len(row) for row in rows], [2, 2])
-        self.assertEqual(rows[0][0].callback_data, "listing:detail:l_1024")
-        self.assertEqual(rows[0][1].callback_data, "listing:appoint:l_1024")
-        self.assertIn("l_1024", rows[1][0].callback_data)
-        self.assertEqual(rows[1][1].callback_data, "listing:similar:l_1024")
+        labels = [button.text for row in rows for button in row]
+        callbacks = [button.callback_data for row in rows for button in row]
+        self.assertEqual(labels[:4], ["📸 更多实拍", "📋 租赁详情", "📅 预约看房", "💬 联系中文顾问"])
+        self.assertIn("listing:photos:l_1024", callbacks)
+        self.assertIn("listing:detail:l_1024", callbacks)
+        self.assertIn("listing:appoint:l_1024", callbacks)
+        self.assertIn("listing:consult:l_1024", callbacks)
+        self.assertNotIn("listing:similar:l_1024", callbacks)
+        self.assertNotIn("咨询顾问", " ".join(labels))
 
     def test_tenant_bind_and_channel_topic_payloads_are_supported(self):
         payload = parse_start_arg_payload("t_bind_ABC123")

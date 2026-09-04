@@ -25,7 +25,7 @@ class SimplifiedAppointmentTests(unittest.IsolatedAsyncioTestCase):
     def test_video_entry_only_lives_on_appointment_date_page(self):
         date_keyboard = user_bot._appointment_date_keyboard()
         date_buttons = [button.text for row in date_keyboard.inline_keyboard for button in row]
-        self.assertIn("🎥 实时视频看房", date_buttons)
+        self.assertIn("🎥 改为视频看房", date_buttons)
 
         handoff = user_bot.contact_handoff_keyboard()
         handoff_buttons = [button.text for row in handoff.inline_keyboard for button in row]
@@ -44,12 +44,11 @@ class SimplifiedAppointmentTests(unittest.IsolatedAsyncioTestCase):
                 initial_mode="offline",
             )
 
-        self.assertEqual(state, user_bot.APPT_DATE)
+        self.assertEqual(state, user_bot.MAIN)
         text = render.await_args.kwargs["text"]
-        self.assertIn("请选择方便看房的日期", text)
-        self.assertIn("实时视频看房", text)
+        self.assertIn("请先从具体房源的「预约看房」进入", text)
         self.assertNotIn("请选择你最关注的验房点", text)
-        self.assertEqual(context.user_data["appt"]["focus_keys"], [])
+        self.assertNotIn("appt", context.user_data)
 
     async def test_back_paths_preserve_listing_source_and_default_checks(self):
         query = SimpleNamespace(
@@ -77,11 +76,9 @@ class SimplifiedAppointmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(context.user_data["appt"]["listing_id"], "L_0315")
         self.assertEqual(context.user_data["appt"]["source"], "channel_post")
         self.assertEqual(context.user_data["appt"]["touch_payload"], {"post_token": "p1"})
-        self.assertEqual(
-            context.user_data["appt"]["focus_keys"],
-            list(user_bot.APPOINTMENT_FOCUS_ORDER),
-        )
-        self.assertIn("请选择方便看房的日期", query.edit_message_text.await_args.args[0])
+        text = query.edit_message_text.await_args.args[0]
+        self.assertIn("哪天方便视频看房？", text)
+        self.assertIn("视频看房", text)
 
     async def test_stale_old_button_fails_closed_without_creating_empty_draft(self):
         query = SimpleNamespace(
@@ -95,7 +92,7 @@ class SimplifiedAppointmentTests(unittest.IsolatedAsyncioTestCase):
         state = await user_bot.appoint_flow_cb(update, context)
 
         self.assertEqual(state, user_bot.MAIN)
-        self.assertNotIn("appt", context.user_data)
+        self.assertFalse(bool(context.user_data.get("appt")))
         text = query.edit_message_text.await_args.args[0]
         self.assertIn("预约已失效", text)
 
@@ -110,9 +107,9 @@ class SimplifiedAppointmentTests(unittest.IsolatedAsyncioTestCase):
         context = SimpleNamespace(
             user_data={
                 "appt": {
-                    "listing_id": "待推荐",
+                    "listing_id": "l_315",
                     "source": "user_bot",
-                    "touch_payload": {"listing_unknown": True},
+                    "touch_payload": {},
                     "mode": "offline",
                     "date": "08-12",
                     "focus_keys": [],
@@ -124,6 +121,8 @@ class SimplifiedAppointmentTests(unittest.IsolatedAsyncioTestCase):
             patch.object(user_bot.db, "create_appointment", return_value=89) as create_appt,
             patch.object(user_bot, "create_lead", return_value=100),
             patch.object(user_bot, "_notify_admins", new=AsyncMock()),
+            patch("qiaolian_dual.listing.listing_is_available", return_value=(True, "active")),
+            patch("qiaolian_dual.channel_status_sync.sync_channel_listing_status", new=AsyncMock()),
         ):
             state = await user_bot.appoint_flow_cb(update, context)
 
@@ -142,9 +141,9 @@ class SimplifiedAppointmentTests(unittest.IsolatedAsyncioTestCase):
         context = SimpleNamespace(
             user_data={
                 "appt": {
-                    "listing_id": "待推荐",
+                    "listing_id": "l_315",
                     "source": "user_bot",
-                    "touch_payload": {"listing_unknown": True},
+                    "touch_payload": {},
                     "mode": "offline",
                     "date": "8月20日",
                     "focus_keys": [],
@@ -157,6 +156,8 @@ class SimplifiedAppointmentTests(unittest.IsolatedAsyncioTestCase):
             patch.object(user_bot.db, "create_appointment", return_value=90) as create_appt,
             patch("qiaolian_dual.search.create_lead", return_value=101),
             patch("qiaolian_dual.results_admin._notify_admins", new=AsyncMock()),
+            patch("qiaolian_dual.listing.listing_is_available", return_value=(True, "active")),
+            patch("qiaolian_dual.channel_status_sync.sync_channel_listing_status", new=AsyncMock()),
         ):
             state = await user_bot.handle_appointment_text(update, context)
 
@@ -179,7 +180,7 @@ class SimplifiedAppointmentTests(unittest.IsolatedAsyncioTestCase):
         context = SimpleNamespace(
             user_data={
                 "appt": {
-                    "listing_id": "L_0315",
+                    "listing_id": "l_315",
                     "source": "channel_post",
                     "touch_payload": {"post_token": "p1"},
                     "mode": "offline",
@@ -195,20 +196,20 @@ class SimplifiedAppointmentTests(unittest.IsolatedAsyncioTestCase):
             patch.object(user_bot, "create_lead", return_value=99) as create_lead,
             patch.object(user_bot, "_notify_admins", new=AsyncMock()) as notify,
             patch("qiaolian_dual.listing.listing_is_available", return_value=(True, "active")),
+            patch("qiaolian_dual.channel_status_sync.sync_channel_listing_status", new=AsyncMock()),
         ):
             state = await user_bot.appoint_flow_cb(update, context)
 
         self.assertEqual(state, user_bot.MAIN)
         saved = create_appt.call_args.args[0]
-        self.assertEqual(saved["listing_id"], "L_0315")
+        self.assertEqual(saved["listing_id"], "l_315")
         self.assertEqual(saved["viewing_mode"], "offline")
         self.assertEqual(saved["appointment_date"], "08-12")
         self.assertEqual(saved["appointment_time"], "pm")
         self.assertEqual(saved["status"], "pending")
-        self.assertIn("空调", saved["note"])
+        self.assertEqual(saved["note"], "")
         payload = create_lead.call_args.kwargs["payload"]
         self.assertEqual(payload["post_token"], "p1")
-        self.assertEqual(payload["focus_keys"], list(user_bot.APPOINTMENT_FOCUS_ORDER))
         notify_lines = notify.await_args.kwargs["lines"]
         self.assertTrue(any(line.startswith("🏠 ") for line in notify_lines))
         self.assertTrue(any("实地看房" in line for line in notify_lines))

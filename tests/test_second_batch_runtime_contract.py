@@ -135,12 +135,14 @@ def test_full_album_has_no_ten_photo_truncation_and_chunks_by_ten():
 
 def test_full_album_action_box_is_single_and_exact():
     src = Path('qiaolian_dual/results_admin.py').read_text(encoding='utf-8')
+    kb = src[src.index('def _photo_action_keyboard'):src.index('async def send_listing_photo_preview')]
     fn = src[src.index('async def send_listing_photo_preview'):]
-    assert "📋 租赁详情" in fn
-    assert "📅 预约看房" in fn
-    assert "🤖 侨联找房助手" not in fn
-    assert "💬 联系中文顾问" in fn
-    assert "💬 咨询顾问" not in fn
+    assert "📋 租赁详情" in kb
+    assert "📅 预约看房" in kb
+    assert "💬 联系中文顾问" in kb
+    assert "🤖 侨联找房助手" not in kb
+    assert "💬 咨询顾问" not in kb
+    assert '_photo_action_keyboard(' in fn
     assert fn.count("reply_markup=keyboard") == 2
 
 

@@ -15,6 +15,9 @@ from qiaolian_dual.texts import advisor_text, help_text
 from v2.qiaolian_publisher_v2.keyboards import publish_post_keyboard
 
 
+LOCKED_ALBUM_LABELS = ["📋 租赁详情", "📅 预约看房", "💬 联系中文顾问"]
+
+
 def _buttons(keyboard):
     return [button for row in keyboard.inline_keyboard for button in row]
 
@@ -98,7 +101,9 @@ def test_listing_detail_hides_unknown_or_empty_rows():
         text = listing_cost_text("l_42")
 
     assert "永旺1｜1房1卫" in text
-    assert "租金：$800/月" in text
+    assert "$800/月" in text
+    assert "金额：" not in text
+    assert "租金：" not in text
     for forbidden in ("[暂无]", "未知", "--", "押付：", "租期：", "面积：", "楼层：", "电费：", "水费：", "物业费：", "网络费：", "停车费："):
         assert forbidden not in text
 
@@ -116,16 +121,18 @@ async def test_gallery_sends_source_photos_then_one_operation_box(tmp_path):
     bot.send_photo = AsyncMock()
     bot.send_message = AsyncMock()
 
-    with patch("qiaolian_dual.listing.listing_context", return_value={"media_files": paths}):
+    with patch("qiaolian_dual.listing.listing_context", return_value={"media_files": paths, "status": "active"}):
         await send_listing_photo_preview(bot, 123, "l_42")
 
     assert bot.send_media_group.await_count == 1
     assert bot.send_photo.await_count == 1
     assert bot.send_message.await_count == 1
     kwargs = bot.send_message.await_args.kwargs
-    assert kwargs["text"] == "📸 <b>实拍已全部显示</b>\n\n请选择下一步。"
+    assert "更多实拍" in kwargs["text"]
+    assert "以上是这套房目前保存的现场实拍。" in kwargs["text"]
     labels = [button.text for button in _buttons(kwargs["reply_markup"])]
-    assert labels == ["📅 预约看房", "📋 租赁详情", "💬 咨询顾问"]
+    assert labels == LOCKED_ALBUM_LABELS
+    assert "咨询顾问" not in " ".join(labels)
 
 
 @pytest.mark.asyncio
@@ -135,13 +142,15 @@ async def test_gallery_no_more_copy_is_locked():
     bot.send_photo = AsyncMock()
     bot.send_message = AsyncMock()
 
-    with patch("qiaolian_dual.listing.listing_context", return_value={"media_files": []}):
+    with patch("qiaolian_dual.listing.listing_context", return_value={"media_files": [], "status": "active"}):
         await send_listing_photo_preview(bot, 123, "l_42")
 
     bot.send_media_group.assert_not_awaited()
     bot.send_photo.assert_not_awaited()
     bot.send_message.assert_awaited_once()
-    assert "这套房源目前的实拍已经全部显示。" in bot.send_message.await_args.kwargs["text"]
+    text = bot.send_message.await_args.kwargs["text"]
+    assert "这套房的实拍暂时没有加载出来。" in text
+    assert "中文顾问" in text
 
 
 def test_new_appointment_ui_has_no_focus_confirm_or_edit_entry():
@@ -162,7 +171,7 @@ def test_video_is_only_exposed_as_date_page_branch():
     appointment_menu_labels = [button.text for button in _buttons(appointment_menu_keyboard())]
     handoff_labels = [button.text for button in _buttons(contact_handoff_keyboard())]
 
-    assert "🎥 实时视频看房" in date_labels
+    assert "🎥 改为视频看房" in date_labels
     assert not any("视频" in label for label in appointment_menu_labels)
     assert not any("视频" in label for label in handoff_labels)
 
