@@ -22,12 +22,12 @@ def _callbacks(markup):
 
 def test_customer_wording_is_unified():
     labels = _labels(main_keyboard())
-    assert labels == ['🔍 帮我找房', '📅 我的预约', '🛡 租房服务', '🛠 入住服务', '💬 联系中文顾问']
+    assert labels == ['🔍 帮我找房', '📅 我的预约', '🛡 侨联保障', '🛠 入住服务', '💬 联系我们']
     joined = ' '.join(labels)
     assert '可预约房源' not in joined
     assert '当前可预约' not in joined
     assert '在架房源' not in joined
-    assert '联系我们' not in joined
+    assert '联系中文顾问' not in joined
     assert '管理号' not in joined
     assert '待推荐' not in joined
 
@@ -73,15 +73,7 @@ def test_floor_is_normalized_only_for_display():
 
 
 def test_publication_caption_uses_display_layout_and_floor():
-    item = {
-        'area': '永旺1',
-        'layout': '1房1办公2卫',
-        'property_type': '公寓',
-        'size': '96.3㎡',
-        'floor': '23',
-        'price': 1800,
-        'deal_type': 'rent',
-    }
+    item = {'area': '永旺1', 'layout': '1房1办公2卫', 'property_type': '公寓', 'size': '96.3㎡', 'floor': '23', 'price': 1800, 'deal_type': 'rent'}
     text = publication_package.format_button_post_text(item, 'l_2', [])
     assert '1房＋书房｜2卫' in text
     assert '1房1办公2卫' not in text
@@ -90,18 +82,10 @@ def test_publication_caption_uses_display_layout_and_floor():
 
 def test_no_match_never_falls_back_to_unrelated_recent_listing(monkeypatch):
     monkeypatch.setattr(search, '_public_search_listings', lambda **kwargs: [])
-
     def _must_not_run(*args, **kwargs):
         raise AssertionError('strict public search must not silently return recent listings')
-
     monkeypatch.setattr(search.db, 'list_recent_listings', _must_not_run)
-    matches, mode = search.search_listings_with_fallback(
-        property_type='公寓',
-        area='不存在区域',
-        budget_min=12345,
-        budget_max=13000,
-        limit=3,
-    )
+    matches, mode = search.search_listings_with_fallback(property_type='公寓', area='不存在区域', budget_min=12345, budget_max=13000, limit=3)
     assert matches == []
     assert mode == 'no_match'
 
@@ -116,11 +100,7 @@ def test_discussion_mapping_prefers_posts_and_only_uses_legacy_as_fallback(monke
     monkeypatch.setattr(discussion_map_store, '_load_posts_sqlite', lambda: {'3054': 5140})
     monkeypatch.setattr(discussion_map_store, '_load_legacy_sqlite', lambda: {'3054': 9999, '3055': 5143})
     monkeypatch.setattr(discussion_map_store, '_load_json', lambda: {'3055': 8888, '3000': 4000})
-    assert discussion_map_store.load_discuss_map() == {
-        '3054': 5140,
-        '3055': 5143,
-        '3000': 4000,
-    }
+    assert discussion_map_store.load_discuss_map() == {'3054': 5140, '3055': 5143, '3000': 4000}
 
 
 def test_historical_publication_package_fallback_is_preserved():
@@ -133,8 +113,8 @@ def test_historical_publication_package_fallback_is_preserved():
 def test_listing_entry_keeps_photo_detail_appointment_links():
     callbacks = _callbacks(listing_entry_keyboard('l_2'))
     assert callbacks == [
-        'listing:photos:l_2',
         'listing:detail:l_2',
+        'listing:photos:l_2',
         'listing:appoint:l_2',
         'listing:consult:l_2',
         'home_smart_search',
@@ -154,21 +134,14 @@ def test_publication_package_has_no_duplicate_floor_import():
 
 
 def test_customer_routes_do_not_leak_internal_listing_wording():
-    customer_route_files = [
-        'qiaolian_dual/start_routes.py',
-        'qiaolian_dual/message_handlers.py',
-        'qiaolian_dual/listing.py',
-    ]
+    customer_route_files = ['qiaolian_dual/start_routes.py', 'qiaolian_dual/message_handlers.py', 'qiaolian_dual/listing.py']
     source = '\n'.join(Path(path).read_text(encoding='utf-8') for path in customer_route_files)
     assert '在架房源' not in source
     assert '请联系我们重新获取绑定码' not in source
 
 
 def test_binding_copy_only_promises_service_context_and_seven_day_reminder():
-    sources = '\n'.join(
-        Path(path).read_text(encoding='utf-8')
-        for path in ('qiaolian_dual/message_handlers.py', 'qiaolian_dual/admin_commands.py')
-    )
+    sources = '\n'.join(Path(path).read_text(encoding='utf-8') for path in ('qiaolian_dual/message_handlers.py', 'qiaolian_dual/admin_commands.py'))
     assert '到期前 7 天' in sources
     assert '续租和换房时无需重复填写' not in sources
 
