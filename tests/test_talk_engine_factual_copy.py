@@ -35,6 +35,22 @@ def test_service_fact_uses_fixed_plain_copy():
     assert "性价比" not in text
 
 
+def test_fee_summary_leaves_room_for_one_real_service_point():
+    listing = {
+        "listing_id": "QC0355",
+        "normalized_data": {
+            "management_fee": "包含",
+            "electric_rate": "$0.25/度",
+            "services": {"pest_control": "包含", "cleaning": "每周2次"},
+        },
+    }
+    lines = generate_talk(listing, max_points=2).splitlines()
+    assert len(lines) == 2
+    assert "物业包了" in lines[0]
+    assert "电费$0.25/度" in lines[0]
+    assert "灭虫" in lines[1]
+
+
 def test_no_supported_fact_means_no_automatic_talk():
     listing = {"listing_id": "QC0352", "project": "测试项目", "price": 800}
     assert generate_talk(listing, max_points=2, allow_empty=True) == ""
