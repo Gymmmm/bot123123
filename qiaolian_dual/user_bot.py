@@ -29,14 +29,11 @@ from .callbacks import handle_ui_callback as _handle_ui_callback_impl
 from .jobs import lease_reminder_job
 from .appointment_flow import appoint_flow_cb as _appoint_flow_cb_impl, handle_appointment_text
 from .app import cancel, error_handler, build_application as _build_application_impl, main
-from .detail_runtime_patch import install_detail_runtime_patch
 
 # results_admin was split out of the old monolith but one search-card path still
 # resolves listing_context from its module globals. Bind the canonical helper
 # explicitly so the customer-facing "available listings" flow cannot NameError.
 _results_admin_module.listing_context = listing_context
-
-install_detail_runtime_patch()
 
 
 def build_application():
