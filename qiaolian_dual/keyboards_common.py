@@ -9,7 +9,7 @@ def main_keyboard() -> InlineKeyboardMarkup:
         [
             [
                 InlineKeyboardButton('🔍 帮我找房', callback_data='home_smart_search'),
-                InlineKeyboardButton('🏠 可预约房源', callback_data='hub:available'),
+                InlineKeyboardButton('🏠 看可预约房源', callback_data='hub:available'),
             ],
             [
                 InlineKeyboardButton('📅 我的预约', callback_data='hub:appointments'),
@@ -20,25 +20,51 @@ def main_keyboard() -> InlineKeyboardMarkup:
     )
 
 def no_match_followup_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([[InlineKeyboardButton('✏️ 修改条件', callback_data='findmode:guided'), InlineKeyboardButton('💬 让顾问帮我找', callback_data='appointment_menu:contact')], [InlineKeyboardButton('🏠 看其他可预约房源', callback_data='hub:latest')]])
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton('✏️ 修改条件', callback_data='findmode:guided'),
+            InlineKeyboardButton('💬 让顾问帮我找', callback_data='appointment_menu:contact'),
+        ],
+        [InlineKeyboardButton('🏠 看可预约房源', callback_data='hub:latest')],
+    ])
 
 def quick_start_keyboard() -> InlineKeyboardMarkup:
     return main_keyboard()
 
 def room_type_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([[InlineKeyboardButton('开间', callback_data='roompick:studio'), InlineKeyboardButton('1房', callback_data='roompick:1房')], [InlineKeyboardButton('2房', callback_data='roompick:2房'), InlineKeyboardButton('3房+', callback_data='roompick:3房')], [InlineKeyboardButton('别墅/排屋', callback_data='roompick:别墅'), InlineKeyboardButton('商铺/办公', callback_data='roompick:商铺')], [InlineKeyboardButton('⬅️ 返回', callback_data='home')]])
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton('开间', callback_data='roompick:studio'), InlineKeyboardButton('1房', callback_data='roompick:1房')],
+        [InlineKeyboardButton('2房', callback_data='roompick:2房'), InlineKeyboardButton('3房及以上', callback_data='roompick:3房')],
+        [InlineKeyboardButton('别墅/排屋', callback_data='roompick:别墅'), InlineKeyboardButton('商铺/办公', callback_data='roompick:商铺')],
+        [InlineKeyboardButton('🏠 返回首页', callback_data='home')],
+    ])
 
 def latest_listing_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([[InlineKeyboardButton('🔍 帮我找房', callback_data='home_smart_search'), InlineKeyboardButton('💬 联系中文顾问', callback_data='hub:advisor')], [InlineKeyboardButton('⬅️ 返回首页', callback_data='home')]])
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton('🔍 帮我找房', callback_data='home_smart_search'),
+            InlineKeyboardButton('💬 联系中文顾问', callback_data='hub:advisor'),
+        ],
+        [InlineKeyboardButton('🏠 返回首页', callback_data='home')],
+    ])
 
 def keyword_followup_keyboard(*, area: str='', room_type: str='') -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
     if area:
-        rows.append([InlineKeyboardButton('💰 再按预算缩小', callback_data='hub:budget'), InlineKeyboardButton('🛏 再按户型缩小', callback_data='hub:layout')])
+        rows.append([
+            InlineKeyboardButton('💰 按预算筛', callback_data='hub:budget'),
+            InlineKeyboardButton('🛏 按户型筛', callback_data='hub:layout'),
+        ])
     elif room_type:
-        rows.append([InlineKeyboardButton('📍 补一个区域', callback_data='hub:area'), InlineKeyboardButton('💰 补一个预算', callback_data='hub:budget')])
+        rows.append([
+            InlineKeyboardButton('📍 选区域', callback_data='hub:area'),
+            InlineKeyboardButton('💰 选预算', callback_data='hub:budget'),
+        ])
     else:
-        rows.append([InlineKeyboardButton('📍 按区域继续找', callback_data='hub:area'), InlineKeyboardButton('💰 按预算继续找', callback_data='hub:budget')])
+        rows.append([
+            InlineKeyboardButton('📍 选区域', callback_data='hub:area'),
+            InlineKeyboardButton('💰 选预算', callback_data='hub:budget'),
+        ])
     # 视频看房只作为“预约看房”日期页里的分支，不在找房结果页另开入口。
     rows.append([InlineKeyboardButton('💬 联系中文顾问', callback_data='appointment_menu:contact')])
     rows.append([InlineKeyboardButton('🏠 返回首页', callback_data='home')])
@@ -84,14 +110,17 @@ def contact_handoff_keyboard(*, listing_id: str='') -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [chat_btn],
         [InlineKeyboardButton('📅 预约看房', callback_data='appointment_menu:offline')],
-        [InlineKeyboardButton('🏠 继续看房', callback_data='hub:latest')],
+        [InlineKeyboardButton('🏠 看可预约房源', callback_data='hub:latest')],
     ])
 
 def appointment_success_keyboard() -> InlineKeyboardMarkup:
     """提交后给出查看、顾问与继续看房三个明确去向。"""
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton('📅 我的预约', callback_data='appointment_menu:list'), InlineKeyboardButton('💬 联系中文顾问', callback_data='appointment_menu:contact')],
-        [InlineKeyboardButton('🏠 继续看房', callback_data='hub:latest')],
+        [
+            InlineKeyboardButton('📅 我的预约', callback_data='appointment_menu:list'),
+            InlineKeyboardButton('💬 联系中文顾问', callback_data='appointment_menu:contact'),
+        ],
+        [InlineKeyboardButton('🏠 看可预约房源', callback_data='hub:latest')],
     ])
 
 def channel_return_keyboard(channel_url: str='') -> InlineKeyboardMarkup:
@@ -99,7 +128,10 @@ def channel_return_keyboard(channel_url: str='') -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
     if channel_url and channel_url.strip():
         rows.append([InlineKeyboardButton('📺 返回频道继续看', url=channel_url)])
-    rows.append([InlineKeyboardButton('🔍 继续筛选其他房源', callback_data='hub:find'), InlineKeyboardButton('🏠 返回首页', callback_data='home')])
+    rows.append([
+        InlineKeyboardButton('🔍 继续找房', callback_data='hub:find'),
+        InlineKeyboardButton('🏠 返回首页', callback_data='home'),
+    ])
     return InlineKeyboardMarkup(rows)
 
 def lead_capture_keyboard() -> InlineKeyboardMarkup:
@@ -110,7 +142,10 @@ def lead_capture_keyboard() -> InlineKeyboardMarkup:
         rows.append([InlineKeyboardButton('💬 联系中文顾问', url=advisor_url)])
     else:
         rows.append([InlineKeyboardButton('💬 联系中文顾问', callback_data='hub:advisor')])
-    rows.append([InlineKeyboardButton('🔍 继续找房', callback_data='home_smart_search'), InlineKeyboardButton('🏠 返回首页', callback_data='home')])
+    rows.append([
+        InlineKeyboardButton('🔍 继续找房', callback_data='home_smart_search'),
+        InlineKeyboardButton('🏠 返回首页', callback_data='home'),
+    ])
     return InlineKeyboardMarkup(rows)
 
 def old_tenant_followup_keyboard() -> InlineKeyboardMarkup:
