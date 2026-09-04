@@ -1,0 +1,162 @@
+name: qiaolian-production-ops
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Safe production operation
+        required: true
+        default: inspect
+        type: choice
+        options: [inspect, health, latest-draft, logs, restart]
+  push:
+    branches: [codex/qiaolian-ui-cleanup-20260829]
+    paths: [.github/ops-control/request.txt]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qiaolian-production-ops
+  cancel-in-progress: false
+
+env:
+  PROD_HOST: 50.114.74.120
+  PROD_PORT: '22'
+  PROD_SSH_USER: root
+  PROD_SSH_KNOWN_HOSTS: '50.114.74.120 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILuFtkSn5SJKY7mZ52Lc/QydPRTvHFpsj87M/HcIkb/L'
+  PROD_SSH_HOST_FINGERPRINT: 'SHA256:sgqLYOUAZ482H3y5jREQ6q2BVvNFPXYiOg4ruyFVnsA'
+
+jobs:
+  production-ops:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the exact control revision
+        if: github.event_name == 'push'
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+
+      - name: Read and validate requested operation
+        id: request
+        env:
+          DISPATCH_ACTION: '${{ inputs.action }}'
+          EVENT_NAME: '${{ github.event_name }}'
+        run: |
+          set -Eeuo pipefail
+          if [[ "$EVENT_NAME" == workflow_dispatch ]]; then
+            action=$DISPATCH_ACTION
+          elif [[ "$EVENT_NAME" == push ]]; then
+            request=$(<.github/ops-control/request.txt)
+            test "$(printf '%s\n' "$request" | wc -l | tr -d ' ')" = 2
+            action=$(printf '%s\n' "$request" | sed -n '1p')
+            request_id=$(printf '%s\n' "$request" | sed -n '2p')
+            [[ "$request_id" =~ ^[A-Za-z0-9._:-]{1,80}$ ]]
+          else
+            echo 'Unsupported trigger' >&2
+            exit 2
+          fi
+          case "$action" in
+            inspect|health|latest-draft|logs|restart) ;;
+            *) echo 'Unsupported operation' >&2; exit 2 ;;
+          esac
+          printf 'action=%s\n' "$action" >> "$GITHUB_OUTPUT"
+
+      - name: Verify production SSH host key
+        run: |
+          set -Eeuo pipefail
+          ssh-keyscan -T 10 -p "$PROD_PORT" -t ed25519 "$PROD_HOST" 2>/dev/null | grep -v '^#' > "$RUNNER_TEMP/known_hosts_observed"
+          ssh-keygen -lf "$RUNNER_TEMP/known_hosts_observed" | grep -F "$PROD_SSH_HOST_FINGERPRINT"
+
+      - name: Configure production SSH
+        env:
+          PROD_SSH_PRIVATE_KEY: '${{ secrets.PROD_SSH_PRIVATE_KEY }}'
+        run: |
+          set -Eeuo pipefail
+          test -n "$PROD_SSH_PRIVATE_KEY"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
+          printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
+
+      - name: Run allowlisted production operation
+        env:
+          OPS_ACTION: '${{ steps.request.outputs.action }}'
+        run: |
+          set -Eeuo pipefail
+          ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 "$PROD_SSH_USER@$PROD_HOST" "bash -s -- '$OPS_ACTION'" <<'REMOTE'
+          set -Eeuo pipefail
+          readonly ACTION=$1
+          readonly APP=/opt/qiaolian_dual_bots
+          readonly DB="$APP/data/qiaolian_dual_bot.db"
+          readonly -a SERVICES=(qiaolian-user-bot.service qiaolian-publisher-bot.service qiaolian-collector.service)
+
+          case "$ACTION" in
+            inspect|health|latest-draft|logs|restart) ;;
+            *) echo 'Unsupported operation' >&2; exit 2 ;;
+          esac
+          test -d "$APP"
+          test -f "$DB"
+
+          health() {
+            echo '=== DEPLOYED VERSION ==='
+            if [[ -f "$APP/.deployed_sha" ]]; then
+              tr -cd '0-9a-fA-F\n' < "$APP/.deployed_sha" | head -n 1
+            else
+              git -c safe.directory="$APP" -C "$APP" rev-parse HEAD
+            fi
+            echo '=== SERVICES ==='
+            for service in "${SERVICES[@]}"; do
+              printf '%s: ' "$service"
+              systemctl is-active "$service" || true
+              systemctl show "$service" --property=ActiveState,SubState,MainPID,NRestarts,ExecMainStatus --no-pager
+            done
+            echo '=== DISK ==='
+            df -h --output=source,size,used,avail,pcent,target "$APP"
+          }
+
+          latest_draft() {
+            echo '=== LATEST DRAFT SAFE SUMMARY ==='
+            APP_DB="$DB" python3 - <<'PY'
+          import os
+          import sqlite3
+
+          db = sqlite3.connect(f"file:{os.environ['APP_DB']}?mode=ro", uri=True)
+          db.execute('PRAGMA query_only = ON')
+          columns = {row[1] for row in db.execute('PRAGMA table_info(drafts)')}
+          wanted = [name for name in ('id', 'draft_id', 'review_status', 'approved_at', 'published_at', 'created_at', 'updated_at') if name in columns]
+          if wanted:
+              row = db.execute(f"SELECT {','.join(wanted)} FROM drafts ORDER BY id DESC LIMIT 1").fetchone()
+              print(dict(zip(wanted, row)) if row else 'no drafts')
+          for table in ('drafts', 'listings', 'media_assets', 'publication_packages'):
+              exists = db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)).fetchone()
+              if exists:
+                  print(f'{table}: {db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]}')
+          PY
+          }
+
+          logs() {
+            echo '=== RECENT JOURNAL METADATA (MESSAGE CONTENT OMITTED) ==='
+            journalctl -u qiaolian-user-bot.service -u qiaolian-publisher-bot.service -u qiaolian-collector.service \
+              --since '-30 minutes' --no-pager -n 200 -o json \
+              | python3 -c 'import json,sys; allowed=("__REALTIME_TIMESTAMP","PRIORITY","_SYSTEMD_UNIT","SYSLOG_IDENTIFIER","_PID"); [print(json.dumps({k:o[k] for k in allowed if k in o}, sort_keys=True)) for line in sys.stdin if (o:=json.loads(line))]'
+          }
+
+          case "$ACTION" in
+            health) health ;;
+            latest-draft) latest_draft ;;
+            logs) logs ;;
+            inspect) health; latest_draft; logs ;;
+            restart)
+              echo '=== RESTART ALLOWLISTED SERVICES ==='
+              systemctl restart "${SERVICES[@]}"
+              for service in "${SERVICES[@]}"; do systemctl is-active --quiet "$service"; done
+              health
+              ;;
+          esac
+          REMOTE
+
+      - name: Remove temporary SSH material
+        if: always()
+        run: rm -f "$HOME/.ssh/qiaolian_production"
