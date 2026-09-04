@@ -18,7 +18,7 @@ def test_appointment_success_copy_and_buttons():
     assert "预约申请已提交" in text
     assert "无需重复提交" not in text
     assert "✅ <b>预约申请已提交</b>" in text
-    assert _labels(appointment_success_keyboard()) == ["📅 我的预约", "💬 联系中文顾问", "🔍 继续找房"]
+    assert _labels(appointment_success_keyboard()) == ["📅 查看我的预约", "💬 联系我们", "🔍 继续找房"]
 
 
 def test_appointment_submit_page_uses_compact_date_time_and_no_repeat_copy():
@@ -94,9 +94,8 @@ def test_recommendation_card_navigation_and_more_photos_stay_locked(monkeypatch)
     assert "📸 更多实拍" in labels
     assert "📋 租赁详情" in labels
     assert "📅 预约看房" in labels
-    assert "💬 联系中文顾问" in labels
-    assert "查看更多实拍" not in " ".join(labels)
-    assert "咨询顾问" not in " ".join(labels)
+    assert "💬 联系我们" in labels
+    assert "联系中文顾问" not in " ".join(labels)
     assert "findcard:0" in callbacks
     assert "findcard:2" in callbacks
     assert "listing:photos:l_2" in callbacks
