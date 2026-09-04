@@ -97,8 +97,8 @@ async def handle_listing_callback(update: Update, context: ContextTypes.DEFAULT_
                 back_callback = 'home'
                 back_label = '🏠 返回首页'
             detail_rows = [
-                [InlineKeyboardButton('📸 完整实拍', callback_data=f'listing:photos:{listing_id}'), InlineKeyboardButton('📅 预约看房', callback_data=f'listing:appoint:{listing_id}')],
-                [InlineKeyboardButton('💬 咨询这套', callback_data=f'listing:consult:{listing_id}')],
+                [InlineKeyboardButton('📸 更多实拍', callback_data=f'listing:photos:{listing_id}'), InlineKeyboardButton('📅 预约看房', callback_data=f'listing:appoint:{listing_id}')],
+                [InlineKeyboardButton('💬 联系中文顾问', callback_data=f'listing:consult:{listing_id}')],
                 [InlineKeyboardButton(back_label, callback_data=back_callback)],
             ]
             detail_keyboard = InlineKeyboardMarkup(detail_rows)
@@ -114,7 +114,7 @@ async def handle_listing_callback(update: Update, context: ContextTypes.DEFAULT_
                         available_photos.append(mf)
             elif media_file and os.path.exists(media_file):
                 available_photos.append(media_file)
-            # 房源详情只展示一张封面；完整相册由用户主动点击“全部实拍”查看。
+            # 房源详情只展示一张封面；完整相册由用户主动点击“更多实拍”查看。
             available_photos = available_photos[:1]
             if len(available_photos) == 1:
                 try:
@@ -162,8 +162,8 @@ async def handle_listing_callback(update: Update, context: ContextTypes.DEFAULT_
             create_lead(user, action='listing_detail_view', source='listing_landing', listing_id=lid)
             detail_rows = []
             if availability_reason in {'active', 'reserved'}:
-                detail_rows.append([InlineKeyboardButton('📅 预约这套', callback_data=f'listing:appoint:{lid}')])
-                detail_rows.append([InlineKeyboardButton('📸 查看更多实拍', callback_data=f'listing:photos:{lid}')])
+                detail_rows.append([InlineKeyboardButton('📅 预约看房', callback_data=f'listing:appoint:{lid}')])
+                detail_rows.append([InlineKeyboardButton('📸 更多实拍', callback_data=f'listing:photos:{lid}')])
             detail_rows.extend([
                 [InlineKeyboardButton('💬 联系中文顾问', callback_data=f'listing:consult:{lid}')],
                 [InlineKeyboardButton(
