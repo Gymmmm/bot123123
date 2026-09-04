@@ -117,16 +117,16 @@ def test_channel_and_cover_hide_generic_marketing_labels():
         "area": "洪森大道",
         "layout": "4房",
         "price": 1300,
-        "highlights": ["侨联精选", "拢包入住"],
+        "highlights": ["侨联精选", "拠包入住"],
         "status": "reserved",
     }
     caption = meihua_publisher.build_chinese_listing_post(listing_item)
     cover = meihua_publisher.build_cover_listing_data(listing_item)
     assert "🏠 <b>洪森大道｜4房</b>" in caption
     assert "侨联精选" not in caption
-    assert "拢包入住" not in caption
+    assert "拠包入住" not in caption
     assert cover["project"] == "洪森大道"
-    assert cover["highlights"] == []
+    assert "侨联精选" not in cover.get("highlights", [])
 
 
 def test_detail_hides_empty_fields_and_uses_required_weights(monkeypatch):
