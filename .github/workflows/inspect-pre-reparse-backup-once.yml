@@ -30,36 +30,34 @@ jobs:
           printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
           printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
-      - name: Scan pre-reparse backup read-only
+      - name: Scan database text fields read-only
         run: |
           set -Eeuo pipefail
           ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes "$PROD_SSH_USER@$PROD_HOST" "python3 - <<'PY'
-          import sqlite3, unicodedata, json
-          DB='/opt/backups/qiaolian-actions-20260904-075533/qiaolian_dual_bot.db'
-          DRAFT='DRF_0cdfabc0-4136-4da4-819c-a50525da19ae'
-          conn=sqlite3.connect(f'file:{DB}?mode=ro', uri=True)
-          conn.row_factory=sqlite3.Row
-          sp=conn.execute('SELECT * FROM source_posts WHERE id=1').fetchone()
-          dr=conn.execute('SELECT * FROM drafts WHERE draft_id=?',(DRAFT,)).fetchone()
-          def scan(label, value):
-              s=str(value or '')
-              found=[]
-              for i,ch in enumerate(s):
-                  cat=unicodedata.category(ch)
-                  cp=ord(ch)
-                  if cat in {'Cf','Co'} or 0xE000 <= cp <= 0xF8FF:
-                      found.append((i,f'U+{cp:04X}',cat,unicodedata.name(ch,'UNNAMED')))
-              if found:
-                  print(label, 'NOISE=', sorted(set((cp,cat,name) for _,cp,cat,name in found)), 'COUNT=',len(found))
-          for k in sp.keys():
-              if isinstance(sp[k], str): scan('source_posts.'+k, sp[k])
-          for k in dr.keys():
-              if isinstance(dr[k], str): scan('drafts.'+k, dr[k])
-          print('OLD_PROPERTY_TYPE=', dr['property_type'] if 'property_type' in dr.keys() else None)
-          try:
-              f=json.loads(dr['normalized_data'] or '{}')
-              print('OLD_DEAL_TYPE=', f.get('deal_type'))
-              print('OLD_BLOCKERS=', (f.get('quality') or {}).get('blocking_flags'))
-          except Exception as e: print('OLD_FACTS_PARSE_ERROR=', type(e).__name__)
-          conn.close()
+          import sqlite3, unicodedata, collections
+          DBS=[
+            ('pre_reparse','/opt/backups/qiaolian-actions-20260904-075533/qiaolian_dual_bot.db'),
+            ('live','/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db'),
+          ]
+          for label,path in DBS:
+              conn=sqlite3.connect(f'file:{path}?mode=ro', uri=True)
+              totals=collections.Counter(); locations=collections.Counter()
+              tables=[r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")]
+              for table in tables:
+                  cols=[r[1] for r in conn.execute(f'PRAGMA table_info("{table}")')]
+                  if not cols: continue
+                  try: rows=conn.execute(f'SELECT * FROM "{table}"')
+                  except sqlite3.Error: continue
+                  for row in rows:
+                      for col,val in zip(cols,row):
+                          if not isinstance(val,str): continue
+                          for ch in val:
+                              cp=ord(ch); cat=unicodedata.category(ch)
+                              if cat in {'Cf','Co'} or 0xE000 <= cp <= 0xF8FF:
+                                  key=(f'U+{cp:04X}',cat,unicodedata.name(ch,'UNNAMED'))
+                                  totals[key]+=1; locations[(table,col,key)]+=1
+              print(label,'UNICODE_NOISE_TOTALS=',dict(totals))
+              for (table,col,key),count in locations.most_common(30):
+                  print(label,'LOCATION=',table+'.'+col,key,'COUNT=',count)
+              conn.close()
           PY"
