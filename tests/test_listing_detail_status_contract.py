@@ -6,19 +6,14 @@ import pytest
 
 
 STATUS_LINE = {
-    "active": "\U0001f7e2 <b>房态：</b> 当前可预约",
-    "reserved": "\U0001f7e1 <b>房态：</b> 已有预约 · 仍可预约",
-    "pending": "\U0001f535 <b>房态：</b> 房态待确认",
-    "rented": "\U0001f534 <b>房态：</b> 已租出",
-    "inactive": "⚫ <b>房态：</b> 已下架",
+    "active": "<b>🟢 当前可预约</b>",
+    "reserved": "<b>🟡 已有预约 · 仍可预约</b>",
+    "pending": "<b>🔵 房态待确认</b>",
+    "rented": "<b>🔴 已租出</b>",
+    "inactive": "<b>⚫ 已下架</b>",
 }
 
-NEW_TAIL = (
-    "\U0001f4c5 <b>想看这套？</b>\n"
-    "点「预约看房」选时间。\n"
-    "没时间到现场，也可以在预约里选择实时视频看房。"
-)
-OLD_TAIL = "\U0001f4c5 <b>想实地看看？</b>\n选择方便的时间即可。"
+VISIT_HINT = "支持实地看房，也可以安排实时视频看房。"
 
 
 def _item(status: str, **extra) -> dict:
@@ -45,8 +40,8 @@ def test_detail_runtime_patch_module_is_gone():
     assert "detail_runtime_patch" not in user_bot
     assert "listing.listing_cost_text =" not in listing
     assert "想实地看看" not in listing
-    assert "想看这套" in listing
     assert "from .talk_engine import generate_talk" in listing
+    assert "水电进入住服务" in listing
 
 
 @pytest.mark.parametrize("status", ["active", "reserved", "pending", "rented", "inactive"])
@@ -59,10 +54,12 @@ def test_listing_cost_text_renders_each_canonical_status(monkeypatch, status):
     for other_status, line in STATUS_LINE.items():
         if other_status != status:
             assert line not in text
-    assert text.count("房态：") == 1
-    assert NEW_TAIL in text
-    assert OLD_TAIL not in text
-    assert "QC0089" in text or "房源编号" in text
+    assert text.count(STATUS_LINE[status]) == 1
+    assert "QC0089" in text
+    if status in {"active", "reserved"}:
+        assert VISIT_HINT in text
+    else:
+        assert VISIT_HINT not in text
 
 
 def test_listing_cost_text_includes_talk_when_facts_support_it(monkeypatch):
@@ -75,7 +72,9 @@ def test_listing_cost_text_includes_talk_when_facts_support_it(monkeypatch):
     )
     text = listing_mod.listing_cost_text("l_89")
     assert "💬 <b>侨联说</b>" in text
-    assert NEW_TAIL in text
+    assert STATUS_LINE["active"] in text
+    assert "水费" not in text
+    assert "电费" not in text
 
 
 def test_listing_cost_text_omits_talk_when_no_distinctive_fact(monkeypatch):
@@ -84,7 +83,8 @@ def test_listing_cost_text_omits_talk_when_no_distinctive_fact(monkeypatch):
     monkeypatch.setattr(listing_mod, "listing_context", lambda _lid: _item("reserved"))
     text = listing_mod.listing_cost_text("l_89")
     assert "💬 <b>侨联说</b>" not in text
-    assert NEW_TAIL in text
+    assert STATUS_LINE["reserved"] in text
+    assert VISIT_HINT in text
 
 
 def test_listing_is_available_matches_five_statuses(monkeypatch):

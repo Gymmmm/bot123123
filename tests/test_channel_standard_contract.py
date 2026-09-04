@@ -56,13 +56,12 @@ def test_locked_caption_is_compact_mobile_layout():
         "💰 <b>$680/月</b>",
         "",
         "🏢 公寓｜75㎡｜18/35楼",
-        "🔑 押2付1｜1年",
+        "🔑 押2付1｜租期1年",
         "",
         "🟢 当前可预约　QC0089",
         "",
-        "#钻石岛 #金边租房 #租金500至1000",
+        "#钻石岛 #两房 #租金500至1000",
     ]
-    assert "#两房" not in text
     assert "面议" not in text
     assert "随时入住" not in text
     assert "家具家电" not in text
