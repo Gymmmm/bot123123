@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - codex/qiaolian-ui-cleanup-20260829
+      - agent/talk-engine-detail-copy-20260904
   pull_request:
     branches:
       - codex/production-sync-20260829
@@ -52,6 +53,7 @@ jobs:
             tests/test_issue25_contract.py \
             tests/test_channel_standard_contract.py \
             tests/test_listing_detail_status_contract.py \
+            tests/test_talk_engine_factual_copy.py \
             tests/test_package_approval_media_count.py \
             tests/test_wechat_canonical_regressions.py \
             tests/test_noto_font_contract.py \
