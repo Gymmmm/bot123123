@@ -125,18 +125,33 @@ def _json_mapping(value: Any) -> dict[str, Any]:
     return parsed if isinstance(parsed, dict) else {}
 
 
-def _fact_value(listing: dict[str, Any], key: str) -> str:
-    for mapping in (
+def _fact_mappings(listing: dict[str, Any]) -> tuple[dict[str, Any], ...]:
+    return (
         listing,
         _json_mapping(listing.get("canonical_facts")),
         _json_mapping(listing.get("normalized_data")),
         _json_mapping(listing.get("extracted_data")),
-    ):
+    )
+
+
+def _fact_value(listing: dict[str, Any], key: str) -> str:
+    for mapping in _fact_mappings(listing):
         raw = mapping.get(key)
         value = str(raw or "").strip()
         if value and value.lower() not in _EMPTY_FACTS:
             return value
     return ""
+
+
+def _service_facts(listing: dict[str, Any]) -> dict[str, Any]:
+    merged: dict[str, Any] = {}
+    for mapping in _fact_mappings(listing):
+        services = mapping.get("services")
+        if isinstance(services, dict):
+            for key, value in services.items():
+                if key not in merged or merged.get(key) in (None, ""):
+                    merged[key] = value
+    return merged
 
 
 def _is_included(value: str) -> bool:
@@ -181,6 +196,7 @@ def _combined_listing_text(listing: dict[str, Any]) -> str:
 
 def detect_talk_tags(listing: dict[str, Any]) -> list[str]:
     text = _combined_listing_text(listing).lower()
+    services = _service_facts(listing)
     tags: list[str] = []
 
     def has(*words: str) -> bool:
@@ -188,10 +204,18 @@ def detect_talk_tags(listing: dict[str, Any]) -> list[str]:
 
     if has("匹克球", "pickleball"):
         tags.append("pickleball")
-    if has("灭虫", "除虫", "pest control", "pest_control"):
+    if has("灭虫", "除虫", "pest control", "pest_control") or str(services.get("pest_control") or "").strip():
         tags.append("pest_control")
 
-    if has("每周3次", "每周三次", "一周3次", "一周三次") and has("保洁", "清洁", "打扫"):
+    cleaning = str(services.get("cleaning") or "").strip()
+    if cleaning:
+        if any(token in cleaning for token in ("每周3次", "每周三次", "一周3次", "一周三次")):
+            tags.append("cleaning_3x")
+        elif any(token in cleaning for token in ("每周2次", "每周两次", "一周2次", "一周两次")):
+            tags.append("cleaning_2x")
+        elif any(token in cleaning for token in ("每周1次", "每周一次", "一周1次", "一周一次")):
+            tags.append("cleaning_1x")
+    elif has("每周3次", "每周三次", "一周3次", "一周三次") and has("保洁", "清洁", "打扫"):
         tags.append("cleaning_3x")
     elif has("每周2次", "每周两次", "一周2次", "一周两次") and has("保洁", "清洁", "打扫"):
         tags.append("cleaning_2x")
