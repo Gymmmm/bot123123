@@ -1,0 +1,144 @@
+name: apply-listing-copy-v3-once
+
+on:
+  push:
+    branches: [codex/qiaolian-ui-cleanup-20260829]
+    paths: [.github/workflows/apply-listing-copy-v3-once.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/qiaolian-ui-cleanup-20260829
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply approved listing copy
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('qiaolian_dual/listing.py')
+          s = p.read_text()
+          replacement = '''def listing_cost_text(listing_id: str) -> str:
+              """房源详情：完整事实字段 → 侨联说 → 房态。未知字段整行隐藏。"""
+              from .talk_engine import generate_talk
+              from .utils_formatting import _display_floor, _display_layout, _display_listing_id, _fmt_price
+
+              item = listing_context(listing_id)
+              normalized = _normalized_facts(item)
+              area = _known_value(item.get('area'), item.get('community'))
+              layout = _known_value(_display_layout(item.get('layout') or item.get('property_type'), item.get('property_type')))
+              price = _fmt_price(item.get('price')) if item.get('price') not in (None, '', 0, '0') else ''
+              size = _known_value(item.get('size_sqm'), item.get('size'))
+              if size and '㎡' not in size:
+                  size += '㎡'
+              floor = _display_floor(item.get('floor'))
+              deposit = _known_value(item.get('deposit'), item.get('deposit_rule'), normalized.get('deposit_payment_terms'))
+              contract = _known_value(normalized.get('contract_term_display'), normalized.get('contract_term'), item.get('contract_term'))
+              lease = ' · '.join(v for v in (deposit, contract) if v)
+              qc = _display_listing_id(listing_id)
+              status = str(item.get('status') or 'pending').strip().lower()
+              status_text = {
+                  'active': '当前可预约',
+                  'reserved': '已有预约 · 仍可预约',
+                  'pending': '房态确认中',
+                  'rented': '已租出',
+                  'inactive': '已下架',
+                  'offline': '已下架',
+              }.get(status, '房态确认中')
+              status_icon = {'active':'🟢','reserved':'🟡','pending':'🔵','rented':'🔴','inactive':'⚫','offline':'⚫'}.get(status, '🔵')
+
+              lines = ['🏠 <b>房源详情</b>', '']
+              if area:
+                  lines.append(f'🏠 区域：{he(area)}')
+              if layout:
+                  lines.append(f'🛏 户型：{he(layout)}')
+              if price:
+                  lines.append(f'💰 租金：{he(price)}')
+              if size:
+                  lines.append(f'📐 面积：{he(size)}')
+              if floor:
+                  lines.append(f'🏢 楼层：{he(floor)}')
+              if lease:
+                  lines.append(f'🔑 租约：{he(lease)}')
+              lines.append(f'{status_icon} 房态：{he(status_text)}')
+              if qc:
+                  lines.append(f'📸 实拍：{he(qc)}')
+
+              talk = generate_talk(item, max_points=2, allow_empty=True).strip()
+              if talk:
+                  safe_talk = '\\n'.join(he(line) for line in talk.splitlines() if line.strip())
+                  lines.extend(['', '💬 <b>侨联说</b>', '', safe_talk])
+              return '\\n'.join(lines)
+          '''
+          pattern = r'def listing_cost_text\(listing_id: str\) -> str:\n.*?(?=\ndef listing_cost_keyboard\()'
+          s2, n = re.subn(pattern, replacement, s, flags=re.S)
+          if n != 1:
+              raise SystemExit(f'listing_cost_text replacement count={n}')
+          s2 = s2.replace("'📋 租赁详情'", "'🏠 房源详情'").replace('"📋 租赁详情"', '"🏠 房源详情"')
+          p.write_text(s2)
+
+          # Channel publisher button wording: keep deep-link action unchanged, only public label changes.
+          for name in ('meihua_publisher.py', 'autopilot_publish_bot.py'):
+              path = Path(name)
+              if path.exists():
+                  text = path.read_text()
+                  text = text.replace('📋 租赁详情', '🏠 房源详情').replace('租赁详情', '房源详情')
+                  path.write_text(text)
+
+          # Talk: real living/service facts outrank fee recitation. Fees only fill a remaining slot.
+          p = Path('qiaolian_dual/talk_engine.py')
+          s = p.read_text()
+          old = '''    lines: list[str] = []
+
+    cost_line = _cost_talk_line(listing)
+    if cost_line:
+        lines.append(cost_line)
+
+    remaining = max(0, max_points - len(lines))
+    selected = choose_talk_tags(detect_talk_tags(listing), max_points=remaining)
+    for tag in selected:
+        if TALK_LIBRARY.get(tag):
+            lines.append(_stable_choice(TALK_LIBRARY[tag], listing_id, tag))
+'''
+          new = '''    lines: list[str] = []
+
+    selected = choose_talk_tags(detect_talk_tags(listing), max_points=max_points)
+    for tag in selected:
+        if TALK_LIBRARY.get(tag):
+            lines.append(_stable_choice(TALK_LIBRARY[tag], listing_id, tag))
+
+    # 居住感受/特殊服务优先；费用只是补充，不再让“电费$0.25/度”抢第一句。
+    if len(lines) < max_points:
+        cost_line = _cost_talk_line(listing)
+        if cost_line:
+            lines.append(cost_line)
+'''
+          if old not in s:
+              raise SystemExit('talk priority block not found')
+          p.write_text(s.replace(old, new))
+
+          # Update regression expectation for the approved priority.
+          p = Path('tests/test_talk_engine_factual_copy.py')
+          s = p.read_text()
+          s = s.replace('''    assert "物业包了" in lines[0]\n    assert "电费$0.25/度" in lines[0]\n    assert "灭虫" in lines[1]\n''', '''    assert "灭虫" in lines[0]\n    assert "保洁" in lines[1]\n    assert "电费$0.25/度" not in lines[0]\n''')
+          p.write_text(s)
+          PY
+          python -m compileall -q qiaolian_dual meihua_publisher.py autopilot_publish_bot.py tests
+          python -m pytest -q tests/test_talk_engine_factual_copy.py tests/test_channel_three_entry_contract.py
+          git diff --check
+      - name: Commit approved copy
+        run: |
+          git config user.name 'qiaolian-actions'
+          git config user.email 'actions@users.noreply.github.com'
+          git add qiaolian_dual/listing.py qiaolian_dual/talk_engine.py meihua_publisher.py autopilot_publish_bot.py tests/test_talk_engine_factual_copy.py
+          git diff --cached --quiet && exit 0
+          git commit -m 'Refine listing detail and Qiaolian talk copy'
+          git push origin HEAD:codex/qiaolian-ui-cleanup-20260829
