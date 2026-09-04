@@ -93,7 +93,13 @@ def callbacks(markup):
 def test_home_available_button_uses_unified_callback():
     kb = main_keyboard()
     mapping = {button.text: button.callback_data for row in kb.inline_keyboard for button in row}
-    assert mapping['🏠 可预约房源'] == 'hub:available'
+    assert '🏠 可预约房源' not in mapping
+    assert '当前可预约' not in ''.join(mapping)
+    assert mapping['🔍 帮我找房'] == 'home_smart_search'
+    assert mapping['📅 我的预约'] == 'hub:appointments'
+    assert mapping['🛡 租房服务'] == 'hub:rental'
+    assert mapping['🛠 入住服务'] == 'hub:service'
+    assert mapping['💬 联系中文顾问'] == 'hub:advisor'
 
 
 @pytest.mark.asyncio
@@ -137,7 +143,7 @@ async def test_listing_detail_calls_real_detail_route(monkeypatch):
     assert seen['text'] == '<b>DETAIL</b>'
     assert seen['parse_mode'] == ParseMode.HTML
     assert context.user_data['contact_listing_id'] == 'l_2'
-    assert '📅 预约这套' in labels(seen['reply_markup'])
+    assert '📅 预约看房' in labels(seen['reply_markup'])
 
 
 @pytest.mark.asyncio
