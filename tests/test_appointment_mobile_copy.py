@@ -18,7 +18,7 @@ def test_appointment_success_copy_and_buttons():
     assert "预约申请已提交" in text
     assert "无需重复提交" not in text
     assert "✅ <b>预约申请已提交</b>" in text
-    assert _labels(appointment_success_keyboard()) == ["📅 我的预约", "💬 联系中文顾问", "🏠 继续看房"]
+    assert _labels(appointment_success_keyboard()) == ["📅 我的预约", "💬 联系中文顾问", "🔍 继续找房"]
 
 
 def test_appointment_submit_page_uses_compact_date_time_and_no_repeat_copy():
