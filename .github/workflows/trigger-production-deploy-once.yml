@@ -20,5 +20,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: Gymmmm/bot123123
         run: |
-          echo 'retry V2 final customer flow after contract update 2026-09-05'
+          echo 'deploy black-gold V4 cover 2026-09-05'
           gh workflow run qiaolian-production-deploy.yml --repo "$GH_REPO" --ref codex/qiaolian-ui-cleanup-20260829 -f confirm=DEPLOY
