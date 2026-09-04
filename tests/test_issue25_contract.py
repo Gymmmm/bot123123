@@ -53,8 +53,6 @@ async def test_public_qc_detail_route_resolves_to_internal_listing_id():
 
 
 def test_channel_cta_is_fixed_and_has_no_helper(monkeypatch):
-    import meihua_publisher
-
     monkeypatch.setattr(meihua_publisher, "BOT_USERNAME", "QiaolianBot")
     markup = meihua_publisher.build_keyboard("QC0002")
     assert _labels(markup) == [["📋 租赁详情", "📸 更多实拍"], ["📅 预约看房"]]
@@ -68,12 +66,8 @@ def test_channel_cta_is_fixed_and_has_no_helper(monkeypatch):
 
 def test_channel_caption_has_no_legacy_inline_action_links():
     text = meihua_publisher.build_chinese_listing_post({
-        "listing_id": "l_2",
-        "area": "永旺1",
-        "project": "永旺一",
-        "layout": "1房1办公2卫",
-        "property_type": "公寓",
-        "price": 1800,
+        "listing_id": "l_2", "area": "永旺1", "project": "永旺一",
+        "layout": "1房1办公2卫", "property_type": "公寓", "price": 1800,
     })
     assert "<a href=" not in text
     assert "💬 问这套" not in text
@@ -81,30 +75,16 @@ def test_channel_caption_has_no_legacy_inline_action_links():
 
 def test_channel_caption_uses_confirmed_compact_post_format():
     text = meihua_publisher.build_chinese_listing_post({
-        "listing_id": "l_5",
-        "project": "钻石岛",
-        "area": "钻石岛",
-        "layout": "2房2卫",
-        "property_type": "公寓",
-        "size_sqm": 75,
-        "floor": "18/35楼",
-        "price": 680,
-        "deposit_rule": "押2付1",
-        "contract_term": "1年",
-        "highlights": ["家具家电齐全", "含物业"],
-        "available_date": "随时入住",
-        "status": "reserved",
+        "listing_id": "l_5", "project": "钻石岛", "area": "钻石岛",
+        "layout": "2房2卫", "property_type": "公寓", "size_sqm": 75,
+        "floor": "18/35楼", "price": 680, "deposit_rule": "押2付1",
+        "contract_term": "1年", "highlights": ["家具家电齐全", "含物业"],
+        "available_date": "随时入住", "status": "reserved",
     })
     assert text.splitlines() == [
-        "🏠 <b>钻石岛｜2房2卫</b>",
-        "",
-        "💰 <b>$680/月</b> 📐 <b>75㎡｜18/35楼</b>",
-        "📄 <b>押付/合同：押2付1｜1年</b>",
-        "📅 <b>可入住：随时入住</b>",
-        "",
-        "🟡 <b>已有预约 · 仍可预约</b> 🆔 <b>QJ0005</b>",
-        "",
-        "<b>#钻石岛 #两房 #金边租房</b>",
+        "🏠 <b>钻石岛｜2房2卫</b>", "", "💰 <b>$680/月</b> 📐 <b>75㎡｜18/35楼</b>",
+        "📄 <b>押付/合同：押2付1｜1年</b>", "📅 <b>可入住：随时入住</b>", "",
+        "🟡 <b>已有预约 · 仍可预约</b> 🆔 <b>QJ0005</b>", "", "<b>#钻石岛 #两房 #金边租房</b>",
     ]
     assert "　" not in text
     assert "\n\n\n" not in text
@@ -112,13 +92,8 @@ def test_channel_caption_uses_confirmed_compact_post_format():
 
 def test_channel_and_cover_hide_generic_marketing_labels():
     listing_item = {
-        "listing_id": "l_38",
-        "project": "侨联地产",
-        "area": "洪森大道",
-        "layout": "4房",
-        "price": 1300,
-        "highlights": ["侨联精选", "拠包入住"],
-        "status": "reserved",
+        "listing_id": "l_38", "project": "侨联地产", "area": "洪森大道",
+        "layout": "4房", "price": 1300, "highlights": ["侨联精选", "拠包入住"], "status": "reserved",
     }
     caption = meihua_publisher.build_chinese_listing_post(listing_item)
     cover = meihua_publisher.build_cover_listing_data(listing_item)
@@ -136,10 +111,11 @@ def test_detail_hides_empty_fields_and_uses_required_weights(monkeypatch):
         "electric_rate": "--", "floor": "23楼", "status": "reserved",
     })
     text = listing.listing_cost_text("QC0002")
-    assert "📋 <b>租赁详情｜QC0002</b>" in text
-    assert "💰 <b>$1,800/月</b>" in text
-    assert "🏢 23楼" in text
-    assert "<b>🟡 已有预约 · 仍可预约</b>" in text
+    assert "🏠 <b>房源详情</b>" in text
+    assert "永旺1｜1房" in text
+    assert "💰 租金：<b>$1,800/月</b>" in text
+    assert "🏢 楼层：23楼" in text
+    assert "🟡 已有预约 · 仍可预约" in text
     assert "押付" not in text and "水费" not in text and "电费" not in text
     assert all(token not in text for token in ("[暂无]", "未知", "--"))
 
@@ -169,10 +145,10 @@ async def test_appointment_starts_at_date_and_video_goes_to_video_date():
     ):
         video_state = await start_appointment(SimpleNamespace(), video_context, "QC0002", initial_mode="video", render_panel_fn=video_render)
     assert video_state == APPT_DATE
-    assert "哪天方便视频看房？" in video_render.await_args.kwargs["text"]
+    assert "哪天方便看房？" in video_render.await_args.kwargs["text"]
     video_labels = sum(_labels(video_render.await_args.kwargs["reply_markup"]), [])
     assert "🎥 改为视频看房" not in video_labels
-    assert "👀 改为实地看房" in video_labels
+    assert "🚶 改为实地看房" in video_labels
 
 
 @pytest.mark.asyncio
@@ -192,7 +168,7 @@ async def test_album_has_no_summary_and_one_action_box():
     assert bot.send_message.await_count == 1
     text = bot.send_message.await_args.kwargs["text"]
     assert "不应重复" not in text
-    assert _labels(bot.send_message.await_args.kwargs["reply_markup"]) == [["📋 租赁详情", "📅 预约看房"], ["💬 联系中文顾问"]]
+    assert _labels(bot.send_message.await_args.kwargs["reply_markup"]) == [["📋 租赁详情", "📅 预约看房"], ["💬 联系我们"]]
 
 
 @pytest.mark.asyncio
@@ -203,7 +179,7 @@ async def test_album_empty_copy_keeps_actions():
     assert bot.send_message.await_count == 1
     assert "这套房的实拍暂时没有加载出来。" in bot.send_message.await_args.kwargs["text"]
     assert bot.send_message.await_args.kwargs["reply_markup"] is not None
-    assert _labels(bot.send_message.await_args.kwargs["reply_markup"]) == [["📋 租赁详情", "📅 预约看房"], ["💬 联系中文顾问"]]
+    assert _labels(bot.send_message.await_args.kwargs["reply_markup"]) == [["📋 租赁详情", "📅 预约看房"], ["💬 联系我们"]]
 
 
 def test_date_keyboard_has_video_branch_without_mode_gate():
@@ -212,11 +188,7 @@ def test_date_keyboard_has_video_branch_without_mode_gate():
 
 
 def test_new_appointment_ui_has_no_focus_or_contact_entry():
-    callback_values = [
-        button.callback_data
-        for row in _appointment_date_keyboard().inline_keyboard
-        for button in row
-    ]
+    callback_values = [button.callback_data for row in _appointment_date_keyboard().inline_keyboard for button in row]
     assert not any((value or "").startswith("apfocus:") for value in callback_values)
     assert "apedit:contact" not in callback_values
 
@@ -225,18 +197,13 @@ def test_submit_and_advisor_states_are_distinct_and_consistent(monkeypatch):
     monkeypatch.setattr("qiaolian_dual.listing.listing_context", lambda _lid: {
         "area": "永旺1", "layout": "1房", "price": 1800,
     })
-    assert "顾问已收到" in advisor_text()
-    assert "顾问已收到" in advisor_handoff_text(listing_id="QC0002")
+    assert "联系我们" in advisor_text()
+    assert "已记录您咨询的房源" in advisor_handoff_text(listing_id="QC0002")
     assert "顾问已接手" in advisor_response_notice_text()
-    assert "顾问已收到" not in advisor_response_notice_text()
 
 
 def test_action_buttons_are_plain_text_without_html():
-    markups = [
-        _appointment_date_keyboard(),
-        appointment_success_keyboard(),
-        listing.listing_cost_keyboard("QC0002"),
-    ]
+    markups = [_appointment_date_keyboard(), appointment_success_keyboard(), listing.listing_cost_keyboard("QC0002")]
     for markup in markups:
         for row in markup.inline_keyboard:
             for button in row:
