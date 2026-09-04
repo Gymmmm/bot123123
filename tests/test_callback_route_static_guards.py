@@ -25,3 +25,42 @@ def test_unavailable_callback_paths_use_html_parse_mode():
 def test_recommendation_card_no_longer_routes_detail_to_open():
     source = Path('qiaolian_dual/results_admin.py').read_text(encoding='utf-8')
     assert "InlineKeyboardButton('📋 租赁详情', callback_data=f'listing:detail:{listing_id}')" in source
+
+
+def test_rental_service_callbacks_are_wired_and_legacy_aliases_are_kept():
+    dispatcher = Path('qiaolian_dual/callbacks.py').read_text(encoding='utf-8')
+    rental = Path('qiaolian_dual/callback_rental.py').read_text(encoding='utf-8')
+    assert 'matches_rental' in dispatcher
+    assert '(matches_rental, handle_rental_callback)' in dispatcher
+    required = {
+        'hub:rental',
+        'hub:rental:fees',
+        'hub:rental:handover',
+        'hub:rental:handover:preview',
+        'hub:rental:handover:details',
+        'hub:rental:handover:pdf',
+        'hub:rental:deposit',
+        'hub:rental:viewing',
+        'service:handover',
+        'service:deposit',
+    }
+    for callback in required:
+        assert repr(callback) in rental
+
+
+def test_rental_customer_copy_uses_non_guarantee_deposit_language():
+    rental = Path('qiaolian_dual/callback_rental.py').read_text(encoding='utf-8')
+    assert '侨联不替房东决定押金退多少' in rental
+    assert '最终押金退还金额' in rental
+    assert '仍以合同和实际核对结果为准' in rental
+    for banned in ('押金保障承诺', '保证退押金', '保障每一分押金', '一定不扣', '通常不会扣灯泡'):
+        assert banned not in rental
+
+
+def test_rental_handover_uses_preview_first_pdf_second_layer():
+    rental = Path('qiaolian_dual/callback_rental.py').read_text(encoding='utf-8')
+    assert "'👀 看留档样例', callback_data='hub:rental:handover:preview'" in rental
+    assert "'🔍 查看留档内容', callback_data='hub:rental:handover:details'" in rental
+    assert "'📄 查看完整样表 PDF', callback_data='hub:rental:handover:pdf'" in rental
+    assert 'send_photo' in rental
+    assert 'send_document' in rental
