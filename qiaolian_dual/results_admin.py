@@ -15,13 +15,12 @@ def _listing_card_keyboard(listing_id: str, *, available: bool = True, nav: list
     ])
     if available:
         rows.append([InlineKeyboardButton('📅 预约看房', callback_data=f'listing:appoint:{listing_id}')])
-    rows.append([InlineKeyboardButton('💬 联系中文顾问', callback_data=f'listing:consult:{listing_id}')])
-    rows.append([InlineKeyboardButton('✏️ 换条件', callback_data='home_smart_search')])
+    rows.append([InlineKeyboardButton('💬 联系我们', callback_data=f'listing:consult:{listing_id}')])
+    rows.append([InlineKeyboardButton('✏️ 换个条件', callback_data='home_smart_search')])
     return InlineKeyboardMarkup(rows)
 
 
 async def send_listing_card(bot, chat_id: int, listing: dict, index: int=0, total: int=1) -> None:
-    """兼容旧调用：仍使用统一客户房源卡 renderer。"""
     listing_id = str(listing.get('listing_id') or '').strip()
     caption, keyboard, photo_path = _find_result_card_content(listing, index, total, [listing_id] if listing_id else None)
     if photo_path:
@@ -32,11 +31,10 @@ async def send_listing_card(bot, chat_id: int, listing: dict, index: int=0, tota
 
 
 async def send_find_results_as_cards(update: Update, context: ContextTypes.DEFAULT_TYPE, matches: list[dict], match_mode: str='strict') -> None:
-    """所有找房来源只发一张可切换卡片。"""
     from .keyboards_common import no_match_followup_keyboard
     if not matches:
         await update.effective_message.reply_text(
-            '🔎 <b>暂时没有完全符合条件的房源</b>\n\n你可以调整一个条件继续找，\n也可以让中文顾问按这个需求继续留意。',
+            '🔍 <b>暂时没有完全符合条件的房源</b>\n\n不用重新开始。\n\n您可以稍微调整条件，或者先看看最接近需求的房源。',
             reply_markup=no_match_followup_keyboard(),
             parse_mode=ParseMode.HTML,
         )
@@ -71,18 +69,15 @@ def _find_result_card_content(item: dict, index: int, total: int, result_ids: li
     price = _fmt_price(item.get('price'))
     size = clean_inline_text(str(item.get('size_sqm') or item.get('size') or ''))
     floor = _display_floor(item.get('floor'))
-    deposit = clean_inline_text(str(item.get('deposit_rule') or item.get('deposit') or ''))
-    contract = clean_inline_text(str(item.get('contract_term') or ''))
     status = str(item.get('status') or 'active').strip().lower()
     status_text = '🟡 <b>已有预约 · 仍可预约</b>' if status == 'reserved' else '🟢 <b>当前可预约</b>'
 
     lines = [f'🏠 <b>{he(project)}｜{he(layout)}</b>', f'💰 <b>{he(price)}</b>', '']
+    if item.get('area'):
+        lines.append(f'📍 {he(str(item.get("area")))}')
     house_bits = [value for value in (size + ('㎡' if size and '㎡' not in size else ''), floor) if value]
     if house_bits:
-        lines.append(f"📐 {he('｜'.join(house_bits))}")
-    rent_bits = [value for value in (deposit, contract) if value]
-    if rent_bits:
-        lines.append(f"🔑 {he('｜'.join(rent_bits))}")
+        lines.append(f"📐 {he(' · '.join(house_bits))}")
     lines.extend(['', status_text, f'第 {index + 1}/{total} 套'])
 
     nav: list[InlineKeyboardButton] = []
@@ -163,7 +158,7 @@ def search_results_keyboard(matches: list[dict]) -> InlineKeyboardMarkup:
             rows.append([InlineKeyboardButton('📋 租赁详情', callback_data=f'listing:detail:{listing_id}')])
     rows.extend([
         [InlineKeyboardButton('✏️ 调整条件', callback_data='home_smart_search')],
-        [InlineKeyboardButton('💬 联系中文顾问', callback_data='hub:advisor')],
+        [InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')],
         [InlineKeyboardButton('🏠 返回首页', callback_data='home')],
     ])
     return InlineKeyboardMarkup(rows)
@@ -218,12 +213,11 @@ def _photo_action_keyboard(listing_id: str, *, available: bool) -> InlineKeyboar
     rows = [[InlineKeyboardButton('📋 租赁详情', callback_data=f'listing:detail:{listing_id}')]]
     if available:
         rows[0].append(InlineKeyboardButton('📅 预约看房', callback_data=f'listing:appoint:{listing_id}'))
-    rows.append([InlineKeyboardButton('💬 联系中文顾问', callback_data=f'listing:consult:{listing_id}')])
+    rows.append([InlineKeyboardButton('💬 联系我们', callback_data=f'listing:consult:{listing_id}')])
     return InlineKeyboardMarkup(rows)
 
 
 async def send_listing_photo_preview(bot, chat_id: int, listing_id: str) -> None:
-    """直接发送当前 QC 对应实拍；照片结束后只补一次操作消息。"""
     from .listing import listing_context
     from .utils_formatting import _display_listing_id
     from telegram import InputMediaPhoto
@@ -242,11 +236,7 @@ async def send_listing_photo_preview(bot, chat_id: int, listing_id: str) -> None
     if not photos:
         await bot.send_message(
             chat_id=chat_id,
-            text=(
-                f'📸 <b>更多实拍｜{he(qc)}</b>\n\n'
-                '这套房的实拍暂时没有加载出来。\n\n'
-                '可以稍后再试，\n或者让中文顾问直接补充给你。'
-            ),
+            text=(f'📸 <b>更多实拍｜{he(qc)}</b>\n\n这套房的实拍暂时没有加载出来。\n\n可以稍后再试，或直接联系我们。'),
             parse_mode=ParseMode.HTML,
             reply_markup=keyboard,
         )
@@ -264,7 +254,7 @@ async def send_listing_photo_preview(bot, chat_id: int, listing_id: str) -> None
             await bot.send_media_group(chat_id=chat_id, media=media)
     await bot.send_message(
         chat_id=chat_id,
-        text=f'📸 <b>更多实拍｜{he(qc)}</b>\n\n以上是这套房目前保存的现场实拍。',
+        text='📸 <b>以上是这套房目前保存的现场实拍。</b>\n\n想进一步了解，可以继续看详情，或直接预约。',
         parse_mode=ParseMode.HTML,
         reply_markup=keyboard,
     )
