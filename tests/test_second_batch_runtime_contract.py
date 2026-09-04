@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import asyncio
-import inspect
 import re
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
+
+
+LOCKED_ALBUM_LABELS = ['📋 租赁详情', '📅 预约看房', '💬 联系中文顾问']
 
 
 def _labels(kb):
@@ -105,21 +105,22 @@ async def test_answer_callback_once_hits_telegram_only_once():
 
 def test_listing_handlers_all_use_canonical_availability():
     src = Path('qiaolian_dual/callback_listing.py').read_text(encoding='utf-8')
-    for prefix in ('listing:photos:', 'listing:appoint:'):
-        block_start = src.index(prefix)
-        assert 'listing_is_available' in src[block_start:block_start + 2200]
+    photos = src[src.index("if data.startswith('listing:photos:')"):src.index("if data.startswith('listing:appoint:')")]
+    appoint = src[src.index("if data.startswith('listing:appoint:')"):src.index("if data.startswith('listing:consult:')")]
+    assert 'listing_action_allowed' in photos
+    assert 'listing_is_available' in appoint
     for prefix in ('listing:detail:', 'listing:consult:'):
         block_start = src.index(prefix)
         assert 'listing_action_allowed' in src[block_start:block_start + 2200]
 
 
-def test_pending_allows_detail_and_consult_but_not_album_or_appointment(monkeypatch):
+def test_pending_allows_detail_photos_consult_but_not_appointment(monkeypatch):
     import qiaolian_dual.listing as listing_mod
 
     monkeypatch.setattr(listing_mod.db, 'get_listing', lambda _lid: {'listing_id': 'l_pending', 'status': 'pending'})
     assert listing_mod.listing_action_allowed('l_pending', 'detail') == (True, 'pending')
     assert listing_mod.listing_action_allowed('l_pending', 'consult') == (True, 'pending')
-    assert listing_mod.listing_action_allowed('l_pending', 'photos') == (False, 'pending')
+    assert listing_mod.listing_action_allowed('l_pending', 'photos') == (True, 'pending')
     assert listing_mod.listing_action_allowed('l_pending', 'appoint') == (False, 'pending')
 
 
@@ -138,8 +139,9 @@ def test_full_album_action_box_is_single_and_exact():
     assert "📋 租赁详情" in fn
     assert "📅 预约看房" in fn
     assert "🤖 侨联找房助手" not in fn
-    assert "💬 咨询顾问" in fn
-    assert fn.count("reply_markup=keyboard") == 2  # photos-present and no-photos terminal branches only
+    assert "💬 联系中文顾问" in fn
+    assert "💬 咨询顾问" not in fn
+    assert fn.count("reply_markup=keyboard") == 2
 
 
 def test_legacy_show_more_no_longer_batches_three_listings():
@@ -168,8 +170,8 @@ def test_stale_current_card_auto_skips_when_other_valid_ids_exist():
     block = src[fn_start:fn_end]
     assert 'valid_ids' in block
     assert 'requested_id' in block
-    assert "这批推荐的房态都已经变化" in block
-    assert "这套推荐的房态已经变化" not in block
+    assert '这批推荐的房态已经变化' in block
+    assert '这套推荐的房态已经变化' not in block
 
 
 def test_main_pattern_still_routes_all_callbacks():
@@ -198,6 +200,7 @@ async def test_full_album_12_photos_sends_10_plus_2_and_one_action_box(monkeypat
         'project': 'BKK1',
         'layout': '2房',
         'property_type': '公寓',
+        'status': 'active',
         'media_files': photos,
     })
 
@@ -219,7 +222,7 @@ async def test_full_album_12_photos_sends_10_plus_2_and_one_action_box(monkeypat
     assert len(bot.messages) == 1
     assert len(bot.photos) == 0
     labels = [button.text for row in bot.messages[0]['reply_markup'].inline_keyboard for button in row]
-    assert labels == ['📅 预约看房', '📋 租赁详情', '💬 咨询顾问']
+    assert labels == LOCKED_ALBUM_LABELS
 
 
 @pytest.mark.asyncio
@@ -250,6 +253,7 @@ async def test_full_album_required_photo_counts(
         'project': 'BKK1',
         'layout': '2房',
         'property_type': '公寓',
+        'status': 'active',
         'media_files': photos,
     })
 
@@ -272,6 +276,6 @@ async def test_full_album_required_photo_counts(
     assert len(bot.messages) == 1
     terminal = bot.messages[0]
     labels = [button.text for row in terminal['reply_markup'].inline_keyboard for button in row]
-    assert labels == ['📅 预约看房', '📋 租赁详情', '💬 咨询顾问']
+    assert labels == LOCKED_ALBUM_LABELS
     if photo_count == 0:
-        assert '这套房源目前的实拍已经全部显示。' in terminal['text']
+        assert '这套房的实拍暂时没有加载出来。' in terminal['text']
