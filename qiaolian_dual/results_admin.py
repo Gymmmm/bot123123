@@ -214,6 +214,14 @@ def _allow_admin_notify(context: ContextTypes.DEFAULT_TYPE, *, key: str, cooldow
     return True
 
 
+def _photo_action_keyboard(listing_id: str, *, available: bool) -> InlineKeyboardMarkup:
+    rows = [[InlineKeyboardButton('📋 租赁详情', callback_data=f'listing:detail:{listing_id}')]]
+    if available:
+        rows[0].append(InlineKeyboardButton('📅 预约看房', callback_data=f'listing:appoint:{listing_id}'))
+    rows.append([InlineKeyboardButton('💬 联系中文顾问', callback_data=f'listing:consult:{listing_id}')])
+    return InlineKeyboardMarkup(rows)
+
+
 async def send_listing_photo_preview(bot, chat_id: int, listing_id: str) -> None:
     """直接发送当前 QC 对应实拍；照片结束后只补一次操作消息。"""
     from .listing import listing_context
@@ -228,11 +236,7 @@ async def send_listing_photo_preview(bot, chat_id: int, listing_id: str) -> None
         and os.path.basename(p).lower() not in {'cover.jpg', 'cover.jpeg', 'cover.png'}
     ))
     status = str(info.get('status') or 'active').strip().lower()
-    rows = [[InlineKeyboardButton('📋 租赁详情', callback_data=f'listing:detail:{listing_id}')]]
-    if status in {'active', 'reserved'}:
-        rows[0].append(InlineKeyboardButton('📅 预约看房', callback_data=f'listing:appoint:{listing_id}'))
-    rows.append([InlineKeyboardButton('💬 联系中文顾问', callback_data=f'listing:consult:{listing_id}')])
-    keyboard = InlineKeyboardMarkup(rows)
+    keyboard = _photo_action_keyboard(listing_id, available=status in {'active', 'reserved'})
     qc = _display_listing_id(listing_id)
 
     if not photos:
@@ -244,10 +248,7 @@ async def send_listing_photo_preview(bot, chat_id: int, listing_id: str) -> None
                 '可以稍后再试，\n或者让中文顾问直接补充给你。'
             ),
             parse_mode=ParseMode.HTML,
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton('🔄 重新加载', callback_data=f'listing:photos:{listing_id}'), InlineKeyboardButton('💬 联系中文顾问', callback_data=f'listing:consult:{listing_id}')],
-                [InlineKeyboardButton('📋 租赁详情', callback_data=f'listing:detail:{listing_id}')],
-            ]),
+            reply_markup=keyboard,
         )
         return
 
