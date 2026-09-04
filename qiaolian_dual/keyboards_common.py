@@ -101,11 +101,11 @@ def _listing_channel_url(listing_id: str) -> str:
 
 
 def contact_handoff_keyboard(*, listing_id: str='') -> InlineKeyboardMarkup:
-    """顾问最终跳转使用“打开中文顾问”；普通入口仍使用“联系中文顾问”。"""
+    """顾问跳转和普通入口都使用锁定词：联系中文顾问。"""
     listing_id = str(listing_id or '').strip()
     advisor_url = _advisor_listing_url(listing_id) if listing_id else _advisor_tg_url()
     if advisor_url:
-        chat_btn = InlineKeyboardButton('💬 打开中文顾问', url=advisor_url)
+        chat_btn = InlineKeyboardButton('💬 联系中文顾问', url=advisor_url)
     else:
         chat_btn = InlineKeyboardButton('💬 联系中文顾问', callback_data='appointment_menu:contact')
     if listing_id:
@@ -138,7 +138,7 @@ def channel_return_keyboard(channel_url: str='') -> InlineKeyboardMarkup:
 
 def lead_capture_keyboard() -> InlineKeyboardMarkup:
     advisor_url = _advisor_tg_url()
-    chat_btn = InlineKeyboardButton('💬 打开中文顾问', url=advisor_url) if advisor_url else InlineKeyboardButton('💬 联系中文顾问', callback_data='hub:advisor')
+    chat_btn = InlineKeyboardButton('💬 联系中文顾问', url=advisor_url) if advisor_url else InlineKeyboardButton('💬 联系中文顾问', callback_data='hub:advisor')
     return InlineKeyboardMarkup([
         [chat_btn],
         [InlineKeyboardButton('🔍 继续找房', callback_data='home_smart_search')],
