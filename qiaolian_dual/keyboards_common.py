@@ -9,18 +9,35 @@ def main_keyboard() -> InlineKeyboardMarkup:
         [
             [
                 InlineKeyboardButton('🔍 帮我找房', callback_data='home_smart_search'),
-                InlineKeyboardButton('🏠 可预约房源', callback_data='hub:available'),
+                InlineKeyboardButton('📅 我的预约', callback_data='hub:appointments'),
             ],
             [
-                InlineKeyboardButton('📅 我的预约', callback_data='hub:appointments'),
+                InlineKeyboardButton('🛡 租房服务', callback_data='hub:rental'),
                 InlineKeyboardButton('🛠 入住服务', callback_data='hub:service'),
             ],
             [InlineKeyboardButton('💬 联系中文顾问', callback_data='hub:advisor')],
         ]
     )
 
+def rental_service_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton('💰 费用说明', callback_data='hub:rental:fees'),
+                InlineKeyboardButton('📋 入住留档', callback_data='hub:rental:handover'),
+            ],
+            [
+                InlineKeyboardButton('🔐 押金说明', callback_data='hub:rental:deposit'),
+                InlineKeyboardButton('🎥 实地 / 视频看房', callback_data='hub:rental:viewing'),
+            ],
+            [InlineKeyboardButton('💬 联系中文顾问', callback_data='hub:advisor')],
+            [InlineKeyboardButton('⬅️ 返回首页', callback_data='home')],
+        ]
+    )
+
+
 def no_match_followup_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([[InlineKeyboardButton('✏️ 修改条件', callback_data='findmode:guided'), InlineKeyboardButton('💬 让顾问帮我找', callback_data='appointment_menu:contact')], [InlineKeyboardButton('🏠 看其他可预约房源', callback_data='hub:latest')]])
+    return InlineKeyboardMarkup([[InlineKeyboardButton('✏️ 修改条件', callback_data='findmode:guided'), InlineKeyboardButton('💬 联系中文顾问', callback_data='appointment_menu:contact')], [InlineKeyboardButton('🇨🇦 当前可预约', callback_data='hub:available')]])
 
 def quick_start_keyboard() -> InlineKeyboardMarkup:
     return main_keyboard()
@@ -39,7 +56,6 @@ def keyword_followup_keyboard(*, area: str='', room_type: str='') -> InlineKeybo
         rows.append([InlineKeyboardButton('📍 补一个区域', callback_data='hub:area'), InlineKeyboardButton('💰 补一个预算', callback_data='hub:budget')])
     else:
         rows.append([InlineKeyboardButton('📍 按区域继续找', callback_data='hub:area'), InlineKeyboardButton('💰 按预算继续找', callback_data='hub:budget')])
-    # 视频看房只作为“预约看房”日期页里的分支，不在找房结果页另开入口。
     rows.append([InlineKeyboardButton('💬 联系中文顾问', callback_data='appointment_menu:contact')])
     rows.append([InlineKeyboardButton('🏠 返回首页', callback_data='home')])
     return InlineKeyboardMarkup(rows)
