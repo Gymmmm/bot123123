@@ -32,17 +32,18 @@ ROOM_TYPE_HINTS = {'studio': ['studio', '开间', '单间'], '1房': ['1房', '�
 START_ACTIONS = ('consult', 'appoint', 'fav', 'more')
 START_ACTION_ALIASES = {'a': 'appoint', 'f': 'fav', 'm': 'more', 'q': 'consult'}
 START_ACTION_CODES = {action: alias for alias, action in START_ACTION_ALIASES.items()}
-APPOINTMENT_MODE_LABELS = {'offline': '实地看房', 'video': '实时视频代看'}
-APPOINTMENT_TIME_LABELS = {'am': '上午 9:00-12:00', 'pm': '下午 14:00-17:00', 'evening': '傍晚 17:00-19:00'}
+APPOINTMENT_MODE_LABELS = {'offline': '实地看房', 'video': '实时视频看房'}
+APPOINTMENT_TIME_LABELS = {'am': '上午 09:00–12:00', 'pm': '下午 14:00–17:00', 'evening': '晚上 17:00–19:00'}
 APPOINTMENT_FOCUS_LABELS = {'ac': '空调型号和老旧程度', 'appliances': '冰箱/洗衣机/家具使用痕迹', 'light_noise': '采光、噪音、窗外环境', 'water': '水压、热水、排水', 'fee_contract': '费用和合同细节'}
 APPOINTMENT_FOCUS_ORDER = ['ac', 'appliances', 'light_noise', 'water', 'fee_contract']
 APPOINTMENT_STATUS_LABELS = {'pending': '待确认', 'assigned': '顾问联系中', 'contacted': '顾问联系中', 'confirmed': '已确认', 'done': '已完成', 'cancelled': '已取消'}
 LEASE_REMINDER_DAYS = (7,)
-SERVICE_REQUEST_LABELS = {'repair_ac': '空调不制冷 / 家电故障', 'repair_water': '漏水 / 下水堵塞', 'repair_power': '灯具 / 电路问题', 'repair_door': '门锁 / 门窗问题', 'repair_furniture': '家具损坏', 'repair_other': '其他报修', 'property': '物业沟通'}
+SERVICE_REQUEST_LABELS = {'repair_ac': '空调 / 家电', 'repair_water': '漏水 / 排水', 'repair_power': '灯具 / 电路', 'repair_door': '门锁 / 门窗', 'repair_furniture': '家具损坏', 'repair_other': '其他问题', 'property': '物业沟通'}
 PREF_CONDITION_LABELS = {'budget': '预算优先', 'area': '区域优先', 'utility': '必须民水民电', 'parking': '停车方便', 'quiet': '安静不吵', 'sunlight': '采光好', 'pet': '可养宠物', 'furnished': '拎包入住', 'chinese_owner': '中国房东', 'amenity': '电梯/泳池'}
 FIND_AREA_CODE_MAP = {
     'rf': '富力城', 'pp': '炳发城', 'ph': '太子幸福广场',
-    'bkk1': 'BKK1', 'tk': 'TK/7月区', 'koh': '钻石岛',
+    'bkk1': 'BKK1', 'bkk23': 'BKK2 / BKK3', 'tk': 'TK/7月区', 'koh': '钻石岛',
+    'aeon1': '永旺1', 'russian': '俄罗斯市场', 'chroy': '水净华', 'sen': '森速',
     'a4': 'BKK1', 'a8': '森速', 'a6': 'TK/7月区', 'a7': '洪森大道',
     'a41': 'BKK2', 'a42': 'BKK3', 'a0': '不限',
 }
@@ -55,9 +56,6 @@ FIND_BUDGET_OPTIONS: dict[str, list[tuple[str, str, int | None, int | None]]] = 
 db = Database(DB_PATH)
 PANEL_ANCHOR_KEY = '_panel_anchor'
 
-# CallbackQuery can only be answered once. All handlers use this idempotent helper.
-# Real Telegram callbacks have a stable query.id. A weak object set is only for local
-# test/fallback query objects that do not expose an id, avoiding Python id() reuse.
 from weakref import WeakSet
 _CALLBACK_ANSWERED_IDS: set[str] = set()
 _CALLBACK_ANSWERED_ORDER: list[str] = []
@@ -94,9 +92,6 @@ async def answer_callback_once(query, text: str | None=None, *, show_alert: bool
 
 __all__ = [name for name in globals() if not name.startswith('__')]
 
-# ConversationHandler callback patterns
-# 主界面与找房筛选状态接收全部按钮回调。已注册回调由对应域处理；
-# 旧按钮或遗漏回调由统一兜底提示处理，避免用户在手机端点击后毫无反应。
 _MAIN_CB_PATTERN = r"^"
 _APPT_CB_PATTERN = r"^(apmode:|apfocus:|apdate:|aptime:|apconfirm:|apedit:|appoint_back_mode|appoint_back_date|appoint_back_time|home$)"
 
