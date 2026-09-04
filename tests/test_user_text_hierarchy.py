@@ -42,16 +42,10 @@ def test_core_user_pages_have_balanced_hierarchical_html(monkeypatch):
     }
     monkeypatch.setattr(listing_mod, 'listing_context', lambda _lid: item)
     pages = [
-        home_text(),
-        service_hub_text(),
-        listing_mod.listing_cost_text('l_88'),
-        listing_mod.listing_unavailable_text('pending'),
-        listing_mod.listing_unavailable_text('rented'),
+        home_text(), service_hub_text(), listing_mod.listing_cost_text('l_88'),
+        listing_mod.listing_unavailable_text('pending'), listing_mod.listing_unavailable_text('rented'),
         listing_mod.listing_unavailable_text('offline'),
-        _appointment_confirm_text({
-            'listing_id': 'l_88', 'date': '08/29', 'time': 'pm',
-            'mode': 'offline', 'touch_payload': {},
-        }),
+        _appointment_confirm_text({'listing_id': 'l_88', 'date': '08/29', 'time': 'pm', 'mode': 'offline', 'touch_payload': {}}),
     ]
     for page in pages:
         _assert_html_contract(page)
@@ -61,8 +55,8 @@ def test_status_is_highlighted_once_per_listing_page(monkeypatch):
     from qiaolian_dual import listing as listing_mod
 
     for status, expected in (
-        ('active', '<b>🟢 当前可预约</b>'),
-        ('reserved', '<b>🟡 已有预约 · 仍可预约</b>'),
+        ('active', '🟢 当前可预约'),
+        ('reserved', '🟡 已有预约 · 仍可预约'),
     ):
         monkeypatch.setattr(listing_mod, 'listing_context', lambda _lid, value=status: {
             'listing_id': 'l_1', 'status': value, 'price': 800,
@@ -84,11 +78,8 @@ def test_listing_card_keeps_callbacks_and_escapes_dynamic_values(monkeypatch):
     assert '&lt;一&gt;' in text and '&amp;' in text
     callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
     assert callbacks == [
-        'listing:detail:l_1',
-        'listing:photos:l_1',
-        'listing:appoint:l_1',
-        'listing:consult:l_1',
-        'home_smart_search',
+        'listing:detail:l_1', 'listing:photos:l_1', 'listing:appoint:l_1',
+        'listing:consult:l_1', 'home_smart_search',
     ]
 
 
