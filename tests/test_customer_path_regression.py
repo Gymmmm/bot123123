@@ -32,8 +32,8 @@ def test_booking_display_uses_shared_formatters():
     assert "time_text = _appointment_time_compact" in appointment
 
 
-def test_listing_detail_uses_consistent_advisor_wording():
+def test_listing_detail_uses_consistent_contact_wording():
     source = Path("qiaolian_dual/listing.py").read_text(encoding="utf-8")
-    assert "点“联系顾问”逐项核对。" not in source
-    assert "InlineKeyboardButton('💬 联系中文顾问'" in source
+    assert "InlineKeyboardButton('💬 联系我们'" in source
+    assert "联系中文顾问" not in source
     assert "咨询顾问" not in source
