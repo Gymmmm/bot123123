@@ -61,8 +61,8 @@ def test_status_is_highlighted_once_per_listing_page(monkeypatch):
     from qiaolian_dual import listing as listing_mod
 
     for status, expected in (
-        ('active', '🟢 <b>房态：</b> 当前可预约'),
-        ('reserved', '🟡 <b>房态：</b> 已有预约 · 仍可预约'),
+        ('active', '<b>🟢 当前可预约</b>'),
+        ('reserved', '<b>🟡 已有预约 · 仍可预约</b>'),
     ):
         monkeypatch.setattr(listing_mod, 'listing_context', lambda _lid, value=status: {
             'listing_id': 'l_1', 'status': value, 'price': 800,
@@ -84,8 +84,11 @@ def test_listing_card_keeps_callbacks_and_escapes_dynamic_values(monkeypatch):
     assert '&lt;一&gt;' in text and '&amp;' in text
     callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
     assert callbacks == [
-        'listing:detail:l_1', 'listing:appoint:l_1',
-        'listing:photos:l_1', 'listing:consult:l_1', 'home_smart_search',
+        'listing:detail:l_1',
+        'listing:photos:l_1',
+        'listing:appoint:l_1',
+        'listing:consult:l_1',
+        'home_smart_search',
     ]
 
 
@@ -93,7 +96,7 @@ def test_core_html_sends_declare_html_parse_mode():
     paths = {
         'qiaolian_dual/results_admin.py': ('send_listing_photo_preview',),
         'qiaolian_dual/appointment_flow.py': ('_appointment_confirm_text', 'parse_mode=ParseMode.HTML'),
-        'qiaolian_dual/callback_service.py': ('报修已提交', 'parse_mode=ParseMode.HTML'),
+        'qiaolian_dual/callback_service.py': ('报修需求已提交', 'parse_mode=ParseMode.HTML'),
     }
     for filename, needles in paths.items():
         source = open(filename, encoding='utf-8').read()

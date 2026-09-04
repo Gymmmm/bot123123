@@ -61,6 +61,7 @@ jobs:
             tests/test_callback_route_repair.py \
             tests/test_callback_route_static_guards.py \
             tests/test_user_ui_cleanup.py \
+            tests/test_locked_customer_buttons.py \
             tests/test_daily_broadcast_rotation.py \
             tests/test_tg_album_45.py \
             tests/test_cover_consolidation.py \
