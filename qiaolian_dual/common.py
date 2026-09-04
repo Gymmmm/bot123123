@@ -56,6 +56,16 @@ FIND_BUDGET_OPTIONS: dict[str, list[tuple[str, str, int | None, int | None]]] = 
 db = Database(DB_PATH)
 PANEL_ANCHOR_KEY = '_panel_anchor'
 
+
+def _title_layout_label(title: str, layout: str, separator: str='｜') -> str:
+    """跨预约模块共用的标题/户型去重 helper，兼容旧回调。"""
+    title_text = str(title or '').strip()
+    layout_text = str(layout or '').strip()
+    if not layout_text or layout_text.lower() in title_text.lower():
+        return title_text
+    return f'{title_text}{separator}{layout_text}'
+
+
 from weakref import WeakSet
 _CALLBACK_ANSWERED_IDS: set[str] = set()
 _CALLBACK_ANSWERED_ORDER: list[str] = []
