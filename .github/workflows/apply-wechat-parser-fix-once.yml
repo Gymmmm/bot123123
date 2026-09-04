@@ -23,6 +23,6 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install test dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements.txt pytest
       - name: Apply fix, run focused regression, commit and push
         run: python tools/apply_wechat_parser_fix_once.py
