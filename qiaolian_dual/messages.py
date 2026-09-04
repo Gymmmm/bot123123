@@ -31,7 +31,6 @@ def listing_detail(item: dict) -> str:
     from .text_utils import clean_telegram_text, remove_test_markers, fix_duplicate_words
     from .location_mapping import get_display_location
     from .utils_formatting import _fmt_price
-
     title = remove_test_markers(item.get('title', ''))
     listing_id = item.get('listing_id', '')
     area_raw = item.get('area', '')
@@ -41,7 +40,6 @@ def listing_detail(item: dict) -> str:
     hidden_costs = clean_telegram_text(item.get('hidden_costs', ''))
     drawbacks = clean_telegram_text(item.get('drawbacks', ''))
     available_date = fix_duplicate_words(item.get('available_date', ''))
-
     location_values: list[str] = []
     for value in (area, community):
         normalized = str(value or '').strip()
@@ -97,9 +95,7 @@ def advisor_text() -> str:
 
 
 def advisor_contact_supplement_text() -> str:
-    return (
-        "顾问会直接通过 Telegram 联系你，无需另外填写手机号或微信。"
-    )
+    return "顾问会直接通过 Telegram 联系你，无需另外填写手机号或微信。"
 
 
 def deposit_text() -> str:
@@ -116,7 +112,6 @@ def deposit_text() -> str:
 
 
 def home_text() -> str:
-    """首页只说明客户能做什么；具体房态放在各套房源里。"""
     return (
         "你好，我是侨联小管家。\n\n"
         "金边租房，先选你现在要做的事。"
@@ -210,3 +205,73 @@ def help_repeat_keyboard() -> InlineKeyboardMarkup:
         rows.append([InlineKeyboardButton("📢 频道实拍上新", url=ch)])
     rows.append([InlineKeyboardButton("🏠 返回首页", callback_data="home")])
     return InlineKeyboardMarkup(rows)
+
+
+def search_entry_intro_text() -> str:
+    return "🏠 <b>想找什么房？</b>\n\n选一个大概类型就行。"
+
+
+def smart_find_play_prompt_text() -> str:
+    return (
+        "🎲 <b>一句话关键词</b>\n\n"
+        "请直接发一句需求，无需固定格式。\n"
+        "例如：<code>BKK1 预算800冄 1房</code>\n"
+        "也可以只发：<code>钻石岛</code>、<code>500以内</code>、<code>两房</code>、<code>视频看房</code>\n\n"
+        "我会先按你说的方向筛一轮，再引导你继续缩小范围。"
+    )
+
+
+def smart_find_guided_header_text() -> str:
+    return "🏠 <b>想找什么房？</b>\n\n选一个大概类型就行。"
+
+
+def smart_find_play_footer_hint_text(*, used_fallback: bool) -> str:
+    if used_fallback:
+        return "\n\n先给你看接近的房源，还可以继续调整位置或预算。"
+    return "\n\n如需更精准，可点「帮我找房」再按类型筛选。"
+
+
+def repeat_tenant_ack_text() -> str:
+    ch = (CHANNEL_URL or "").strip()
+    ch_line = f"\n\n📢 实拍频道：<a href=\"{e(ch)}\">点这里关注上新</a>" if ch else ""
+    return (
+        "✅ <b>已登记为侨联老客回流</b>\n\n"
+        "收到，顾问会继续帮你处理换房、续租或升级户型。"
+        + ch_line
+    )
+
+
+def find_area_budget_hint_text() -> str:
+    return (
+        "💵 <b>预算大概在哪个区间？（USD/月）</b>\n\n"
+        "<b>公寓常见参考</b>：<code>300以下</code> · <code>300–500</code> · <code>500–800</code> · "
+        "<code>800–1200</code> · <code>1200以上</code>\n"
+        "<b>别墅常见参考</b>：<code>800–1500</code> · <code>1500–2500</code> · <code>2500以上</code>\n\n"
+        "一条消息里可同时带上户型，例如：<code>800–1200 两房</code>。"
+    )
+
+
+def listing_match_intro_text() -> str:
+    return "✅ <b>已为你筛出更匹配的房源</b>（优先展示可快速决策的少量选项）"
+
+
+def listing_match_footer_text() -> str:
+    return (
+        "\n\n<b>下一步</b>：点「📅 预约看房」安排到场，或点「💬 联系中文顾问」帮你对比选择。"
+    )
+
+
+def find_no_match_text() -> str:
+    return (
+        "暂时没找到完全符合条件的房源。\n"
+        "可以换一个预算或位置，\n"
+        "也可以让顾问继续帮你找。"
+    )
+
+
+def want_home_ack_text() -> str:
+    return (
+        "✅ <b>已收到你的找房条件</b>\n\n"
+        "顾问会按这些条件帮你筛出 1–3 套，并提前标注关键费用，方便你对比。\n\n"
+        "想更快收到推荐，也可以补充预算上限、民水民电、电梯/泳池需求，或直接发截图。"
+    )
