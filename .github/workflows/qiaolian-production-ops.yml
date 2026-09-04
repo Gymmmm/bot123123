@@ -4,16 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: 'Safe production operation'
+        description: Safe production operation
         required: true
         default: inspect
         type: choice
-        options:
-          - inspect
-          - latest-draft
-          - health
-          - logs
-          - restart
+        options: [inspect, health, latest-draft, logs, restart]
+  push:
+    branches: [ops/gpt-production-control]
+    paths: [.github/ops-control/request.txt]
 
 permissions:
   contents: read
@@ -34,6 +32,37 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - name: Check out the exact control revision
+        if: github.event_name == 'push'
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+
+      - name: Read and validate requested operation
+        id: request
+        env:
+          DISPATCH_ACTION: '${{ inputs.action }}'
+          EVENT_NAME: '${{ github.event_name }}'
+        run: |
+          set -Eeuo pipefail
+          if [[ "$EVENT_NAME" == workflow_dispatch ]]; then
+            action=$DISPATCH_ACTION
+          elif [[ "$EVENT_NAME" == push ]]; then
+            request=$(<.github/ops-control/request.txt)
+            test "$(printf '%s\n' "$request" | wc -l | tr -d ' ')" = 2
+            action=$(printf '%s\n' "$request" | sed -n '1p')
+            request_id=$(printf '%s\n' "$request" | sed -n '2p')
+            [[ "$request_id" =~ ^[A-Za-z0-9._:-]{1,80}$ ]]
+          else
+            echo 'Unsupported trigger' >&2
+            exit 2
+          fi
+          case "$action" in
+            inspect|health|latest-draft|logs|restart) ;;
+            *) echo 'Unsupported operation' >&2; exit 2 ;;
+          esac
+          printf 'action=%s\n' "$action" >> "$GITHUB_OUTPUT"
+
       - name: Verify production SSH host key
         run: |
           set -Eeuo pipefail
@@ -51,86 +80,83 @@ jobs:
           printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
 
-      - name: Run safe production operation
+      - name: Run allowlisted production operation
         env:
-          OPS_ACTION: '${{ inputs.action }}'
+          OPS_ACTION: '${{ steps.request.outputs.action }}'
         run: |
           set -Eeuo pipefail
           ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 "$PROD_SSH_USER@$PROD_HOST" "bash -s -- '$OPS_ACTION'" <<'REMOTE'
           set -Eeuo pipefail
-          ACTION=$1
-          APP=/opt/qiaolian_dual_bots
-          DB="$APP/data/qiaolian_dual_bot.db"
-          SERVICES=(qiaolian-user-bot.service qiaolian-publisher-bot.service qiaolian-collector.service)
+          readonly ACTION=$1
+          readonly APP=/opt/qiaolian_dual_bots
+          readonly DB="$APP/data/qiaolian_dual_bot.db"
+          readonly -a SERVICES=(qiaolian-user-bot.service qiaolian-publisher-bot.service qiaolian-collector.service)
 
+          case "$ACTION" in
+            inspect|health|latest-draft|logs|restart) ;;
+            *) echo 'Unsupported operation' >&2; exit 2 ;;
+          esac
           test -d "$APP"
           test -f "$DB"
 
           health() {
-            echo '=== DEPLOYED SHA ==='
-            cat "$APP/.deployed_sha" 2>/dev/null || git -c safe.directory="$APP" -C "$APP" rev-parse HEAD
+            echo '=== DEPLOYED VERSION ==='
+            if [[ -f "$APP/.deployed_sha" ]]; then
+              tr -cd '0-9a-fA-F\n' < "$APP/.deployed_sha" | head -n 1
+            else
+              git -c safe.directory="$APP" -C "$APP" rev-parse HEAD
+            fi
             echo '=== SERVICES ==='
-            for s in "${SERVICES[@]}"; do
-              printf '%s: ' "$s"
-              systemctl is-active "$s" || true
-              systemctl show "$s" -p MainPID -p NRestarts --no-pager
+            for service in "${SERVICES[@]}"; do
+              printf '%s: ' "$service"
+              systemctl is-active "$service" || true
+              systemctl show "$service" --property=ActiveState,SubState,MainPID,NRestarts,ExecMainStatus --no-pager
             done
             echo '=== DISK ==='
-            df -h "$APP"
+            df -h --output=source,size,used,avail,pcent,target "$APP"
           }
 
           latest_draft() {
-            echo '=== LATEST DRAFT SUMMARY ==='
-            sqlite3 -readonly "$DB" <<'SQL'
-          .headers on
-          .mode line
-          SELECT id,draft_id,source_post_id,listing_id,title,project,community,area,property_type,price,layout,size,floor,deposit,available_date,review_status,review_note,cover_asset_id,approved_at,published_at,created_at,updated_at,canonical_facts_schema,public_location_key,public_location_display,publication_location_level,canonical_area_key,property_subtype,project_brand,quality_json
-          FROM drafts ORDER BY id DESC LIMIT 1;
-          SQL
-            echo '=== LATEST CANONICAL FACTS ==='
-            sqlite3 -readonly "$DB" "SELECT normalized_data FROM drafts ORDER BY id DESC LIMIT 1;" | python3 -m json.tool 2>/dev/null || true
-            echo '=== COUNTS ==='
-            sqlite3 -readonly "$DB" <<'SQL'
-          .headers on
-          .mode column
-          SELECT 'drafts' AS item, COUNT(*) AS count FROM drafts
-          UNION ALL SELECT 'listings', COUNT(*) FROM listings
-          UNION ALL SELECT 'media_assets', COUNT(*) FROM media_assets
-          UNION ALL SELECT 'publication_packages', COUNT(*) FROM publication_packages;
-          SQL
+            echo '=== LATEST DRAFT SAFE SUMMARY ==='
+            APP_DB="$DB" python3 - <<'PY'
+          import os
+          import sqlite3
+
+          db = sqlite3.connect(f"file:{os.environ['APP_DB']}?mode=ro", uri=True)
+          db.execute('PRAGMA query_only = ON')
+          columns = {row[1] for row in db.execute('PRAGMA table_info(drafts)')}
+          wanted = [name for name in ('id', 'draft_id', 'review_status', 'approved_at', 'published_at', 'created_at', 'updated_at') if name in columns]
+          if wanted:
+              row = db.execute(f"SELECT {','.join(wanted)} FROM drafts ORDER BY id DESC LIMIT 1").fetchone()
+              print(dict(zip(wanted, row)) if row else 'no drafts')
+          for table in ('drafts', 'listings', 'media_assets', 'publication_packages'):
+              exists = db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)).fetchone()
+              if exists:
+                  print(f'{table}: {db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]}')
+          PY
           }
 
           logs() {
-            echo '=== RECENT ERRORS ==='
-            journalctl -u qiaolian-user-bot.service -u qiaolian-publisher-bot.service -u qiaolian-collector.service --since '-30 minutes' --no-pager -n 300 | tail -n 300
+            echo '=== RECENT JOURNAL METADATA (MESSAGE CONTENT OMITTED) ==='
+            journalctl -u qiaolian-user-bot.service -u qiaolian-publisher-bot.service -u qiaolian-collector.service \
+              --since '-30 minutes' --no-pager -n 200 -o json \
+              | python3 -c 'import json,sys; allowed=("__REALTIME_TIMESTAMP","PRIORITY","_SYSTEMD_UNIT","SYSLOG_IDENTIFIER","_PID"); [print(json.dumps({k:o[k] for k in allowed if k in o}, sort_keys=True)) for line in sys.stdin if (o:=json.loads(line))]'
           }
 
           case "$ACTION" in
-            health)
-              health
-              ;;
-            latest-draft)
-              latest_draft
-              ;;
-            logs)
-              logs
-              ;;
-            inspect)
-              health
-              latest_draft
-              echo '=== RECENT LOGS ==='
-              logs
-              ;;
+            health) health ;;
+            latest-draft) latest_draft ;;
+            logs) logs ;;
+            inspect) health; latest_draft; logs ;;
             restart)
-              echo '=== RESTART SERVICES ==='
+              echo '=== RESTART ALLOWLISTED SERVICES ==='
               systemctl restart "${SERVICES[@]}"
-              sleep 3
-              for s in "${SERVICES[@]}"; do systemctl is-active --quiet "$s"; done
+              for service in "${SERVICES[@]}"; do systemctl is-active --quiet "$service"; done
               health
-              ;;
-            *)
-              echo "Unsupported action: $ACTION" >&2
-              exit 2
               ;;
           esac
           REMOTE
+
+      - name: Remove temporary SSH material
+        if: always()
+        run: rm -f "$HOME/.ssh/qiaolian_production"
