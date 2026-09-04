@@ -17,6 +17,24 @@ def matches(data: str) -> bool:
     )
 
 
+def _with_return_nav(markup: InlineKeyboardMarkup, *, include_search: bool=True) -> InlineKeyboardMarkup:
+    """给房源二/三级页统一补退出链路，避免用户被困在当前页。"""
+    rows = [list(row) for row in (getattr(markup, 'inline_keyboard', None) or [])]
+    callbacks = {
+        str(getattr(button, 'callback_data', '') or '')
+        for row in rows
+        for button in row
+    }
+    nav: list[InlineKeyboardButton] = []
+    if include_search and 'home_smart_search' not in callbacks:
+        nav.append(InlineKeyboardButton('🔍 继续找房', callback_data='home_smart_search'))
+    if 'home' not in callbacks:
+        nav.append(InlineKeyboardButton('🏠 返回首页', callback_data='home'))
+    if nav:
+        rows.append(nav)
+    return InlineKeyboardMarkup(rows)
+
+
 async def handle_listing_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, query, data: str, user) -> int | None:
     from .flows import contact_management, start_appointment
     from .keyboards_common import main_keyboard, no_match_followup_keyboard
@@ -70,7 +88,7 @@ async def handle_listing_callback(update: Update, context: ContextTypes.DEFAULT_
         lid = data.split(':', 2)[2]
         allowed, reason = listing_action_allowed(lid, 'photos')
         if not allowed:
-            await render_panel(update, text=listing_unavailable_text(reason, lid), parse_mode=ParseMode.HTML, reply_markup=listing_unavailable_keyboard(lid), context=context)
+            await render_panel(update, text=listing_unavailable_text(reason, lid), parse_mode=ParseMode.HTML, reply_markup=_with_return_nav(listing_unavailable_keyboard(lid)), context=context)
             return MAIN
         context.user_data['contact_listing_id'] = lid
         await send_listing_photo_preview(context.bot, update.effective_chat.id, lid)
@@ -86,7 +104,7 @@ async def handle_listing_callback(update: Update, context: ContextTypes.DEFAULT_
             return MAIN
         allowed, reason = listing_is_available(lid)
         if not allowed:
-            await render_panel(update, text=listing_unavailable_text(reason, lid), parse_mode=ParseMode.HTML, reply_markup=listing_unavailable_keyboard(lid), context=context)
+            await render_panel(update, text=listing_unavailable_text(reason, lid), parse_mode=ParseMode.HTML, reply_markup=_with_return_nav(listing_unavailable_keyboard(lid)), context=context)
             return MAIN
         context.user_data['contact_listing_id'] = lid
         return await start_appointment(update, context, lid, source='listing_card', touch_payload={'listing_id': lid}, initial_mode=mode)
@@ -95,7 +113,7 @@ async def handle_listing_callback(update: Update, context: ContextTypes.DEFAULT_
         lid = data.split(':', 2)[2]
         allowed, reason = listing_action_allowed(lid, 'consult')
         if not allowed:
-            await render_panel(update, text=listing_unavailable_text(reason, lid), parse_mode=ParseMode.HTML, reply_markup=listing_unavailable_keyboard(lid), context=context)
+            await render_panel(update, text=listing_unavailable_text(reason, lid), parse_mode=ParseMode.HTML, reply_markup=_with_return_nav(listing_unavailable_keyboard(lid)), context=context)
             return MAIN
         context.user_data['contact_listing_id'] = lid
         context.user_data['contact_touch_payload'] = {'listing_id': lid, 'entry': 'listing_card'}
@@ -105,7 +123,7 @@ async def handle_listing_callback(update: Update, context: ContextTypes.DEFAULT_
         lid = data.split(':', 2)[2]
         allowed, reason = listing_action_allowed(lid, 'detail')
         if not allowed:
-            await render_panel(update, text=listing_unavailable_text(reason, lid), parse_mode=ParseMode.HTML, reply_markup=listing_unavailable_keyboard(lid), context=context)
+            await render_panel(update, text=listing_unavailable_text(reason, lid), parse_mode=ParseMode.HTML, reply_markup=_with_return_nav(listing_unavailable_keyboard(lid)), context=context)
             return MAIN
         item = listing_context(lid)
         if not item or not db.get_listing(lid):
@@ -114,7 +132,7 @@ async def handle_listing_callback(update: Update, context: ContextTypes.DEFAULT_
         context.user_data['contact_listing_id'] = lid
         create_lead(user, action='listing_detail_view', source='listing_landing', listing_id=lid)
         detail_text = listing_cost_text(lid)
-        detail_kb = listing_cost_keyboard(lid)
+        detail_kb = _with_return_nav(listing_cost_keyboard(lid))
         if getattr(query.message, 'photo', None):
             await query.edit_message_caption(caption=detail_text, parse_mode=ParseMode.HTML, reply_markup=detail_kb)
         else:
