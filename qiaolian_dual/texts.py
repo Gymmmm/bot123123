@@ -4,10 +4,21 @@ from __future__ import annotations
 from .common import *
 
 def welcome_text() -> str:
-    return copy_channel_welcome_text()
+    return (
+        '👋 你好，我是侨联小管家\n\n'
+        '想找房、约看房，或者已经入住了，\n'
+        '有需要直接找我就可以。'
+    )
 
 def channel_welcome_text(first_name: str='') -> str:
-    return copy_channel_welcome_text(first_name=first_name)
+    name = str(first_name or '').strip()
+    if not name:
+        return welcome_text()
+    return (
+        f'👋 你好 <b>{he(name)}</b>，我是侨联小管家\n\n'
+        '想找房、约看房，或者已经入住了，\n'
+        '有需要直接找我就可以。'
+    )
 
 def discussion_entry_welcome_text(first_name: str='', listing_id: str='') -> str:
     return copy_discussion_entry_welcome_text(first_name=first_name, listing_id=listing_id)
