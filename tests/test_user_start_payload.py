@@ -82,7 +82,6 @@ class UserStartPayloadTests(unittest.TestCase):
         self.assertEqual(payload["target"], "BKK1|cv=a")
 
     def test_new_deeplink_formats(self):
-        """新版稳定深链：detail/book/similar/video。"""
         cases = (
             ("details", "detail_"),
             ("book", "book_"),
@@ -125,7 +124,7 @@ class UserStartPayloadTests(unittest.TestCase):
         rows = keyboard.inline_keyboard
         labels = [button.text for row in rows for button in row]
         callbacks = [button.callback_data for row in rows for button in row]
-        self.assertEqual(labels[:4], ["📋 租赁详情", "📸 更多实拍", "📅 预约看房", "💬 联系我们"])
+        self.assertEqual(labels[:4], ["🏠 房源详情", "📸 更多实拍", "📅 预约看房", "💬 联系我们"])
         self.assertIn("listing:photos:l_1024", callbacks)
         self.assertIn("listing:detail:l_1024", callbacks)
         self.assertIn("listing:appoint:l_1024", callbacks)
