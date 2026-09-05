@@ -144,7 +144,9 @@ def merge_touch(existing, incoming, *, user_id, username="", display_name="", li
     from .session_deeplink import now_ts
     stamp = now or now_ts()
     incoming = dict(incoming)
-    latest = str(incoming.pop("latest_override", "") or incoming.get("source_type") or "other")
+    latest_override = str(incoming.pop("latest_override", "") or "")
+    latest = str(latest_override or incoming.get("source_type") or "other")
+    latest_detail = latest if latest_override else str(incoming.get("source_detail") or latest)
     first = dict(existing or {})
     listing = str(listing_id or incoming.get("listing_hint") or first.get("listing_id") or "")
     if first.get("first_source_type"):
@@ -159,7 +161,7 @@ def merge_touch(existing, incoming, *, user_id, username="", display_name="", li
         first_link = str(incoming.get("deep_link_payload") or "")
     return {
         "user_id": int(user_id or 0), "username": username, "display_name": display_name,
-        "source_type": latest, "source_detail": str(incoming.get("source_detail") or latest),
+        "source_type": latest, "source_detail": latest_detail,
         "listing_id": listing, "channel_message_id": incoming.get("channel_message_id") or first.get("channel_message_id"),
         "deep_link_payload": str(incoming.get("deep_link_payload") or first.get("latest_deep_link") or ""),
         "entry_action": str(incoming.get("entry_action") or ""),
@@ -167,7 +169,7 @@ def merge_touch(existing, incoming, *, user_id, username="", display_name="", li
         "first_listing_id": first.get("first_listing_id") or listing, "first_deep_link": first_link,
         "first_entry_action": first.get("first_entry_action") or incoming.get("entry_action") or "",
         "first_legacy": first_legacy, "latest_source_type": latest,
-        "latest_source_detail": str(incoming.get("source_detail") or latest), "latest_touch_at": stamp,
+        "latest_source_detail": latest_detail, "latest_touch_at": stamp,
         "latest_listing_id": listing, "latest_deep_link": str(incoming.get("deep_link_payload") or ""),
         "latest_entry_action": str(incoming.get("entry_action") or ""),
         "legacy": bool(incoming.get("legacy") or first_legacy),

@@ -47,13 +47,38 @@ def consult_action_keyboard(*, lead_id: int | None, appointment_id: int = 0, use
     uid = int(user_id or 0)
     suffix = f"{lid}:{aid}:{uid}"
     rows = [
-        [InlineKeyboardButton("✅ 我来跟进", callback_data=f"adminlead:claim:{suffix}")],
-        [InlineKeyboardButton("📞 已联系", callback_data=f"adminlead:contacted:{suffix}")],
-        [InlineKeyboardButton("✅ 完成", callback_data=f"adminlead:done:{suffix}")],
+        [
+            InlineKeyboardButton("✅ 我来跟进", callback_data=f"adminlead:claim:{suffix}"),
+            InlineKeyboardButton("📞 已联系", callback_data=f"adminlead:contacted:{suffix}"),
+        ],
+        [
+            InlineKeyboardButton("✅ 完成", callback_data=f"adminlead:done:{suffix}"),
+            InlineKeyboardButton("🚫 结束跟进", callback_data=f"adminlead:invalid:{suffix}"),
+        ],
     ]
-    if lid:
+    if str(listing_id or "").strip():
         rows.append([InlineKeyboardButton("🏠 查看房源", callback_data=f"adminq:view:{lid}")])
     return InlineKeyboardMarkup(rows)
+
+
+def format_listing_summary(listing_id: str) -> str:
+    from .listing import listing_context
+    from .utils_formatting import _display_layout, _fmt_price
+
+    item = listing_context(str(listing_id or "").strip())
+    if not item or not any(item.get(key) not in (None, "") for key in ("project", "community", "area", "layout", "property_type", "price")):
+        return ""
+    project = str(item.get("project") or item.get("community") or item.get("area") or "-")
+    layout = _display_layout(item.get("layout") or item.get("property_type"), item.get("property_type")) or "-"
+    price = _fmt_price(item.get("price")) if item.get("price") not in (None, "") else "-"
+    return "\n".join([
+        "🏠 <b>房源摘要</b>",
+        "",
+        f"QC：<b>{he(_display_listing_id(listing_id))}</b>",
+        f"项目：{he(project)}",
+        f"户型：{he(layout)}",
+        f"价格：{he(price)}",
+    ])
 
 
 def _lead_source_type(lead: dict) -> str:
@@ -158,9 +183,25 @@ async def handle_admin_query(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user = update.effective_user
     if query is None or user is None or not _is_admin(user.id):
         return
-    await answer_callback_once(query)
     data = str(query.data or "")
     action = data.split(":", 1)[1] if ":" in data else "home"
+
+    if action.startswith("view:"):
+        raw = action.split(":", 1)[1]
+        if not raw.isdigit():
+            await answer_callback_once(query, "房源信息已失效", show_alert=True)
+            return
+        lead = db.get_lead(int(raw))
+        listing_id = str((lead or {}).get("listing_id") or "").strip()
+        summary = format_listing_summary(listing_id) if listing_id else ""
+        if not summary:
+            await answer_callback_once(query, "房源信息已失效", show_alert=True)
+            return
+        await answer_callback_once(query)
+        await query.edit_message_text(summary, parse_mode=ParseMode.HTML)
+        return
+
+    await answer_callback_once(query)
 
     if action == "home":
         await query.edit_message_text("🧭 <b>侨联咨询后台</b>\n\n请选择要查看的内容。", parse_mode=ParseMode.HTML, reply_markup=admin_home_keyboard())
@@ -205,7 +246,7 @@ async def handle_admin_query(update: Update, context: ContextTypes.DEFAULT_TYPE)
             text.append(f"• {he(admin_source_group_zh(row.get('src')))}：<b>{int(row.get('total') or 0)}</b>")
         await query.edit_message_text("\n".join(text), parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ 返回咨询后台", callback_data="adminq:home")]]))
         return
-    if action.startswith("lead:") or action.startswith("view:"):
+    if action.startswith("lead:"):
         raw = action.split(":", 1)[1]
         if not raw.isdigit():
             return

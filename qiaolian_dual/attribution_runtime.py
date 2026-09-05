@@ -71,10 +71,12 @@ def install_attribution_runtime() -> None:
     results_admin._notify_admins = notify_admins_with_attribution
 
     def admin_lead_keyboard_with_done(*, lead_id, appointment_id, user_id):
+        lead = search.db.get_lead(int(lead_id or 0)) or {}
         return consult_action_keyboard(
             lead_id=lead_id,
             appointment_id=appointment_id,
             user_id=user_id,
+            listing_id=str(lead.get("listing_id") or ""),
         )
 
     results_admin.admin_lead_keyboard = admin_lead_keyboard_with_done
@@ -95,7 +97,7 @@ def install_attribution_runtime() -> None:
                     customer_id=customer_id,
                 )
                 if handled:
-                    return 0
+                    return callback_admin.MAIN
         return await original_handle_admin(update, context, query, data, user)
 
     callback_admin.handle_admin_callback = handle_admin_callback_with_done

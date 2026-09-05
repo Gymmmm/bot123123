@@ -1,12 +1,18 @@
 from types import SimpleNamespace
+from pathlib import Path
+from unittest.mock import AsyncMock
+
+import pytest
 
 from qiaolian_dual.attribution import (
     admin_source_group_zh,
+    classify_bot_event,
     classify_start_arg,
     merge_touch,
     public_deep_link_ok,
 )
 from qiaolian_dual.admin_consult import admin_home_keyboard, consult_action_keyboard
+from qiaolian_dual import admin_consult
 
 
 def test_public_deep_links_classify_without_changing_contract():
@@ -83,3 +89,79 @@ def test_admin_keyboards_are_mobile_safe_and_callbacks_short():
     assert "adminlead:claim:8:9:1001" in actions
     assert "adminlead:contacted:8:9:1001" in actions
     assert "adminlead:done:8:9:1001" in actions
+    assert "adminlead:invalid:8:9:1001" in actions
+    assert "adminq:view:8" in actions
+    assert not any(str(action).startswith("adminlead:view:") for action in actions)
+    assert [button.text for button in keyboards[1].inline_keyboard[0]] == ["✅ 我来跟进", "📞 已联系"]
+    assert [button.text for button in keyboards[1].inline_keyboard[1]] == ["✅ 完成", "🚫 结束跟进"]
+
+
+def test_listing_button_requires_real_listing_id():
+    keyboard = consult_action_keyboard(lead_id=8, appointment_id=9, user_id=1001)
+    actions = [button.callback_data for row in keyboard.inline_keyboard for button in row]
+    assert not any(str(action).startswith("adminq:view:") for action in actions)
+
+
+def test_latest_override_drops_old_deep_link_detail():
+    incoming = classify_bot_event(
+        action="smart_search",
+        payload={"start_arg": "property_QC0001_details"},
+    )
+    merged = merge_touch(None, incoming, user_id=1001, now="2026-09-05 09:00:00")
+    assert merged["latest_source_type"] == "bot_search"
+    assert merged["latest_source_detail"] == "bot_search"
+    assert merged["source_detail"] == "bot_search"
+
+
+def test_done_runtime_returns_callback_admin_main():
+    source = Path("qiaolian_dual/attribution_runtime.py").read_text(encoding="utf-8")
+    assert "return callback_admin.MAIN" in source
+    assert "if handled:\n                    return 0" not in source
+
+
+@pytest.mark.asyncio
+async def test_admin_view_edits_current_message_with_real_listing_summary(monkeypatch):
+    monkeypatch.setattr(admin_consult, "_is_admin", lambda _user_id: True)
+    monkeypatch.setattr(admin_consult.db, "get_lead", lambda lead_id: {"id": lead_id, "listing_id": "l_1"})
+    monkeypatch.setattr(
+        "qiaolian_dual.listing.listing_context",
+        lambda listing_id: {"listing_id": listing_id, "project": "测试项目", "layout": "2房", "price": 800},
+    )
+    query = SimpleNamespace(data="adminq:view:8", answer=AsyncMock(), edit_message_text=AsyncMock())
+    update = SimpleNamespace(callback_query=query, effective_user=SimpleNamespace(id=1))
+
+    await admin_consult.handle_admin_query(update, SimpleNamespace())
+
+    query.edit_message_text.assert_awaited_once()
+    text = query.edit_message_text.await_args.args[0]
+    assert "QC0001" in text
+    assert "测试项目" in text
+    assert "2房" in text
+    assert "$800/月" in text
+
+
+@pytest.mark.asyncio
+async def test_admin_view_without_listing_reports_expired(monkeypatch):
+    monkeypatch.setattr(admin_consult, "_is_admin", lambda _user_id: True)
+    monkeypatch.setattr(admin_consult.db, "get_lead", lambda _lead_id: {"id": 8, "listing_id": ""})
+    query = SimpleNamespace(data="adminq:view:8", answer=AsyncMock(), edit_message_text=AsyncMock())
+    update = SimpleNamespace(callback_query=query, effective_user=SimpleNamespace(id=1))
+
+    await admin_consult.handle_admin_query(update, SimpleNamespace())
+
+    query.edit_message_text.assert_not_awaited()
+    assert any(call.kwargs.get("text") == "房源信息已失效" for call in query.answer.await_args_list)
+
+
+@pytest.mark.asyncio
+async def test_admin_view_missing_listing_record_reports_expired(monkeypatch):
+    monkeypatch.setattr(admin_consult, "_is_admin", lambda _user_id: True)
+    monkeypatch.setattr(admin_consult.db, "get_lead", lambda _lead_id: {"id": 8, "listing_id": "l_404"})
+    monkeypatch.setattr("qiaolian_dual.listing.listing_context", lambda listing_id: {"listing_id": listing_id, "caption_variant": "a"})
+    query = SimpleNamespace(data="adminq:view:8", answer=AsyncMock(), edit_message_text=AsyncMock())
+    update = SimpleNamespace(callback_query=query, effective_user=SimpleNamespace(id=1))
+
+    await admin_consult.handle_admin_query(update, SimpleNamespace())
+
+    query.edit_message_text.assert_not_awaited()
+    assert any(call.kwargs.get("text") == "房源信息已失效" for call in query.answer.await_args_list)
