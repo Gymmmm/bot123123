@@ -53,8 +53,11 @@ async def handle_ui_callback(update: Update, context: ContextTypes.DEFAULT_TYPE,
             return MAIN if result is None else result
 
         logger.warning("[CALLBACK] unhandled user_id=%s data=%s", user.id, data)
-        text = "这个操作已失效，请返回首页继续。"
-        reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("🏠 返回首页", callback_data="home")]])
+        text = "💡 您还在挑选吗？这个操作可能已经过期，点下面可以直接重新开始。"
+        reply_markup = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔄 重新开始", callback_data="home_smart_search")],
+            [InlineKeyboardButton("🏠 返回首页", callback_data="home")],
+        ])
         try:
             await query.edit_message_text(text, reply_markup=reply_markup)
         except Exception:
