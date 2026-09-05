@@ -79,25 +79,8 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
             lead_id, appointment_id, customer_id = map(int, parts[2:])
 
             if action == 'view':
-                from .utils_formatting import _display_listing_id, _fmt_price
-                lead = db.get_lead(lead_id) or {}
-                listing_id = str(lead.get('listing_id') or '').strip()
-                info = listing_context(listing_id) if listing_id else {}
-                if not info:
-                    await answer_callback_once(query, '这条线索没有可查看的房源', show_alert=True)
-                    return MAIN
-                project = str(info.get('project') or info.get('community') or info.get('area') or '房源')
-                await context.bot.send_message(
-                    chat_id=int(user.id),
-                    text=(
-                        f'🏠 <b>{he(project)}</b>\n'
-                        f'🆔 {he(_display_listing_id(listing_id))}\n'
-                        f'💰 {he(_fmt_price(info.get("price")))}\n'
-                        f'📍 {he(str(info.get("area") or ""))}'
-                    ),
-                    parse_mode=ParseMode.HTML,
-                )
-                await answer_callback_once(query, '房源已发到当前对话')
+                from .admin_consult import handle_lead_view
+                await handle_lead_view(query, lead_id)
                 return MAIN
 
             status_map = {
@@ -110,9 +93,9 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 return MAIN
             lead_status, appointment_status, label = status_map[action]
             advisor_name = user_display_name(user)
-            ok = apply_admin_lead_action(
-                lead_id=lead_id,
-                action=action,
+            ok, _ = apply_admin_lead_action(
+                action,
+                lead_id,
                 advisor_id=str(user.id),
                 advisor_name=advisor_name,
             )
@@ -135,10 +118,16 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 updated = original.rstrip() + '\n\n' + status_line
             updated = re.sub(r'\n\n<b>处理状态：</b>[^\n]*', '', updated)
             keep_keyboard = action in {'claim', 'contacted'}
+            lead = db.get_lead(lead_id) or {}
             await query.edit_message_text(
                 updated,
                 parse_mode=ParseMode.HTML,
-                reply_markup=admin_lead_keyboard(lead_id=lead_id, appointment_id=appointment_id, user_id=customer_id) if keep_keyboard else None,
+                reply_markup=admin_lead_keyboard(
+                    lead_id=lead_id,
+                    appointment_id=appointment_id,
+                    user_id=customer_id,
+                    listing_id=str(lead.get('listing_id') or ''),
+                ) if keep_keyboard else None,
             )
             if action in {'claim', 'contacted'}:
                 from .messages import advisor_response_notice_text
