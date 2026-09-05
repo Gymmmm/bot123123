@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from types import SimpleNamespace
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
@@ -10,7 +11,6 @@ from telegram.ext import ContextTypes
 from .common import answer_callback_once, db, he
 from .attribution import admin_source_group_zh, entry_action_zh, lead_status_zh, source_type_zh
 from .attribution_store import (
-    get_user_attribution,
     list_leads_by_status,
     list_listing_leads,
     list_service_tickets,
@@ -28,34 +28,99 @@ def admin_home_keyboard() -> InlineKeyboardMarkup:
     ])
 
 
-def consult_action_keyboard(*, lead_id: int | None, appointment_id: int, user_id: int) -> InlineKeyboardMarkup:
+def consult_action_keyboard(
+    *,
+    lead_id: int,
+    appointment_id: int = 0,
+    user_id: int = 0,
+    listing_id: str = '',
+    include_back: bool = True,
+) -> InlineKeyboardMarkup:
     suffix = f'{int(lead_id or 0)}:{int(appointment_id or 0)}:{int(user_id or 0)}'
-    return InlineKeyboardMarkup([
+    rows = [
         [InlineKeyboardButton('✅ 我来跟进', callback_data=f'adminlead:claim:{suffix}')],
         [InlineKeyboardButton('📞 已联系', callback_data=f'adminlead:contacted:{suffix}')],
         [InlineKeyboardButton('✅ 完成', callback_data=f'adminlead:done:{suffix}')],
-        [InlineKeyboardButton('🏠 查看房源', callback_data=f'adminlead:view:{suffix}')],
-    ])
+    ]
+    if listing_id:
+        rows.append([InlineKeyboardButton('🏠 查看房源', callback_data=f'adminlead:view:{suffix}')])
+    if include_back:
+        rows.append([InlineKeyboardButton('⬅️ 返回后台', callback_data='adminq:home')])
+    for row in rows:
+        for button in row:
+            raw = str(button.callback_data or '')
+            if len(raw.encode('utf-8')) > 64:
+                raise ValueError(f'callback_data too long: {raw}')
+    return InlineKeyboardMarkup(rows)
 
 
-def format_consult_notify(*, user_id: int, title: str, lines: list[str], current_action: str = '') -> tuple[str, list[str]]:
-    attr = get_user_attribution(int(user_id or 0)) or {}
-    first_type = str(attr.get('first_source_type') or 'other')
-    latest_type = str(attr.get('latest_source_type') or first_type or 'other')
-    action = str(current_action or attr.get('latest_entry_action') or '')
-    deep = str(attr.get('latest_deep_link') or attr.get('first_deep_link') or '')
-    cleaned = [str(line) for line in lines if not str(line or '').startswith('入口：')]
-    cleaned.extend([
-        '',
-        f'来源：{he(admin_source_group_zh(first_type))}',
-        f'首次进入：{he(source_type_zh(first_type))}',
-        f'本次动作：{he(entry_action_zh(action))}',
-    ])
-    if deep:
-        cleaned.append(f'入口：<code>{he(deep)}</code>')
-    if latest_type != first_type:
-        cleaned.append(f'最近来源：{he(source_type_zh(latest_type))}')
-    return title, cleaned
+def _customer_line(user=None, *, username: str = '', display_name: str = '', user_id: int = 0) -> str:
+    if user is not None:
+        display_name = getattr(user, 'full_name', '') or getattr(user, 'first_name', '') or display_name or '客户'
+        username = getattr(user, 'username', '') or username
+        user_id = int(getattr(user, 'id', 0) or user_id or 0)
+    name = (display_name or '客户').strip()
+    handle = f' @{username}' if username else ''
+    if not handle and user_id:
+        handle = f' {user_id}'
+    return f'{name}{handle}'.strip()
+
+
+def _listing_facts(listing_id: str) -> dict[str, str]:
+    from .listing import listing_context
+    from .utils_formatting import _display_layout, _display_listing_id, _fmt_price
+
+    info = listing_context(listing_id) if listing_id else {}
+    project = str(info.get('project') or info.get('community') or info.get('area') or '').strip()
+    layout = _display_layout(info.get('layout') or info.get('property_type'), info.get('property_type')) if info else ''
+    return {
+        'qc': _display_listing_id(listing_id) if listing_id else '',
+        'project': project,
+        'layout': layout or '',
+        'price': _fmt_price(info.get('price')) if info else '',
+    }
+
+
+def format_consult_notify(
+    *,
+    user=None,
+    touch: dict | None = None,
+    listing_id: str = '',
+    title: str = '房源咨询',
+    current_action: str = '',
+    username: str = '',
+    display_name: str = '',
+    user_id: int = 0,
+) -> tuple[str, list[str]]:
+    touch = dict(touch or {})
+    listing_id = str(listing_id or touch.get('listing_id') or touch.get('latest_listing_id') or '').strip()
+    facts = _listing_facts(listing_id)
+    first_type = touch.get('first_source_type') or touch.get('source_type') or 'other'
+    latest_type = touch.get('latest_source_type') or touch.get('source_type') or first_type
+    first_label = source_type_zh(first_type)
+    if touch.get('first_legacy') or touch.get('legacy'):
+        first_label = f'{first_label}（历史入口）'
+    latest_label = admin_source_group_zh(latest_type)
+    action_label = entry_action_zh(current_action or touch.get('entry_action'))
+    entry = str(touch.get('deep_link_payload') or touch.get('latest_deep_link') or touch.get('first_deep_link') or '').strip()
+    if entry.startswith('discussion_entry'):
+        entry = '历史讨论区入口'
+    lines = [
+        f'客户：{he(_customer_line(user, username=username, display_name=display_name, user_id=user_id))}',
+        f'来源：{he(latest_label)}',
+    ]
+    if facts['qc']:
+        lines.append(f"房源：{he(facts['qc'])}")
+    if facts['project']:
+        lines.append(f"楼盘：{he(facts['project'])}")
+    if facts['layout']:
+        lines.append(f"户型：{he(facts['layout'])}")
+    if facts['price']:
+        lines.append(f"租金：{he(facts['price'])}")
+    lines.extend(['', f'首次进入：{he(first_label)}', f'本次动作：{he(action_label)}'])
+    if entry:
+        lines.append(f'入口：{he(entry)}')
+    return title, lines
 
 
 def _lead_card(lead: dict) -> str:
@@ -139,14 +204,67 @@ async def handle_admin_query(update: Update, context: ContextTypes.DEFAULT_TYPE)
             lead = db.get_lead(int(raw))
             if lead:
                 uid = int(lead.get('user_id') or 0)
-                await query.edit_message_text(_lead_card(lead), parse_mode=ParseMode.HTML, reply_markup=consult_action_keyboard(lead_id=int(raw), appointment_id=0, user_id=uid))
+                await query.edit_message_text(
+                    _lead_card(lead),
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=consult_action_keyboard(
+                        lead_id=int(raw),
+                        appointment_id=0,
+                        user_id=uid,
+                        listing_id=str(lead.get('listing_id') or ''),
+                    ),
+                )
         return 0
     return 0
 
 
-def apply_admin_lead_action(*, lead_id: int, action: str, advisor_id: str = '', advisor_name: str = '') -> bool:
-    mapping = {'claim': 'claimed', 'contacted': 'contacted', 'done': 'done', 'invalid': 'invalid'}
-    status = mapping.get(str(action or ''))
-    if not status:
-        return False
-    return update_lead_status(lead_id, status, advisor_id=advisor_id, advisor_name=advisor_name)
+async def handle_lead_view(query, lead_id: int) -> None:
+    lead = db.get_lead(lead_id) or {}
+    listing_id = str(lead.get('listing_id') or '').strip()
+    if not listing_id:
+        await answer_callback_once(query, '这条线索没有关联房源', show_alert=True)
+        return
+    user_obj = SimpleNamespace(
+        id=int(lead.get('user_id') or 0),
+        username=str(lead.get('username') or ''),
+        first_name=str(lead.get('display_name') or '客户'),
+        full_name=str(lead.get('display_name') or '客户'),
+    )
+    title, lines = format_consult_notify(
+        user=user_obj,
+        touch={
+            'first_source_type': lead.get('first_source_type') or lead.get('source_type'),
+            'latest_source_type': lead.get('source_type'),
+            'first_legacy': 'legacy_discussion_entry' in str(lead.get('source_detail') or lead.get('deep_link_payload') or ''),
+            'deep_link_payload': lead.get('deep_link_payload') or '',
+            'entry_action': lead.get('entry_action') or lead.get('action') or '',
+            'listing_id': listing_id,
+        },
+        listing_id=listing_id,
+        title='查看房源',
+        current_action=str(lead.get('entry_action') or lead.get('action') or ''),
+    )
+    text = f"🏠 <b>{he(title)}</b>\n\n" + '\n'.join(lines) + f"\n\n当前状态：{he(lead_status_zh(lead.get('lead_status')))}"
+    await query.edit_message_text(
+        text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=consult_action_keyboard(
+            lead_id=lead_id,
+            appointment_id=0,
+            user_id=int(lead.get('user_id') or 0),
+            listing_id=listing_id,
+        ),
+    )
+
+
+def apply_admin_lead_action(action: str, lead_id: int, *, advisor_id: str, advisor_name: str) -> tuple[bool, str]:
+    mapping = {
+        'claim': ('claimed', '已接手'),
+        'contacted': ('contacted', '已联系'),
+        'done': ('done', '已完成'),
+        'invalid': ('invalid', '无效'),
+    }
+    if action not in mapping:
+        return False, ''
+    status, label = mapping[action]
+    return update_lead_status(lead_id, status, advisor_id=advisor_id, advisor_name=advisor_name), label
