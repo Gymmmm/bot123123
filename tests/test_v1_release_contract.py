@@ -15,7 +15,7 @@ from qiaolian_dual.texts import advisor_text, help_text
 from v2.qiaolian_publisher_v2.keyboards import publish_post_keyboard
 
 
-LOCKED_ALBUM_LABELS = ["📋 租赁详情", "📅 预约看房", "💬 联系我们"]
+LOCKED_ALBUM_LABELS = ["🏠 房源详情", "📅 预约看房", "💬 联系我们"]
 
 
 def _buttons(keyboard):
@@ -34,7 +34,7 @@ def test_channel_post_has_exact_three_locked_ctas_and_listing_context():
         post_token="qlabc123",
     )
     assert [[button.text for button in row] for row in keyboard.inline_keyboard] == [
-        ["📋 租赁详情", "📸 更多实拍"],
+        ["🏠 房源详情", "📸 更多实拍"],
         ["📅 预约看房"],
     ]
     urls = [unquote(button.url or "") for button in _buttons(keyboard)]
@@ -57,7 +57,7 @@ def test_meihua_publisher_keyboard_uses_same_public_qc_contract():
         )
 
     assert [[button.text for button in row] for row in keyboard.inline_keyboard] == [
-        ["📋 租赁详情", "📸 更多实拍"],
+        ["🏠 房源详情", "📸 更多实拍"],
         ["📅 预约看房"],
     ]
     urls = [unquote(button.url or "") for button in _buttons(keyboard)]
@@ -101,8 +101,7 @@ def test_listing_detail_hides_unknown_or_empty_rows():
         text = listing_cost_text("l_42")
 
     assert "永旺1｜1房1卫" in text
-    assert "$800/月" in text
-    assert "💰 租金：" in text
+    assert "<b>租金：</b> <b>$800/月</b>" in text
     for forbidden in ("[暂无]", "未知", "--", "押付：", "租期：", "面积：", "楼层：", "电费：", "水费：", "物业费：", "网络费：", "停车费："):
         assert forbidden not in text
 
