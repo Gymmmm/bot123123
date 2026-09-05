@@ -127,6 +127,7 @@ async def show_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 
 async def contact_management(update: Update, context: ContextTypes.DEFAULT_TYPE, *, source: str='menu', from_listing: str | None = None) -> int:
+    from .admin_consult import format_consult_notify
     from .admin_contract import _user_contact_text, _user_mention_html
     from .keyboards_common import contact_handoff_keyboard
     from .listing import listing_context
@@ -145,7 +146,13 @@ async def contact_management(update: Update, context: ContextTypes.DEFAULT_TYPE,
     admin_lines = [f'用户：{_user_mention_html(update.effective_user)}', f'联系方式：{he(_user_contact_text(update.effective_user))}', f'入口：{he(source or "用户咨询")}']
     if listing_id:
         admin_lines.append(f'咨询房源：{he(_display_listing_id(listing_id))}')
-    await _notify_admins(context, title='用户联系我们', lines=admin_lines)
+    notify_title, notify_lines = format_consult_notify(
+        user_id=int(update.effective_user.id),
+        title='用户联系我们',
+        lines=admin_lines,
+        current_action='consult_menu_click',
+    )
+    await _notify_admins(context, title=notify_title, lines=notify_lines)
 
     if listing_id:
         item = listing_context(listing_id)

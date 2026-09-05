@@ -67,8 +67,11 @@ class LeadWorkflowTests(unittest.TestCase):
         ]
         self.assertIn("adminlead:claim:8:9:1001", callbacks)
         self.assertIn("adminlead:contacted:8:9:1001", callbacks)
-        self.assertIn("adminlead:invalid:8:9:1001", callbacks)
-        self.assertTrue(all(len(value) <= 64 for value in callbacks))
+        self.assertIn("adminlead:done:8:9:1001", callbacks)
+        self.assertIn("adminlead:view:8:9:1001", callbacks)
+        self.assertNotIn("adminlead:invalid:8:9:1001", callbacks)
+        self.assertTrue(all(len(value.encode("utf-8")) <= 64 for value in callbacks))
+        self.assertTrue(all(len(row) == 1 for row in keyboard.inline_keyboard))
 
 
 if __name__ == "__main__":

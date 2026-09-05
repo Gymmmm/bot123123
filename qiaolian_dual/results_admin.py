@@ -180,11 +180,8 @@ async def _notify_admins(context: ContextTypes.DEFAULT_TYPE, *, title: str, line
 
 
 def admin_lead_keyboard(*, lead_id: int | None, appointment_id: int, user_id: int) -> InlineKeyboardMarkup:
-    suffix = f'{lead_id or 0}:{appointment_id}:{user_id}'
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton('✅ 我来跟进', callback_data=f'adminlead:claim:{suffix}')],
-        [InlineKeyboardButton('📞 已联系客户', callback_data=f'adminlead:contacted:{suffix}'), InlineKeyboardButton('🚫 结束跟进', callback_data=f'adminlead:invalid:{suffix}')],
-    ])
+    from .admin_consult import consult_action_keyboard
+    return consult_action_keyboard(lead_id=lead_id, appointment_id=appointment_id, user_id=user_id)
 
 
 def admin_repair_keyboard(ticket_id: int) -> InlineKeyboardMarkup:

@@ -32,15 +32,16 @@ def build_application(*, token: str | None = None) -> Application:
     from .user_ux_patch import install_user_ux_patch
     install_user_ux_patch()
 
+    from .admin_consult import cmd_admin_home, handle_admin_query
     from .admin_contract_ui import cmd_contracts
     from .admin_commands import cmd_deal_done, cmd_lead_response, cmd_push_all, cmd_push_local, cmd_repair_update
     from .admin_contract import _all_user_admin_ids
     from .appointment_flow import appoint_flow_cb, handle_appointment_text
+    from .attribution_hooks import start_with_attribution
     from .callbacks import handle_ui_callback
     from .jobs import lease_reminder_job
     from .message_handlers import cmd_about, cmd_admin_add, cmd_admin_list, cmd_admin_remove, cmd_appointments, cmd_contact, cmd_favorites, cmd_find, cmd_help, cmd_search, cmd_service, handle_main_message
     from .search_text_handlers import handle_find_area, handle_find_budget
-    from .start_routes import start
 
     active_token = USER_BOT_TOKEN if token is None else str(token)
     if not active_token.strip():
@@ -50,7 +51,7 @@ def build_application(*, token: str | None = None) -> Application:
     app = Application.builder().token(active_token).request(request).get_updates_request(updates_request).build()
     conv_handler = ConversationHandler(
         entry_points=[
-            CommandHandler('start', start), CommandHandler('search', cmd_search), CommandHandler('about', cmd_about),
+            CommandHandler('start', start_with_attribution), CommandHandler('search', cmd_search), CommandHandler('about', cmd_about),
             CommandHandler('find', cmd_find), CommandHandler('favorites', cmd_favorites), CommandHandler('appointments', cmd_appointments),
             CommandHandler('help', cmd_help), CommandHandler('service', cmd_service), CommandHandler('contact', cmd_contact),
             CommandHandler('admin_list', cmd_admin_list), CommandHandler('admin_add', cmd_admin_add), CommandHandler('admin_remove', cmd_admin_remove),
@@ -69,7 +70,7 @@ def build_application(*, token: str | None = None) -> Application:
             APPT_CONFIRM: [CallbackQueryHandler(appoint_flow_cb, pattern=_APPT_CB_PATTERN), CallbackQueryHandler(handle_ui_callback, pattern=_MAIN_CB_PATTERN), MessageHandler(filters.TEXT & ~filters.COMMAND, handle_appointment_text)],
         },
         fallbacks=[
-            CommandHandler('cancel', cancel), CommandHandler('start', start), CommandHandler('search', cmd_search), CommandHandler('about', cmd_about),
+            CommandHandler('cancel', cancel), CommandHandler('start', start_with_attribution), CommandHandler('search', cmd_search), CommandHandler('about', cmd_about),
             CommandHandler('find', cmd_find), CommandHandler('favorites', cmd_favorites), CommandHandler('appointments', cmd_appointments),
             CommandHandler('help', cmd_help), CommandHandler('service', cmd_service), CommandHandler('contact', cmd_contact),
             CommandHandler('admin_list', cmd_admin_list), CommandHandler('admin_add', cmd_admin_add), CommandHandler('admin_remove', cmd_admin_remove),
@@ -79,6 +80,8 @@ def build_application(*, token: str | None = None) -> Application:
         allow_reentry=True,
     )
     app.add_handler(CommandHandler('contracts', cmd_contracts), group=-1)
+    app.add_handler(CommandHandler('admin', cmd_admin_home), group=-1)
+    app.add_handler(CallbackQueryHandler(handle_admin_query, pattern=r'^adminq:'), group=-1)
     app.add_handler(conv_handler)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_main_message))
     logger.info('全局兜底 MessageHandler 已注册 (group=0)')
@@ -91,7 +94,7 @@ def build_application(*, token: str | None = None) -> Application:
             BotCommand('service', '入住服务'), BotCommand('contact', '联系我们'), BotCommand('help', '使用帮助'), BotCommand('about', '关于侨联'),
         ]
         await application.bot.set_my_commands(user_commands)
-        admin_commands = user_commands + [BotCommand('contracts', '租客与合同'), BotCommand('admin_list', '管理员管理')]
+        admin_commands = user_commands + [BotCommand('admin', '咨询后台'), BotCommand('contracts', '租客与合同'), BotCommand('admin_list', '管理员管理')]
         for admin_id in sorted(_all_user_admin_ids()):
             scope = BotCommandScopeChat(chat_id=admin_id)
             await application.bot.set_my_commands(admin_commands, scope=scope)
