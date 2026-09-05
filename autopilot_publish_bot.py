@@ -704,47 +704,31 @@ def _kb_preview(draft_pk: int, selected_variant: str = "a") -> InlineKeyboardMar
 
 
 def build_channel_menu_keyboard() -> InlineKeyboardMarkup:
-    """频道置顶帖：四个按钮 2×2（按区域｜按预算｜最新房源｜顾问咨询）。"""
+    """频道置顶索引：频道负责浏览，Bot 负责筛选与承接。"""
     if DEEPLINK_BOT_USERNAME:
         base = f"https://t.me/{DEEPLINK_BOT_USERNAME}?start="
-        return InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton("📍 区域找房", url=f"{base}find_area"),
-                    InlineKeyboardButton("💰 预算找房", url=f"{base}find_budget"),
-                ],
-                [
-                    InlineKeyboardButton("🆕 最新房源", url=f"{base}latest"),
-                    InlineKeyboardButton("💬 中文顾问", url=f"{base}advisor"),
-                ],
-            ]
-        )
-    ch = CHANNEL_ID.replace("-100", "").lstrip("-")
-    if ch:
-        url = f"https://t.me/c/{ch}"
-        return InlineKeyboardMarkup(
-            [
-                [InlineKeyboardButton(f"进入 {BRAND_NAME} 频道", url=url)],
-            ]
-        )
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton('按区域找房', url=base + 'find_area'), InlineKeyboardButton('按预算找房', url=base + 'find_budget')],
+            [InlineKeyboardButton('按户型找房', url=base + 'find_layout'), InlineKeyboardButton('最新房源', url=base + 'latest')],
+            [InlineKeyboardButton('联系侨联', url=base + 'advisor')],
+        ])
     return InlineKeyboardMarkup([])
-
 
 def default_pin_html() -> str:
     custom = _get_setting(KEY_PIN_TEXT, "").strip()
     if custom:
         return custom
-    # Never expose environment labels such as “测试” in public channel copy.
-    public_brand = (BRAND_NAME or "侨联地产").replace("测试", "").strip() or "侨联地产"
-    b = html.escape(public_brand)
     return (
-        f"<b>🏠 {b}｜金边华人租房</b>\n"
-        "实拍房源 · 费用先说 · 中文带看\n\n"
-        "看中房源，直接点帖内「咨询」或「预约」，\n"
-        "系统会自动带上房源编号。\n\n"
-        "👇 也可以按区域或预算开始找"
+        '<b>侨联地产｜金边租房频道</b>\n'
+        '<b>您在金边的自己人</b>\n\n'
+        '这里持续更新金边真实在租房源。\n\n'
+        '<b>怎么看：</b>直接往下浏览，每套主帖先看区域、户型和租金；需要更多照片，点「更多实拍」。\n'
+        '<b>怎么找：</b>用下方索引按区域、预算或户型进入 Bot 筛选。\n'
+        '<b>怎么问：</b>看中具体房源，点「房源详情」进入 Bot，房源信息会自动带上。\n'
+        '<b>怎么约：</b>点房源下方「预约看房」，直接选择日期和实地 / 视频方式。\n\n'
+        '<b>频道负责看房源，Bot 负责找房、咨询和预约。</b>\n\n'
+        '<b>侨联地产｜您在金边的自己人</b>'
     )
-
 
 def channel_index_html() -> str:
     """旧 /post_index 复用唯一置顶文案，避免产生第二套导航口径。"""

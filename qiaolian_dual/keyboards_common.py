@@ -5,12 +5,16 @@ from .common import *
 
 
 def main_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([
+    rows = [
         [InlineKeyboardButton('🔍 帮我找房', callback_data='home_smart_search'), InlineKeyboardButton('📅 我的预约', callback_data='hub:appointments')],
         [InlineKeyboardButton('🛡 侨联保障', callback_data='hub:rental'), InlineKeyboardButton('🛠 入住服务', callback_data='hub:service')],
-        [InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')],
-    ])
-
+    ]
+    channel_url = str(CHANNEL_URL or '').strip()
+    if channel_url:
+        rows.append([InlineKeyboardButton('房源频道', url=channel_url), InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')])
+    else:
+        rows.append([InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')])
+    return InlineKeyboardMarkup(rows)
 
 def rental_service_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([

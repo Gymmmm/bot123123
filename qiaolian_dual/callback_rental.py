@@ -33,17 +33,14 @@ def matches(data: str) -> bool:
 
 def rental_home_text() -> str:
     return (
-        '🛡 <b>通过侨联租房，多一层安心。</b>\n\n'
-        '🎥 <b>看房更方便</b>\n'
-        '支持实地看房，也可以先视频看房。\n\n'
-        '💰 <b>费用先说清</b>\n'
-        '水电、物业、网络等重要费用，签约前尽量确认。\n\n'
-        '🔐 <b>入住有留档</b>\n'
-        '房屋现状、家具家电等做好记录，退租时更有依据。\n\n'
-        '🤝 <b>签约后也有人跟进</b>\n'
-        '从找房、签约到入住，不因为拿到钥匙就结束。'
+        '🛡 <b>侨联保障</b>\n\n'
+        '一次租房，涉及的不只是房源本身。\n\n'
+        '从看房、费用确认，到签约、入住和后续居住，侨联希望把容易产生疑问的环节尽量提前说明，把需要留下依据的事项尽量记录清楚。\n\n'
+        '<b>看房方式：</b> 支持实地看房，也可先通过视频了解房源。\n'
+        '<b>费用确认：</b> 水电、物业、网络及其他重要费用，签约前尽量确认。\n'
+        '<b>入住留档：</b> 入住时记录房屋、家具家电及相关费用信息。\n'
+        '<b>后续协助：</b> 签约并不意味着服务结束，入住后的住房与生活问题也可继续联系侨联。'
     )
-
 
 def rental_home_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
@@ -56,26 +53,17 @@ def rental_home_keyboard() -> InlineKeyboardMarkup:
 def handover_text() -> str:
     return (
         '🔐 <b>押金与入住留档</b>\n\n'
-        '入住前，建议把重要情况说清楚、写下来、留好证据。\n\n'
-        '侨联可协助记录：\n\n'
-        '• 家具、家电现状\n'
-        '• 墙面、地面情况\n'
-        '• 水表、电表读数\n'
-        '• 水电、物业、网络等费用规则\n'
-        '• 其他需要双方确认的事项\n\n'
-        '退租时，如果对扣费存在疑问，也可以根据留档协助核对和沟通。'
+        '很多退租时的分歧，都来自入住时没有留下足够清楚的记录。\n\n'
+        '入住前，建议将房屋现状、家具家电、表计读数及相关费用规则进行确认并留档。\n\n'
+        '这些资料不会替代合同，但可以作为后续交接、费用核对和争议沟通时的重要参考。'
     )
-
 
 def handover_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton('📸 查看留档单示例', callback_data='hub:rental:handover:preview')],
-        [InlineKeyboardButton('📄 查看押金说明', callback_data='hub:rental:deposit')],
-        [InlineKeyboardButton('📥 下载完整版 PDF', callback_data='hub:rental:handover:pdf')],
-        [InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')],
+        [InlineKeyboardButton('🔒 押金保障', callback_data='hub:rental:deposit'), InlineKeyboardButton('📄 入住交接留档', callback_data='hub:rental:handover:details')],
+        [InlineKeyboardButton('💡 费用说明', callback_data='hub:rental:fees'), InlineKeyboardButton('📥 下载完整资料', callback_data='hub:rental:handover:pdf')],
         [InlineKeyboardButton('⬅️ 返回', callback_data='hub:rental')],
     ])
-
 
 def preview_followup_text() -> str:
     return (
@@ -93,51 +81,60 @@ def preview_followup_keyboard() -> InlineKeyboardMarkup:
 
 
 def details_text() -> str:
-    return handover_text()
-
-
-def details_keyboard() -> InlineKeyboardMarkup:
-    return handover_keyboard()
-
-
-def deposit_text() -> str:
     return (
-        '📄 <b>押金说明</b>\n\n'
-        '<b>签约前</b>\n'
-        '确认押金、提前退租和扣费规则，尽量写进合同。\n\n'
-        '<b>入住当天</b>\n'
-        '记录房屋现状、仪表、家电和钥匙门卡，并保留现场照片和视频。\n\n'
-        '<b>退租当天</b>\n'
-        '按合同和入住留档逐项核对。\n\n'
-        '如果双方对某一项有分歧，侨联可以根据合同和留档协助核对和沟通。\n\n'
-        '最终押金退还金额，仍以合同和实际核对结果为准。'
+        '📄 <b>入住交接留档</b>\n\n'
+        '通过侨联成交的房源，入住交接时建议记录：\n\n'
+        '• 房屋整体状态\n'
+        '• 家具家电使用情况\n'
+        '• 空调、冰箱、洗衣机等设备照片\n'
+        '• 电表、水表读数\n'
+        '• 墙面、地面、门锁等易产生争议的位置\n'
+        '• 押金、电费、水费、物业费等费用规则\n\n'
+        '这些记录在退租时，是核对情况的重要依据。'
     )
 
-
-def deposit_keyboard() -> InlineKeyboardMarkup:
+def details_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton('📸 查看留档单示例', callback_data='hub:rental:handover:preview')],
-        [InlineKeyboardButton('📥 下载完整版 PDF', callback_data='hub:rental:handover:pdf')],
+        [InlineKeyboardButton('📸 查看留档示例', callback_data='hub:rental:handover:preview')],
         [InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')],
         [InlineKeyboardButton('⬅️ 返回', callback_data='hub:rental:handover')],
     ])
 
+def deposit_text() -> str:
+    return (
+        '🔒 <b>押金保障</b>\n\n'
+        '入住前，侨联协助完成房屋现状留档，包含设施状态、已有瑕疵、水电表读数等信息。\n\n'
+        '退租时，侨联可作为第三方协助核对房屋状态、费用明细及扣费依据。如出现明显争议，优先协助沟通协调。\n\n'
+        '押金保障不是退租那天才开始，而是从入住第一天就把细节留清楚。'
+    )
+
+def deposit_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton('📄 入住交接留档', callback_data='hub:rental:handover:details')],
+        [InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')],
+        [InlineKeyboardButton('⬅️ 返回', callback_data='hub:rental:handover')],
+    ])
 
 def fees_text() -> str:
     return (
-        '💰 <b>费用说明</b>\n\n'
-        '除了月租，签约前建议确认：押金和付款方式、物业、水电、网络、停车，以及其他固定费用。\n\n'
-        '已确认的费用按实际情况记录；没有确认的数据，不代替房东填写。'
+        '💡 <b>费用说明</b>\n\n'
+        '在金边租房，费用相关的问题往往集中在以下细节：\n\n'
+        '• 电费、水费计算方式\n'
+        '• 物业费由谁承担\n'
+        '• 网络是否需要自行安装\n'
+        '• 停车费是否另计\n'
+        '• 垃圾费、清洁费\n'
+        '• 是否允许做饭\n'
+        '• 提前退租的处理方式\n\n'
+        '侨联会尽量提前确认并说明这些内容。'
     )
-
 
 def fees_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton('🔐 押金与入住留档', callback_data='hub:rental:handover')],
+        [InlineKeyboardButton('🔍 去找房', callback_data='home_smart_search')],
         [InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')],
-        [InlineKeyboardButton('⬅️ 返回', callback_data='hub:rental')],
+        [InlineKeyboardButton('⬅️ 返回', callback_data='hub:rental:handover')],
     ])
-
 
 def viewing_text() -> str:
     return (
@@ -157,15 +154,13 @@ def viewing_keyboard() -> InlineKeyboardMarkup:
 
 def moving_text() -> str:
     return (
-        '🚚 <b>搬家，也可以让侨联帮您协调。</b>\n\n'
-        '通过侨联成交的客户，可咨询基础搬家协助。\n\n'
-        '我们可以协助：\n'
-        '• 确认搬家时间\n'
-        '• 对接车辆和搬运人员\n'
-        '• 协调入住相关事项\n\n'
-        '从签约到真正住进去，我们希望都有人接得上。'
+        '🚚 <b>搬家协助</b>\n\n'
+        '通过侨联成交的客户，可获得基础搬家协助：\n\n'
+        '• 协调搬家时间\n'
+        '• 对接车辆和人手\n'
+        '• 提供必要的现场支持\n\n'
+        '搬家不是租约的终点，而是生活真正开始的节点。我们能做的，是让这一小段过渡，稍微从容一些。'
     )
-
 
 def moving_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
@@ -177,16 +172,12 @@ def moving_keyboard() -> InlineKeyboardMarkup:
 def about_text() -> str:
     return (
         '🏠 <b>关于侨联</b>\n\n'
-        '来到金边，很多事情都需要重新熟悉。\n\n'
-        '从住哪里、怎么租，到签约、入住，再到日常生活中遇到的各种问题。\n\n'
-        '侨联想做的，不只是给您发几套房源。\n\n'
-        '找房时，帮您多看一步；\n'
-        '签约时，帮您多问一句；\n'
-        '住下以后，有事还能找到人。\n\n'
-        '认识侨联 · 选择侨联 · 信赖侨联\n\n'
-        '我们希望成为您在金边，愿意长期联系的那个自己人。'
+        '这些年，我们始终专注于柬埔寨本地房产与居住服务。\n\n'
+        '在长期服务客户的过程中，我们越来越清楚，一次租房真正需要解决的，不只是找到房源，更包括信息确认、签约衔接、入住交接，以及住下以后仍然有人可以联系。\n\n'
+        '我们相信，真正有价值的服务，不止于完成一次交易，更在于建立长久而持续的信任。\n\n'
+        '从第一次认识，到长期选择，侨联希望以稳定的服务与责任，成为您在柬埔寨值得长期信赖的生活伙伴。\n\n'
+        '<b>侨联地产｜您在金边的自己人</b>'
     )
-
 
 def about_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([

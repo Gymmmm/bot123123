@@ -100,21 +100,19 @@ def precise_filter_keyboard(selected: set[str] | None=None) -> InlineKeyboardMar
 
 def service_hub_keyboard(user_id: int | None=None) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton('📋 入住交接留档', callback_data='hub:rental:handover'), InlineKeyboardButton('🔐 押金说明', callback_data='hub:rental:deposit')],
-        [InlineKeyboardButton('🔧 设备报修', callback_data='service:repair_hub'), InlineKeyboardButton('💬 联系我们', callback_data='service:contact')],
+        [InlineKeyboardButton('🔧 设备报修', callback_data='service:repair_hub'), InlineKeyboardButton('🏢 物业协调', callback_data='service_request:property')],
+        [InlineKeyboardButton('📦 生活服务', callback_data='service:local_life'), InlineKeyboardButton('💬 其他帮助', callback_data='service:contact')],
         [InlineKeyboardButton('⬅️ 返回首页', callback_data='home')],
     ])
-
 
 def service_repair_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton('❄️ 空调', callback_data='service_request:repair_ac'), InlineKeyboardButton('🚿 热水器', callback_data='service_request:repair_water')],
-        [InlineKeyboardButton('🧺 洗衣机', callback_data='service_request:repair_furniture'), InlineKeyboardButton('🧊 冰箱', callback_data='service_request:repair_ac')],
-        [InlineKeyboardButton('📶 网络', callback_data='service_request:repair_other'), InlineKeyboardButton('🔐 门锁/门禁', callback_data='service_request:repair_door')],
+        [InlineKeyboardButton('🧺 洗衣机', callback_data='service_request:repair_washer'), InlineKeyboardButton('🧊 冰箱', callback_data='service_request:repair_fridge')],
+        [InlineKeyboardButton('📶 网络', callback_data='service_request:repair_network'), InlineKeyboardButton('🔐 门锁/门禁', callback_data='service_request:repair_door')],
         [InlineKeyboardButton('🔧 其他设备', callback_data='service_request:repair_other')],
         [InlineKeyboardButton('⬅️ 返回', callback_data='service:hub')],
     ])
-
 
 def service_detail_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
@@ -125,11 +123,10 @@ def service_detail_keyboard() -> InlineKeyboardMarkup:
 
 def local_life_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton('🧹 保洁家政', callback_data='rfcity:recreation'), InlineKeyboardButton('🚚 搬家协助', callback_data='service:contact')],
+        [InlineKeyboardButton('🧹 保洁家政', callback_data='rfcity:recreation'), InlineKeyboardButton('🚚 搬家协助', callback_data='hub:rental:moving')],
         [InlineKeyboardButton('🗺 周边推荐', callback_data='local:rfcity'), InlineKeyboardButton('💬 其他需求', callback_data='service:contact')],
         [InlineKeyboardButton('⬅️ 返回', callback_data='service:hub')],
     ])
-
 
 def rfcity_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
