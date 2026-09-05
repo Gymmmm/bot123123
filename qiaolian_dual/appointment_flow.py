@@ -64,6 +64,7 @@ async def _submit_appointment(
     from .admin_contract import _user_contact_text, _user_mention_html
     from .appointment_ui import _title_layout_label
     from .appointments_view import _appointment_date_compact, _appointment_time_compact
+    from .attribution_store import get_user_attribution
     from .keyboards_common import appointment_success_keyboard
     from .listing import listing_context, listing_is_available, listing_unavailable_keyboard, listing_unavailable_text
     from .results_admin import _notify_admins as default_notify_admins, admin_lead_keyboard
@@ -170,26 +171,29 @@ async def _submit_appointment(
     time_text = _appointment_time_compact(time_value)
     mode_label = APPOINTMENT_MODE_LABELS.get(mode, '实地看房')
 
+    touch = get_user_attribution(int(user.id)) or {}
     notify_title, notify_lines = format_consult_notify(
-        user_id=int(user.id),
+        user=user,
+        touch=touch,
+        listing_id=lid,
         title=f"📅 {'预约时间已修改' if edit_id else '新预约'} #{appointment_id}",
-        lines=[
-            f'🏠 <b>{he(subject)}</b>',
-            f'🕐 {he(date_text)} · {he(time_text)}',
-            f'📍 {he(mode_label)}',
-            '',
-            f'👤 客户｜{_user_mention_html(user)}',
-            f'💬 Telegram｜{he(_user_contact_text(user))}',
-            '',
-            '<b>当前状态｜🟡 待确认</b>',
-        ],
         current_action='appointment_submit' if not edit_id else 'appointment_time_update',
     )
+    notify_lines.extend([
+        '',
+        f'🏠 <b>{he(subject)}</b>',
+        f'🕐 {he(date_text)} · {he(time_text)}',
+        f'📍 {he(mode_label)}',
+        f'👤 客户｜{_user_mention_html(user)}',
+        f'💬 Telegram｜{he(_user_contact_text(user))}',
+        '',
+        '<b>当前状态｜🟡 待确认</b>',
+    ])
     await notify_admins(
         context,
         title=notify_title,
         lines=notify_lines,
-        reply_markup=admin_lead_keyboard(lead_id=lead_id, appointment_id=appointment_id, user_id=int(user.id)) if lead_id else None,
+        reply_markup=admin_lead_keyboard(lead_id=lead_id, appointment_id=appointment_id, user_id=int(user.id), listing_id=lid) if lead_id else None,
         show_bell=False,
     )
 
