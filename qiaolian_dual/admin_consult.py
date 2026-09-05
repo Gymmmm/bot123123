@@ -34,6 +34,7 @@ def consult_action_keyboard(*, lead_id: int | None, appointment_id: int, user_id
         [InlineKeyboardButton('✅ 我来跟进', callback_data=f'adminlead:claim:{suffix}')],
         [InlineKeyboardButton('📞 已联系', callback_data=f'adminlead:contacted:{suffix}')],
         [InlineKeyboardButton('✅ 完成', callback_data=f'adminlead:done:{suffix}')],
+        [InlineKeyboardButton('🏠 查看房源', callback_data=f'adminlead:view:{suffix}')],
     ])
 
 
