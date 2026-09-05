@@ -2,10 +2,9 @@
 from __future__ import annotations
 
 from .common import *
-
 def welcome_text() -> str:
     return (
-        '🏠 <b>侨联地产｜您在金边的自己人</b>\n\n'
+        '💎 <b>侨联地产｜您在金边的自己人</b>\n\n'
         '找房、约看房、入住服务，都可以从这里开始。\n\n'
         '如果您已经在频道看到具体房源，直接点房源下方按钮进入，房源信息会自动带上。\n\n'
         '也可以直接告诉我：<b>区域 + 预算 + 户型</b>。\n\n'
@@ -123,7 +122,7 @@ def about_text() -> str:
         '在长期服务客户的过程中，我们越来越清楚，一次租房真正需要解决的，不只是找到房源，更包括信息确认、签约衔接、入住交接，以及住下以后仍然有人可以联系。\n\n'
         '我们相信，真正有价值的服务，不止于完成一次交易，更在于建立长久而持续的信任。\n\n'
         '从第一次认识，到长期选择，侨联希望以稳定的服务与责任，成为您在柬埔寨值得长期信赖的生活伙伴。\n\n'
-        '<b>侨联地产｜您在金边的自己人</b>'
+        '<b>💎 侨联地产｜您在金边的自己人</b>'
     )
 
 def brand_story_text() -> str:
@@ -161,8 +160,6 @@ def listing_detail_text(item: dict) -> str:
     from .talk_engine import generate_talk
 
     base = copy_listing_detail(item)
-    talk = generate_talk(item, max_points=2, allow_empty=True).strip()
-    if not talk:
-        return base
+    talk = generate_talk(item, max_points=2, allow_empty=False).strip()
     safe_talk = '\n'.join(he(line) for line in talk.splitlines() if line.strip())
     return f"{base}\n\n💬 <b>侨联说</b>\n{safe_talk}"
