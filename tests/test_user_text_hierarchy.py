@@ -55,8 +55,8 @@ def test_status_is_highlighted_once_per_listing_page(monkeypatch):
     from qiaolian_dual import listing as listing_mod
 
     for status, expected in (
-        ('active', '🟢 当前可预约'),
-        ('reserved', '🟡 已有预约 · 仍可预约'),
+        ('active', '🟢 房态：当前可预约'),
+        ('reserved', '🟡 房态：已有预约 · 仍可预约'),
     ):
         monkeypatch.setattr(listing_mod, 'listing_context', lambda _lid, value=status: {
             'listing_id': 'l_1', 'status': value, 'price': 800,
@@ -87,7 +87,7 @@ def test_core_html_sends_declare_html_parse_mode():
     paths = {
         'qiaolian_dual/results_admin.py': ('send_listing_photo_preview',),
         'qiaolian_dual/appointment_flow.py': ('_appointment_confirm_text', 'parse_mode=ParseMode.HTML'),
-        'qiaolian_dual/callback_service.py': ('报修需求已提交', 'parse_mode=ParseMode.HTML'),
+        'qiaolian_dual/callback_service.py': ('报修信息已收到', 'parse_mode=ParseMode.HTML'),
     }
     for filename, needles in paths.items():
         source = open(filename, encoding='utf-8').read()
