@@ -5,7 +5,7 @@ from .common import *
 
 
 def matches(data: str) -> bool:
-    return data.startswith(('adminlead:', 'adminrepair:'))
+    return data.startswith(('adminq:', 'adminlead:', 'adminrepair:'))
 
 
 async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, query, data: str, user) -> int | None:
@@ -20,6 +20,11 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
     from .session_deeplink import _remember_video_pref, clear_session_for_fresh_entry, now_ts, user_display_name
     from .start_routes import route_start_arg
     from .texts import advisor_handoff_text, advisor_text, brand_story_text, deposit_text, lead_capture_text, listing_detail_text, local_life_text, promise_text, render_panel, rfcity_text, service_hub_text, smart_search_text, want_home_ack_text, welcome_text
+
+    if data.startswith('adminq:'):
+        from .admin_consult import handle_admin_query
+        return await handle_admin_query(update, context)
+
     if data.startswith('adminrepair:'):
             from .admin_contract import _is_admin_user
             from .messages import repair_progress_text
@@ -61,6 +66,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
             await answer_callback_once(query, f'已通知客户：{labels[stage]}')
             return MAIN
     if data.startswith('adminlead:'):
+            from .admin_consult import apply_admin_lead_action
             from .admin_contract import _is_admin_user
             if not _is_admin_user(getattr(user, 'id', 0)):
                 await answer_callback_once(query, '仅顾问可操作', show_alert=True)
@@ -71,12 +77,45 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 return MAIN
             action = parts[1]
             lead_id, appointment_id, customer_id = map(int, parts[2:])
-            status_map = {'claim': ('claimed', 'assigned', '🟢 顾问跟进中'), 'contacted': ('contacted', 'contacted', '🟢 顾问跟进中'), 'invalid': ('invalid', 'cancelled', '⚪ 已结束跟进')}
+
+            if action == 'view':
+                from .utils_formatting import _display_listing_id, _fmt_price
+                lead = db.get_lead(lead_id) or {}
+                listing_id = str(lead.get('listing_id') or '').strip()
+                info = listing_context(listing_id) if listing_id else {}
+                if not info:
+                    await answer_callback_once(query, '这条线索没有可查看的房源', show_alert=True)
+                    return MAIN
+                project = str(info.get('project') or info.get('community') or info.get('area') or '房源')
+                await context.bot.send_message(
+                    chat_id=int(user.id),
+                    text=(
+                        f'🏠 <b>{he(project)}</b>\n'
+                        f'🆔 {he(_display_listing_id(listing_id))}\n'
+                        f'💰 {he(_fmt_price(info.get("price")))}\n'
+                        f'📍 {he(str(info.get("area") or ""))}'
+                    ),
+                    parse_mode=ParseMode.HTML,
+                )
+                await answer_callback_once(query, '房源已发到当前对话')
+                return MAIN
+
+            status_map = {
+                'claim': ('claimed', 'assigned', '🟢 已接手'),
+                'contacted': ('contacted', 'contacted', '🟢 已联系'),
+                'done': ('done', 'done', '✅ 已完成'),
+                'invalid': ('invalid', 'cancelled', '⚪ 已结束跟进'),
+            }
             if action not in status_map:
                 return MAIN
             lead_status, appointment_status, label = status_map[action]
             advisor_name = user_display_name(user)
-            ok = db.update_lead_workflow(lead_id, status=lead_status, advisor_id=str(user.id), advisor_name=advisor_name)
+            ok = apply_admin_lead_action(
+                lead_id=lead_id,
+                action=action,
+                advisor_id=str(user.id),
+                advisor_name=advisor_name,
+            )
             if appointment_id > 0:
                 db.update_appointment_status(appointment_id, appointment_status)
                 with db.connect() as conn:
@@ -95,7 +134,12 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
             else:
                 updated = original.rstrip() + '\n\n' + status_line
             updated = re.sub(r'\n\n<b>处理状态：</b>[^\n]*', '', updated)
-            await query.edit_message_text(updated, parse_mode=ParseMode.HTML, reply_markup=admin_lead_keyboard(lead_id=lead_id, appointment_id=appointment_id, user_id=customer_id) if action == 'claim' else None)
+            keep_keyboard = action in {'claim', 'contacted'}
+            await query.edit_message_text(
+                updated,
+                parse_mode=ParseMode.HTML,
+                reply_markup=admin_lead_keyboard(lead_id=lead_id, appointment_id=appointment_id, user_id=customer_id) if keep_keyboard else None,
+            )
             if action in {'claim', 'contacted'}:
                 from .messages import advisor_response_notice_text
                 user_text = advisor_response_notice_text()
