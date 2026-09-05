@@ -13,8 +13,8 @@ jobs:
     env:
       USER_BOT_TOKEN: '123456:TESTTOKEN'
       PUBLISHER_BOT_TOKEN: '123456:TESTTOKEN'
-      DB_PATH: '${{ runner.temp }}/attribution.db'
-      PYTHONPATH: '${{ github.workspace }}'
+      DB_PATH: '/tmp/attribution.db'
+      PYTHONPATH: '.'
     steps:
       - uses: actions/checkout@v4
         with:
