@@ -1,0 +1,119 @@
+name: attribution-integration-check
+
+on:
+  push:
+    branches:
+      - codex/attribution-integration-20260905
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  attribution-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/attribution-integration-20260905
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pytest pytest-asyncio
+      - name: Syntax check
+        env:
+          USER_BOT_TOKEN: '123456:TESTTOKEN'
+          PUBLISHER_BOT_TOKEN: '123456:TESTTOKEN'
+          DB_PATH: '${{ runner.temp }}/syntax.db'
+        run: |
+          python -m compileall -q qiaolian_dual tests
+          python -c "from qiaolian_dual.user_bot import build_application; assert build_application() is not None"
+      - name: Required targeted pytest
+        env:
+          PYTHONPATH: '${{ github.workspace }}'
+          USER_BOT_TOKEN: '123456:TESTTOKEN'
+          PUBLISHER_BOT_TOKEN: '123456:TESTTOKEN'
+          DB_PATH: '${{ runner.temp }}/targeted.db'
+        run: |
+          python -m pytest tests/test_attribution_admin.py tests/test_lead_workflow.py tests/test_user_start_payload.py -q
+      - name: Migration dry-run on schema-compatible local dump
+        env:
+          PYTHONPATH: '${{ github.workspace }}'
+          USER_BOT_TOKEN: '123456:TESTTOKEN'
+          PUBLISHER_BOT_TOKEN: '123456:TESTTOKEN'
+          DB_PATH: '${{ runner.temp }}/prod-schema-dump.db'
+        run: |
+          python - <<'PY'
+          import os, sqlite3
+          from qiaolian_dual.common import db
+          from qiaolian_dual.attribution_store import ensure_attribution_schema
+          db.create_lead({'user_id':1001,'username':'before','display_name':'迁移前','source':'channel','action':'consult_click','listing_id':'l_1','created_at':'2026-09-05 09:00:00'})
+          db.create_lead({'user_id':1002,'username':'before2','display_name':'迁移前2','source':'user_bot','action':'appointment_submit','listing_id':'l_2','created_at':'2026-09-05 09:01:00'})
+          path = os.environ['DB_PATH']
+          with sqlite3.connect(path) as conn:
+              before = conn.execute('SELECT COUNT(*) FROM leads').fetchone()[0]
+              sample_before = conn.execute('SELECT user_id, listing_id, source, action FROM leads ORDER BY id').fetchall()
+          ensure_attribution_schema()
+          ensure_attribution_schema()
+          with sqlite3.connect(path) as conn:
+              after = conn.execute('SELECT COUNT(*) FROM leads').fetchone()[0]
+              sample_after = conn.execute('SELECT user_id, listing_id, source, action FROM leads ORDER BY id').fetchall()
+              cols = {r[1] for r in conn.execute('PRAGMA table_info(leads)').fetchall()}
+              required = {'source_type','source_detail','first_source_type','first_source_detail','first_entry_at','latest_touch_at','entry_action','deep_link_payload','channel_message_id'}
+              assert required <= cols
+              assert before == after == 2
+              assert sample_before == sample_after
+              conn.execute("INSERT INTO leads (user_id, username, display_name, source, action, listing_id, created_at) VALUES (?,?,?,?,?,?,datetime('now'))", (999999991,'migration_check','migration_check','test','consult_click','l_0'))
+              assert conn.execute('SELECT COUNT(*) FROM leads WHERE user_id=999999991').fetchone()[0] == 1
+              conn.execute('DELETE FROM leads WHERE user_id=999999991')
+              conn.commit()
+          print(f'MIGRATION_OK before_leads={before} after_leads={after} existing_rows_unchanged=1 read_write_after_alter=1')
+          print('ADDED_COLUMNS=' + ','.join(sorted(required)))
+          PY
+      - name: Simulated end-to-end deep-link consultation flow
+        env:
+          PYTHONPATH: '${{ github.workspace }}'
+          USER_BOT_TOKEN: '123456:TESTTOKEN'
+          PUBLISHER_BOT_TOKEN: '123456:TESTTOKEN'
+          DB_PATH: '${{ runner.temp }}/journey.db'
+        run: |
+          python - <<'PY'
+          from types import SimpleNamespace
+          from qiaolian_dual.attribution import classify_start_arg, remember_touch
+          from qiaolian_dual.search import create_lead
+          from qiaolian_dual.admin_consult import format_consult_notify, consult_action_keyboard, apply_admin_lead_action
+          from qiaolian_dual.common import db
+          payload = 'property_QC0001_details'
+          classified = classify_start_arg(payload)
+          assert classified['source_type'] == 'channel_listing_detail'
+          user = SimpleNamespace(id=1001, username='demo', full_name='张三', first_name='张三', last_name='')
+          remember_touch(user, start_arg=payload)
+          lead_id = create_lead(user, action='consult_menu_click', source='channel_deeplink', listing_id='QC0001', payload={'deep_link_payload': payload})
+          assert lead_id
+          title, lines = format_consult_notify(user_id=1001, title='房源咨询', lines=['客户：张三 @demo','房源：QC0001'], current_action='consult_menu_click')
+          card = '\n'.join(lines)
+          assert '来源：频道房源详情' in card
+          assert '首次进入：频道房源详情' in card
+          assert '本次动作：联系我们' in card
+          assert 'property_QC0001_details' in card
+          kb = consult_action_keyboard(lead_id=lead_id, appointment_id=0, user_id=1001)
+          callbacks = [b.callback_data for row in kb.inline_keyboard for b in row]
+          assert all(len(v.encode('utf-8')) <= 64 for v in callbacks)
+          transitions = []
+          for action, expected in [('claim','claimed'),('contacted','contacted'),('done','done')]:
+              assert apply_admin_lead_action(lead_id=lead_id, action=action, advisor_id='9001', advisor_name='测试顾问')
+              status = db.get_lead(lead_id)['lead_status']
+              assert status == expected
+              transitions.append(f'{action}->{status}')
+          print('SIMULATED_ADMIN_NOTIFICATION_START')
+          print(title)
+          print(card)
+          print('BUTTONS=' + ' | '.join(callbacks))
+          print('TRANSITIONS=' + ' | '.join(transitions))
+          print('SIMULATED_ADMIN_NOTIFICATION_END')
+          PY
