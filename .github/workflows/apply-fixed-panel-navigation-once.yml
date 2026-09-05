@@ -5,7 +5,7 @@ on:
     branches:
       - codex/qiaolian-ui-cleanup-20260829
     paths:
-      - '.github/workflows/apply-fixed-panel-navigation-once.yml'
+      - .github/workflows/apply-fixed-panel-navigation-once.yml
 
 permissions:
   contents: write
@@ -18,89 +18,30 @@ jobs:
         with:
           ref: codex/qiaolian-ui-cleanup-20260829
           fetch-depth: 0
-
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Apply fixed panel navigation
         shell: bash
         run: |
-          set -Eeuo pipefail
           python - <<'PY'
           from pathlib import Path
 
           p = Path('qiaolian_dual/start_routes.py')
-          s = p.read_text()
-          s = s.replace(
-              'from .texts import about_text, brand_story_text, want_home_prompt_text',
-              'from .texts import about_text, brand_story_text, want_home_prompt_text, render_panel',
-              1,
-          )
-
-          pairs = [
-              (
-                  'await message.reply_text(listing_unavailable_text(reason, listing_id), parse_mode=ParseMode.HTML, reply_markup=listing_unavailable_keyboard(listing_id))',
-                  'await render_panel(update, text=listing_unavailable_text(reason, listing_id), parse_mode=ParseMode.HTML, reply_markup=listing_unavailable_keyboard(listing_id), context=context)',
-              ),
-              (
-                  'await message.reply_text(listing_cost_text(listing_id), parse_mode=ParseMode.HTML, reply_markup=listing_cost_keyboard(listing_id))',
-                  'await render_panel(update, text=listing_cost_text(listing_id), parse_mode=ParseMode.HTML, reply_markup=listing_cost_keyboard(listing_id), context=context)',
-              ),
-              (
-                  "await message.reply_text('📍 <b>想住在哪个区域？</b>', parse_mode=ParseMode.HTML, reply_markup=find_area_keyboard())",
-                  "await render_panel(update, text='📍 <b>想住在哪个区域？</b>', parse_mode=ParseMode.HTML, reply_markup=find_area_keyboard(), context=context)",
-              ),
-              (
-                  "await message.reply_text('💰 <b>您的月租预算是多少？</b>', parse_mode=ParseMode.HTML, reply_markup=find_budget_keyboard('any'))",
-                  "await render_panel(update, text='💰 <b>您的月租预算是多少？</b>', parse_mode=ParseMode.HTML, reply_markup=find_budget_keyboard('any'), context=context)",
-              ),
-              (
-                  "await message.reply_text('🏠 <b>需要几房？</b>', parse_mode=ParseMode.HTML, reply_markup=room_type_keyboard())",
-                  "await render_panel(update, text='🏠 <b>需要几房？</b>', parse_mode=ParseMode.HTML, reply_markup=room_type_keyboard(), context=context)",
-              ),
-              (
-                  'await message.reply_text(_latest_listing_text(), parse_mode=ParseMode.HTML, reply_markup=latest_listing_keyboard())',
-                  'await render_panel(update, text=_latest_listing_text(), parse_mode=ParseMode.HTML, reply_markup=latest_listing_keyboard(), context=context)',
-              ),
-              (
-                  'await message.reply_text(channel_topic_welcome_text(topic), reply_markup=find_area_keyboard())',
-                  'await render_panel(update, text=channel_topic_welcome_text(topic), reply_markup=find_area_keyboard(), context=context)',
-              ),
-              (
-                  'await message.reply_text(channel_topic_welcome_text(topic), reply_markup=main_keyboard())',
-                  'await render_panel(update, text=channel_topic_welcome_text(topic), reply_markup=main_keyboard(), context=context)',
-              ),
-              (
-                  "await message.reply_text('这套房源目前无法找到。', reply_markup=no_match_followup_keyboard())",
-                  "await render_panel(update, text='这套房源目前无法找到。', reply_markup=no_match_followup_keyboard(), context=context)",
-              ),
-              (
-                  'await message.reply_text(listing_entry_text(listing_id), parse_mode=ParseMode.HTML, reply_markup=listing_entry_keyboard(listing_id))',
-                  'await render_panel(update, text=listing_entry_text(listing_id), parse_mode=ParseMode.HTML, reply_markup=listing_entry_keyboard(listing_id), context=context)',
-              ),
-              (
-                  "await message.reply_text('当前同区域暂时没有可预约房源。\\n可以调整条件，或联系我们继续留意。', reply_markup=no_match_followup_keyboard())",
-                  "await render_panel(update, text='当前同区域暂时没有可预约房源。\\n可以调整条件，或联系我们继续留意。', reply_markup=no_match_followup_keyboard(), context=context)",
-              ),
-              (
-                  'await message.reply_text(brand_story_text(), parse_mode=ParseMode.HTML, reply_markup=main_keyboard())',
-                  'await render_panel(update, text=brand_story_text(), parse_mode=ParseMode.HTML, reply_markup=main_keyboard(), context=context)',
-              ),
-              (
-                  'await message.reply_text(about_text(), parse_mode=ParseMode.HTML, reply_markup=main_keyboard())',
-                  'await render_panel(update, text=about_text(), parse_mode=ParseMode.HTML, reply_markup=main_keyboard(), context=context)',
-              ),
-              (
-                  'await message.reply_text(want_home_prompt_text(), parse_mode=ParseMode.HTML, reply_markup=precise_filter_keyboard(set()))',
-                  'await render_panel(update, text=want_home_prompt_text(), parse_mode=ParseMode.HTML, reply_markup=precise_filter_keyboard(set()), context=context)',
-              ),
-          ]
-          for old, new in pairs:
-              if old in s:
-                  s = s.replace(old, new)
-
-          s = s.replace(
-              'from .texts import channel_welcome_text',
-              'from .texts import channel_welcome_text, render_panel',
-              1,
-          )
+          s = p.read_text(encoding='utf-8')
+          s = s.replace('from .texts import about_text, brand_story_text, want_home_prompt_text', 'from .texts import about_text, brand_story_text, want_home_prompt_text, render_panel', 1)
+          s = s.replace("await message.reply_text('📍 <b>想住在哪个区域？</b>', parse_mode=ParseMode.HTML, reply_markup=find_area_keyboard())", "await render_panel(update, text='📍 <b>想住在哪个区域？</b>', parse_mode=ParseMode.HTML, reply_markup=find_area_keyboard(), context=context)")
+          s = s.replace("await message.reply_text('💰 <b>您的月租预算是多少？</b>', parse_mode=ParseMode.HTML, reply_markup=find_budget_keyboard('any'))", "await render_panel(update, text='💰 <b>您的月租预算是多少？</b>', parse_mode=ParseMode.HTML, reply_markup=find_budget_keyboard('any'), context=context)")
+          s = s.replace("await message.reply_text('🏠 <b>需要几房？</b>', parse_mode=ParseMode.HTML, reply_markup=room_type_keyboard())", "await render_panel(update, text='🏠 <b>需要几房？</b>', parse_mode=ParseMode.HTML, reply_markup=room_type_keyboard(), context=context)")
+          s = s.replace('await message.reply_text(_latest_listing_text(), parse_mode=ParseMode.HTML, reply_markup=latest_listing_keyboard())', 'await render_panel(update, text=_latest_listing_text(), parse_mode=ParseMode.HTML, reply_markup=latest_listing_keyboard(), context=context)')
+          s = s.replace('await message.reply_text(listing_cost_text(listing_id), parse_mode=ParseMode.HTML, reply_markup=listing_cost_keyboard(listing_id))', 'await render_panel(update, text=listing_cost_text(listing_id), parse_mode=ParseMode.HTML, reply_markup=listing_cost_keyboard(listing_id), context=context)')
+          s = s.replace('await message.reply_text(listing_entry_text(listing_id), parse_mode=ParseMode.HTML, reply_markup=listing_entry_keyboard(listing_id))', 'await render_panel(update, text=listing_entry_text(listing_id), parse_mode=ParseMode.HTML, reply_markup=listing_entry_keyboard(listing_id), context=context)')
+          s = s.replace('await message.reply_text(channel_topic_welcome_text(topic), reply_markup=find_area_keyboard())', 'await render_panel(update, text=channel_topic_welcome_text(topic), reply_markup=find_area_keyboard(), context=context)')
+          s = s.replace('await message.reply_text(channel_topic_welcome_text(topic), reply_markup=main_keyboard())', 'await render_panel(update, text=channel_topic_welcome_text(topic), reply_markup=main_keyboard(), context=context)')
+          s = s.replace('await message.reply_text(brand_story_text(), parse_mode=ParseMode.HTML, reply_markup=main_keyboard())', 'await render_panel(update, text=brand_story_text(), parse_mode=ParseMode.HTML, reply_markup=main_keyboard(), context=context)')
+          s = s.replace('await message.reply_text(about_text(), parse_mode=ParseMode.HTML, reply_markup=main_keyboard())', 'await render_panel(update, text=about_text(), parse_mode=ParseMode.HTML, reply_markup=main_keyboard(), context=context)')
+          s = s.replace('await message.reply_text(want_home_prompt_text(), parse_mode=ParseMode.HTML, reply_markup=precise_filter_keyboard(set()))', 'await render_panel(update, text=want_home_prompt_text(), parse_mode=ParseMode.HTML, reply_markup=precise_filter_keyboard(set()), context=context)')
+          s = s.replace('from .texts import channel_welcome_text', 'from .texts import channel_welcome_text, render_panel', 1)
           old = """await update.effective_message.reply_text(
         channel_welcome_text(first_name=getattr(user, 'first_name', '') or getattr(user, 'full_name', '') or ''),
         reply_markup=main_keyboard(),
@@ -113,36 +54,25 @@ jobs:
         parse_mode=ParseMode.HTML,
         context=context,
     )"""
-          if old in s:
-              s = s.replace(old, new, 1)
-          p.write_text(s)
+          s = s.replace(old, new, 1)
+          p.write_text(s, encoding='utf-8')
 
           p = Path('qiaolian_dual/search_text_handlers.py')
-          s = p.read_text()
-          old = "await update.effective_message.reply_text('预算没有识别出来。请试试：<code>800以内</code>、<code>600-900</code> 或 <code>1500以上</code>。', parse_mode=ParseMode.HTML)"
-          new = "await render_panel(update, text='预算没有识别出来。请试试：<code>800以内</code>、<code>600-900</code> 或 <code>1500以上</code>。', parse_mode=ParseMode.HTML, context=context, prefer_edit_anchor=True)"
-          if old in s:
-              s = s.replace(old, new, 1)
-          p.write_text(s)
+          s = p.read_text(encoding='utf-8')
+          s = s.replace("await update.effective_message.reply_text('预算没有识别出来。请试试：<code>800以内</code>、<code>600-900</code> 或 <code>1500以上</code>。', parse_mode=ParseMode.HTML)", "await render_panel(update, text='预算没有识别出来。请试试：<code>800以内</code>、<code>600-900</code> 或 <code>1500以上</code>。', parse_mode=ParseMode.HTML, context=context, prefer_edit_anchor=True)", 1)
+          p.write_text(s, encoding='utf-8')
           PY
-
       - name: Validate
         shell: bash
         run: |
-          set -Eeuo pipefail
           python -m compileall -q qiaolian_dual
           python -m pytest -q tests/test_user_bot_runtime_guards.py tests/test_callback_route_static_guards.py
-
       - name: Commit changes
         shell: bash
         run: |
-          set -Eeuo pipefail
           git config user.name qiaolian-actions
           git config user.email actions@users.noreply.github.com
           git add qiaolian_dual/start_routes.py qiaolian_dual/search_text_handlers.py
-          if git diff --cached --quiet; then
-            echo 'No changes needed'
-            exit 0
-          fi
+          git diff --cached --quiet && exit 0
           git commit -m 'Keep Bot navigation in a fixed panel'
           git push origin HEAD:codex/qiaolian-ui-cleanup-20260829
