@@ -74,4 +74,5 @@ jobs:
             tests/test_media_selection_contract.py \
             tests/test_channel_three_entry_contract.py \
             tests/test_attribution_admin.py \
-            tests/test_lead_workflow.py
+            tests/test_lead_workflow.py \
+            tests/test_publisher_user_polish.py
