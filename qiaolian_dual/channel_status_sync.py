@@ -22,7 +22,7 @@ _ACTIVE_APPOINTMENT_STATUSES = ("pending", "assigned", "contacted", "confirmed")
 _STATUS_RE = re.compile(
     r"(?m)^[🟢🟡🔵🔴⚫]️?\s*(?:房源状态｜)?[^\n]*"
 )
-_QC_RE = re.compile(r"\bQC\d{3,8}\b", re.I)
+_PUBLIC_ID_RE = re.compile(r"\b(?:QL-[A-HJ-NP-Z2-9]{6}|QC\d{3,8})\b", re.I)
 
 
 def _active_appointment_count(conn: sqlite3.Connection, listing_id: str) -> int:
@@ -90,7 +90,7 @@ def _caption_with_status(
 ) -> str:
     raw = str(caption or "").strip()
     label = _status_label(status, appointment_count)
-    found = _QC_RE.search(raw)
+    found = _PUBLIC_ID_RE.search(raw)
     qc = found.group(0).upper() if found else public_qc_code(listing_id)
     status_line = f"{label}　{qc}" if qc else label
 

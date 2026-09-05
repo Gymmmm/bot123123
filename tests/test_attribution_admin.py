@@ -134,7 +134,8 @@ async def test_admin_view_edits_current_message_with_real_listing_summary(monkey
 
     query.edit_message_text.assert_awaited_once()
     text = query.edit_message_text.await_args.args[0]
-    assert "QC0001" in text
+    from qiaolian_dual.public_listing_id import public_listing_id
+    assert public_listing_id("l_1") in text
     assert "测试项目" in text
     assert "2房" in text
     assert "$800/月" in text

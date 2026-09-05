@@ -102,7 +102,8 @@ class _BotProxy:
             )
             if "QJ" in text:
                 import re
-                text = re.sub(r"\bQJ[-_]?(\d{1,8})\b", lambda m: f"QC{int(m.group(1)):04d}", text)
+                from qiaolian_dual.public_listing_id import public_listing_id
+                text = re.sub(r"\bQJ[-_]?(\d{1,8})\b", lambda m: public_listing_id(f"l_{int(m.group(1))}"), text)
             if "text" in kwargs:
                 kwargs["text"] = text
             elif len(args) >= 2:
@@ -136,7 +137,8 @@ def install_release_contract_patch() -> None:
         import re
         text = original_build_caption(*args, **kwargs)
         if isinstance(text, str):
-            text = re.sub(r"\bQJ[-_]?(\d{1,8})\b", lambda m: f"QC{int(m.group(1)):04d}", text)
+            from qiaolian_dual.public_listing_id import public_listing_id
+            text = re.sub(r"\bQJ[-_]?(\d{1,8})\b", lambda m: public_listing_id(f"l_{int(m.group(1))}"), text)
         return text
 
     publisher.build_caption = patched_build_caption

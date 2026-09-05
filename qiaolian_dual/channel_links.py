@@ -17,12 +17,9 @@ _ACTION_SUFFIX = {
 
 
 def public_qc_code(listing_id: str) -> str:
-    """Return the stable public QC identifier for an internal/public listing id."""
-    raw = str(listing_id or "").strip()
-    match = re.search(r"(\d{1,8})", raw)
-    if not match:
-        return raw.upper()
-    return f"QC{int(match.group(1)):04d}"
+    """Compatibility name returning the stable QL public identifier."""
+    from .public_listing_id import public_listing_id
+    return public_listing_id(listing_id)
 
 
 def channel_target(listing_id: str) -> str:

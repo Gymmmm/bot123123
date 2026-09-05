@@ -12,6 +12,7 @@ from publication_package import (
     render_cover_preview,
 )
 from qiaolian_dual.channel_post import format_channel_listing_post
+from qiaolian_dual.public_listing_id import public_listing_id
 from qiaolian_dual.channel_status_sync import (
     APPOINTMENT_LOCK_COUNT,
     _caption_with_status,
@@ -50,6 +51,7 @@ def test_publication_package_lifecycle_surface_is_restored():
 
 
 def test_locked_caption_is_compact_mobile_layout():
+    public_id = public_listing_id("l_89")
     text = format_button_post_text(DIAMOND, "l_89", ["#钻石岛", "#两房", "#金边租房"])
     assert text.splitlines() == [
         "🏠 <b>钻石岛｜2房2卫</b>",
@@ -58,7 +60,7 @@ def test_locked_caption_is_compact_mobile_layout():
         "🏢 公寓｜75㎡｜18/35楼",
         "🔑 押2付1｜租期1年",
         "",
-        "🟢 当前可预约　QC0089",
+        f"🟢 当前可预约　{public_id}",
         "",
         "#钻石岛 #两房 #租金500至1000",
     ]
@@ -75,7 +77,7 @@ def test_first_freeze_treats_empty_and_draft_status_as_active():
     for status in ("", "draft"):
         listing = dict(DIAMOND, status=status)
         text = format_button_post_text(listing, "l_89", [])
-        assert "🟢 当前可预约　QC0089" in text
+        assert f"🟢 当前可预约　{public_listing_id('l_89')}" in text
         assert "🔵 房态待确认" not in text
 
 
@@ -90,8 +92,9 @@ def test_missing_price_does_not_write_mianyi():
 def test_status_sync_keeps_qc_and_drops_book_button_at_five():
     caption = format_button_post_text(DIAMOND, "l_89", [])
     locked = _caption_with_status(caption, "pending", APPOINTMENT_LOCK_COUNT, "l_89")
-    assert "QC0089" in locked
-    assert "🔵 已有5份预约看房，房态待确认　QC0089" in locked
+    public_id = public_listing_id("l_89")
+    assert public_id in locked
+    assert f"🔵 已有5份预约看房，房态待确认　{public_id}" in locked
     assert _status_label("pending", 2) == "🔵 房态待确认"
     markup = _keyboard("QiaolianBot", "", "l_89", "pending")
     labels = [[button.text for button in row] for row in markup.inline_keyboard]

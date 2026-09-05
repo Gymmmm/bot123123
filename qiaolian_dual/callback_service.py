@@ -12,6 +12,7 @@ def matches(data: str) -> bool:
         or data in {'service:renew', 'service:change', 'service:renew_change', 'service:terminate', 'service:move', 'service:staging', 'service:addons', 'service:checkin_tips'}
         or data in {'service:guide', 'service:local_life'}
         or data == 'service:repair_hub'
+        or data in {'service:general', 'service:nearby', 'local:other'}
         or data.startswith('service_request:')
         or data.startswith('service_slot:')
         or data == 'local:rfcity'
@@ -29,7 +30,7 @@ def _service_back_keyboard(*, parent_callback: str='service:hub', parent_label: 
 async def handle_service_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, query, data: str, user) -> int | None:
     from .admin_contract import _user_contact_text, _user_mention_html
     from .flows import contact_management, show_search_entry, show_service_hub
-    from .keyboards_search import local_life_keyboard, rfcity_back_keyboard, rfcity_keyboard, service_repair_keyboard
+    from .keyboards_search import local_life_keyboard, nearby_area_keyboard, rfcity_back_keyboard, rfcity_keyboard, service_repair_keyboard
     from .results_admin import _notify_admins, admin_repair_keyboard
     from .search import create_lead
     from .session_deeplink import now_ts
@@ -42,6 +43,36 @@ async def handle_service_callback(update: Update, context: ContextTypes.DEFAULT_
         # Generic service contact must not inherit a listing opened earlier in the chat.
         context.user_data.pop('contact_listing_id', None)
         return await contact_management(update, context, source='service_hub')
+
+    if data == 'service:general':
+        for key in ('contact_listing_id', 'contact_touch_payload', 'appt', 'active_listing_id', 'listing_id'):
+            context.user_data.pop(key, None)
+        context.user_data['awaiting_service_general'] = True
+        await render_panel(
+            update,
+            text='💬 <b>通用服务咨询</b>\n\n请直接说需要什么帮助，我们会按服务需求跟进。',
+            parse_mode=ParseMode.HTML,
+            reply_markup=_service_back_keyboard(parent_callback='service:hub', parent_label='返回入住服务'),
+            context=context,
+        )
+        return MAIN
+
+    if data == 'service:nearby':
+        await render_panel(update, text='🗺 <b>周边推荐</b>\n\n先选择要查看的区域。', parse_mode=ParseMode.HTML, reply_markup=nearby_area_keyboard(), context=context)
+        return MAIN
+
+    if data == 'local:other':
+        for key in ('contact_listing_id', 'contact_touch_payload', 'appt', 'active_listing_id', 'listing_id'):
+            context.user_data.pop(key, None)
+        context.user_data['awaiting_nearby_request'] = True
+        await render_panel(
+            update,
+            text='📍 <b>其他区域周边需求</b>\n\n请直接发送区域或地标，以及想找的餐饮、超市、交通或生活服务。',
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('⬅️ 返回周边推荐', callback_data='service:nearby')]]),
+            context=context,
+        )
+        return MAIN
 
     if data == 'service:repair_hub':
         await render_panel(update, text='🔧 <b>设备报修</b>\n\n请选择出现问题的设备。', parse_mode=ParseMode.HTML, reply_markup=service_repair_keyboard(), context=context)

@@ -23,6 +23,8 @@ jobs:
           python-version: '3.12'
       - name: Install test dependencies
         run: |
+          sudo apt-get update
+          sudo apt-get install -y fonts-noto-cjk
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt pytest pytest-asyncio
       - name: Diff whitespace check
@@ -74,4 +76,5 @@ jobs:
             tests/test_media_selection_contract.py \
             tests/test_channel_three_entry_contract.py \
             tests/test_attribution_admin.py \
-            tests/test_lead_workflow.py
+            tests/test_lead_workflow.py \
+            tests/test_publisher_user_polish.py

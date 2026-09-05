@@ -729,8 +729,8 @@ def build_package(
     tag_lines = [line for line in post_lines if line.strip().startswith("#")]
     body_lines = [line for line in post_lines if not line.strip().startswith("#")]
     post_text = format_button_post_text(d, listing_id, tag_lines, styles["caption_variant"])
-    listing_number = re.search(r"(\d+)", str(listing_id))
-    qc_code = f"QC{int(listing_number.group(1)):04d}" if listing_number else ""
+    from qiaolian_dual.public_listing_id import public_listing_id
+    qc_code = public_listing_id(listing_id)
     if qc_code and qc_code not in post_text:
         lines = post_text.splitlines()
         tag_at = next((i for i, line in enumerate(lines) if line.startswith("#")), len(lines))

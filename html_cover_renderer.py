@@ -77,9 +77,9 @@ def _canonical_cover_fields(data: dict[str, Any]) -> dict[str, Any]:
         size += "㎡"
     highlights = facts.get("highlights") if isinstance(facts.get("highlights"), list) else []
     ref = str(first(data.get("qc_code"), data.get("ref"), data.get("listing_id"))).strip()
-    listing_match = re.fullmatch(r"(?i)l[_-]?(\d+)", ref)
-    if listing_match:
-        ref = f"QC{int(listing_match.group(1)):04d}"
+    from qiaolian_dual.public_listing_id import public_listing_id
+    if ref:
+        ref = public_listing_id(ref)
     if ref.upper().startswith("DRF_"):
         ref = ""
     return {

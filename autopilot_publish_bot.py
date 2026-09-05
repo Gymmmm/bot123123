@@ -303,11 +303,17 @@ def _conn() -> sqlite3.Connection:
 
 
 def _resolve_admin_draft_id(raw_id: str) -> str | None:
-    """管理员只输入 QC 编号；内部仍解析到 draft_id。旧 DRF 仅作兼容，不再展示。"""
+    """Resolve new public IDs plus legacy QC/internal draft references."""
     raw = str(raw_id or "").strip()
     if not raw:
         return None
+    from qiaolian_dual.public_listing_id import resolve_listing_id
+    resolved = resolve_listing_id(raw, db_path=DB_PATH)
     with _conn() as c:
+        if resolved and resolved != raw:
+            row = c.execute("SELECT draft_id FROM drafts WHERE listing_id=? ORDER BY id DESC LIMIT 1", (resolved,)).fetchone()
+            if row:
+                return str(row[0])
         if re.fullmatch(r"(?i)qc[-_]?\d+", raw):
             n = int(re.search(r"\d+", raw).group(0))
             internal = f"l_{n}"
@@ -329,10 +335,76 @@ def _admin_qc_for_draft(draft_id: str) -> str:
     with _conn() as c:
         row = c.execute("SELECT listing_id,id FROM drafts WHERE draft_id=? LIMIT 1", (draft_id,)).fetchone()
     value = str(row[0] or "") if row else ""
-    m = re.fullmatch(r"(?i)l[_-]?(\d+)", value)
-    if not m and row:
-        m = re.fullmatch(r"\d+", str(row[1] or ""))
-    return f"QC{int(m.group(1)):04d}" if m else "QC-"
+    from qiaolian_dual.public_listing_id import public_listing_id
+    if not value and row:
+        value = f"l_{int(row[1])}"
+    return public_listing_id(value, db_path=DB_PATH) or "待生成"
+
+
+def _intake_result_card(row: sqlite3.Row | dict, image_count: int, missing_media: int = 0) -> tuple[str, InlineKeyboardMarkup]:
+    data = dict(row)
+    from qiaolian_dual.public_listing_id import public_listing_id
+    listing_id = str(data.get("listing_id") or f"l_{int(data.get('id') or 0)}")
+    public_id = public_listing_id(listing_id, db_path=DB_PATH)
+    required = {
+        "项目/区域": data.get("project") or data.get("community") or data.get("area"),
+        "户型": data.get("layout") or data.get("property_type"),
+        "租金": data.get("price"),
+        "至少4张图片": int(image_count or 0) >= 4,
+    }
+    missing = [label for label, value in required.items() if not value]
+    if missing_media:
+        missing.append(f"{int(missing_media)}张源图片不可用")
+    status = str(data.get("review_status") or "pending")
+    publishable = not missing and status == "approved"
+    lines = [
+        "✅ <b>房源导入结果</b>", "",
+        f"房源编号：<b>{html.escape(public_id or '待生成')}</b>",
+        "解析状态：<b>已解析</b>",
+        f"图片数量：<b>{int(image_count or 0)}</b>",
+        f"缺失字段：<b>{html.escape('、'.join(missing) if missing else '无')}</b>",
+        f"当前状态：<b>{html.escape(status)}</b>",
+    ]
+    if not publishable:
+        reason = "、".join(missing) if missing else "需要先完成预览审核"
+        lines.extend(["", f"暂不能发布：{html.escape(reason)}"])
+    pk = int(data.get("id") or 0)
+    rows = [
+        [InlineKeyboardButton("👀 预览房源", callback_data=f"ap:u:{pk}"), InlineKeyboardButton("✏️ 修改内容", callback_data=f"ap:e:{pk}")],
+    ]
+    if publishable:
+        rows.append([InlineKeyboardButton("📤 发布到频道", callback_data=f"ap:na:{pk}"), InlineKeyboardButton("📥 暂存", callback_data=f"ap:h:{pk}")])
+    else:
+        rows.append([InlineKeyboardButton("📥 暂存", callback_data=f"ap:h:{pk}")])
+    rows.append([InlineKeyboardButton("🏠 返回首页", callback_data="cmd:quick_help")])
+    return "\n".join(lines), InlineKeyboardMarkup(rows)
+
+
+async def cmd_sample_preview(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Private, side-effect-free example of the final channel post."""
+    if not _is_admin(update.effective_user.id):
+        return
+    from PIL import Image, ImageDraw
+    from qiaolian_dual.callback_rental import _font
+    from qiaolian_dual.channel_post import format_channel_listing_post
+    from v2.qiaolian_publisher_v2.keyboards import publish_post_keyboard
+    sample_id = "QL-RF-K7M2"
+    img = Image.new("RGB", (1200, 900), (247, 243, 234))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle((0, 0, 1200, 18), fill=(174, 139, 62))
+    draw.text((70, 75), "侨联地产｜发布效果示例", fill=(30, 35, 42), font=_font(52, bold=True))
+    draw.text((70, 155), sample_id, fill=(174, 139, 62), font=_font(34, bold=True))
+    draw.text((70, 245), "BKK1 示例公寓", fill=(30, 35, 42), font=_font(44, bold=True))
+    draw.text((70, 325), "2房｜$850 / 月", fill=(30, 35, 42), font=_font(38))
+    draw.text((70, 815), "示例预览｜不入库｜不发频道", fill=(90, 90, 90), font=_font(24))
+    out = io.BytesIO()
+    img.save(out, format="PNG")
+    out.seek(0)
+    sample = {"listing_id": sample_id, "project": "BKK1 示例公寓", "area": "BKK1", "layout": "2房", "price": 850, "status": "active"}
+    caption = format_channel_listing_post(sample, sample_id, status="active")
+    keyboard = publish_post_keyboard(sample_id, "BKK1", DEEPLINK_BOT_USERNAME)
+    await context.bot.send_photo(chat_id=update.effective_chat.id, photo=out, caption="示例预览，不入库、不发频道")
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=caption, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
 def _table_columns(table_name: str) -> set[str]:
     try:
@@ -963,7 +1035,7 @@ async def cmd_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         f"审核包 ready：<b>{ready}</b> · 已批准待发：<b>{approved}</b>",
         f"频道已发：<b>{published_today}</b> · 新预约：<b>{appointments_today}</b>",
         f"队列：<b>{'暂停' if paused else '运行'}</b> · 槽位：<code>{html.escape(_slots_raw_effective())}</code>",
-        "\n此页只读；发布前请对单套执行 <code>/check QC0001</code>。",
+        "\n此页只读；发布前请对单套执行 <code>/check QL-RF-K7M2</code>。",
     ]
     await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML, reply_markup=admin_menu())
 
@@ -1119,7 +1191,7 @@ async def cmd_ops(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         f"发帖时段：<code>{html.escape(slots)}</code>\n\n"
         f"待审核Top：{pending_line}\n"
         f"下一个审核包待批准：{ready_line}\n\n"
-        "快捷：<code>/pending</code> <code>/send QC0001</code> <code>/slots 10:30,17:00,21:30</code>",
+        "快捷：<code>/pending</code> <code>/send QL-RF-K7M2</code> <code>/slots 10:30,17:00,21:30</code>",
         parse_mode=ParseMode.HTML,
         reply_markup=admin_menu(),
     )
@@ -1314,7 +1386,7 @@ async def cmd_approve(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
     if not context.args:
         await update.effective_message.reply_text(
-            "用法：<code>/approve QC0001 A</code>\n"
+            "用法：<code>/approve QL-RF-K7M2 A</code>\n"
             "A=标准信息，B=亮点价格，C=专业参数。省略版本时按物业类型自动选择。\n"
             "更推荐直接点 <code>/pending</code> 中的封面预览按钮。",
             parse_mode=ParseMode.HTML,
@@ -1440,7 +1512,7 @@ async def cmd_reject(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     if not _is_admin(update.effective_user.id):
         return
     if not context.args:
-        await update.message.reply_text("用法：<code>/reject QC0001</code>", parse_mode=ParseMode.HTML)
+        await update.message.reply_text("用法：<code>/reject QL-RF-K7M2</code>", parse_mode=ParseMode.HTML)
         return
     input_id = context.args[0].strip()
     draft_id = _resolve_admin_draft_id(input_id)
@@ -1521,7 +1593,7 @@ async def cmd_check(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _is_admin(update.effective_user.id):
         return
     if not context.args:
-        await update.effective_message.reply_text("用法：<code>/check QC0001</code>", parse_mode=ParseMode.HTML)
+        await update.effective_message.reply_text("用法：<code>/check QL-RF-K7M2</code>", parse_mode=ParseMode.HTML)
         return
     input_id = str(context.args[0]).strip()
     draft_id = _resolve_admin_draft_id(input_id)
@@ -2194,7 +2266,7 @@ async def cmd_intake_done(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         # 查询刚生成的草稿
         with _conn() as c:
             row = c.execute(
-                "SELECT draft_id FROM drafts WHERE source_post_id=? ORDER BY id DESC LIMIT 1",
+                "SELECT * FROM drafts WHERE source_post_id=? ORDER BY id DESC LIMIT 1",
                 (source_row_id,),
             ).fetchone()
         if row and row["draft_id"]:
@@ -2206,17 +2278,13 @@ async def cmd_intake_done(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         logger.exception("auto parse after intake_done failed")
         parse_msg = f"⚠️ 自动解析失败：{html.escape(str(e))}\n可用 <code>/intake_pending</code> 查看。"
 
-    await update.message.reply_text(
-        "✅ 已导入微信笔记\n"
-        f"source_post_id: <code>{html.escape(source_post_id)}</code>\n"
-        f"title: {html.escape(parsed.get('title') or '-')}\n"
-        f"images: {len(images)} · 已登记源图片: {media_result.get('registered', 0) + media_result.get('existing', 0)}"
-        + (f" · 缺失: {media_result.get('missing', 0)}" if media_result.get('missing', 0) else "")
-        + "\n\n"
-        + parse_msg,
-        parse_mode=ParseMode.HTML,
-        reply_markup=admin_menu(),
-    )
+    if draft_id_gen:
+        with _conn() as c:
+            result_row = c.execute("SELECT * FROM drafts WHERE draft_id=?", (draft_id_gen,)).fetchone()
+        card, keyboard = _intake_result_card(result_row, len(images), int(media_result.get("missing", 0)))
+        await update.message.reply_text(card, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+    else:
+        await update.message.reply_text(parse_msg, parse_mode=ParseMode.HTML, reply_markup=admin_menu())
 
 
 async def cmd_intake_pending(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2248,7 +2316,7 @@ async def cmd_intake_pending(update: Update, context: ContextTypes.DEFAULT_TYPE)
                     f"{html.escape(str(r['t'] or '')[:16])}\n"
                     f"  {html.escape(str(r['title'] or '（无标题）')[:40])}"
                 )
-            out.append("\n状态说明：pending/ready 需先执行 <code>/approve QC0001</code> 生成并审核 package；只有 approved 后才能 /send。")
+            out.append("\n状态说明：pending/ready 需先执行 <code>/approve QL-RF-K7M2</code> 生成并审核 package；只有 approved 后才能 /send。")
     except Exception as e:
         out.append(f"读取失败：{html.escape(str(e))}")
     await update.message.reply_text("\n".join(out), parse_mode=ParseMode.HTML, reply_markup=admin_menu())
@@ -2686,6 +2754,10 @@ async def on_preview_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         await q.edit_message_text("草稿已不存在。")
         return
     draft_id = row["draft_id"]
+
+    if act == "h":
+        await q.edit_message_text("📥 <b>已暂存</b>\n\n房源仍在待审队列，没有发送到频道。", parse_mode=ParseMode.HTML, reply_markup=admin_menu())
+        return
 
     if act == "f":
         context.user_data["await"] = "fix_area"

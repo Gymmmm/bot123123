@@ -47,6 +47,20 @@ async def handle_main_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         issue_key = str(service_request.get('issue_key') or 'repair_other')
         await render_panel(update, text=f'✅ 已记录：{he(text[:500])}\n\n选希望处理的时间：', parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('🚨 今天内', callback_data=f'service_slot:{issue_key}:today'), InlineKeyboardButton('🕘 明天上午', callback_data=f'service_slot:{issue_key}:tomorrow_am')], [InlineKeyboardButton('🕒 明天下午', callback_data=f'service_slot:{issue_key}:tomorrow_pm')], [InlineKeyboardButton('⬅️ 返回入住后服务', callback_data='service:hub')]]), context=context)
         return MAIN
+    general_kind = None
+    if context.user_data.pop('awaiting_service_general', None):
+        general_kind = '通用服务咨询'
+    elif context.user_data.pop('awaiting_nearby_request', None):
+        general_kind = '周边需求'
+    if general_kind:
+        if len(text) < 2:
+            context.user_data['awaiting_service_general' if general_kind == '通用服务咨询' else 'awaiting_nearby_request'] = True
+            await update.effective_message.reply_text('请简单说一下需要什么帮助。')
+            return MAIN
+        create_lead(user, action='service_general', source='service_hub', payload={'kind': general_kind, 'details': text[:800]})
+        await _notify_admins(context, title=general_kind, lines=[f'用户：{_user_mention_html(user)}', f'联系方式：{he(_user_contact_text(user))}', f'需求：<code>{he(text[:700])}</code>'])
+        await render_panel(update, text='✅ 已收到你的需求\n\n顾问会根据这条内容联系你。', parse_mode=ParseMode.HTML, reply_markup=service_hub_keyboard(user.id), context=context)
+        return MAIN
     kctx = context.user_data.pop('awaiting_keyword_find', None)
     if kctx is not None:
         if not text:

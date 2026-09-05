@@ -27,10 +27,8 @@ def _is_admin(user_id: int) -> bool:
 
 
 def _display_listing_id(value: str) -> str:
-    raw = str(value or "").strip()
-    if raw.lower().startswith("l_") and raw[2:].isdigit():
-        return f"QC{int(raw[2:]):04d}"
-    return raw
+    from .utils_formatting import _display_listing_id as display
+    return display(value)
 
 
 def admin_home_keyboard() -> InlineKeyboardMarkup:
@@ -74,7 +72,7 @@ def format_listing_summary(listing_id: str) -> str:
     return "\n".join([
         "🏠 <b>房源摘要</b>",
         "",
-        f"QC：<b>{he(_display_listing_id(listing_id))}</b>",
+        f"房源编号：<b>{he(_display_listing_id(listing_id))}</b>",
         f"项目：{he(project)}",
         f"户型：{he(layout)}",
         f"价格：{he(price)}",

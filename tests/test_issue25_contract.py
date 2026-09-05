@@ -19,6 +19,7 @@ from qiaolian_dual.results_admin import send_listing_photo_preview
 from qiaolian_dual.session_deeplink import parse_start_arg_payload
 from qiaolian_dual.start_routes import route_start_arg
 from qiaolian_dual.utils_formatting import _internal_listing_id
+from qiaolian_dual.public_listing_id import public_listing_id
 
 
 def _labels(markup):
@@ -57,10 +58,11 @@ def test_channel_cta_is_fixed_and_has_no_helper(monkeypatch):
     markup = meihua_publisher.build_keyboard("QC0002")
     assert _labels(markup) == [["🏠 房源详情", "📸 更多实拍"], ["📅 预约看房"]]
     urls = [button.url for row in markup.inline_keyboard for button in row]
+    public_id = public_listing_id("l_2")
     assert urls == [
-        "https://t.me/QiaolianBot?start=property_QC0002_details",
-        "https://t.me/QiaolianBot?start=property_QC0002_photos",
-        "https://t.me/QiaolianBot?start=property_QC0002_book",
+        f"https://t.me/QiaolianBot?start=property_{public_id}_details",
+        f"https://t.me/QiaolianBot?start=property_{public_id}_photos",
+        f"https://t.me/QiaolianBot?start=property_{public_id}_book",
     ]
 
 
@@ -84,7 +86,7 @@ def test_channel_caption_uses_confirmed_compact_post_format():
     assert text.splitlines() == [
         "🏠 <b>钻石岛｜2房2卫</b>", "", "💰 <b>$680/月</b> 📐 <b>75㎡｜18/35楼</b>",
         "📄 <b>押付/合同：押2付1｜1年</b>", "📅 <b>可入住：随时入住</b>", "",
-        "🟡 <b>已有预约 · 仍可预约</b> 🆔 <b>QJ0005</b>", "", "<b>#钻石岛 #两房 #金边租房</b>",
+        f"🟡 <b>已有预约 · 仍可预约</b> 🆔 <b>{public_listing_id('l_5')}</b>", "", "<b>#钻石岛 #两房 #金边租房</b>",
     ]
     assert "　" not in text
     assert "\n\n\n" not in text
@@ -132,7 +134,7 @@ async def test_appointment_starts_at_date_and_video_goes_to_video_date():
         state = await start_appointment(SimpleNamespace(), context, "QC0002", render_panel_fn=render)
     assert state == APPT_DATE
     assert "哪天方便看房？" in render.await_args.kwargs["text"]
-    assert "📅 <b>预约看房｜QC0002</b>" in render.await_args.kwargs["text"]
+    assert f"📅 <b>预约看房｜{public_listing_id('l_2')}</b>" in render.await_args.kwargs["text"]
     labels = sum(_labels(render.await_args.kwargs["reply_markup"]), [])
     assert "🎥 改为视频看房" in labels
     assert context.user_data["appt"]["mode"] == "offline"

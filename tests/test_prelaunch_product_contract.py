@@ -7,6 +7,7 @@ from PIL import Image
 import discussion_map_store
 from meihua_publisher import CHANNEL_ALBUM_SIZE, normalize_album_image
 from publication_package import classify
+from qiaolian_dual.public_listing_id import public_listing_id
 from v2.qiaolian_publisher_v2.keyboards import preview_keyboard, publish_post_keyboard, type_keyboard
 
 
@@ -45,7 +46,7 @@ def test_admin_ui_uses_direct_publish_copy_and_more_photos_never_becomes_similar
     kb = publish_post_keyboard('l_2', '永旺1', 'QiaolianBot')
     buttons = [b for row in kb.inline_keyboard for b in row]
     media = next(b for b in buttons if '更多实拍' in b.text)
-    assert 'start=property_QC0002_photos' in media.url
+    assert f"start=property_{public_listing_id('l_2')}_photos" in media.url
     assert 'l_2' not in media.url
     assert 'similar' not in media.url
 
