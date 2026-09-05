@@ -36,10 +36,10 @@ def test_publish_routing_matches_product_contract():
     assert routed['cover_template'] == 'black_gold'
 
 
-def test_admin_ui_is_truthful_and_more_photos_never_becomes_similar():
+def test_admin_ui_uses_direct_publish_copy_and_more_photos_never_becomes_similar():
     preview_labels = [b.text for row in preview_keyboard().inline_keyboard for b in row]
-    assert '✅ 保存到待审' in preview_labels
-    assert all('立即发布' not in x for x in preview_labels)
+    assert '📤 发布到频道' in preview_labels
+    assert '✅ 保存到待审' not in preview_labels
     type_labels = [b.text for row in type_keyboard().inline_keyboard for b in row]
     assert '🏘 排屋' in type_labels
     kb = publish_post_keyboard('l_2', '永旺1', 'QiaolianBot')
