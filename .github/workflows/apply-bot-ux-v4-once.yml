@@ -131,6 +131,7 @@ jobs:
       - name: Syntax and focused tests
         run: |
           python -m py_compile qiaolian_dual/keyboards_search.py qiaolian_dual/texts.py v2/qiaolian_publisher_v2/keyboards.py autopilot_publish_bot.py
+          python -m pip install -q pytest
           python -m pytest -q tests/test_user_bot_return_paths.py tests/test_talk_engine_factual_copy.py
 
       - name: Commit changes
