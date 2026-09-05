@@ -21,24 +21,20 @@ def main_menu() -> InlineKeyboardMarkup:
 
 
 def admin_menu() -> InlineKeyboardMarkup:
-    """Six plain-language entry points for the normal publishing workflow."""
+    """Publisher home: six high-frequency actions only."""
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("🏠 待发布房源", callback_data="cmd:queue"),
-                InlineKeyboardButton("🟢 房态管理", callback_data="cmd:listing_states"),
-            ],
-            [
+                InlineKeyboardButton("🏠 待发布", callback_data="cmd:queue"),
                 InlineKeyboardButton("➕ 添加房源", callback_data="cmd:intake"),
-                InlineKeyboardButton("📡 采集源", callback_data="cmd:sources"),
             ],
             [
+                InlineKeyboardButton("🟢 房态管理", callback_data="cmd:listing_states"),
                 InlineKeyboardButton("📢 每日广播", callback_data="cmd:daily"),
-                InlineKeyboardButton("📚 发布记录", callback_data="cmd:logs"),
             ],
             [
-                InlineKeyboardButton("⚙️ 运营设置", callback_data="cmd:settings_hub"),
-                InlineKeyboardButton("❓ 使用帮助", callback_data="cmd:quick_help"),
+                InlineKeyboardButton("📡 采集源", callback_data="cmd:sources"),
+                InlineKeyboardButton("📚 发布记录", callback_data="cmd:logs"),
             ],
         ]
     )
@@ -137,7 +133,7 @@ def publish_post_keyboard(
         [
             [
                 InlineKeyboardButton(
-                    "📋 租赁详情",
+                    "🏠 房源详情",
                     url=channel_action_url(user_bot_username, listing_id, "details"),
                 ),
                 InlineKeyboardButton(

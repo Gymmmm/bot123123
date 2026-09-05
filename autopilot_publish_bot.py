@@ -230,9 +230,11 @@ _WEATHER_LABELS = {
 
 
 def _fetch_phnom_penh_daily_info() -> str:
-    """仅在管理员预览或已开启的当日发送前读取公开数据；任一源不可用时安全降级。"""
-    weather_line = "天气暂时无法获取，出门建议留意降雨。"
-    fx_line = "汇率暂时无法获取，换汇前请以银行或换汇点实时牌价为准。"
+    """Build a concise live Phnom Penh daily card; never publish fabricated fallback numbers."""
+    now = datetime.now(TZ)
+    weekday = "一二三四五六日"[now.weekday()]
+    weather_line = "🌤 天气：暂时无法获取"
+    fx_line = "💵 汇率：暂时无法获取"
     weather_url = (
         "https://api.open-meteo.com/v1/forecast?latitude=11.5564&longitude=104.9282"
         "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max"
@@ -247,23 +249,26 @@ def _fetch_phnom_penh_daily_info() -> str:
         high = float((daily.get("temperature_2m_max") or [0])[0])
         low = float((daily.get("temperature_2m_min") or [0])[0])
         rain = int(round(float((daily.get("precipitation_probability_max") or [0])[0])))
-        weather_line = f"金边天气：{_WEATHER_LABELS.get(code, '天气多变')}，{low:.0f}–{high:.0f}℃，降雨概率 {rain}%"
+        weather_line = f"🌤 天气：{_WEATHER_LABELS.get(code, '天气多变')} {low:.0f}–{high:.0f}℃｜降雨 {rain}%"
     except Exception:
         logger.info("每日广播天气数据暂不可用", exc_info=True)
     try:
         request = Request("https://open.er-api.com/v6/latest/USD", headers={"User-Agent": "QiaolianRentalBot/1.0"})
         with urlopen(request, timeout=6) as response:
             exchange = json.loads(response.read().decode("utf-8"))
-        khr = float((exchange.get("rates") or {}).get("KHR"))
-        fx_line = f"参考汇率：1 USD ≈ {khr:,.0f} KHR"
+        rates = exchange.get("rates") or {}
+        cny = float(rates.get("CNY"))
+        khr = float(rates.get("KHR"))
+        fx_line = f"💵 汇率：1 USD ≈ {cny:.2f} CNY｜{khr:,.0f} KHR"
     except Exception:
         logger.info("每日广播汇率数据暂不可用", exc_info=True)
     return (
-        "<b>☀️ 金边今日信息</b>\n\n"
+        "<b>☀️ 侨联地产｜早安金边</b>\n"
+        f"📅 {now:%Y.%m.%d}｜星期{weekday}\n\n"
         f"{weather_line}\n"
         f"{fx_line}\n\n"
-        "天气与汇率仅作出行和换汇参考；实际以当日现场信息为准。\n"
-        "准备看房，直接发区域和预算给顾问。"
+        "🏠 今天要看房：直接发区域 + 预算，我帮你筛。\n"
+        "<i>天气与汇率仅供参考，以实时信息/实际牌价为准。</i>"
     )
 
 

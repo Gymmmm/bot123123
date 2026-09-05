@@ -100,8 +100,8 @@ def precise_filter_keyboard(selected: set[str] | None=None) -> InlineKeyboardMar
 
 def service_hub_keyboard(user_id: int | None=None) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton('🔧 设备报修', callback_data='service:repair_hub'), InlineKeyboardButton('🏢 物业协调', callback_data='service_request:property')],
-        [InlineKeyboardButton('📦 生活服务', callback_data='service:local_life'), InlineKeyboardButton('💬 其他帮助', callback_data='service:contact')],
+        [InlineKeyboardButton('📋 入住交接留档', callback_data='hub:rental:handover'), InlineKeyboardButton('🔐 押金说明', callback_data='hub:rental:deposit')],
+        [InlineKeyboardButton('🔧 设备报修', callback_data='service:repair_hub'), InlineKeyboardButton('💬 联系我们', callback_data='service:contact')],
         [InlineKeyboardButton('⬅️ 返回首页', callback_data='home')],
     ])
 

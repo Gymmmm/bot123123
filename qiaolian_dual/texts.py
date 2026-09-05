@@ -145,7 +145,7 @@ def help_text() -> str:
     )
 
 def service_hub_text() -> str:
-    return ('🛠 <b>入住服务</b>\n\n住下以后，有事也可以找侨联。\n住房或生活上的问题，都可以先问问我们。')
+    return ('🛠 <b>入住服务</b>\n\n入住后的常用事项放在这里。\n留档、押金、设备问题，直接点就行。')
 
 def local_life_text() -> str:
     return copy_local_life_text()
