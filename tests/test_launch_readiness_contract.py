@@ -20,8 +20,14 @@ def test_channel_detail_payload_reaches_details_route():
 def test_channel_post_has_exactly_three_launch_actions():
     keyboard = publish_post_keyboard("l_1047", "BKK1", "QiaolianBot", post_token="abc123")
     buttons = [button for row in keyboard.inline_keyboard for button in row]
-    assert [button.text for button in buttons] == ["📋 租赁详情", "📸 更多实拍", "📅 预约看房"]
+    assert [button.text for button in buttons] == ["🏠 房源详情", "📸 更多实拍", "📅 预约看房"]
     assert all(button.url for button in buttons)
+
+
+def test_channel_status_sync_uses_same_detail_label():
+    source = Path("qiaolian_dual/channel_status_sync.py").read_text(encoding="utf-8")
+    assert '"🏠 房源详情"' in source
+    assert '"📋 租赁详情"' not in source
 
 
 def test_launch_cover_defaults_match_final_product_contract():
@@ -29,6 +35,7 @@ def test_launch_cover_defaults_match_final_product_contract():
     assert classify(source_type="telegram", source_name="collector", property_type="公寓", project="", price=1200)["cover_template"] == "black_gold"
     assert classify(source_type="telegram", source_name="collector", property_type="排屋", project="", price=700)["cover_template"] == "black_gold"
     assert classify(source_type="telegram", source_name="collector", property_type="别墅", project="", price=700)["cover_template"] == "black_gold"
+
 
 def test_cover_source_remains_in_complete_gallery():
     source = Path("publication_package.py").read_text(encoding="utf-8")
