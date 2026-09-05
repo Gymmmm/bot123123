@@ -225,12 +225,21 @@ def create_lead(
     budget_max: int | None = None,
     payload: dict | None = None,
 ) -> int | None:
+    from .attribution import attach_to_lead_payload, remember_touch
+    from .attribution_store import apply_lead_attribution_columns
     from .session_deeplink import _normalize_variant, now_ts, user_display_name
 
     if user is None or not getattr(user, 'id', None):
         logger.warning('跳过无用户身份的线索写入: action=%s listing=%s', action, listing_id)
         return None
-    lead_payload = payload or {}
+    touch = remember_touch(
+        user,
+        action=action,
+        source=source,
+        listing_id=listing_id,
+        payload=payload,
+    )
+    lead_payload = attach_to_lead_payload(payload, touch)
     raw_message_id = lead_payload.get('channel_message_id', lead_payload.get('message_id'))
     try:
         message_id = int(raw_message_id) if raw_message_id not in (None, '', 0) else None
@@ -241,7 +250,7 @@ def create_lead(
     agent_id = str(lead_payload.get('agent_id') or '').strip()
     response_at = str(lead_payload.get('response_at') or '').strip()
     try:
-        return db.create_lead({
+        lead_id = db.create_lead({
             'user_id': user.id,
             'username': getattr(user, 'username', '') or '',
             'display_name': user_display_name(user),
@@ -260,6 +269,8 @@ def create_lead(
             'response_at': response_at,
             'created_at': now_ts(),
         })
+        apply_lead_attribution_columns(lead_id, touch)
+        return lead_id
     except Exception:
         logger.exception('写入 leads 失败: action=%s listing=%s', action, listing_id)
         return None
