@@ -50,8 +50,9 @@ async def render_panel(update: Update, *, text: str, reply_markup: InlineKeyboar
                 context.user_data[PANEL_ANCHOR_KEY] = {'chat_id': int(query.message.chat_id), 'message_id': int(query.message.message_id)}
             return
         except Exception as exc:
-            if 'message is not modified' not in str(exc).lower():
-                logger.debug('render_panel edit failed, fallback to send: %s', exc)
+            if 'message is not modified' in str(exc).lower():
+                return
+            logger.debug('render_panel edit failed, fallback to send: %s', exc)
     if context is not None and prefer_edit_anchor and (query is None):
         anchor = context.user_data.get(PANEL_ANCHOR_KEY) or {}
         chat_id = anchor.get('chat_id')
@@ -66,6 +67,8 @@ async def render_panel(update: Update, *, text: str, reply_markup: InlineKeyboar
                 await update.get_bot().edit_message_text(**kwargs_anchor)
                 return
             except Exception as exc:
+                if 'message is not modified' in str(exc).lower():
+                    return
                 logger.debug('render_panel anchor edit failed, fallback to send: %s', exc)
     msg = update.effective_message
     kwargs2: dict[str, object] = {'text': text, 'reply_markup': reply_markup}
