@@ -38,9 +38,14 @@ def consult_action_keyboard(
 ) -> InlineKeyboardMarkup:
     suffix = f'{int(lead_id or 0)}:{int(appointment_id or 0)}:{int(user_id or 0)}'
     rows = [
-        [InlineKeyboardButton('✅ 我来跟进', callback_data=f'adminlead:claim:{suffix}')],
-        [InlineKeyboardButton('📞 已联系', callback_data=f'adminlead:contacted:{suffix}')],
-        [InlineKeyboardButton('✅ 完成', callback_data=f'adminlead:done:{suffix}')],
+        [
+            InlineKeyboardButton('✅ 我来跟进', callback_data=f'adminlead:claim:{suffix}'),
+            InlineKeyboardButton('📞 已联系', callback_data=f'adminlead:contacted:{suffix}'),
+        ],
+        [
+            InlineKeyboardButton('✅ 完成', callback_data=f'adminlead:done:{suffix}'),
+            InlineKeyboardButton('🚫 结束跟进', callback_data=f'adminlead:invalid:{suffix}'),
+        ],
     ]
     if listing_id:
         rows.append([InlineKeyboardButton('🏠 查看房源', callback_data=f'adminlead:view:{suffix}')])

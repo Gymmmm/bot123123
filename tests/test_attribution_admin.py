@@ -67,15 +67,17 @@ def test_chinese_source_labels_and_short_callbacks():
     assert "adminlead:claim:8:9:1001" in callbacks
     assert "adminlead:contacted:8:9:1001" in callbacks
     assert "adminlead:done:8:9:1001" in callbacks
+    assert "adminlead:invalid:8:9:1001" in callbacks
     assert "adminlead:view:8:9:1001" in callbacks
-    assert "adminlead:invalid:8:9:1001" not in callbacks
     assert all(len(value.encode("utf-8")) <= 64 for value in callbacks)
-    assert all(len(row) == 1 for row in with_listing.inline_keyboard)
+    assert all(len(row) <= 2 for row in with_listing.inline_keyboard)
+    assert [button.text for button in with_listing.inline_keyboard[0]] == ["✅ 我来跟进", "📞 已联系"]
+    assert [button.text for button in with_listing.inline_keyboard[1]] == ["✅ 完成", "🚫 结束跟进"]
 
     without_listing = consult_action_keyboard(lead_id=8, appointment_id=9, user_id=1001)
     bare = [button.callback_data for row in without_listing.inline_keyboard for button in row]
     assert "adminlead:view:8:9:1001" not in bare
-    assert "adminlead:invalid:8:9:1001" not in bare
+    assert "adminlead:invalid:8:9:1001" in bare
 
 
 def test_schema_migration_keeps_existing_leads_read_write(monkeypatch):

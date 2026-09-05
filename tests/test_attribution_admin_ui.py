@@ -69,11 +69,15 @@ class AdminCopyTests(unittest.TestCase):
         self.assertIn("✅ 我来跟进", labels)
         self.assertIn("📞 已联系", labels)
         self.assertIn("✅ 完成", labels)
+        self.assertIn("🚫 结束跟进", labels)
         self.assertIn("🏠 查看房源", labels)
-        self.assertTrue(all(len(row) == 1 for row in actions.inline_keyboard))
+        self.assertTrue(all(len(row) <= 2 for row in actions.inline_keyboard))
+        self.assertEqual(2, len(actions.inline_keyboard[0]))
+        self.assertEqual(2, len(actions.inline_keyboard[1]))
         self.assertTrue(all(len(value.encode("utf-8")) <= 64 for value in callbacks))
         self.assertIn("adminlead:claim:8:9:1001", callbacks)
         self.assertIn("adminlead:done:8:9:1001", callbacks)
+        self.assertIn("adminlead:invalid:8:9:1001", callbacks)
         self.assertIn("adminlead:view:8:9:1001", callbacks)
 
 
