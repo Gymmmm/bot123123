@@ -14,6 +14,7 @@ for path in (REPO_ROOT, BASE_DIR):
         sys.path.insert(0, path_s)
 
 from qiaolian_publisher_v2.cover_picker_patch import install_cover_picker
+from qiaolian_publisher_v2.daily_broadcast_patch import install_daily_broadcast_patch
 from qiaolian_publisher_v2.media_selection_patch import install_media_selection_patch
 from qiaolian_publisher_v2.review_queue_patch import install_review_queue_patch
 from qiaolian_publisher_v2.release_contract_patch import install_release_contract_patch
@@ -23,6 +24,7 @@ install_cover_picker()
 install_media_selection_patch()
 install_review_queue_patch()
 install_release_contract_patch()
+install_daily_broadcast_patch()
 
 _LOCK_FH = None
 
