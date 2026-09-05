@@ -24,10 +24,10 @@ def _fmt_price(price: object) -> str:
 def _display_listing_id(listing_id: object) -> str:
     """客户统一看到永久随机 QL 编号；内部键不变。"""
     from .public_listing_id import public_listing_id
-    return public_listing_id(listing_id)
+    return public_listing_id(listing_id) or '待生成'
 
 
-def _internal_listing_id(listing_id: object) -> str:
+def _internal_listing_id(listing_id: object) -> str | None:
     """新 QL、旧 QC/QJ 和内部编号统一解析到内部 listing_id。"""
     from .public_listing_id import resolve_listing_id
     return resolve_listing_id(listing_id)

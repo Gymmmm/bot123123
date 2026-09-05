@@ -78,9 +78,9 @@ def _format_price_display(price_raw: str) -> str:
 
 
 def _format_listing_code(data: dict) -> str:
-    raw = str(data.get("listing_id") or data.get("draft_id") or "").strip()
+    raw = str(data.get("listing_id") or "").strip()
     from qiaolian_dual.public_listing_id import public_listing_id
-    return public_listing_id(raw)
+    return public_listing_id(raw) or "待生成"
 
 
 def _format_size_for_caption(size_raw: str) -> str:

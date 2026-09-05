@@ -19,6 +19,13 @@ from telegram.constants import ParseMode
 _INSTALLED = False
 _FX_KEY = "daily_broadcast_fx_offset"
 _BUTTON_KEY = "daily_broadcast_button"
+_BUTTON_LABELS = {
+    "none": "不带按钮",
+    "find": "帮我找房",
+    "latest": "最新房源",
+    "contact": "联系我们",
+    "combo": "组合按钮",
+}
 
 
 def install_daily_broadcast_patch() -> None:
@@ -223,16 +230,17 @@ def install_daily_broadcast_patch() -> None:
             reply_markup=_center_keyboard(),
         )
 
-    async def _show_daily(target) -> None:
+    async def _show_daily(target, *, notice: str = "") -> None:
         tm = ap._get_setting(ap.KEY_DAILY_TIME, "09:30").strip() or "09:30"
         key = _selected_key()
         title = "每日天气汇率" if key == "live" else (templates.get(key, ("自定义文案", ""))[0] if key != "custom" else "自定义文案")
         await target.edit_message_text(
-            "📢 <b>广播页面</b>\n\n"
+            (f"✅ 已选择：<b>{html.escape(notice)}</b>\n\n" if notice else "")
+            + "📢 <b>广播页面</b>\n\n"
             f"当前模板：<b>{html.escape(title)}</b>\n"
             f"汇率偏移：<b>{html.escape(_fx_label())}</b>\n"
             f"定时：<b>{'已开启' if _on() else '未开启'}</b> · {html.escape(tm)}（{html.escape(ap.TZ_NAME)}）\n\n"
-            f"底部按钮：<b>{html.escape(ap._get_setting(_BUTTON_KEY, 'none'))}</b>",
+            f"底部按钮：<b>{html.escape(_BUTTON_LABELS.get(ap._get_setting(_BUTTON_KEY, 'none'), '不带按钮'))}</b>",
             parse_mode=ParseMode.HTML,
             reply_markup=_daily_keyboard(_on()),
         )
@@ -280,7 +288,7 @@ def install_daily_broadcast_patch() -> None:
             choice = data.rsplit(":", 1)[1]
             if choice in {"none", "find", "latest", "contact", "combo"}:
                 ap._set_setting(_BUTTON_KEY, choice)
-                await _show_daily(q)
+                await _show_daily(q, notice=_BUTTON_LABELS[choice])
             return
         if data.startswith("daily:fxset:"):
             raw = data.rsplit(":", 1)[1]
@@ -337,6 +345,7 @@ def install_daily_broadcast_patch() -> None:
                 "<b>👀 频道发送预览</b>\n\n" + tpl[1],
                 parse_mode=ParseMode.HTML,
                 disable_web_page_preview=True,
+                reply_markup=_footer_keyboard(),
             )
             return
 

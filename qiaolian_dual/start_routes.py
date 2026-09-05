@@ -50,6 +50,9 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
     target = target or raw_target
     if action in {'appoint', 'consult', 'photos', 'details', 'book', 'similar', 'video', 'fav', 'discussion_entry'}:
         target = _internal_listing_id(target)
+        if target is None:
+            await render_panel(update, text='未找到该房源', reply_markup=no_match_followup_keyboard(), context=context)
+            return MAIN
 
     post_token = str(payload.get('post_token') or '')
     channel_message_id = payload.get('channel_message_id')

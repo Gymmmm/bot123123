@@ -11,7 +11,8 @@ import autopilot_publish_bot as ap
 from qiaolian_dual import admin_consult, callback_rental, callback_service, public_listing_id
 from qiaolian_dual.channel_links import channel_start_payload
 from qiaolian_dual.keyboards_search import local_life_keyboard, nearby_area_keyboard, service_hub_keyboard
-from qiaolian_dual.public_listing_id import public_listing_id as make_public_id, resolve_listing_id
+from qiaolian_dual.public_listing_id import normalize_public_id, public_listing_id as make_public_id, resolve_listing_id
+from qiaolian_dual.start_routes import route_start_arg
 
 
 def _callbacks(markup):
@@ -21,12 +22,52 @@ def _callbacks(markup):
 def test_public_listing_id_is_random_unique_and_permanent(tmp_path):
     db_path = tmp_path / "ids.db"
     values = [make_public_id(f"l_{index}", db_path=db_path) for index in range(1, 101)]
-    assert all(re.fullmatch(r"QL-[A-HJ-NP-Z2-9]{6}", value) for value in values)
+    assert all(re.fullmatch(r"QL-PP-[A-HJ-NP-Z][2-9][A-HJ-NP-Z][2-9]", value) for value in values)
     assert len(set(values)) == len(values)
     assert make_public_id("l_1", db_path=db_path) == values[0]
     assert make_public_id("QC0001", db_path=db_path) == values[0]
     assert resolve_listing_id(values[0], db_path=db_path) == "l_1"
     assert resolve_listing_id("QC0001", db_path=db_path) == "l_1"
+
+
+def test_location_code_is_fixed_at_first_generation(tmp_path):
+    db_path = tmp_path / "location.db"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("CREATE TABLE listings(listing_id TEXT PRIMARY KEY, project TEXT, area TEXT)")
+        conn.execute("INSERT INTO listings VALUES ('l_7', '富力城', '洪森大道')")
+    first = make_public_id("l_7", db_path=db_path)
+    assert re.fullmatch(r"QL-RF-[A-HJ-NP-Z][2-9][A-HJ-NP-Z][2-9]", first)
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("UPDATE listings SET project='钻石岛', area='钻石岛' WHERE listing_id='l_7'")
+    assert make_public_id("l_7", db_path=db_path) == first
+
+
+def test_public_id_normalization_and_legacy_lookup(tmp_path):
+    db_path = tmp_path / "compat.db"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("CREATE TABLE listing_public_ids(listing_id TEXT PRIMARY KEY, public_id TEXT UNIQUE, created_at TEXT)")
+        conn.execute("INSERT INTO listing_public_ids VALUES ('l_1', 'QL-A7K3M9', CURRENT_TIMESTAMP)")
+    assert normalize_public_id("QL-A7K3M9") == "QL-A7K3M9"
+    assert normalize_public_id("ql-a7k3m9") == "QL-A7K3M9"
+    assert normalize_public_id("QLA7K3M9") == "QL-A7K3M9"
+    assert normalize_public_id("QLRFK7M2") == "QL-RF-K7M2"
+    for value in ("QL-A7K3M9", "ql-a7k3m9", "QLA7K3M9", "QC0001", "QC-0001", "QJ0001", "l_1"):
+        assert resolve_listing_id(value, db_path=db_path) == "l_1"
+    assert resolve_listing_id("QL-Z9Z9Z9", db_path=db_path) is None
+
+
+@pytest.mark.asyncio
+async def test_unknown_public_id_shows_not_found(tmp_path, monkeypatch):
+    monkeypatch.setattr(public_listing_id, "DB_PATH", str(tmp_path / "unknown.db"))
+    render = AsyncMock()
+    monkeypatch.setattr("qiaolian_dual.texts.render_panel", render)
+    update = SimpleNamespace(
+        effective_user=SimpleNamespace(id=1),
+        effective_message=SimpleNamespace(chat_id=1),
+    )
+    result = await route_start_arg(update, SimpleNamespace(user_data={}), "property_QL-Z9Z9Z9_details")
+    assert result is not None
+    assert render.await_args.kwargs["text"] == "未找到该房源"
 
 
 def test_new_and_legacy_deep_links_resolve_same_listing(tmp_path, monkeypatch):
@@ -41,7 +82,8 @@ def test_import_result_card_shows_required_state_and_hides_publish(monkeypatch, 
     monkeypatch.setattr(public_listing_id, "DB_PATH", str(tmp_path / "card.db"))
     row = {"id": 8, "listing_id": "l_8", "project": "测试项目", "layout": "2房", "price": 800, "review_status": "pending"}
     text, keyboard = ap._intake_result_card(row, 2)
-    assert all(label in text for label in ("QC编号", "解析状态", "图片数量", "缺失字段", "当前状态"))
+    assert all(label in text for label in ("房源编号", "解析状态", "图片数量", "缺失字段", "当前状态"))
+    assert "QC编号" not in text
     callbacks = _callbacks(keyboard)
     assert "ap:u:8" in callbacks and "ap:e:8" in callbacks and "ap:h:8" in callbacks
     assert not any(button.text == "📤 发布到频道" for line in keyboard.inline_keyboard for button in line)
@@ -114,6 +156,13 @@ def test_public_surfaces_do_not_generate_sequential_qc_codes():
     assert not re.search(r'f["\']QC\{', sources)
 
 
+def test_missing_listing_code_uses_pending_label_only():
+    from v2.qiaolian_publisher_v2.formatters import _format_listing_code
+    assert _format_listing_code({}) == "待生成"
+    assert _format_listing_code({"draft_id": "DRF_PRIVATE"}) == "待生成"
+    assert _format_listing_code({"listing_id": ""}) == "待生成"
+
+
 @pytest.mark.asyncio
 async def test_broadcast_settings_save_and_echo(monkeypatch):
     from v2.qiaolian_publisher_v2 import daily_broadcast_patch
@@ -147,7 +196,25 @@ async def test_broadcast_settings_save_and_echo(monkeypatch):
     query.data = "daily:btn:combo"
     await ap.on_daily_callback(update, context)
     assert settings["daily_broadcast_button"] == "combo"
-    assert "combo" in query.edit_message_text.await_args.args[0]
+    page = query.edit_message_text.await_args.args[0]
+    assert "已选择：<b>组合按钮</b>" in page
+    assert "底部按钮：<b>组合按钮</b>" in page
+    assert "combo" not in page
+
+    query.data = "daily:preview"
+    await ap.on_daily_callback(update, context)
+    daily_preview_keyboard = message.reply_text.await_args.kwargs["reply_markup"]
+    query.data = "daily:tplpreview:weekly"
+    await ap.on_daily_callback(update, context)
+    template_preview_keyboard = message.reply_text.await_args.kwargs["reply_markup"]
+    assert daily_preview_keyboard == template_preview_keyboard
+
+    channel_bot = SimpleNamespace(send_message=AsyncMock())
+    context.bot = channel_bot
+    monkeypatch.setattr(ap, "CHANNEL_ID", "-100123")
+    query.data = "daily:send"
+    await ap.on_daily_callback(update, context)
+    assert channel_bot.send_message.await_args.kwargs["reply_markup"] == daily_preview_keyboard
 
     context.user_data["await"] = "daily_patch_text"
     message.text = "新的广播文案"

@@ -338,7 +338,7 @@ def _admin_qc_for_draft(draft_id: str) -> str:
     from qiaolian_dual.public_listing_id import public_listing_id
     if not value and row:
         value = f"l_{int(row[1])}"
-    return public_listing_id(value, db_path=DB_PATH) or "QL-"
+    return public_listing_id(value, db_path=DB_PATH) or "待生成"
 
 
 def _intake_result_card(row: sqlite3.Row | dict, image_count: int, missing_media: int = 0) -> tuple[str, InlineKeyboardMarkup]:
@@ -359,7 +359,7 @@ def _intake_result_card(row: sqlite3.Row | dict, image_count: int, missing_media
     publishable = not missing and status == "approved"
     lines = [
         "✅ <b>房源导入结果</b>", "",
-        f"QC编号：<b>{html.escape(public_id)}</b>",
+        f"房源编号：<b>{html.escape(public_id or '待生成')}</b>",
         "解析状态：<b>已解析</b>",
         f"图片数量：<b>{int(image_count or 0)}</b>",
         f"缺失字段：<b>{html.escape('、'.join(missing) if missing else '无')}</b>",
@@ -388,7 +388,7 @@ async def cmd_sample_preview(update: Update, context: ContextTypes.DEFAULT_TYPE)
     from qiaolian_dual.callback_rental import _font
     from qiaolian_dual.channel_post import format_channel_listing_post
     from v2.qiaolian_publisher_v2.keyboards import publish_post_keyboard
-    sample_id = "QL-7K3M9X"
+    sample_id = "QL-RF-K7M2"
     img = Image.new("RGB", (1200, 900), (247, 243, 234))
     draw = ImageDraw.Draw(img)
     draw.rectangle((0, 0, 1200, 18), fill=(174, 139, 62))
@@ -1035,7 +1035,7 @@ async def cmd_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         f"审核包 ready：<b>{ready}</b> · 已批准待发：<b>{approved}</b>",
         f"频道已发：<b>{published_today}</b> · 新预约：<b>{appointments_today}</b>",
         f"队列：<b>{'暂停' if paused else '运行'}</b> · 槽位：<code>{html.escape(_slots_raw_effective())}</code>",
-        "\n此页只读；发布前请对单套执行 <code>/check QL-7K3M9X</code>。",
+        "\n此页只读；发布前请对单套执行 <code>/check QL-RF-K7M2</code>。",
     ]
     await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML, reply_markup=admin_menu())
 
@@ -1191,7 +1191,7 @@ async def cmd_ops(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         f"发帖时段：<code>{html.escape(slots)}</code>\n\n"
         f"待审核Top：{pending_line}\n"
         f"下一个审核包待批准：{ready_line}\n\n"
-        "快捷：<code>/pending</code> <code>/send QL-7K3M9X</code> <code>/slots 10:30,17:00,21:30</code>",
+        "快捷：<code>/pending</code> <code>/send QL-RF-K7M2</code> <code>/slots 10:30,17:00,21:30</code>",
         parse_mode=ParseMode.HTML,
         reply_markup=admin_menu(),
     )
@@ -1386,7 +1386,7 @@ async def cmd_approve(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
     if not context.args:
         await update.effective_message.reply_text(
-            "用法：<code>/approve QL-7K3M9X A</code>\n"
+            "用法：<code>/approve QL-RF-K7M2 A</code>\n"
             "A=标准信息，B=亮点价格，C=专业参数。省略版本时按物业类型自动选择。\n"
             "更推荐直接点 <code>/pending</code> 中的封面预览按钮。",
             parse_mode=ParseMode.HTML,
@@ -1512,7 +1512,7 @@ async def cmd_reject(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     if not _is_admin(update.effective_user.id):
         return
     if not context.args:
-        await update.message.reply_text("用法：<code>/reject QL-7K3M9X</code>", parse_mode=ParseMode.HTML)
+        await update.message.reply_text("用法：<code>/reject QL-RF-K7M2</code>", parse_mode=ParseMode.HTML)
         return
     input_id = context.args[0].strip()
     draft_id = _resolve_admin_draft_id(input_id)
@@ -1593,7 +1593,7 @@ async def cmd_check(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _is_admin(update.effective_user.id):
         return
     if not context.args:
-        await update.effective_message.reply_text("用法：<code>/check QL-7K3M9X</code>", parse_mode=ParseMode.HTML)
+        await update.effective_message.reply_text("用法：<code>/check QL-RF-K7M2</code>", parse_mode=ParseMode.HTML)
         return
     input_id = str(context.args[0]).strip()
     draft_id = _resolve_admin_draft_id(input_id)
@@ -2316,7 +2316,7 @@ async def cmd_intake_pending(update: Update, context: ContextTypes.DEFAULT_TYPE)
                     f"{html.escape(str(r['t'] or '')[:16])}\n"
                     f"  {html.escape(str(r['title'] or '（无标题）')[:40])}"
                 )
-            out.append("\n状态说明：pending/ready 需先执行 <code>/approve QL-7K3M9X</code> 生成并审核 package；只有 approved 后才能 /send。")
+            out.append("\n状态说明：pending/ready 需先执行 <code>/approve QL-RF-K7M2</code> 生成并审核 package；只有 approved 后才能 /send。")
     except Exception as e:
         out.append(f"读取失败：{html.escape(str(e))}")
     await update.message.reply_text("\n".join(out), parse_mode=ParseMode.HTML, reply_markup=admin_menu())

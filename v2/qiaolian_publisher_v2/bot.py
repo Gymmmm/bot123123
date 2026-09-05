@@ -548,7 +548,7 @@ class PublisherBot:
             "2) A/B/C 三版任选一版预览\n"
             "3) 点“采用并审核”，系统冻结正文、封面与图片\n"
             "4) 点 <code>/send</code> 打开已审核队列，一键发布\n\n"
-            "也可使用 <code>/approve QL-7K3M9X B</code> 和 <code>/send QL-7K3M9X</code>。",
+            "也可使用 <code>/approve QL-RF-K7M2 B</code> 和 <code>/send QL-RF-K7M2</code>。",
             parse_mode=ParseMode.HTML,
             reply_markup=admin_menu(),
         )
@@ -1135,7 +1135,7 @@ class PublisherBot:
                 return ST_PREVIEW
 
     @staticmethod
-    def _admin_listing_id(raw: str) -> str:
+    def _admin_listing_id(raw: str) -> str | None:
         from qiaolian_dual.public_listing_id import resolve_listing_id
         return resolve_listing_id(raw)
 
@@ -1157,13 +1157,13 @@ class PublisherBot:
             return
         raw = (context.args or [""])[0]
         if not raw:
-            await update.effective_message.reply_text("用法：/listing_status QL-7K3M9X")
+            await update.effective_message.reply_text("用法：/listing_status QL-RF-K7M2")
             return
         listing_id = self._admin_listing_id(raw)
         with self.db._connect() as conn:
             row = conn.execute("SELECT listing_id, community, area, layout, price, status, updated_at FROM listings WHERE listing_id=?", (listing_id,)).fetchone()
         if not row:
-            await update.effective_message.reply_text("未找到这套房源。请检查 QC 编号。")
+            await update.effective_message.reply_text("未找到该房源。请检查房源编号。")
             return
         await update.effective_message.reply_text(
             f"房源状态\n\n编号｜{self._display_listing_id(row['listing_id'])}\n项目｜{row['community'] or '-'}\n区域｜{row['area'] or '-'}\n户型｜{row['layout'] or '-'}\n租金｜${row['price'] or '-'} / 月\n状态｜{row['status'] or '-'}\n更新时间｜{row['updated_at'] or '-'}"
@@ -1278,7 +1278,7 @@ class PublisherBot:
             return
         args=list(context.args or [])
         if len(args)<3:
-            await update.effective_message.reply_text("用法：/listing_area_set QL-7K3M9X 炳发城 原文明确写有具体位置")
+            await update.effective_message.reply_text("用法：/listing_area_set QL-RF-K7M2 炳发城 原文明确写有具体位置")
             return
         listing_id=self._admin_listing_id(args[0]); area=str(args[1]).strip(); reason=' '.join(args[2:]).strip()
         try:
@@ -1296,7 +1296,7 @@ class PublisherBot:
             return
         args = list(context.args or [])
         if len(args) < 2:
-            await update.effective_message.reply_text("用法：/listing_set QL-7K3M9X active|pending|reserved|rented|inactive")
+            await update.effective_message.reply_text("用法：/listing_set QL-RF-K7M2 active|pending|reserved|rented|inactive")
             return
         listing_id = self._admin_listing_id(args[0])
         status = str(args[1] or "").strip().lower()
