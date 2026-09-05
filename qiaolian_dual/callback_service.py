@@ -19,10 +19,10 @@ def matches(data: str) -> bool:
     )
 
 
-def _service_back_keyboard() -> InlineKeyboardMarkup:
+def _service_back_keyboard(*, parent_callback: str='service:hub', parent_label: str='返回上一页') -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton('💬 联系我们', callback_data='service:contact')],
-        [InlineKeyboardButton('⬅️ 返回入住服务', callback_data='service:hub')],
+        [InlineKeyboardButton(f'⬅️ {parent_label}', callback_data=parent_callback)],
     ])
 
 
@@ -39,6 +39,8 @@ async def handle_service_callback(update: Update, context: ContextTypes.DEFAULT_
         return await show_service_hub(update, context)
 
     if data == 'service:contact':
+        # Generic service contact must not inherit a listing opened earlier in the chat.
+        context.user_data.pop('contact_listing_id', None)
         return await contact_management(update, context, source='service_hub')
 
     if data == 'service:repair_hub':
@@ -73,7 +75,7 @@ async def handle_service_callback(update: Update, context: ContextTypes.DEFAULT_
             update,
             text=f'🔧 <b>{he(issue_label)}</b>\n\n请发送问题照片或短视频，并简单说明异常情况。\n例如：<code>空调可以启动，但一直不制冷。</code>{note}',
             parse_mode=ParseMode.HTML,
-            reply_markup=_service_back_keyboard(),
+            reply_markup=_service_back_keyboard(parent_callback='service:repair_hub'),
             context=context,
         )
         return MAIN
@@ -121,7 +123,7 @@ async def handle_service_callback(update: Update, context: ContextTypes.DEFAULT_
                 f'{urgent_note}'
             ),
             parse_mode=ParseMode.HTML,
-            reply_markup=_service_back_keyboard(),
+            reply_markup=_service_back_keyboard(parent_callback='service:repair_hub'),
             context=context,
         )
         return MAIN
