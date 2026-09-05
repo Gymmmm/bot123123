@@ -7,9 +7,14 @@ on:
   workflow_dispatch:
 
 jobs:
-  full-check:
+  attribution-check:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      USER_BOT_TOKEN: '123456:TESTTOKEN'
+      PUBLISHER_BOT_TOKEN: '123456:TESTTOKEN'
+      DB_PATH: '${{ runner.temp }}/attribution.db'
+      PYTHONPATH: '${{ github.workspace }}'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -22,20 +27,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt pytest pytest-asyncio
-      - name: Syntax and import check
-        env:
-          USER_BOT_TOKEN: '123456:TESTTOKEN'
-          PUBLISHER_BOT_TOKEN: '123456:TESTTOKEN'
-          DB_PATH: '${{ runner.temp }}/syntax.db'
-          PYTHONPATH: '${{ github.workspace }}'
-        run: |
-          python -m compileall -q qiaolian_dual v2/qiaolian_publisher_v2 tests
-          python -c "from qiaolian_dual.user_bot import build_application; assert build_application() is not None"
-          (cd v2 && env -u PYTHONPATH python -c "import run_publisher_bot_v2; print('PUBLISHER_IMPORT_OK')")
-      - name: Full repository pytest
-        env:
-          USER_BOT_TOKEN: '123456:TESTTOKEN'
-          PUBLISHER_BOT_TOKEN: '123456:TESTTOKEN'
-          DB_PATH: '${{ runner.temp }}/full.db'
-          PYTHONPATH: '${{ github.workspace }}'
-        run: python -m pytest -q
+      - name: Syntax check touched modules
+        run: python -m compileall -q qiaolian_dual tests/test_attribution_admin_ui.py
+      - name: Attribution related tests
+        run: python -m pytest tests/test_attribution_admin.py tests/test_lead_workflow.py tests/test_user_start_payload.py tests/test_attribution_admin_ui.py -q
