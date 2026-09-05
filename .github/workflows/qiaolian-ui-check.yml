@@ -72,4 +72,6 @@ jobs:
             tests/test_v2_safe_adapter.py \
             tests/test_media_pipeline_v11.py \
             tests/test_media_selection_contract.py \
-            tests/test_channel_three_entry_contract.py
+            tests/test_channel_three_entry_contract.py \
+            tests/test_attribution_admin.py \
+            tests/test_lead_workflow.py
