@@ -10,7 +10,7 @@ def _listing_card_keyboard(listing_id: str, *, available: bool = True, nav: list
     if nav:
         rows.append(nav)
     rows.append([
-        InlineKeyboardButton('📋 租赁详情', callback_data=f'listing:detail:{listing_id}'),
+        InlineKeyboardButton('🏠 房源详情', callback_data=f'listing:detail:{listing_id}'),
         InlineKeyboardButton('📸 更多实拍', callback_data=f'listing:photos:{listing_id}'),
     ])
     if available:
@@ -155,7 +155,7 @@ def search_results_keyboard(matches: list[dict]) -> InlineKeyboardMarkup:
     for item in matches[:3]:
         listing_id = str(item.get('listing_id') or '').strip()
         if listing_id:
-            rows.append([InlineKeyboardButton('📋 租赁详情', callback_data=f'listing:detail:{listing_id}')])
+            rows.append([InlineKeyboardButton('🏠 房源详情', callback_data=f'listing:detail:{listing_id}')])
     rows.extend([
         [InlineKeyboardButton('✏️ 调整条件', callback_data='home_smart_search')],
         [InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')],
@@ -210,7 +210,7 @@ def _allow_admin_notify(context: ContextTypes.DEFAULT_TYPE, *, key: str, cooldow
 
 
 def _photo_action_keyboard(listing_id: str, *, available: bool) -> InlineKeyboardMarkup:
-    rows = [[InlineKeyboardButton('📋 租赁详情', callback_data=f'listing:detail:{listing_id}')]]
+    rows = [[InlineKeyboardButton('🏠 房源详情', callback_data=f'listing:detail:{listing_id}')]]
     if available:
         rows[0].append(InlineKeyboardButton('📅 预约看房', callback_data=f'listing:appoint:{listing_id}'))
     rows.append([InlineKeyboardButton('💬 联系我们', callback_data=f'listing:consult:{listing_id}')])
