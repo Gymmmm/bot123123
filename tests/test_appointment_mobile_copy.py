@@ -92,7 +92,7 @@ def test_recommendation_card_navigation_and_more_photos_stay_locked(monkeypatch)
     assert "⬅️ 上一套" in labels
     assert "下一套 ➡️" in labels
     assert "📸 更多实拍" in labels
-    assert "📋 租赁详情" in labels
+    assert "🏠 房源详情" in labels
     assert "📅 预约看房" in labels
     assert "💬 联系我们" in labels
     assert "联系中文顾问" not in " ".join(labels)
