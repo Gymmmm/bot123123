@@ -209,7 +209,7 @@ def test_unavailable_page_is_html_and_has_all_real_callbacks():
     text = listing_unavailable_text('pending')
     assert '🔵 <b>这套房正在确认最新房态</b>' in text
     kb = listing_unavailable_keyboard('')
-    assert labels(kb) == ['🏘 同区可约房源', '💬 联系我们', '📋 租赁详情']
+    assert labels(kb) == ['🏘 同区可约房源', '💬 联系我们', '🏠 房源详情']
     assert callbacks(kb) == ['unavail:more:any', 'listing:consult:', 'listing:detail:']
 
 
