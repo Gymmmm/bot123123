@@ -179,9 +179,15 @@ async def _notify_admins(context: ContextTypes.DEFAULT_TYPE, *, title: str, line
             logger.exception('发送管理号消息失败: admin_id=%s title=%s', admin_id, title)
 
 
-def admin_lead_keyboard(*, lead_id: int | None, appointment_id: int, user_id: int) -> InlineKeyboardMarkup:
+def admin_lead_keyboard(*, lead_id: int | None, appointment_id: int, user_id: int, listing_id: str = '') -> InlineKeyboardMarkup:
     from .admin_consult import consult_action_keyboard
-    return consult_action_keyboard(lead_id=lead_id, appointment_id=appointment_id, user_id=user_id)
+    return consult_action_keyboard(
+        lead_id=int(lead_id or 0),
+        appointment_id=appointment_id,
+        user_id=user_id,
+        listing_id=listing_id,
+        include_back=False,
+    )
 
 
 def admin_repair_keyboard(ticket_id: int) -> InlineKeyboardMarkup:
