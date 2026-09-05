@@ -123,8 +123,8 @@ def service_detail_keyboard() -> InlineKeyboardMarkup:
 
 def local_life_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton('🧹 保洁家政', callback_data='rfcity:recreation'), InlineKeyboardButton('🚚 搬家协助', callback_data='hub:rental:moving')],
-        [InlineKeyboardButton('🗺 周边推荐', callback_data='local:rfcity'), InlineKeyboardButton('💬 其他需求', callback_data='service:contact')],
+        [InlineKeyboardButton('🧹 保洁家政', callback_data='service:contact'), InlineKeyboardButton('🚚 搬家协助', callback_data='hub:rental:moving')],
+        [InlineKeyboardButton('🗺 周边推荐', callback_data='service:contact'), InlineKeyboardButton('💬 其他需求', callback_data='service:contact')],
         [InlineKeyboardButton('⬅️ 返回', callback_data='service:hub')],
     ])
 
@@ -139,7 +139,7 @@ def rfcity_keyboard() -> InlineKeyboardMarkup:
 
 
 def rfcity_back_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([[InlineKeyboardButton('⬅️ 返回周边推荐', callback_data='local:rfcity')]])
+    return InlineKeyboardMarkup([[InlineKeyboardButton('⬅️ 返回生活服务', callback_data='service:local_life')]])
 
 
 def merchant_join_keyboard() -> InlineKeyboardMarkup:
@@ -152,5 +152,5 @@ def merchant_join_keyboard() -> InlineKeyboardMarkup:
     else:
         rows.append([InlineKeyboardButton('📩 提交商家信息', callback_data='service:contact')])
         rows.append([InlineKeyboardButton('💬 联系我们', callback_data='service:contact')])
-    rows.append([InlineKeyboardButton('⬅️ 返回周边推荐', callback_data='local:rfcity')])
+    rows.append([InlineKeyboardButton('⬅️ 返回生活服务', callback_data='service:local_life')])
     return InlineKeyboardMarkup(rows)
