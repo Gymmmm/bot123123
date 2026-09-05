@@ -8,7 +8,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
-from .common import db, he
+from .common import answer_callback_once, db, he
 from .attribution import admin_source_group_zh, entry_action_zh, lead_status_zh, source_type_zh
 from .attribution_store import (
     get_user_attribution,
@@ -24,6 +24,13 @@ from .attribution_store import (
 def _is_admin(user_id: int) -> bool:
     from .admin_contract import _is_admin_user
     return bool(_is_admin_user(int(user_id or 0)))
+
+
+def _display_listing_id(value: str) -> str:
+    raw = str(value or "").strip()
+    if raw.lower().startswith("l_") and raw[2:].isdigit():
+        return f"QC{int(raw[2:]):04d}"
+    return raw
 
 
 def admin_home_keyboard() -> InlineKeyboardMarkup:
@@ -71,7 +78,7 @@ def format_lead_card(lead: dict) -> str:
         f"来源：{he(admin_source_group_zh(first_type))}",
     ]
     if listing_id:
-        lines.append(f"房源：{he(listing_id)}")
+        lines.append(f"房源：{he(_display_listing_id(listing_id))}")
     lines.extend([
         f"状态：{he(lead_status_zh(lead.get('lead_status')))}",
         "",
@@ -151,7 +158,7 @@ async def handle_admin_query(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user = update.effective_user
     if query is None or user is None or not _is_admin(user.id):
         return
-    await query.answer()
+    await answer_callback_once(query)
     data = str(query.data or "")
     action = data.split(":", 1)[1] if ":" in data else "home"
 
@@ -177,7 +184,7 @@ async def handle_admin_query(update: Update, context: ContextTypes.DEFAULT_TYPE)
         if not rows:
             text.append("今天暂时没有预约。")
         for row in rows[:12]:
-            text.append(f"• #{int(row.get('id') or 0)}｜{he(str(row.get('listing_id') or '-'))}｜{he(str(row.get('appointment_time') or '待定'))}｜{he(str(row.get('status') or 'pending'))}")
+            text.append(f"• #{int(row.get('id') or 0)}｜{he(_display_listing_id(str(row.get('listing_id') or '-')))}｜{he(str(row.get('appointment_time') or '待定'))}｜{he(str(row.get('status') or 'pending'))}")
         await query.edit_message_text("\n".join(text), parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ 返回咨询后台", callback_data="adminq:home")]]))
         return
     if action == "services":
@@ -204,7 +211,7 @@ async def handle_admin_query(update: Update, context: ContextTypes.DEFAULT_TYPE)
             return
         lead = db.get_lead(int(raw))
         if not lead:
-            await query.answer("这条线索不存在", show_alert=True)
+            await answer_callback_once(query, "这条线索不存在", show_alert=True)
             return
         appointment_id = 0
         uid = int(lead.get("user_id") or 0)
@@ -226,9 +233,9 @@ async def handle_admin_done(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     if appointment_id > 0:
         db.update_appointment_status(appointment_id, "done")
     if not ok:
-        await query.answer("线索不存在或已失效", show_alert=True)
+        await answer_callback_once(query, "线索不存在或已失效", show_alert=True)
         return True
     lead = db.get_lead(lead_id) or {}
     await query.edit_message_text(format_lead_card(lead) + "\n\n<b>当前状态｜✅ 已完成</b>", parse_mode=ParseMode.HTML)
-    await query.answer("已完成")
+    await answer_callback_once(query, "已完成")
     return True
