@@ -23,6 +23,7 @@ from .attribution_store import (
 )
 from .common import MAIN, db
 from .session_deeplink import now_ts
+from .admin_consult_pages import apply_admin_lead_action, handle_admin_console, handle_lead_view
 
 
 def _cb(*parts: object) -> str:
@@ -79,12 +80,7 @@ def consult_action_keyboard(
 
 def _customer_line(user=None, *, username: str = "", display_name: str = "", user_id: int = 0) -> str:
     if user is not None:
-        display_name = (
-            getattr(user, "full_name", "")
-            or getattr(user, "first_name", "")
-            or display_name
-            or "客户"
-        )
+        display_name = getattr(user, "full_name", "") or getattr(user, "first_name", "") or display_name or "客户"
         username = getattr(user, "username", "") or username
         user_id = int(getattr(user, "id", 0) or user_id or 0)
     name = (display_name or "客户").strip()
@@ -97,7 +93,6 @@ def _customer_line(user=None, *, username: str = "", display_name: str = "", use
 def _listing_facts(listing_id: str) -> dict[str, str]:
     from .listing import listing_context
     from .utils_formatting import _display_layout, _display_listing_id, _fmt_price
-
     info = listing_context(listing_id) if listing_id else {}
     project = str(info.get("project") or info.get("community") or info.get("area") or "").strip()
     layout = _display_layout(info.get("layout") or info.get("property_type"), info.get("property_type")) if info else ""
@@ -167,8 +162,6 @@ async def cmd_admin_home(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.effective_message.reply_text("这个入口只给中文顾问使用。")
         return MAIN
     await update.effective_message.reply_text(
-        admin_home_text(),
-        parse_mode=ParseMode.HTML,
-        reply_markup=admin_home_keyboard(),
+        admin_home_text(), parse_mode=ParseMode.HTML, reply_markup=admin_home_keyboard()
     )
     return MAIN
