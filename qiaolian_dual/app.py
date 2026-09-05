@@ -29,6 +29,9 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 def build_application(*, token: str | None = None) -> Application:
+    from .user_ux_patch import install_user_ux_patch
+    install_user_ux_patch()
+
     from .admin_contract_ui import cmd_contracts
     from .admin_commands import cmd_deal_done, cmd_lead_response, cmd_push_all, cmd_push_local, cmd_repair_update
     from .admin_contract import _all_user_admin_ids
@@ -85,7 +88,7 @@ def build_application(*, token: str | None = None) -> Application:
         from telegram import BotCommand, BotCommandScopeChat
         user_commands = [
             BotCommand('start', '回到首页'), BotCommand('find', '帮我找房'), BotCommand('appointments', '我的预约'),
-            BotCommand('service', '入住服务'), BotCommand('contact', '联系中文顾问'), BotCommand('help', '使用帮助'), BotCommand('about', '关于侨联'),
+            BotCommand('service', '入住服务'), BotCommand('contact', '联系我们'), BotCommand('help', '使用帮助'), BotCommand('about', '关于侨联'),
         ]
         await application.bot.set_my_commands(user_commands)
         admin_commands = user_commands + [BotCommand('contracts', '租客与合同'), BotCommand('admin_list', '管理员管理')]
