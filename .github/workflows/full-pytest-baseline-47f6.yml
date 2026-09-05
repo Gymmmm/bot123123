@@ -1,0 +1,28 @@
+name: full-pytest-baseline-47f6
+
+on:
+  push:
+    branches:
+      - codex/full-pytest-baseline-47f6
+
+jobs:
+  full-pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/full-pytest-baseline-47f6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pytest pytest-asyncio
+      - name: Full repository pytest
+        env:
+          USER_BOT_TOKEN: '123456:TESTTOKEN'
+          PUBLISHER_BOT_TOKEN: '123456:TESTTOKEN'
+          DB_PATH: '${{ runner.temp }}/full.db'
+          PYTHONPATH: '${{ github.workspace }}'
+        run: python -m pytest -q
