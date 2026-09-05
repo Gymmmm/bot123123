@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 def main_menu() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         [
-            [InlineKeyboardButton("➕ 新建房源", callback_data="pub:new")],
+            [InlineKeyboardButton("➕ 发布房源", callback_data="pub:new")],
             [InlineKeyboardButton("🧪 检查频道权限", callback_data="pub:test")],
             [InlineKeyboardButton("❌ 取消当前流程", callback_data="pub:cancel")],
         ]
@@ -21,21 +21,18 @@ def main_menu() -> InlineKeyboardMarkup:
 
 
 def admin_menu() -> InlineKeyboardMarkup:
-    """Publisher home: six high-frequency actions only."""
+    """Publisher home: direct publishing, status management and broadcasts."""
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("🏠 待发布", callback_data="cmd:queue"),
-                InlineKeyboardButton("➕ 添加房源", callback_data="cmd:intake"),
+                InlineKeyboardButton("➕ 发布房源", callback_data="cmd:intake"),
+                InlineKeyboardButton("🔵 房态管理", callback_data="cmd:listing_states"),
             ],
             [
-                InlineKeyboardButton("🟢 房态管理", callback_data="cmd:listing_states"),
-                InlineKeyboardButton("📢 每日广播", callback_data="cmd:daily"),
-            ],
-            [
+                InlineKeyboardButton("📢 广播中心", callback_data="cmd:daily"),
                 InlineKeyboardButton("📡 采集源", callback_data="cmd:sources"),
-                InlineKeyboardButton("📚 发布记录", callback_data="cmd:logs"),
             ],
+            [InlineKeyboardButton("📚 发布记录", callback_data="cmd:logs")],
         ]
     )
 
@@ -77,8 +74,8 @@ def preview_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("✅ 保存到待审", callback_data="preview:publish"),
-                InlineKeyboardButton("✏️ 修改字段", callback_data="preview:edit"),
+                InlineKeyboardButton("📤 发布到频道", callback_data="preview:publish"),
+                InlineKeyboardButton("✏️ 修改内容", callback_data="preview:edit"),
             ],
             [InlineKeyboardButton("❌ 取消", callback_data="pub:cancel")],
         ]
@@ -98,7 +95,7 @@ def edit_keyboard() -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton("费用", callback_data="edit:fee_note"),
-                InlineKeyboardButton("缺点/提醒", callback_data="edit:advisor_note"),
+                InlineKeyboardButton("提醒", callback_data="edit:advisor_note"),
             ],
             [InlineKeyboardButton("⬅️ 返回预览", callback_data="edit:done")],
         ]
