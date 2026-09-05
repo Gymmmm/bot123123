@@ -42,8 +42,8 @@ def test_classic_blue_matches_approved_structure():
     assert 'width:885px' in text
     assert 'height:305px' in text
     assert 'border-radius:38px' in text
-    assert 'rgba(21,61,154,.91)' in text
-    assert '#f7d769' in text
+    assert 'linear-gradient(104deg,rgba(20,57,148,.93)' in text
+    assert '#f5d56b' in text
     for token in ('{{PROJECT}}', '{{LAYOUT}}', '{{SIZE}}', '{{FLOOR}}', '{{PRICE}}', '{{H1}}', '{{H2}}', '{{H3}}'):
         assert token in text
     assert 'id="t1"' in text and 'id="t8"' in text
