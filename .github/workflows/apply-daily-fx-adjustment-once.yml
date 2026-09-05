@@ -1,0 +1,52 @@
+name: apply-daily-fx-adjustment-once
+
+on:
+  push:
+    branches: [codex/qiaolian-ui-cleanup-20260829]
+    paths:
+      - .github/workflows/apply-daily-fx-adjustment-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/qiaolian-ui-cleanup-20260829
+          fetch-depth: 0
+      - name: Adjust daily FX display
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('autopilot_publish_bot.py')
+          s = p.read_text(encoding='utf-8')
+          old = '''        rates = exchange.get("rates") or {}
+        cny = float(rates.get("CNY"))
+        khr = float(rates.get("KHR"))
+        fx_line = f"💵 汇率：1 USD ≈ {cny:.2f} CNY｜{khr:,.0f} KHR"'''
+          new = '''        rates = exchange.get("rates") or {}
+        market_cny = float(rates.get("CNY"))
+        cny = market_cny - 0.20
+        if cny <= 0:
+            raise ValueError("adjusted USD/CNY rate is invalid")
+        usd = 1.0 / cny
+        fx_line = f"💵 美元/人民币：1 USD ≈ {cny:.2f} CNY\\n💴 人民币/美元：1 CNY ≈ {usd:.3f} USD"'''
+          assert old in s, 'daily FX block not found'
+          s = s.replace(old, new, 1)
+          s = s.replace('"天气和 USD/KHR 参考汇率会在发送前实时更新。\\n"', '"天气和 USD/CNY 参考汇率会在发送前实时更新。\\n"')
+          p.write_text(s, encoding='utf-8')
+          PY
+          python -m py_compile autopilot_publish_bot.py
+          grep -q 'market_cny - 0.20' autopilot_publish_bot.py
+          grep -q '人民币/美元' autopilot_publish_bot.py
+          ! grep -q 'khr = float(rates.get("KHR"))' autopilot_publish_bot.py
+      - name: Commit
+        run: |
+          git config user.name qiaolian-actions
+          git config user.email actions@users.noreply.github.com
+          git add autopilot_publish_bot.py
+          git commit -m "Adjust daily FX rate by 0.20"
+          git push origin HEAD:codex/qiaolian-ui-cleanup-20260829
