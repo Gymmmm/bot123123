@@ -70,7 +70,7 @@ def test_v2_more_photos_actions_use_current_detail_label():
 def test_v2_assurance_and_move_in_hubs():
     assurance = rental_home_text()
     assert '🛡 <b>侨联保障</b>' in assurance
-    assert '费用确认' in assurance
+    assert '签约前核对费用' in assurance
     assert '入住留档' in assurance
     assert labels(rental_home_keyboard()) == [
         '🔐 押金与入住留档', '🚚 搬家协助', '🏠 关于侨联', '💬 联系我们', '⬅️ 返回首页'
