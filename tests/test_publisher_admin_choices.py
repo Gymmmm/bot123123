@@ -18,6 +18,7 @@ for path in (str(ROOT), str(V2_ROOT)):
 import autopilot_publish_bot as autopilot
 import qiaolian_publisher_v2.bot as publisher_bot_module
 from qiaolian_publisher_v2.bot import PublisherBot
+from qiaolian_publisher_v2.daily_broadcast_patch import install_daily_broadcast_patch
 
 
 class PublisherAdminChoiceTests(unittest.TestCase):
@@ -36,14 +37,13 @@ class PublisherAdminChoiceTests(unittest.TestCase):
             ("buttons", "none"),
         )
 
-    def test_daily_templates_are_short_and_actionable(self) -> None:
-        self.assertEqual(set(autopilot.DAILY_TEMPLATES), {1, 2, 3, 4, 5})
-        for title, body in autopilot.DAILY_TEMPLATES.values():
-            self.assertTrue(title)
-            self.assertLessEqual(len(body), 220)
-            self.assertIn("顾问", body)
+    def test_production_daily_patch_replaces_weekly_scheduler(self) -> None:
+        install_daily_broadcast_patch()
+        self.assertEqual(autopilot.scheduled_daily_broadcast.__module__, "qiaolian_publisher_v2.daily_broadcast_patch")
+        self.assertEqual(autopilot.cmd_daily.__module__, "qiaolian_publisher_v2.daily_broadcast_patch")
+        self.assertEqual(autopilot.on_daily_callback.__module__, "qiaolian_publisher_v2.daily_broadcast_patch")
 
-    def test_daily_info_renders_weather_and_usd_khr_reference(self) -> None:
+    def test_daily_info_renders_weather_and_usd_cny_minus_point_two(self) -> None:
         class FakeResponse:
             def __init__(self, payload: bytes):
                 self.payload = payload
@@ -58,14 +58,14 @@ class PublisherAdminChoiceTests(unittest.TestCase):
                 return False
 
         weather = b'{"daily":{"weather_code":[95],"temperature_2m_max":[31.1],"temperature_2m_min":[26.1],"precipitation_probability_max":[97]}}'
-        exchange = b'{"rates":{"KHR":4100.5}}'
+        exchange = b'{"rates":{"CNY":7.10}}'
         with patch.object(autopilot, "urlopen", side_effect=[FakeResponse(weather), FakeResponse(exchange)]):
             body = autopilot._fetch_phnom_penh_daily_info()
         self.assertIn("雷雨", body)
         self.assertIn("26–31℃", body)
         self.assertIn("97%", body)
-        self.assertIn("4,100 KHR", body)
-        self.assertIn("仅作出行和换汇参考", body)
+        self.assertIn("1 USD ≈ 6.90 CNY", body)
+        self.assertNotIn("KHR", body)
 
     def test_preview_keyboard_exposes_four_plain_language_choices(self) -> None:
         with patch.object(autopilot, "_conn", side_effect=sqlite3.OperationalError("test")):
