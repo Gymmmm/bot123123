@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 
-LOCKED_ALBUM_LABELS = ['📋 租赁详情', '📅 预约看房', '💬 联系我们']
+LOCKED_ALBUM_LABELS = ['🏠 房源详情', '📅 预约看房', '💬 联系我们']
 
 
 def _labels(kb):
@@ -137,7 +137,7 @@ def test_full_album_action_box_is_single_and_exact():
     src = Path('qiaolian_dual/results_admin.py').read_text(encoding='utf-8')
     kb = src[src.index('def _photo_action_keyboard'):src.index('async def send_listing_photo_preview')]
     fn = src[src.index('async def send_listing_photo_preview'):]
-    assert "📋 租赁详情" in kb
+    assert "🏠 房源详情" in kb
     assert "📅 预约看房" in kb
     assert "💬 联系我们" in kb
     assert "🤖 侨联找房助手" not in kb
