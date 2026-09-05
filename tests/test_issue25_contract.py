@@ -55,7 +55,7 @@ async def test_public_qc_detail_route_resolves_to_internal_listing_id():
 def test_channel_cta_is_fixed_and_has_no_helper(monkeypatch):
     monkeypatch.setattr(meihua_publisher, "BOT_USERNAME", "QiaolianBot")
     markup = meihua_publisher.build_keyboard("QC0002")
-    assert _labels(markup) == [["📋 租赁详情", "📸 更多实拍"], ["📅 预约看房"]]
+    assert _labels(markup) == [["🏠 房源详情", "📸 更多实拍"], ["📅 预约看房"]]
     urls = [button.url for row in markup.inline_keyboard for button in row]
     assert urls == [
         "https://t.me/QiaolianBot?start=property_QC0002_details",
@@ -113,9 +113,9 @@ def test_detail_hides_empty_fields_and_uses_required_weights(monkeypatch):
     text = listing.listing_cost_text("QC0002")
     assert "🏠 <b>房源详情</b>" in text
     assert "永旺1｜1房" in text
-    assert "💰 租金：<b>$1,800/月</b>" in text
+    assert "<b>租金：</b> <b>$1,800/月</b>" in text
     assert "🏢 楼层：23楼" in text
-    assert "🟡 已有预约 · 仍可预约" in text
+    assert "🟡 房态：已有预约 · 仍可预约" in text
     assert "押付" not in text and "水费" not in text and "电费" not in text
     assert all(token not in text for token in ("[暂无]", "未知", "--"))
 
@@ -168,7 +168,7 @@ async def test_album_has_no_summary_and_one_action_box():
     assert bot.send_message.await_count == 1
     text = bot.send_message.await_args.kwargs["text"]
     assert "不应重复" not in text
-    assert _labels(bot.send_message.await_args.kwargs["reply_markup"]) == [["📋 租赁详情", "📅 预约看房"], ["💬 联系我们"]]
+    assert _labels(bot.send_message.await_args.kwargs["reply_markup"]) == [["🏠 房源详情", "📅 预约看房"], ["💬 联系我们"]]
 
 
 @pytest.mark.asyncio
@@ -179,12 +179,12 @@ async def test_album_empty_copy_keeps_actions():
     assert bot.send_message.await_count == 1
     assert "这套房的实拍暂时没有加载出来。" in bot.send_message.await_args.kwargs["text"]
     assert bot.send_message.await_args.kwargs["reply_markup"] is not None
-    assert _labels(bot.send_message.await_args.kwargs["reply_markup"]) == [["📋 租赁详情", "📅 预约看房"], ["💬 联系我们"]]
+    assert _labels(bot.send_message.await_args.kwargs["reply_markup"]) == [["🏠 房源详情", "📅 预约看房"], ["💬 联系我们"]]
 
 
 def test_date_keyboard_has_video_branch_without_mode_gate():
     labels = _labels(_appointment_date_keyboard())
-    assert labels == [["今天", "明天"], ["后天", "📅 其他日期"], ["🎥 改为视频看房"], ["⬅️ 返回房源"]]
+    assert labels == [["今天", "明天"], ["后天", "📅 其他日期"], ["🎥 改为视频看房"], ["⬅️ 返回房源", "🏠 返回首页"]]
 
 
 def test_new_appointment_ui_has_no_focus_or_contact_entry():
