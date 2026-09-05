@@ -13,15 +13,17 @@ def test_production_runner_installs_daily_broadcast_contract():
     assert "install_daily_broadcast_patch()" in source
 
 
-def test_daily_live_template_is_fixed_except_fx_offset():
+def test_daily_broadcast_can_edit_copy_fx_time_and_footer():
     source = Path("v2/qiaolian_publisher_v2/daily_broadcast_patch.py").read_text(encoding="utf-8")
-    assert "日期 + 金边实时天气 + USD/CNY" in source
     assert "scheduled_daily_broadcast" in source
     assert "_fetch_phnom_penh_daily_info" in source
     assert "daily_broadcast_fx_offset" in source
     assert "daily:fxset:-20" in source
     assert "daily:fxset:20" in source
-    assert "这个模板只调整汇率偏移" in source
+    assert "daily:custom" in source
+    assert "daily:time" in source
+    assert "daily:buttons" in source
+    assert "daily:btn:" in source
 
 
 def test_broadcast_center_has_ready_to_send_presets():
@@ -33,13 +35,12 @@ def test_broadcast_center_has_ready_to_send_presets():
     assert "daily:tplsend:" in source
 
 
-def test_scheduled_broadcast_always_uses_live_daily_body():
+def test_scheduled_broadcast_uses_current_saved_body():
     source = Path("v2/qiaolian_publisher_v2/daily_broadcast_patch.py").read_text(encoding="utf-8")
     block = source.split("async def scheduled_daily_broadcast", 1)[1].split("async def cmd_daily_text", 1)[0]
-    assert "_live_body" in block
-    assert "templates" not in block
+    assert "_current_body" in block
     assert "WEEKLY_DAILY_PLAN" not in block
-    assert "KEY_DAILY_TEXT" not in block
+    assert "KEY_DAILY_TEXT" in source
 
 
 def test_live_fetch_uses_usd_cny_minus_point_two_not_khr():

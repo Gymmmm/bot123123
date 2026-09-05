@@ -79,10 +79,8 @@ def _format_price_display(price_raw: str) -> str:
 
 def _format_listing_code(data: dict) -> str:
     raw = str(data.get("listing_id") or data.get("draft_id") or "").strip()
-    digits = re.sub(r"\D", "", raw)
-    if digits:
-        return f"QC{digits.zfill(4)}"
-    return "QC0000"
+    from qiaolian_dual.public_listing_id import public_listing_id
+    return public_listing_id(raw)
 
 
 def _format_size_for_caption(size_raw: str) -> str:

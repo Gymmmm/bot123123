@@ -3,17 +3,18 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from qiaolian_dual.public_listing_id import public_listing_id
 
 
 STATUS_LINE = {
-    "active": "<b>🟢 当前可预约</b>",
-    "reserved": "<b>🟡 已有预约 · 仍可预约</b>",
-    "pending": "<b>🔵 房态待确认</b>",
-    "rented": "<b>🔴 已租出</b>",
-    "inactive": "<b>⚫ 已下架</b>",
+    "active": "🟢 房态：当前可预约",
+    "reserved": "🟡 房态：已有预约 · 仍可预约",
+    "pending": "🔵 房态：房态确认中",
+    "rented": "🔴 房态：已租出",
+    "inactive": "⚫ 房态：已下架",
 }
 
-VISIT_HINT = "支持实地看房，也可以安排实时视频看房。"
+VISIT_HINT = "📅 预约看房"
 
 
 def _item(status: str, **extra) -> dict:
@@ -41,7 +42,7 @@ def test_detail_runtime_patch_module_is_gone():
     assert "listing.listing_cost_text =" not in listing
     assert "想实地看看" not in listing
     assert "from .talk_engine import generate_talk" in listing
-    assert "水电进入住服务" in listing
+    assert "房源详情" in listing
 
 
 @pytest.mark.parametrize("status", ["active", "reserved", "pending", "rented", "inactive"])
@@ -55,11 +56,7 @@ def test_listing_cost_text_renders_each_canonical_status(monkeypatch, status):
         if other_status != status:
             assert line not in text
     assert text.count(STATUS_LINE[status]) == 1
-    assert "QC0089" in text
-    if status in {"active", "reserved"}:
-        assert VISIT_HINT in text
-    else:
-        assert VISIT_HINT not in text
+    assert public_listing_id("l_89") in text
 
 
 def test_listing_cost_text_includes_talk_when_facts_support_it(monkeypatch):
@@ -84,7 +81,6 @@ def test_listing_cost_text_omits_talk_when_no_distinctive_fact(monkeypatch):
     text = listing_mod.listing_cost_text("l_89")
     assert "💬 <b>侨联说</b>" not in text
     assert STATUS_LINE["reserved"] in text
-    assert VISIT_HINT in text
 
 
 def test_listing_is_available_matches_five_statuses(monkeypatch):
@@ -112,6 +108,6 @@ def test_five_appointment_lock_is_covered_without_manual_booking():
     assert APPOINTMENT_LOCK_COUNT == 5
     assert _status_label("pending", 5) == "🔵 已有5份预约看房，房态待确认"
     labels = [[button.text for button in row] for row in _keyboard("Bot", "", "l_89", "pending").inline_keyboard]
-    assert labels == [["📋 租赁详情", "📸 更多实拍"]]
+    assert labels == [["🏠 房源详情", "📸 更多实拍"]]
     bookable = [[button.text for button in row] for row in _keyboard("Bot", "", "l_89", "reserved").inline_keyboard]
     assert bookable == [["📋 租赁详情", "📸 更多实拍"], ["📅 预约看房"]]

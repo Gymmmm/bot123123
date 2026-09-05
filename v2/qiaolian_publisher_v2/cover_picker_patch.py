@@ -15,8 +15,8 @@ _MANUAL_COVER_PATH = ""
 
 
 def _display_qc(listing_id: str) -> str:
-    match = re.search(r"(\d{1,8})", str(listing_id or ""))
-    return f"QC{int(match.group(1)):04d}" if match else str(listing_id or "")
+    from qiaolian_dual.public_listing_id import public_listing_id
+    return public_listing_id(listing_id)
 
 
 def _resolve_draft(conn: sqlite3.Connection, token: str):

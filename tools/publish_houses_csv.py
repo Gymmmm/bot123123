@@ -603,18 +603,10 @@ def _caption_from_row(row: dict[str, str], text_style: str = "ch1") -> str:
             f"{hashtags}"
         )
     raw_ref = _listing_ref_code(row).upper()
-    if raw_ref.startswith("QC"):
-        qc_tag = raw_ref
-    elif raw_ref.startswith("SP_"):
-        digits = re.sub(r"\D", "", raw_ref)
-        qc_tag = f"QC{digits.zfill(4)}" if digits else "QC0000"
-    else:
-        digits = re.sub(r"\D", "", str(row.get("source_post_id", "")))
-        if digits:
-            qc_tag = f"QC{digits.zfill(4)}"
-        else:
-            digits = re.sub(r"\D", "", raw_ref)
-            qc_tag = f"QC{digits.zfill(4)}" if digits else "QC0000"
+    from qiaolian_dual.public_listing_id import public_listing_id
+    digits = re.sub(r"\D", "", raw_ref) or re.sub(r"\D", "", str(row.get("source_post_id", "")))
+    internal_ref = f"l_{int(digits)}" if digits else raw_ref
+    qc_tag = public_listing_id(internal_ref)
     default_prefix = f"侨联 #{qc_tag}"
 
     forced_prefix = _first_non_empty(

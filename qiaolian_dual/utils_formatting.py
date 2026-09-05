@@ -22,17 +22,15 @@ def _fmt_price(price: object) -> str:
 
 
 def _display_listing_id(listing_id: object) -> str:
-    """客户统一看到 QCxxxx；内部数据库和深链继续使用 l_xxxx。"""
-    raw = str(listing_id or '').strip()
-    match = re.fullmatch('(?i)l[_-]?(\\d+)', raw)
-    return f'QC{int(match.group(1)):04d}' if match else raw.upper()
+    """客户统一看到永久随机 QL 编号；内部键不变。"""
+    from .public_listing_id import public_listing_id
+    return public_listing_id(listing_id)
 
 
 def _internal_listing_id(listing_id: object) -> str:
-    """把公开 QCxxxx 编号还原为内部 l_x，其他 ID 原样保留。"""
-    raw = str(listing_id or '').strip()
-    match = re.fullmatch(r'(?i)QC[_-]?(\d+)', raw)
-    return f'l_{int(match.group(1))}' if match else raw
+    """新 QL、旧 QC/QJ 和内部编号统一解析到内部 listing_id。"""
+    from .public_listing_id import resolve_listing_id
+    return resolve_listing_id(listing_id)
 
 
 def _display_layout(layout: object, property_type: object='') -> str:

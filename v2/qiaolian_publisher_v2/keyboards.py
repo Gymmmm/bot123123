@@ -32,6 +32,7 @@ def admin_menu() -> InlineKeyboardMarkup:
                 InlineKeyboardButton("📢 广播中心", callback_data="cmd:daily"),
                 InlineKeyboardButton("📡 采集源", callback_data="cmd:sources"),
             ],
+            [InlineKeyboardButton("🧪 查看发布效果", callback_data="cmd:sample_preview")],
             [InlineKeyboardButton("📚 发布记录", callback_data="cmd:logs")],
         ]
     )

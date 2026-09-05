@@ -1909,27 +1909,12 @@ def _listing_ref_code(d: dict) -> str:
 
 
 def _qc_code_from_draft(d: dict) -> str:
-    """统一外显编号：QCxxxx（优先 listing_id / source_post_id 数字）。"""
+    """统一外显为永久随机 QL 编号，不从顺序字段推算。"""
+    from qiaolian_dual.public_listing_id import public_listing_id
     listing_id = str(d.get("listing_id") or "").strip()
-    m = re.search(r"(\d{1,8})", listing_id)
-    if m:
-        return f"QC{m.group(1).zfill(4)}"
-
-    source_post_id = str(d.get("source_post_id") or "").strip()
-    digits = re.sub(r"\D", "", source_post_id)
-    if digits:
-        return f"QC{digits.zfill(4)}"
-
-    raw_id = str(d.get("id") or "").strip()
-    digits = re.sub(r"\D", "", raw_id)
-    if digits:
-        return f"QC{digits.zfill(4)}"
-
-    ref_code = _listing_ref_code(d)
-    digits = re.sub(r"\D", "", ref_code)
-    if digits:
-        return f"QC{digits.zfill(4)}"
-    return "QC0000"
+    if not listing_id and d.get("id") not in (None, ""):
+        listing_id = f"l_{int(d['id'])}"
+    return public_listing_id(listing_id)
 
 
 def _compact_listing_title(d: dict, area: str, room_type: str, price: str) -> str:
@@ -2630,12 +2615,9 @@ def system_listing_id_from_draft(d: dict) -> str:
 
 
 def display_listing_id(listing_id: str) -> str:
-    """所有客户、频道和管理端外显统一为 QCxxxx；内部仍保留 l_xxxx。"""
-    raw = str(listing_id or "").strip()
-    match = re.fullmatch(r"(?i)l[_-]?(\d+)", raw)
-    if match:
-        return f"QC{int(match.group(1)):04d}"
-    return raw.upper()
+    """所有客户、频道和管理端外显统一为永久随机 QL 编号。"""
+    from qiaolian_dual.public_listing_id import public_listing_id
+    return public_listing_id(listing_id)
 
 
 def build_caption(d: dict, caption_variant: str | None = None) -> str:

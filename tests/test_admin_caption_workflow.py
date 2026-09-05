@@ -112,4 +112,5 @@ def test_admin_menu_and_send_command_expose_clickable_approved_queue() -> None:
         assert "已审核待发布" in call.args[0]
         keyboard = call.kwargs["reply_markup"]
         assert keyboard.inline_keyboard[0][0].callback_data == "ap:nc:10"
-        assert "QC0010" in keyboard.inline_keyboard[0][0].text
+        from qiaolian_dual.public_listing_id import public_listing_id
+        assert public_listing_id("l_10") in keyboard.inline_keyboard[0][0].text

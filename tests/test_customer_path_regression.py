@@ -1,5 +1,6 @@
 from pathlib import Path
 from urllib.parse import unquote
+from qiaolian_dual.public_listing_id import public_listing_id
 
 
 def test_channel_cta_carries_public_listing_identity(monkeypatch):
@@ -10,7 +11,7 @@ def test_channel_cta_carries_public_listing_identity(monkeypatch):
     decoded = unquote(rendered)
     assert "📅 预约看房" in rendered
     assert "💬 问这套" in rendered
-    assert "QC0002" in decoded
+    assert public_listing_id("l_2") in decoded
     assert "1房＋书房｜2卫" in decoded
     assert "1房1办公2卫" not in decoded
 

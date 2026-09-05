@@ -34,18 +34,15 @@ def matches(data: str) -> bool:
 def rental_home_text() -> str:
     return (
         '🛡 <b>侨联保障</b>\n\n'
-        '一次租房，涉及的不只是房源本身。\n\n'
-        '从看房、费用确认，到签约、入住和后续居住，侨联希望把容易产生疑问的环节尽量提前说明，把需要留下依据的事项尽量记录清楚。\n\n'
-        '<b>看房方式：</b> 支持实地看房，也可先通过视频了解房源。\n'
-        '<b>费用确认：</b> 水电、物业、网络及其他重要费用，签约前尽量确认。\n'
-        '<b>入住留档：</b> 入住时记录房屋、家具家电及相关费用信息。\n'
-        '<b>后续协助：</b> 签约并不意味着服务结束，入住后的住房与生活问题也可继续联系侨联。'
+        '签约前核对费用；入住时把房屋、表计和物品状态留档；退租时按记录核对。\n\n'
+        '发生问题时，侨联协助沟通。'
     )
 
 def rental_home_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton('🔐 押金与入住留档', callback_data='hub:rental:handover'), InlineKeyboardButton('🚚 搬家协助', callback_data='hub:rental:moving')],
-        [InlineKeyboardButton('🏠 关于侨联', callback_data='hub:rental:about'), InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')],
+        [InlineKeyboardButton('💰 费用核对', callback_data='hub:rental:fees'), InlineKeyboardButton('📋 入住交接', callback_data='hub:rental:handover')],
+        [InlineKeyboardButton('🔐 押金与退租', callback_data='hub:rental:deposit'), InlineKeyboardButton('🚚 搬家协助', callback_data='hub:rental:moving')],
+        [InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')],
         [InlineKeyboardButton('⬅️ 返回首页', callback_data='home')],
     ])
 
@@ -194,6 +191,9 @@ def _font_path(bold: bool = False) -> str:
             p = root / name
             if p.exists():
                 return str(p)
+    mac = Path('/System/Library/Fonts/STHeiti Medium.ttc' if bold else '/System/Library/Fonts/STHeiti Light.ttc')
+    if mac.exists():
+        return str(mac)
     raise FileNotFoundError('Noto Sans CJK font not found')
 
 
@@ -202,17 +202,17 @@ def _font(size: int, *, bold: bool = False):
 
 
 def _build_preview_jpg() -> BytesIO:
-    w, h = 1050, 1425
-    img = Image.new('RGB', (w, h), (22, 20, 18))
+    w, h = 1050, 1485
+    img = Image.new('RGB', (w, h), (248, 244, 235))
     d = ImageDraw.Draw(img)
-    gold, cream, muted, line, card = (207, 172, 91), (240, 233, 216), (180, 174, 160), (82, 72, 54), (31, 29, 26)
+    gold, cream, muted, line, card = (174, 139, 62), (31, 35, 42), (92, 91, 86), (205, 191, 158), (255, 253, 248)
     title, en, sub, head, body = _font(40, bold=True), _font(20), _font(21), _font(23, bold=True), _font(18)
     m = 68
     d.text((m, 58), '侨联地产｜入住交接留档单', font=title, fill=cream)
     d.text((m, 112), 'MOVE-IN HANDOVER & RECORD FORM', font=en, fill=gold)
     d.text((m, 153), '把入住当天的真实状态，留作退租与押金核对依据', font=sub, fill=muted)
     d.line((m, 205, w - m, 205), fill=gold, width=2)
-    meta = [('档案编号', 'QL-HO-2026-0008'), ('交接日期', 'YYYY / MM / DD'), ('经办顾问', '侨联顾问')]
+    meta = [('档案编号', '________________'), ('交接日期', '____ / ____ / ____'), ('经办顾问', '________________')]
     x = m
     for label, value in meta:
         d.rounded_rectangle((x, 235, x + 285, 308), radius=12, fill=card, outline=line, width=2)

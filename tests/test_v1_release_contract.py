@@ -9,6 +9,7 @@ from qiaolian_dual.keyboards_common import contact_handoff_keyboard
 from qiaolian_dual.keyboards_search import appointment_menu_keyboard
 from qiaolian_dual.listing import listing_cost_text
 from qiaolian_dual.messages import advisor_response_notice_text
+from qiaolian_dual.public_listing_id import public_listing_id
 from qiaolian_dual.results_admin import send_listing_photo_preview
 from qiaolian_dual.session_deeplink import parse_start_arg_payload
 from qiaolian_dual.texts import advisor_text, help_text
@@ -38,9 +39,10 @@ def test_channel_post_has_exact_three_locked_ctas_and_listing_context():
         ["📅 预约看房"],
     ]
     urls = [unquote(button.url or "") for button in _buttons(keyboard)]
-    assert any("start=property_QC0042_details" in url for url in urls)
-    assert any("start=property_QC0042_photos" in url for url in urls)
-    assert any("start=property_QC0042_book" in url for url in urls)
+    public_id = public_listing_id("l_42")
+    assert any(f"start=property_{public_id}_details" in url for url in urls)
+    assert any(f"start=property_{public_id}_photos" in url for url in urls)
+    assert any(f"start=property_{public_id}_book" in url for url in urls)
     assert all("l_42" not in url for url in urls)
     assert all("侨联找房助手" not in button.text for button in _buttons(keyboard))
 
@@ -61,9 +63,10 @@ def test_meihua_publisher_keyboard_uses_same_public_qc_contract():
         ["📅 预约看房"],
     ]
     urls = [unquote(button.url or "") for button in _buttons(keyboard)]
-    assert any("start=property_QC0042_details" in url for url in urls)
-    assert any("start=property_QC0042_photos" in url for url in urls)
-    assert any("start=property_QC0042_book" in url for url in urls)
+    public_id = public_listing_id("l_42")
+    assert any(f"start=property_{public_id}_details" in url for url in urls)
+    assert any(f"start=property_{public_id}_photos" in url for url in urls)
+    assert any(f"start=property_{public_id}_book" in url for url in urls)
     assert all("l_42" not in url for url in urls)
 
 
