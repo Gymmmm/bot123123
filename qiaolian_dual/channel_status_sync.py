@@ -122,7 +122,7 @@ def _caption_with_status(
 def _keyboard(username: str, token: str, listing_id: str, status: str) -> InlineKeyboardMarkup:
     _ = token
     details = InlineKeyboardButton(
-        "📋 租赁详情", url=channel_action_url(username, listing_id, "details")
+        "🏠 房源详情", url=channel_action_url(username, listing_id, "details")
     )
     photos = InlineKeyboardButton(
         "📸 更多实拍", url=channel_action_url(username, listing_id, "photos")
