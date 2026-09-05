@@ -59,7 +59,7 @@ class LeadWorkflowTests(unittest.TestCase):
         self.assertEqual(appointment["status"], "assigned")
 
     def test_admin_lead_keyboard_contains_actionable_callbacks(self):
-        keyboard = admin_lead_keyboard(lead_id=8, appointment_id=9, user_id=1001)
+        keyboard = admin_lead_keyboard(lead_id=8, appointment_id=9, user_id=1001, listing_id="l_1")
         callbacks = [
             button.callback_data
             for row in keyboard.inline_keyboard
@@ -72,6 +72,15 @@ class LeadWorkflowTests(unittest.TestCase):
         self.assertNotIn("adminlead:invalid:8:9:1001", callbacks)
         self.assertTrue(all(len(value.encode("utf-8")) <= 64 for value in callbacks))
         self.assertTrue(all(len(row) == 1 for row in keyboard.inline_keyboard))
+
+        hidden = admin_lead_keyboard(lead_id=8, appointment_id=9, user_id=1001)
+        hidden_callbacks = [
+            button.callback_data
+            for row in hidden.inline_keyboard
+            for button in row
+        ]
+        self.assertNotIn("adminlead:view:8:9:1001", hidden_callbacks)
+        self.assertNotIn("adminlead:invalid:8:9:1001", hidden_callbacks)
 
 
 if __name__ == "__main__":

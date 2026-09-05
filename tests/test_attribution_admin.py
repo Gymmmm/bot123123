@@ -62,14 +62,20 @@ def test_legacy_discussion_entry_maps_to_listing_detail():
 def test_chinese_source_labels_and_short_callbacks():
     assert admin_source_group_zh("channel_listing_detail") == "频道房源详情"
     assert admin_source_group_zh("bot_search") == "Bot 找房"
-    keyboard = consult_action_keyboard(lead_id=8, appointment_id=9, user_id=1001)
-    callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
+    with_listing = consult_action_keyboard(lead_id=8, appointment_id=9, user_id=1001, listing_id="l_1")
+    callbacks = [button.callback_data for row in with_listing.inline_keyboard for button in row]
     assert "adminlead:claim:8:9:1001" in callbacks
     assert "adminlead:contacted:8:9:1001" in callbacks
     assert "adminlead:done:8:9:1001" in callbacks
     assert "adminlead:view:8:9:1001" in callbacks
+    assert "adminlead:invalid:8:9:1001" not in callbacks
     assert all(len(value.encode("utf-8")) <= 64 for value in callbacks)
-    assert all(len(row) == 1 for row in keyboard.inline_keyboard)
+    assert all(len(row) == 1 for row in with_listing.inline_keyboard)
+
+    without_listing = consult_action_keyboard(lead_id=8, appointment_id=9, user_id=1001)
+    bare = [button.callback_data for row in without_listing.inline_keyboard for button in row]
+    assert "adminlead:view:8:9:1001" not in bare
+    assert "adminlead:invalid:8:9:1001" not in bare
 
 
 def test_schema_migration_keeps_existing_leads_read_write(monkeypatch):
@@ -111,23 +117,26 @@ def test_schema_migration_keeps_existing_leads_read_write(monkeypatch):
         assert test_db.get_lead(after_id)["listing_id"] == "l_2"
 
 
-def test_notification_card_uses_chinese_attribution(monkeypatch):
-    fake = {
-        "first_source_type": "channel_listing_detail",
-        "latest_source_type": "bot_listing_consult",
-        "latest_entry_action": "consult_menu_click",
-        "latest_deep_link": "property_QC0001_details",
-    }
-    monkeypatch.setattr("qiaolian_dual.admin_consult.get_user_attribution", lambda user_id: fake)
+def test_notification_card_uses_chinese_attribution():
+    user = SimpleNamespace(id=1001, username="tester", first_name="张三", full_name="张三")
     title, lines = format_consult_notify(
-        user_id=1001,
+        user=user,
+        touch={
+            "first_source_type": "channel_listing_detail",
+            "latest_source_type": "bot_listing_consult",
+            "entry_action": "consult_menu_click",
+            "latest_deep_link": "property_QC0001_details",
+        },
+        listing_id="",
         title="房源咨询",
-        lines=["客户：张三", "房源：QC0001"],
         current_action="consult_menu_click",
     )
     text = "\n".join(lines)
     assert title == "房源咨询"
-    assert "来源：频道房源详情" in text
+    assert "客户：张三 @tester" in text
+    assert "来源：Bot 房源咨询" in text
     assert "首次进入：频道房源详情" in text
     assert "本次动作：联系我们" in text
-    assert "入口：<code>property_QC0001_details</code>" in text
+    assert "入口：property_QC0001_details" in text
+    assert "source_type" not in text
+    assert "<code>" not in text
