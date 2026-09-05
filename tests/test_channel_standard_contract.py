@@ -95,10 +95,10 @@ def test_status_sync_keeps_qc_and_drops_book_button_at_five():
     assert _status_label("pending", 2) == "🔵 房态待确认"
     markup = _keyboard("QiaolianBot", "", "l_89", "pending")
     labels = [[button.text for button in row] for row in markup.inline_keyboard]
-    assert labels == [["📋 租赁详情", "📸 更多实拍"]]
+    assert labels == [["🏠 房源详情", "📸 更多实拍"]]
     bookable = _keyboard("QiaolianBot", "", "l_89", "reserved")
     book_labels = [[button.text for button in row] for row in bookable.inline_keyboard]
-    assert book_labels == [["📋 租赁详情", "📸 更多实拍"], ["📅 预约看房"]]
+    assert book_labels == [["🏠 房源详情", "📸 更多实拍"], ["📅 预约看房"]]
 
 
 def test_commit_success_sql_does_not_force_every_listing_active():
