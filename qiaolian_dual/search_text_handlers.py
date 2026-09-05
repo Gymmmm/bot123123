@@ -48,7 +48,13 @@ async def handle_find_budget(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if budget_min is None and budget_max is None:
         context.user_data['search_pref'] = pref
         context.user_data['awaiting_custom_budget'] = True
-        await update.effective_message.reply_text('预算没有识别出来。请试试：<code>800以内</code>、<code>600-900</code> 或 <code>1500以上</code>。', parse_mode=ParseMode.HTML)
+        await render_panel(
+            update,
+            text='预算没有识别出来。请试试：<code>800以内</code>、<code>600-900</code> 或 <code>1500以上</code>。',
+            parse_mode=ParseMode.HTML,
+            context=context,
+            prefer_edit_anchor=True,
+        )
         return FIND_BUDGET
 
     area = str(pref.get('area') or '')
