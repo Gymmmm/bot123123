@@ -93,7 +93,8 @@ def listing_cost_text(listing_id: str) -> str:
 
     item = listing_context(listing_id)
     normalized = _normalized_facts(item)
-    area = _known_value(item.get('area'), item.get('community'))
+    project = _known_value(item.get('project'), item.get('community'))
+    area = _known_value(item.get('area'))
     layout = _known_value(_display_layout(item.get('layout') or item.get('property_type'), item.get('property_type')))
     price = _fmt_price(item.get('price')) if item.get('price') not in (None, '', 0, '0') else ''
     size = _known_value(item.get('size_sqm'), item.get('size'))
@@ -112,9 +113,11 @@ def listing_cost_text(listing_id: str) -> str:
     status_icon = {'active':'🟢','reserved':'🟡','pending':'🔵','rented':'🔴','inactive':'⚫','offline':'⚫'}.get(status, '🔵')
 
     lines = ['🏠 <b>房源详情</b>', '']
-    if area: lines.append(f'🏠 区域：{he(area)}')
-    if layout: lines.append(f'🛏 户型：{he(layout)}')
-    if price: lines.append(f'💰 租金：{he(price)}')
+    subject = '｜'.join(v for v in (project, layout) if v)
+    if subject: lines.append(f'🏠 <b>{he(subject)}</b>')
+    elif area: lines.append(f'🏠 <b>{he(area)}</b>')
+    if area and area != project: lines.append(f'<b>区域：</b> {he(area)}')
+    if price: lines.append(f'<b>租金：</b> <b>{he(price)}</b>')
     if size: lines.append(f'📐 面积：{he(size)}')
     if floor: lines.append(f'🏢 楼层：{he(floor)}')
     if lease: lines.append(f'🔑 租约：{he(lease)}')

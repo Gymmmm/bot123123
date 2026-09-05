@@ -38,7 +38,7 @@ APPOINTMENT_FOCUS_LABELS = {'ac': '空调型号和老旧程度', 'appliances': '
 APPOINTMENT_FOCUS_ORDER = ['ac', 'appliances', 'light_noise', 'water', 'fee_contract']
 APPOINTMENT_STATUS_LABELS = {'pending': '待确认', 'assigned': '顾问联系中', 'contacted': '顾问联系中', 'confirmed': '已确认', 'done': '已完成', 'cancelled': '已取消'}
 LEASE_REMINDER_DAYS = (7,)
-SERVICE_REQUEST_LABELS = {'repair_ac': '空调 / 家电', 'repair_water': '漏水 / 排水', 'repair_power': '灯具 / 电路', 'repair_door': '门锁 / 门窗', 'repair_furniture': '家具损坏', 'repair_other': '其他问题', 'property': '物业沟通'}
+SERVICE_REQUEST_LABELS = {'repair_ac': '空调', 'repair_water': '热水器 / 漏水排水', 'repair_power': '灯具 / 电路', 'repair_door': '门锁 / 门禁', 'repair_washer': '洗衣机', 'repair_fridge': '冰箱', 'repair_network': '网络', 'repair_furniture': '家具损坏', 'repair_other': '其他设备', 'property': '物业协调'}
 PREF_CONDITION_LABELS = {'budget': '预算优先', 'area': '区域优先', 'utility': '必须民水民电', 'parking': '停车方便', 'quiet': '安静不吵', 'sunlight': '采光好', 'pet': '可养宠物', 'furnished': '拎包入住', 'chinese_owner': '中国房东', 'amenity': '电梯/泳池'}
 FIND_AREA_CODE_MAP = {
     'rf': '富力城', 'pp': '炳发城', 'ph': '太子幸福广场',
