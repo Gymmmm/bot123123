@@ -221,9 +221,6 @@ async def handle_admin_query(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def handle_lead_view(query, lead_id: int) -> None:
     lead = db.get_lead(lead_id) or {}
     listing_id = str(lead.get('listing_id') or '').strip()
-    if not listing_id:
-        await answer_callback_once(query, '这条线索没有关联房源', show_alert=True)
-        return
     user_obj = SimpleNamespace(
         id=int(lead.get('user_id') or 0),
         username=str(lead.get('username') or ''),
