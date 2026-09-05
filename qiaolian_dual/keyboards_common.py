@@ -16,14 +16,6 @@ def main_keyboard() -> InlineKeyboardMarkup:
         rows.append([InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')])
     return InlineKeyboardMarkup(rows)
 
-def rental_service_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton('💰 费用说明', callback_data='hub:rental:fees'), InlineKeyboardButton('📋 入住留档', callback_data='hub:rental:handover')],
-        [InlineKeyboardButton('🔐 押金说明', callback_data='hub:rental:deposit'), InlineKeyboardButton('🎥 实地 / 视频看房', callback_data='hub:rental:viewing')],
-        [InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')],
-        [InlineKeyboardButton('⬅️ 返回首页', callback_data='home')],
-    ])
-
 
 def no_match_followup_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
