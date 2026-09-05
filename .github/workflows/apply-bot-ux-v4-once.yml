@@ -24,7 +24,6 @@ jobs:
           from pathlib import Path
           import re
 
-          # 1) User Bot: practical move-in service, no nested life-service maze.
           p = Path('qiaolian_dual/keyboards_search.py')
           s = p.read_text(encoding='utf-8')
           new = '''def service_hub_keyboard(user_id: int | None=None) -> InlineKeyboardMarkup:
@@ -37,7 +36,7 @@ jobs:
           
           def service_repair_keyboard() -> InlineKeyboardMarkup:
           '''
-          s2, n = re.subn(r'def service_hub_keyboard\(user_id: int \| None=None\) -> InlineKeyboardMarkup:.*?\ndef service_repair_keyboard\(\) -> InlineKeyboardMarkup:\n', new, s, flags=re.S)
+          s2, n = re.subn(r'def service_hub_keyboard\(user_id: int \| None=None\) -> InlineKeyboardMarkup:.*?\ndef service_repair_keyboard\(\) -> InlineKeyboardMarkup:\n', lambda m: new, s, flags=re.S)
           assert n == 1, f'service_hub patch count={n}'
           p.write_text(s2, encoding='utf-8')
 
@@ -48,7 +47,6 @@ jobs:
           assert old in s
           p.write_text(s.replace(old, new), encoding='utf-8')
 
-          # 2) Publisher Bot: keep six practical admin actions, remove settings/help clutter from home.
           p = Path('v2/qiaolian_publisher_v2/keyboards.py')
           s = p.read_text(encoding='utf-8')
           new_admin = '''def admin_menu() -> InlineKeyboardMarkup:
@@ -73,12 +71,11 @@ jobs:
           
           def type_keyboard() -> InlineKeyboardMarkup:
           '''
-          s2, n = re.subn(r'def admin_menu\(\) -> InlineKeyboardMarkup:.*?\ndef type_keyboard\(\) -> InlineKeyboardMarkup:\n', new_admin, s, flags=re.S)
+          s2, n = re.subn(r'def admin_menu\(\) -> InlineKeyboardMarkup:.*?\ndef type_keyboard\(\) -> InlineKeyboardMarkup:\n', lambda m: new_admin, s, flags=re.S)
           assert n == 1, f'admin_menu patch count={n}'
           s2 = s2.replace('"📋 租赁详情",', '"🏠 房源详情",')
           p.write_text(s2, encoding='utf-8')
 
-          # 3) Daily broadcast: short, useful, live Phnom Penh weather + USD/CNY and USD/KHR.
           p = Path('autopilot_publish_bot.py')
           s = p.read_text(encoding='utf-8')
           new_daily = '''def _fetch_phnom_penh_daily_info() -> str:
@@ -126,7 +123,7 @@ jobs:
           
           def _conn() -> sqlite3.Connection:
           '''
-          s2, n = re.subn(r'def _fetch_phnom_penh_daily_info\(\) -> str:.*?\ndef _conn\(\) -> sqlite3.Connection:\n', new_daily, s, flags=re.S)
+          s2, n = re.subn(r'def _fetch_phnom_penh_daily_info\(\) -> str:.*?\ndef _conn\(\) -> sqlite3.Connection:\n', lambda m: new_daily, s, flags=re.S)
           assert n == 1, f'daily patch count={n}'
           p.write_text(s2, encoding='utf-8')
           PY
@@ -134,7 +131,7 @@ jobs:
       - name: Syntax and focused tests
         run: |
           python -m py_compile qiaolian_dual/keyboards_search.py qiaolian_dual/texts.py v2/qiaolian_publisher_v2/keyboards.py autopilot_publish_bot.py
-          python -m pytest -q tests/test_user_bot_return_paths.py tests/test_talk_engine_factual_copy.py || exit 1
+          python -m pytest -q tests/test_user_bot_return_paths.py tests/test_talk_engine_factual_copy.py
 
       - name: Commit changes
         run: |
