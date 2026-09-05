@@ -1,0 +1,241 @@
+name: apply-prelaunch-channel-bot-copy-once
+
+on:
+  push:
+    branches:
+      - codex/qiaolian-ui-cleanup-20260829
+    paths:
+      - .github/workflows/apply-prelaunch-channel-bot-copy-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/qiaolian-ui-cleanup-20260829
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply locked copy and navigation
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          def replace_func(path: str, name: str, new_src: str):
+              p = Path(path)
+              s = p.read_text(encoding='utf-8')
+              pattern = rf"(?ms)^def {re.escape(name)}\([^\n]*\).*?(?=^def |\Z)"
+              m = re.search(pattern, s)
+              if not m:
+                  raise SystemExit(f'function not found: {path}:{name}')
+              s2 = s[:m.start()] + new_src.rstrip() + "\n\n" + s[m.end():]
+              p.write_text(s2, encoding='utf-8')
+
+          replace_func('qiaolian_dual/texts.py', 'welcome_text', '''def welcome_text() -> str:
+              return (
+                  '🏠 <b>侨联地产｜您在金边的自己人</b>\\n\\n'
+                  '找房、约看房、入住服务，都可以从这里开始。\\n\\n'
+                  '如果您已经在频道看到具体房源，直接点房源下方按钮进入，房源信息会自动带上。\\n\\n'
+                  '也可以直接告诉我：<b>区域 + 预算 + 户型</b>。\\n\\n'
+                  '请选择您现在需要的服务：'
+              )''')
+
+          replace_func('qiaolian_dual/texts.py', 'about_text', '''def about_text() -> str:
+              return (
+                  '🏠 <b>关于侨联</b>\\n\\n'
+                  '这些年，我们始终专注于柬埔寨本地房产与居住服务。\\n\\n'
+                  '在长期服务客户的过程中，我们越来越清楚，一次租房真正需要解决的，不只是找到房源，更包括信息确认、签约衔接、入住交接，以及住下以后仍然有人可以联系。\\n\\n'
+                  '我们相信，真正有价值的服务，不止于完成一次交易，更在于建立长久而持续的信任。\\n\\n'
+                  '从第一次认识，到长期选择，侨联希望以稳定的服务与责任，成为您在柬埔寨值得长期信赖的生活伙伴。\\n\\n'
+                  '<b>侨联地产｜您在金边的自己人</b>'
+              )''')
+
+          replace_func('qiaolian_dual/texts.py', 'service_hub_text', '''def service_hub_text() -> str:
+              return (
+                  '🛠 <b>入住服务</b>\\n\\n'
+                  '签约不是结束。入住后遇到设备、物业或生活服务问题，都可以从这里联系侨联。\\n\\n'
+                  '能协助处理的，我们协助处理；需要专业服务的，我们帮助对接。'
+              )''')
+
+          replace_func('qiaolian_dual/keyboards_common.py', 'main_keyboard', '''def main_keyboard() -> InlineKeyboardMarkup:
+              rows = [
+                  [InlineKeyboardButton('🔍 帮我找房', callback_data='home_smart_search'), InlineKeyboardButton('📅 我的预约', callback_data='hub:appointments')],
+                  [InlineKeyboardButton('🛡 侨联保障', callback_data='hub:rental'), InlineKeyboardButton('🛠 入住服务', callback_data='hub:service')],
+              ]
+              channel_url = str(CHANNEL_URL or '').strip()
+              if channel_url:
+                  rows.append([InlineKeyboardButton('房源频道', url=channel_url), InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')])
+              else:
+                  rows.append([InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')])
+              return InlineKeyboardMarkup(rows)''')
+
+          replace_func('qiaolian_dual/keyboards_search.py', 'service_hub_keyboard', '''def service_hub_keyboard(user_id: int | None=None) -> InlineKeyboardMarkup:
+              return InlineKeyboardMarkup([
+                  [InlineKeyboardButton('🔧 设备报修', callback_data='service:repair_hub'), InlineKeyboardButton('🏢 物业协调', callback_data='service_request:property')],
+                  [InlineKeyboardButton('📦 生活服务', callback_data='service:local_life'), InlineKeyboardButton('💬 其他帮助', callback_data='service:contact')],
+                  [InlineKeyboardButton('⬅️ 返回首页', callback_data='home')],
+              ])''')
+
+          replace_func('qiaolian_dual/keyboards_search.py', 'service_repair_keyboard', '''def service_repair_keyboard() -> InlineKeyboardMarkup:
+              return InlineKeyboardMarkup([
+                  [InlineKeyboardButton('❄️ 空调', callback_data='service_request:repair_ac'), InlineKeyboardButton('🚿 热水器', callback_data='service_request:repair_water')],
+                  [InlineKeyboardButton('🧺 洗衣机', callback_data='service_request:repair_washer'), InlineKeyboardButton('🧊 冰箱', callback_data='service_request:repair_fridge')],
+                  [InlineKeyboardButton('📶 网络', callback_data='service_request:repair_network'), InlineKeyboardButton('🔐 门锁/门禁', callback_data='service_request:repair_door')],
+                  [InlineKeyboardButton('🔧 其他设备', callback_data='service_request:repair_other')],
+                  [InlineKeyboardButton('⬅️ 返回', callback_data='service:hub')],
+              ])''')
+
+          replace_func('qiaolian_dual/keyboards_search.py', 'local_life_keyboard', '''def local_life_keyboard() -> InlineKeyboardMarkup:
+              return InlineKeyboardMarkup([
+                  [InlineKeyboardButton('🧹 保洁家政', callback_data='rfcity:recreation'), InlineKeyboardButton('🚚 搬家协助', callback_data='hub:rental:moving')],
+                  [InlineKeyboardButton('🗺 周边推荐', callback_data='local:rfcity'), InlineKeyboardButton('💬 其他需求', callback_data='service:contact')],
+                  [InlineKeyboardButton('⬅️ 返回', callback_data='service:hub')],
+              ])''')
+
+          replace_func('qiaolian_dual/callback_rental.py', 'rental_home_text', '''def rental_home_text() -> str:
+              return (
+                  '🛡 <b>侨联保障</b>\\n\\n'
+                  '一次租房，涉及的不只是房源本身。\\n\\n'
+                  '从看房、费用确认，到签约、入住和后续居住，侨联希望把容易产生疑问的环节尽量提前说明，把需要留下依据的事项尽量记录清楚。\\n\\n'
+                  '<b>看房方式：</b> 支持实地看房，也可先通过视频了解房源。\\n'
+                  '<b>费用确认：</b> 水电、物业、网络及其他重要费用，签约前尽量确认。\\n'
+                  '<b>入住留档：</b> 入住时记录房屋、家具家电及相关费用信息。\\n'
+                  '<b>后续协助：</b> 签约并不意味着服务结束，入住后的住房与生活问题也可继续联系侨联。'
+              )''')
+
+          replace_func('qiaolian_dual/callback_rental.py', 'handover_text', '''def handover_text() -> str:
+              return (
+                  '🔐 <b>押金与入住留档</b>\\n\\n'
+                  '很多退租时的分歧，都来自入住时没有留下足够清楚的记录。\\n\\n'
+                  '入住前，建议将房屋现状、家具家电、表计读数及相关费用规则进行确认并留档。\\n\\n'
+                  '这些资料不会替代合同，但可以作为后续交接、费用核对和争议沟通时的重要参考。'
+              )''')
+
+          replace_func('qiaolian_dual/callback_rental.py', 'handover_keyboard', '''def handover_keyboard() -> InlineKeyboardMarkup:
+              return InlineKeyboardMarkup([
+                  [InlineKeyboardButton('🔒 押金保障', callback_data='hub:rental:deposit'), InlineKeyboardButton('📄 入住交接留档', callback_data='hub:rental:handover:details')],
+                  [InlineKeyboardButton('💡 费用说明', callback_data='hub:rental:fees'), InlineKeyboardButton('📥 下载完整资料', callback_data='hub:rental:handover:pdf')],
+                  [InlineKeyboardButton('⬅️ 返回', callback_data='hub:rental')],
+              ])''')
+
+          replace_func('qiaolian_dual/callback_rental.py', 'details_text', '''def details_text() -> str:
+              return (
+                  '📄 <b>入住交接留档</b>\\n\\n'
+                  '通过侨联成交的房源，入住交接时建议记录：\\n\\n'
+                  '• 房屋整体状态\\n'
+                  '• 家具家电使用情况\\n'
+                  '• 空调、冰箱、洗衣机等设备照片\\n'
+                  '• 电表、水表读数\\n'
+                  '• 墙面、地面、门锁等易产生争议的位置\\n'
+                  '• 押金、电费、水费、物业费等费用规则\\n\\n'
+                  '这些记录在退租时，是核对情况的重要依据。'
+              )''')
+
+          replace_func('qiaolian_dual/callback_rental.py', 'details_keyboard', '''def details_keyboard() -> InlineKeyboardMarkup:
+              return InlineKeyboardMarkup([
+                  [InlineKeyboardButton('📸 查看留档示例', callback_data='hub:rental:handover:preview')],
+                  [InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')],
+                  [InlineKeyboardButton('⬅️ 返回', callback_data='hub:rental:handover')],
+              ])''')
+
+          replace_func('qiaolian_dual/callback_rental.py', 'deposit_text', '''def deposit_text() -> str:
+              return (
+                  '🔒 <b>押金保障</b>\\n\\n'
+                  '入住前，侨联协助完成房屋现状留档，包含设施状态、已有瑕疵、水电表读数等信息。\\n\\n'
+                  '退租时，侨联可作为第三方协助核对房屋状态、费用明细及扣费依据。如出现明显争议，优先协助沟通协调。\\n\\n'
+                  '押金保障不是退租那天才开始，而是从入住第一天就把细节留清楚。'
+              )''')
+
+          replace_func('qiaolian_dual/callback_rental.py', 'deposit_keyboard', '''def deposit_keyboard() -> InlineKeyboardMarkup:
+              return InlineKeyboardMarkup([
+                  [InlineKeyboardButton('📄 入住交接留档', callback_data='hub:rental:handover:details')],
+                  [InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')],
+                  [InlineKeyboardButton('⬅️ 返回', callback_data='hub:rental:handover')],
+              ])''')
+
+          replace_func('qiaolian_dual/callback_rental.py', 'fees_text', '''def fees_text() -> str:
+              return (
+                  '💡 <b>费用说明</b>\\n\\n'
+                  '在金边租房，费用相关的问题往往集中在以下细节：\\n\\n'
+                  '• 电费、水费计算方式\\n'
+                  '• 物业费由谁承担\\n'
+                  '• 网络是否需要自行安装\\n'
+                  '• 停车费是否另计\\n'
+                  '• 垃圾费、清洁费\\n'
+                  '• 是否允许做饭\\n'
+                  '• 提前退租的处理方式\\n\\n'
+                  '侨联会尽量提前确认并说明这些内容。'
+              )''')
+
+          replace_func('qiaolian_dual/callback_rental.py', 'fees_keyboard', '''def fees_keyboard() -> InlineKeyboardMarkup:
+              return InlineKeyboardMarkup([
+                  [InlineKeyboardButton('🔍 去找房', callback_data='home_smart_search')],
+                  [InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')],
+                  [InlineKeyboardButton('⬅️ 返回', callback_data='hub:rental:handover')],
+              ])''')
+
+          replace_func('qiaolian_dual/callback_rental.py', 'moving_text', '''def moving_text() -> str:
+              return (
+                  '🚚 <b>搬家协助</b>\\n\\n'
+                  '通过侨联成交的客户，可获得基础搬家协助：\\n\\n'
+                  '• 协调搬家时间\\n'
+                  '• 对接车辆和人手\\n'
+                  '• 提供必要的现场支持\\n\\n'
+                  '搬家不是租约的终点，而是生活真正开始的节点。我们能做的，是让这一小段过渡，稍微从容一些。'
+              )''')
+
+          replace_func('qiaolian_dual/callback_rental.py', 'about_text', '''def about_text() -> str:
+              return (
+                  '🏠 <b>关于侨联</b>\\n\\n'
+                  '这些年，我们始终专注于柬埔寨本地房产与居住服务。\\n\\n'
+                  '在长期服务客户的过程中，我们越来越清楚，一次租房真正需要解决的，不只是找到房源，更包括信息确认、签约衔接、入住交接，以及住下以后仍然有人可以联系。\\n\\n'
+                  '我们相信，真正有价值的服务，不止于完成一次交易，更在于建立长久而持续的信任。\\n\\n'
+                  '从第一次认识，到长期选择，侨联希望以稳定的服务与责任，成为您在柬埔寨值得长期信赖的生活伙伴。\\n\\n'
+                  '<b>侨联地产｜您在金边的自己人</b>'
+              )''')
+
+          replace_func('autopilot_publish_bot.py', 'build_channel_menu_keyboard', '''def build_channel_menu_keyboard() -> InlineKeyboardMarkup:
+              """频道置顶索引：频道负责浏览，Bot 负责筛选与承接。"""
+              if DEEPLINK_BOT_USERNAME:
+                  base = f"https://t.me/{DEEPLINK_BOT_USERNAME}?start="
+                  return InlineKeyboardMarkup([
+                      [InlineKeyboardButton('按区域找房', url=base + 'find_area'), InlineKeyboardButton('按预算找房', url=base + 'find_budget')],
+                      [InlineKeyboardButton('按户型找房', url=base + 'find_layout'), InlineKeyboardButton('最新房源', url=base + 'latest')],
+                      [InlineKeyboardButton('联系侨联', url=base + 'advisor')],
+                  ])
+              return InlineKeyboardMarkup([])''')
+
+          replace_func('autopilot_publish_bot.py', 'default_pin_html', '''def default_pin_html() -> str:
+              custom = _get_setting(KEY_PIN_TEXT, "").strip()
+              if custom:
+                  return custom
+              return (
+                  '<b>侨联地产｜金边租房频道</b>\\n'
+                  '<b>您在金边的自己人</b>\\n\\n'
+                  '这里持续更新金边真实在租房源。\\n\\n'
+                  '<b>怎么看：</b>直接往下浏览，每套主帖先看区域、户型和租金；需要更多照片，点「更多实拍」。\\n'
+                  '<b>怎么找：</b>用下方索引按区域、预算或户型进入 Bot 筛选。\\n'
+                  '<b>怎么问：</b>看中具体房源，点「房源详情」进入 Bot，房源信息会自动带上。\\n'
+                  '<b>怎么约：</b>点房源下方「预约看房」，直接选择日期和实地 / 视频方式。\\n\\n'
+                  '<b>频道负责看房源，Bot 负责找房、咨询和预约。</b>\\n\\n'
+                  '<b>侨联地产｜您在金边的自己人</b>'
+              )''')
+          PY
+
+          python -m compileall -q qiaolian_dual autopilot_publish_bot.py
+          git config user.name qiaolian-actions
+          git config user.email actions@users.noreply.github.com
+          git add qiaolian_dual/texts.py qiaolian_dual/keyboards_common.py qiaolian_dual/keyboards_search.py qiaolian_dual/callback_rental.py autopilot_publish_bot.py
+          if git diff --cached --quiet; then
+            echo 'No changes.'
+            exit 0
+          fi
+          git commit -m 'Align prelaunch Bot and channel experience'
+          git push origin HEAD:codex/qiaolian-ui-cleanup-20260829
