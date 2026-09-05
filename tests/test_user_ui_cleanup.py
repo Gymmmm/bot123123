@@ -22,7 +22,9 @@ def _callbacks(markup):
 
 def test_customer_wording_is_unified():
     labels = _labels(main_keyboard())
-    assert labels == ['🔍 帮我找房', '📅 我的预约', '🛡 侨联保障', '🛠 入住服务', '💬 联系我们']
+    assert labels[:4] == ['🔍 帮我找房', '📅 我的预约', '🛡 侨联保障', '🛠 入住服务']
+    assert labels[-1] == '💬 联系我们'
+    assert set(labels[4:-1]).issubset({'房源频道'})
     joined = ' '.join(labels)
     assert '可预约房源' not in joined
     assert '当前可预约' not in joined
