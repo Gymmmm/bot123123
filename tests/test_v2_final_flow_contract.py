@@ -73,7 +73,7 @@ def test_v2_assurance_and_move_in_hubs():
     assert '签约前核对费用' in assurance
     assert '入住时把房屋、表计和物品状态留档' in assurance
     assert labels(rental_home_keyboard()) == [
-        '💰 费用核对', '📋 入住交接', '🔐 押金与退租', '🚚 搬家协助', '💬 联系我们', '⬅️ 返回首页'
+        '📋 入住交接', '🔐 押金与退租', '🚚 搬家协助', '💬 联系我们'
     ]
     assert labels(service_hub_keyboard()) == [
         '🔧 设备报修', '🏢 物业协调', '📦 生活服务', '💬 其他帮助', '⬅️ 返回首页'

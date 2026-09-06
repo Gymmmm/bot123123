@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>侨联地产 · 入住交接留档单 & 押金说明</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
+
+  :root {
+    --gold: #C5A24A;
+    --gold-light: #E8D49A;
+    --gold-pale: #FAF3E0;
+    --ink: #1A1610;
+    --ink-mid: #3D3320;
+    --ink-light: #6B5C3E;
+    --paper: #FDFBF6;
+    --red: #9B2335;
+    --green: #2D6A4F;
+    --rule: #D4C08A;
+    --rule-light: rgba(197,162,74,0.25);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Noto Sans SC', sans-serif;
+    background: #F0E9D6;
+    color: var(--ink);
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  @media print {
+    body { background: white; font-size: 10.5px; }
+    .no-print { display: none; }
+    .doc-page { box-shadow: none; margin: 0; border-radius: 0; }
+    .page-break { page-break-before: always; }
+  }
+
+  .print-bar {
+    background: var(--ink);
+    padding: 10px 30px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+  .print-btn {
+    background: var(--gold);
+    color: var(--ink);
+    border: none;
+    padding: 7px 20px;
+    font-family: 'Noto Sans SC', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 1px;
+  }
+  .print-note {
+    font-size: 11px;
+    color: rgba(197,162,74,0.6);
+    letter-spacing: 1px;
+  }
+
+  .doc-page {
+    max-width: 800px;
+    margin: 20px auto;
+    background: var(--paper);
+    box-shadow: 0 4px 30px rgba(0,0,0,0.2);
+    position: relative;
+  }
+
+  /* ===== DOCUMENT 1: HANDOVER ===== */
+  .handover-header {
+    background: var(--ink);
+    padding: 22px 36px 16px;
+    position: relative;
+    overflow: hidden;
+  }
+  .handover-header::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--gold), var(--gold-light), var(--gold));
+  }
+  .handover-header::after {
+    content: '入住留档';
+    position: absolute;
+    right: 24px; top: 50%;
+    transform: translateY(-50%);
+    font-family: 'Noto Serif SC', serif;
+    font-size: 60px;
+    font-weight: 700;
+    color: rgba(197,162,74,0.07);
+    letter-spacing: 4px;
+  }
+  .header-brand {
+    font-size: 10px;
+    letter-spacing: 4px;
+    color: var(--gold);
+    margin-bottom: 6px;
+  }
+  .header-title {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--gold-light);
+    letter-spacing: 2px;
+  }
+  .header-en {
+    font-size: 10px;
+    color: rgba(197,162,74,0.5);
+    letter-spacing: 2px;
+    margin-top: 2px;
+    font-weight: 300;
+  }
+  .doc-no-row {
+    display: flex;
+    gap: 20px;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(197,162,74,0.2);
+    flex-wrap: wrap;
+  }
+  .doc-no-field {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    color: var(--gold);
+    letter-spacing: 1px;
+  }
+  .doc-no-line {
+    border-bottom: 1px solid rgba(197,162,74,0.4);
+    width: 80px;
+    height: 14px;
+  }
+
+  /* Form body */
+  .form-body {
+    padding: 20px 36px 30px;
+  }
+
+  /* Section */
+  .f-section {
+    margin-bottom: 18px;
+  }
+  .f-section-title {
+    background: var(--ink);
+    color: var(--gold);
+    font-family: 'Noto Serif SC', serif;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 5px 12px;
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .f-section-title span {
+    background: var(--gold);
+    color: var(--ink);
+    font-size: 9px;
+    padding: 1px 6px;
+    font-weight: 900;
+    letter-spacing: 1px;
+  }
+
+  /* Field rows */
+  .f-grid {
+    display: grid;
+    gap: 5px;
+  }
+  .f-grid-2 { grid-template-columns: 1fr 1fr; gap: 5px 16px; }
+  .f-grid-3 { grid-template-columns: 1fr 1fr 1fr; gap: 5px 12px; }
+  .f-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    border-bottom: 1px dashed var(--rule-light);
+  }
+  .f-label {
+    font-size: 11px;
+    color: var(--ink-light);
+    white-space: nowrap;
+    min-width: 70px;
+  }
+  .f-label.wide { min-width: 90px; }
+  .f-line {
+    flex: 1;
+    border-bottom: 1px solid var(--ink-light);
+    height: 14px;
+    min-width: 50px;
+  }
+  .f-unit {
+    font-size: 10px;
+    color: var(--ink-light);
+    white-space: nowrap;
+  }
+
+  /* Meter reading table */
+  .meter-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+  .meter-table th {
+    background: var(--gold-pale);
+    border: 1px solid var(--rule);
+    padding: 5px 10px;
+    font-weight: 700;
+    color: var(--ink-mid);
+    text-align: center;
+    font-family: 'Noto Serif SC', serif;
+  }
+  .meter-table td {
+    border: 1px solid var(--rule);
+    padding: 8px 10px;
+    color: var(--ink-mid);
+    text-align: center;
+    height: 28px;
+  }
+  .meter-table td.label-cell {
+    background: #f9f6ef;
+    font-weight: 700;
+    color: var(--ink-light);
+    text-align: left;
+  }
+
+  /* Room condition table */
+  .room-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+  .room-table th {
+    background: var(--ink);
+    color: var(--gold-light);
+    padding: 6px 8px;
+    font-family: 'Noto Serif SC', serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-align: center;
+    border: 1px solid rgba(197,162,74,0.3);
+  }
+  .room-table td {
+    border: 1px solid var(--rule);
+    padding: 5px 8px;
+    color: var(--ink-mid);
+    vertical-align: middle;
+    height: 24px;
+  }
+  .room-table td.room-name {
+    background: var(--gold-pale);
+    font-weight: 700;
+    color: var(--ink);
+    text-align: center;
+    font-family: 'Noto Serif SC', serif;
+    font-size: 11px;
+    width: 70px;
+  }
+  .condition-cell {
+    text-align: center;
+  }
+  .rating-boxes {
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+  }
+  .r-box {
+    width: 11px; height: 11px;
+    border: 1.5px solid var(--rule);
+    display: inline-block;
+  }
+  .r-label {
+    font-size: 9px;
+    color: var(--ink-light);
+    display: block;
+    text-align: center;
+    margin-top: 1px;
+  }
+
+  /* Key table */
+  .key-grid {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .key-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--ink-mid);
+    border: 1px dashed var(--rule);
+    padding: 6px 12px;
+    flex: 1;
+    min-width: 120px;
+  }
+  .key-box {
+    width: 12px; height: 12px;
+    border: 1.5px solid var(--gold);
+    display: inline-block;
+    flex-shrink: 0;
+  }
+
+  /* Agreement text */
+  .agreement-box {
+    background: var(--gold-pale);
+    border: 1px solid var(--rule);
+    padding: 12px 16px;
+    font-size: 11px;
+    color: var(--ink-mid);
+    line-height: 1.8;
+    margin: 12px 0;
+  }
+  .agreement-box strong { color: var(--red); }
+
+  /* Signatures */
+  .sig-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    margin-top: 16px;
+  }
+  .sig-block {
+    border-top: 2px solid var(--rule);
+    padding-top: 8px;
+  }
+  .sig-role {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--gold);
+    letter-spacing: 1px;
+    margin-bottom: 24px;
+  }
+  .sig-line {
+    border-bottom: 1px solid var(--ink-light);
+    margin-bottom: 4px;
+  }
+  .sig-note {
+    font-size: 9px;
+    color: var(--ink-light);
+    text-align: center;
+  }
+
+  /* ===== SEPARATOR ===== */
+  .doc-separator {
+    height: 40px;
+    background: #E8DFC8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: var(--ink-light);
+    letter-spacing: 4px;
+  }
+
+  /* ===== DOCUMENT 2: DEPOSIT GUARANTEE ===== */
+  .deposit-header {
+    background: linear-gradient(135deg, #1A2535 0%, #0D1117 100%);
+    padding: 28px 36px 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .deposit-header::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--gold), var(--gold-light), var(--gold));
+  }
+  .deposit-header::after {
+    content: '押金';
+    position: absolute;
+    right: 30px; top: 50%;
+    transform: translateY(-50%);
+    font-family: 'Noto Serif SC', serif;
+    font-size: 90px;
+    font-weight: 700;
+    color: rgba(197,162,74,0.06);
+    letter-spacing: 8px;
+  }
+  .dep-brand { font-size: 10px; letter-spacing: 4px; color: var(--gold); margin-bottom: 6px; }
+  .dep-title {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--gold-light);
+    letter-spacing: 2px;
+    line-height: 1.3;
+  }
+  .dep-tagline {
+    font-size: 11px;
+    color: rgba(232,212,154,0.6);
+    margin-top: 6px;
+    letter-spacing: 1px;
+  }
+
+  /* Deposit body */
+  .deposit-body {
+    padding: 24px 36px 36px;
+  }
+
+  /* Intro */
+  .dep-intro {
+    background: var(--gold-pale);
+    border-left: 4px solid var(--gold);
+    padding: 12px 16px;
+    font-size: 12px;
+    color: var(--ink-mid);
+    line-height: 1.8;
+    margin-bottom: 20px;
+  }
+  .dep-intro strong { color: var(--ink); }
+
+  /* Guarantee cards */
+  .guarantee-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .g-card {
+    border: 1px solid var(--rule);
+    background: white;
+    overflow: hidden;
+  }
+  .g-card-header {
+    background: var(--ink);
+    color: var(--gold-light);
+    padding: 8px 14px;
+    font-family: 'Noto Serif SC', serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .g-num {
+    background: var(--gold);
+    color: var(--ink);
+    width: 20px; height: 20px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px;
+    font-weight: 900;
+    flex-shrink: 0;
+  }
+  .g-card-body {
+    padding: 12px 14px;
+    font-size: 12px;
+    color: var(--ink-mid);
+    line-height: 1.8;
+  }
+  .g-card-body strong { color: var(--red); }
+  .g-card-body em {
+    font-style: normal;
+    color: var(--green);
+    font-weight: 700;
+  }
+
+  /* Process timeline */
+  .process-timeline {
+    display: flex;
+    gap: 0;
+    margin: 16px 0;
+    position: relative;
+  }
+  .process-timeline::before {
+    content: '';
+    position: absolute;
+    top: 18px; left: 18px; right: 18px;
+    height: 2px;
+    background: linear-gradient(90deg, var(--gold), var(--gold-light), var(--gold));
+    z-index: 0;
+  }
+  .p-step {
+    flex: 1;
+    text-align: center;
+    position: relative;
+    z-index: 1;
+  }
+  .p-dot {
+    width: 36px; height: 36px;
+    background: var(--ink);
+    border: 2px solid var(--gold);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Noto Serif SC', serif;
+    font-size: 13px;
+    color: var(--gold);
+    font-weight: 700;
+    margin: 0 auto 6px;
+    position: relative;
+  }
+  .p-label {
+    font-size: 11px;
+    color: var(--ink-mid);
+    font-weight: 500;
+    line-height: 1.4;
+  }
+  .p-sub {
+    font-size: 10px;
+    color: var(--ink-light);
+  }
+
+  /* What's covered / not covered */
+  .coverage-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .cov-card {
+    border: 1px solid var(--rule);
+    overflow: hidden;
+  }
+  .cov-header {
+    padding: 7px 12px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+  .cov-header.covered { background: rgba(45,106,79,0.12); color: var(--green); border-bottom: 2px solid var(--green); }
+  .cov-header.not-covered { background: rgba(155,35,53,0.08); color: var(--red); border-bottom: 2px solid var(--red); }
+  .cov-body { padding: 10px 14px; background: white; }
+  .cov-list {
+    list-style: none;
+  }
+  .cov-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 11.5px;
+    color: var(--ink-mid);
+    padding: 3px 0;
+    border-bottom: 1px dotted var(--rule-light);
+    line-height: 1.5;
+  }
+  .cov-list li:last-child { border: none; }
+  .check-green { color: var(--green); font-weight: 700; flex-shrink: 0; }
+  .check-red { color: var(--red); font-weight: 700; flex-shrink: 0; }
+
+  /* Client-facing copy */
+  .client-copy {
+    background: var(--ink);
+    color: var(--gold-light);
+    padding: 18px 20px;
+    margin-top: 16px;
+    position: relative;
+  }
+  .client-copy::before {
+    content: '对客户说明文案';
+    position: absolute;
+    top: -1px; left: 16px;
+    background: var(--gold);
+    color: var(--ink);
+    font-size: 9px;
+    font-weight: 900;
+    padding: 2px 10px;
+    letter-spacing: 2px;
+  }
+  .client-title {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--gold);
+    margin-bottom: 10px;
+    letter-spacing: 1px;
+  }
+  .client-text {
+    font-size: 12px;
+    line-height: 2;
+    color: rgba(232,212,154,0.85);
+  }
+  .client-text strong { color: var(--gold); }
+
+  /* Notice box */
+  .notice-box {
+    border: 1px solid rgba(155,35,53,0.3);
+    background: rgba(155,35,53,0.06);
+    padding: 10px 14px;
+    font-size: 11px;
+    color: var(--ink-mid);
+    line-height: 1.7;
+    margin-top: 12px;
+  }
+  .notice-box::before {
+    content: '⚠ 重要提示：';
+    font-weight: 700;
+    color: var(--red);
+  }
+
+  /* Footnote */
+  .doc-footer {
+    border-top: 1px solid var(--rule);
+    padding: 12px 36px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #FAF6EC;
+  }
+  .footer-brand {
+    font-size: 10px;
+    color: var(--ink-light);
+    letter-spacing: 2px;
+  }
+  .footer-ver {
+    font-size: 10px;
+    color: var(--rule);
+    letter-spacing: 1px;
+  }
+
+  /* ===== QIAOLIAN BRAND SYSTEM ===== */
+  :root {
+    --gold: #C8A96B;
+    --gold-light: #E7D8B9;
+    --gold-pale: #F7F4EC;
+    --ink: #0F2A44;
+    --ink-mid: #1F2933;
+    --ink-light: #5B6773;
+    --paper: #FFFFFF;
+    --navy: #0F2A44;
+    --navy-soft: #EAF0F4;
+    --red: #8B3A3A;
+    --green: #376B57;
+    --rule: #CAD5DE;
+    --rule-light: rgba(125, 149, 168, 0.28);
+  }
+  body { background: #F3F1EC; color: var(--ink-mid); }
+  .print-bar { background: var(--navy); }
+  .print-btn { background: var(--gold); color: var(--navy); border-radius: 4px; }
+  .print-note { color: rgba(255,255,255,.72); }
+  .doc-page { background: #fff; box-shadow: 0 8px 28px rgba(15,42,68,.13); }
+  .handover-header, .deposit-header { background: var(--navy); }
+  .handover-header::before, .deposit-header::before { background: var(--gold); }
+  .handover-header::after, .deposit-header::after { display: none; }
+  .header-brand, .dep-brand { color: var(--gold); }
+  .header-title, .dep-title { color: #fff; }
+  .header-en, .dep-tagline { color: rgba(255,255,255,.72); }
+  .doc-no-row { border-top-color: rgba(200,169,107,.48); }
+  .doc-no-field { color: #fff; }
+  .doc-no-line { border-bottom-color: rgba(255,255,255,.7); }
+  .f-section-title { background: var(--navy-soft); color: var(--navy); border-left: 4px solid var(--gold); }
+  .f-section-title span { background: transparent; color: #7A6234; border-left: 1px solid var(--gold); }
+  .f-line { border-bottom-color: #8797A4; }
+  .meter-table th, .room-table th { background: var(--navy-soft); color: var(--navy); border-color: var(--rule); }
+  .meter-table td.label-cell, .room-table td.room-name { background: #F6F8F9; color: var(--navy); }
+  .key-box { border-color: var(--navy); }
+  .agreement-box, .dep-intro { background: #F6F8F9; border-color: var(--rule); }
+  .agreement-box { border-left: 4px solid var(--gold); }
+  .agreement-box strong, .g-card-body strong { color: var(--navy); }
+  .sig-role { color: var(--navy); }
+  .doc-separator { background: #E4EAEE; color: var(--navy); }
+  .g-card-header { background: var(--navy-soft); color: var(--navy); border-bottom: 1px solid var(--rule); }
+  .g-num { background: var(--gold); color: var(--navy); border-radius: 50%; }
+  .process-timeline::before { background: var(--rule); }
+  .p-dot { background: #fff; color: var(--navy); border-color: var(--gold); }
+  .client-copy { background: var(--navy-soft); color: var(--ink-mid); border: 1px solid var(--rule); border-left: 4px solid var(--gold); }
+  .client-copy::before { background: var(--gold); color: var(--navy); }
+  .client-title { color: var(--navy); }
+  .client-text { color: var(--ink-mid); }
+  .client-text strong { color: var(--navy); }
+  .notice-box { border-color: var(--rule); background: #F6F8F9; }
+  .notice-box::before { color: var(--navy); }
+  .doc-footer { background: #F6F8F9; border-top-color: var(--rule); }
+  .footer-ver { color: #7C8B97; }
+  @media (max-width: 680px) {
+    body { font-size: 12px; }
+    .print-bar { padding: 10px 14px; flex-wrap: wrap; }
+    .doc-page { margin: 12px 8px; }
+    .handover-header, .deposit-header { padding-left: 20px; padding-right: 20px; }
+    .form-body, .deposit-body { padding: 18px 20px 26px; }
+    .f-grid-2, .f-grid-3, .guarantee-grid, .coverage-grid { grid-template-columns: 1fr; }
+    .room-table, .meter-table { font-size: 9px; }
+    .room-table th, .room-table td, .meter-table th, .meter-table td { padding: 4px; }
+    .condition-cell { white-space: nowrap; }
+    .process-timeline { flex-wrap: wrap; gap: 12px 0; }
+    .process-timeline::before { display: none; }
+    .p-step { flex: 0 0 33.333%; }
+    .doc-footer { padding: 12px 20px; gap: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="print-bar no-print">
+  <button class="print-btn" onclick="window.print()">🖨 打印两份 / 导出PDF</button>
+  <span class="print-note">建议A4打印 · 入住当天双方各留一份</span>
+</div>
+
+<!-- ===================== DOCUMENT 1: HANDOVER ===================== -->
+<div class="doc-page">
+
+  <div class="handover-header">
+    <div class="header-brand">QIAOLIAN REALTY · 侨联地产</div>
+    <div class="header-title">入住交接留档单</div>
+    <div class="header-en">MOVE-IN HANDOVER & RECORD FORM</div>
+    <div class="doc-no-row">
+      <div class="doc-no-field">档案编号<div class="doc-no-line"></div></div>
+      <div class="doc-no-field">交接日期<div class="doc-no-line"></div></div>
+      <div class="doc-no-field">经办顾问<div class="doc-no-line"></div></div>
+    </div>
+  </div>
+
+  <div class="form-body">
+
+    <!-- 基础信息 -->
+    <div class="f-section">
+      <div class="f-section-title">一 · 房源基础信息</div>
+      <div class="f-grid f-grid-2">
+        <div class="f-row"><span class="f-label">楼盘名称</span><div class="f-line"></div></div>
+        <div class="f-row"><span class="f-label">房源地址</span><div class="f-line"></div></div>
+        <div class="f-row"><span class="f-label">房源编号</span><div class="f-line"></div></div>
+        <div class="f-row"><span class="f-label">户型</span><div class="f-line"></div><span class="f-unit">室&nbsp;&nbsp;厅&nbsp;&nbsp;卫</span></div>
+        <div class="f-row"><span class="f-label">楼层</span><div class="f-line"></div><span class="f-unit">/ 共</span><div class="f-line" style="max-width:30px;"></div><span class="f-unit">层</span></div>
+        <div class="f-row"><span class="f-label">面积</span><div class="f-line"></div><span class="f-unit">㎡</span></div>
+      </div>
+    </div>
+
+    <!-- 租约信息 -->
+    <div class="f-section">
+      <div class="f-section-title">二 · 租约与财务信息</div>
+      <div class="f-grid f-grid-2">
+        <div class="f-row"><span class="f-label wide">月租金</span><div class="f-line"></div><span class="f-unit">USD</span></div>
+        <div class="f-row"><span class="f-label wide">押金金额</span><div class="f-line"></div><span class="f-unit">USD</span></div>
+        <div class="f-row"><span class="f-label wide">付款方式</span><div class="f-line"></div></div>
+        <div class="f-row"><span class="f-label wide">租期</span><div class="f-line"></div><span class="f-unit">至</span><div class="f-line"></div></div>
+        <div class="f-row"><span class="f-label wide">电费单价</span><div class="f-line"></div><span class="f-unit">/ 度</span></div>
+        <div class="f-row"><span class="f-label wide">水费</span><div class="f-line"></div></div>
+        <div class="f-row"><span class="f-label wide">物业费</span><div class="f-line"></div><span class="f-unit">□ 房东出 □ 租客出</span></div>
+        <div class="f-row"><span class="f-label wide">停车费</span><div class="f-line"></div><span class="f-unit">□ 含在内 □ 另计</span></div>
+        <div class="f-row"><span class="f-label wide">网络</span><div class="f-line"></div><span class="f-unit">□ 已装 □ 需自装</span></div>
+        <div class="f-row"><span class="f-label wide">提前退租</span><div class="f-line"></div></div>
+      </div>
+    </div>
+
+    <!-- 仪表读数 -->
+    <div class="f-section">
+      <div class="f-section-title">三 · 仪表初始读数</div>
+      <table class="meter-table">
+        <tr>
+          <th style="width:100px;">项目</th>
+          <th>表号 / 位置</th>
+          <th style="width:160px;">入住读数</th>
+          <th style="width:160px;">退房读数（退租时填）</th>
+          <th style="width:80px;">备注</th>
+        </tr>
+        <tr>
+          <td class="label-cell">⚡ 电表</td>
+          <td></td>
+          <td style="background:#fdfcf8;"></td>
+          <td style="background:#fdfcf8;"></td>
+          <td></td>
+        </tr>
+        <tr>
+          <td class="label-cell">💧 水表</td>
+          <td></td>
+          <td style="background:#fdfcf8;"></td>
+          <td style="background:#fdfcf8;"></td>
+          <td></td>
+        </tr>
+        <tr>
+          <td class="label-cell">🔥 气表</td>
+          <td></td>
+          <td style="background:#fdfcf8;"></td>
+          <td style="background:#fdfcf8;"></td>
+          <td></td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- 房屋状态 -->
+    <div class="f-section">
+      <div class="f-section-title">四 · 各区域房屋状态留档 <span>新=完好 中=一般 旧=明显磨损</span></div>
+      <table class="room-table">
+        <tr>
+          <th style="width:70px;">区域</th>
+          <th>墙面</th>
+          <th>地板</th>
+          <th>门窗</th>
+          <th>照明</th>
+          <th>家具</th>
+          <th>说明 / 现有损坏描述</th>
+        </tr>
+        <tr>
+          <td class="room-name">客厅</td>
+          <td class="condition-cell"><span class="r-box"></span>新 <span class="r-box"></span>中 <span class="r-box"></span>旧</td>
+          <td class="condition-cell"><span class="r-box"></span>新 <span class="r-box"></span>中 <span class="r-box"></span>旧</td>
+          <td class="condition-cell"><span class="r-box"></span>新 <span class="r-box"></span>中 <span class="r-box"></span>旧</td>
+          <td class="condition-cell"><span class="r-box"></span>新 <span class="r-box"></span>中 <span class="r-box"></span>旧</td>
+          <td class="condition-cell"><span class="r-box"></span>新 <span class="r-box"></span>中 <span class="r-box"></span>旧</td>
+          <td></td>
+        </tr>
+        <tr>
+          <td class="room-name">卧室一</td>
+          <td class="condition-cell"><span class="r-box"></span>新 <span class="r-box"></span>中 <span class="r-box"></span>旧</td>
+          <td class="condition-cell"><span class="r-box"></span>新 <span class="r-box"></span>中 <span class="r-box"></span>旧</td>
+          <td class="condition-cell"><span class="r-box"></span>新 <span class="r-box"></span>中 <span class="r-box"></span>旧</td>
+          <td class="condition-cell"><span class="r-box"></span>新 <span class="r-box"></span>中 <span class="r-box"></span>旧</td>
+          <td class="condition-cell"><span class="r-box"></span>新 <span class="r-box"></span>中 <span class="r-box"></span>旧</td>
+          <td></td>
+        </tr>
+        <tr>
+          <td class="room-name">卧室二</td>
+          <td class="condition-cell"><span class="r-box"></span>新 <span class="r-box"></span>中 <span class="r-box"></span>旧</td>
+          <td class="condition-cell"><span class="r-box"></span>新 <span class="r-box"></span>中 <span class="r-box"></span>旧</td>
+          <td class="condition-cell"><span class="r-box"></span>新 <span class="r-box"></span>中 <span class="r-box"></span>旧</td>
+          <td class="condition-cell"><span class="r-box"></span>新 <span class="r-box"></span>中 <span class="r-box"></span>旧</td>
+          <td class="condition-cell"><span class="r-box"></span>新 <span class="r-box"></span>中 <span class="r-box"></span>旧</td>
+          <td></td>
+        </tr>
+        <tr>
+          <td class="room-name">厨房</td>
+          <td class="condition-cell"><span class="r-box"></span>新 <span class="r-box"></span>中 <span class="r-box"></span>旧</td>
+          <td class="condition-cell"><span class="r-box"></span>新 <span class="r-box"></span>中 <span class="r-box"></span>旧</td>
+          <td class="condition-cell"><span class="r-box"></span>新 <span class="r-box"></span>中 <span class="r-box"></span>旧</td>
+          <td class="condition-cell"><span class="r-box"></span>新 <span class="r-box"></span>中 <span class="r-box"></span>旧</td>
+          <td class="condition-cell"><span class="r-box"></span>新 <span class="r-box"></span>中 <span class="r-box"></span>旧</td>
+          <td></td>
+        </tr>
+        <tr>
+          <td class="room-name">卫生间</td>
+          <td class="condition-cell"><span class="r-box"></span>新 <span class="r-box"></span>中 <span class="r-box"></span>旧</td>
+          <td class="condition-cell"><span class="r-box"></span>新 <span class="r-box"></span>中 <span class="r-box"></span>旧</td>
+          <td class="condition-cell"><span class="r-box"></span>新 <span class="r-box"></span>中 <span class="r-box"></span>旧</td>
+          <td class="condition-cell"><span class="r-box"></span>新 <span class="r-box"></span>中 <span class="r-box"></span>旧</td>
+          <td class="condition-cell"><span class="r-box"></span>新 <span class="r-box"></span>中 <span class="r-box"></span>旧</td>
+          <td></td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- 家电状态 -->
+    <div class="f-section">
+      <div class="f-section-title">五 · 主要家电状态</div>
+      <div class="f-grid f-grid-3">
+        <div class="f-row"><span class="f-label">空调品牌/型号</span><div class="f-line"></div></div>
+        <div class="f-row"><span class="f-label">空调状态</span><div class="f-line"></div><span class="f-unit">□正常 □待修</span></div>
+        <div class="f-row"><span class="f-label">冰箱品牌</span><div class="f-line"></div></div>
+        <div class="f-row"><span class="f-label">冰箱状态</span><div class="f-line"></div><span class="f-unit">□正常 □待修</span></div>
+        <div class="f-row"><span class="f-label">洗衣机品牌</span><div class="f-line"></div></div>
+        <div class="f-row"><span class="f-label">洗衣机状态</span><div class="f-line"></div><span class="f-unit">□正常 □待修</span></div>
+        <div class="f-row"><span class="f-label">热水器品牌</span><div class="f-line"></div></div>
+        <div class="f-row"><span class="f-label">热水器状态</span><div class="f-line"></div><span class="f-unit">□正常 □待修</span></div>
+        <div class="f-row"><span class="f-label">电视/其他</span><div class="f-line"></div><span class="f-unit">□正常 □无</span></div>
+      </div>
+    </div>
+
+    <!-- 钥匙门卡 -->
+    <div class="f-section">
+      <div class="f-section-title">六 · 钥匙 / 门禁卡交接</div>
+      <div class="key-grid">
+        <div class="key-item"><span class="key-box"></span>房门钥匙&nbsp;×<div class="f-line" style="max-width:30px;"></div>把</div>
+        <div class="key-item"><span class="key-box"></span>门禁卡&nbsp;×<div class="f-line" style="max-width:30px;"></div>张</div>
+        <div class="key-item"><span class="key-box"></span>停车卡&nbsp;×<div class="f-line" style="max-width:30px;"></div>张</div>
+        <div class="key-item"><span class="key-box"></span>信箱钥匙&nbsp;×<div class="f-line" style="max-width:30px;"></div>把</div>
+        <div class="key-item"><span class="key-box"></span>其他：<div class="f-line"></div></div>
+      </div>
+    </div>
+
+    <!-- 补充说明 -->
+    <div class="f-section">
+      <div class="f-section-title">七 · 补充说明 / 现有问题记录</div>
+      <div style="border:1px dashed var(--rule);min-height:50px;padding:8px 12px;font-size:11px;color:var(--ink-light);">
+        （房屋现有损坏、待修项、双方约定事项请在此注明）
+      </div>
+    </div>
+
+    <!-- Agreement -->
+    <div class="agreement-box">
+      三方确认：上述内容用于记录入住交接时的房屋状态。退租时可结合本留档单、合同约定、房屋实际状态和相关费用凭据进行核对。最终押金退还及可能扣费由房东与租客根据合同和核对结果确认；侨联提供留档与沟通协助，不作保赔承诺。本表一式两份，双方各执一份。
+    </div>
+
+    <!-- Signatures -->
+    <div class="sig-row">
+      <div class="sig-block">
+        <div class="sig-role">🏠 房东 / 管理方</div>
+        <div class="sig-line"></div>
+        <div class="sig-note">签名&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;日期</div>
+      </div>
+      <div class="sig-block">
+        <div class="sig-role">👤 租客</div>
+        <div class="sig-line"></div>
+        <div class="sig-note">签名&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;日期</div>
+      </div>
+      <div class="sig-block">
+        <div class="sig-role">📋 侨联经办顾问</div>
+        <div class="sig-line"></div>
+        <div class="sig-note">签名 / 工号&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;日期</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="doc-footer">
+    <div class="footer-brand">侨联地产 QIAOLIAN REALTY · 入住交接留档单</div>
+    <div class="footer-ver">v1.0 · 双方各执一份</div>
+  </div>
+
+</div><!-- /doc-page 1 -->
+
+<div class="doc-separator">— 下方为独立文件：押金说明 —</div>
+
+<!-- ===================== DOCUMENT 2: DEPOSIT GUARANTEE ===================== -->
+<div class="doc-page" style="margin-top:0;">
+
+  <div class="deposit-header">
+    <div class="dep-brand">QIAOLIAN REALTY · 侨联地产 · 租赁服务</div>
+    <div class="dep-title">押金说明</div>
+    <div class="dep-tagline">SECURITY DEPOSIT GUIDE · 提前留档，退租时按依据核对</div>
+  </div>
+
+  <div class="deposit-body">
+
+    <div class="dep-intro">
+      押金是租房过程中容易产生分歧的环节。侨联地产协助在签约前确认相关条款，并在入住、退租时留存和核对记录。<strong>最终押金退还以合同约定、房屋实际状态和双方核对结果为准。</strong>
+    </div>
+
+    <!-- 四项核对依据 -->
+    <div style="font-family:'Noto Serif SC',serif;font-size:13px;font-weight:700;color:var(--ink);margin-bottom:10px;letter-spacing:1px;">押金核对的四项依据</div>
+
+    <div class="guarantee-grid">
+      <div class="g-card">
+        <div class="g-card-header"><span class="g-num">1</span>入住留档</div>
+        <div class="g-card-body">入住当天，顾问协助记录房屋状态、已有问题、家电情况和仪表读数；现场照片与视频按档案编号保存，供退租核对时参考。</div>
+      </div>
+      <div class="g-card">
+        <div class="g-card-header"><span class="g-num">2</span>规则前置确认</div>
+        <div class="g-card-body">签约前协助确认押金、扣费、提前退租等规则，并建议将双方确认的内容写入合同，减少仅凭口头约定产生的分歧。</div>
+      </div>
+      <div class="g-card">
+        <div class="g-card-header"><span class="g-num">3</span>退租协助</div>
+        <div class="g-card-body">退租时可协助双方对照合同、入住留档和房屋实际状态逐项核对；具体责任与扣费由双方依据合同及核对结果确认。</div>
+      </div>
+      <div class="g-card">
+        <div class="g-card-header"><span class="g-num">4</span>争议介入</div>
+        <div class="g-card-body">如对押金有分歧，侨联可根据现有合同和留档材料协助沟通，但不替代房东、租客作最终决定，也不承诺押金金额或赔付结果。</div>
+      </div>
+    </div>
+
+    <!-- 流程 -->
+    <div style="font-family:'Noto Serif SC',serif;font-size:13px;font-weight:700;color:var(--ink);margin-bottom:12px;letter-spacing:1px;">押金留档与核对流程</div>
+
+    <div class="process-timeline">
+      <div class="p-step">
+        <div class="p-dot">1</div>
+        <div class="p-label">签约前</div>
+        <div class="p-sub">确认押金规则<br>写入合同</div>
+      </div>
+      <div class="p-step">
+        <div class="p-dot">2</div>
+        <div class="p-label">入住当天</div>
+        <div class="p-sub">留档拍摄<br>仪表读数</div>
+      </div>
+      <div class="p-step">
+        <div class="p-dot">3</div>
+        <div class="p-label">居住期间</div>
+        <div class="p-sub">顾问保持联系<br>问题及时记录</div>
+      </div>
+      <div class="p-step">
+        <div class="p-dot">4</div>
+        <div class="p-label">退租前</div>
+        <div class="p-sub">提前通知<br>对照合同</div>
+      </div>
+      <div class="p-step">
+        <div class="p-dot">5</div>
+        <div class="p-label">退租当天</div>
+        <div class="p-sub">逐项核查<br>记录双方结果</div>
+      </div>
+    </div>
+
+    <!-- 哪些会扣 哪些不会扣 -->
+    <div style="font-family:'Noto Serif SC',serif;font-size:13px;font-weight:700;color:var(--ink);margin:16px 0 10px;letter-spacing:1px;">押金扣除参考标准</div>
+
+    <div class="coverage-grid">
+      <div class="cov-card">
+        <div class="cov-header covered">✓ 通常可作为不扣除依据</div>
+        <div class="cov-body">
+          <ul class="cov-list">
+            <li><span class="check-green">✓</span>入住前已存在的损坏（留档为证）</li>
+            <li><span class="check-green">✓</span>正常居住磨损（油漆轻微褪色、小划痕）</li>
+            <li><span class="check-green">✓</span>灯泡等消耗品正常损耗</li>
+            <li><span class="check-green">✓</span>家电自然老化（非人为损坏）</li>
+            <li><span class="check-green">✓</span>正常清洁状态（达到入住时水平）</li>
+          </ul>
+        </div>
+      </div>
+      <div class="cov-card">
+        <div class="cov-header not-covered">! 通常需要重点核对</div>
+        <div class="cov-body">
+          <ul class="cov-list">
+            <li><span class="check-red">!</span>墙面破损或明显污损的成因及修复费用</li>
+            <li><span class="check-red">!</span>家具、家电损坏的责任与实际维修费用</li>
+            <li><span class="check-red">!</span>退租清洁状态与合同约定标准</li>
+            <li><span class="check-red">!</span>未经同意的房屋结构或装修改动</li>
+            <li><span class="check-red">!</span>钥匙、门禁卡等交还数量</li>
+            <li><span class="check-red">!</span>提前退租条款（如合同有明确约定）</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- 对客户的说明文案 -->
+    <div class="client-copy">
+      <div class="client-title">📱 顾问可直接发给客户的说明文案</div>
+      <div class="client-text">
+关于押金，我想帮您提前说清楚。
+
+我们侨联的做法是：<strong>入住当天协助留档</strong>，把房屋现有状态、家电情况和水电表读数记录下来，现场照片和视频关联档案编号，退租时作为核对依据。
+
+入住前已有的问题会在留档中标明，退租时结合合同和房屋实际状态一起核对。
+
+签约前，我们会协助确认押金、扣费和提前退租规则，并建议写入合同。退租时如有分歧，侨联可以依据现有材料协助双方沟通。
+
+最终押金退还以合同约定、房屋实际状态和双方核对结果为准；侨联不替任何一方决定金额，也不作保赔承诺。
+
+有任何关于押金的问题，随时找我。
+      </div>
+    </div>
+
+    <div class="notice-box">
+      本页是一般流程说明，不构成押金退还或赔付承诺。最终押金退还以双方签订的合同、退租时房屋实际状态、费用凭据和双方核对结果为准；如有争议，应由双方协商或按合同约定处理。
+    </div>
+
+  </div>
+
+  <div class="doc-footer">
+    <div class="footer-brand">侨联地产 QIAOLIAN REALTY · 押金说明</div>
+    <div class="footer-ver">租客版 · 可转发</div>
+  </div>
+
+</div><!-- /doc-page 2 -->
+
+</body>
+</html>

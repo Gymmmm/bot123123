@@ -102,7 +102,7 @@ async def handle_find_budget(update: Update, context: ContextTypes.DEFAULT_TYPE)
         summary = '｜'.join(value for value in (area, '' if goal in {'any', '住宅'} else goal, _budget_text(budget_min, budget_max)) if value)
         await render_panel(
             update,
-            text=f'🔎 <b>暂时没有完全符合条件的房源</b>\n\n{he(summary)}\n\n你可以调整一个条件继续找，\n也可以让中文顾问按这个需求继续留意。',
+            text=f'🔎 <b>暂时没有完全符合条件的房源</b>\n\n{he(summary)}\n\n您可以调整一个条件继续找，\n也可以让中文顾问按这个需求继续留意。',
             parse_mode=ParseMode.HTML,
             reply_markup=no_match_followup_keyboard(),
             context=context,

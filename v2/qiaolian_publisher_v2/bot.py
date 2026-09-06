@@ -633,12 +633,10 @@ class PublisherBot:
         if not await self._ensure_admin(update):
             return
         await update.effective_message.reply_text(
-            "❓ <b>怎么使用</b>\n\n"
-            "1. 采集到合格房源后，机器人会主动提醒\n"
-            "2. 点“房源队列”查看封面和文案\n"
-            "3. 需要时点“修改文案”或重新选主图\n"
-            "4. 确认后直接发布\n\n"
-            "临时录入：点“录入房源”，发送文字和至少 4 张图片。",
+            "🏠 <b>侨联地产｜发布后台</b>\n\n"
+            "录入房源后，请先核对解析结果、图片数量和缺失字段。\n"
+            "确认内容无误后，再预览或发布到正式频道。\n\n"
+            "请选择要处理的事项：",
             parse_mode=ParseMode.HTML,
             reply_markup=admin_menu(),
         )

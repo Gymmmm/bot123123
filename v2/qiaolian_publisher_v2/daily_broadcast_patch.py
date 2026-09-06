@@ -21,9 +21,9 @@ _FX_KEY = "daily_broadcast_fx_offset"
 _BUTTON_KEY = "daily_broadcast_button"
 _BUTTON_LABELS = {
     "none": "不带按钮",
-    "find": "帮我找房",
+    "find": "租房找房",
     "latest": "最新房源",
-    "contact": "联系我们",
+    "contact": "租房置业咨询",
     "combo": "组合按钮",
 }
 
@@ -43,7 +43,7 @@ def install_daily_broadcast_patch() -> None:
             "📅 每周找房提醒",
             "<b>📅 侨联地产｜本周找房提醒</b>\n\n"
             "这周准备找房或换房，可以直接把 <b>区域 + 月预算 + 户型 + 入住时间</b> 发给我们。\n\n"
-            "我们按当前在租房源帮你筛，不需要先翻一大堆无关房源。\n\n"
+            "我们按当前在租房源为您筛选，不需要先翻一大堆无关房源。\n\n"
             "<b>💎 侨联地产｜您在金边的自己人</b>",
         ),
         "weekend": (
@@ -122,9 +122,9 @@ def install_daily_broadcast_patch() -> None:
             return None
         base = f"https://t.me/{username}?start="
         buttons = {
-            "find": InlineKeyboardButton("🔍 帮我找房", url=base + "find_home"),
+            "find": InlineKeyboardButton("🔍 租房找房", url=base + "find_home"),
             "latest": InlineKeyboardButton("🏠 查看最新房源", url=base + "latest"),
-            "contact": InlineKeyboardButton("💬 联系我们", url=base + "advisor"),
+            "contact": InlineKeyboardButton("💬 租房置业咨询", url=base + "advisor"),
         }
         if key == "combo":
             return InlineKeyboardMarkup([[buttons["find"], buttons["latest"]], [buttons["contact"]]])
@@ -198,8 +198,8 @@ def install_daily_broadcast_patch() -> None:
     def _button_keyboard() -> InlineKeyboardMarkup:
         return InlineKeyboardMarkup([
             [InlineKeyboardButton("不带按钮", callback_data="daily:btn:none")],
-            [InlineKeyboardButton("🔍 帮我找房", callback_data="daily:btn:find"), InlineKeyboardButton("🏠 查看最新房源", callback_data="daily:btn:latest")],
-            [InlineKeyboardButton("💬 联系我们", callback_data="daily:btn:contact"), InlineKeyboardButton("组合按钮", callback_data="daily:btn:combo")],
+            [InlineKeyboardButton("🔍 租房找房", callback_data="daily:btn:find"), InlineKeyboardButton("🏠 最新房源", callback_data="daily:btn:latest")],
+            [InlineKeyboardButton("💬 租房置业咨询", callback_data="daily:btn:contact"), InlineKeyboardButton("组合按钮", callback_data="daily:btn:combo")],
             [InlineKeyboardButton("⬅️ 返回广播页面", callback_data="daily:open")],
         ])
 
@@ -270,7 +270,7 @@ def install_daily_broadcast_patch() -> None:
             await _show_center(q)
             return
         if data == "daily:open":
-            await _show_daily(q)
+            await _show_daily(q, notice=f"汇率偏移 {_fx_label()}")
             return
         if data == "daily:fx":
             await q.edit_message_text(

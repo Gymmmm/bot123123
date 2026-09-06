@@ -132,7 +132,7 @@ def deposit_text() -> str:
 
 def home_text() -> str:
     return (
-        "你好，我是侨联小管家。\n\n"
+        "您好，我是侨联小管家。\n\n"
         "金边租房，先选你现在要做的事。"
     )
 
@@ -140,7 +140,7 @@ def home_text() -> str:
 def channel_welcome_text(first_name: str = "") -> str:
     if not first_name:
         return home_text()
-    return f"👋 你好 <b>{e(first_name)}</b>。\n\n{home_text()}"
+    return f"👋 您好 <b>{e(first_name)}</b>。\n\n{home_text()}"
 
 
 def about_text() -> str:
@@ -159,7 +159,7 @@ def about_text() -> str:
 def brand_text() -> str:
     return (
         f"🏠 <b>{public_brand_name()}｜金边租房中介</b>\n\n"
-        "中文顾问帮你筛房、带看、确认费用、沟通条件并跟进签约入住。\n\n"
+        "中文顾问为您筛房、带看、确认费用、沟通条件并跟进签约入住。\n\n"
         "✅ 房源先筛 — 按需求收窄到 1-3 套\n"
         "✅ 费用透明 — 押付、水电提前说清\n"
         "✅ 实地/视频看房\n"
@@ -173,7 +173,7 @@ def want_home_text() -> str:
     return (
         "📍 <b>提交找房需求</b>\n\n"
         "选出你最在意的条件即可。\n"
-        "顾问会据此帮你缩小到 1–3 套更值得看的房源。"
+        "顾问会据此为您缩小到 1–3 套更合适的房源。"
     )
 
 
@@ -257,7 +257,7 @@ def repeat_tenant_ack_text() -> str:
     ch_line = f"\n\n📢 实拍频道：<a href=\"{e(ch)}\">点这里关注上新</a>" if ch else ""
     return (
         "✅ <b>已登记为侨联老客回流</b>\n\n"
-        "收到，顾问会继续帮你处理换房、续租或升级户型。"
+        "收到，顾问会继续为您处理换房、续租或升级户型。"
         + ch_line
     )
 
@@ -278,7 +278,7 @@ def listing_match_intro_text() -> str:
 
 def listing_match_footer_text() -> str:
     return (
-        "\n\n<b>下一步</b>：点「📅 预约看房」安排到场，或点「💬 联系中文顾问」帮你对比选择。"
+        "\n\n<b>下一步</b>：点「📅 预约看房」安排到场，或点「💬 联系中文顾问」协助对比。"
     )
 
 
@@ -286,13 +286,13 @@ def find_no_match_text() -> str:
     return (
         "暂时没找到完全符合条件的房源。\n"
         "可以换一个预算或位置，\n"
-        "也可以让顾问继续帮你找。"
+        "也可以让顾问继续为您找。"
     )
 
 
 def want_home_ack_text() -> str:
     return (
-        "✅ <b>已收到你的找房条件</b>\n\n"
-        "顾问会按这些条件帮你筛出 1–3 套，并提前标注关键费用，方便你对比。\n\n"
+        "✅ <b>已收到您的找房条件</b>\n\n"
+        "顾问会按这些条件为您筛出 1–3 套，并提前标注关键费用，方便对比。\n\n"
         "想更快收到推荐，也可以补充预算上限、民水民电、电梯/泳池需求，或直接发截图。"
     )

@@ -94,7 +94,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, qu
         pushed = False
         if target_user_id > 0:
             try:
-                await context.bot.send_message(chat_id=target_user_id, text=f'🏠 <b>你的租客档案已准备好</b>\n\n房源｜{he(str(draft["property_name"]))}\n到期｜{he(str(draft["end_date"]))}\n\n点下方完成绑定，即可查看租约、接收到期提醒和提交报修。', parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔗 绑定租客档案", url=deep_link)]]))
+                await context.bot.send_message(chat_id=target_user_id, text=f'🏠 <b>您的租客档案已准备好</b>\n\n房源｜{he(str(draft["property_name"]))}\n到期｜{he(str(draft["end_date"]))}\n\n点下方完成绑定，即可查看租约、接收到期提醒和提交报修。', parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔗 绑定租客档案", url=deep_link)]]))
                 pushed = True
             except Exception:
                 logger.exception("租约已录入，但绑定链接推送失败: binding_id=%s", binding_id)

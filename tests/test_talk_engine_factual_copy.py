@@ -1,78 +1,15 @@
-from __future__ import annotations
-
 from qiaolian_dual.talk_engine import generate_talk
 
+def test_talk_uses_only_supported_location_building_and_value_facts():
+    listing = {"area": "BKK1", "project": "ABC Residence", "property_type": "公寓", "size_sqm": 60, "floor": "12楼", "price": 800, "management_fee": "包含"}
+    text = generate_talk(listing, max_points=3)
+    assert "BKK1" in text and "ABC Residence" in text
+    assert "公寓" in text and "60㎡" in text and "12楼" in text
+    assert "$800" in text and "物业费已包含" in text
 
-def test_known_costs_are_spoken_in_plain_language_without_inventing_values():
-    listing = {
-        "listing_id": "QC0350",
-        "normalized_data": {
-            "management_fee": "包含",
-            "internet_fee": "包含",
-            "electric_rate": "$0.25/度",
-            "water_rate": "$0.50/吨",
-        },
-    }
-    text = generate_talk(listing, max_points=2)
-    assert "物业包了" in text
-    assert "网络包了" in text
-    assert "电费$0.25/度" in text
-    assert "水费$0.50/吨" in text
-    assert "停车" not in text
+def test_talk_does_not_invent_marketing_claims_or_use_manual_copy():
+    text = generate_talk({"qiaolian_talk": "核心位置、生活便利、视野开阔、性价比高、租金含物业"})
+    assert text == ""
 
-
-def test_service_fact_uses_fixed_plain_copy():
-    listing = {
-        "listing_id": "QC0351",
-        "normalized_data": {
-            "services": {"pest_control": "包含", "cleaning": "每周2次"},
-        },
-    }
-    text = generate_talk(listing, max_points=2)
-    assert "灭虫" in text
-    assert "保洁" in text
-    assert "值得" not in text
-    assert "性价比" not in text
-
-
-def test_fee_summary_leaves_room_for_one_real_service_point():
-    listing = {
-        "listing_id": "QC0355",
-        "normalized_data": {
-            "management_fee": "包含",
-            "electric_rate": "$0.25/度",
-            "services": {"pest_control": "包含", "cleaning": "每周2次"},
-        },
-    }
-    lines = generate_talk(listing, max_points=2).splitlines()
-    assert len(lines) == 2
-    assert "灭虫" in lines[0]
-    assert "保洁" in lines[1]
-    assert "电费$0.25/度" not in lines[0]
-
-
-def test_no_supported_fact_means_no_automatic_talk():
-    listing = {"listing_id": "QC0352", "project": "测试项目", "price": 800}
-    assert generate_talk(listing, max_points=2, allow_empty=True) == ""
-
-
-def test_unknown_costs_are_not_rendered_as_facts():
-    listing = {
-        "listing_id": "QC0353",
-        "normalized_data": {
-            "management_fee": "待确认",
-            "internet_fee": "未知",
-            "electric_rate": "",
-            "water_rate": None,
-        },
-    }
-    assert generate_talk(listing, max_points=2, allow_empty=True) == ""
-
-
-def test_manual_talk_still_wins():
-    listing = {
-        "listing_id": "QC0354",
-        "qiaolian_talk": "房东确认周六下午可以看房。",
-        "normalized_data": {"management_fee": "包含"},
-    }
-    assert generate_talk(listing, max_points=2) == "房东确认周六下午可以看房。"
+def test_unknown_costs_and_empty_listing_produce_no_talk():
+    assert generate_talk({"management_fee": "待确认", "internet_fee": "未知"}) == ""

@@ -58,7 +58,7 @@ async def handle_service_callback(update: Update, context: ContextTypes.DEFAULT_
         return MAIN
 
     if data == 'service:nearby':
-        await render_panel(update, text='🗺 <b>周边推荐</b>\n\n先选择要查看的区域。', parse_mode=ParseMode.HTML, reply_markup=nearby_area_keyboard(), context=context)
+        await render_panel(update, text='🗺 <b>周边服务</b>\n\n可查看富力城已核实的周边商家；其他区域可提交需求，我们会在1个工作日内反馈。', parse_mode=ParseMode.HTML, reply_markup=nearby_area_keyboard(), context=context)
         return MAIN
 
     if data == 'local:other':
@@ -67,7 +67,7 @@ async def handle_service_callback(update: Update, context: ContextTypes.DEFAULT_
         context.user_data['awaiting_nearby_request'] = True
         await render_panel(
             update,
-            text='📍 <b>其他区域周边需求</b>\n\n请直接发送区域或地标，以及想找的餐饮、超市、交通或生活服务。',
+            text='📍 <b>其他区域需求提交</b>\n\n请发送区域或地标，以及需要的餐饮、超市、交通或生活服务。提交后，我们会在1个工作日内回复。',
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('⬅️ 返回周边推荐', callback_data='service:nearby')]]),
             context=context,

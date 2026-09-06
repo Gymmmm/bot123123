@@ -57,9 +57,11 @@ async def handle_main_message(update: Update, context: ContextTypes.DEFAULT_TYPE
             context.user_data['awaiting_service_general' if general_kind == '通用服务咨询' else 'awaiting_nearby_request'] = True
             await update.effective_message.reply_text('请简单说一下需要什么帮助。')
             return MAIN
-        create_lead(user, action='service_general', source='service_hub', payload={'kind': general_kind, 'details': text[:800]})
+        is_nearby = general_kind == '周边需求'
+        create_lead(user, action='nearby_request' if is_nearby else 'service_general', source='nearby_service' if is_nearby else 'service_hub', payload={'kind': general_kind, 'details': text[:800]})
         await _notify_admins(context, title=general_kind, lines=[f'用户：{_user_mention_html(user)}', f'联系方式：{he(_user_contact_text(user))}', f'需求：<code>{he(text[:700])}</code>'])
-        await render_panel(update, text='✅ 已收到你的需求\n\n顾问会根据这条内容联系你。', parse_mode=ParseMode.HTML, reply_markup=service_hub_keyboard(user.id), context=context)
+        reply = '✅ 已收到您的周边需求\n\n我们会在1个工作日内回复。' if is_nearby else '✅ 已收到您的需求\n\n顾问会根据这条内容联系您。'
+        await render_panel(update, text=reply, parse_mode=ParseMode.HTML, reply_markup=service_hub_keyboard(user.id), context=context)
         return MAIN
     kctx = context.user_data.pop('awaiting_keyword_find', None)
     if kctx is not None:
@@ -78,7 +80,7 @@ async def handle_main_message(update: Update, context: ContextTypes.DEFAULT_TYPE
             notify_title = '找房需求（顾问协助）' if source == 'advisor_handoff' else '找房需求（普通线索）'
             await _notify_admins(context, title=notify_title, lines=[f'用户：{_user_mention_html(user)}', f'联系方式：{he(_user_contact_text(user))}', f'模式：{he(match_mode)}', f'需求：<code>{he(text[:700])}</code>', '说明：10 分钟内重复搜索仅记录，不重复提醒'])
         if source == 'advisor_handoff':
-            await update.effective_message.reply_text('✅ 已收到你的需求。我先为你匹配当前可预约房源；顾问也会继续按这些条件帮你筛选。', reply_markup=main_keyboard())
+            await update.effective_message.reply_text('✅ 已收到您的需求。先为您匹配当前可预约房源；顾问也会继续按这些条件筛选。', reply_markup=main_keyboard())
         await send_find_results_as_cards(update, context, matches, match_mode)
         return MAIN
     normalized_text = text.lower()
@@ -86,7 +88,7 @@ async def handle_main_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     # not silently discard the saved area/budget session.
     pref = context.user_data.get('search_pref') or {}
     if pref.get('goal') or pref.get('area'):
-        await render_panel(update, text='已保留你的筛选进度。请点上方的区域或预算按钮继续；想换一种找法，可点「🏠 返回首页」重新开始。', reply_markup=main_keyboard(), context=context, prefer_edit_anchor=True)
+        await render_panel(update, text='已保留您的筛选进度。请点上方的区域或预算按钮继续；想换一种找法，可点「🏠 返回首页」重新开始。', reply_markup=main_keyboard(), context=context, prefer_edit_anchor=True)
         return MAIN
     natural_area = detect_area(text)
     area_use = natural_area if natural_area != text[:40] else ''
@@ -105,14 +107,14 @@ async def handle_main_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         if matches:
             await send_find_results_as_cards(update, context, matches, match_mode)
         else:
-            await render_panel(update, text=_keyword_intro_text(area=area_use, room_type=room_type, budget_min=budget_min, budget_max=budget_max) + '\n\n暂时没有完全符合条件、可以预约看房的房源。你可以换一个预算或位置，也可以让中文顾问继续帮你找。', parse_mode=ParseMode.HTML, reply_markup=keyword_followup_keyboard(area=area_use, room_type=room_type), context=context, prefer_edit_anchor=True)
+            await render_panel(update, text=_keyword_intro_text(area=area_use, room_type=room_type, budget_min=budget_min, budget_max=budget_max) + '\n\n暂时没有完全符合条件、可以预约看房的房源。您可以换一个预算或位置，也可以让中文顾问继续寻找。', parse_mode=ParseMode.HTML, reply_markup=keyword_followup_keyboard(area=area_use, room_type=room_type), context=context, prefer_edit_anchor=True)
         return MAIN
     if text in {'🏠 返回首页', '🏠 返回首页'}:
         clear_session_for_fresh_entry(context)
         await render_panel(update, text=welcome_text(), reply_markup=main_keyboard(), parse_mode=ParseMode.HTML, context=context, prefer_edit_anchor=True)
         return MAIN
     if any((token in normalized_text for token in ('找房', '租房', '房子', '公寓', '别墅'))):
-        await render_panel(update, text='🔍 <b>我来帮你找</b>\n\n直接发一句需求就可以，例如：\n<code>BKK1 800以内 一房</code>\n<code>钻石岛 两房 下月入住</code>\n\n不想打字，也可以点按钮选择。', parse_mode=ParseMode.HTML, reply_markup=search_entry_keyboard(), context=context, prefer_edit_anchor=True)
+        await render_panel(update, text='🔍 <b>我来为您找</b>\n\n直接发一句需求就可以，例如：\n<code>BKK1 800以内 一房</code>\n<code>钻石岛 两房 下月入住</code>\n\n不想打字，也可以点按钮选择。', parse_mode=ParseMode.HTML, reply_markup=search_entry_keyboard(), context=context, prefer_edit_anchor=True)
         return MAIN
     contact_listing_id = str(context.user_data.get('contact_listing_id') or '').strip()
     if contact_listing_id:
@@ -122,7 +124,7 @@ async def handle_main_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         await _notify_admins(context, title='房源咨询留言', lines=[f'用户：{_user_mention_html(user)}', f'联系方式：{he(_user_contact_text(user))}', f'房源：{he(_display_listing_id(contact_listing_id))}', f'留言：<code>{he(text[:700])}</code>'])
         await render_panel(update, text='已收到你对这套房的留言，顾问会按这条内容继续跟进。\n\n如果方便，也可以直接点下方按钮预约看房或直连顾问。', reply_markup=contact_handoff_keyboard(listing_id=contact_listing_id), parse_mode=ParseMode.HTML, context=context, prefer_edit_anchor=True)
         return MAIN
-    await render_panel(update, text='我可以帮你找房。直接发「BKK1、500以内、一房、视频看房」这类关键词，或从下方选择一个入口开始。', reply_markup=main_keyboard(), context=context, prefer_edit_anchor=True)
+    await render_panel(update, text='我可以为您找房。直接发「BKK1、500以内、一房、视频看房」这类关键词，或从下方选择一个入口开始。', reply_markup=main_keyboard(), context=context, prefer_edit_anchor=True)
     return MAIN
 
 async def handle_find_area(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:

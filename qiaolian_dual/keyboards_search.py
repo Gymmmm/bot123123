@@ -132,7 +132,7 @@ def local_life_keyboard() -> InlineKeyboardMarkup:
 def nearby_area_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton('🏙 富力城导航', callback_data='local:rfcity')],
-        [InlineKeyboardButton('📍 其他区域', callback_data='local:other')],
+        [InlineKeyboardButton('📍 其他区域需求提交', callback_data='local:other')],
         [InlineKeyboardButton('⬅️ 返回生活服务', callback_data='service:local_life')],
     ])
 
