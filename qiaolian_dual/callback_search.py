@@ -54,7 +54,7 @@ async def handle_search_callback(update: Update, context: ContextTypes.DEFAULT_T
         else:
             context.user_data['last_search_pref'] = {'property_type': property_type or None, 'area': None, 'budget_min': None, 'budget_max': None}
             label = '不限户型' if room_type == 'any' else room_type
-            await render_panel(update, text=f'🔎 <b>暂时没有完全符合条件的房源</b>\n\n{he(label)}\n\n你可以调整一个条件继续找，\n也可以让中文顾问按这个需求继续留意。', parse_mode=ParseMode.HTML, reply_markup=no_match_followup_keyboard(), context=context)
+            await render_panel(update, text=f'🔎 <b>暂时没有完全符合条件的房源</b>\n\n{he(label)}\n\n您可以调整一个条件继续找，\n也可以让中文顾问按这个需求继续留意。', parse_mode=ParseMode.HTML, reply_markup=no_match_followup_keyboard(), context=context)
         return MAIN
 
     if data == 'profile:repeat':
@@ -132,7 +132,7 @@ async def handle_search_callback(update: Update, context: ContextTypes.DEFAULT_T
             await send_results(update, context, matches_found, 'strict')
         else:
             summary = '｜'.join(value for value in (area, '' if goal in {'any', '住宅'} else goal, budget_label) if value)
-            await render_panel(update, text=f'🔎 <b>暂时没有完全符合条件的房源</b>\n\n{he(summary)}\n\n你可以调整一个条件继续找，\n也可以让中文顾问按这个需求继续留意。', parse_mode=ParseMode.HTML, reply_markup=no_match_followup_keyboard(), context=context)
+            await render_panel(update, text=f'🔎 <b>暂时没有完全符合条件的房源</b>\n\n{he(summary)}\n\n您可以调整一个条件继续找，\n也可以让中文顾问按这个需求继续留意。', parse_mode=ParseMode.HTML, reply_markup=no_match_followup_keyboard(), context=context)
         return MAIN
 
     if data == 'find:similar':

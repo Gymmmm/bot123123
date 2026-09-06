@@ -166,7 +166,7 @@ def smart_search_text() -> str:
 
 def consult_submit_ok_text() -> str:
     return (
-        "✅ 已收到你的咨询\n"
+        "✅ 已收到您的咨询\n"
         "顾问会尽快通过 Telegram 回复你。\n"
         "也可点下方直接预约看房。"
     )
@@ -196,8 +196,8 @@ def advisor_notify_ok_text() -> str:
 
 def handoff_find_ok_text() -> str:
     return (
-        "✅ 已收到你的找房需求\n"
-        "发区域、预算或户型中的任意一项即可，顾问会继续帮你缩小范围。"
+        "✅ 已收到您的找房需求\n"
+        "发区域、预算或户型中的任意一项即可，顾问会继续为您缩小范围。"
     )
 
 
@@ -220,7 +220,7 @@ def repair_progress_text(issue_label: str, stage: str, note: str = "") -> str:
 def advisor_response_notice_text() -> str:
     return (
         "💬 <b>顾问已接手</b>\n\n"
-        "你的预约和房源信息已经一起发给顾问。\n"
+        "您的预约和房源信息已经一起发给顾问。\n"
         "顾问会通过 Telegram 联系你确认。\n\n"
         "时间或需求有变化，\n"
         "直接回复这条消息就可以。"

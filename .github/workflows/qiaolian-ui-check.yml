@@ -77,4 +77,5 @@ jobs:
             tests/test_channel_three_entry_contract.py \
             tests/test_attribution_admin.py \
             tests/test_lead_workflow.py \
-            tests/test_publisher_user_polish.py
+            tests/test_publisher_user_polish.py \
+            tests/test_qiaolian_v2_2_contract.py

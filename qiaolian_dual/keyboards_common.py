@@ -73,7 +73,7 @@ def _advisor_listing_url(listing_id: str) -> str:
     info = listing_context(listing_id)
     project = str(info.get('project') or info.get('community') or info.get('area') or '').strip()
     layout = _display_layout(info.get('layout'), info.get('property_type'))
-    lines = [f'你好，我想咨询房源 {_display_listing_id(listing_id)}']
+    lines = [f'您好，我想咨询房源 {_display_listing_id(listing_id)}']
     subject = '｜'.join(value for value in (project, layout) if value)
     if subject:
         lines.extend(['', subject])

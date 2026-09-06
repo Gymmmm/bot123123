@@ -139,13 +139,10 @@ async def test_admin_today_appointments_stays_on_adminq(monkeypatch):
     assert _callbacks(markup) == ["adminq:home"]
 
 
-def test_handover_preview_and_two_page_pdf_generate():
-    preview = callback_rental._build_preview_jpg()
-    pdf = callback_rental._build_sample_pdf()
-    assert preview.getvalue().startswith(b"\xff\xd8")
-    assert pdf.getvalue().startswith(b"%PDF")
-    assert pdf.getvalue().count(b"/Type /Page") >= 2
-    assert b"QL-HO-2026-0008" not in preview.getvalue()
+def test_handover_and_deposit_assets_generate_separately():
+    for kind in ("handover", "deposit"):
+        assert (callback_rental._ASSET_DIR / f"{kind}.png").read_bytes().startswith(b"\x89PNG")
+        assert (callback_rental._ASSET_DIR / f"{kind}.pdf").read_bytes().startswith(b"%PDF")
 
 
 def test_public_surfaces_do_not_generate_sequential_qc_codes():

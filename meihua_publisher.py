@@ -2324,11 +2324,7 @@ def build_chinese_listing_post(
         verified_date = re.search(r"\d{4}-(\d{1,2})-(\d{1,2})", approved_at)
         if verified_date:
             verified_line = f"🟢 {int(verified_date.group(1))}月{int(verified_date.group(2))}日已核实"
-    comment_line = (
-        "📸 更多实拍与费用说明在评论区👇"
-        if has_extra_photos
-        else "📋 费用、押付与配套见评论区👇"
-    )
+    comment_line = ""
     tag_values = ["金边租房"]
     for raw in (area_display, heading_type, title_room):
         tag = re.sub(r"[^0-9A-Za-z\u4e00-\u9fff]+", "", str(raw or "").replace("+", "加"))
@@ -2367,7 +2363,7 @@ def build_chinese_listing_post(
             f"🔑 {he(deposit)}" if deposit else "",
             f"📄 {he(contract)}" if contract else "",
             "",
-            "📸 更多实拍与预约入口在评论区👇",
+            "",
             f"#{public_tag} #金边租房",
         ]
     elif variant == "c":
@@ -2383,7 +2379,7 @@ def build_chinese_listing_post(
             f"🔑 押付｜{he(deposit)}" if deposit else "",
             f"📄 租期｜{he(contract)}" if contract else "",
             "",
-            "📸 更多实拍与预约入口在评论区👇",
+            "",
             f"#{public_tag} #金边租房",
         ]
     elif variant == "d":
@@ -2393,7 +2389,7 @@ def build_chinese_listing_post(
             " · ".join(he(part) for part in fact_parts),
             f"✨ {' · '.join(he(item) for item in caption_highlights[:2])}" if caption_highlights else "",
             "",
-            "📸 更多实拍与预约入口在评论区👇",
+            "",
             f"#{public_tag} #金边租房",
         ]
     else:
@@ -2411,7 +2407,7 @@ def build_chinese_listing_post(
             action_links,
             "──────────────",
             "",
-            "📸 更多实拍与预约入口在评论区👇",
+            "",
         ]
     # 统一手机端正文：封面可以保留不同视觉风格，但正文只保留一套字段顺序，避免A/B/C/D变体造成用户理解成本。
     # 移动端首屏：只保留用户决定是否咨询所需的核心字段，避免项目名/区域重复。

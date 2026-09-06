@@ -33,6 +33,7 @@ import os
 import re
 import sqlite3
 import subprocess
+from qiaolian_dual.status_labels import status_label
 import sys
 from time import monotonic
 from urllib.request import Request, urlopen
@@ -228,13 +229,48 @@ _WEATHER_LABELS = {
     95: "雷雨", 96: "雷雨夹冰雹", 99: "雷雨夹冰雹",
 }
 
+_WEATHER_TEMPLATE_PATH = Path(__file__).resolve().parent / "assets" / "v2_2" / "weather_reminder_templates.json"
+_WEATHER_FALLBACK_ORDER = (
+    "storm", "rain_heavy", "rain_light", "rain_possible", "hot",
+    "sunny", "humid", "good", "stable",
+)
+
+
+def _load_weather_reminder_templates() -> tuple[tuple[str, ...], dict[str, str]]:
+    payload = json.loads(_WEATHER_TEMPLATE_PATH.read_text(encoding="utf-8"))
+    order = tuple(payload.get("fallback_order") or ())
+    if order != _WEATHER_FALLBACK_ORDER:
+        raise ValueError("weather fallback_order does not match the V2.2 contract")
+    templates = payload.get("templates") or {}
+    return order, {key: str((templates.get(key) or {}).get("text") or "").strip() for key in order}
+
+
+def _select_weather_reminder(weather_code: int, high: float, low: float, rain: int) -> tuple[str, str]:
+    """Match WMO weather_code in the JSON-defined order; stable is last."""
+    order, templates = _load_weather_reminder_templates()
+    predicates = {
+        "storm": weather_code in {95, 96, 99},
+        "rain_heavy": weather_code in {65, 67, 82, 86} or rain >= 70,
+        "rain_light": weather_code in {61, 63, 80, 81} or rain >= 40,
+        "rain_possible": weather_code in {51, 53, 55, 56, 57} or rain >= 20,
+        "hot": high >= 35,
+        "sunny": weather_code in {0, 1} and high >= 32,
+        "humid": weather_code in {2, 3} and high >= 28,
+        "good": weather_code in {0, 1, 2} and 25 <= high < 32,
+        "stable": True,
+    }
+    for key in order:
+        if predicates[key]:
+            return key, templates[key]
+    raise AssertionError("stable weather fallback missing")
+
 
 def _fetch_phnom_penh_daily_info() -> str:
     """Build the live Phnom Penh daily card with a simple human weather note."""
     now = datetime.now(TZ)
     weekday = "一二三四五六日"[now.weekday()]
     weather_line = "🌤 天气：暂时无法获取"
-    weather_note = "🌤 今天天气怎么样都好，看房记得找我接你。"
+    weather_note = "今天天气比较稳定，没有特别需要注意的。"
     fx_line = "💵 美元/人民币：暂时无法获取"
     weather_url = (
         "https://api.open-meteo.com/v1/forecast?latitude=11.5564&longitude=104.9282"
@@ -252,26 +288,7 @@ def _fetch_phnom_penh_daily_info() -> str:
         rain = int(round(float((daily.get("precipitation_probability_max") or [0])[0])))
         weather_line = f"🌤 天气：{_WEATHER_LABELS.get(code, '天气多变')} {low:.0f}–{high:.0f}℃｜降雨 {rain}%"
 
-        if code in {95, 96, 99}:
-            weather_note = "⛈ 今天有雷雨，看房记得找我接你。"
-        elif code in {65, 82} or rain >= 70:
-            weather_note = "☔ 今天雨有点大，看房记得找我接你。"
-        elif code in {61, 63, 80, 81} or rain >= 40:
-            weather_note = "🌧 今天有雨，出门看房记得找我接你。"
-        elif code in {51, 53, 55} or rain >= 20:
-            weather_note = "🌦 今天可能会下雨，看房记得找我接你。"
-        elif high >= 35:
-            weather_note = "🔥 今天有点热，看房记得找我接你。"
-        elif code == 0:
-            weather_note = "☀️ 今天太阳大，看房记得找我接你。"
-        elif code == 1:
-            weather_note = "🌤 今天有点晒，看房记得找我接你。"
-        elif code == 2 and high <= 31:
-            weather_note = "⛅ 今天天气很好，我有点想你。"
-        elif code in {2, 3} and high <= 30:
-            weather_note = "🌥 今天凉爽，看房记得找我接你。"
-        else:
-            weather_note = "🌤 今天天气还行，看房记得找我接你。"
+        _weather_kind, weather_note = _select_weather_reminder(code, high, low, rain)
     except Exception:
         logger.info("每日广播天气数据暂不可用", exc_info=True)
 
@@ -355,8 +372,9 @@ def _intake_result_card(row: sqlite3.Row | dict, image_count: int, missing_media
     missing = [label for label, value in required.items() if not value]
     if missing_media:
         missing.append(f"{int(missing_media)}张源图片不可用")
-    status = str(data.get("review_status") or "pending")
-    publishable = not missing and status == "approved"
+    raw_status = str(data.get("review_status") or "pending").strip().lower()
+    status = status_label(raw_status)
+    publishable = not missing and raw_status == "approved"
     lines = [
         "✅ <b>房源导入结果</b>", "",
         f"房源编号：<b>{html.escape(public_id or '待生成')}</b>",
@@ -877,7 +895,7 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         rows = c.execute(
             "SELECT review_status, COUNT(*) AS n FROM drafts GROUP BY review_status"
         ).fetchall()
-    lines = [f"{r['review_status']}: {r['n']}" for r in rows]
+    lines = [f"{status_label(r['review_status'])}: {r['n']}" for r in rows]
     paused = _scheduler_paused()
     daily_on = _get_setting(KEY_DAILY_ON, "0").strip() in ("1", "true", "yes")
     await update.message.reply_text(
@@ -2311,7 +2329,7 @@ async def cmd_intake_pending(update: Update, context: ContextTypes.DEFAULT_TYPE)
             for r in rows:
                 out.append(
                     f"• <code>{html.escape(str(r['draft_id'] or '-'))}</code>\n"
-                    f"  [{html.escape(str(r['review_status'] or '-'))}] "
+                    f"  [{html.escape(status_label(r['review_status']))}] "
                     f"score={int(float(r['score'] or 0))} "
                     f"{html.escape(str(r['t'] or '')[:16])}\n"
                     f"  {html.escape(str(r['title'] or '（无标题）')[:40])}"
@@ -2995,7 +3013,7 @@ async def on_preview_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
                 text=(
-                    "✅ <b>房源已发布到测试频道</b>"
+                    "✅ <b>房源已发布到正式频道</b>"
                 ),
                 parse_mode=ParseMode.HTML,
             )

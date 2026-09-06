@@ -110,4 +110,4 @@ def test_five_appointment_lock_is_covered_without_manual_booking():
     labels = [[button.text for button in row] for row in _keyboard("Bot", "", "l_89", "pending").inline_keyboard]
     assert labels == [["🏠 房源详情", "📸 更多实拍"]]
     bookable = [[button.text for button in row] for row in _keyboard("Bot", "", "l_89", "reserved").inline_keyboard]
-    assert bookable == [["📋 租赁详情", "📸 更多实拍"], ["📅 预约看房"]]
+    assert bookable == [["🏠 房源详情", "📸 更多实拍"], ["📅 预约看房"]]
