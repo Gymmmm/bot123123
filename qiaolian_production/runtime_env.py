@@ -14,55 +14,73 @@ def _absolute_from_app_root(value: str | os.PathLike[str], app_root: Path) -> Pa
 
 
 def configure_environment() -> Path:
-    """Preserve production paths while code lives under qiaolian_production/.
-
-    The extraction branch intentionally keeps runtime state outside the copied
-    source tree. Existing .env, SQLite data, Telethon sessions and media remain
-    rooted at the original application directory unless explicitly overridden.
-    """
+    """Preserve production state paths while source lives under qiaolian_production/."""
     explicit_root = str(os.getenv("QIAOLIAN_RUNTIME_ROOT", "")).strip()
-    app_root = _absolute_from_app_root(explicit_root, PACKAGE_ROOT.parent) if explicit_root else PACKAGE_ROOT.parent.resolve()
-    os.environ.setdefault("QIAOLIAN_RUNTIME_ROOT", str(app_root))
+    app_root = (
+        _absolute_from_app_root(explicit_root, PACKAGE_ROOT.parent)
+        if explicit_root
+        else PACKAGE_ROOT.parent.resolve()
+    )
+    os.environ["QIAOLIAN_RUNTIME_ROOT"] = str(app_root)
 
-    # Load the same production .env before any copied module imports its own
-    # path-relative fallback. Never override variables already supplied by
-    # systemd or the process environment.
+    # Production keeps one .env at the application root. Process/systemd
+    # variables retain precedence; relative filesystem values are normalized
+    # against that same root before copied modules import them.
     load_dotenv(app_root / ".env", override=False)
 
-    data_dir = _absolute_from_app_root(os.getenv("DATA_DIR", str(app_root / "data")), app_root)
+    data_dir = _absolute_from_app_root(
+        os.getenv("DATA_DIR", str(app_root / "data")), app_root
+    )
     db_path = _absolute_from_app_root(
         os.getenv("DB_PATH", str(data_dir / "qiaolian_dual_bot.db")), app_root
     )
-
-    os.environ.setdefault("DATA_DIR", str(data_dir))
-    os.environ.setdefault("DB_PATH", str(db_path))
-    os.environ.setdefault("SQLITE_PATH", str(db_path))
-    os.environ.setdefault("COLLECTOR_SOURCES_JSON", str(app_root / "sources.json"))
-    os.environ.setdefault("COLLECTOR_DOWNLOAD_DIR", str(app_root / "media" / "collector_downloads"))
-    os.environ.setdefault("QIAOLIAN_RENDER_TMP", str(app_root / "media" / "renders" / "runtime"))
-    os.environ.setdefault(
-        "CORNER_LOGO_PATH",
-        str(app_root / "assets" / "brand" / "qiaolian_corner_mark_120x40.png"),
+    sqlite_path = _absolute_from_app_root(
+        os.getenv("SQLITE_PATH", str(db_path)), app_root
+    )
+    sources_path = _absolute_from_app_root(
+        os.getenv("COLLECTOR_SOURCES_JSON", str(app_root / "sources.json")), app_root
+    )
+    download_dir = _absolute_from_app_root(
+        os.getenv("COLLECTOR_DOWNLOAD_DIR", str(app_root / "media" / "collector_downloads")),
+        app_root,
+    )
+    render_tmp = _absolute_from_app_root(
+        os.getenv("QIAOLIAN_RENDER_TMP", str(app_root / "media" / "renders" / "runtime")),
+        app_root,
+    )
+    corner_logo = _absolute_from_app_root(
+        os.getenv(
+            "CORNER_LOGO_PATH",
+            str(app_root / "assets" / "brand" / "qiaolian_corner_mark_120x40.png"),
+        ),
+        app_root,
+    )
+    gallery_logo = _absolute_from_app_root(
+        os.getenv("QIAOLIAN_GALLERY_LOGO", str(corner_logo)), app_root
     )
 
-    # collector_bot historically resolves COLLECTOR_SESSION_NAME relative to
-    # the repository root. Once copied into collector/, that implicit base
-    # would move. Pin an equivalent absolute path unless the operator already
-    # supplied TELETHON_SESSION_PATH.
-    if not str(os.getenv("TELETHON_SESSION_PATH", "")).strip():
+    os.environ["DATA_DIR"] = str(data_dir)
+    os.environ["DB_PATH"] = str(db_path)
+    os.environ["SQLITE_PATH"] = str(sqlite_path)
+    os.environ["COLLECTOR_SOURCES_JSON"] = str(sources_path)
+    os.environ["COLLECTOR_DOWNLOAD_DIR"] = str(download_dir)
+    os.environ["QIAOLIAN_RENDER_TMP"] = str(render_tmp)
+    os.environ["CORNER_LOGO_PATH"] = str(corner_logo)
+    os.environ["QIAOLIAN_GALLERY_LOGO"] = str(gallery_logo)
+
+    explicit_session = str(os.getenv("TELETHON_SESSION_PATH", "")).strip()
+    if explicit_session:
+        session_path = _absolute_from_app_root(explicit_session, app_root)
+    else:
         session_name = str(os.getenv("COLLECTOR_SESSION_NAME", "")).strip() or "qiaolian_collector"
-        os.environ["TELETHON_SESSION_PATH"] = str(app_root / "telethon_sessions" / session_name)
+        session_path = app_root / "telethon_sessions" / session_name
+    os.environ["TELETHON_SESSION_PATH"] = str(session_path)
 
     return app_root
 
 
-def patch_legacy_path_globals(app_root: Path) -> None:
-    """Repair path globals in copied modules without changing business logic.
-
-    These modules historically used __file__ because they lived at repository
-    root. The copied versions now live one or two directories deeper, so only
-    their filesystem roots are rebound to the original application root.
-    """
+def patch_legacy_path_globals(app_root: Path, *, publisher_runtime: bool = False) -> None:
+    """Rebind only filesystem roots that historically depended on __file__."""
     try:
         import cover_generator
 
@@ -79,3 +97,15 @@ def patch_legacy_path_globals(app_root: Path) -> None:
         publication_package.PACKAGE_ROOT = app_root / "media" / "publication_packages"
     except ModuleNotFoundError:
         pass
+
+    if publisher_runtime:
+        # autopilot_publish_bot is a compatibility helper used by the active
+        # publisher patches. It is not a separate polling service, but its
+        # source/scratch/weather paths must remain rooted at the production app.
+        import autopilot_publish_bot
+
+        autopilot_publish_bot.BASE_DIR = app_root
+        autopilot_publish_bot.DB_PATH = os.environ["DB_PATH"]
+        autopilot_publish_bot._WEATHER_TEMPLATE_PATH = (
+            app_root / "assets" / "v2_2" / "weather_reminder_templates.json"
+        )

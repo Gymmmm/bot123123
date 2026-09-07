@@ -27,7 +27,7 @@ def _activate_paths() -> None:
 def _load_runtime():
     _activate_paths()
     app_root = configure_environment()
-    patch_legacy_path_globals(app_root)
+    patch_legacy_path_globals(app_root, publisher_runtime=True)
 
     from qiaolian_publisher_v2.cover_picker_patch import install_cover_picker
     from qiaolian_publisher_v2.daily_broadcast_patch import install_daily_broadcast_patch
