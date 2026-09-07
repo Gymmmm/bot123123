@@ -7,7 +7,7 @@
 - Phase 1 PASS head / Phase 2 parent: `cee9e567d7681c1a81f900922031c3c7ab5bbede`
 - Phase 2 branch: `v3/phase2-ingest`
 - Phase 2 PR: `#42`
-- Phase 2 must remain Draft/unmerged until independent review returns `PASS`.
+- Phase 2 remains Draft/unmerged pending independent re-review.
 
 ## Scope
 
@@ -31,9 +31,79 @@ Explicitly not modified or wired:
 - production services
 - Telegram write paths
 
+## Independent review corrections
+
+The first independent Phase 2 review returned `CHANGES REQUIRED` with two blockers. Both are addressed in the same Draft PR #42 without widening scope.
+
+### 1. Ordered media identity in source_content_hash
+
+Correct contract:
+
+```text
+source_content_hash = sha256(sanitized_text + normalized ordered media identity)
+```
+
+`SourceIngestService` normalizes media by `sort_order`. `make_source_content_hash()` now preserves that incoming order and preserves duplicate media identities. It does not sort media hashes/identities internally.
+
+Therefore:
+
+```text
+same text + [A, B] != same text + [B, A]
+```
+
+and a same-source album reorder produces:
+
+```text
+SOURCE_UPDATED
+revision + 1
+```
+
+rather than `DUPLICATE_IGNORE`.
+
+### 2. Telegram media read/download adapter and identity fallback
+
+`qiaolian_v3/media/source_media.py` now contains `TelegramSourceMedia.download()` as a Phase-2-only read adapter equivalent to the stable read/download responsibility from locked V2.2 `collector_bot.download_media`.
+
+Boundary:
+
+```text
+Telegram observed media
+→ client.download_media(...)
+→ local file hash when available
+→ Telegram evidence metadata
+→ SourceMedia
+→ ingest
+```
+
+It does not start a Telegram client/session, register listeners, publish, send, edit, or perform any Telegram write.
+
+Stable media identity contract is now:
+
+```text
+file SHA-256
+↓ if unavailable
+Telegram unique identity
+↓ final defensive fallback
+Telegram file id
+```
+
+The required contract is satisfied by the first two layers: file hash is preferred and Telegram unique identity is the official fallback. Telegram file id is retained only as a last-resort evidence fallback rather than replacing the required unique identity behavior.
+
+Evidence metadata retained:
+
+- `local_path`
+- `content_hash`
+- `telegram_file_id`
+- `telegram_file_unique_id`
+- `message_id`
+- `sort_order`
+- `media_type`
+
+Tests use fake Telegram client/message objects only; no real network or Telegram session is used.
+
 ## Files changed
 
-Relative to Phase 1 PASS head, Phase 2 adds/changes only:
+Relative to Phase 1 PASS head, Phase 2 remains confined to:
 
 - `qiaolian_v3/ingest/__init__.py`
 - `qiaolian_v3/ingest/sanitizer.py`
@@ -49,43 +119,34 @@ Relative to Phase 1 PASS head, Phase 2 adds/changes only:
 - `tests/v3/ingest/test_telegram_collector_boundary.py`
 - `PHASE_2_RESULT.md`
 
-## Functions / contracts changed
+## Core contracts
 
 ### Source identity
 
 - `build_single_external_post_id(message_id)`
 - `build_album_external_post_id(grouped_id, anchor_message_id)`
-- `make_source_content_hash(sanitized_text, media_hashes)`
+- `make_source_content_hash(sanitized_text, ordered_media_identities)`
 
-Single-message identity remains the Telegram message id.
-Album identity follows the locked V2.2 rule: `album_{grouped_id}` with `album_{anchor_message_id}` fallback.
-
-Source content hash is computed from sanitized fact text plus normalized media content hashes, not fetch timestamps or removed source contacts.
+Single-message identity remains Telegram message id.
+Album identity follows locked V2.2: `album_{grouped_id}`, with `album_{anchor_message_id}` fallback.
 
 ### Sanitizer
 
-The verified behavior from locked V2.2 `source_sanitizer.py` is extracted into `qiaolian_v3/ingest/sanitizer.py`:
+Extracted from locked V2.2 `source_sanitizer.py`:
 
-- strip Unicode formatting/private-use noise;
-- isolate URL/handle/phone/contact lines;
-- remove source promotion text;
-- preserve factual prefix when contact text is appended to a fact line;
-- keep source contacts outside canonical input text.
+- strips Unicode formatting/private-use noise;
+- isolates URL/handle/phone/contact lines;
+- removes source promotion text;
+- preserves factual prefix when contact text follows facts on the same line;
+- keeps source contacts outside sanitized canonical input text.
 
 ### Source media
 
-`SourceMedia` provides stable SHA-256 media identity from bytes/files and retains ingest evidence metadata such as sort order, Telegram file ids and message id.
+`SourceMedia` provides immutable source evidence metadata and `media_identity`.
+
+`TelegramSourceMedia.download()` provides the read/download adapter using a supplied client only. It is intentionally dependency-light and imports no Publisher or publication code.
 
 Phase 2 does not rank photos, select covers, render media, or decide listing quality.
-
-### Ingest repository
-
-Phase 1 SourceRepository contracts remain authoritative. Phase 2 only adds ingest lookups:
-
-- source post lookup by stable identity;
-- current revision lookup for a SourcePost.
-
-`SourceMediaRepository` only persists immutable revision-to-media-hash links using the Phase 1 `source_post_media` table.
 
 ### SourceIngestService
 
@@ -105,124 +166,80 @@ same source identity + same source content hash
 → no new revision
 → last_seen_at advances
 
-same source identity + changed source content hash
+same source identity + changed facts/media/media order
 → SOURCE_UPDATED
 → next immutable SourcePostRevision
 → current_revision_id moves to new revision
 ```
 
-A contact/promotion-only source edit that sanitizes to the same factual text and has the same media does not create a false factual revision.
-
-### TelegramCollector
-
-Phase 2 provides the collector core boundary only:
-
-```text
-observed Telegram evidence
-→ source identity
-→ sanitize
-→ content/media hash
-→ SourcePost / SourcePostRevision
-→ source media links
-→ END
-```
-
-It is deliberately not connected to production Telethon sessions/services in this phase.
-
-Collector Phase 2 code has:
-
-- zero publication imports;
-- zero publisher imports;
-- zero package build calls;
-- zero Telegram channel writes.
+A contact/promotion-only edit that sanitizes to the same factual text and has the same ordered media identities does not create a false factual revision.
 
 ## DB migrations
 
 **None.**
 
-Phase 2 uses the schema frozen and approved by Phase 1. No migration or schema contract was changed in Phase 2.
+Phase 2 uses the Phase 1 approved schema. No schema contract was changed.
 
-## Tests added
+## Tests
 
-13 Phase 2 ingest tests were added, covering:
+Phase 2 ingest coverage now includes:
 
 - single source identity;
 - album/grouped identity;
-- content hash normalization;
+- ordered source content hash;
+- duplicate media identities preserved in hash input;
 - exact duplicate -> `DUPLICATE_IGNORE`;
 - contact-only edit remains duplicate/no new fact revision;
 - factual edit -> `SOURCE_UPDATED` revision 2;
+- same text + same media identities in different order -> different hash -> `SOURCE_UPDATED` -> revision 2;
 - revision `source_created_at` / `fetched_at` persistence;
 - sanitizer fact-prefix preservation;
 - Unicode noise removal;
-- stable media SHA-256 identity;
+- stable file SHA-256 identity;
+- Telegram fake-client download -> file hash preferred;
+- fake download unavailable -> Telegram unique identity fallback;
+- Telegram evidence metadata preservation;
 - fewer than 4 photos still preserved;
 - album edit becomes revision, not duplicate skip;
 - static collector boundary: no publication/publisher/package-build dependency.
 
-## Tests passed
+## CI
 
-CI verification for implementation head `232ae9d99c1871cf2ec37f3860c7882f159f45a7`:
+Final post-review-fix CI results are pending at this report commit and will be updated before re-review. The previous accepted Phase 2 CI before these two corrections was:
 
-- Workflow: `qiaolian-ui-check`
-- Run: `34148794641`
-- Job: `101826454123`
-- Syntax/import check: PASS
-- `tests/v3`: **51 passed in 0.41s**
-- old production regression suite: **261 passed, 2 existing warnings in 6.37s**
-- failures: **0**
+- `tests/v3`: 51 passed
+- production regression: 261 passed, 2 existing warnings
+- failures: 0
 
-The two warnings are the pre-existing `python-telegram-bot ConversationHandler` warnings from legacy production tests.
-
-The existing workflow does not listen to PRs whose base is `v3/refactor-baseline`. To obtain the required CI without modifying the workflow file outside Phase 2 scope, PR #42 was temporarily retargeted to `v3/phase0-baseline` only for the CI trigger. After final report CI, the PR base is restored to `v3/refactor-baseline`. No code was borrowed from the temporary base change and no workflow code was modified.
-
-## Diff summary
-
-Phase 2 extracts only the stable collector/source-evidence behavior from locked V2.2 `collector_bot.py` and `source_sanitizer.py`.
-
-The critical legacy bug is not carried forward: legacy collection treated an existing source tuple as a duplicate before comparing content. V3 Phase 2 distinguishes source identity from immutable content revision, so editing the same source post produces a new revision when facts/media actually change.
-
-## Behavior changes
-
-New V3-only behavior:
-
-- exact factual duplicate: no second revision;
-- same logical source post with changed facts/media: new revision;
-- contact-only changes do not manufacture fact updates;
-- album identity remains stable across edits;
-- media identity uses content SHA-256;
-- fewer than 4 photos are preserved as source evidence and flagged insufficient rather than discarded;
-- source evidence persistence stops before Parser/publication.
-
-There is **no production runtime switchover** in Phase 2.
+The existing workflow only listens to PRs targeting `v3/phase0-baseline`. As previously independently validated, the PR may be temporarily retargeted only to trigger the synthetic CI merge, then restored to the formal Phase 1 PASS base `v3/refactor-baseline`. No workflow file is modified and no code is borrowed from the temporary base.
 
 ## Compatibility kept
 
 - locked V2.2 production files remain unchanged;
 - Phase 1 database contracts remain unchanged;
-- legacy collector remains production runtime until a later approved migration phase;
-- V2.2 sanitizer semantics used here are preserved by regression-style tests;
-- current production regression suite remains green.
+- legacy collector remains production runtime;
+- no V3 production cutover;
+- current production regression suite remains required.
 
 ## Compatibility removed
 
 None from production runtime.
 
-Phase 2 does not delete or disable any legacy code.
+Phase 2 deletes or disables no legacy code.
 
 ## Known blockers
 
-No Phase 2 functional blocker is known after current tests.
+The two blockers from the first independent Phase 2 review are implemented and await CI/re-review.
 
-Intentional later-phase work, not Phase 2 blockers:
+No Phase 3 work has started.
 
-- no Parser invocation/enqueue wiring yet;
+Intentional later-phase work remains outside Phase 2:
+
+- no Parser invocation/enqueue wiring;
 - no production Telethon/session/service cutover;
 - no Listing/Offer materialization;
 - no Quality Gate;
 - no publication/publisher behavior.
-
-These belong to later phases and must not be pulled into Phase 2.
 
 ## Rollback notes
 
@@ -234,7 +251,7 @@ Phase 2 is branch/PR-only and has:
 - no Telegram mutation;
 - no legacy production file edit.
 
-Rollback is therefore code-only: discard/revert the Phase 2 branch/PR commits and retain the Phase 1 PASS head `cee9e567d7681c1a81f900922031c3c7ab5bbede`.
+Rollback is code-only: revert/discard Phase 2 and retain Phase 1 PASS head `cee9e567d7681c1a81f900922031c3c7ab5bbede`.
 
 ## Safety
 
@@ -248,16 +265,6 @@ Rollback is therefore code-only: discard/revert the Phase 2 branch/PR commits an
 - Admin Bot modification: **NO**
 - Phase 3 started: **NO**
 
-## Next phase prerequisites
+## Next phase prerequisite
 
-Stop after Phase 2.
-
-Do not merge or start Phase 3 until independent review of PR #42 returns `PASS` for:
-
-- exact duplicate vs source update behavior;
-- album identity;
-- sanitizer contract;
-- media hash and <4-photo preservation;
-- no publication/publisher/package-build dependency;
-- diff remains inside the Phase 2 allowed boundary;
-- final CI remains green.
+Stop after Phase 2. Do not merge or start Phase 3 until independent re-review of PR #42 returns `PASS`.
