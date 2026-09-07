@@ -1,8 +1,8 @@
-# V3 Phase 1 Report — PR #37 Final DB Contract Alignment
+# V3 Phase 1 Report — PR #37 Final Source DB Closure
 
 ## Status
 
-Phase 1 DB foundation and final persistence schema contracts are complete for independent review.
+Phase 1 DB foundation is complete for independent review.
 
 **Do not merge and do not start Phase 2 until an independent reviewer returns `PASS`.**
 
@@ -15,319 +15,222 @@ Phase 1 DB foundation and final persistence schema contracts are complete for in
 - Phase 1 branch: `v3/refactor-baseline`
 - PR: `#37`
 
-Phase 0 remains the isolated V3 skeleton on top of the locked V2.2 production baseline. Phase 1 remains DB/repository/migration/test infrastructure only.
+Phase 1 remains migration/schema/repository/test infrastructure only. It is not wired into production runtime.
 
 ## Phase 1 boundary
 
-The repaired PR does **not** modify or wire V3 into:
+This final Source DB closure did not modify or wire V3 into:
 
-- `ai_parser.py`
-- `collector_bot.py`
-- `publication_package.py`
-- `publication_delivery.py`
-- `autopilot_publish_bot.py`
-- `qiaolian_dual/user_bot.py`
+- Parser / `ai_parser.py`
+- Collector / `collector_bot.py`
+- Publisher
+- User Bot
 - V2 publisher runtime
 
-Phase 1 does not deploy, does not call Telegram, does not operate a server, and does not write legacy production business tables.
+It did not write legacy production business tables.
 
-## FIX-01 ～ FIX-13 status
+No merge, deployment, production server operation, or Telegram mutation occurred.
 
-The previous production-boundary fixes remain in force:
+## Previous Phase 1 contracts remain unchanged
 
-- strict Phase 1-only diff;
-- no writes to legacy production `listings`;
-- `qiaolian_v3/db` owns V3 schema/migrations/repositories/UoW;
-- immutable source revisions;
-- real repository/schema tests;
-- migration ledger/checksum/idempotency/simulation;
-- rent/sale offer separation;
-- sale DB-forced store-only;
-- formal canonical `deal_type = rent | sale | unknown` only;
-- no runtime integration.
+The already-reviewed Phase 1 contracts remain in force and were not expanded in this closure:
 
-This final alignment round adds the remaining locked schema contracts described below.
+- `qiaolian_v3/db` is the V3 schema owner;
+- migration ledger / checksum / forward simulation / UoW remain intact;
+- immutable source revisions remain intact;
+- `canonical_records` lifecycle and `deal_type = rent | sale | unknown` remain unchanged;
+- Listing formal fields/status contract remains unchanged;
+- ListingOffer rent/sale separation and sale store-only remain unchanged;
+- ReviewItem contract remains unchanged;
+- PublicationPackage persistence contract remains unchanged;
+- ChannelPost persistence contract remains unchanged;
+- no V3 repository writes legacy production `listings`.
 
-## 1. Independent V3 SourcePost contract
+From previous final head `3978a8de1a15ef44947fbf858eb69306f28e9765` to the final Source schema/code head, only these files changed:
 
-V3 SourcePost is now independent from legacy `source_posts`.
+- `qiaolian_v3/db/migrations/001_phase1_core.sql`
+- `qiaolian_v3/db/repositories/sources.py`
+- `tests/v3/db/test_source_repository.py`
 
-Table: `v3_source_posts`
+## 1. V3 Source registry
 
-Key contract:
+A V3-owned source registry now exists:
 
-- `source_identity_key` unique;
-- `source_mode` is exactly `collector | admin_import | migration`;
-- `source_type`, `source_name`, `external_post_id` identify the logical source post;
-- `source_url`, `source_author`, `dedupe_key`, ingest/parse state are V3-owned;
-- `current_revision_id` points to the current immutable V3 source revision;
-- `legacy_source_post_id` is nullable and unique but has **no foreign key** to legacy `source_posts`;
-- creating a V3 SourcePost does not require any legacy row;
-- unique `(source_type, source_name, external_post_id)`.
+`v3_sources`
 
-`SourceRepository.register_source_post()` can create a V3 SourcePost when legacy `source_posts` is empty. The compatibility bridge may be absent or may carry a legacy id without making that id a creation precondition.
+Its responsibility is the V3 `Source` domain object described by `V3_EXTRACTION_PLAN.md`:
 
-## 2. Immutable SourcePostRevision contract
+- `source_type`
+- `source_name`
+- `external_identity`
+- `enabled`
+- `collector_config_json`
+- timestamps
 
-Table: `source_post_revisions`
-
-Formal identity is:
+Uniqueness:
 
 ```text
-source_post_id + revision_no
-source_post_id + source_content_hash
+UNIQUE(source_type, external_identity)
 ```
 
-Revision evidence includes:
+`SourceRepository.register_source()` and `get_source()` provide the Phase 1 repository interface.
 
-- `raw_text`;
-- `sanitized_text`;
-- `raw_payload_json`;
-- raw image/video/contact/meta snapshots;
-- `source_content_hash`.
+## 2. SourcePost source ownership / FK
 
-Behavior:
-
-- same source + same hash => no-op/reuse existing revision;
-- changed hash => next revision number;
-- UPDATE is rejected by SQLite trigger;
-- DELETE is rejected by SQLite trigger;
-- the SourcePost current revision pointer must reference a revision belonging to that same SourcePost.
-
-## 3. Canonical lifecycle contract
-
-`canonical_records.processing_status` is now exactly the unified persisted lifecycle:
+`v3_source_posts` now has:
 
 ```text
-COLLECTED
-PARSING
-PARSED
-STORED
-NEEDS_REVIEW
-READY_TO_PUBLISH
-PUBLISHING
-PUBLISHED
-REJECTED
-FAILED
+source_id
 ```
 
-`superseded` is not a lifecycle status.
-
-Canonical history is represented only by:
-
-- `is_current`;
-- `supersedes_id`.
-
-When a new canonical version becomes current, the previous record keeps its original lifecycle status and only changes `is_current` to `0`.
-
-The DB also continues to enforce:
+with a formal V3 FK:
 
 ```text
-deal_type IN ('rent','sale','unknown')
+v3_source_posts.source_id
+→ v3_sources.id
+ON DELETE RESTRICT
 ```
 
-`mixed` is rejected.
+`source_id` is NOT NULL.
 
-Each canonical record binds to an immutable revision of the same V3 SourcePost, and only one current canonical record is allowed per V3 SourcePost.
+A SourcePost can no longer exist in the V3 schema without a V3 Source owner.
 
-## 4. Formal Listing contract
-
-Table: `v3_listings`
-
-The formal Listing identity/property projection now contains:
-
-- `public_listing_id` UNIQUE;
-- `current_canonical_record_id`;
-- `property_identity_key` UNIQUE;
-- `project_name`;
-- `project_alias`;
-- `property_type`;
-- `property_subtype`;
-- `city_key`;
-- `project_key`;
-- `canonical_area_key`;
-- `public_location_key`;
-- `public_location_display`;
-- `layout`;
-- `bedrooms`;
-- `living_rooms`;
-- `bathrooms`;
-- `helper_rooms`;
-- `size_sqm`;
-- `floor`;
-- `listing_status`;
-- timestamps.
-
-`semantic_key` is not a formal persisted Listing field; the formal identity key is `property_identity_key`.
-
-Formal Listing status is exactly:
+The nullable compatibility bridge remains:
 
 ```text
-active | reserved | pending | rented | inactive
+legacy_source_post_id
 ```
 
-`closed` and `archived` are rejected as Listing statuses.
+It is still **not** a foreign key to legacy `source_posts` and is not a creation precondition.
 
-Commercial transaction terms remain separated in `listing_offers` rather than being folded back into Listing identity.
+## 3. SourcePost minimum field contract
 
-## 5. ListingOffer contract
-
-The previous Phase 1 offer contract remains intact:
-
-- offer type is `rent | sale`;
-- rent requires positive `monthly_rent_usd` and no sale price;
-- sale requires positive `sale_price_usd` and no monthly rent;
-- one current offer per `(listing_id, offer_type)`;
-- history uses `is_current / supersedes_id`;
-- sale must have `publication_policy='store_only'`;
-- SQLite rejects sale + `telegram_rent`.
-
-Phase 1 still does not compute final runtime publishability.
-
-## 6. ReviewItem contract
-
-Table: `review_items`
-
-Formal persisted fields now include:
-
-- `review_type`;
-- `canonical_record_id` nullable FK;
-- `listing_id` nullable FK;
-- `offer_id` nullable FK;
-- `reason_codes_json` valid JSON;
-- `source_mode` exactly `collector | admin_import | migration`;
-- `operator_id`;
-- `resolution_json` valid JSON;
-- timestamps.
-
-At least one canonical/listing/offer subject reference must be present.
-
-Formal review status is exactly:
+`v3_source_posts` now includes the full minimum SourcePost contract:
 
 ```text
-open | approved | rejected | resolved
+id
+source_id
+source_mode
+source_type
+source_name
+external_post_id
+source_identity_key
+current_revision_id
+first_seen_at
+last_seen_at
+status
 ```
 
-## 7. Final PublicationPackage persistence contract
+The existing fields used for evidence routing/compatibility remain available.
 
-Table: `v3_publication_packages`
-
-This is a persistence contract only; Publisher runtime is not wired in Phase 1.
-
-Persisted fields now support the locked later-phase needs without a schema redesign:
-
-- `package_id` UNIQUE;
-- `idempotency_key` UNIQUE;
-- `listing_id`;
-- `offer_id`;
-- `canonical_record_id`;
-- `package_version > 0`;
-- `target_kind='telegram_rent'`;
-- `target_channel_id`;
-- status `prepared | frozen | publishing | published | superseded | failed`;
-- approval mode `auto | admin`;
-- `approved_by` / `approved_at`;
-- `cover_path` / `cover_hash`;
-- `gallery_json` / `gallery_hash`;
-- `caption_html`;
-- `keyboard_json`;
-- `content_hash`;
-- `canonical_hash`;
-- timestamps.
-
-Unique package version/target contract:
+Formal source mode is unchanged and DB-enforced:
 
 ```text
-(listing_id, offer_id, package_version, target_kind, target_channel_id)
+collector | admin_import | migration
 ```
 
-Once a package leaves `prepared`, its frozen content identity/snapshot fields cannot be modified in place.
+`source_identity_key` remains unique.
 
-## 8. Final ChannelPost persistence contract
+`current_revision_id` remains the pointer to the current immutable revision.
 
-Table: `v3_channel_posts`
+### first_seen_at / last_seen_at behavior
 
-Persisted mapping includes:
+Repository behavior is now explicit:
 
-- `idempotency_key` UNIQUE;
-- `channel_id`;
-- `message_id`;
-- `listing_id`;
-- `offer_id`;
-- `current_package_id`;
-- `publication_kind='telegram_rent'`;
-- `content_hash`;
-- `post_status`;
-- `last_synced_at`;
-- `published_at`;
-- `updated_at`.
+- first registration stores `first_seen_at`;
+- re-observing the same SourcePost keeps the original `first_seen_at`;
+- re-observing updates `last_seen_at`;
+- SourcePost identity remains stable;
+- SourcePost `status` is persisted and can be updated on re-observation.
 
-Formal uniqueness includes:
+## 4. SourcePostRevision time contract
+
+`source_post_revisions` now includes:
 
 ```text
-UNIQUE(channel_id, message_id)
-UNIQUE(channel_id, listing_id, publication_kind)
+source_created_at
+fetched_at
 ```
 
-SQLite triggers additionally reject a ChannelPost whose current package does not match its listing, offer, target channel, and publication kind.
+The formal minimum revision contract is therefore:
 
-## 9. Migration contract
+```text
+id
+source_post_id
+revision_no
+raw_text
+sanitized_text
+raw_payload_json
+source_content_hash
+source_created_at
+fetched_at
+created_at
+```
 
-Migration remains:
+plus the existing raw media/contact/meta snapshot fields.
+
+Uniqueness remains:
+
+```text
+UNIQUE(source_post_id, revision_no)
+UNIQUE(source_post_id, source_content_hash)
+```
+
+Revision immutability remains enforced by SQLite UPDATE/DELETE triggers.
+
+### revision timestamp behavior
+
+`SourceRepository.append_revision()` now accepts and persists:
+
+- `source_created_at`
+- `fetched_at`
+
+Same source + same content hash remains a no-op/reuse of the original immutable revision, including the original timestamp values.
+
+A new content hash creates the next revision and advances `current_revision_id`.
+
+## 5. Real SQLite tests added
+
+The Source DB tests now verify actual SQLite behavior, including:
+
+- V3 Source registry persistence;
+- `v3_source_posts.source_id` FK points to `v3_sources`;
+- invalid/missing Source FK is rejected;
+- deleting a Source referenced by a SourcePost is restricted;
+- SourcePost creation remains independent from legacy `source_posts`;
+- nullable legacy bridge remains optional;
+- `source_mode` remains exactly `collector | admin_import | migration`;
+- stable SourcePost identity;
+- first seen value is preserved;
+- last seen value advances on re-observation;
+- SourcePost status persists/updates;
+- `source_created_at` persists on immutable revisions;
+- `fetched_at` persists on immutable revisions;
+- same-hash no-op preserves original revision timestamps;
+- new hash creates the next revision;
+- current revision pointer advances;
+- revision UPDATE/DELETE remain rejected.
+
+These tests operate on a real migrated in-memory SQLite database and exercise FK/constraint/repository behavior.
+
+## 6. Migration status
+
+The migration remains:
 
 `qiaolian_v3/db/migrations/001_phase1_core.sql`
 
-PR #37 is still draft/unmerged/undeployed, so Phase 1 can finalize this first V3 migration before it becomes an applied production migration.
+PR #37 is still Draft / unmerged / undeployed, so this initial Phase 1 migration is being finalized before any production application.
 
-`MigrationRunner` continues to provide:
+The migration remains additive relative to the locked V2.2 production schema and does not alter legacy production business tables.
 
-- version discovery;
-- SHA-256 migration checksum ledger;
-- idempotent re-run;
-- checksum drift rejection;
-- transactional forward migration;
-- `PRAGMA foreign_key_check`;
-- SAVEPOINT-based forward simulation with rollback.
+## 7. Final Source schema/code CI evidence
 
-The migration remains additive relative to locked V2.2 production tables.
+Final Source schema/code head before this report-only update:
 
-## 10. Real SQLite contract tests
-
-`tests/v3` now validates behavior against a real SQLite database rather than tautological constant assertions.
-
-Coverage includes:
-
-- independent V3 SourcePost creation with zero legacy source rows;
-- no FK/precondition on nullable legacy source bridge;
-- strict source modes;
-- immutable revisions and current pointer consistency;
-- all ten canonical lifecycle states;
-- rejection of `superseded` lifecycle state;
-- canonical supersedes lineage preserving prior lifecycle;
-- rejection of `mixed` deal type;
-- source/revision consistency;
-- full Listing field persistence;
-- exact five Listing statuses and rejection of `closed/archived`;
-- public Listing id uniqueness;
-- review references, JSON fields, source mode and status constraints;
-- rent/sale offer price and store-only constraints;
-- package version/target/approval/idempotency contracts;
-- frozen package content immutability;
-- ChannelPost message/listing uniqueness;
-- ChannelPost current-package consistency;
-- V3 source operations do not mutate legacy `source_posts`;
-- V3 listing/offer operations do not mutate legacy `listings`;
-- UnitOfWork rollback/commit behavior;
-- migration ledger/simulation behavior.
-
-## CI verification for final schema/code head
-
-Final schema/code head before this report-only update:
-
-- Head: `bf4f1caccd4cfe40f9d308525c9d555fc04f4270`
+- Head: `8019c6a7300074c73396683e83808b7ce49e7a51`
 - Workflow: `qiaolian-ui-check`
-- Run: `34130020806`
-- Job: `101767631491`
+- Run: `34143642566`
+- Job: `101810855739`
 - Result: **SUCCESS**
 
 Results:
@@ -335,16 +238,14 @@ Results:
 ```text
 Diff whitespace check: PASS
 Syntax/runtime import check: PASS
-tests/v3: 36 passed in 0.24s
-Old production regression suite: 261 passed, 2 warnings in 6.15s
+tests/v3: 38 passed in 0.28s
+Old production regression suite: 261 passed, 2 warnings in 6.33s
 Failures: 0
 ```
 
-The two warnings are the existing `python-telegram-bot` `ConversationHandler` warnings in the legacy production regression suite; they are not V3 failures.
+The two warnings are the pre-existing `python-telegram-bot` `ConversationHandler` warnings in the old production regression suite and are not V3 failures.
 
-The workflow uses dummy test tokens only and performs no outbound production mutation.
-
-A final CI run is required on this report-only commit. No code/schema/runtime behavior is changed by the report commit itself.
+The workflow uses dummy test tokens and performs no production Telegram mutation.
 
 ## Operational safety
 
@@ -357,12 +258,11 @@ A final CI run is required on this report-only commit. No code/schema/runtime be
 - Collector changed/wired: **NO**
 - Publisher changed/wired: **NO**
 - User Bot changed/wired: **NO**
-- Legacy `source_posts` mutated by V3 repository flow: **NO**
-- Legacy `listings` mutated by V3 repository flow: **NO**
+- Legacy production business tables written by this closure: **NO**
 
 ## Stop condition
 
-After the report-only commit's CI is green, Phase 1 stops again.
+Run CI once on this report-only commit. If it is green, Phase 1 stops.
 
 Do not merge.
 Do not deploy.
