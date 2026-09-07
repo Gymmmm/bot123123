@@ -6,6 +6,11 @@ import os
 import sys
 from pathlib import Path
 
+try:
+    from .runtime_env import configure_environment, patch_legacy_path_globals
+except ImportError:  # direct script execution
+    from runtime_env import configure_environment, patch_legacy_path_globals
+
 
 def _root() -> Path:
     return Path(__file__).resolve().parent
@@ -13,7 +18,7 @@ def _root() -> Path:
 
 def _activate_paths() -> None:
     root = _root()
-    for path in (root / "shared", root / "user", root / "publisher"):
+    for path in (root / "shared", root / "user", root / "collector", root / "publisher"):
         value = str(path)
         if value not in sys.path:
             sys.path.insert(0, value)
@@ -21,12 +26,16 @@ def _activate_paths() -> None:
 
 def _load_runtime():
     _activate_paths()
+    app_root = configure_environment()
+    patch_legacy_path_globals(app_root)
+
     from qiaolian_publisher_v2.cover_picker_patch import install_cover_picker
     from qiaolian_publisher_v2.daily_broadcast_patch import install_daily_broadcast_patch
     from qiaolian_publisher_v2.media_selection_patch import install_media_selection_patch
     from qiaolian_publisher_v2.review_queue_patch import install_review_queue_patch
     from qiaolian_publisher_v2.release_contract_patch import install_release_contract_patch
     from qiaolian_publisher_v2.bot import main
+
     return (
         main,
         install_cover_picker,
