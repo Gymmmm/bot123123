@@ -14,6 +14,7 @@ from collector_db_compat import DatabaseManager
 from qiaolian_dual.canonical_facts import canonicalize_source, draft_projection
 from qiaolian_dual.canonical_listing_materializer import materialize_draft_facts
 from qiaolian_dual.v2_safe_adapter import enrich_authoritative_facts
+from qiaolian_dual.v3_shadow_store import normalize_v3_facts, shadow_write_v3
 
 
 class LLMClient:
@@ -103,6 +104,10 @@ class AIParserModule:
         # before projection, and its adapter asserts that existing facts remain
         # byte-for-byte semantically unchanged.
         facts = enrich_authoritative_facts(sanitized_text, facts)
+        # V3 stores valid sale facts.  The legacy canonical parser marked every
+        # sale as non_rental_source; Phase 1 removes that storage-layer blocker
+        # while the existing publishability contract still hard-blocks non-rent.
+        facts = normalize_v3_facts(facts)
         return post_id, facts, draft_projection(facts)
 
     def _write_existing_draft(self, draft_id: str, facts: dict[str, Any], projection: dict[str, Any]) -> None:
@@ -170,6 +175,14 @@ class AIParserModule:
         post_id = int(source["id"])
         try:
             _post_id, facts, projection = self._canonicalize(source)
+            # Additive V3 shadow write. If the V3 migration has not been applied
+            # yet, shadow_write_v3 returns schema_not_applied and V2.2 continues
+            # unchanged. It never publishes or calls Telegram.
+            shadow_write_v3(
+                self.db_manager._get_connection(),
+                source_post_id=post_id,
+                facts=facts,
+            )
             hard_flags = set((facts.get("quality") or {}).get("hard_flags") or [])
             if "non_rental_source" in hard_flags:
                 self._mark_source_post(post_id, "skipped_non_rental", "non_rental_source")
@@ -222,7 +235,12 @@ class AIParserModule:
         for raw in rows or []:
             row = self._as_mapping(raw, columns)
             source = {key: row[key] for key in self._SOURCE_COLUMNS}
-            _post_id, facts, projection = self._canonicalize(source)
+            post_id, facts, projection = self._canonicalize(source)
+            shadow_write_v3(
+                self.db_manager._get_connection(),
+                source_post_id=post_id,
+                facts=facts,
+            )
             self._write_existing_draft(str(row["draft_id"]), facts, projection)
             count += 1
         return count
