@@ -6,6 +6,9 @@ on:
       - refactor/production-extraction
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -142,3 +145,16 @@ jobs:
               raise SystemExit('user local-source leaks: ' + repr(sorted(leaks)))
           print('USER_BUILD_OK')
           PY
+      - name: Commit validated autopilot slice
+        if: github.event_name == 'push'
+        run: |
+          if git diff --quiet -- qiaolian_production/shared/autopilot_publish_bot.py; then
+            echo 'AUTOPILOT_SLICE_ALREADY_COMMITTED=1'
+            exit 0
+          fi
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add qiaolian_production/shared/autopilot_publish_bot.py
+          git commit -m 'refactor: slim autopilot production runtime'
+          git push origin HEAD:refactor/production-extraction
