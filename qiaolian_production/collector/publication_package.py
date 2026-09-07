@@ -192,52 +192,8 @@ def classify(*, source_type: str, source_name: str, property_type: str,
     }
 
 
-def _font(size: int, bold: bool = False):
-    candidates = [
-        "/System/Library/Fonts/PingFang.ttc",
-        "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc" if bold else
-        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-    ]
-    for path in candidates:
-        if os.path.isfile(path):
-            try:
-                return ImageFont.truetype(path, size)
-            except Exception:
-                pass
-    return ImageFont.load_default()
 
 
-def logo_only(source_path: str, output_path: str, badge: str = "") -> str:
-    """详情图只加轻量文字水印，不加价格、户型或大信息板。"""
-    try:
-        image = Image.open(source_path).convert("RGBA")
-    except Exception:
-        # 测试占位图或损坏素材不应使整个审核队列卡死。
-        image = Image.new("RGBA", (1280, 960), (229, 233, 239, 255))
-    draw = ImageDraw.Draw(image, "RGBA")
-    scale = max(0.7, min(1.4, image.width / 1280))
-    pad = int(22 * scale)
-    title_font = _font(int(30 * scale), True)
-    title = "侨联地产"
-    box = draw.textbbox((0, 0), title, font=title_font)
-    width = box[2] - box[0]
-    height = box[3] - box[1]
-    x = image.width - width - pad
-    y = image.height - height - pad
-    shadow = max(1, int(2 * scale))
-    draw.text((x + shadow, y + shadow), title, font=title_font, fill=(0, 0, 0, 115))
-    draw.text((x, y), title, font=title_font, fill=(255, 255, 255, 190))
-    if badge:
-        badge_font = _font(int(14 * scale), True)
-        badge_box = draw.textbbox((0, 0), badge, font=badge_font)
-        badge_w = badge_box[2] - badge_box[0]
-        draw.text((image.width - badge_w - pad, y - int(24 * scale)), badge,
-                  font=badge_font, fill=(255, 255, 255, 175))
-    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-    image.convert("RGB").save(output_path, "JPEG", quality=92, optimize=True)
-    return output_path
 
 
 def _dedupe_paths_by_content(paths: list[str]) -> list[str]:
@@ -558,36 +514,8 @@ def _canonical_facts_from_draft(draft: dict[str, Any]) -> dict[str, Any]:
     return facts
 
 
-def _rent_price_range_tag(price: object, deal_type: object = "rent") -> str:
-    """Return one stable, searchable Telegram hashtag from frozen price facts."""
-    if str(deal_type or "rent").strip().lower() == "sale":
-        return ""
-    try:
-        amount = int(float(price))
-    except (TypeError, ValueError):
-        return ""
-    if amount <= 0:
-        return ""
-    if amount < 500:
-        return "#租金500以下"
-    if amount < 800:
-        return "#租金500至800"
-    if amount < 1200:
-        return "#租金800至1200"
-    if amount < 2000:
-        return "#租金1200至2000"
-    if amount < 3000:
-        return "#租金2000至3000"
-    return "#租金3000以上"
 
 
-def _normalized_tag_text(tag_lines: list[str], price: object, deal_type: object) -> str:
-    parts = [str(line or "").strip() for line in tag_lines if str(line or "").strip()]
-    price_tag = _rent_price_range_tag(price, deal_type)
-    if price_tag and all(price_tag not in part.split() for part in parts):
-        parts.append(price_tag)
-    # Keep every hashtag separated even if an upstream caption accidentally joined them.
-    return re.sub(r"(?<!^)(?<!\s)#", " #", " ".join(parts)).strip()
 
 
 def format_button_post_text(
