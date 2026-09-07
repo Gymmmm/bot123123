@@ -189,10 +189,10 @@ def _line_count_after_slice(tree: ast.Module, dead: set[str]) -> tuple[int, int]
 def write_slice(dead: set[str], tree: ast.Module) -> None:
     lines = TARGET.read_text(encoding="utf-8").splitlines(keepends=True)
     removed = _removed_lines(tree, dead)
-    TARGET.write_text(
-        "".join(line for no, line in enumerate(lines, start=1) if no not in removed),
-        encoding="utf-8",
-    )
+    sliced = "".join(line for no, line in enumerate(lines, start=1) if no not in removed)
+    # Keep exactly one terminal newline so git diff --check does not report
+    # blank lines at EOF after the historical standalone main block is removed.
+    TARGET.write_text(sliced.rstrip() + "\n", encoding="utf-8")
 
 
 def main(argv: Iterable[str] | None = None) -> int:
