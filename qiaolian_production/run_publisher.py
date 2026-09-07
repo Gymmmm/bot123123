@@ -3,25 +3,37 @@ from __future__ import annotations
 import atexit
 import fcntl
 import os
+import sys
 from pathlib import Path
 
-from v2.qiaolian_publisher_v2.cover_picker_patch import install_cover_picker
-from v2.qiaolian_publisher_v2.daily_broadcast_patch import install_daily_broadcast_patch
-from v2.qiaolian_publisher_v2.media_selection_patch import install_media_selection_patch
-from v2.qiaolian_publisher_v2.review_queue_patch import install_review_queue_patch
-from v2.qiaolian_publisher_v2.release_contract_patch import install_release_contract_patch
-from v2.qiaolian_publisher_v2.bot import main
+
+def _publisher_dir() -> Path:
+    return Path(__file__).resolve().parent / "publisher"
+
+
+def _load_runtime():
+    publisher_dir = str(_publisher_dir())
+    if publisher_dir not in sys.path:
+        sys.path.insert(0, publisher_dir)
+
+    from qiaolian_publisher_v2.cover_picker_patch import install_cover_picker
+    from qiaolian_publisher_v2.daily_broadcast_patch import install_daily_broadcast_patch
+    from qiaolian_publisher_v2.media_selection_patch import install_media_selection_patch
+    from qiaolian_publisher_v2.review_queue_patch import install_review_queue_patch
+    from qiaolian_publisher_v2.release_contract_patch import install_release_contract_patch
+    from qiaolian_publisher_v2.bot import main
+
+    return (
+        main,
+        install_cover_picker,
+        install_daily_broadcast_patch,
+        install_media_selection_patch,
+        install_review_queue_patch,
+        install_release_contract_patch,
+    )
 
 
 _LOCK_FH = None
-
-
-def _install_runtime_patches() -> None:
-    install_cover_picker()
-    install_media_selection_patch()
-    install_review_queue_patch()
-    install_release_contract_patch()
-    install_daily_broadcast_patch()
 
 
 def _acquire_single_instance_lock() -> None:
@@ -48,7 +60,21 @@ def _acquire_single_instance_lock() -> None:
 
 
 def run() -> None:
-    _install_runtime_patches()
+    (
+        main,
+        install_cover_picker,
+        install_daily_broadcast_patch,
+        install_media_selection_patch,
+        install_review_queue_patch,
+        install_release_contract_patch,
+    ) = _load_runtime()
+
+    install_cover_picker()
+    install_media_selection_patch()
+    install_review_queue_patch()
+    install_release_contract_patch()
+    install_daily_broadcast_patch()
+
     _acquire_single_instance_lock()
     main()
 
