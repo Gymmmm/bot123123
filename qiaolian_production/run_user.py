@@ -3,6 +3,11 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+try:
+    from .runtime_env import configure_environment
+except ImportError:  # direct script execution
+    from runtime_env import configure_environment
+
 
 def _root() -> Path:
     return Path(__file__).resolve().parent
@@ -18,11 +23,13 @@ def _activate_paths() -> None:
 
 def _load_runtime():
     _activate_paths()
+    configure_environment()
     from qiaolian_dual.runtime_guard import (
         acquire_user_bot_polling_lock,
         release_user_bot_polling_lock,
     )
     from qiaolian_dual.user_bot import main
+
     return main, acquire_user_bot_polling_lock, release_user_bot_polling_lock
 
 
