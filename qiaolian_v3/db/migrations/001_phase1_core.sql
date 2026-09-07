@@ -1,34 +1,44 @@
 -- V3 Phase 1 additive DB foundation.
 -- This migration creates only isolated V3-owned tables. It does not alter
--- Parser/Collector/Publisher/User Bot behavior and does not write legacy listings.
+-- Parser/Collector/Publisher/User Bot behavior and does not write legacy business tables.
 
-CREATE TABLE IF NOT EXISTS source_post_identities (
+-- V3 SourcePost is an independent logical-post identity/state record.
+-- legacy_source_post_id is a nullable compatibility bridge only; it is not a FK
+-- and is never required to create a V3 SourcePost.
+CREATE TABLE IF NOT EXISTS v3_source_posts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     source_identity_key TEXT NOT NULL UNIQUE,
-    legacy_source_post_id INTEGER NOT NULL UNIQUE REFERENCES source_posts(id) ON DELETE RESTRICT,
+    source_mode TEXT NOT NULL CHECK(source_mode IN ('collector','admin_import','migration')),
     source_type TEXT NOT NULL,
     source_name TEXT NOT NULL,
     external_post_id TEXT NOT NULL,
+    source_url TEXT NOT NULL DEFAULT '',
+    source_author TEXT NOT NULL DEFAULT '',
+    dedupe_key TEXT NOT NULL DEFAULT '',
+    ingest_status TEXT NOT NULL DEFAULT 'COLLECTED' CHECK(length(ingest_status) > 0),
+    parse_status TEXT NOT NULL DEFAULT 'COLLECTED' CHECK(length(parse_status) > 0),
+    current_revision_id INTEGER REFERENCES source_post_revisions(id) ON DELETE RESTRICT,
+    legacy_source_post_id INTEGER UNIQUE,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(source_type, source_name, external_post_id)
 );
 
 CREATE TABLE IF NOT EXISTS source_post_revisions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    source_identity_id INTEGER NOT NULL REFERENCES source_post_identities(id) ON DELETE RESTRICT,
+    source_post_id INTEGER NOT NULL REFERENCES v3_source_posts(id) ON DELETE RESTRICT,
     revision_no INTEGER NOT NULL CHECK(revision_no > 0),
-    content_hash TEXT NOT NULL CHECK(length(content_hash) > 0),
+    source_content_hash TEXT NOT NULL CHECK(length(source_content_hash) > 0),
     raw_text TEXT NOT NULL DEFAULT '',
     sanitized_text TEXT NOT NULL DEFAULT '',
+    raw_payload_json TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(raw_payload_json)),
     raw_images_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(raw_images_json)),
     raw_videos_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(raw_videos_json)),
     raw_contact TEXT NOT NULL DEFAULT '',
     raw_meta_json TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(raw_meta_json)),
-    ingest_origin TEXT NOT NULL DEFAULT 'collector'
-        CHECK(ingest_origin IN ('collector','admin','csv_import','other')),
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(source_identity_id, revision_no),
-    UNIQUE(source_identity_id, content_hash)
+    UNIQUE(source_post_id, revision_no),
+    UNIQUE(source_post_id, source_content_hash)
 );
 
 CREATE TRIGGER IF NOT EXISTS trg_source_post_revisions_immutable_update
@@ -43,6 +53,17 @@ BEGIN
     SELECT RAISE(ABORT, 'source_post_revisions_are_immutable');
 END;
 
+CREATE TRIGGER IF NOT EXISTS trg_v3_source_current_revision_match_update
+BEFORE UPDATE OF current_revision_id ON v3_source_posts
+WHEN NEW.current_revision_id IS NOT NULL
+BEGIN
+    SELECT CASE WHEN NOT EXISTS (
+        SELECT 1 FROM source_post_revisions r
+        WHERE r.id = NEW.current_revision_id
+          AND r.source_post_id = NEW.id
+    ) THEN RAISE(ABORT, 'source_current_revision_mismatch') END;
+END;
+
 CREATE TABLE IF NOT EXISTS source_post_media (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     source_post_revision_id INTEGER NOT NULL REFERENCES source_post_revisions(id) ON DELETE RESTRICT,
@@ -54,7 +75,7 @@ CREATE TABLE IF NOT EXISTS source_post_media (
 
 CREATE TABLE IF NOT EXISTS canonical_records (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    source_identity_id INTEGER NOT NULL REFERENCES source_post_identities(id) ON DELETE RESTRICT,
+    source_post_id INTEGER NOT NULL REFERENCES v3_source_posts(id) ON DELETE RESTRICT,
     source_post_revision_id INTEGER NOT NULL REFERENCES source_post_revisions(id) ON DELETE RESTRICT,
     schema_version TEXT NOT NULL,
     parser_revision TEXT NOT NULL,
@@ -63,8 +84,11 @@ CREATE TABLE IF NOT EXISTS canonical_records (
     deal_type TEXT NOT NULL CHECK(deal_type IN ('rent','sale','unknown')),
     deal_type_candidates_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(deal_type_candidates_json)),
     quality_json TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(quality_json)),
-    processing_status TEXT NOT NULL DEFAULT 'parsed'
-        CHECK(processing_status IN ('parsed','needs_review','invalid','superseded')),
+    processing_status TEXT NOT NULL DEFAULT 'PARSED'
+        CHECK(processing_status IN (
+            'COLLECTED','PARSING','PARSED','STORED','NEEDS_REVIEW',
+            'READY_TO_PUBLISH','PUBLISHING','PUBLISHED','REJECTED','FAILED'
+        )),
     supersedes_id INTEGER REFERENCES canonical_records(id) ON DELETE RESTRICT,
     is_current INTEGER NOT NULL DEFAULT 1 CHECK(is_current IN (0,1)),
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -72,16 +96,16 @@ CREATE TABLE IF NOT EXISTS canonical_records (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_canonical_one_current_per_source
-    ON canonical_records(source_identity_id) WHERE is_current = 1;
+    ON canonical_records(source_post_id) WHERE is_current = 1;
 
-CREATE TRIGGER IF NOT EXISTS trg_canonical_revision_identity_match_insert
+CREATE TRIGGER IF NOT EXISTS trg_canonical_revision_source_match_insert
 BEFORE INSERT ON canonical_records
 BEGIN
     SELECT CASE WHEN NOT EXISTS (
         SELECT 1 FROM source_post_revisions r
         WHERE r.id = NEW.source_post_revision_id
-          AND r.source_identity_id = NEW.source_identity_id
-    ) THEN RAISE(ABORT, 'canonical_revision_identity_mismatch') END;
+          AND r.source_post_id = NEW.source_post_id
+    ) THEN RAISE(ABORT, 'canonical_revision_source_mismatch') END;
 END;
 
 CREATE TABLE IF NOT EXISTS canonical_overrides (
@@ -95,19 +119,39 @@ CREATE TABLE IF NOT EXISTS canonical_overrides (
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Physical/semantic listing identity. Rent/sale commercial terms belong to listing_offers.
 CREATE TABLE IF NOT EXISTS v3_listings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    semantic_key TEXT NOT NULL UNIQUE,
-    status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','inactive','closed','archived')),
+    public_listing_id TEXT UNIQUE,
+    current_canonical_record_id INTEGER REFERENCES canonical_records(id) ON DELETE RESTRICT,
+    property_identity_key TEXT NOT NULL UNIQUE,
+    project_name TEXT NOT NULL DEFAULT '',
+    project_alias TEXT NOT NULL DEFAULT '',
+    property_type TEXT NOT NULL DEFAULT '',
+    property_subtype TEXT NOT NULL DEFAULT '',
+    city_key TEXT NOT NULL DEFAULT '',
+    project_key TEXT NOT NULL DEFAULT '',
+    canonical_area_key TEXT NOT NULL DEFAULT '',
+    public_location_key TEXT NOT NULL DEFAULT '',
+    public_location_display TEXT NOT NULL DEFAULT '',
+    layout TEXT NOT NULL DEFAULT '',
+    bedrooms INTEGER CHECK(bedrooms IS NULL OR bedrooms >= 0),
+    living_rooms INTEGER CHECK(living_rooms IS NULL OR living_rooms >= 0),
+    bathrooms INTEGER CHECK(bathrooms IS NULL OR bathrooms >= 0),
+    helper_rooms INTEGER CHECK(helper_rooms IS NULL OR helper_rooms >= 0),
+    size_sqm REAL CHECK(size_sqm IS NULL OR size_sqm > 0),
+    floor TEXT NOT NULL DEFAULT '',
+    listing_status TEXT NOT NULL DEFAULT 'pending'
+        CHECK(listing_status IN ('active','reserved','pending','rented','inactive')),
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS listing_sources (
     listing_id INTEGER NOT NULL REFERENCES v3_listings(id) ON DELETE RESTRICT,
-    source_identity_id INTEGER NOT NULL REFERENCES source_post_identities(id) ON DELETE RESTRICT,
+    source_post_id INTEGER NOT NULL REFERENCES v3_source_posts(id) ON DELETE RESTRICT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY(listing_id, source_identity_id)
+    PRIMARY KEY(listing_id, source_post_id)
 );
 
 CREATE TABLE IF NOT EXISTS listing_offers (
@@ -144,14 +188,18 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_listing_offer_one_current
 
 CREATE TABLE IF NOT EXISTS review_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    subject_type TEXT NOT NULL CHECK(subject_type IN ('canonical','listing','offer','publication')),
-    subject_id INTEGER NOT NULL,
     review_type TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','resolved','dismissed')),
-    note TEXT NOT NULL DEFAULT '',
+    canonical_record_id INTEGER REFERENCES canonical_records(id) ON DELETE RESTRICT,
+    listing_id INTEGER REFERENCES v3_listings(id) ON DELETE RESTRICT,
+    offer_id INTEGER REFERENCES listing_offers(id) ON DELETE RESTRICT,
+    reason_codes_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(reason_codes_json)),
+    status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','approved','rejected','resolved')),
+    source_mode TEXT NOT NULL CHECK(source_mode IN ('collector','admin_import','migration')),
     operator_id TEXT NOT NULL DEFAULT '',
+    resolution_json TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(resolution_json)),
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    resolved_at TEXT
+    resolved_at TEXT,
+    CHECK(canonical_record_id IS NOT NULL OR listing_id IS NOT NULL OR offer_id IS NOT NULL)
 );
 
 CREATE TABLE IF NOT EXISTS listing_media (
@@ -165,30 +213,86 @@ CREATE TABLE IF NOT EXISTS listing_media (
     UNIQUE(listing_id, source_post_media_id)
 );
 
--- Phase 1 publication persistence contracts only. No publisher runtime wiring.
+-- Final publication persistence contract only. There is no Publisher runtime wiring in Phase 1.
 CREATE TABLE IF NOT EXISTS v3_publication_packages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    package_key TEXT NOT NULL UNIQUE,
-    listing_offer_id INTEGER NOT NULL REFERENCES listing_offers(id) ON DELETE RESTRICT,
-    snapshot_json TEXT NOT NULL CHECK(json_valid(snapshot_json)),
-    snapshot_hash TEXT NOT NULL CHECK(length(snapshot_hash) > 0),
-    state TEXT NOT NULL DEFAULT 'prepared' CHECK(state IN ('prepared','approved','published','superseded')),
+    package_id TEXT NOT NULL UNIQUE,
+    idempotency_key TEXT NOT NULL UNIQUE,
+    listing_id INTEGER NOT NULL REFERENCES v3_listings(id) ON DELETE RESTRICT,
+    offer_id INTEGER NOT NULL REFERENCES listing_offers(id) ON DELETE RESTRICT,
+    canonical_record_id INTEGER NOT NULL REFERENCES canonical_records(id) ON DELETE RESTRICT,
+    package_version INTEGER NOT NULL CHECK(package_version > 0),
+    target_kind TEXT NOT NULL DEFAULT 'telegram_rent' CHECK(target_kind = 'telegram_rent'),
+    target_channel_id TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'prepared'
+        CHECK(status IN ('prepared','frozen','publishing','published','superseded','failed')),
+    approval_mode TEXT NOT NULL CHECK(approval_mode IN ('auto','admin')),
+    approved_by TEXT NOT NULL DEFAULT '',
+    approved_at TEXT,
+    cover_path TEXT NOT NULL DEFAULT '',
+    cover_hash TEXT NOT NULL DEFAULT '',
+    gallery_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(gallery_json)),
+    gallery_hash TEXT NOT NULL DEFAULT '',
+    caption_html TEXT NOT NULL DEFAULT '',
+    keyboard_json TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(keyboard_json)),
+    content_hash TEXT NOT NULL CHECK(length(content_hash) > 0),
+    canonical_hash TEXT NOT NULL CHECK(length(canonical_hash) > 0),
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    published_at TEXT,
+    UNIQUE(listing_id, offer_id, package_version, target_kind, target_channel_id)
 );
 
-CREATE TRIGGER IF NOT EXISTS trg_v3_package_snapshot_immutable
-BEFORE UPDATE OF package_key, listing_offer_id, snapshot_json, snapshot_hash ON v3_publication_packages
+CREATE TRIGGER IF NOT EXISTS trg_v3_package_frozen_content_immutable
+BEFORE UPDATE OF
+    package_id,idempotency_key,listing_id,offer_id,canonical_record_id,package_version,
+    target_kind,target_channel_id,cover_path,cover_hash,gallery_json,gallery_hash,
+    caption_html,keyboard_json,content_hash,canonical_hash
+ON v3_publication_packages
+WHEN OLD.status <> 'prepared'
 BEGIN
-    SELECT RAISE(ABORT, 'publication_package_snapshot_is_immutable');
+    SELECT RAISE(ABORT, 'publication_package_frozen_content_is_immutable');
 END;
 
 CREATE TABLE IF NOT EXISTS v3_channel_posts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    publication_package_id INTEGER NOT NULL UNIQUE REFERENCES v3_publication_packages(id) ON DELETE RESTRICT,
     idempotency_key TEXT NOT NULL UNIQUE,
     channel_id TEXT NOT NULL,
     message_id INTEGER NOT NULL,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(channel_id, message_id)
+    listing_id INTEGER NOT NULL REFERENCES v3_listings(id) ON DELETE RESTRICT,
+    offer_id INTEGER NOT NULL REFERENCES listing_offers(id) ON DELETE RESTRICT,
+    current_package_id INTEGER NOT NULL REFERENCES v3_publication_packages(id) ON DELETE RESTRICT,
+    publication_kind TEXT NOT NULL DEFAULT 'telegram_rent' CHECK(publication_kind = 'telegram_rent'),
+    content_hash TEXT NOT NULL CHECK(length(content_hash) > 0),
+    post_status TEXT NOT NULL DEFAULT 'published' CHECK(length(post_status) > 0),
+    last_synced_at TEXT,
+    published_at TEXT,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(channel_id, message_id),
+    UNIQUE(channel_id, listing_id, publication_kind)
 );
+
+CREATE TRIGGER IF NOT EXISTS trg_v3_channel_post_package_match_insert
+BEFORE INSERT ON v3_channel_posts
+BEGIN
+    SELECT CASE WHEN NOT EXISTS (
+        SELECT 1 FROM v3_publication_packages p
+        WHERE p.id = NEW.current_package_id
+          AND p.listing_id = NEW.listing_id
+          AND p.offer_id = NEW.offer_id
+          AND p.target_channel_id = NEW.channel_id
+          AND p.target_kind = NEW.publication_kind
+    ) THEN RAISE(ABORT, 'channel_post_package_mismatch') END;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_v3_channel_post_package_match_update
+BEFORE UPDATE OF channel_id,listing_id,offer_id,current_package_id,publication_kind ON v3_channel_posts
+BEGIN
+    SELECT CASE WHEN NOT EXISTS (
+        SELECT 1 FROM v3_publication_packages p
+        WHERE p.id = NEW.current_package_id
+          AND p.listing_id = NEW.listing_id
+          AND p.offer_id = NEW.offer_id
+          AND p.target_channel_id = NEW.channel_id
+          AND p.target_kind = NEW.publication_kind
+    ) THEN RAISE(ABORT, 'channel_post_package_mismatch') END;
+END;
