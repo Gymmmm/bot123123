@@ -203,24 +203,26 @@ No Telegram call exists in this path.
 
 ## CI verification
 
-Verified workflow: `qiaolian-ui-check` on head `d689f588ef63f2226d4a223bc0e56d6bf791a086` before this report-only commit.
+Final verified implementation/report head before this evidence-only update:
 
-Run: `34103716222`
+- Head: `647d6d80a9b8843180e47ff42c454b6acb6f0022`
+- Workflow: `qiaolian-ui-check`
+- Run: `34103882377`
+- Job: `101684337790`
+- Result: **SUCCESS**
 
 Results:
 
 ```text
 Syntax/runtime import check: PASS
 V3 Phase 1 DB contracts: 16 passed in 0.11s
-Old production regression suite: 261 passed, 2 warnings in 6.17s
+Old production regression suite: 261 passed, 2 warnings in 6.64s
 Failures: 0
 ```
 
 The two warnings are existing `python-telegram-bot` `ConversationHandler` warnings from the production regression suite; no V3 failure is associated with them.
 
-The workflow uses dummy test tokens only.
-
-A final CI run is required on the report commit itself; PR #37 is not review-ready until that final head is green.
+The workflow uses dummy test tokens only. The final evidence-only report commit must also remain green; no code or schema change is introduced by that commit.
 
 ## Operational safety
 
@@ -233,7 +235,7 @@ A final CI run is required on the report commit itself; PR #37 is not review-rea
 
 ## Stop condition
 
-After final CI on this report commit is green, Phase 1 stops.
+Phase 1 stops after the evidence-only report commit's CI is green.
 
 Do not merge.
 Do not deploy.
