@@ -4,21 +4,25 @@ import sys
 from pathlib import Path
 
 
-def _user_runtime_dir() -> Path:
-    return Path(__file__).resolve().parent / "user"
+def _root() -> Path:
+    return Path(__file__).resolve().parent
+
+
+def _activate_paths() -> None:
+    root = _root()
+    for path in (root / "shared", root / "user"):
+        value = str(path)
+        if value not in sys.path:
+            sys.path.insert(0, value)
 
 
 def _load_runtime():
-    runtime_dir = str(_user_runtime_dir())
-    if runtime_dir not in sys.path:
-        sys.path.insert(0, runtime_dir)
-
+    _activate_paths()
     from qiaolian_dual.runtime_guard import (
         acquire_user_bot_polling_lock,
         release_user_bot_polling_lock,
     )
     from qiaolian_dual.user_bot import main
-
     return main, acquire_user_bot_polling_lock, release_user_bot_polling_lock
 
 
