@@ -59,6 +59,27 @@ class SourceRepository:
     def get_source(self, source_id: int):
         return self.conn.execute('SELECT * FROM v3_sources WHERE id=?', (int(source_id),)).fetchone()
 
+    def get_source_post_by_identity(
+        self,
+        *,
+        source_type: str,
+        source_name: str,
+        external_post_id: str,
+    ):
+        key = make_source_identity_key(source_type, source_name, external_post_id)
+        return self.conn.execute(
+            'SELECT * FROM v3_source_posts WHERE source_identity_key=?',
+            (key,),
+        ).fetchone()
+
+    def get_current_revision_for_source_post(self, source_post_id: int):
+        return self.conn.execute(
+            '''SELECT r.* FROM v3_source_posts p
+               JOIN source_post_revisions r ON r.id=p.current_revision_id
+               WHERE p.id=?''',
+            (int(source_post_id),),
+        ).fetchone()
+
     def register_source_post(
         self,
         *,
