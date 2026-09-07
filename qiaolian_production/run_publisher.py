@@ -7,22 +7,26 @@ import sys
 from pathlib import Path
 
 
-def _publisher_dir() -> Path:
-    return Path(__file__).resolve().parent / "publisher"
+def _root() -> Path:
+    return Path(__file__).resolve().parent
+
+
+def _activate_paths() -> None:
+    root = _root()
+    for path in (root / "shared", root / "user", root / "publisher"):
+        value = str(path)
+        if value not in sys.path:
+            sys.path.insert(0, value)
 
 
 def _load_runtime():
-    publisher_dir = str(_publisher_dir())
-    if publisher_dir not in sys.path:
-        sys.path.insert(0, publisher_dir)
-
+    _activate_paths()
     from qiaolian_publisher_v2.cover_picker_patch import install_cover_picker
     from qiaolian_publisher_v2.daily_broadcast_patch import install_daily_broadcast_patch
     from qiaolian_publisher_v2.media_selection_patch import install_media_selection_patch
     from qiaolian_publisher_v2.review_queue_patch import install_review_queue_patch
     from qiaolian_publisher_v2.release_contract_patch import install_release_contract_patch
     from qiaolian_publisher_v2.bot import main
-
     return (
         main,
         install_cover_picker,
@@ -68,13 +72,11 @@ def run() -> None:
         install_review_queue_patch,
         install_release_contract_patch,
     ) = _load_runtime()
-
     install_cover_picker()
     install_media_selection_patch()
     install_review_queue_patch()
     install_release_contract_patch()
     install_daily_broadcast_patch()
-
     _acquire_single_instance_lock()
     main()
 
