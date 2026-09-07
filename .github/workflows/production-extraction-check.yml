@@ -30,17 +30,18 @@ jobs:
           python qiaolian_production/tools/slim_autopilot.py --write
           python -m py_compile qiaolian_production/shared/autopilot_publish_bot.py
           git diff --exit-code -- qiaolian_production/shared/autopilot_publish_bot.py
-      - name: Slice and compile meihua runtime candidate
+      - name: Verify committed meihua runtime slice
         run: |
           python qiaolian_production/tools/audit_meihua_symbols.py
           python qiaolian_production/tools/audit_meihua_symbols.py --write
           python -m py_compile qiaolian_production/shared/meihua_publisher.py
+          git diff --exit-code -- qiaolian_production/shared/meihua_publisher.py
           python - <<'PY'
           import sys
           from pathlib import Path
           repo = Path.cwd().resolve()
           prod = (repo / 'qiaolian_production').resolve()
-          for path in (prod / 'shared', prod / 'user', prod / 'publisher'):
+          for path in (prod / 'shared', prod / 'user', prod / 'collector', prod / 'publisher'):
               sys.path.insert(0, str(path))
           sys.path[:] = [p for p in sys.path if Path(p or '.').resolve() != repo]
           import meihua_publisher as mp
@@ -58,8 +59,10 @@ jobs:
           assert mp.default_caption_variant_for_property('公寓') == 'a'
           assert mp.default_caption_variant_for_property('别墅') == 'b'
           assert mp.default_caption_variant_for_property('办公室') == 'c'
-          print('MEIHUA_SLICE_IMPORT_OK')
+          print('MEIHUA_COMMITTED_SLICE_OK')
           PY
+      - name: Audit publication package symbol closure
+        run: python qiaolian_production/tools/audit_publication_package_symbols.py
       - name: Import collector from extracted tree only
         env:
           DB_PATH: '${{ runner.temp }}/qiaolian-extraction.db'
@@ -95,7 +98,7 @@ jobs:
               raise SystemExit('collector local-source leaks: ' + repr(sorted(leaks)))
           print('COLLECTOR_IMPORT_OK')
           PY
-      - name: Import publisher from sliced extracted tree only
+      - name: Import publisher from extracted tree only
         env:
           DB_PATH: '${{ runner.temp }}/qiaolian-extraction.db'
           SQLITE_PATH: '${{ runner.temp }}/qiaolian-extraction.db'
@@ -139,7 +142,7 @@ jobs:
               raise SystemExit('publisher local-source leaks: ' + repr(sorted(leaks)))
           print('PUBLISHER_IMPORT_OK')
           PY
-      - name: Build user bot from sliced extracted tree only
+      - name: Build user bot from extracted tree only
         env:
           DB_PATH: '${{ runner.temp }}/qiaolian-extraction-user.db'
           SQLITE_PATH: '${{ runner.temp }}/qiaolian-extraction-user.db'
@@ -176,16 +179,3 @@ jobs:
               raise SystemExit('user local-source leaks: ' + repr(sorted(leaks)))
           print('USER_BUILD_OK')
           PY
-      - name: Commit validated meihua slice
-        if: github.event_name == 'push'
-        run: |
-          if git diff --quiet -- qiaolian_production/shared/meihua_publisher.py; then
-            echo 'MEIHUA_SLICE_ALREADY_COMMITTED=1'
-            exit 0
-          fi
-          git diff --check
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add qiaolian_production/shared/meihua_publisher.py
-          git commit -m 'refactor: slim meihua production runtime'
-          git push origin HEAD:refactor/production-extraction
