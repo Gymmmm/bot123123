@@ -2,11 +2,26 @@
 -- This migration creates only isolated V3-owned tables. It does not alter
 -- Parser/Collector/Publisher/User Bot behavior and does not write legacy business tables.
 
+-- V3-owned source registry. A Source represents one intake origin (for example
+-- a Telegram channel) and owns SourcePost.source_id.
+CREATE TABLE IF NOT EXISTS v3_sources (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_type TEXT NOT NULL,
+    source_name TEXT NOT NULL,
+    external_identity TEXT NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN (0,1)),
+    collector_config_json TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(collector_config_json)),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(source_type, external_identity)
+);
+
 -- V3 SourcePost is an independent logical-post identity/state record.
 -- legacy_source_post_id is a nullable compatibility bridge only; it is not a FK
 -- and is never required to create a V3 SourcePost.
 CREATE TABLE IF NOT EXISTS v3_source_posts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_id INTEGER NOT NULL REFERENCES v3_sources(id) ON DELETE RESTRICT,
     source_identity_key TEXT NOT NULL UNIQUE,
     source_mode TEXT NOT NULL CHECK(source_mode IN ('collector','admin_import','migration')),
     source_type TEXT NOT NULL,
@@ -18,6 +33,9 @@ CREATE TABLE IF NOT EXISTS v3_source_posts (
     ingest_status TEXT NOT NULL DEFAULT 'COLLECTED' CHECK(length(ingest_status) > 0),
     parse_status TEXT NOT NULL DEFAULT 'COLLECTED' CHECK(length(parse_status) > 0),
     current_revision_id INTEGER REFERENCES source_post_revisions(id) ON DELETE RESTRICT,
+    first_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    status TEXT NOT NULL DEFAULT 'active' CHECK(length(status) > 0),
     legacy_source_post_id INTEGER UNIQUE,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -36,6 +54,8 @@ CREATE TABLE IF NOT EXISTS source_post_revisions (
     raw_videos_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(raw_videos_json)),
     raw_contact TEXT NOT NULL DEFAULT '',
     raw_meta_json TEXT NOT NULL DEFAULT '{}' CHECK(json_valid(raw_meta_json)),
+    source_created_at TEXT,
+    fetched_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(source_post_id, revision_no),
     UNIQUE(source_post_id, source_content_hash)
