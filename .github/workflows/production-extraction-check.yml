@@ -31,12 +31,19 @@ jobs:
           python - <<'PY'
           import sys
           from pathlib import Path
+
+          repo = Path.cwd().resolve()
+          prod = (repo / 'qiaolian_production').resolve()
           import qiaolian_production.run_collector as entry
           entry._activate_paths()
           entry.configure_environment()
+          sys.path[:] = [p for p in sys.path if Path(p or '.').resolve() != repo]
+
           import collector_bot
-          repo = Path.cwd().resolve()
-          prod = (repo / 'qiaolian_production').resolve()
+          import ai_parser
+          import publication_package
+          assert collector_bot and ai_parser and publication_package
+
           leaks = []
           for name, module in tuple(sys.modules.items()):
               raw = getattr(module, '__file__', None)
@@ -63,11 +70,24 @@ jobs:
           python - <<'PY'
           import sys
           from pathlib import Path
-          import qiaolian_production.run_publisher as entry
-          loaded = entry._load_runtime()
-          assert loaded and loaded[0]
+
           repo = Path.cwd().resolve()
           prod = (repo / 'qiaolian_production').resolve()
+          import qiaolian_production.run_publisher as entry
+          entry._activate_paths()
+          entry.configure_environment()
+          sys.path[:] = [p for p in sys.path if Path(p or '.').resolve() != repo]
+
+          loaded = entry._load_runtime()
+          assert loaded and loaded[0]
+          main, install_cover_picker, install_daily_broadcast_patch, install_media_selection_patch, install_review_queue_patch, install_release_contract_patch = loaded
+          install_cover_picker()
+          install_media_selection_patch()
+          install_review_queue_patch()
+          install_release_contract_patch()
+          install_daily_broadcast_patch()
+          assert main
+
           leaks = []
           for name, module in tuple(sys.modules.items()):
               raw = getattr(module, '__file__', None)
@@ -80,7 +100,7 @@ jobs:
               raise SystemExit('publisher local-source leaks: ' + repr(sorted(leaks)))
           print('PUBLISHER_IMPORT_OK')
           PY
-      - name: Import user bot from extracted tree only
+      - name: Build user bot from extracted tree only
         env:
           DB_PATH: '${{ runner.temp }}/qiaolian-extraction-user.db'
           SQLITE_PATH: '${{ runner.temp }}/qiaolian-extraction-user.db'
@@ -91,11 +111,20 @@ jobs:
           python - <<'PY'
           import sys
           from pathlib import Path
-          import qiaolian_production.run_user as entry
-          loaded = entry._load_runtime()
-          assert loaded and loaded[0]
+
           repo = Path.cwd().resolve()
           prod = (repo / 'qiaolian_production').resolve()
+          import qiaolian_production.run_user as entry
+          entry._activate_paths()
+          entry.configure_environment()
+          sys.path[:] = [p for p in sys.path if Path(p or '.').resolve() != repo]
+
+          loaded = entry._load_runtime()
+          assert loaded and loaded[0]
+          import qiaolian_dual.user_bot as user_bot
+          app = user_bot.build_application()
+          assert app is not None
+
           leaks = []
           for name, module in tuple(sys.modules.items()):
               raw = getattr(module, '__file__', None)
@@ -106,5 +135,5 @@ jobs:
                   leaks.append((name, str(path.relative_to(repo))))
           if leaks:
               raise SystemExit('user local-source leaks: ' + repr(sorted(leaks)))
-          print('USER_IMPORT_OK')
+          print('USER_BUILD_OK')
           PY
