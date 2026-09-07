@@ -101,11 +101,11 @@ def patch_legacy_path_globals(app_root: Path, *, publisher_runtime: bool = False
     if publisher_runtime:
         # autopilot_publish_bot is a compatibility helper used by the active
         # publisher patches. It is not a separate polling service, but its
-        # source/scratch/weather paths must remain rooted at the production app.
+        # source/scratch paths must remain rooted at the production app.
         import autopilot_publish_bot
 
         autopilot_publish_bot.BASE_DIR = app_root
         autopilot_publish_bot.DB_PATH = os.environ["DB_PATH"]
         autopilot_publish_bot._WEATHER_TEMPLATE_PATH = (
-            app_root / "assets" / "v2_2" / "weather_reminder_templates.json"
+            PACKAGE_ROOT / "shared" / "assets" / "v2_2" / "weather_reminder_templates.json"
         )
