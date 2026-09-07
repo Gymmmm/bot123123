@@ -3,9 +3,10 @@
 
 This operates only on qiaolian_production/shared/autopilot_publish_bot.py.
 Production roots are discovered from the active Publisher Bot and its runtime
-patch modules.  The production call to register_autopilot_features always uses
+patch modules. The production call to register_autopilot_features always uses
 simple_mode=True, so dependency scanning of that function intentionally follows
-only the simple-mode branch.
+only the simple-mode branch. The historical standalone ``main`` entrypoint is
+not a production service entrypoint and is excluded together with its guard.
 """
 from __future__ import annotations
 
@@ -25,7 +26,7 @@ HOST_SOURCES = [
     ROOT / "publisher" / "qiaolian_publisher_v2" / "release_contract_patch.py",
 ]
 
-# Symbols registered only by the live simple-mode branch.  Host-source discovery
+# Symbols registered only by the live simple-mode branch. Host-source discovery
 # adds every ap.<symbol> / direct import used by the active Publisher and patches.
 SIMPLE_MODE_ROOTS = {
     "register_autopilot_features",
@@ -118,6 +119,14 @@ def _is_main_guard(node: ast.AST) -> bool:
     )
 
 
+def _node_start_line(node: ast.AST) -> int:
+    start = int(getattr(node, "lineno", 1))
+    decorators = getattr(node, "decorator_list", None) or []
+    if decorators:
+        start = min(start, *(int(getattr(item, "lineno", start)) for item in decorators))
+    return start
+
+
 def analyze() -> tuple[set[str], set[str], set[str], ast.Module, dict[str, ast.AST]]:
     source = TARGET.read_text(encoding="utf-8")
     tree = ast.parse(source, filename=str(TARGET))
@@ -131,13 +140,15 @@ def analyze() -> tuple[set[str], set[str], set[str], ast.Module, dict[str, ast.A
             symbol_node.setdefault(name, node)
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
             removable_defs.update(names)
-        else:
+        elif not _is_main_guard(node):
             # Conservatively preserve top-level setup/assignments/imports and any
-            # helper definitions they reference.
+            # helper definitions they reference. The standalone main guard is
+            # explicitly outside the active systemd Publisher entrypoint.
             baseline_refs.update(_loaded_names(node))
 
     roots = SIMPLE_MODE_ROOTS | _host_roots() | baseline_refs
-    missing = {name for name in roots if name not in symbol_node and name in SIMPLE_MODE_ROOTS | _host_roots()}
+    required = SIMPLE_MODE_ROOTS | _host_roots()
+    missing = {name for name in required if name not in symbol_node}
 
     live: set[str] = set()
     queue = [name for name in roots if name in symbol_node]
@@ -159,26 +170,29 @@ def analyze() -> tuple[set[str], set[str], set[str], ast.Module, dict[str, ast.A
     return live, dead, missing, tree, symbol_node
 
 
-def _line_count_after_slice(tree: ast.Module, dead: set[str]) -> tuple[int, int]:
-    source_lines = TARGET.read_text(encoding="utf-8").splitlines()
+def _removed_lines(tree: ast.Module, dead: set[str]) -> set[int]:
     removed: set[int] = set()
     for node in tree.body:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and node.name in dead:
-            removed.update(range(node.lineno, (node.end_lineno or node.lineno) + 1))
+            removed.update(range(_node_start_line(node), (node.end_lineno or node.lineno) + 1))
         elif _is_main_guard(node):
             removed.update(range(node.lineno, (node.end_lineno or node.lineno) + 1))
+    return removed
+
+
+def _line_count_after_slice(tree: ast.Module, dead: set[str]) -> tuple[int, int]:
+    source_lines = TARGET.read_text(encoding="utf-8").splitlines()
+    removed = _removed_lines(tree, dead)
     return len(source_lines), len(source_lines) - len(removed)
 
 
 def write_slice(dead: set[str], tree: ast.Module) -> None:
     lines = TARGET.read_text(encoding="utf-8").splitlines(keepends=True)
-    removed: set[int] = set()
-    for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and node.name in dead:
-            removed.update(range(node.lineno, (node.end_lineno or node.lineno) + 1))
-        elif _is_main_guard(node):
-            removed.update(range(node.lineno, (node.end_lineno or node.lineno) + 1))
-    TARGET.write_text("".join(line for no, line in enumerate(lines, start=1) if no not in removed), encoding="utf-8")
+    removed = _removed_lines(tree, dead)
+    TARGET.write_text(
+        "".join(line for no, line in enumerate(lines, start=1) if no not in removed),
+        encoding="utf-8",
+    )
 
 
 def main(argv: Iterable[str] | None = None) -> int:
