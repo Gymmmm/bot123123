@@ -19,15 +19,16 @@ def build_album_external_post_id(*, grouped_id: int | str | None, anchor_message
     return f"album_{grouped_id}"
 
 
-def make_source_content_hash(sanitized_text: str, media_hashes: Iterable[str]) -> str:
-    """Hash semantic source evidence, not fetch timestamps or source contacts.
+def make_source_content_hash(sanitized_text: str, media_identities: Iterable[str]) -> str:
+    """Hash semantic source evidence using normalized ordered media identity.
 
-    Media identity is normalized as a sorted multiset so transport/order-only
-    differences do not manufacture a new SourcePostRevision.
+    The caller normalizes media order (Telegram album/source order). This
+    function deliberately preserves that order and duplicate identities so an
+    album reorder is a real SourcePostRevision change.
     """
     payload = {
         "sanitized_text": str(sanitized_text or ""),
-        "media_hashes": sorted(str(value) for value in media_hashes if str(value)),
+        "media_identities": [str(value) for value in media_identities if str(value)],
     }
     encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
