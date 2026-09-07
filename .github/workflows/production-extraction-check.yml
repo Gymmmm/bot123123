@@ -40,7 +40,7 @@ jobs:
           leaks = []
           for name, module in tuple(sys.modules.items()):
               raw = getattr(module, '__file__', None)
-              if not raw:
+              if not raw or name == '__main__' or str(raw).startswith('<'):
                   continue
               path = Path(raw).resolve()
               if (path == repo or repo in path.parents) and not (path == prod or prod in path.parents):
@@ -71,7 +71,7 @@ jobs:
           leaks = []
           for name, module in tuple(sys.modules.items()):
               raw = getattr(module, '__file__', None)
-              if not raw:
+              if not raw or name == '__main__' or str(raw).startswith('<'):
                   continue
               path = Path(raw).resolve()
               if (path == repo or repo in path.parents) and not (path == prod or prod in path.parents):
@@ -99,7 +99,7 @@ jobs:
           leaks = []
           for name, module in tuple(sys.modules.items()):
               raw = getattr(module, '__file__', None)
-              if not raw:
+              if not raw or name == '__main__' or str(raw).startswith('<'):
                   continue
               path = Path(raw).resolve()
               if (path == repo or repo in path.parents) and not (path == prod or prod in path.parents):
