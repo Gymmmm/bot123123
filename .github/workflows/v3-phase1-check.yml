@@ -6,7 +6,7 @@ on:
       - v3/refactor-baseline
   pull_request:
     branches:
-      - master
+      - v3/baseline-base
   workflow_dispatch:
 
 jobs:
