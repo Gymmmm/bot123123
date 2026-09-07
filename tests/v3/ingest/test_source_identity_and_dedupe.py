@@ -25,12 +25,13 @@ def test_single_and_album_external_identity_contract():
     assert build_album_external_post_id(grouped_id=None, anchor_message_id=100) == 'album_100'
 
 
-def test_source_content_hash_uses_sanitized_text_and_normalized_media_identity():
+def test_source_content_hash_preserves_normalized_ordered_media_identity():
     a = make_source_content_hash('租金 $800/月', ['b' * 64, 'a' * 64])
     b = make_source_content_hash('租金 $800/月', ['a' * 64, 'b' * 64])
-    assert a == b
-    assert a != make_source_content_hash('租金 $850/月', ['a' * 64, 'b' * 64])
-    assert a != make_source_content_hash('租金 $800/月', ['a' * 64, 'c' * 64])
+    assert a != b
+    assert a != make_source_content_hash('租金 $850/月', ['b' * 64, 'a' * 64])
+    assert a != make_source_content_hash('租金 $800/月', ['b' * 64, 'c' * 64])
+    assert make_source_content_hash('x', ['a', 'a']) != make_source_content_hash('x', ['a'])
 
 
 def test_same_identity_same_hash_is_duplicate_ignore_and_only_moves_last_seen():
@@ -91,6 +92,33 @@ def test_same_identity_changed_hash_creates_new_revision_not_duplicate_skip():
     assert updated.revision_id != first.revision_id
     post = conn.execute('SELECT current_revision_id FROM v3_source_posts WHERE id=?', (first.source_post_id,)).fetchone()
     assert post['current_revision_id'] == updated.revision_id
+
+
+def test_same_text_same_media_different_order_creates_revision():
+    conn = migrated_connection()
+    service = SourceIngestService(conn)
+    photo_a = _media(b'photo-a', order=0, message_id=10)
+    photo_b = _media(b'photo-b', order=1, message_id=11)
+
+    first = service.ingest_telegram(
+        source_name='fixture', source_external_identity='-100123', external_post_id='album_77',
+        raw_text='租金 $800/月', media=[photo_a, photo_b],
+        source_created_at='2026-09-01T10:00:00+00:00', fetched_at='2026-09-01T10:01:00+00:00',
+    )
+    reordered = service.ingest_telegram(
+        source_name='fixture', source_external_identity='-100123', external_post_id='album_77',
+        raw_text='租金 $800/月',
+        media=[
+            _media(b'photo-b', order=0, message_id=11),
+            _media(b'photo-a', order=1, message_id=10),
+        ],
+        source_created_at='2026-09-01T10:00:00+00:00', fetched_at='2026-09-01T10:06:00+00:00',
+    )
+
+    assert first.source_content_hash != reordered.source_content_hash
+    assert reordered.disposition is IngestDisposition.SOURCE_UPDATED
+    assert reordered.revision_no == 2
+    assert reordered.revision_id != first.revision_id
 
 
 def test_revision_preserves_source_created_and_fetched_timestamps():
