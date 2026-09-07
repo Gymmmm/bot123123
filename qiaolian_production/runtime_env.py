@@ -44,9 +44,21 @@ def configure_environment() -> Path:
         os.getenv("COLLECTOR_DOWNLOAD_DIR", str(app_root / "media" / "collector_downloads")),
         app_root,
     )
+    media_root = _absolute_from_app_root(
+        os.getenv("MEDIA_ROOT", str(app_root / "media")), app_root
+    )
     render_tmp = _absolute_from_app_root(
-        os.getenv("QIAOLIAN_RENDER_TMP", str(app_root / "media" / "renders" / "runtime")),
+        os.getenv("QIAOLIAN_RENDER_TMP", str(media_root / "renders" / "runtime")),
         app_root,
+    )
+    discussion_map = _absolute_from_app_root(
+        os.getenv("DISCUSSION_MAP_FILE", str(data_dir / "discussion_map.json")), app_root
+    )
+    discussion_bridge = _absolute_from_app_root(
+        os.getenv("DISCUSSION_BRIDGE_FILE", str(data_dir / "discussion_bridge.json")), app_root
+    )
+    playwright_browsers = _absolute_from_app_root(
+        os.getenv("PLAYWRIGHT_BROWSERS_PATH", str(app_root / ".playwright-browsers")), app_root
     )
     corner_logo = _absolute_from_app_root(
         os.getenv(
@@ -64,7 +76,11 @@ def configure_environment() -> Path:
     os.environ["SQLITE_PATH"] = str(sqlite_path)
     os.environ["COLLECTOR_SOURCES_JSON"] = str(sources_path)
     os.environ["COLLECTOR_DOWNLOAD_DIR"] = str(download_dir)
+    os.environ["MEDIA_ROOT"] = str(media_root)
     os.environ["QIAOLIAN_RENDER_TMP"] = str(render_tmp)
+    os.environ["DISCUSSION_MAP_FILE"] = str(discussion_map)
+    os.environ["DISCUSSION_BRIDGE_FILE"] = str(discussion_bridge)
+    os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(playwright_browsers)
     os.environ["CORNER_LOGO_PATH"] = str(corner_logo)
     os.environ["QIAOLIAN_GALLERY_LOGO"] = str(gallery_logo)
 
