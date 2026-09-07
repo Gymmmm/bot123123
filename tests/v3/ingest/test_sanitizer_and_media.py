@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
 from qiaolian_v3.ingest.sanitizer import sanitize_source_text, strip_unicode_noise
 from qiaolian_v3.ingest.source_service import SourceIngestService
-from qiaolian_v3.media.source_media import SourceMedia
+from qiaolian_v3.media.source_media import SourceMedia, TelegramSourceMedia
 from tests.v3.db._helpers import migrated_connection
 
 
@@ -30,6 +35,62 @@ def test_media_hash_is_content_based_and_stable(tmp_path):
     assert a.content_hash == b.content_hash == from_file.content_hash
     assert a.content_hash != c.content_hash
     assert len(a.content_hash) == 64
+    assert a.media_identity == a.content_hash
+
+
+@pytest.mark.asyncio
+async def test_telegram_media_download_prefers_file_hash_and_keeps_evidence(tmp_path):
+    downloaded = tmp_path / 'photo.jpg'
+
+    class FakeClient:
+        async def download_media(self, media, file):
+            assert media is message.media
+            assert Path(file) == tmp_path
+            downloaded.write_bytes(b'telegram-photo-bytes')
+            return str(downloaded)
+
+    message = SimpleNamespace(
+        id=321,
+        media=SimpleNamespace(
+            photo=SimpleNamespace(id=987, access_hash=654),
+            document=None,
+        ),
+    )
+
+    item = await TelegramSourceMedia.download(
+        FakeClient(), message, download_dir=tmp_path, sort_order=2, media_type='photo'
+    )
+
+    assert item.local_path == str(downloaded.resolve())
+    assert item.telegram_file_id == '987'
+    assert item.telegram_file_unique_id == '654'
+    assert item.message_id == 321
+    assert item.sort_order == 2
+    assert item.content_hash
+    assert item.media_identity == item.content_hash
+
+
+@pytest.mark.asyncio
+async def test_telegram_media_download_falls_back_to_unique_identity_without_file_hash(tmp_path):
+    class FakeClient:
+        async def download_media(self, media, file):
+            return None
+
+    message = SimpleNamespace(
+        id=400,
+        media=SimpleNamespace(
+            photo=SimpleNamespace(id=111, access_hash=222),
+            document=None,
+        ),
+    )
+
+    item = await TelegramSourceMedia.download(
+        FakeClient(), message, download_dir=tmp_path, sort_order=0, media_type='photo'
+    )
+
+    assert item.content_hash == ''
+    assert item.telegram_file_unique_id == '222'
+    assert item.media_identity == 'telegram_unique:222'
 
 
 def test_less_than_four_photos_are_preserved_as_revision_media():
@@ -51,5 +112,5 @@ def test_less_than_four_photos_are_preserved_as_revision_media():
         'SELECT media_asset_key,sort_order FROM source_post_media WHERE source_post_revision_id=? ORDER BY sort_order',
         (result.revision_id,),
     ).fetchall()
-    assert [row['media_asset_key'] for row in links] == [item.content_hash for item in media]
+    assert [row['media_asset_key'] for row in links] == [item.media_identity for item in media]
     assert [row['sort_order'] for row in links] == [0, 1, 2]
