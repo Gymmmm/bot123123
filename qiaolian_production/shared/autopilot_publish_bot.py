@@ -460,18 +460,6 @@ def _ensure_collect_sources_table() -> None:
         c.commit()
 
 
-def _ensure_default_collect_source() -> None:
-    _ensure_collect_sources_table()
-    with _conn() as c:
-        c.execute(
-            """
-            INSERT OR IGNORE INTO collect_sources (
-                source_key, source_name, source_type, source_url, fetch_mode, is_enabled, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-            """,
-            ("zufang555", "zufang555 频道", "telethon", "https://t.me/zufang555", "channel"),
-        )
-        c.commit()
 
 
 def _get_setting(key: str, default: str = "") -> str:
@@ -506,25 +494,6 @@ def _slots_raw_effective() -> str:
     return v if v else SLOTS_RAW
 
 
-def _parse_slots_from_raw(raw: str) -> list[time]:
-    out: list[time] = []
-    for part in raw.split(","):
-        part = part.strip()
-        if not part:
-            continue
-        m = re.match(r"^(\d{1,2}):(\d{2})$", part)
-        if not m:
-            continue
-        h, mi = int(m.group(1)), int(m.group(2))
-        if h > 23 or mi > 59:
-            continue
-        out.append(time(h, mi, tzinfo=TZ))
-    return out or [
-        time(9, 0, tzinfo=TZ),
-        time(12, 0, tzinfo=TZ),
-        time(15, 0, tzinfo=TZ),
-        time(20, 0, tzinfo=TZ),
-    ]
 
 
 def _parse_hhmm(s: str) -> tuple[int, int] | None:
@@ -820,59 +789,13 @@ def default_pin_html() -> str:
         '<b>侨联地产｜您在金边的自己人</b>'
     )
 
-def channel_index_html() -> str:
-    """旧 /post_index 复用唯一置顶文案，避免产生第二套导航口径。"""
-    return default_pin_html()
 
 
-async def cmd_post_index(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """发布频道索引帖（第二条置顶）。"""
-    if not _is_admin(update.effective_user.id):
-        return
-    if not CHANNEL_ID:
-        await update.message.reply_text("未配置 CHANNEL_ID。")
-        return
-    if not _direct_publish_enabled():
-        logger.warning("Direct publish via autopilot blocked. Set AUTOPILOT_DIRECT_PUBLISH_ENABLED=yes to enable.")
-        await update.effective_message.reply_text("⛔ 当前生产配置已关闭直接发布，未发送频道消息。")
-        return
-    text = channel_index_html()
-    kb = build_channel_menu_keyboard()
-    try:
-        msg = await context.bot.send_message(
-            chat_id=CHANNEL_ID,
-            text=text,
-            parse_mode=ParseMode.HTML,
-            disable_web_page_preview=True,
-            reply_markup=kb if kb.inline_keyboard else None,
-        )
-        try:
-            await context.bot.pin_chat_message(chat_id=CHANNEL_ID, message_id=msg.message_id, disable_notification=True)
-            note = "已尝试置顶。"
-        except Exception as e:
-            note = f"发帖成功，置顶失败：{e}"
-        await update.message.reply_text(f"频道索引帖已发送。\n{note}")
-    except Exception as e:
-        logger.exception("cmd_post_index")
-        await update.message.reply_text(f"发送失败：{e}")
 
 
 # ── 命令 ──────────────────────────────────────────────────
 
 
-async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not _is_admin(update.effective_user.id):
-        return
-    await update.message.reply_text(
-        "🏠 <b>侨联发布助手</b>\n\n"
-        "发房源只要三步：\n"
-        "1. 发文字和图片\n"
-        "2. 看预览，缺什么就补什么\n"
-        "3. 确认后发布\n\n"
-        "直接点下面第一个按钮开始。",
-        parse_mode=ParseMode.HTML,
-        reply_markup=admin_menu(),
-    )
 
 
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -937,125 +860,12 @@ _QUALITY_REASON_LABELS = {
 _NON_BLOCKING_QUALITY_CODES = {"whitelist_core_area", "whitelist_known_property"}
 
 
-def _quality_codes(review_note: str | None) -> list[str]:
-    """只读地取出当前质量评估写入的阻塞码，兼容用 | 串接的历史备注。"""
-    note = str(review_note or "")
-    match = re.search(r"(?:^|\|)\s*quality:([^|]+)", note)
-    if not match:
-        return []
-    return [item.strip() for item in match.group(1).split(",") if item.strip()]
 
 
-def _quality_text(codes: list[str]) -> str:
-    if not codes:
-        return "待人工复核"
-    actionable = [code for code in codes if code not in _NON_BLOCKING_QUALITY_CODES]
-    if not actionable:
-        return "无阻塞项（仅识别标签）"
-    return "、".join(_QUALITY_REASON_LABELS.get(code, code) for code in actionable)
 
 
-async def cmd_quality(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """面板“质量检查”：列出真实阻塞项和可继续处理的草稿，不创建/修改发布包。"""
-    if not _is_admin(update.effective_user.id):
-        return
-    try:
-        with _conn() as c:
-            rows = c.execute(
-                """SELECT draft_id, title, review_status, queue_score, review_note,
-                          area, price, layout, cover_asset_id, updated_at
-                   FROM drafts
-                   WHERE review_status IN ('pending', 'ready')
-                   ORDER BY CASE review_status WHEN 'ready' THEN 0 ELSE 1 END,
-                            COALESCE(queue_score, 0) DESC, id DESC
-                   LIMIT 60"""
-            ).fetchall()
-    except Exception:
-        logger.exception("quality panel query failed")
-        await update.message.reply_text("❌ 暂时无法读取草稿质量数据，请稍后重试。", reply_markup=admin_menu())
-        return
-
-    pending = [row for row in rows if row["review_status"] == "pending"]
-    ready = [row for row in rows if row["review_status"] == "ready"]
-    reason_counts: dict[str, int] = {}
-    informational_counts: dict[str, int] = {}
-    no_cover = 0
-    for row in pending:
-        if not row["cover_asset_id"]:
-            no_cover += 1
-        for code in _quality_codes(row["review_note"]):
-            target = informational_counts if code in _NON_BLOCKING_QUALITY_CODES else reason_counts
-            target[code] = target.get(code, 0) + 1
-
-    lines = [
-        "🔍 <b>检查问题</b>",
-        f"需要处理：<b>{len(pending)}</b> 套 · 已准备审核：<b>{len(ready)}</b>",
-    ]
-    if not rows:
-        lines.append("当前没有待处理房源。")
-    elif reason_counts or no_cover:
-        lines.append("\n<b>最常见阻塞</b>")
-        ranked = sorted(reason_counts.items(), key=lambda item: (-item[1], item[0]))[:5]
-        for code, count in ranked:
-            lines.append(f"• {_QUALITY_REASON_LABELS.get(code, code)}：{count} 套")
-        if no_cover:
-            lines.append(f"• 尚无审核封面：{no_cover} 套")
-    if informational_counts:
-        tags = "、".join(
-            f"{_QUALITY_REASON_LABELS.get(code, code)} {count} 套"
-            for code, count in sorted(informational_counts.items(), key=lambda item: (-item[1], item[0]))
-        )
-        lines.append(f"\n已识别但不影响处理：{tags}")
-    if pending:
-        lines.append("\n<b>优先处理（最多 6 套）</b>")
-        for row in pending[:6]:
-            title = html.escape(str(row["title"] or "（无标题）")[:32])
-            issues = html.escape(_quality_text(_quality_codes(row["review_note"])))
-            lines.append(
-                f"• {title}\n"
-                f"  需要处理：{issues}"
-            )
-        lines.append("\n请点击对应房源卡片继续；不确定时先点“检查问题”。")
-    await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML, reply_markup=admin_menu())
 
 
-async def cmd_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """面板“数据仪表盘”：给出运营所需的真实只读总览，不触发发布或采集。"""
-    if not _is_admin(update.effective_user.id):
-        return
-    try:
-        with _conn() as c:
-            pending = c.execute("SELECT COUNT(*) FROM drafts WHERE review_status='pending'").fetchone()[0]
-            ready = c.execute("SELECT COUNT(*) FROM drafts WHERE review_status='ready'").fetchone()[0]
-            approved = c.execute("SELECT COUNT(*) FROM drafts WHERE review_status='approved'").fetchone()[0]
-            published_today = c.execute(
-                """SELECT COUNT(*) FROM posts
-                   WHERE publish_status='published'
-                     AND date(COALESCE(published_at, updated_at), 'localtime') = date('now', 'localtime')"""
-            ).fetchone()[0]
-            source_today = c.execute(
-                "SELECT COUNT(*) FROM source_posts WHERE date(COALESCE(created_at, fetched_at), 'localtime') = date('now', 'localtime')"
-            ).fetchone()[0]
-            appointments_today = 0
-            if _table_exists(c, "appointments"):
-                appointments_today = c.execute(
-                    "SELECT COUNT(*) FROM appointments WHERE date(created_at, 'localtime') = date('now', 'localtime')"
-                ).fetchone()[0]
-    except Exception:
-        logger.exception("dashboard panel query failed")
-        await update.message.reply_text("❌ 暂时无法读取运营数据，请稍后重试。", reply_markup=admin_menu())
-        return
-
-    paused = _scheduler_paused()
-    lines = [
-        "📊 <b>数据仪表盘（今日）</b>",
-        f"新采集：<b>{source_today}</b> · 待审核：<b>{pending}</b>",
-        f"审核包 ready：<b>{ready}</b> · 已批准待发：<b>{approved}</b>",
-        f"频道已发：<b>{published_today}</b> · 新预约：<b>{appointments_today}</b>",
-        f"队列：<b>{'暂停' if paused else '运行'}</b> · 槽位：<code>{html.escape(_slots_raw_effective())}</code>",
-        "\n此页只读；发布前请对单套执行 <code>/check QL-RF-K7M2</code>。",
-    ]
-    await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML, reply_markup=admin_menu())
 
 
 def _parse_analytics_days(context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1393,170 +1203,10 @@ async def cmd_logs(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("\n".join(out), parse_mode=ParseMode.HTML, reply_markup=admin_menu())
 
 
-async def cmd_publish(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """兼容旧命令：/publish == /send"""
-    await cmd_send(update, context)
 
 
-async def cmd_approve(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Build and approve one selected frozen package; never publish it."""
-    if not _is_admin(update.effective_user.id):
-        return
-    if not context.args:
-        await update.effective_message.reply_text(
-            "用法：<code>/approve QL-RF-K7M2 A</code>\n"
-            "A=标准信息，B=亮点价格，C=专业参数。省略版本时按物业类型自动选择。\n"
-            "更推荐直接点 <code>/pending</code> 中的封面预览按钮。",
-            parse_mode=ParseMode.HTML,
-        )
-        return
-    input_id = context.args[0].strip()
-    draft_id = _resolve_admin_draft_id(input_id)
-    if not draft_id:
-        await update.effective_message.reply_text(
-            f"❌ 未找到房源：<code>{html.escape(input_id)}</code>",
-            parse_mode=ParseMode.HTML,
-        )
-        return
-    try:
-        from publication_package import approve_package, build_package
-        with _conn() as c:
-            draft = c.execute("SELECT * FROM drafts WHERE draft_id=?", (draft_id,)).fetchone()
-            pkg = c.execute(
-                "SELECT package_id, package_version, status, property_id, snapshot_json FROM publication_packages WHERE draft_id=? ORDER BY package_version DESC LIMIT 1",
-                (draft_id,),
-            ).fetchone()
-        if not draft:
-            await update.effective_message.reply_text(f"❌ 未找到房源：<code>{html.escape(input_id)}</code>", parse_mode=ParseMode.HTML)
-            return
-        draft_state = str(draft["review_status"] or "").lower()
-        if draft_state == 'publishing':
-            await update.effective_message.reply_text(
-                "⛔ 此草稿正在投递或等待对账，不能重新审核或再次发送。请先处理投递记录。",
-                parse_mode=ParseMode.HTML,
-            )
-            return
-        if draft_state == 'published':
-            await update.effective_message.reply_text(
-                "⛔ 此草稿已经发布。需要重新公开发布时必须新建草稿并重新生成、审核冻结包。",
-                parse_mode=ParseMode.HTML,
-            )
-            return
-        if pkg and str(pkg[2] or '').lower() == 'approved':
-            try:
-                frozen_variant = str(json.loads(pkg[4] or "{}").get("caption_variant") or "a").lower()
-            except (TypeError, ValueError, json.JSONDecodeError):
-                frozen_variant = "a"
-            await update.effective_message.reply_text(
-                f"✅ {_admin_qc_for_draft(draft_id)} 已审核，冻结文案为 <b>{_caption_variant_label(frozen_variant)}</b>。\n"
-                "点击下方按钮即可发布。",
-                parse_mode=ParseMode.HTML,
-                reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("📤 发布到频道", callback_data=f"ap:n{frozen_variant}:{int(draft['id'])}"),
-                ]]),
-            )
-            return
-
-        variant = _selected_variant_for_draft(draft)
-        if len(context.args) >= 2:
-            raw_variant = str(context.args[1] or "").strip().lower()
-            aliases = {
-                "a": "a", "标准": "a", "标准信息": "a",
-                "b": "b", "亮点": "b", "亮点价格": "b",
-                "c": "c", "专业": "c", "专业参数": "c",
-            }
-            if raw_variant not in aliases:
-                await update.effective_message.reply_text("文案版本只能是 A、B 或 C。")
-                return
-            variant = aliases[raw_variant]
-        _save_caption_variant_for_draft(draft_id, variant)
-
-        package_variant = ""
-        package_template = ""
-        if pkg and pkg[4]:
-            try:
-                package_snapshot = json.loads(pkg[4])
-                package_variant = str(package_snapshot.get("caption_variant") or "").lower()
-                package_template = normalize_cover_style(package_snapshot.get("cover_template"))
-            except (TypeError, ValueError, json.JSONDecodeError):
-                package_variant = ""
-                package_template = ""
-        reusable = bool(
-            pkg
-            and str(pkg[2] or "").lower() == "package_ready"
-            and re.fullmatch(r"(?i)l_\d+", str(pkg[3] or ""))
-            and package_variant == variant
-            and package_template == _cover_template_from_note(draft["review_note"])
-        )
-        if not reusable:
-            await asyncio.to_thread(
-                build_package,
-                DB_PATH,
-                draft_id,
-                caption_variant_override=variant,
-            )
-        approved = await asyncio.to_thread(approve_package, DB_PATH, draft_id, str(update.effective_user.id))
-        with _conn() as c:
-            c.execute(
-                "UPDATE drafts SET review_status='approved', approved_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP WHERE draft_id=?",
-                (draft_id,),
-            )
-            c.commit()
-        _log_action(update.effective_user.id, 'approve_package', draft_id, str(approved.get('package_id') or ''))
-        await update.effective_message.reply_text(
-            f"✅ {_admin_qc_for_draft(draft_id)} 审核通过\n"
-            f"文案：<b>{_caption_variant_label(variant)}</b>（已冻结）\n"
-            "下一步：点击下方按钮发布到频道。",
-            parse_mode=ParseMode.HTML,
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("📤 发布到频道", callback_data=f"ap:n{variant}:{int(draft['id'])}"),
-            ]]),
-        )
-    except Exception as exc:
-        logger.exception('approve package failed')
-        reason = str(exc)
-        if reason in {"package_source_post_has_no_media_assets", "package_source_media_missing_asset_ids", "missing_usable_images"}:
-            text = (
-                "❌ 审核包未生成：这套房源没有可冻结的原始图片。\n"
-                "请通过「微信导入」重新发送至少 1 张图片后再点完成；系统不会用其他房源图片补位。"
-            )
-        else:
-            text = f"❌ 审核未完成：<code>{html.escape(reason)}</code>"
-        await update.effective_message.reply_text(text, parse_mode=ParseMode.HTML)
 
 
-async def cmd_reject(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """兼容旧命令：按 draft_id 丢弃草稿。"""
-    if not _is_admin(update.effective_user.id):
-        return
-    if not context.args:
-        await update.message.reply_text("用法：<code>/reject QL-RF-K7M2</code>", parse_mode=ParseMode.HTML)
-        return
-    input_id = context.args[0].strip()
-    draft_id = _resolve_admin_draft_id(input_id)
-    if not draft_id:
-        await update.message.reply_text(f"未找到房源：<code>{html.escape(input_id)}</code>", parse_mode=ParseMode.HTML)
-        return
-    display_id = _admin_qc_for_draft(draft_id)
-    with _conn() as c:
-        row = c.execute("SELECT id, review_note FROM drafts WHERE draft_id=?", (draft_id,)).fetchone()
-        if not row:
-            await update.message.reply_text(f"未找到草稿：<code>{html.escape(display_id)}</code>", parse_mode=ParseMode.HTML)
-            return
-        note = (row["review_note"] or "").strip()
-        extra = "rejected_by_command"
-        next_note = f"{note} | {extra}" if note else extra
-        c.execute(
-            """UPDATE drafts
-               SET review_status='rejected',
-                   review_note=?,
-                   updated_at=CURRENT_TIMESTAMP
-               WHERE draft_id=?""",
-            (next_note, draft_id),
-        )
-        c.commit()
-    _log_action(update.effective_user.id, "reject", draft_id, "from /reject")
-    await update.message.reply_text(f"🗑 已丢弃草稿：<code>{html.escape(display_id)}</code>", parse_mode=ParseMode.HTML)
 
 
 def _scheduler_paused() -> bool:
@@ -2064,11 +1714,6 @@ async def cmd_daily_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await update.message.reply_text("请下一条消息发送每日广播正文（支持 HTML）。发送 /cancel 取消。")
 
 
-async def cmd_pin_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not _is_admin(update.effective_user.id):
-        return
-    context.user_data["await"] = "pin_html"
-    await update.message.reply_text("请下一条消息发送频道置顶帖正文（HTML）。发送 /cancel 取消。")
 
 
 async def cmd_intake(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2154,13 +1799,6 @@ async def cmd_batch_generate(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
 
 
-async def cmd_intake_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not _is_admin(update.effective_user.id):
-        return
-    context.user_data.pop("await", None)
-    context.user_data.pop("intake_text", None)
-    context.user_data.pop("intake_images", None)
-    await update.message.reply_text("已取消微信笔记导入。")
 
 
 async def cmd_intake_done(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2359,64 +1997,8 @@ async def cmd_tpl(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML)
 
 
-async def cmd_tpl_use(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not _is_admin(update.effective_user.id):
-        return
-    if not context.args or not context.args[0].isdigit():
-        await update.message.reply_text("用法：<code>/tpl_use 1</code>", parse_mode=ParseMode.HTML)
-        return
-    n = int(context.args[0])
-    if n not in DAILY_TEMPLATES:
-        await update.message.reply_text("编号不存在，先 /tpl 查看。")
-        return
-    _, body = DAILY_TEMPLATES[n]
-    _set_setting(KEY_DAILY_TEXT, body)
-    await update.message.reply_text(f"已套用模版 {n} 作为每日广播正文。\n可用 /daily 查看。", parse_mode=ParseMode.HTML)
 
 
-async def cmd_tpl_test(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """各模版各发一条，便于核对 HTML 与按钮（默认发频道）。"""
-    if not _is_admin(update.effective_user.id):
-        return
-    args = [a.lower() for a in (context.args or [])]
-    only_here = "here" in args or "private" in args or "dm" in args
-    if not only_here and not CHANNEL_ID:
-        await update.message.reply_text(
-            "未配置 CHANNEL_ID。使用 <code>/tpl_test here</code> 仅在当前聊天预览各模版。",
-            parse_mode=ParseMode.HTML,
-        )
-        return
-    if (not only_here) and (not _direct_publish_enabled()):
-        logger.warning("Direct publish via autopilot blocked. Set AUTOPILOT_DIRECT_PUBLISH_ENABLED=yes to enable.")
-        await update.effective_message.reply_text("⛔ 当前生产配置已关闭频道发布，未发送模板。")
-        return
-    dest = update.effective_chat.id if only_here else CHANNEL_ID
-    kb = build_channel_menu_keyboard()
-    markup = kb if kb.inline_keyboard else None
-    sent = 0
-    errs: list[str] = []
-    for n, (title, body) in sorted(DAILY_TEMPLATES.items()):
-        header = f"<b>【测试·模版{n}·{html.escape(title)}】</b>\n\n"
-        text = header + body
-        if len(text) > 3900:
-            text = text[:3900]
-        try:
-            await context.bot.send_message(
-                chat_id=dest,
-                text=text,
-                parse_mode=ParseMode.HTML,
-                disable_web_page_preview=True,
-                reply_markup=markup,
-            )
-            sent += 1
-            await asyncio.sleep(0.35)
-        except Exception as e:
-            errs.append(f"{n}: {e}")
-    loc = "频道" if not only_here else "本聊天"
-    msg = f"已发往{loc}：{sent}/{len(DAILY_TEMPLATES)} 条。"
-    if errs:
-        msg += "\n失败：" + "；".join(errs)
-    await update.message.reply_text(msg)
 
 
 async def cmd_post_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2596,13 +2178,6 @@ def _variant_from_action(act: str) -> str:
     return "a"
 
 
-def _caption_variant_label(variant: str) -> str:
-    return {
-        "a": "A·标准信息版",
-        "b": "B·亮点价格版",
-        "c": "C·专业参数版",
-        "d": "D·简洁推广版",
-    }.get(str(variant or "").lower(), "A·标准信息版")
 
 
 def _default_variant_for_draft(row: sqlite3.Row | dict) -> str:
@@ -2647,22 +2222,6 @@ def _save_caption_variant_for_draft(draft_id: str, variant: str) -> None:
         c.commit()
 
 
-def _return_publish_blocked_to_pending(draft_id: str) -> None:
-    with _conn() as c:
-        row = c.execute("SELECT review_note FROM drafts WHERE draft_id=?", (draft_id,)).fetchone()
-        current = (row["review_note"] or "").strip() if row else ""
-        parts = [p.strip() for p in current.split("|") if p.strip()]
-        if "publish_gate_blocked" not in parts:
-            parts.append("publish_gate_blocked")
-        c.execute(
-            """UPDATE drafts
-               SET review_status='pending',
-                   review_note=?,
-                   updated_at=CURRENT_TIMESTAMP
-               WHERE draft_id=?""",
-            (" | ".join(parts), draft_id),
-        )
-        c.commit()
 
 
 async def _send_visual_preview(
@@ -3221,74 +2780,6 @@ async def on_photo_private(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await update.message.reply_text("图片保存失败，请重发，或直接 /intake_done 先导入文本。")
 
 
-async def scheduled_publish(context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Publish one explicitly approved frozen package through the same publisher as /send.
-
-    The scheduler never consumes ready/pending drafts and never rewrites an
-    approval after a publisher failure.  The delivery protocol owns the only
-    transition to publishing/published or an explicit reconciliation hold.
-    """
-    if _scheduler_paused():
-        logger.info("定时房源帖：暂停，跳过")
-        return
-    if not _direct_publish_enabled():
-        logger.warning("定时房源帖：发布开关关闭，跳过")
-        return
-    with _conn() as c:
-        if c.execute(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='publication_packages'"
-        ).fetchone() is None:
-            orphan = c.execute(
-                "SELECT draft_id FROM drafts WHERE review_status IN ('ready','approved') ORDER BY id LIMIT 1"
-            ).fetchone()
-            if orphan:
-                _return_publish_blocked_to_pending(str(orphan["draft_id"]))
-            logger.error("定时房源帖：publication_packages 表不存在；请先执行数据库 bootstrap，已安全跳过")
-            return
-        row = c.execute(
-            """SELECT d.id, d.draft_id, d.review_note, d.property_type, pp.snapshot_json
-               FROM drafts d
-               JOIN publication_packages pp ON pp.draft_id=d.draft_id
-               WHERE d.review_status='approved' AND pp.status='approved'
-               ORDER BY COALESCE(d.queue_score, 0) DESC, d.id ASC
-               LIMIT 1"""
-        ).fetchone()
-    if not row:
-        with _conn() as c:
-            orphan = c.execute(
-                """SELECT d.draft_id
-                   FROM drafts d
-                   LEFT JOIN publication_packages pp
-                     ON pp.draft_id=d.draft_id AND pp.status='approved'
-                   WHERE d.review_status IN ('ready','approved')
-                     AND pp.package_id IS NULL
-                   ORDER BY d.id LIMIT 1"""
-            ).fetchone()
-        if orphan:
-            _return_publish_blocked_to_pending(str(orphan["draft_id"]))
-            logger.warning("定时房源帖：发现无 approved frozen package 的队列项，已退回 pending：%s", orphan["draft_id"])
-            return
-        logger.info("定时房源帖：没有 approved frozen package")
-        return
-    draft_id = str(row["draft_id"])
-    from meihua_publisher import MeihuaPublisher
-
-    try:
-        variant = str(json.loads(row["snapshot_json"] or "{}").get("caption_variant") or "").lower()
-    except (TypeError, ValueError, json.JSONDecodeError):
-        variant = ""
-    if variant not in {"a", "b", "c", "d"}:
-        from meihua_publisher import default_caption_variant_for_property
-        variant = _variant_from_note(
-            row["review_note"],
-            default_caption_variant_for_property(row["property_type"]),
-        )
-    publisher = MeihuaPublisher(DB_PATH)
-    ok = await asyncio.to_thread(publisher.publish_draft, draft_id, variant)
-    if not ok:
-        logger.warning("定时房源帖未完成：%s；审核状态保持，由投递协议决定恢复或对账", draft_id)
-        return
-    logger.info("定时房源帖已提交：%s 版本 %s", draft_id, variant.upper())
 
 
 async def scheduled_daily_broadcast(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -3339,28 +2830,6 @@ async def tick_daily_broadcast(context: ContextTypes.DEFAULT_TYPE) -> None:
     await scheduled_daily_broadcast(context)
 
 
-async def tick_schedules(context: ContextTypes.DEFAULT_TYPE) -> None:
-    """约每 30 秒检查一次，匹配当前「分」的槽位（改 /slots 无需重启）。"""
-    now = datetime.now(TZ)
-    bd = context.application.bot_data
-    hm = (now.hour, now.minute)
-
-    slots = _parse_slots_from_raw(_slots_raw_effective())
-    if any((t.hour, t.minute) == hm for t in slots):
-        key = ("pub", now.date(), hm[0], hm[1])
-        if bd.get("_tick_pub") != key:
-            bd["_tick_pub"] = key
-            await scheduled_publish(context)
-
-    d_on = _get_setting(KEY_DAILY_ON, "0").strip() in ("1", "true", "yes")
-    d_raw = _get_setting(KEY_DAILY_TIME, "").strip()
-    if d_on and d_raw:
-        parsed = _parse_hhmm(d_raw)
-        if parsed and (parsed[0], parsed[1]) == hm:
-            dkey = ("daily", now.date())
-            if bd.get("_tick_daily") != dkey:
-                bd["_tick_daily"] = dkey
-                await scheduled_daily_broadcast(context)
 
 
 def clear_autopilot_input_state(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -3496,20 +2965,3 @@ def register_autopilot_features(
     else:
         jq.run_repeating(tick_schedules, interval=30.0, first=8.0, name="tick_schedules")
         logger.info("已挂载调度 tick（30s）时区=%s 槽=%s", TZ_NAME, _slots_raw_effective())
-
-
-def main() -> None:
-    if not BOT_TOKEN:
-        raise SystemExit("请设置 AUTOPILOT_BOT_TOKEN 或 PUBLISHER_BOT_TOKEN")
-    if not ADMIN_IDS:
-        raise SystemExit("ADMIN_IDS 未设置")
-
-    app = Application.builder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("start", cmd_start), group=-1)
-    register_autopilot_features(app, include_cancel=True)
-    logger.info("Autopilot publish bot 独立启动（未与 v2 合并）")
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
-
-
-if __name__ == "__main__":
-    main()
