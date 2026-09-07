@@ -1,0 +1,36 @@
+name: v3-phase1-check
+
+on:
+  push:
+    branches:
+      - v3/refactor-baseline
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      USER_BOT_TOKEN: '123456:TESTTOKEN'
+      PUBLISHER_BOT_TOKEN: '123456:TESTTOKEN'
+      PYTHONPATH: '${{ github.workspace }}'
+      DB_PATH: '${{ runner.temp }}/qiaolian-v3-phase1.db'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pytest pytest-asyncio
+      - name: Syntax check
+        run: |
+          python -m compileall -q ai_parser.py qiaolian_dual/v3_shadow_store.py tests/v3
+          git diff --check HEAD^ HEAD
+      - name: V3 Phase 1 contracts
+        run: python -m pytest -q tests/v3
+      - name: Existing production regression suite
+        run: python -m pytest -q tests
