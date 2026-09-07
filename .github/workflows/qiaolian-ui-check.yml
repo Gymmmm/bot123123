@@ -4,10 +4,12 @@ on:
   push:
     branches:
       - codex/qiaolian-ui-cleanup-20260829
+      - v3/refactor-baseline
   pull_request:
     branches:
       - codex/production-sync-20260829
       - codex/qiaolian-ui-cleanup-20260829
+      - v3/phase0-baseline
   workflow_dispatch:
 
 jobs:
@@ -35,10 +37,17 @@ jobs:
           PUBLISHER_BOT_TOKEN: '123456:TESTTOKEN'
           DB_PATH: '${{ runner.temp }}/qiaolian-ui-check.db'
         run: |
-          python -m compileall -q qiaolian_dual v2/qiaolian_publisher_v2 meihua_publisher.py cover_generator.py autopilot_publish_bot.py publication_package.py publication_delivery.py discussion_map_store.py parser_v2_safe.py media_selection.py tools/run_parser_v2_safe.py photo_formatter_v1_1.py photo_ranker.py media_pipeline_v1_1.py tests
+          python -m compileall -q qiaolian_v3 qiaolian_dual v2/qiaolian_publisher_v2 meihua_publisher.py cover_generator.py autopilot_publish_bot.py publication_package.py publication_delivery.py discussion_map_store.py parser_v2_safe.py media_selection.py tools/run_parser_v2_safe.py photo_formatter_v1_1.py photo_ranker.py media_pipeline_v1_1.py tests
+          python -c "import qiaolian_v3; import qiaolian_v3.db"
           python -c "import qiaolian_dual.user_bot"
           python -c "from qiaolian_dual.user_bot import build_application; assert build_application() is not None"
           (cd v2 && env -u PYTHONPATH python -c "import run_publisher_bot_v2; print('PUBLISHER_IMPORT_OK')")
+      - name: V3 Phase 1 DB contracts
+        env:
+          PYTHONPATH: '${{ github.workspace }}'
+          USER_BOT_TOKEN: '123456:TESTTOKEN'
+          PUBLISHER_BOT_TOKEN: '123456:TESTTOKEN'
+        run: python -m pytest -q tests/v3
       - name: Full non-outbound production launch gate
         env:
           PYTHONPATH: '${{ github.workspace }}'
