@@ -4,10 +4,12 @@ on:
   push:
     branches:
       - codex/qiaolian-ui-cleanup-20260829
+      - v3/refactor-baseline
   pull_request:
     branches:
       - codex/production-sync-20260829
       - codex/qiaolian-ui-cleanup-20260829
+      - v3/baseline-base
   workflow_dispatch:
 
 jobs:
@@ -39,6 +41,13 @@ jobs:
           python -c "import qiaolian_dual.user_bot"
           python -c "from qiaolian_dual.user_bot import build_application; assert build_application() is not None"
           (cd v2 && env -u PYTHONPATH python -c "import run_publisher_bot_v2; print('PUBLISHER_IMPORT_OK')")
+      - name: V3 Phase 1 contracts
+        env:
+          PYTHONPATH: '${{ github.workspace }}'
+          USER_BOT_TOKEN: '123456:TESTTOKEN'
+          PUBLISHER_BOT_TOKEN: '123456:TESTTOKEN'
+          DB_PATH: '${{ runner.temp }}/qiaolian-ui-check.db'
+        run: python -m pytest -q tests/v3
       - name: Full non-outbound production launch gate
         env:
           PYTHONPATH: '${{ github.workspace }}'
