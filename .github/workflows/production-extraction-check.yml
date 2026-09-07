@@ -21,8 +21,11 @@ jobs:
           python -m pip install -r qiaolian_production/requirements.txt
       - name: Compile extracted runtime
         run: python -m compileall -q qiaolian_production
-      - name: Audit live autopilot symbol closure
-        run: python qiaolian_production/tools/slim_autopilot.py
+      - name: Slice and compile live autopilot runtime candidate
+        run: |
+          python qiaolian_production/tools/slim_autopilot.py
+          python qiaolian_production/tools/slim_autopilot.py --write
+          python -m py_compile qiaolian_production/shared/autopilot_publish_bot.py
       - name: Import collector from extracted tree only
         env:
           DB_PATH: '${{ runner.temp }}/qiaolian-extraction.db'
@@ -58,7 +61,7 @@ jobs:
               raise SystemExit('collector local-source leaks: ' + repr(sorted(leaks)))
           print('COLLECTOR_IMPORT_OK')
           PY
-      - name: Import publisher from extracted tree only
+      - name: Import publisher from sliced extracted tree only
         env:
           DB_PATH: '${{ runner.temp }}/qiaolian-extraction.db'
           SQLITE_PATH: '${{ runner.temp }}/qiaolian-extraction.db'
@@ -102,7 +105,7 @@ jobs:
               raise SystemExit('publisher local-source leaks: ' + repr(sorted(leaks)))
           print('PUBLISHER_IMPORT_OK')
           PY
-      - name: Build user bot from extracted tree only
+      - name: Build user bot from sliced extracted tree only
         env:
           DB_PATH: '${{ runner.temp }}/qiaolian-extraction-user.db'
           SQLITE_PATH: '${{ runner.temp }}/qiaolian-extraction-user.db'
