@@ -49,9 +49,9 @@ def _timestamp(value: str | datetime | None) -> str:
 class SourceIngestService:
     """Persist normalized source evidence without crossing into Parser/publication.
 
-    The source content hash is based on sanitized text plus normalized media
-    content hashes. Exact repeats therefore do not create a second revision,
-    while an edit to facts or media creates the next immutable revision.
+    The source content hash is based on sanitized text plus normalized ordered
+    media identity. Exact repeats do not create a second revision, while edits
+    to facts, media, or album media order create the next immutable revision.
     """
 
     def __init__(self, conn: sqlite3.Connection, *, min_listing_images: int = 4) -> None:
@@ -80,11 +80,11 @@ class SourceIngestService:
     ) -> IngestResult:
         fetched = _timestamp(fetched_at)
         created = _timestamp(source_created_at) if source_created_at is not None else None
-        ordered_media = sorted(tuple(media), key=lambda item: (item.sort_order, item.content_hash))
+        ordered_media = sorted(tuple(media), key=lambda item: item.sort_order)
         sanitized = sanitize_source_text(raw_text)
         content_hash = make_source_content_hash(
             sanitized.text,
-            (item.content_hash for item in ordered_media),
+            (item.media_identity for item in ordered_media),
         )
 
         existing_before = self.sources.get_source_post_by_identity(
@@ -159,7 +159,7 @@ class SourceIngestService:
         for item in ordered_media:
             self.source_media.link_revision_media(
                 revision_id=revision.id,
-                media_asset_key=item.content_hash,
+                media_asset_key=item.media_identity,
                 sort_order=item.sort_order,
             )
 
