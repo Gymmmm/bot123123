@@ -61,8 +61,31 @@ jobs:
           assert mp.default_caption_variant_for_property('办公室') == 'c'
           print('MEIHUA_COMMITTED_SLICE_OK')
           PY
-      - name: Audit publication package symbol closure
-        run: python qiaolian_production/tools/audit_publication_package_symbols.py
+      - name: Slice and compile publication package candidate
+        run: |
+          python qiaolian_production/tools/audit_publication_package_symbols.py
+          python qiaolian_production/tools/audit_publication_package_symbols.py --write
+          python -m py_compile qiaolian_production/collector/publication_package.py
+          python - <<'PY'
+          import sys
+          from pathlib import Path
+          repo = Path.cwd().resolve()
+          prod = (repo / 'qiaolian_production').resolve()
+          for path in (prod / 'shared', prod / 'user', prod / 'collector', prod / 'publisher'):
+              sys.path.insert(0, str(path))
+          sys.path[:] = [p for p in sys.path if Path(p or '.').resolve() != repo]
+          import publication_package as pp
+          required = {
+              'PACKAGE_ROOT', 'ROOT', '_paths', '_select_cover_source',
+              'approve_package', 'approved_package', 'build_package',
+              'ensure_source_media_assets', 'evaluate_publishability',
+              'format_button_post_text', 'render_cover_preview',
+          }
+          missing = sorted(name for name in required if not hasattr(pp, name))
+          if missing:
+              raise SystemExit('missing publication package production symbols: ' + repr(missing))
+          print('PACKAGE_SLICE_IMPORT_OK')
+          PY
       - name: Import collector from extracted tree only
         env:
           DB_PATH: '${{ runner.temp }}/qiaolian-extraction.db'
@@ -179,3 +202,16 @@ jobs:
               raise SystemExit('user local-source leaks: ' + repr(sorted(leaks)))
           print('USER_BUILD_OK')
           PY
+      - name: Commit validated publication package slice
+        if: github.event_name == 'push'
+        run: |
+          if git diff --quiet -- qiaolian_production/collector/publication_package.py; then
+            echo 'PACKAGE_SLICE_ALREADY_COMMITTED=1'
+            exit 0
+          fi
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add qiaolian_production/collector/publication_package.py
+          git commit -m 'refactor: slim publication package production runtime'
+          git push origin HEAD:refactor/production-extraction
