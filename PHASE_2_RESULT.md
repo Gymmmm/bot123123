@@ -205,13 +205,21 @@ Phase 2 ingest coverage now includes:
 
 ## CI
 
-Final post-review-fix CI results are pending at this report commit and will be updated before re-review. The previous accepted Phase 2 CI before these two corrections was:
+Post-review-fix implementation CI:
 
-- `tests/v3`: 51 passed
-- production regression: 261 passed, 2 existing warnings
-- failures: 0
+- Workflow: `qiaolian-ui-check`
+- Run: `34152093453` (#652)
+- Tested head: `372c63a924db028cc6650d05abdc9e8b13bcfc1f`
+- Syntax/import checks: PASS
+- `tests/v3`: **54 passed in 0.36s**
+- production regression: **261 passed, 2 existing warnings in 6.14s**
+- failures: **0**
 
-The existing workflow only listens to PRs targeting `v3/phase0-baseline`. As previously independently validated, the PR may be temporarily retargeted only to trigger the synthetic CI merge, then restored to the formal Phase 1 PASS base `v3/refactor-baseline`. No workflow file is modified and no code is borrowed from the temporary base.
+The two warnings are the same pre-existing `python-telegram-bot ConversationHandler` warnings from the legacy production suite.
+
+This report commit is the only change after that implementation CI and is followed by the same final CI gate before re-review.
+
+The existing workflow only listens to PRs targeting `v3/phase0-baseline`. As previously independently validated, the PR is temporarily retargeted only to trigger the synthetic CI merge, then restored to the formal Phase 1 PASS base `v3/refactor-baseline`. No workflow file is modified and no code is borrowed from the temporary base.
 
 ## Compatibility kept
 
@@ -219,7 +227,7 @@ The existing workflow only listens to PRs targeting `v3/phase0-baseline`. As pre
 - Phase 1 database contracts remain unchanged;
 - legacy collector remains production runtime;
 - no V3 production cutover;
-- current production regression suite remains required.
+- current production regression suite remains green.
 
 ## Compatibility removed
 
@@ -229,7 +237,7 @@ Phase 2 deletes or disables no legacy code.
 
 ## Known blockers
 
-The two blockers from the first independent Phase 2 review are implemented and await CI/re-review.
+The two blockers from the first independent Phase 2 review are fixed and covered by passing tests. No known Phase 2 implementation blocker remains; independent re-review is still required before PASS/merge.
 
 No Phase 3 work has started.
 
