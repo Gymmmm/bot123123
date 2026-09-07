@@ -24,13 +24,42 @@ jobs:
           python -m pip install -r qiaolian_production/requirements.txt
       - name: Compile extracted runtime
         run: python -m compileall -q qiaolian_production
-      - name: Slice and compile live autopilot runtime candidate
+      - name: Verify committed autopilot runtime slice
         run: |
           python qiaolian_production/tools/slim_autopilot.py
           python qiaolian_production/tools/slim_autopilot.py --write
           python -m py_compile qiaolian_production/shared/autopilot_publish_bot.py
-      - name: Audit meihua production symbol closure
-        run: python qiaolian_production/tools/audit_meihua_symbols.py
+          git diff --exit-code -- qiaolian_production/shared/autopilot_publish_bot.py
+      - name: Slice and compile meihua runtime candidate
+        run: |
+          python qiaolian_production/tools/audit_meihua_symbols.py
+          python qiaolian_production/tools/audit_meihua_symbols.py --write
+          python -m py_compile qiaolian_production/shared/meihua_publisher.py
+          python - <<'PY'
+          import sys
+          from pathlib import Path
+          repo = Path.cwd().resolve()
+          prod = (repo / 'qiaolian_production').resolve()
+          for path in (prod / 'shared', prod / 'user', prod / 'publisher'):
+              sys.path.insert(0, str(path))
+          sys.path[:] = [p for p in sys.path if Path(p or '.').resolve() != repo]
+          import meihua_publisher as mp
+          required = {
+              'MeihuaPublisher', '_album_paths_for_draft', '_parsed_normalized',
+              '_public_clean_text', 'add_detail_logo_watermark',
+              'assert_public_output_safe', 'build_caption', 'build_channel_caption',
+              'build_chinese_listing_post', 'build_discussion_detail_text',
+              'default_caption_variant_for_property', 'evaluate_publish_gate',
+              'send_discussion_three_segments', 'system_listing_id_from_draft',
+          }
+          missing = sorted(name for name in required if not hasattr(mp, name))
+          if missing:
+              raise SystemExit('missing meihua production symbols: ' + repr(missing))
+          assert mp.default_caption_variant_for_property('公寓') == 'a'
+          assert mp.default_caption_variant_for_property('别墅') == 'b'
+          assert mp.default_caption_variant_for_property('办公室') == 'c'
+          print('MEIHUA_SLICE_IMPORT_OK')
+          PY
       - name: Import collector from extracted tree only
         env:
           DB_PATH: '${{ runner.temp }}/qiaolian-extraction.db'
@@ -147,16 +176,16 @@ jobs:
               raise SystemExit('user local-source leaks: ' + repr(sorted(leaks)))
           print('USER_BUILD_OK')
           PY
-      - name: Commit validated autopilot slice
+      - name: Commit validated meihua slice
         if: github.event_name == 'push'
         run: |
-          if git diff --quiet -- qiaolian_production/shared/autopilot_publish_bot.py; then
-            echo 'AUTOPILOT_SLICE_ALREADY_COMMITTED=1'
+          if git diff --quiet -- qiaolian_production/shared/meihua_publisher.py; then
+            echo 'MEIHUA_SLICE_ALREADY_COMMITTED=1'
             exit 0
           fi
           git diff --check
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add qiaolian_production/shared/autopilot_publish_bot.py
-          git commit -m 'refactor: slim autopilot production runtime'
+          git add qiaolian_production/shared/meihua_publisher.py
+          git commit -m 'refactor: slim meihua production runtime'
           git push origin HEAD:refactor/production-extraction
