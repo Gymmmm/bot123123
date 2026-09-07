@@ -29,6 +29,8 @@ jobs:
           python qiaolian_production/tools/slim_autopilot.py
           python qiaolian_production/tools/slim_autopilot.py --write
           python -m py_compile qiaolian_production/shared/autopilot_publish_bot.py
+      - name: Audit meihua production symbol closure
+        run: python qiaolian_production/tools/audit_meihua_symbols.py
       - name: Import collector from extracted tree only
         env:
           DB_PATH: '${{ runner.temp }}/qiaolian-extraction.db'
