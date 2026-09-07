@@ -347,87 +347,14 @@ def _draw_detail_logo_badge(
     draw.text((text_x, sub_y), subtitle, font=sub_font, fill=sub_white)
 
 
-def _compact_layout_for_detail_tag(layout: str) -> str:
-    raw = str(layout or "").strip()
-    if not raw:
-        return ""
-    lower = raw.lower()
-    if "studio" in lower or "单间" in raw:
-        return "单间"
-    m = re.search(r"([一二三四五六七八九\d]+)\s*房", raw)
-    if m:
-        return f"{m.group(1)}房"
-    short = normalize_room_type(raw)
-    if len(short) > 8:
-        return short[:8]
-    return short
 
 
-def _detail_subtag_from_listing(listing: dict | None) -> str:
-    if not listing:
-        return DETAIL_FALLBACK_SUBTAG
-    area = _listing_value(listing, "area", "project", "community", default="").strip()
-    layout_raw = _listing_value(listing, "room_type", "layout", default="").strip()
-    layout = _compact_layout_for_detail_tag(layout_raw)
-    if area and layout:
-        return f"{area} · {layout}"
-    if area:
-        return area
-    if layout:
-        return layout
-    return DETAIL_FALLBACK_SUBTAG
 
 
-def _source_visual_profile(listing: dict | None) -> tuple[str, str]:
-    """人工/微信来源可标注为侨联实拍；外部自动采集只标注侨联地产。
-
-    这里不把第三方来源图伪装成侨联自拍，但两类图都统一加侨联 Logo。
-    """
-    payload = listing or {}
-    key = " ".join(
-        str(payload.get(field) or "").strip().lower()
-        for field in ("source_type", "source_name")
-    )
-    manual_markers = ("wechat", "manual", "admin_upload", "csv_intake", "excel_intake")
-    if any(marker in key for marker in manual_markers):
-        return "manual", "侨联实拍"
-    return "collector", "侨联地产"
 
 
-def _apply_source_color_style(image: Image.Image, listing: dict | None) -> Image.Image:
-    """按素材来源统一调色，但不篡改房屋真实颜色。
-
-    微信/人工：暖金自然，适合侨联自有实拍。
-    自动采集：冷蓝清透，便于在频道中一眼区分来源。
-    """
-    profile, _ = _source_visual_profile(listing)
-    rgb = image.convert("RGB")
-    if profile == "manual":
-        rgb = ImageEnhance.Brightness(rgb).enhance(1.035)
-        rgb = ImageEnhance.Color(rgb).enhance(1.055)
-        tint = Image.new("RGB", rgb.size, (255, 190, 105))
-        rgb = Image.blend(rgb, tint, 0.035)
-    else:
-        rgb = ImageEnhance.Contrast(rgb).enhance(1.06)
-        rgb = ImageEnhance.Color(rgb).enhance(0.97)
-        tint = Image.new("RGB", rgb.size, (92, 158, 226))
-        rgb = Image.blend(rgb, tint, 0.045)
-    return rgb.convert("RGBA")
 
 
-def _apply_detail_photo_shade(overlay: Image.Image) -> None:
-    w, h = overlay.size
-    d = ImageDraw.Draw(overlay)
-    d.rectangle((0, 0, w, h), fill=(5, 18, 36, 28))
-    top_h = max(1, int(h * 0.18))
-    bottom_h = max(1, int(h * 0.42))
-    for y in range(top_h):
-        a = int(22 * (1 - y / max(1, top_h)))
-        d.line((0, y, w, y), fill=(5, 18, 36, a))
-    start = h - bottom_h
-    for y in range(start, h):
-        a = int(26 + (y - start) / max(1, bottom_h) * 86)
-        d.line((0, y, w, y), fill=(5, 18, 36, min(124, a)))
 
 
 def _draw_detail_mini_logo_badge(
@@ -514,78 +441,6 @@ def _draw_detail_mini_logo_badge(
     draw.text((text_x, sub_y), sub_text, font=sub_font, fill=(224, 232, 245, 205))
     return im
 
-def _draw_detail_corner_tags(
-    im: Image.Image,
-    overlay: Image.Image,
-    *,
-    edge: int,
-    scale: float,
-    ref: float,
-    listing: dict | None,
-) -> Image.Image:
-    draw = ImageDraw.Draw(overlay)
-    main_text = str(DETAIL_MAIN_TAG_TEXT or "实拍房源").strip() or "实拍房源"
-    sub_text = _detail_subtag_from_listing(listing)
-
-    font_main = _font_for_listing(max(18, min(34, int(ref * 0.031))), bold=True)
-    font_sub = _font_for_listing(max(16, min(30, int(ref * 0.026))), bold=True)
-
-    m_box = draw.textbbox((0, 0), main_text, font=font_main)
-    s_box = draw.textbbox((0, 0), sub_text, font=font_sub)
-    m_w, m_h = m_box[2] - m_box[0], m_box[3] - m_box[1]
-    s_w, s_h = s_box[2] - s_box[0], s_box[3] - s_box[1]
-
-    gap = max(8, int(12 * scale))
-    pad_x_m = max(12, int(18 * scale))
-    pad_y_m = max(8, int(11 * scale))
-    pad_x_s = max(11, int(16 * scale))
-    pad_y_s = max(7, int(10 * scale))
-
-    m_w2 = m_w + pad_x_m * 2
-    m_h2 = m_h + pad_y_m * 2
-    s_w2 = s_w + pad_x_s * 2
-    s_h2 = s_h + pad_y_s * 2
-
-    total_w = m_w2 + gap + s_w2
-    x1 = edge
-    y2 = overlay.size[1] - edge
-    y1 = y2 - max(m_h2, s_h2)
-
-    m_box_px = (x1, y1, x1 + m_w2, y1 + m_h2)
-    s_box_px = (x1 + m_w2 + gap, y1 + (m_h2 - s_h2) // 2, x1 + total_w, y1 + (m_h2 - s_h2) // 2 + s_h2)
-
-    im = _apply_frosted_panel(
-        im,
-        m_box_px,
-        radius=max(12, int(16 * scale)),
-        blur_radius=max(7, int(10 * scale)),
-        tint_rgb=(7, 18, 36),
-        tint_alpha=188,
-        outline=(246, 210, 122, 154),
-    )
-    im = _apply_frosted_panel(
-        im,
-        s_box_px,
-        radius=max(12, int(16 * scale)),
-        blur_radius=max(7, int(10 * scale)),
-        tint_rgb=(255, 255, 255),
-        tint_alpha=44,
-        outline=(255, 255, 255, 86),
-    )
-
-    draw.text(
-        (m_box_px[0] + pad_x_m - m_box[0], m_box_px[1] + pad_y_m - m_box[1]),
-        main_text,
-        font=font_main,
-        fill=(246, 210, 122, 255),
-    )
-    draw.text(
-        (s_box_px[0] + pad_x_s - s_box[0], s_box_px[1] + pad_y_s - s_box[1]),
-        sub_text,
-        font=font_sub,
-        fill=(255, 255, 255, 242),
-    )
-    return im
 
 
 def _font_for_listing(size: int, *, bold: bool = False):
@@ -623,20 +478,6 @@ def _font_for_listing(size: int, *, bold: bool = False):
     return _font_for_watermark(size)
 
 
-def _draft_price_str(d: dict | None) -> str:
-    if not d:
-        return "面议"
-    price = d.get("price")
-    if price is not None and str(price).replace(".", "", 1).isdigit():
-        p = float(price) if "." in str(price) else int(price)
-        if p <= 0:
-            return "面议"
-        if p == int(p):
-            return f"${int(p):,} / 月"
-        return f"${p} / 月"
-    if price:
-        return f"${price} / 月"
-    return "面议"
 
 
 def _display_floor(floor: str) -> str:
@@ -664,18 +505,6 @@ def _overlay_price_compact(d: dict | None) -> str:
     return "面议"
 
 
-def _listing_highlight_pills(listing: dict, max_n: int = 3) -> list[str]:
-    raw = listing.get("highlights") or []
-    if isinstance(raw, str):
-        try:
-            raw = json.loads(raw)
-        except Exception:
-            raw = [raw] if raw.strip() else []
-    if not isinstance(raw, list):
-        return []
-    generic = {"侨联精选", "拎包入住", "精选房源", "优选房源"}
-    out = [str(x).strip() for x in raw if str(x).strip() and str(x).strip() not in generic]
-    return out[:max_n]
 
 
 def _wrap_cover_title(
@@ -719,9 +548,6 @@ def _wrap_cover_title(
     return lines
 
 
-def build_channel_platform_header_html() -> str:
-    """侨联频道统一版头。用户可见内容只保留中文。"""
-    return f"<b>{BRAND_NAME}</b>\n━━━━━━━━━━"
 
 
 def add_channel_listing_overlay(
@@ -984,16 +810,6 @@ def add_channel_listing_overlay(
     buf.seek(0)
     return buf
 
-def add_brand_watermark(
-    image_bytes: bytes,
-    listing: dict | None = None,
-    *,
-    with_listing_footer: bool = False,
-) -> io.BytesIO:
-    """兼容旧调用名：等同 add_channel_listing_overlay。"""
-    return add_channel_listing_overlay(
-        image_bytes, listing, with_listing_footer=with_listing_footer
-    )
 
 
 def add_detail_logo_watermark(image_bytes: bytes, listing: dict | None = None) -> io.BytesIO:
@@ -1007,83 +823,14 @@ def add_detail_logo_watermark(image_bytes: bytes, listing: dict | None = None) -
     )
 
 
-def prepare_channel_photo_for_publish(
-    image_bytes: bytes,
-    listing: dict | None,
-    *,
-    is_generated_cover: bool,
-) -> io.BytesIO:
-    """发布阶段只处理一次视觉信息层。
-
-    CoverGenerator 生成的首图已包含品牌、标题、户型和价格；这里必须原样透传，
-    否则会出现双品牌、双价格和旧底栏残留。普通细节图仍只加轻量 logo。
-    """
-    if is_generated_cover:
-        buf = io.BytesIO(image_bytes)
-        buf.name = "cover.jpg"
-        buf.seek(0)
-        return buf
-    return add_detail_logo_watermark(image_bytes, listing)
 
 
-def _fit_to_clean_album_card(
-    image: Image.Image,
-    *,
-    canvas_size: tuple[int, int] = CHANNEL_ALBUM_SIZE,
-) -> Image.Image:
-    """生成 4:3 白卡片实拍图；照片完整保留，不为填满画布硬裁主体。"""
-    src = image.convert("RGB")
-    cw, ch = canvas_size
-    margin = max(10, int(CHANNEL_ALBUM_MARGIN))
-    inner_w = max(1, cw - margin * 2)
-    inner_h = max(1, ch - margin * 2)
-
-    fg = src.copy()
-    fg.thumbnail((inner_w, inner_h), Image.Resampling.LANCZOS)
-    x = (cw - fg.width) // 2
-    y = (ch - fg.height) // 2
-
-    canvas = Image.new("RGBA", (cw, ch), (255, 255, 255, 255))
-    # 极轻阴影只负责把白边从 Telegram 深色背景中分离出来。
-    shadow = Image.new("RGBA", (cw, ch), (0, 0, 0, 0))
-    sd = ImageDraw.Draw(shadow)
-    radius = max(8, int(CHANNEL_ALBUM_CORNER_RADIUS))
-    shadow_box = (x - 3, y - 3, x + fg.width + 3, y + fg.height + 3)
-    sd.rounded_rectangle(shadow_box, radius=radius + 2, fill=(0, 0, 0, 28))
-    shadow = shadow.filter(ImageFilter.GaussianBlur(5))
-    canvas = Image.alpha_composite(canvas, shadow)
-
-    mask = Image.new("L", (fg.width, fg.height), 0)
-    md = ImageDraw.Draw(mask)
-    md.rounded_rectangle((0, 0, fg.width - 1, fg.height - 1), radius=radius, fill=255)
-    canvas.paste(fg, (x, y), mask)
-    return canvas.convert("RGB")
 
 
-def normalize_album_image(
-    image_bytes: bytes,
-    *,
-    target_size: int = 1280,
-    force_square: bool = False,
-    fit_box: tuple[int, int] | None = None,
-) -> bytes:
-    """统一 Telegram 实拍派生图为 1200x900 白卡片；旧参数仅兼容调用。"""
-    _ = (target_size, force_square, fit_box)
-    im = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-    im = _fit_to_clean_album_card(im)
-    out = io.BytesIO()
-    im.save(out, "JPEG", quality=92, optimize=True)
-    return out.getvalue()
 
 
-def _album_layout_is_one_three() -> bool:
-    """兼容旧调用；新发布布局固定为 clean_white_4_3。"""
-    return False
 
 
-def _normalize_for_album_slot(image_bytes: bytes, *, index: int, total: int) -> bytes:
-    """所有频道主相册和评论区相册统一 4:3 白卡片，不按槽位改变比例。"""
-    return normalize_album_image(image_bytes)
 
 
 # ── 文案构造 ──────────────────────────────────────────────
@@ -1165,207 +912,28 @@ def _price_compact_for_post(d: dict) -> str:
     return "面议"
 
 
-def _is_manual_intake_listing(d: dict) -> bool:
-    st = str(d.get("source_type") or "").strip().lower()
-    return st in {"csv_intake", "wechat_note", "excel_intake"}
 
 
-def property_type_for_tags(d: dict) -> str:
-    raw = _resolved_property_type(d)
-    lowered = raw.lower()
-    if any(x in lowered for x in ("villa", "house")) or "别墅" in raw:
-        return "别墅"
-    if "排屋" in raw:
-        return "排屋"
-    return "公寓"
 
 
-def price_range_tag(d: dict) -> str:
-    price = _price_value(d)
-    if price <= 0:
-        return "价格待确认"
-    if price < 500:
-        return "500以下"
-    if price < 1000:
-        return "500_1000"
-    if price < 1500:
-        return "1000_1500"
-    return "1500以上"
 
 
-def _tag_safe(value: str) -> str:
-    return re.sub(r"[^0-9A-Za-z\u4e00-\u9fff_]", "", str(value or "").replace(" ", ""))
 
 
-def _area_tags(area: str) -> list[str]:
-    raw = str(area or "").strip()
-    compact = _tag_safe(raw)
-    mapping = {
-        "富力城": ["#富力城租房", "#RFCity"],
-        "RFCity": ["#富力城租房", "#RFCity"],
-        "RFCITY": ["#富力城租房", "#RFCity"],
-        "BKK1": ["#BKK1租房", "#BKK1"],
-        "BKK2": ["#BKK2租房", "#BKK2"],
-        "BKK3": ["#BKK3租房", "#BKK3"],
-        "钻石岛": ["#钻石岛租房", "#钻石岛"],
-        "DiamondIsland": ["#钻石岛租房", "#DiamondIsland"],
-        "KohPich": ["#钻石岛租房", "#DiamondIsland"],
-        "俄罗斯市场": ["#俄罗斯市场租房", "#TTP"],
-        "RussianMarket": ["#俄罗斯市场租房", "#TTP"],
-        "TTP": ["#俄罗斯市场租房", "#TTP"],
-    }
-    if compact in mapping:
-        return mapping[compact]
-    if compact and compact not in {"金边", "未知"}:
-        return [f"#{compact}租房"]
-    return []
 
 
-def _room_type_tags(room_type: str) -> list[str]:
-    raw = str(room_type or "").strip().lower()
-    if "studio" in raw or "单间" in raw or "单身" in raw:
-        return ["#单间"]
-    if "1房" in raw or "一房" in raw:
-        return ["#一房一厅"]
-    if "2房" in raw or "两房" in raw or "二房" in raw:
-        return ["#两房一厅"]
-    if any(x in raw for x in ("3房", "三房", "4房", "四房", "5房", "五房")):
-        return ["#三房"]
-    return []
 
 
-def _price_range_tags(d: dict) -> list[str]:
-    price = _price_value(d)
-    if price <= 0:
-        return []
-    if price < 400:
-        return ["#400美金以下"]
-    if price < 800:
-        return ["#400到800美金"]
-    if price < 1500:
-        return ["#800到1500美金"]
-    return ["#1500美金以上"]
 
 
-def _property_tags(d: dict) -> list[str]:
-    raw = _resolved_property_type(d)
-    lowered = raw.lower()
-    if "服务" in raw or "serviced" in lowered or "service" in lowered:
-        return ["#服务式公寓"]
-    if "penthouse" in lowered or "顶层" in raw:
-        return ["#Penthouse"]
-    if "villa" in lowered or "别墅" in raw:
-        return ["#别墅租赁", "#Villa"]
-    if "排屋" in raw or "townhouse" in lowered:
-        return ["#排屋出租"]
-    if "office" in lowered or "办公室" in raw:
-        return ["#办公室租赁"]
-    return ["#金边公寓"]
 
 
-def _feature_tags(d: dict) -> list[str]:
-    highlights = " ".join(_as_list(d.get("highlights")) + _as_list(_parsed_normalized(d).get("highlights")))
-    furniture = furniture_text(d)
-    text = " ".join([highlights, furniture, _listing_value(d, "cost_notes", default="")]).lower()
-    tags: list[str] = []
-    for needles, tag in (
-        (("宠", "pet"), "#可养宠物"),
-        (("阳台", "balcony"), "#带阳台"),
-        (("泳池", "pool"), "#游泳池"),
-        (("健身", "gym"), "#健身房"),
-        (("中文",), "#中文客服"),
-        (("拎包", "家具齐全", "全家具", "fully furnished"), "#拎包入住"),
-        (("实拍", "视频", "video"), "#实拍视频"),
-        (("物业费", "包物业", "management fee"), "#包物业费"),
-        (("超市", "supermarket"), "#近超市"),
-        (("学校", "school"), "#近学校"),
-        (("高层", "景观", "view"), "#高层视野"),
-        (("安保", "security", "24/7"), "#24小时安保"),
-    ):
-        if any(needle in text for needle in needles):
-            tags.append(tag)
-    return tags
 
 
-def build_listing_tags(d: dict) -> list[str]:
-    area = _listing_value(d, "area", "project", "community", default="金边")
-    room_type = normalize_room_type(_listing_value(d, "room_type", "layout", default=""))
-    tags = [
-        "#金边租房",
-        "#金边华人租房",
-        "#侨联实拍",
-        *_area_tags(area),
-        *_room_type_tags(room_type),
-        *_price_range_tags(d),
-        *_property_tags(d),
-        *_feature_tags(d),
-    ]
-    out: list[str] = []
-    for tag in tags:
-        if tag and tag not in out:
-            out.append(tag)
-        if len(out) >= 8:
-            break
-    fallback_pool = ["#实地看房", "#视频看房", "#金边生活"]
-    for tag in fallback_pool:
-        if len(out) >= 6:
-            break
-        if tag not in out:
-            out.append(tag)
-    return out
 
 
-def furniture_text(d: dict) -> str:
-    raw = _listing_value(d, "furniture", "furnishing", default="")
-    if raw:
-        return raw
-    highlights = " ".join(_as_list(d.get("highlights")) + _as_list(_parsed_normalized(d).get("highlights")))
-    if any(x in highlights for x in ("全新", "齐全", "家具", "拎包")):
-        return "家具齐全"
-    return "可咨询确认"
 
 
-def generate_advantages_and_notes(d: dict) -> tuple[list[str], list[str]]:
-    """从结构化字段生成 2 条优点 + 2 条注意，避免空占位。"""
-    area = _listing_value(d, "area", default="")
-    floor = _listing_value(d, "floor", default="")
-    size = _listing_value(d, "size", default="")
-    furniture = furniture_text(d)
-    highlights = _as_list(d.get("highlights")) + _as_list(_parsed_normalized(d).get("highlights"))
-    raw_text = " ".join([area, floor, size, furniture, " ".join(highlights)])
-
-    advantages: list[str] = []
-    for h in highlights:
-        if h not in advantages:
-            advantages.append(h)
-        if len(advantages) >= 2:
-            break
-    if any(x in raw_text for x in ("高层", "楼", "采光", "景观")) and "采光好" not in advantages:
-        advantages.append("采光好")
-    if any(x in raw_text for x in ("BKK", "市中心", "核心", "商场", "超市", "金边")) and "生活便利" not in advantages:
-        advantages.append("生活便利")
-    if any(x in raw_text for x in ("家具齐全", "拎包", "全新")) and "拎包入住" not in advantages:
-        advantages.append("拎包入住")
-    advantages = advantages[:2]
-
-    notes: list[str] = []
-    cost_notes = _listing_value(d, "cost_notes", default="")
-    payment_contract = _payment_contract_summary(d)
-    if cost_notes:
-        notes.append(cost_notes)
-    if payment_contract:
-        notes.append(payment_contract)
-    if any(x in raw_text for x in ("停车位有限", "停车少", "小停车")):
-        notes.append("停车位有限")
-    notes.append("价格和空房状态以实时确认为准")
-    notes.append("看房时间需提前预约")
-    dedup_notes: list[str] = []
-    for note in notes:
-        if note and note not in dedup_notes:
-            dedup_notes.append(note)
-        if len(dedup_notes) >= 2:
-            break
-    return advantages[:2], dedup_notes[:2]
 
 
 def _compact_copy(value: str, max_len: int = 22) -> str:
@@ -1439,27 +1007,6 @@ def _project_label_for_post(d: dict) -> str:
     return _compact_copy(primary, 24) if primary else ""
 
 
-def _listing_snapshot_for_post(d: dict) -> str:
-    items: list[str] = []
-    property_type = _resolved_property_type(d)
-    size = _listing_value(d, "size", default="")
-    floor = _listing_value(d, "floor", default="")
-    available = _listing_value(d, "available_date", default="")
-
-    if property_type:
-        items.append(_compact_copy(property_type, 8))
-    if size:
-        size_raw = str(size).strip()
-        if size_raw and size_raw.replace(".", "", 1).isdigit():
-            size_raw = f"{size_raw}平"
-        items.append(_compact_copy(size_raw, 12))
-    if floor:
-        items.append(_compact_copy(_display_floor(floor), 10))
-    if available:
-        items.append(_compact_copy(f"可{available}入住", 14))
-    if not items:
-        return "实拍房源｜支持实地看房/实时视频代看"
-    return "｜".join(items[:4])
 
 
 def _normalize_deposit_text(raw: str) -> str:
@@ -1518,23 +1065,8 @@ def _normalize_contract_term(raw: str) -> str:
     return f"{num}{unit}" if num and unit else ""
 
 
-def _payment_contract_summary(d: dict) -> str:
-    payment_terms = _normalize_deposit_text(_listing_value(d, "payment_terms", "deposit", default="")) or "待确认"
-    contract_term = _normalize_contract_term(_listing_value(d, "contract_term", default="")) or "待确认"
-    return f"付款/合同：{payment_terms}｜{contract_term}"
 
 
-def _marketing_points(d: dict, fallback_points: list[str], max_n: int = 2) -> list[str]:
-    raw_highlights = _as_list(d.get("highlights")) + _as_list(_parsed_normalized(d).get("highlights"))
-    pool = [*raw_highlights, *fallback_points, "实拍房源", "中文顾问可约看房"]
-    out: list[str] = []
-    for item in pool:
-        cleaned = _compact_copy(item, 18)
-        if cleaned and cleaned not in out:
-            out.append(cleaned)
-        if len(out) >= max_n:
-            break
-    return out
 
 
 def _is_noisy_highlight(text: str) -> bool:
@@ -1592,17 +1124,6 @@ def _semantic_area_values(d: dict) -> tuple[str, str, str]:
         size = ""
     return size, land, building
 
-def _public_area_lines(d: dict) -> list[str]:
-    size, land, building = _semantic_area_values(d)
-    out = []
-    if size:
-        value = size if re.search(r"㎡|m²|sqm", size, re.I) else f"{size}㎡"
-        out.append(f"<b>面积：</b>{he(value)}")
-    if land:
-        out.append(f"<b>土地尺寸：</b>{he(land)}")
-    if building:
-        out.append(f"<b>建筑尺寸：</b>{he(building)}")
-    return out
 
 def assert_public_output_safe(*values: object, context: str = "public_output") -> None:
     visible = []
@@ -1682,145 +1203,14 @@ def _collect_fee_fragments(raw_text: str, max_n: int = 2) -> list[str]:
     return out
 
 
-def _factual_highlight_text(d: dict) -> str:
-    out: list[str] = []
-
-    size = _listing_value(d, "size", "size_sqm", default="")
-    if size:
-        raw = str(size).strip()
-        if raw and raw.replace(".", "", 1).isdigit():
-            raw = f"{raw}平"
-        fact = _normalize_fact_fragment(raw, 10)
-        if fact:
-            out.append(fact)
-
-    floor = _display_floor(_listing_value(d, "floor", default=""))
-    if floor:
-        fact = _normalize_fact_fragment(floor, 10)
-        if fact and fact not in out:
-            out.append(fact)
-
-    furniture = furniture_text(d)
-    if furniture and furniture != "可咨询确认":
-        fact = _canonical_highlight_phrase(_normalize_fact_fragment(furniture, 12))
-        if fact and fact not in out and all(fact not in x and x not in fact for x in out):
-            out.append(fact)
-
-    available = _listing_value(d, "available_date", default="")
-    if available:
-        fact = _normalize_fact_fragment(f"可{available}入住", 14)
-        if fact and fact not in out:
-            out.append(fact)
-
-    raw_highlights = _as_list(d.get("highlights")) + _as_list(_parsed_normalized(d).get("highlights"))
-    feature_needles = (
-        "采光",
-        "安静",
-        "景观",
-        "高层",
-        "低楼层",
-        "电梯",
-        "泳池",
-        "健身",
-        "宠",
-        "停车",
-        "阳台",
-        "新装修",
-        "近",
-        "通勤",
-        "拎包",
-        "家具",
-        "通透",
-        "视野",
-        "全新",
-        "南北",
-        "朝南",
-        "网络",
-        "打扫",
-        "实拍",
-        "可看房",
-        "view",
-        "quiet",
-        "balcony",
-        "pool",
-        "gym",
-        "furnished",
-    )
-    for item in raw_highlights:
-        cleaned = _canonical_highlight_phrase(_normalize_fact_fragment(item, 16))
-        if _is_noisy_highlight(cleaned):
-            continue
-        low = cleaned.lower()
-        if not any((needle in cleaned) or (needle in low) for needle in feature_needles):
-            continue
-        if cleaned not in out and all(cleaned not in x and x not in cleaned for x in out):
-            out.append(cleaned)
-        if len(out) >= 2:
-            break
-    if not out:
-        return "以实拍与现场为准"
-    return "；".join(out[:2])
 
 
-def _factual_fee_text(d: dict) -> str:
-    notes = _collect_fee_fragments(
-        "；".join(
-            [
-                _listing_value(d, "cost_notes", default=""),
-                _listing_value(d, "hidden_costs", default=""),
-                _listing_value(d, "drawbacks", default=""),
-            ]
-        ),
-        max_n=2,
-    )
-
-    payment_contract = _payment_contract_summary(d)
-    if payment_contract and payment_contract not in notes:
-        notes.insert(0, payment_contract)
-    if not notes:
-        return "付款方式和合同年限待确认，可先约看房"
-    return "；".join(notes[:2])
 
 
-def _audience_hint(room_type: str, d: dict) -> str:
-    raw = str(room_type or "").lower()
-    if "studio" in raw or "单间" in raw:
-        base = "单人/情侣优先，通勤灵活"
-    elif "1房" in raw or "一房" in raw:
-        base = "单人或情侣，入住门槛低"
-    elif "2房" in raw or "两房" in raw or "二房" in raw:
-        base = "情侣或小家庭，功能更完整"
-    elif any(x in raw for x in ("3房", "三房", "4房", "四房", "5房", "五房")):
-        base = "家庭或多人同住，空间更充足"
-    else:
-        base = "可按预算和通勤再精筛同区房源"
-
-    price = _price_value(d)
-    if price > 0 and price <= 700:
-        return f"{base}，预算友好"
-    if price >= 1500:
-        return f"{base}，偏中高配居住"
-    return base
 
 
-def _speed_hint(d: dict) -> str:
-    price = _price_value(d)
-    if 0 < price <= 700:
-        return "该价位流转快，建议先锁看房时段"
-    if price >= 1500:
-        return "中高预算段可谈细节，先看房更有优势"
-    return "同区域可快速对比，建议当天预约"
 
 
-def _decision_hint(d: dict, note_text: str) -> str:
-    note = str(note_text or "")
-    if "押" in note or "付" in note:
-        return "押付和费用细节可逐项确认后再定"
-    if "物业" in note or "包" in note:
-        return "费用边界先确认，再谈议价空间"
-    if _price_value(d) <= 0:
-        return "先确认租金区间，再决定是否线下看房"
-    return "价格和空房以实时确认为准，建议先看再定"
 
 
 def _normalize_caption_variant(caption_variant: str | None) -> str:
@@ -1882,30 +1272,6 @@ def _attach_caption_variant_to_target(target: str, caption_variant: str | None =
     return f"{safe_target}|cv={raw_variant}"
 
 
-def _listing_ref_code(d: dict) -> str:
-    existing = str(d.get("listing_id") or "").strip()
-    if existing:
-        return existing
-
-    raw_id = str(d.get("id") or "").strip()
-    if raw_id.isdigit():
-        return f"l_{raw_id}"
-
-    source_post_id = str(d.get("source_post_id") or "").strip()
-    if source_post_id.isdigit():
-        return f"sp_{source_post_id}"
-
-    seed = "|".join(
-        [
-            str(d.get("draft_id") or "").strip(),
-            str(d.get("title") or "").strip(),
-            str(d.get("area") or "").strip(),
-            str(d.get("layout") or "").strip(),
-            str(d.get("price") or "").strip(),
-        ]
-    )
-    digest = hashlib.md5(seed.encode("utf-8", errors="ignore")).hexdigest()[:8]
-    return f"ref_{digest}"
 
 
 def _qc_code_from_draft(d: dict) -> str:
@@ -1917,14 +1283,6 @@ def _qc_code_from_draft(d: dict) -> str:
     return public_listing_id(listing_id)
 
 
-def _compact_listing_title(d: dict, area: str, room_type: str, price: str) -> str:
-    """生成频道帖子标题：优先 项目名｜户型｜租金，始终保持短标题格式。
-    只读 project/community，不读 title（title 字段往往是长句）。
-    """
-    raw = _listing_value(d, "project", "community", default="")
-    project_label = _compact_copy(_clean_project_label(raw), 24) if raw else ""
-    prefix = project_label or area
-    return _compact_copy(f"{prefix}｜{room_type}｜{price}", 40)
 
 
 _NOISE_KEYWORDS = (
@@ -1945,67 +1303,10 @@ _NO_PET_KEYWORDS = ("不允许宠物", "no pet", "禁止养宠")
 _COMMERCIAL_ELEC_KEYWORDS = ("商业电", "商电", "commercial", "高电费", "电费贵")
 
 
-def _contextual_viewing_hint(d: dict) -> str:
-    """生成"提前说清"段：真实、靠谱，不写广告腔。最多 28 字。"""
-    raw_notes = " ".join(
-        [
-            _listing_value(d, "cost_notes", default=""),
-            _listing_value(d, "drawbacks", default=""),
-            _listing_value(d, "hidden_costs", default=""),
-        ]
-    ).lower()
-
-    if any(x in raw_notes for x in _NOISE_KEYWORDS):
-        return "比较在意安静的话，看房时建议重点确认楼层和窗外环境"
-    if any(x in raw_notes for x in _MIN_LEASE_KEYWORDS):
-        return "有最短租期要求，短租需求请看房前先确认"
-    if any(x in raw_notes for x in _PARKING_KEYWORDS):
-        return "停车位有限，有用车需求的建议提前确认"
-    if any(x in raw_notes for x in _NO_PET_KEYWORDS):
-        return "业主不允许养宠，有宠物需求请提前说明"
-    if any(x in raw_notes for x in _COMMERCIAL_ELEC_KEYWORDS):
-        return "用的是商业电，电费会比民电高，建议看房时问清月均用电"
-
-    # 无特定风险 → 通用付款提醒
-    deposit = _confirmed_public_detail(_normalize_deposit_text(_listing_value(d, "payment_terms", "deposit", default="")))
-    contract = _confirmed_public_detail(_normalize_contract_term(_listing_value(d, "contract_term", default="")))
-    if deposit and contract:
-        return _compact_copy(f"押付 {deposit}，合同 {contract}，细节看房前可逐项确认", 28)
-    if deposit:
-        return _compact_copy(f"押付 {deposit}，具体费用细节建议看房前问清", 28)
-    return "价格和空房以实时确认为准，建议看房前先问清押付"
 
 
-def _advisor_decision_hint(d: dict) -> str:
-    """只基于已解析事实给建议，不虚构房源优缺点。"""
-    raw_notes = " ".join(
-        [
-            _listing_value(d, "cost_notes", default=""),
-            _listing_value(d, "drawbacks", default=""),
-            _listing_value(d, "hidden_costs", default=""),
-        ]
-    ).lower()
-    if any(x in raw_notes for x in _NOISE_KEYWORDS):
-        return "位置方便；重视安静建议优先看高楼层"
-    if any(x in raw_notes for x in _COMMERCIAL_ELEC_KEYWORDS):
-        return "入住成本可能偏高，先核对月均电费"
-    if any(x in raw_notes for x in _NO_PET_KEYWORDS):
-        return "不适合养宠家庭，可让顾问另找同区房源"
-    if any(x in raw_notes for x in _PARKING_KEYWORDS):
-        return "有车用户先确认车位，再安排看房"
-    return _factual_highlight_text(d)
 
 
-def _verification_status_text(d: dict) -> str:
-    """频道正式标准只展示状态，不让日期变化破坏固定版式。"""
-    status = _listing_value(d, "verification_status", default="").strip().lower()
-    if status in {"pending", "unverified", "待核验", "待确认"}:
-        return "🟡 待核验"
-    if status in {"expired", "已过期", "过期"}:
-        return "🟠 需重新核验"
-    if status in {"disputed", "有争议", "信息冲突"}:
-        return "🔴 信息待复核"
-    return "🟢 发布前已核实"
 
 
 def _monthly_cost_summary(d: dict) -> str:
@@ -2040,17 +1341,6 @@ def _monthly_cost_summary(d: dict) -> str:
     return "管理费、水电、网络及停车待确认"
 
 
-def _listing_detail_summary(d: dict) -> str:
-    parts: list[str] = []
-    property_type = _resolved_property_type(d)
-    size = _listing_value(d, "size", "size_sqm", default="")
-    floor = _display_floor(_listing_value(d, "floor", default=""))
-    furniture = furniture_text(d)
-    for value in (property_type, size, floor, furniture):
-        cleaned = _normalize_fact_fragment(value, 12)
-        if cleaned and cleaned != "可咨询确认" and cleaned not in parts:
-            parts.append(cleaned)
-    return "｜".join(parts[:4]) or "实拍房源"
 
 
 def _caption_action_links(
@@ -2240,15 +1530,6 @@ def build_discussion_detail_text(d: dict) -> str:
     return "\n".join(lines)[:4096]
 
 
-def _short_room_label(value: str) -> str:
-    """首页标题只显示房数，完整户型仍放在面积行，避免首屏过长。"""
-    text = str(value or "").strip()
-    match = re.search(r"(\d{1,2})\s*(?:\+\s*\d{1,2}\s*)?房", text)
-    if not match:
-        return text
-    numerals = {"0": "零", "1": "一", "2": "两", "3": "三", "4": "四", "5": "五", "6": "六", "7": "七", "8": "八", "9": "九", "10": "十"}
-    number = match.group(1)
-    return f"{numerals.get(number, number)}房"
 
 
 def build_chinese_listing_post(
@@ -2537,22 +1818,6 @@ def build_chinese_listing_post(
         compact_lines.append(line)
     return "\n".join(compact_lines).strip()[:1024]
 
-def build_cover_listing_data(d: dict) -> dict:
-    normalized = _parsed_normalized(d)
-    project = normalized.get("project_name") or d.get("project_name") or d.get("project") or ""
-    if str(project or "").strip() in {"侨联地产", "侨联精选", "精选房源", "金边房源"}:
-        project = normalized.get("public_location_display") or d.get("public_location_display") or d.get("area") or ""
-    return {
-        "project": project,
-        "project_alias": normalized.get("project_alias") or d.get("project_alias") or "",
-        "property_type": normalized.get("property_type_display") or d.get("property_type_display") or d.get("property_type") or "",
-        "layout": normalized.get("layout") or d.get("layout") or d.get("room_type") or "",
-        "price": normalized.get("monthly_rent_usd") or d.get("price"),
-        "area": normalized.get("public_location_display") or d.get("public_location_display") or d.get("area") or "",
-        "size": normalized.get("size_sqm") or d.get("size") or "",
-        "floor": normalized.get("floor") or d.get("floor") or "",
-        "highlights": _listing_highlight_pills(d),
-    }
 
 
 def _base36_encode(value: int) -> str:
@@ -2586,10 +1851,6 @@ def build_start_payload(
     return f"{action}_{safe_target}"
 
 
-def build_caption_consult_lines(d: dict, caption_variant: str | None = "a") -> list[str]:
-    if BOT_USERNAME:
-        return ["点下方「咨询这套」即可对接中文顾问"]
-    return [f"咨询：{ADVISOR_TG}"]
 
 def system_listing_id_from_draft(d: dict) -> str:
     """统一新房源编号：展示/深链都使用 l_房源ID，例如 l_1024。"""
@@ -2620,9 +1881,6 @@ def build_caption(d: dict, caption_variant: str | None = None) -> str:
     """发布层统一生成中文租房帖，不透传 AI 模板文案。"""
     return build_chinese_listing_post(d, caption_variant=caption_variant)
 
-def build_detail_text(d: dict, caption_variant: str | None = None) -> str:
-    """文字消息正文：统一中文结构，避免模板名/开发调试词进入频道。"""
-    return build_chinese_listing_post(d, caption_variant=caption_variant)
 
 
 def build_channel_caption(d: dict, album_paths: list[str], caption_variant: str | None = "a") -> str:
@@ -2684,43 +1942,10 @@ def build_channel_caption(d: dict, album_paths: list[str], caption_variant: str 
     return '\n'.join(lines)[:1024]
 
 
-def build_rich_album_caption(d: dict, caption_variant: str | None = None) -> str:
-    """频道主帖文案：固定中文租房结构，不展示内部编号或模板名。"""
-    return build_chinese_listing_post(d, caption_variant=caption_variant)
 
 
-def build_channel_teaser_caption(d: dict, caption_variant: str | None = None) -> str:
-    """频道首图 caption 同样使用中文租房结构。"""
-    return build_chinese_listing_post(d, caption_variant=caption_variant)
 
 
-def _merge_photo_labels_into_caption(main: str, photo_labels: list[str]) -> str:
-    """
-    Telegram 相册只在首图下展示一条 caption；逐张说明合并进首图。
-    photo_labels 顺序对应「封面后的第 1 张实拍」起。
-    """
-    if not photo_labels:
-        return main[:1024]
-    lines = ["", "--- PHOTO INDEX ---"]
-    for i, lab in enumerate(photo_labels, start=2):
-        t = str(lab).strip()
-        if not t:
-            continue
-        lines.append(f"{i}｜{t}")
-    extra = "\n".join(lines)
-    if len(main) + len(extra) <= 1024:
-        return (main + extra)[:1024]
-    out = main
-    for i, lab in enumerate(photo_labels, start=2):
-        t = str(lab).strip()
-        if not t:
-            continue
-        piece = f"\n{i}｜{t}"
-        if len(out) + len(piece) <= 1024:
-            out += piece
-        else:
-            break
-    return out[:1024]
 
 
 def _image_difference_hash(path: str) -> int | None:
@@ -2778,10 +2003,6 @@ def split_album_for_channel(paths: list[str]) -> tuple[list[str], list[str]]:
     return selected, extra
 
 
-def normalize_album_grid(paths: list[str]) -> list[str]:
-    """兼容旧调用：频道默认保持封面 + 三张差异较大的独立实拍。"""
-    selected, _ = split_album_for_channel(paths)
-    return selected
 
 
 async def resolve_discussion_chat_id(bot: Bot) -> str | None:
@@ -2803,15 +2024,6 @@ async def resolve_discussion_chat_id(bot: Bot) -> str | None:
     return None
 
 
-async def resolve_discussion_id(bot: Bot) -> int | None:
-    """与 resolve_discussion_chat_id 同源；返回 int 讨论组 id，未配置则 None。"""
-    raw = await resolve_discussion_chat_id(bot)
-    if not raw:
-        return None
-    try:
-        return int(raw)
-    except (TypeError, ValueError):
-        return None
 
 
 def load_discuss_map() -> dict:
@@ -2902,138 +2114,14 @@ def add_discuss_publish_queue(channel_post_id: int) -> None:
     save_discussion_bridge(data)
 
 
-async def send_comment_to_discussion(
-    bot: Bot,
-    channel_post_id: int,
-    text: str,
-    reply_markup=None,
-    parse_mode=None,
-) -> int | None:
-    """
-    根据 discussion_map（channel_post_id -> 讨论区自动转发消息 id）发首条评论。
-    返回发送后的 discussion message_id；映射未就绪或失败返回 None。
-    """
-    discussion_id = await resolve_discussion_chat_id(bot)
-    if not discussion_id:
-        logger.warning(
-            "频道未绑定讨论组或读不到 linked_chat_id：请检查频道-讨论组绑定、Bot 在讨论组权限（CHANNEL_ID=%s）",
-            CHANNEL_ID,
-        )
-        return None
-
-    mapping = load_discuss_map()
-    discussion_msg_id = mapping.get(str(channel_post_id))
-    if not discussion_msg_id:
-        logger.debug(
-            "discussion 映射未就绪 channel_post_id=%s（等 v2 capture 写入 %s）",
-            channel_post_id,
-            DISCUSSION_MAP_FILE,
-        )
-        return None
-    try:
-        sent = await bot.send_message(
-            chat_id=discussion_id,
-            text=text,
-            reply_to_message_id=int(discussion_msg_id),
-            reply_markup=reply_markup,
-            parse_mode=parse_mode,
-            allow_sending_without_reply=True,
-        )
-        return sent.message_id
-    except Exception:
-        logger.exception("send_comment_to_discussion 失败")
-        return None
 
 
-async def poll_discussion_first_reply(
-    bot: Bot,
-    channel_post_id: int,
-    text: str,
-    *,
-    reply_markup=None,
-    parse_mode: ParseMode | str | None = None,
-    attempts: int = 25,
-    delay_seconds: float = 1.0,
-) -> int | None:
-    """
-    发频道帖后等「自动转发」映射落盘，再发讨论区首评。
-    每轮先 sleep 再发（与常见稳定用法一致），避免映射未写入就发导致失败。
-    """
-    for _ in range(max(1, attempts)):
-        await asyncio.sleep(delay_seconds)
-        mid = await send_comment_to_discussion(
-            bot, channel_post_id, text, reply_markup=reply_markup, parse_mode=parse_mode
-        )
-        if mid:
-            return mid
-    logger.warning(
-        "poll_discussion_first_reply 耗尽: channel_post_id=%s attempts=%s",
-        channel_post_id,
-        attempts,
-    )
-    return None
 
 
-async def send_discussion_cta_with_retry(
-    bot: Bot,
-    channel_post_id: int,
-    text: str,
-    *,
-    reply_markup=None,
-    parse_mode: ParseMode | str | None = None,
-    attempts: int = 12,
-    delay_seconds: float = 1.0,
-) -> bool:
-    """单图/模板发帖后：轮询发讨论区 CTA（成功返回 True）。"""
-    mid = await poll_discussion_first_reply(
-        bot,
-        channel_post_id,
-        text,
-        reply_markup=reply_markup,
-        parse_mode=parse_mode,
-        attempts=attempts,
-        delay_seconds=delay_seconds,
-    )
-    return mid is not None
 
 
-def _build_discussion_action_keyboard(listing_id: str, post_token: str) -> InlineKeyboardMarkup:
-    """讨论区末尾只保留两个高意向动作。"""
-    if BOT_USERNAME:
-        user = BOT_USERNAME.lstrip("@")
-        base = f"https://t.me/{user}?start="
-        consult_payload = (
-            f"q__{post_token}" if str(post_token).startswith("ql")
-            else build_start_payload("q", listing_id, post_token)
-        )
-        appoint_payload = (
-            f"a__{post_token}" if str(post_token).startswith("ql")
-            else build_start_payload("a", listing_id, post_token)
-        )
-        return InlineKeyboardMarkup(
-            [[
-                InlineKeyboardButton(
-                    "💬 问清费用",
-                    url=base + consult_payload,
-                ),
-                InlineKeyboardButton(
-                    "📅 预约看房",
-                    url=base + appoint_payload,
-                ),
-            ]]
-        )
-    return InlineKeyboardMarkup([])
 
 
-def _build_discussion_continue_keyboard(listing_id: str, post_token: str) -> InlineKeyboardMarkup:
-    """讨论区第三段：继续看房入口，深链到用户 Bot 的讨论区入口。"""
-    if BOT_USERNAME:
-        user = BOT_USERNAME.lstrip("@")
-        entry_payload = f"discussion_entry__{post_token or ''}__{listing_id}|entry=discussion|step=seg3"
-        return InlineKeyboardMarkup(
-            [[InlineKeyboardButton("🤖 打开侨联小助手", url=f"https://t.me/{user}?start={entry_payload}")]]
-        )
-    return InlineKeyboardMarkup([])
 
 
 async def send_discussion_three_segments(
@@ -4636,32 +3724,3 @@ class MeihuaPublisher:
             else:
                 results["failed"] += 1
         return results
-
-
-if __name__ == "__main__":
-    import sys
-
-    db_path = os.getenv("DB_PATH", "data/qiaolian_dual_bot.db")
-    publisher = MeihuaPublisher(db_path)
-
-    # 检查配置
-    print("=" * 60)
-    print("MeihuaPublisher 配置检查")
-    print(f"  DB_PATH          : {db_path}")
-    print(f"  PUBLISHER_TOKEN  : {'已设置' if PUBLISHER_TOKEN else '未设置！'}")
-    print(f"  CHANNEL_ID       : {CHANNEL_ID or '未设置！'}")
-    print(
-        f"  发布Bot @        : @{PUBLISHER_BOT_USER} (PUBLISHER_BOT_USERNAME)"
-        if PUBLISHER_BOT_USER
-        else "  发布Bot @        : (未设 PUBLISHER_BOT_USERNAME)"
-    )
-    print(f"  按钮深链 Bot     : @{BOT_USERNAME or '(未设 USER_BOT_USERNAME)'}")
-    print(f"  NOTION_TOKEN     : {'已设置' if NOTION_TOKEN else '未配置（跳过）'}")
-    print(f"  NOTION_DATABASE_ID: {NOTION_DB_ID or '未配置（跳过）'}")
-    print("=" * 60)
-
-    print(
-        "安全退出：禁止直接执行 meihua_publisher.py 批量发布。\n"
-        "请通过 systemd 管理的审核发布 Bot 操作；它只接受人工审核并冻结的 publication package。"
-    )
-    sys.exit(2)
