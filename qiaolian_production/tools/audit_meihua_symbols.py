@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-"""Report top-level meihua_publisher symbols reachable from extracted production.
+"""Audit/slice top-level meihua_publisher symbols reachable from production.
 
-This is audit-only. It discovers direct imports and module-attribute references
-from the extracted collector/publisher/user runtime, then follows top-level name
-references inside meihua_publisher.py. No source is modified.
+The tool discovers direct imports, module-attribute access and constant-name
+getattr/setattr calls from the extracted collector/publisher/user runtime, then
+follows top-level name references inside meihua_publisher.py. Dynamic reflection
+that cannot be resolved statically is treated as unsafe and blocks slicing.
 """
 from __future__ import annotations
 
+import argparse
 import ast
 from pathlib import Path
 
@@ -54,8 +56,33 @@ def _is_main_guard(node: ast.AST) -> bool:
     )
 
 
-def _external_roots() -> set[str]:
+def _node_start_line(node: ast.AST) -> int:
+    start = int(getattr(node, "lineno", 1))
+    decorators = getattr(node, "decorator_list", None) or []
+    if decorators:
+        start = min(start, *(int(getattr(item, "lineno", start)) for item in decorators))
+    return start
+
+
+def _constant_string(node: ast.AST | None) -> str | None:
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    return None
+
+
+def _module_aliases(tree: ast.AST) -> set[str]:
+    aliases: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == "meihua_publisher":
+                    aliases.add(alias.asname or "meihua_publisher")
+    return aliases
+
+
+def _external_roots() -> tuple[set[str], list[str]]:
     roots: set[str] = set()
+    unsafe: list[str] = []
     for path in ROOT.rglob("*.py"):
         if path == TARGET or path.parent == ROOT / "tools":
             continue
@@ -64,30 +91,51 @@ def _external_roots() -> set[str]:
         except (OSError, SyntaxError, UnicodeDecodeError):
             continue
 
-        aliases: set[str] = set()
+        aliases = _module_aliases(tree)
         for node in ast.walk(tree):
-            if isinstance(node, ast.Import):
-                for alias in node.names:
-                    if alias.name == "meihua_publisher":
-                        aliases.add(alias.asname or "meihua_publisher")
-            elif isinstance(node, ast.ImportFrom) and node.module == "meihua_publisher":
+            if isinstance(node, ast.ImportFrom) and node.module == "meihua_publisher":
                 for alias in node.names:
                     if alias.name == "*":
-                        raise RuntimeError(f"unsupported star import from meihua_publisher: {path}")
-                    roots.add(alias.name)
+                        unsafe.append(f"{path.relative_to(ROOT)}:{node.lineno}:star-import")
+                    else:
+                        roots.add(alias.name)
 
-        if aliases:
-            for node in ast.walk(tree):
-                if (
-                    isinstance(node, ast.Attribute)
-                    and isinstance(node.value, ast.Name)
-                    and node.value.id in aliases
-                ):
-                    roots.add(node.attr)
-    return roots
+            if aliases and isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name) and node.value.id in aliases:
+                roots.add(node.attr)
+
+            if aliases and isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in {"getattr", "setattr"}:
+                if not node.args or not isinstance(node.args[0], ast.Name) or node.args[0].id not in aliases:
+                    continue
+                name = _constant_string(node.args[1] if len(node.args) > 1 else None)
+                if name:
+                    roots.add(name)
+                else:
+                    unsafe.append(f"{path.relative_to(ROOT)}:{node.lineno}:{node.func.id}-dynamic")
+
+            if aliases and isinstance(node, ast.Attribute) and node.attr == "__dict__" and isinstance(node.value, ast.Name) and node.value.id in aliases:
+                unsafe.append(f"{path.relative_to(ROOT)}:{node.lineno}:module-__dict__")
+
+    return roots, unsafe
 
 
-def main() -> int:
+def _target_dynamic_reflection(tree: ast.Module) -> list[str]:
+    """Reject unresolved module-level reflection that could hide symbol edges."""
+    unsafe: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            if node.func.id in {"eval", "exec"}:
+                unsafe.append(f"target:{node.lineno}:{node.func.id}")
+            elif node.func.id in {"globals", "locals"}:
+                parent_hint = "reflection"
+                unsafe.append(f"target:{node.lineno}:{node.func.id}-{parent_hint}")
+        if isinstance(node, ast.Attribute) and node.attr == "__dict__":
+            # Ordinary object __dict__ access could also be dynamic; none exists
+            # in the current production module, so fail closed if one appears.
+            unsafe.append(f"target:{node.lineno}:__dict__")
+    return sorted(set(unsafe))
+
+
+def analyze() -> tuple[set[str], set[str], list[str], list[str], ast.Module]:
     source = TARGET.read_text(encoding="utf-8")
     tree = ast.parse(source, filename=str(TARGET))
     symbol_node: dict[str, ast.AST] = {}
@@ -103,7 +151,8 @@ def main() -> int:
         elif not _is_main_guard(node):
             baseline_refs.update(_loaded_names(node))
 
-    external = _external_roots()
+    external, unsafe_external = _external_roots()
+    unsafe = [*unsafe_external, *_target_dynamic_reflection(tree)]
     missing = sorted(name for name in external if name not in symbol_node)
     roots = external | baseline_refs
 
@@ -119,17 +168,38 @@ def main() -> int:
                 queue.append(ref)
 
     dead = removable_defs - live
-    removed_lines: set[int] = set()
+    return live, dead, missing, sorted(set(unsafe)), tree
+
+
+def _removed_lines(tree: ast.Module, dead: set[str]) -> set[int]:
+    removed: set[int] = set()
     for node in tree.body:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and node.name in dead:
-            decorators = getattr(node, "decorator_list", None) or []
-            start = min([node.lineno, *[int(item.lineno) for item in decorators]])
-            removed_lines.update(range(start, (node.end_lineno or node.lineno) + 1))
+            removed.update(range(_node_start_line(node), (node.end_lineno or node.lineno) + 1))
         elif _is_main_guard(node):
-            removed_lines.update(range(node.lineno, (node.end_lineno or node.lineno) + 1))
+            removed.update(range(node.lineno, (node.end_lineno or node.lineno) + 1))
+    return removed
 
+
+def write_slice(tree: ast.Module, dead: set[str]) -> None:
+    lines = TARGET.read_text(encoding="utf-8").splitlines(keepends=True)
+    removed = _removed_lines(tree, dead)
+    sliced = "".join(line for no, line in enumerate(lines, start=1) if no not in removed)
+    TARGET.write_text(sliced.rstrip() + "\n", encoding="utf-8")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--write", action="store_true", help="remove validated unreachable top-level definitions")
+    args = parser.parse_args()
+
+    source = TARGET.read_text(encoding="utf-8")
+    external, _ = _external_roots()
+    live, dead, missing, unsafe, tree = analyze()
+    removed = _removed_lines(tree, dead)
     before = len(source.splitlines())
-    after = before - len(removed_lines)
+    after = before - len(removed)
+
     print("MEIHUA_EXTERNAL_ROOTS=" + ",".join(sorted(external)))
     print(f"MEIHUA_EXTERNAL_ROOT_COUNT={len(external)}")
     print(f"MEIHUA_LIVE_TOP_LEVEL_SYMBOLS={len(live)}")
@@ -139,7 +209,13 @@ def main() -> int:
     print("MEIHUA_DEAD_DEFS=" + ",".join(sorted(dead)))
     if missing:
         print("MEIHUA_MISSING_EXTERNAL_ROOTS=" + ",".join(missing))
+    if unsafe:
+        print("MEIHUA_UNSAFE_DYNAMIC_REFS=" + ",".join(unsafe))
+    if missing or unsafe:
         return 2
+    if args.write:
+        write_slice(tree, dead)
+        print("MEIHUA_SLICE_WRITTEN=1")
     return 0
 
 
