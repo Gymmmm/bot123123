@@ -4,16 +4,21 @@ import sys
 from pathlib import Path
 
 
-def _collector_dir() -> Path:
-    return Path(__file__).resolve().parent / "collector"
+def _root() -> Path:
+    return Path(__file__).resolve().parent
+
+
+def _activate_paths() -> None:
+    root = _root()
+    for path in (root / "shared", root / "user", root / "collector"):
+        value = str(path)
+        if value not in sys.path:
+            sys.path.insert(0, value)
 
 
 def run() -> None:
-    collector_dir = str(_collector_dir())
-    if collector_dir not in sys.path:
-        sys.path.insert(0, collector_dir)
+    _activate_paths()
     from collector_bot import main
-
     main()
 
 
