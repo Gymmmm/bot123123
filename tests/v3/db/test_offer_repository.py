@@ -5,31 +5,35 @@ import sqlite3
 import pytest
 
 from qiaolian_v3.db.repositories import CanonicalRecordRepository, ListingOfferRepository, SourceRepository
-from tests.v3.db._helpers import insert_source, migrated_connection
+from tests.v3.db._helpers import migrated_connection
 
 
 def _canonical(conn, deal_type: str = 'rent'):
-    legacy_id = insert_source(conn)
     sources = SourceRepository(conn)
-    identity_id = sources.register_identity(
-        legacy_source_post_id=legacy_id,
-        source_type='telegram_channel', source_name='fixture', external_post_id='100',
+    source_post_id = sources.register_source_post(
+        source_mode='collector', source_type='telegram_channel',
+        source_name='fixture', external_post_id=f'100-{deal_type}',
     )
-    revision = sources.append_revision(source_identity_id=identity_id, content_hash='h1', raw_text='evidence')
+    revision = sources.append_revision(
+        source_post_id=source_post_id, source_content_hash=f'h-{deal_type}', raw_text='evidence'
+    )
     canonical = CanonicalRecordRepository(conn).append(
-        source_identity_id=identity_id, source_post_revision_id=revision.id,
+        source_post_id=source_post_id, source_post_revision_id=revision.id,
         schema_version='v3', parser_revision='r1', facts={'deal_type': deal_type},
-        facts_hash=f'f-{deal_type}', deal_type=deal_type,
+        facts_hash=f'f-{deal_type}', deal_type=deal_type, processing_status='STORED',
     )
-    return identity_id, canonical.id
+    return source_post_id, canonical.id
 
 
 def test_sale_is_db_forced_store_only():
     conn = migrated_connection()
-    identity_id, canonical_id = _canonical(conn, 'sale')
+    source_post_id, canonical_id = _canonical(conn, 'sale')
     repo = ListingOfferRepository(conn)
-    listing_id = repo.create_listing(semantic_key='listing-1')
-    repo.link_source(listing_id=listing_id, source_identity_id=identity_id)
+    listing_id = repo.create_listing(
+        property_identity_key='listing-1', current_canonical_record_id=canonical_id,
+        listing_status='active',
+    )
+    repo.link_source(listing_id=listing_id, source_post_id=source_post_id)
     offer = repo.append_offer(
         listing_id=listing_id, canonical_record_id=canonical_id,
         offer_type='sale', sale_price_usd=150000,
@@ -48,7 +52,9 @@ def test_sale_is_db_forced_store_only():
 def test_rent_and_sale_price_constraints_are_db_enforced():
     conn = migrated_connection()
     _, canonical_id = _canonical(conn, 'rent')
-    listing_id = ListingOfferRepository(conn).create_listing(semantic_key='listing-1')
+    listing_id = ListingOfferRepository(conn).create_listing(
+        property_identity_key='listing-1', current_canonical_record_id=canonical_id
+    )
     with pytest.raises(sqlite3.IntegrityError):
         conn.execute(
             '''INSERT INTO listing_offers(
@@ -67,10 +73,12 @@ def test_rent_and_sale_price_constraints_are_db_enforced():
 
 def test_offer_versions_supersede_and_keep_one_current_per_type():
     conn = migrated_connection()
-    identity_id, canonical_id = _canonical(conn, 'rent')
+    source_post_id, canonical_id = _canonical(conn, 'rent')
     repo = ListingOfferRepository(conn)
-    listing_id = repo.create_listing(semantic_key='listing-1')
-    repo.link_source(listing_id=listing_id, source_identity_id=identity_id)
+    listing_id = repo.create_listing(
+        property_identity_key='listing-1', current_canonical_record_id=canonical_id
+    )
+    repo.link_source(listing_id=listing_id, source_post_id=source_post_id)
     first = repo.append_offer(
         listing_id=listing_id, canonical_record_id=canonical_id,
         offer_type='rent', monthly_rent_usd=800,
