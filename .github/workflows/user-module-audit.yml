@@ -6,6 +6,9 @@ on:
       - refactor/production-extraction
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   audit:
     runs-on: ubuntu-latest
@@ -35,10 +38,29 @@ jobs:
             runtime_guard \
             cover_styles \
             attribution \
-            attribution_resolver \
-            attribution_service \
+            attribution_hooks \
+            attribution_runtime \
+            attribution_store \
             utils
           do
             echo "=== ${module} ==="
             python qiaolian_production/tools/audit_user_symbol_module.py "${module}"
           done
+      - name: Slice confirmed dead user helpers
+        run: |
+          set -e
+          python qiaolian_production/tools/audit_user_symbol_module.py channel_post --write
+          python qiaolian_production/tools/audit_user_symbol_module.py attribution --write
+          python -m compileall -q qiaolian_production/user/qiaolian_dual
+      - name: Commit confirmed user helper slices
+        run: |
+          set -e
+          if git diff --quiet; then
+            echo "No user helper slice changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add qiaolian_production/user/qiaolian_dual/channel_post.py qiaolian_production/user/qiaolian_dual/attribution.py
+          git commit -m "refactor: slim user channel and attribution helpers"
+          git push
