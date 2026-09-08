@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import html as html_std
 import io
 import json
 import os
@@ -92,9 +91,7 @@ def _dhash_bytes(data: bytes) -> int:
     value = 0
     for row in range(8):
         for col in range(8):
-            left = pixels[row * 9 + col]
-            right = pixels[row * 9 + col + 1]
-            value = (value << 1) | int(left > right)
+            value = (value << 1) | int(pixels[row * 9 + col] > pixels[row * 9 + col + 1])
     return value
 
 
@@ -108,12 +105,7 @@ def _hamming(a: int, b: int) -> int:
 
 
 class TelegramMigrationGateway:
-    """Phase-11 live adapter.
-
-    Telethon is used for read-only inspection because the Bot API cannot fetch an
-    arbitrary historical channel message. The publisher bot is used only for the
-    exact known-message media edit.
-    """
+    """Real Phase-11 adapter: Telethon read inspection + Bot API exact edit."""
 
     def __init__(
         self,
@@ -123,12 +115,14 @@ class TelegramMigrationGateway:
         session_path: str,
         publisher_bot_token: str,
         cover_dhash_max: int = 8,
+        receipt_path: str | Path = "data/v3_phase11_gateway_receipts.json",
     ) -> None:
         self.api_id = int(api_id)
         self.api_hash = str(api_hash)
         self.session_path = str(session_path)
         self.publisher_bot_token = str(publisher_bot_token)
         self.cover_dhash_max = max(0, int(cover_dhash_max))
+        self.receipt_path = Path(receipt_path)
         if not self.api_id or not self.api_hash or not self.session_path or not self.publisher_bot_token:
             raise TelegramMigrationGatewayError("missing_migration_gateway_credentials")
 
@@ -173,9 +167,7 @@ class TelegramMigrationGateway:
         cover_path = Path(cover)
         if not cover_path.is_file():
             raise TelegramMigrationGatewayError(f"cover_not_found:{cover}")
-        markup = InlineKeyboardMarkup([
-            [InlineKeyboardButton(text=text, url=url)] for text, url in keyboard
-        ])
+        markup = InlineKeyboardMarkup([[InlineKeyboardButton(text=t, url=u)] for t, u in keyboard])
         async with Bot(self.publisher_bot_token) as bot:
             with cover_path.open("rb") as handle:
                 media = InputMediaPhoto(media=handle, caption=caption, parse_mode="HTML")
@@ -189,15 +181,55 @@ class TelegramMigrationGateway:
     def _edit(self, **kwargs):
         return self._run(self._edit_async(**kwargs))
 
+    def _receipt_key(self, channel_id: str, message_id: int) -> str:
+        return f"{channel_id}:{int(message_id)}"
+
+    def _load_receipts(self) -> dict[str, Any]:
+        if not self.receipt_path.exists():
+            return {}
+        try:
+            value = json.loads(self.receipt_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise TelegramMigrationGatewayError(f"migration_receipt_read_failed:{exc}") from exc
+        return value if isinstance(value, dict) else {}
+
+    def _save_prepared_receipt(
+        self,
+        *,
+        channel_id: str,
+        message_id: int,
+        cover: str,
+        caption: str,
+        keyboard: tuple[tuple[str, str], ...],
+        expected_after_hash: str,
+    ) -> None:
+        receipts = self._load_receipts()
+        receipts[self._receipt_key(channel_id, message_id)] = {
+            "channel_id": str(channel_id),
+            "message_id": int(message_id),
+            "cover": str(Path(cover).resolve()),
+            "caption": str(caption),
+            "keyboard": [{"text": t, "url": u} for t, u in keyboard],
+            "expected_after_hash": str(expected_after_hash),
+            "state": "prepared",
+        }
+        self.receipt_path.parent.mkdir(parents=True, exist_ok=True)
+        temp = self.receipt_path.with_suffix(self.receipt_path.suffix + ".tmp")
+        temp.write_text(json.dumps(receipts, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+        os.replace(temp, self.receipt_path)
+
+    def _receipt_expected(self, channel_id: str, message_id: int) -> dict[str, Any] | None:
+        value = self._load_receipts().get(self._receipt_key(channel_id, message_id))
+        return value if isinstance(value, dict) else None
+
     def _live_fingerprint(self, *, channel_id: str, message_id: int, message: Any) -> str:
-        payload = {
+        return _stable_hash({
             "channel_id": str(channel_id),
             "message_id": int(message_id),
             "caption": _message_caption_signature(message),
             "keyboard": _keyboard_from_telethon(message),
             "media": _media_identity(message),
-        }
-        return _stable_hash(payload)
+        })
 
     def _matches_expected_render(
         self,
@@ -232,6 +264,13 @@ class TelegramMigrationGateway:
         expected_keyboard: Iterable[Mapping[str, Any]] | Iterable[tuple[str, str]] | None = None,
         expected_after_hash: str | None = None,
     ) -> dict[str, Any]:
+        receipt = self._receipt_expected(channel_id, message_id)
+        if receipt and not expected_after_hash:
+            expected_cover = str(receipt.get("cover") or "")
+            expected_caption = str(receipt.get("caption") or "")
+            expected_keyboard = receipt.get("keyboard") or ()
+            expected_after_hash = str(receipt.get("expected_after_hash") or "")
+
         message, media_bytes = self._fetch_message(channel_id=channel_id, message_id=message_id)
         keyboard = _normalize_keyboard(expected_keyboard or ())
         if expected_after_hash and expected_cover and expected_caption is not None and keyboard:
@@ -244,9 +283,7 @@ class TelegramMigrationGateway:
             ):
                 return {"content_hash": str(expected_after_hash), "state": "after_verified"}
         return {
-            "content_hash": self._live_fingerprint(
-                channel_id=channel_id, message_id=message_id, message=message
-            ),
+            "content_hash": self._live_fingerprint(channel_id=channel_id, message_id=message_id, message=message),
             "state": "live_fingerprint",
         }
 
@@ -267,6 +304,14 @@ class TelegramMigrationGateway:
             raise TelegramMigrationGatewayError(
                 f"before_hash_conflict:{channel_id}:{message_id}:{before.get('content_hash')}"
             )
+        self._save_prepared_receipt(
+            channel_id=channel_id,
+            message_id=message_id,
+            cover=cover,
+            caption=caption,
+            keyboard=normalized_keyboard,
+            expected_after_hash=expected_after_hash,
+        )
         result = self._edit(
             channel_id=channel_id,
             message_id=message_id,
@@ -274,14 +319,7 @@ class TelegramMigrationGateway:
             caption=caption,
             keyboard=normalized_keyboard,
         )
-        after = self.inspect_migration_post(
-            channel_id=channel_id,
-            message_id=message_id,
-            expected_cover=cover,
-            expected_caption=caption,
-            expected_keyboard=normalized_keyboard,
-            expected_after_hash=expected_after_hash,
-        )
+        after = self.inspect_migration_post(channel_id=channel_id, message_id=message_id)
         if str(after.get("content_hash") or "") != str(expected_after_hash):
             raise TelegramMigrationGatewayError(f"post_edit_verification_failed:{channel_id}:{message_id}")
         returned_id = int(getattr(result, "message_id", 0) or message_id)
@@ -303,12 +341,14 @@ def build_gateway() -> TelegramMigrationGateway:
     api_hash = str(os.getenv("TG_API_HASH") or "").strip()
     token = str(os.getenv("PUBLISHER_BOT_TOKEN") or "").strip()
     threshold = int(str(os.getenv("MIGRATION_COVER_DHASH_MAX") or "8").strip() or 8)
+    receipt_path = str(os.getenv("MIGRATION_GATEWAY_RECEIPT_PATH") or "data/v3_phase11_gateway_receipts.json").strip()
     return TelegramMigrationGateway(
         api_id=api_id,
         api_hash=api_hash,
         session_path=_resolve_session_path(),
         publisher_bot_token=token,
         cover_dhash_max=threshold,
+        receipt_path=receipt_path,
     )
 
 
