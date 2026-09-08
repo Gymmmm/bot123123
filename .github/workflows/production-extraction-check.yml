@@ -64,6 +64,8 @@ jobs:
           git diff --exit-code -- qiaolian_production/publisher/qiaolian_publisher_v2/keyboards.py
       - name: Audit publisher message constants
         run: python qiaolian_production/tools/audit_publisher_messages.py
+      - name: Audit user bot module reachability
+        run: python qiaolian_production/tools/audit_user_modules.py
       - name: Import collector from extracted tree only
         env:
           DB_PATH: '${{ runner.temp }}/qiaolian-extraction.db'
