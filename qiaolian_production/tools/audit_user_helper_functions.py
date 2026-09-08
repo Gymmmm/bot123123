@@ -18,6 +18,8 @@ TARGET_MODULES = {
     "attribution_hooks",
     "attribution_runtime",
     "attribution_store",
+    "callback_rental",
+    "callback_service",
     "channel_links",
     "channel_post",
     "channel_status_sync",
