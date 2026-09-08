@@ -218,6 +218,12 @@ Report-only CI before the final public-surface cleanup:
 - `tests/v3`: **94 passed**
 - production regression: **261 passed, 2 existing warnings, 0 failures**
 
+The public-surface cleanup implementation head before this report-only CI trigger is:
+
+```text
+44dd4ba20ed9cf9131549b7fd725731b19034f42
+```
+
 The two warnings are the pre-existing `python-telegram-bot ConversationHandler` warnings in the legacy production regression suite.
 
 A new final CI run after this public-surface cleanup must be green before Phase 3 stops again.
