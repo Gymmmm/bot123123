@@ -4,6 +4,7 @@ from v3_core.user_bot.transition_actions import (
     APPOINTMENT_AWAITING_DATE_KEY,
     APPOINTMENT_AWAITING_TIME_KEY,
     LAST_SEARCH_PREF_KEY,
+    SEARCH_AWAITING_AREA_KEY,
     SEARCH_AWAITING_BUDGET_KEY,
     TransitionActionService,
 )
@@ -156,13 +157,75 @@ def test_custom_budget_waits_for_text_instead_of_searching():
     assert result.mutation.set_values == {SEARCH_AWAITING_BUDGET_KEY: True}
 
 
-def test_budget_requires_live_search_pref_and_navigation_is_explicit():
+def test_area_navigation_initializes_public_search_pref_then_advances_to_budget():
+    service = TransitionActionService()
+    start = service.apply(TransitionCallback(kind="search_area"), {})
+    assert start.ok and start.next_step == "navigation"
+    assert start.navigation == "search_area"
+    assert start.mutation is not None
+
+    session = {}
+    apply_session_mutation(session, start.mutation)
+    picked = service.apply(TransitionCallback(kind="area_choice", value="bkk1"), session)
+
+    assert picked.ok and picked.next_step == "navigation"
+    assert picked.navigation == "search_budget"
+    assert picked.mutation is not None
+    pref = picked.mutation.set_values[SEARCH_PREF_SESSION_KEY]
+    assert pref["source"] == "home_area"
+    assert pref["area_display"] == "BKK1"
+    assert pref["location_keys"] == ["BKK1"]
+    assert "listing_id" not in repr(pref)
+
+
+def test_other_area_waits_for_text_and_requires_live_search_pref():
+    service = TransitionActionService()
+    expired = service.apply(TransitionCallback(kind="area_other"), {})
+    assert expired.status == "expired"
+
+    result = service.apply(
+        TransitionCallback(kind="area_other"),
+        {SEARCH_PREF_SESSION_KEY: {"source": "home_area", "goal": "any"}},
+    )
+    assert result.ok and result.next_step == "search_custom_area"
+    assert result.mutation is not None
+    assert result.mutation.set_values == {SEARCH_AWAITING_AREA_KEY: True}
+
+
+def test_layout_choice_reaches_search_boundary_without_internal_identity():
+    service = TransitionActionService()
+    result = service.apply(TransitionCallback(kind="layout_choice", value="2br"), {})
+
+    assert result.ok and result.next_step == "search_submit"
+    assert result.search is not None
+    assert result.search.source == "home_layout"
+    assert result.search.criteria.room_type == "2房"
+    assert result.search.criteria.property_type == ""
+    assert result.search.touch_payload == {"room_type": "2房"}
+    assert "LST_" not in repr(result)
+
+
+def test_current_available_is_direct_published_only_search_boundary():
+    result = TransitionActionService().apply(
+        TransitionCallback(kind="search_available"),
+        {},
+    )
+
+    assert result.ok and result.next_step == "search_submit"
+    assert result.navigation is None
+    assert result.search is not None
+    assert result.search.source == "home_available"
+    assert result.search.criteria.has_filter is False
+    assert result.search.touch_payload == {"current_available": True}
+
+
+def test_budget_requires_live_search_pref_and_remaining_navigation_is_explicit():
     service = TransitionActionService()
     expired = service.apply(TransitionCallback(kind="budget_choice", value="b1"), {})
     assert expired.status == "expired"
     assert expired.reason == "search_session_expired"
 
-    for kind in ("search_area", "search_budget", "search_layout", "search_available", "home"):
+    for kind in ("search_area", "search_budget", "search_layout", "home"):
         result = service.apply(TransitionCallback(kind=kind), {})
         assert result.ok and result.next_step == "navigation"
         assert result.navigation == kind
