@@ -4,8 +4,7 @@ import logging
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-from qiaolian_dual.channel_links import channel_action_url
-from .formatters import AREA_OPTIONS, TYPE_LABELS, deep_link
+from .formatters import AREA_OPTIONS
 
 log = logging.getLogger(__name__)
 
@@ -99,51 +98,5 @@ def edit_keyboard() -> InlineKeyboardMarkup:
                 InlineKeyboardButton("提醒", callback_data="edit:advisor_note"),
             ],
             [InlineKeyboardButton("⬅️ 返回预览", callback_data="edit:done")],
-        ]
-    )
-
-
-def publish_post_keyboard(
-    listing_id: str,
-    area: str,
-    user_bot_username: str,
-    detail_url: str | None = None,
-    maps_url: str | None = None,
-    channel_username: str = "",
-    channel_message_id: int | None = None,
-    discussion_group_link: str = "",
-    post_token: str = "",
-) -> InlineKeyboardMarkup:
-    """频道房源帖固定三个动作；所有入口统一使用公开 QC Deep Link。"""
-    _ = (
-        area,
-        detail_url,
-        maps_url,
-        channel_username,
-        channel_message_id,
-        discussion_group_link,
-        post_token,
-        deep_link,
-        TYPE_LABELS,
-    )
-
-    return InlineKeyboardMarkup(
-        [
-            [
-                InlineKeyboardButton(
-                    "🏠 房源详情",
-                    url=channel_action_url(user_bot_username, listing_id, "details"),
-                ),
-                InlineKeyboardButton(
-                    "📸 更多实拍",
-                    url=channel_action_url(user_bot_username, listing_id, "photos"),
-                ),
-            ],
-            [
-                InlineKeyboardButton(
-                    "📅 预约看房",
-                    url=channel_action_url(user_bot_username, listing_id, "book"),
-                )
-            ],
         ]
     )
