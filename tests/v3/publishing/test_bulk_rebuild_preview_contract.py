@@ -172,7 +172,7 @@ def test_db_loader_rejects_old_numeric_ql_as_official_rent_identity():
     conn.execute("INSERT INTO canonical_records(id,source_post_id,source_post_revision_id,schema_version,parser_revision,facts_json,facts_hash,deal_type) VALUES (1,1,1,'v3','p','{}','canon','rent')")
     conn.execute("INSERT INTO v3_listings(id,public_listing_id,current_canonical_record_id,property_identity_key) VALUES (1,'QL000101',1,'prop')")
     conn.execute("INSERT INTO listing_offers(id,listing_id,canonical_record_id,offer_type,monthly_rent_usd,publication_policy) VALUES (1,1,1,'rent',800,'telegram_rent')")
-    conn.execute("INSERT INTO v3_publication_packages(id,package_id,idempotency_key,listing_id,offer_id,canonical_record_id,target_channel_id,status,approval_mode,cover_path,gallery_json,caption_html,keyboard_json,content_hash,canonical_hash) VALUES (1,'PKG_BAD','PKG_BAD',1,1,1,'-100123','frozen','auto','c','[]','c','[]','h','canon')")
+    conn.execute("INSERT INTO v3_publication_packages(id,package_id,idempotency_key,listing_id,offer_id,canonical_record_id,package_version,target_channel_id,status,approval_mode,cover_path,gallery_json,caption_html,keyboard_json,content_hash,canonical_hash) VALUES (1,'PKG_BAD','PKG_BAD',1,1,1,1,'-100123','frozen','auto','c','[]','c','[]','h','canon')")
     conn.commit()
     with pytest.raises(PreviewInvalid, match='invalid_public_ql_id'):
         load_candidates_from_db(conn, ({'package_id':'PKG_BAD','channel_id':'-100123','message_id':1,'current_content_hash':'before'},))
