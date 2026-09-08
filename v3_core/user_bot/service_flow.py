@@ -35,6 +35,7 @@ class ServiceRequestDraft:
     issue_key: str
     issue_label: str
     detail: str = ""
+    request_token: str = ""
 
 
 @dataclass(frozen=True)
@@ -42,6 +43,7 @@ class RepairSubmission:
     ticket: RepairTicket
     slot_label: str
     urgent: bool
+    created: bool
 
 
 class TenantService:
@@ -54,12 +56,15 @@ class TenantService:
         self.repository = repository
         self.now = now or (lambda: datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
-    def begin_request(self, issue_key: str) -> ServiceRequestDraft:
+    def begin_request(self, issue_key: str, *, request_token: str) -> ServiceRequestDraft:
         clean = str(issue_key or "").strip()
         label = SERVICE_REQUEST_LABELS.get(clean)
+        token = str(request_token or "").strip()
         if not label or clean == "property":
             raise ValueError("unsupported_repair_issue")
-        return ServiceRequestDraft(issue_key=clean, issue_label=label)
+        if not token:
+            raise ValueError("service_request_token_required")
+        return ServiceRequestDraft(issue_key=clean, issue_label=label, request_token=token)
 
     def with_detail(self, draft: ServiceRequestDraft, detail: str) -> ServiceRequestDraft:
         clean = str(detail or "").strip()
@@ -69,6 +74,7 @@ class TenantService:
             issue_key=draft.issue_key,
             issue_label=draft.issue_label,
             detail=clean[:800],
+            request_token=draft.request_token,
         )
 
     def submit_repair(
@@ -84,8 +90,11 @@ class TenantService:
             raise ValueError("unsupported_service_slot")
         if not str(draft.detail or "").strip():
             raise ValueError("service_request_detail_required")
+        if not str(draft.request_token or "").strip():
+            raise ValueError("service_request_token_required")
         binding = self.repository.get_active_binding(int(user_id))
-        ticket = self.repository.create_repair_ticket(
+        write = self.repository.create_repair_ticket(
+            request_token=draft.request_token,
             user_id=int(user_id),
             binding=binding,
             issue_key=draft.issue_key,
@@ -95,9 +104,10 @@ class TenantService:
             created_at=self.now(),
         )
         return RepairSubmission(
-            ticket=ticket,
+            ticket=write.ticket,
             slot_label=slot_label,
             urgent=draft.issue_key in URGENT_ISSUES,
+            created=write.created,
         )
 
 
