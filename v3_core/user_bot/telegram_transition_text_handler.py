@@ -5,8 +5,7 @@ explicit awaiting state. This adapter renders the next local step or, when an
 executor is injected, crosses the appointment/search submit boundary.
 
 Session mutation is deferred until the required Telegram operation succeeds.
-Appointment/search side effects outside their V3 executors remain explicit and
-are never imported from the legacy runtime.
+Lead persistence is injected and best-effort; admin/channel effects stay outside.
 """
 from __future__ import annotations
 
@@ -22,6 +21,8 @@ from .appointment_submit_executor import (
     AppointmentSubmitExecutor,
 )
 from .appointment_success_view import build_appointment_success_view
+from .lead_effects import LeadEffectExecutor, LeadEffectResult
+from .lead_service import LeadUser
 from .search_no_match_view import build_search_no_match_view
 from .search_submit_executor import SearchSubmitExecution, SearchSubmitExecutor
 from .telegram_search_results import (
@@ -53,6 +54,7 @@ class TelegramTransitionTextOutcome:
     appointment_execution: AppointmentSubmitExecution | None = None
     search_execution: SearchSubmitExecution | None = None
     search_presentation: TelegramSearchPresentation | None = None
+    lead_effect: LeadEffectResult | None = None
 
 
 async def _reply_view(message: Any, view: TransitionView) -> None:
@@ -86,6 +88,14 @@ def _telegram_appointment_user(update: Any) -> AppointmentUser:
     )
 
 
+def _lead_user(user: AppointmentUser) -> LeadUser:
+    return LeadUser(
+        user_id=int(user.user_id),
+        username=str(user.username or ""),
+        display_name=str(user.display_name or ""),
+    )
+
+
 def _appointment_success_cleanup() -> SessionMutationPlan:
     return SessionMutationPlan(
         set_values={},
@@ -105,6 +115,7 @@ async def handle_v3_transition_text(
     views: TransitionViewService,
     appointment_executor: AppointmentSubmitExecutor | None = None,
     search_executor: SearchSubmitExecutor | None = None,
+    lead_effects: LeadEffectExecutor | None = None,
 ) -> TelegramTransitionTextOutcome:
     message = getattr(update, "effective_message", None)
     text = str(getattr(message, "text", "") or "") if message is not None else ""
@@ -122,8 +133,6 @@ async def handle_v3_transition_text(
         return TelegramTransitionTextOutcome(handled=True, result=result)
 
     if not result.ok:
-        # Expired awaiting state belongs to a future navigation/error layer.
-        # Keep local state untouched rather than guessing a recovery route.
         return TelegramTransitionTextOutcome(handled=True, result=result)
 
     if result.next_step == "appointment_time":
@@ -151,10 +160,18 @@ async def handle_v3_transition_text(
     if result.next_step == "appointment_submit" and appointment_executor is not None:
         if result.appointment is None:
             raise ValueError("appointment_submit_text_action_missing_draft")
+        appointment_user = _telegram_appointment_user(update)
         execution = appointment_executor.execute(
-            user=_telegram_appointment_user(update),
+            user=appointment_user,
             draft=result.appointment,
         )
+        lead_effect = None
+        if lead_effects is not None:
+            lead_effect = lead_effects.record_appointment(
+                user=_lead_user(appointment_user),
+                execution=execution,
+                draft=result.appointment,
+            )
         success_view = build_appointment_success_view(
             result.appointment,
             views.inventory,
@@ -166,6 +183,7 @@ async def handle_v3_transition_text(
             handled=True,
             result=result,
             appointment_execution=execution,
+            lead_effect=lead_effect,
         )
 
     if result.next_step == "search_submit" and search_executor is not None:
@@ -175,6 +193,12 @@ async def handle_v3_transition_text(
         presentation = await present_search_flow_result(update, context, execution.result)
         if not presentation.matched:
             await _reply_view(message, build_search_no_match_view(result.search))
+        lead_effect = None
+        if lead_effects is not None:
+            lead_effect = lead_effects.record_search(
+                user=_lead_user(_telegram_appointment_user(update)),
+                intent=result.search,
+            )
         if result.mutation is not None:
             apply_session_mutation(user_data, result.mutation)
         return TelegramTransitionTextOutcome(
@@ -182,10 +206,9 @@ async def handle_v3_transition_text(
             result=result,
             search_execution=execution,
             search_presentation=presentation,
+            lead_effect=lead_effect,
         )
 
-    # A recognized submit boundary without the required executor remains pending.
-    # Do not consume awaiting flags or the public-only draft/preferences.
     return TelegramTransitionTextOutcome(handled=True, result=result)
 
 
