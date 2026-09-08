@@ -3,13 +3,15 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 from qiaolian_v3.db.migration_runner import MigrationRunner
 from qiaolian_v3.db.repositories.canonical import CanonicalRecordRepository
 from qiaolian_v3.ingest.source_service import SourceIngestService
+from qiaolian_v3.listing import public_id as public_id_module
 from qiaolian_v3.listing.materializer import CanonicalListingMaterializer
 from qiaolian_v3.listing.public_id import normalize_public_id
 from qiaolian_v3.parser.canonical import canonicalize_source
@@ -20,6 +22,10 @@ from tools.migrations.rebuild_channel import RebuildPreview, generate_preview, l
 FIXTURE_PATH = 'tests/v3/fixtures/phase5_channel_house_groups.tsv'
 TARGET_CHANNEL_ID = '-100123'
 BOT_USERNAME = 'QiaoLianBot'
+# Deterministic acceptance entropy only. Production ID generation still uses the
+# formal assign_public_listing_id() code path; this sequence just makes the
+# committed preview reproducible and reviewable.
+_ACCEPTANCE_PUBLIC_ID_ENTROPY = tuple('H4K7M5N8P6R4T7V5')
 
 
 @dataclass(frozen=True)
@@ -75,6 +81,24 @@ UNKNOWN_SOURCE = ProductionDerivedSource(
 
 def _sha(value: str) -> str:
     return hashlib.sha256(value.encode('utf-8')).hexdigest()
+
+
+@contextmanager
+def _deterministic_public_ids() -> Iterator[None]:
+    values = iter(_ACCEPTANCE_PUBLIC_ID_ENTROPY)
+    original = public_id_module.secrets.choice
+
+    def deterministic_choice(_: str) -> str:
+        try:
+            return next(values)
+        except StopIteration as exc:
+            raise AssertionError('acceptance_public_id_entropy_exhausted') from exc
+
+    public_id_module.secrets.choice = deterministic_choice
+    try:
+        yield
+    finally:
+        public_id_module.secrets.choice = original
 
 
 def _caption(facts: dict[str, Any], public_id: str) -> str:
@@ -207,7 +231,7 @@ def _materialize_rent_package(
         bot_username=BOT_USERNAME,
         public_listing_id=public_id,
     )
-    _insert_package(conn, package, status='frozen' if frozen else 'draft')
+    _insert_package(conn, package, status='frozen' if frozen else 'prepared')
     conn.commit()
     return package
 
@@ -219,26 +243,27 @@ def build_official_preview(workdir: Path) -> RebuildPreview:
     MigrationRunner(conn).migrate()
     cover_root = workdir / 'covers'
 
-    rent_packages: list[FrozenPublicationPackage] = []
-    for source in REAL_RENT_SOURCES:
-        canonical_id, facts = _persist_source(conn, source)
-        if str(facts.get('deal_type')) != 'rent':
-            raise AssertionError('real_rent_fixture_must_parse_as_rent')
-        rent_packages.append(_materialize_rent_package(conn, canonical_id, facts, cover_root, frozen=True))
+    with _deterministic_public_ids():
+        rent_packages: list[FrozenPublicationPackage] = []
+        for source in REAL_RENT_SOURCES:
+            canonical_id, facts = _persist_source(conn, source)
+            if str(facts.get('deal_type')) != 'rent':
+                raise AssertionError('real_rent_fixture_must_parse_as_rent')
+            rent_packages.append(_materialize_rent_package(conn, canonical_id, facts, cover_root, frozen=True))
 
-    sale_id, sale_facts = _persist_source(conn, SALE_SOURCE)
-    if str(sale_facts.get('deal_type')) != 'sale':
-        raise AssertionError('sale_negative_control_must_parse_as_sale')
-    CanonicalListingMaterializer(conn).materialize(sale_id)
+        sale_id, sale_facts = _persist_source(conn, SALE_SOURCE)
+        if str(sale_facts.get('deal_type')) != 'sale':
+            raise AssertionError('sale_negative_control_must_parse_as_sale')
+        CanonicalListingMaterializer(conn).materialize(sale_id)
 
-    unknown_id, unknown_facts = _persist_source(conn, UNKNOWN_SOURCE)
-    if str(unknown_facts.get('deal_type')) != 'unknown':
-        raise AssertionError('unknown_negative_control_must_stay_unknown')
+        unknown_id, unknown_facts = _persist_source(conn, UNKNOWN_SOURCE)
+        if str(unknown_facts.get('deal_type')) != 'unknown':
+            raise AssertionError('unknown_negative_control_must_stay_unknown')
 
-    unfrozen_id, unfrozen_facts = _persist_source(conn, UNFROZEN_RENT_SOURCE)
-    if str(unfrozen_facts.get('deal_type')) != 'rent':
-        raise AssertionError('unfrozen_negative_control_must_parse_as_rent')
-    unfrozen_package = _materialize_rent_package(conn, unfrozen_id, unfrozen_facts, cover_root, frozen=False)
+        unfrozen_id, unfrozen_facts = _persist_source(conn, UNFROZEN_RENT_SOURCE)
+        if str(unfrozen_facts.get('deal_type')) != 'rent':
+            raise AssertionError('unfrozen_negative_control_must_parse_as_rent')
+        unfrozen_package = _materialize_rent_package(conn, unfrozen_id, unfrozen_facts, cover_root, frozen=False)
 
     mappings = [
         {'package_id': rent_packages[0].package_id, 'channel_id': TARGET_CHANNEL_ID, 'message_id': 5001, 'current_content_hash': _sha('TEST_SLOT_5001')},
