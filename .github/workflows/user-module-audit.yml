@@ -44,7 +44,10 @@ jobs:
             utils \
             talk_engine \
             jobs \
-            flows
+            flows \
+            messages \
+            messages_more \
+            texts
           do
             echo "=== ${module} ==="
             python qiaolian_production/tools/audit_user_symbol_module.py "${module}"
