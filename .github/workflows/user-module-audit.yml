@@ -69,27 +69,15 @@ jobs:
             echo "=== ${module} ==="
             python qiaolian_production/tools/audit_user_symbol_module.py "${module}"
           done
-      - name: Slice confirmed dead user helpers
+      - name: Verify committed helper slices
         run: |
           set -e
-          python qiaolian_production/tools/audit_user_symbol_module.py channel_post --write
-          python qiaolian_production/tools/audit_user_symbol_module.py attribution --write
-          python qiaolian_production/tools/audit_user_symbol_module.py message_handlers --write
-          python qiaolian_production/tools/audit_user_symbol_module.py listing --write
+          for module in channel_post attribution message_handlers listing; do
+            python qiaolian_production/tools/audit_user_symbol_module.py "${module}" --write
+          done
           python -m compileall -q qiaolian_production/user/qiaolian_dual
-      - name: Commit confirmed user helper slices
-        run: |
-          set -e
-          if git diff --quiet; then
-            echo "No user helper slice changes"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add \
+          git diff --exit-code -- \
             qiaolian_production/user/qiaolian_dual/channel_post.py \
             qiaolian_production/user/qiaolian_dual/attribution.py \
             qiaolian_production/user/qiaolian_dual/message_handlers.py \
             qiaolian_production/user/qiaolian_dual/listing.py
-          git commit -m "refactor: slim user message and listing helpers"
-          git push
