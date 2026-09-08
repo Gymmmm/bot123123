@@ -2,12 +2,12 @@
 
 The pure ``TransitionActionService`` owns state decisions. This adapter claims
 callbacks from the transition namespace, renders local steps, and can optionally
-execute V3 appointment persistence at the ``appointment_submit`` boundary.
+execute V3 appointment persistence or published-only search at their explicit
+submit boundaries.
 
-Search submit and navigation remain explicit outer-orchestration boundaries.
 Lead creation, admin notification, listing availability recomputation and channel
-sync are never hidden here; the appointment executor returns those as an effect
-plan for a later layer.
+sync are never hidden here. Appointment effects are returned to an outer layer;
+search remains read-only until a separate V3 lead/admin effect executor exists.
 """
 from __future__ import annotations
 
@@ -22,6 +22,12 @@ from .appointment_submit_executor import (
     AppointmentSubmitExecutor,
 )
 from .appointment_success_view import build_appointment_success_view
+from .search_no_match_view import build_search_no_match_view
+from .search_submit_executor import SearchSubmitExecution, SearchSubmitExecutor
+from .telegram_search_results import (
+    TelegramSearchPresentation,
+    present_search_flow_result,
+)
 from .telegram_transition_ui import build_transition_keyboard
 from .transition_actions import (
     APPOINTMENT_AWAITING_DATE_KEY,
@@ -43,6 +49,8 @@ class TelegramTransitionActionOutcome:
     handled: bool
     result: TransitionActionResult | None = None
     appointment_execution: AppointmentSubmitExecution | None = None
+    search_execution: SearchSubmitExecution | None = None
+    search_presentation: TelegramSearchPresentation | None = None
 
 
 async def _edit_view(query: Any, view: TransitionView) -> None:
@@ -130,6 +138,7 @@ async def handle_v3_transition_action(
     actions: TransitionActionService,
     views: TransitionViewService,
     appointment_executor: AppointmentSubmitExecutor | None = None,
+    search_executor: SearchSubmitExecutor | None = None,
 ) -> TelegramTransitionActionOutcome:
     query = getattr(update, "callback_query", None)
     raw = str(getattr(query, "data", "") or "") if query is not None else ""
@@ -179,8 +188,31 @@ async def handle_v3_transition_action(
             appointment_execution=execution,
         )
 
-    # Search submission, navigation, or an appointment boundary without an
-    # injected executor remains deferred. Do not apply its session mutation yet.
+    if result.next_step == "search_submit" and search_executor is not None:
+        if result.search is None:
+            raise ValueError("search_submit_action_missing_intent")
+        execution = search_executor.execute(result.search)
+        presentation = await present_search_flow_result(
+            update,
+            context,
+            execution.result,
+        )
+        if not presentation.matched:
+            await _edit_view(query, build_search_no_match_view(result.search))
+        # The published-only search and Telegram presentation both succeeded.
+        # Only now consume the guided-search preference and retain the canonical
+        # last-search criteria for later explicit similar-search support.
+        if result.mutation is not None:
+            apply_session_mutation(user_data, result.mutation)
+        return TelegramTransitionActionOutcome(
+            handled=True,
+            result=result,
+            search_execution=execution,
+            search_presentation=presentation,
+        )
+
+    # Navigation, or a submit boundary without its injected executor, remains
+    # deferred. Do not apply its session mutation yet.
     return TelegramTransitionActionOutcome(handled=True, result=result)
 
 
