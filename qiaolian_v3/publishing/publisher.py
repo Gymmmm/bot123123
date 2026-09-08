@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .eligibility import evaluate_rent_publication_eligibility
+from .gate import AutoPublishGate
 from .package import FrozenPublicationPackage
 from .delivery import DeliveryCoordinator, DeliveryBlocked
 
@@ -12,29 +12,19 @@ class PublicationBlocked(RuntimeError):
 
 
 class RentPublisher:
-    def __init__(self, *, gateway: Any, delivery: DeliveryCoordinator, dry_run: bool = True) -> None:
+    def __init__(self, *, gateway: Any, delivery: DeliveryCoordinator, dry_run: bool = True, gate: AutoPublishGate | None = None) -> None:
         self.gateway = gateway
         self.delivery = delivery
         self.dry_run = bool(dry_run)
+        self.gate = gate or AutoPublishGate()
 
     def publish(self, package: FrozenPublicationPackage) -> dict[str, Any]:
-        eligibility = evaluate_rent_publication_eligibility(
-            canonical={'deal_type': package.deal_type},
-            offer={'offer_type': package.offer_type, 'publication_policy': package.publication_policy},
-            source_mode=package.source_mode,
-            quality_result=package.quality_result,
-            frozen=package.frozen,
-        )
-        if not eligibility.allowed:
-            raise PublicationBlocked(','.join(eligibility.reason_codes))
+        gate_result = self.gate.evaluate(package)
+        if not gate_result.allowed:
+            raise PublicationBlocked(','.join(gate_result.reasons))
         if self.dry_run:
             return {'action': 'publish', 'dry_run': True, 'package_id': package.package_id, 'writes': 0}
-        try:
-            state = self.delivery.begin(package)
-        except DeliveryBlocked as exc:
-            if 'published' in str(exc):
-                return {'action': 'publish', 'status': 'already_published'}
-            raise
+        state = self.delivery.begin(package)
         if state.state == 'published':
             return {'action': 'publish', 'status': 'already_published', 'message_id': state.message_id}
         try:
