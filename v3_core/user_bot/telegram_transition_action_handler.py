@@ -1,12 +1,11 @@
 """Async Telegram adapter for ``v3u:t:*`` transition callbacks.
 
 The pure ``TransitionActionService`` owns state decisions. This adapter claims
-callbacks from the transition namespace, renders local steps, and can optionally
-execute V3 appointment persistence or published-only search at their explicit
-submit boundaries.
+callbacks from the transition namespace, renders local steps, and executes the
+V3 appointment/search boundaries when their dependencies are injected.
 
-Lead persistence is an injected best-effort effect. Admin notification, listing
-availability recomputation and channel sync remain explicit outer effects.
+Appointment ordering matches the locked runtime: durable appointment -> lead ->
+availability/channel/admin outer effects -> user success page.
 """
 from __future__ import annotations
 
@@ -16,6 +15,10 @@ from typing import Any
 
 from telegram.constants import ParseMode
 
+from .appointment_runtime_effects import (
+    AppointmentRuntimeEffectExecutor,
+    AppointmentRuntimeEffectResult,
+)
 from .appointment_service import AppointmentUser
 from .appointment_submit_executor import (
     AppointmentSubmitExecution,
@@ -26,10 +29,7 @@ from .lead_effects import LeadEffectExecutor, LeadEffectResult
 from .lead_service import LeadUser
 from .search_no_match_view import build_search_no_match_view
 from .search_submit_executor import SearchSubmitExecution, SearchSubmitExecutor
-from .telegram_search_results import (
-    TelegramSearchPresentation,
-    present_search_flow_result,
-)
+from .telegram_search_results import TelegramSearchPresentation, present_search_flow_result
 from .telegram_transition_ui import build_transition_keyboard
 from .transition_actions import (
     APPOINTMENT_AWAITING_DATE_KEY,
@@ -68,6 +68,7 @@ class TelegramTransitionActionOutcome:
     handled: bool
     result: TransitionActionResult | None = None
     appointment_execution: AppointmentSubmitExecution | None = None
+    appointment_effects: AppointmentRuntimeEffectResult | None = None
     search_execution: SearchSubmitExecution | None = None
     search_presentation: TelegramSearchPresentation | None = None
     lead_effect: LeadEffectResult | None = None
@@ -90,10 +91,7 @@ async def _edit_view(query: Any, view: TransitionView) -> None:
     )
 
 
-def _view_for_result(
-    views: TransitionViewService,
-    result: TransitionActionResult,
-) -> TransitionView | None:
+def _view_for_result(views: TransitionViewService, result: TransitionActionResult) -> TransitionView | None:
     if result.next_step == "appointment_date":
         if result.appointment is None:
             raise ValueError("appointment_date_action_missing_draft")
@@ -127,15 +125,10 @@ def _navigation_view(
 ) -> TransitionView | None:
     navigation = result.navigation
     if not navigation or navigation == "home":
-        # Full fixed-SHA home still includes appointment/rental/service/adviser
-        # surfaces that are not all extracted into V3 yet. Keep home as an
-        # explicit outer boundary instead of rendering a partial/dead homepage.
         return None
-
     preview = deepcopy(user_data)
     if result.mutation is not None:
         apply_session_mutation(preview, result.mutation)
-
     if navigation == "search_area":
         return views.search_area()
     if navigation == "search_layout":
@@ -175,11 +168,7 @@ def _telegram_appointment_user(update: Any) -> AppointmentUser:
             )
             if part
         )
-    return AppointmentUser(
-        user_id=int(user.id),
-        username=username,
-        display_name=display_name,
-    )
+    return AppointmentUser(user_id=int(user.id), username=username, display_name=display_name)
 
 
 def _lead_user(user: AppointmentUser) -> LeadUser:
@@ -210,6 +199,7 @@ async def handle_v3_transition_action(
     appointment_executor: AppointmentSubmitExecutor | None = None,
     search_executor: SearchSubmitExecutor | None = None,
     lead_effects: LeadEffectExecutor | None = None,
+    appointment_runtime_effects: AppointmentRuntimeEffectExecutor | None = None,
 ) -> TelegramTransitionActionOutcome:
     query = getattr(update, "callback_query", None)
     raw = str(getattr(query, "data", "") or "") if query is not None else ""
@@ -223,7 +213,6 @@ async def handle_v3_transition_action(
 
     result = actions.apply(callback, user_data)
     await query.answer()
-
     if not result.ok:
         return TelegramTransitionActionOutcome(handled=True, result=result)
 
@@ -244,14 +233,20 @@ async def handle_v3_transition_action(
         if result.appointment is None:
             raise ValueError("appointment_submit_action_missing_draft")
         appointment_user = _telegram_appointment_user(update)
-        execution = appointment_executor.execute(
-            user=appointment_user,
-            draft=result.appointment,
-        )
+        lead_user = _lead_user(appointment_user)
+        execution = appointment_executor.execute(user=appointment_user, draft=result.appointment)
         lead_effect = None
         if lead_effects is not None:
             lead_effect = lead_effects.record_appointment(
-                user=_lead_user(appointment_user),
+                user=lead_user,
+                execution=execution,
+                draft=result.appointment,
+            )
+        runtime_effect = None
+        if appointment_runtime_effects is not None:
+            runtime_effect = await appointment_runtime_effects.execute(
+                bot=getattr(context, "bot", None),
+                user=lead_user,
                 execution=execution,
                 draft=result.appointment,
             )
@@ -260,15 +255,13 @@ async def handle_v3_transition_action(
             views.inventory,
             submission_kind=execution.submission.kind,
         )
-        # Appointment + best-effort lead happen before the user success page,
-        # matching fixed-SHA ordering. If Telegram editing fails, the public
-        # session stays intact; retry reuses the appointment and skips lead.
         await _edit_view(query, success_view)
         apply_session_mutation(user_data, _appointment_success_cleanup())
         return TelegramTransitionActionOutcome(
             handled=True,
             result=result,
             appointment_execution=execution,
+            appointment_effects=runtime_effect,
             lead_effect=lead_effect,
         )
 
@@ -276,15 +269,9 @@ async def handle_v3_transition_action(
         if result.search is None:
             raise ValueError("search_submit_action_missing_intent")
         execution = search_executor.execute(result.search)
-        presentation = await present_search_flow_result(
-            update,
-            context,
-            execution.result,
-        )
+        presentation = await present_search_flow_result(update, context, execution.result)
         if not presentation.matched:
             await _edit_view(query, build_search_no_match_view(result.search))
-        # Search lead recording occurs only after Telegram presentation succeeds,
-        # preserving V3 retry safety while keeping lead failure non-fatal.
         lead_effect = None
         if lead_effects is not None:
             lead_effect = lead_effects.record_search(
@@ -303,7 +290,4 @@ async def handle_v3_transition_action(
     return TelegramTransitionActionOutcome(handled=True, result=result)
 
 
-__all__ = [
-    "TelegramTransitionActionOutcome",
-    "handle_v3_transition_action",
-]
+__all__ = ["TelegramTransitionActionOutcome", "handle_v3_transition_action"]
