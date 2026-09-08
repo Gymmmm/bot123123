@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from v3_core.ingest.source_reader import SourceReader
 from v3_core.ingest.source_repository import SourceRepository
@@ -8,8 +8,18 @@ from v3_core.media.service import MediaPreparationService
 
 
 def _image(path: Path, value: int):
-    image = Image.new("RGB", (640, 480), (value, value, value))
-    image.save(path, "JPEG")
+    """Create a deterministic room-like image that satisfies production media gates."""
+    image = Image.new("RGB", (960, 720), (value + 45, value + 35, value + 25))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((55, 55, 905, 665), outline=(238, 238, 230), width=10)
+    draw.rectangle((120, 135, 480, 430), fill=(185, 205, 220), outline=(60, 75, 90), width=8)
+    draw.rectangle((545, 150, 835, 510), fill=(215, 190, 150), outline=(80, 65, 45), width=8)
+    draw.line((80, 590, 880, 590), fill=(65, 65, 65), width=12)
+    draw.line((180, 590, 260, 470), fill=(95, 75, 55), width=9)
+    draw.line((760, 590, 680, 470), fill=(95, 75, 55), width=9)
+    for x in range(110, 880, 80):
+        draw.line((x, 85, x + 35, 115), fill=(110 + value % 60, 90, 80), width=4)
+    image.save(path, "JPEG", quality=94)
     return str(path)
 
 
