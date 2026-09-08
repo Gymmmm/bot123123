@@ -43,10 +43,8 @@ class SearchSessionService:
         seen: set[str] = set()
         for value in values:
             public_id = normalize_public_id(value)
-            if public_id is None:
+            if public_id is None or public_id in seen:
                 return None
-            if public_id in seen:
-                continue
             output.append(public_id)
             seen.add(public_id)
         return tuple(output)
