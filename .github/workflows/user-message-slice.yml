@@ -1,0 +1,133 @@
+name: user-message-slice
+
+on:
+  push:
+    branches:
+      - refactor/production-extraction
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  slice:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runtime dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r qiaolian_production/requirements.txt
+      - name: Audit and slice user message renderers
+        run: |
+          set -e
+          for module in messages messages_more texts; do
+            echo "=== ${module} ==="
+            python qiaolian_production/tools/audit_user_symbol_module.py "${module}"
+            python qiaolian_production/tools/audit_user_symbol_module.py "${module}" --write
+          done
+          python -m compileall -q qiaolian_production/user/qiaolian_dual
+      - name: Import collector from extracted tree only
+        env:
+          DB_PATH: '${{ runner.temp }}/qiaolian-message-slice.db'
+          USER_BOT_TOKEN: '123456:TESTTOKEN'
+          PUBLISHER_BOT_TOKEN: '123456:TESTTOKEN'
+          ADMIN_IDS: '1'
+        run: |
+          python - <<'PY'
+          import sys
+          from pathlib import Path
+          repo=Path.cwd().resolve(); prod=(repo/'qiaolian_production').resolve()
+          import qiaolian_production.run_collector as entry
+          entry._activate_paths(); entry.configure_environment()
+          sys.path[:]=[p for p in sys.path if Path(p or '.').resolve()!=repo]
+          import collector_bot, ai_parser, publication_package
+          assert collector_bot and ai_parser and publication_package
+          leaks=[]
+          for name,module in tuple(sys.modules.items()):
+              raw=getattr(module,'__file__',None)
+              if not raw or str(raw).startswith('<'): continue
+              path=Path(raw).resolve()
+              if (path==repo or repo in path.parents) and not (path==prod or prod in path.parents): leaks.append((name,str(path.relative_to(repo))))
+          if leaks: raise SystemExit('collector local-source leaks: '+repr(sorted(leaks)))
+          print('COLLECTOR_IMPORT_OK')
+          PY
+      - name: Import publisher with production patches
+        env:
+          DB_PATH: '${{ runner.temp }}/qiaolian-message-slice.db'
+          SQLITE_PATH: '${{ runner.temp }}/qiaolian-message-slice.db'
+          USER_BOT_TOKEN: '123456:TESTTOKEN'
+          PUBLISHER_BOT_TOKEN: '123456:TESTTOKEN'
+          ADMIN_IDS: '1'
+          USER_BOT_USERNAME: 'test_user_bot'
+          PUBLISHER_BOT_USERNAME: 'test_publisher_bot'
+          CHANNEL_ID: '-1001234567890'
+        run: |
+          python - <<'PY'
+          import sys
+          from pathlib import Path
+          repo=Path.cwd().resolve(); prod=(repo/'qiaolian_production').resolve()
+          import qiaolian_production.run_publisher as entry
+          entry._activate_paths(); entry.configure_environment()
+          sys.path[:]=[p for p in sys.path if Path(p or '.').resolve()!=repo]
+          main,cover,daily,media,review,release=entry._load_runtime()
+          cover(); media(); review(); release(); daily()
+          from qiaolian_publisher_v2.bot import PublisherBot
+          assert PublisherBot and main
+          leaks=[]
+          for name,module in tuple(sys.modules.items()):
+              raw=getattr(module,'__file__',None)
+              if not raw or str(raw).startswith('<'): continue
+              path=Path(raw).resolve()
+              if (path==repo or repo in path.parents) and not (path==prod or prod in path.parents): leaks.append((name,str(path.relative_to(repo))))
+          if leaks: raise SystemExit('publisher local-source leaks: '+repr(sorted(leaks)))
+          print('PUBLISHER_IMPORT_OK')
+          PY
+      - name: Build user bot from sliced tree
+        env:
+          DB_PATH: '${{ runner.temp }}/qiaolian-message-slice-user.db'
+          SQLITE_PATH: '${{ runner.temp }}/qiaolian-message-slice-user.db'
+          USER_BOT_TOKEN: '123456:TESTTOKEN'
+          PUBLISHER_BOT_TOKEN: '123456:TESTTOKEN'
+          ADMIN_IDS: '1'
+        run: |
+          python - <<'PY'
+          import sys
+          from pathlib import Path
+          repo=Path.cwd().resolve(); prod=(repo/'qiaolian_production').resolve()
+          import qiaolian_production.run_user as entry
+          entry._activate_paths(); entry.configure_environment()
+          sys.path[:]=[p for p in sys.path if Path(p or '.').resolve()!=repo]
+          loaded=entry._load_runtime(); assert loaded and loaded[0]
+          import qiaolian_dual.user_bot as user_bot
+          assert user_bot.build_application() is not None
+          leaks=[]
+          for name,module in tuple(sys.modules.items()):
+              raw=getattr(module,'__file__',None)
+              if not raw or str(raw).startswith('<'): continue
+              path=Path(raw).resolve()
+              if (path==repo or repo in path.parents) and not (path==prod or prod in path.parents): leaks.append((name,str(path.relative_to(repo))))
+          if leaks: raise SystemExit('user local-source leaks: '+repr(sorted(leaks)))
+          print('USER_BUILD_OK')
+          PY
+      - name: Commit validated message slices
+        if: success()
+        run: |
+          targets=(
+            qiaolian_production/user/qiaolian_dual/messages.py
+            qiaolian_production/user/qiaolian_dual/messages_more.py
+            qiaolian_production/user/qiaolian_dual/texts.py
+          )
+          if git diff --quiet -- "${targets[@]}"; then
+            echo "No message renderer changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "${targets[@]}"
+          git commit -m "refactor: slim user message renderer runtime"
+          git push origin HEAD:refactor/production-extraction
