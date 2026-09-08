@@ -7,11 +7,14 @@ ROOT = Path(__file__).resolve().parents[1]
 USER_DIR = ROOT / "user" / "qiaolian_dual"
 TARGET_MODULES = {
     "area_normalization",
+    "attribution_hooks",
+    "channel_links",
+    "cover_styles",
+    "location_mapping",
     "public_listing_id",
     "publishability_contract",
+    "runtime_guard",
     "status_labels",
-    "location_mapping",
-    "channel_links",
 }
 DYNAMIC_NAMES = {"getattr", "setattr", "hasattr", "globals", "locals", "eval", "exec"}
 
