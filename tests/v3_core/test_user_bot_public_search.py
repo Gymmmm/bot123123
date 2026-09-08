@@ -250,6 +250,46 @@ def test_similar_search_falls_back_to_budget_only_last(tmp_path):
     }
 
 
+def test_strict_single_result_augments_only_with_real_published_similar(tmp_path):
+    db = _db(tmp_path)
+    _seed_listing(
+        db,
+        suffix="G",
+        public_id="QL-BK-N6P7",
+        property_type="别墅",
+        location_key="BKK1",
+        rent=780,
+    )
+    service = PublicSearchService(PublicSearchReader(db))
+    criteria = parse_search_criteria("BKK1 公寓 800以内")
+
+    result = service.strict_for_results(criteria, limit=5)
+
+    assert result.mode == "strict"
+    assert result.has_similar
+    assert [item.public_listing_id for item in result.items] == [
+        "QL-BK-A2B3",
+        "QL-BK-N6P7",
+    ]
+
+
+def test_strict_no_match_is_never_converted_into_automatic_similar(tmp_path):
+    db = _db(tmp_path)
+    service = PublicSearchService(PublicSearchReader(db))
+    criteria = SearchCriteria(
+        property_type="办公室",
+        location_keys=("钻石岛",),
+        budget_min=700,
+        budget_max=900,
+    )
+
+    result = service.strict_for_results(criteria, limit=5)
+
+    assert result.mode == "no_match"
+    assert result.items == ()
+    assert not result.has_similar
+
+
 def test_search_reader_is_read_only_and_does_not_create_missing_db(tmp_path):
     missing = tmp_path / "missing.db"
     reader = PublicSearchReader(missing)
