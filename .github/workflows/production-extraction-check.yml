@@ -24,6 +24,8 @@ jobs:
           python -m pip install -r qiaolian_production/requirements.txt
       - name: Compile extracted runtime
         run: python -m compileall -q qiaolian_production
+      - name: Final production extraction acceptance
+        run: python qiaolian_production/tools/final_acceptance.py
       - name: Verify committed autopilot runtime slice
         run: |
           python qiaolian_production/tools/slim_autopilot.py
