@@ -45,6 +45,7 @@ def evaluate_quality_gate(
     quality = dict(facts.get('quality') or {})
     hard = {str(v) for v in quality.get('hard_flags') or []}
     review = {str(v) for v in quality.get('review_flags') or []}
+    canonical_blocking = {str(v) for v in quality.get('blocking_flags') or []}
     blocking: list[str] = []
     warnings: list[str] = []
 
@@ -57,6 +58,11 @@ def evaluate_quality_gate(
     reject_flags = {'tenant_request', 'seeking_rental', 'non_property_ad', 'spam', 'garbage_source'}
     if hard & reject_flags:
         return QualityDecision(RoutingDecision.REJECT, tuple(sorted(hard & reject_flags)), (), 'store_only')
+
+    # Every non-garbage canonical hard/blocking flag must stop AUTO_PUBLISH.
+    blocking.extend(sorted(hard - reject_flags))
+    blocking.extend(sorted(canonical_blocking - reject_flags))
+    blocking.extend(sorted(review))
 
     if deal_type != 'rent':
         blocking.append('unresolved_deal_type')
@@ -73,15 +79,16 @@ def evaluate_quality_gate(
     if not _present(facts.get('canonical_facts_hash') or facts.get('facts_hash')):
         blocking.append('missing_canonical_hash')
 
-    blocking.extend(sorted(review))
-
-    if source_mode == 'collector':
+    normalized_source_mode = str(source_mode or '').strip()
+    if normalized_source_mode == 'collector':
         if not (_present(facts.get('deposit_payment_terms')) or (_present(facts.get('deposit_months')) and _present(facts.get('prepay_months')))):
             blocking.append('missing_payment_terms')
         if not (_present(facts.get('contract_term_months')) or _present(facts.get('contract_term_display'))):
             blocking.append('missing_contract_term')
-    elif source_mode == 'admin_import':
+    elif normalized_source_mode == 'admin_import':
         blocking.append('admin_import_requires_review')
+    else:
+        blocking.append('invalid_source_mode')
 
     usable_count = int(media.get('usable_count') or 0)
     if usable_count < 4:
