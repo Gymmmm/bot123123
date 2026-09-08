@@ -5,6 +5,8 @@ import pytest
 from qiaolian_v3.listing.dedupe import DedupeDecision
 from qiaolian_v3.parser.quality_gate import RoutingDecision, evaluate_quality_gate
 
+# Phase 4 blocker-closure regressions: hard flags and source_mode are fail-closed.
+
 
 def _valid_rent():
     return {
