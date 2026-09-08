@@ -32,6 +32,8 @@ jobs:
         run: python qiaolian_production/tools/audit_user_imports.py
       - name: Audit shared helper reachability
         run: python qiaolian_production/tools/audit_shared_helper_functions.py
+      - name: Audit shared database reachability
+        run: python qiaolian_production/tools/audit_shared_db_methods.py
       - name: Import collector from extracted tree only
         env:
           DB_PATH: '${{ runner.temp }}/qiaolian-extraction.db'
