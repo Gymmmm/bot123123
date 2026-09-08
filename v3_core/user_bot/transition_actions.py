@@ -11,6 +11,9 @@ Fixed-SHA semantics preserved here:
 - appointment date -> time;
 - appointment time -> ready to submit immediately;
 - custom date/time -> explicit text-awaiting state;
+- area -> budget;
+- layout -> strict search boundary;
+- current available -> published-only search boundary;
 - budget choice -> ready to search immediately;
 - custom budget -> explicit text-awaiting state.
 """
@@ -20,6 +23,7 @@ from dataclasses import dataclass
 from typing import Any, Literal, Mapping
 
 from .public_appointment import PublicAppointmentDraft
+from .search_navigation import area_selection, layout_selection
 from .search_query import SearchCriteria, detect_property_type
 from .transition_callbacks import TransitionCallback
 from .transition_session import (
@@ -35,6 +39,7 @@ from .transition_views import budget_bounds
 
 APPOINTMENT_AWAITING_DATE_KEY = "v3_appointment_awaiting_custom_date"
 APPOINTMENT_AWAITING_TIME_KEY = "v3_appointment_awaiting_custom_time"
+SEARCH_AWAITING_AREA_KEY = "v3_awaiting_custom_area"
 SEARCH_AWAITING_BUDGET_KEY = "v3_awaiting_custom_budget"
 LAST_SEARCH_PREF_KEY = "v3_last_search_pref"
 
@@ -45,6 +50,7 @@ TransitionNextStep = Literal[
     "appointment_custom_date",
     "appointment_custom_time",
     "appointment_submit",
+    "search_custom_area",
     "search_custom_budget",
     "search_submit",
     "navigation",
@@ -54,7 +60,6 @@ TransitionNavigation = Literal[
     "search_area",
     "search_budget",
     "search_layout",
-    "search_available",
 ]
 
 
@@ -123,6 +128,26 @@ def _goal_property_type(goal: object) -> str:
     return detect_property_type(clean) or clean
 
 
+def _fresh_search_pref(source: str) -> dict[str, Any]:
+    return {
+        "source": str(source or "user_search"),
+        "goal": "any",
+        "location_keys": [],
+        "area_display": "",
+        "touch_payload": {},
+    }
+
+
+def _last_pref(criteria: SearchCriteria) -> dict[str, Any]:
+    return {
+        "property_type": criteria.property_type,
+        "location_keys": list(criteria.location_keys),
+        "budget_min": criteria.budget_min,
+        "budget_max": criteria.budget_max,
+        "room_type": criteria.room_type,
+    }
+
+
 def _home_mutation() -> SessionMutationPlan:
     return SessionMutationPlan(
         set_values={},
@@ -131,6 +156,7 @@ def _home_mutation() -> SessionMutationPlan:
             APPOINTMENT_AWAITING_DATE_KEY,
             APPOINTMENT_AWAITING_TIME_KEY,
             SEARCH_PREF_SESSION_KEY,
+            SEARCH_AWAITING_AREA_KEY,
             SEARCH_AWAITING_BUDGET_KEY,
             AWAITING_KEYWORD_SESSION_KEY,
             SEARCH_CARD_SESSION_KEY,
@@ -253,6 +279,115 @@ class TransitionActionService:
                 ),
             )
 
+        if kind == "search_area":
+            return TransitionActionResult(
+                status="ok",
+                next_step="navigation",
+                navigation="search_area",
+                mutation=SessionMutationPlan(
+                    set_values={SEARCH_PREF_SESSION_KEY: _fresh_search_pref("home_area")},
+                    delete_keys=(SEARCH_AWAITING_AREA_KEY, SEARCH_AWAITING_BUDGET_KEY),
+                ),
+            )
+
+        if kind == "area_choice":
+            pref = _search_pref(session)
+            if pref is None:
+                return TransitionActionResult(status="expired", reason="search_session_expired")
+            try:
+                display, location_keys = area_selection(callback.value)
+            except ValueError:
+                return TransitionActionResult(status="invalid", reason="invalid_area_choice")
+            updated_pref = dict(pref)
+            updated_pref["location_keys"] = list(location_keys)
+            updated_pref["area_display"] = display
+            return TransitionActionResult(
+                status="ok",
+                next_step="navigation",
+                navigation="search_budget",
+                mutation=SessionMutationPlan(
+                    set_values={SEARCH_PREF_SESSION_KEY: updated_pref},
+                    delete_keys=(SEARCH_AWAITING_AREA_KEY, SEARCH_AWAITING_BUDGET_KEY),
+                ),
+            )
+
+        if kind == "area_other":
+            if _search_pref(session) is None:
+                return TransitionActionResult(status="expired", reason="search_session_expired")
+            return TransitionActionResult(
+                status="ok",
+                next_step="search_custom_area",
+                mutation=SessionMutationPlan(
+                    set_values={SEARCH_AWAITING_AREA_KEY: True},
+                    delete_keys=(SEARCH_AWAITING_BUDGET_KEY,),
+                ),
+            )
+
+        if kind == "search_budget":
+            return TransitionActionResult(
+                status="ok",
+                next_step="navigation",
+                navigation="search_budget",
+                mutation=SessionMutationPlan(
+                    set_values={SEARCH_PREF_SESSION_KEY: _fresh_search_pref("home_budget")},
+                    delete_keys=(SEARCH_AWAITING_AREA_KEY, SEARCH_AWAITING_BUDGET_KEY),
+                ),
+            )
+
+        if kind == "search_layout":
+            return TransitionActionResult(
+                status="ok",
+                next_step="navigation",
+                navigation="search_layout",
+                mutation=SessionMutationPlan(set_values={}),
+            )
+
+        if kind == "layout_choice":
+            try:
+                display, room_type, property_type = layout_selection(callback.value)
+            except ValueError:
+                return TransitionActionResult(status="invalid", reason="invalid_layout_choice")
+            criteria = SearchCriteria(
+                property_type=property_type,
+                room_type=room_type,
+                raw_text=room_type,
+            )
+            return TransitionActionResult(
+                status="ok",
+                next_step="search_submit",
+                search=SearchSubmitIntent(
+                    criteria=criteria,
+                    source="home_layout",
+                    goal=display,
+                    area_display="",
+                    budget_label="",
+                    touch_payload={"room_type": room_type},
+                ),
+                mutation=SessionMutationPlan(
+                    set_values={LAST_SEARCH_PREF_KEY: _last_pref(criteria)},
+                    delete_keys=(SEARCH_PREF_SESSION_KEY, SEARCH_AWAITING_AREA_KEY, SEARCH_AWAITING_BUDGET_KEY),
+                ),
+            )
+
+        if kind == "search_available":
+            criteria = SearchCriteria(raw_text="")
+            return TransitionActionResult(
+                status="ok",
+                next_step="search_submit",
+                search=SearchSubmitIntent(
+                    criteria=criteria,
+                    source="home_available",
+                    goal="any",
+                    area_display="",
+                    budget_label="",
+                    touch_payload={"current_available": True},
+                ),
+                mutation=SessionMutationPlan(
+                    set_values={LAST_SEARCH_PREF_KEY: _last_pref(criteria)},
+                    delete_keys=(SEARCH_PREF_SESSION_KEY, SEARCH_AWAITING_AREA_KEY, SEARCH_AWAITING_BUDGET_KEY),
+                ),
+            )
+
         if kind == "budget_choice":
             pref = _search_pref(session)
             if pref is None:
@@ -300,15 +435,8 @@ class TransitionActionService:
                     touch_payload=touch_payload,
                 ),
                 mutation=SessionMutationPlan(
-                    set_values={
-                        LAST_SEARCH_PREF_KEY: {
-                            "property_type": property_type,
-                            "location_keys": list(location_keys),
-                            "budget_min": budget_min,
-                            "budget_max": budget_max,
-                        }
-                    },
-                    delete_keys=(SEARCH_PREF_SESSION_KEY, SEARCH_AWAITING_BUDGET_KEY),
+                    set_values={LAST_SEARCH_PREF_KEY: _last_pref(criteria)},
+                    delete_keys=(SEARCH_PREF_SESSION_KEY, SEARCH_AWAITING_AREA_KEY, SEARCH_AWAITING_BUDGET_KEY),
                 ),
             )
 
@@ -323,6 +451,7 @@ class TransitionActionService:
                 next_step="search_custom_budget",
                 mutation=SessionMutationPlan(
                     set_values={SEARCH_AWAITING_BUDGET_KEY: True},
+                    delete_keys=(SEARCH_AWAITING_AREA_KEY,),
                 ),
             )
 
@@ -332,14 +461,6 @@ class TransitionActionService:
                 next_step="navigation",
                 navigation="home",
                 mutation=_home_mutation(),
-            )
-
-        if kind in {"search_area", "search_budget", "search_layout", "search_available"}:
-            return TransitionActionResult(
-                status="ok",
-                next_step="navigation",
-                navigation=kind,  # type: ignore[arg-type]
-                mutation=SessionMutationPlan(set_values={}),
             )
 
         return TransitionActionResult(
@@ -352,6 +473,7 @@ __all__ = [
     "APPOINTMENT_AWAITING_DATE_KEY",
     "APPOINTMENT_AWAITING_TIME_KEY",
     "LAST_SEARCH_PREF_KEY",
+    "SEARCH_AWAITING_AREA_KEY",
     "SEARCH_AWAITING_BUDGET_KEY",
     "SearchSubmitIntent",
     "TransitionActionResult",
