@@ -80,7 +80,7 @@ class PublishedListingView:
         clean = str(action or "").strip().lower()
         if clean == "book":
             return self.bookable
-        if clean == "details":
+        if clean in {"details", "consult"}:
             return True
         if clean == "photos":
             return bool(self.gallery)
