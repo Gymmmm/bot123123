@@ -24,9 +24,19 @@ class RentPublisher:
             raise PublicationBlocked(','.join(gate_result.reasons))
         if self.dry_run:
             return {'action': 'publish', 'dry_run': True, 'package_id': package.package_id, 'writes': 0}
+
+        # Recover any already-durable Telegram receipt before attempting to acquire
+        # send ownership. This closes the crash-after-send/before-final-commit gap.
+        recovered = self.delivery.recover_saved_result(package)
+        if recovered is not None and recovered.state == 'published':
+            return {'action': 'publish', 'status': 'already_published', 'message_id': recovered.message_id}
+
         state = self.delivery.begin(package)
         if state.state == 'published':
             return {'action': 'publish', 'status': 'already_published', 'message_id': state.message_id}
+        if state.state == 'receipt_saved':
+            committed = self.delivery.commit_saved_result(package, message_id=state.message_id)
+            return {'action': 'publish', 'status': 'already_published', 'message_id': committed.message_id}
         try:
             result = self.gateway.send(
                 channel_id=package.target_channel_id,
@@ -40,8 +50,12 @@ class RentPublisher:
         message_id = int(result.get('message_id') or 0)
         if message_id <= 0:
             raise PublicationBlocked('telegram_outcome_unknown_reconcile_required')
-        self.delivery.commit_sent(package, message_id=message_id)
-        return {'action': 'publish', 'status': 'published', 'message_id': message_id}
+
+        # Receipt persistence is a committed boundary before the final publication
+        # state transition, so a process crash here is recoverable without resend.
+        self.delivery.save_sent_result(package, message_id=message_id)
+        committed = self.delivery.commit_saved_result(package, message_id=message_id)
+        return {'action': 'publish', 'status': 'published', 'message_id': committed.message_id}
 
 
 __all__ = ['PublicationBlocked','RentPublisher']
