@@ -14,7 +14,7 @@ Scope is limited to existing real-source fixtures, dry-run report tooling, and b
 
 A real exact same-source duplicate is available: source `zufang555`, source_post_id `728`, source URL `https://t.me/c/2498584369/6443`. The same exported historical row exists unchanged in repository snapshots `d70e8efa2bac6059e97b65cf45a9507a081aff66` and `7f9865a73a28e7953211f6d16436791f866b734d`. Both snapshots preserve the same source identity and raw historical export text. This is classified `DUPLICATE_IGNORE` and must not create a second listing/publication target.
 
-A traceable real changed-revision pair is **not available** in the existing repository history/exports/fixtures searched for Phase 5. The report therefore emits `REAL_REVISION_EVIDENCE_UNAVAILABLE`. No aggregate count is split, no historical message is invented, and no fake `月租：$999/月` edit is presented as real evidence. `_scenario_metrics()` remains only a synthetic unit regression proving the existing dedupe classifier returns `UPDATE_EXISTING` for a changed same-source canonical hash; it is explicitly excluded from real-history acceptance evidence.
+A traceable real changed-revision pair is **not available** in the existing repository history/exports/fixtures searched for Phase 5. The report therefore emits `REAL_REVISION_EVIDENCE_UNAVAILABLE`. Search scope includes Git history for `reports_zufang555_full.csv`, `docs/channel_house_group.tsv`, `docs/channel_captions_full_2026-04-19.md`, `houses.csv`, and existing repository source/revision fixtures/tests. No aggregate count is split, no historical message is invented, and no fake `月租：$999/月` edit is presented as real evidence. `_scenario_metrics()` remains only a synthetic unit regression proving the existing dedupe classifier returns `UPDATE_EXISTING` for a changed same-source canonical hash; it is explicitly excluded from real-history acceptance evidence.
 
 ## Complete deterministic report
 
@@ -35,3 +35,5 @@ The same report contains `anomaly_review`. Anomalies are recorded row-by-row wit
 - sale/deposit/electric/utility-like numbers do not create false rent
 - historical media absence remains fail-closed
 - no Publisher/Admin/User Bot/DB migration/server/Telegram/deployment/Phase 6+7 changes
+
+Final verification is intentionally a single CI pass running `tests/v3` and the locked production regression suite; no separate preflight CI is used.
