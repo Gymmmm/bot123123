@@ -1,8 +1,8 @@
 """Read-only V3 readiness checks.
 
 This module never initializes repositories, creates directories, changes SQLite
-journal mode, renders media, contacts Telegram, or sends messages.  Storage
-creation is available only through ``v3_core.storage.bootstrap``.
+journal mode, renders media, contacts Telegram, or sends messages. Storage
+creation remains explicit through ``v3_core.storage.bootstrap``.
 """
 from __future__ import annotations
 
@@ -43,11 +43,12 @@ class ReadinessReport:
         }
 
 
-COMPONENTS = frozenset({"all", "storage", "collector", "parser", "publisher"})
+COMPONENTS = frozenset({"all", "storage", "collector", "parser", "publisher", "user"})
 ENTRYPOINTS = {
     "collector": "run_v3_collector.py",
     "parser": "run_v3_canonical_worker.py",
     "publisher": "run_v3_publisher_bot.py",
+    "user": "run_v3_user_bot.py",
 }
 
 
@@ -116,8 +117,10 @@ def _dependency_checks(component: str) -> list[ReadinessCheck]:
     modules: set[str] = {"dotenv"}
     if component in {"all", "collector"}:
         modules.add("telethon")
+    if component in {"all", "publisher", "user"}:
+        modules.add("telegram")
     if component in {"all", "publisher"}:
-        modules.update({"telegram", "PIL", "playwright"})
+        modules.update({"PIL", "playwright"})
     return [
         _check(
             f"dependency:{module}",
@@ -126,6 +129,13 @@ def _dependency_checks(component: str) -> list[ReadinessCheck]:
         )
         for module in sorted(modules)
     ]
+
+
+def _admin_ids_check(values: Mapping[str, str], prefix: str) -> ReadinessCheck:
+    admin_raw = str(values.get("ADMIN_IDS", "") or "")
+    admin_parts = [part.strip() for part in admin_raw.split(",") if part.strip()]
+    ok = bool(admin_parts) and all(part.lstrip("-").isdigit() for part in admin_parts)
+    return _check(f"{prefix}:admin_ids", ok, "valid" if ok else "invalid")
 
 
 def run_preflight(
@@ -160,7 +170,7 @@ def run_preflight(
     )
 
     active_components = (
-        {"collector", "parser", "publisher"}
+        {"collector", "parser", "publisher", "user"}
         if clean_component == "all"
         else ({clean_component} if clean_component != "storage" else set())
     )
@@ -180,18 +190,13 @@ def run_preflight(
                 "valid" if api_id.isdigit() and int(api_id) > 0 else "invalid",
             )
         )
-        sources_path = _resolve(
-            root,
-            values.get("COLLECTOR_SOURCES_JSON") or "sources.json",
-        )
+        sources_path = _resolve(root, values.get("COLLECTOR_SOURCES_JSON") or "sources.json")
         checks.append(_source_config_check(sources_path))
 
     if "publisher" in active_components:
         checks.extend(_required_env(values, ("PUBLISHER_BOT_TOKEN", "ADMIN_IDS", "CHANNEL_ID")))
         bot_username = str(
-            values.get("DEEPLINK_BOT_USERNAME")
-            or values.get("USER_BOT_USERNAME")
-            or ""
+            values.get("DEEPLINK_BOT_USERNAME") or values.get("USER_BOT_USERNAME") or ""
         ).strip().lstrip("@")
         checks.append(
             _check(
@@ -200,20 +205,14 @@ def run_preflight(
                 "set" if bot_username else "missing",
             )
         )
-        admin_raw = str(values.get("ADMIN_IDS", "") or "")
-        admin_parts = [part.strip() for part in admin_raw.split(",") if part.strip()]
-        admins_ok = bool(admin_parts) and all(part.lstrip("-").isdigit() for part in admin_parts)
-        checks.append(_check("publisher:admin_ids", admins_ok, "valid" if admins_ok else "invalid"))
+        checks.append(_admin_ids_check(values, "publisher"))
 
         styles = (*FINAL_COVER_STYLES, "video_vertical")
         for style in styles:
             template = cover_template_path(style, allow_video=True).resolve()
             checks.append(_check(f"template:{style}", template.is_file(), str(template)))
 
-        cover_output = _resolve(
-            root,
-            values.get("V3_COVER_OUTPUT_DIR") or "media/covers_v3",
-        )
+        cover_output = _resolve(root, values.get("V3_COVER_OUTPUT_DIR") or "media/covers_v3")
         checks.append(_output_dir_check(cover_output))
 
         discussion_enabled = _truthy(values.get("CHANNEL_DISCUSSION_ENABLED")) or _truthy(
@@ -226,6 +225,30 @@ def run_preflight(
                 "disabled" if not discussion_enabled else "enabled_not_allowed_for_v3_cutover",
             )
         )
+
+    if "user" in active_components:
+        checks.extend(
+            _required_env(
+                values,
+                ("USER_BOT_TOKEN", "PUBLISHER_BOT_TOKEN", "USER_BOT_USERNAME", "ADMIN_IDS"),
+            )
+        )
+        checks.append(_admin_ids_check(values, "user"))
+        channel_url = str(values.get("CHANNEL_URL") or "").strip()
+        checks.append(
+            _check("user:channel_url", bool(channel_url), "set" if channel_url else "missing")
+        )
+        advisor = str(values.get("ADVISOR_TG") or values.get("SUPPORT_USERNAME") or "").strip()
+        checks.append(
+            _check(
+                "user:advisor_contact",
+                bool(advisor),
+                "set" if advisor else "missing",
+            )
+        )
+        for name in ("handover.png", "handover.pdf", "deposit.png", "deposit.pdf"):
+            asset = root / "assets" / "v2_2" / "generated" / name
+            checks.append(_check(f"user:asset:{name}", asset.is_file(), str(asset)))
 
     return ReadinessReport(
         component=clean_component,
