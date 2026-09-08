@@ -1,73 +1,73 @@
 {
   "failures": [
     {
-      "canonical_record_id": 303,
-      "listing_id": 103,
-      "public_ql_id": "QL-PP-P6R4",
+      "canonical_record_id": 3,
+      "listing_id": 0,
+      "public_ql_id": "",
       "reason": "sale_target_blocked",
-      "source_identity": "SuxingFC|phase5:SuxingFC:sale:78000|production-derived:SuxingFC:sale",
+      "source_identity": "SuxingFC|phase5:SuxingFC:sale:78000|1cb941271cfa2f324fcee5b1367cb06f5bd331403a11ffb04071a236dcb0c5f0",
       "target_key": "-100123:5003"
     },
     {
-      "canonical_record_id": 304,
+      "canonical_record_id": 4,
       "listing_id": 0,
       "public_ql_id": "",
       "reason": "unknown_target_blocked",
-      "source_identity": "SuxingFC|phase5:SuxingFC:unknown:apartment|production-derived:SuxingFC:unknown",
+      "source_identity": "SuxingFC|phase5:SuxingFC:unknown:apartment|871c6a55bb58e5a4639f8e147ddbf30bbff0441dc308c28590646de240e36f29",
       "target_key": "-100123:5004"
     },
     {
-      "canonical_record_id": 305,
-      "listing_id": 105,
-      "public_ql_id": "QL-PP-T7V5",
+      "canonical_record_id": 5,
+      "listing_id": 3,
+      "public_ql_id": "QL-PP-P6R4",
       "reason": "unfrozen_package_blocked",
-      "source_identity": "jinbianfangchanzushou|phase5:jinbianfangchanzushou:penthouse:800|production-derived:jinbianfangchanzushou:800",
+      "source_identity": "Jinbianzufanz|117|12c65e372939fcdb84b9a62704e3b9f8c087dcd4608b6b106945c9a4ce5cbc7a",
       "target_key": "-100123:5005"
     }
   ],
   "manifest": [
     {
-      "after_content_hash": "a283c70dd55fc6871fcaac70029af66368eda0db7d92b3116444f442427fb5f1",
+      "after_content_hash": "f77fe68538901027462130cb10507fdc80a6afd0c327a36ca2a86e9343b5f770",
       "before_content_hash": "a00fe8fdc1e2b9d07511d140ce1212833e9e1e39634e7abd2b3a03e53ff58618",
       "buttons": [
         {"text": "🏠 房源详情", "url": "https://t.me/QiaoLianBot?start=details_QL-PP-H4K7"},
         {"text": "📸 更多实拍", "url": "https://t.me/QiaoLianBot?start=photos_QL-PP-H4K7"},
         {"text": "📅 预约看房", "url": "https://t.me/QiaoLianBot?start=book_QL-PP-H4K7"}
       ],
-      "canonical_record_id": 301,
-      "caption": "🏠 太子幸福广场｜1房｜55㎡\n💰 $430/月\n🆔 QL-PP-H4K7",
+      "canonical_record_id": 1,
+      "caption": "🏠 Chamkar Mon｜1房1卫｜73㎡\n💰 $500/月\n🆔 QL-PP-H4K7",
       "channel_id": "-100123",
       "cover": "artifacts/v3/workpack_c/covers/QL-PP-H4K7.svg",
-      "frozen_package_id": "PKG_A283C70DD55FC6871FCA",
-      "listing_id": 101,
+      "frozen_package_id": "PKG_F77FE685389010274621",
+      "listing_id": 1,
       "message_id": 5001,
-      "offer_id": 201,
+      "offer_id": 1,
       "public_ql_id": "QL-PP-H4K7",
-      "source_identity": "SuxingFC|phase5:SuxingFC:太子幸福广场:430|production-derived:SuxingFC:430",
+      "source_identity": "Jinbianzufanz|148|c5efbd08f5a70d7401c17fe21d24ebd34cdf8f010cb252c946dbb704697a9efa",
       "target_key": "-100123:5001"
     },
     {
-      "after_content_hash": "4f53243a39e9ffed7c0987a549bd9c05111d5949404971d8e6df3520fd5467c7",
+      "after_content_hash": "4e37ab700d2ad8eac34b2003288886f36e168dd4781ed15970e89d4c99ac93e0",
       "before_content_hash": "7ade9f17f83f136ab9532d638532b9761502a4a979c19518396c1d63483f90a8",
       "buttons": [
-        {"text": "🏠 房源详情", "url": "https://t.me/QiaoLianBot?start=details_QL-PP-M5N8"},
-        {"text": "📸 更多实拍", "url": "https://t.me/QiaoLianBot?start=photos_QL-PP-M5N8"},
-        {"text": "📅 预约看房", "url": "https://t.me/QiaoLianBot?start=book_QL-PP-M5N8"}
+        {"text": "🏠 房源详情", "url": "https://t.me/QiaoLianBot?start=details_QL-BK-M5N8"},
+        {"text": "📸 更多实拍", "url": "https://t.me/QiaoLianBot?start=photos_QL-BK-M5N8"},
+        {"text": "📅 预约看房", "url": "https://t.me/QiaoLianBot?start=book_QL-BK-M5N8"}
       ],
-      "canonical_record_id": 302,
-      "caption": "🏠 时代广场｜2房2卫｜80㎡\n💰 $1000/月\n🆔 QL-PP-M5N8",
+      "canonical_record_id": 2,
+      "caption": "🏠 BKK1｜1房1卫｜85㎡\n💰 $1300/月\n🆔 QL-BK-M5N8",
       "channel_id": "-100123",
-      "cover": "artifacts/v3/workpack_c/covers/QL-PP-M5N8.svg",
-      "frozen_package_id": "PKG_4F53243A39E9FFED7C09",
-      "listing_id": 102,
+      "cover": "artifacts/v3/workpack_c/covers/QL-BK-M5N8.svg",
+      "frozen_package_id": "PKG_4E37AB700D2AD8EAC34B",
+      "listing_id": 2,
       "message_id": 5002,
-      "offer_id": 202,
-      "public_ql_id": "QL-PP-M5N8",
-      "source_identity": "SuxingFC|phase5:SuxingFC:时代广场:1000|production-derived:SuxingFC:1000",
+      "offer_id": 2,
+      "public_ql_id": "QL-BK-M5N8",
+      "source_identity": "Jinbianzufanz|161|6a370aa7f1f02d91e12be1110b22ac0043282ceed618ae2f71108293686392e1",
       "target_key": "-100123:5002"
     }
   ],
-  "preview_hash": "0246b5a05823ffe42d15f5e46dc58df23ade7d3b6e8bdf0903da8b640fad6eff",
+  "preview_hash": "7f7e7875f57de241834e5c3d7655d48a7a87626a88137725ccd7d6e58cd5e10b",
   "publication_status_mutations": 0,
   "target_set": [
     "-100123:5001",
