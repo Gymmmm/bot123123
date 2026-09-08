@@ -1,12 +1,13 @@
 """Pure transition plans for successful V3 User Bot callback intents.
 
 The Telegram callback layer already separates renderable responses from
-transitions.  This module turns those transitions into explicit domain plans
+transitions. This module turns those transitions into explicit domain plans
 without mutating ``context.user_data``, writing leads, notifying admins, or
 starting appointment persistence.
 
-The plans preserve fixed-SHA entry semantics:
-- book -> offline appointment draft, next step date;
+The plans preserve fixed-SHA entry semantics while keeping Telegram/session
+identity public:
+- book -> public-ID offline appointment draft, next step date;
 - consult -> contact handoff, with lead/admin effects declared but not run;
 - similar -> keep only the frozen public area, goal any, next step budget;
 - change search -> reset to the normal search entry.
@@ -16,8 +17,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from .appointments import AppointmentDraft
 from .consult import ConsultIntent
+from .public_appointment import PublicAppointmentDraft
 from .similar_intent import SimilarSearchIntent
 from .telegram_callback_response import TelegramCallbackResponse
 
@@ -41,8 +42,11 @@ TransitionEffect = Literal[
 
 @dataclass(frozen=True)
 class BookTransition:
-    public_listing_id: str
-    draft: AppointmentDraft
+    draft: PublicAppointmentDraft
+
+    @property
+    def public_listing_id(self) -> str:
+        return self.draft.public_listing_id
 
 
 @dataclass(frozen=True)
@@ -88,9 +92,8 @@ def build_transition_plan(response: TelegramCallbackResponse) -> TransitionPlan:
             next_step="appointment_date",
             effects=("render_appointment_date",),
             book=BookTransition(
-                public_listing_id=intent.public_listing_id,
-                draft=AppointmentDraft(
-                    listing_id=intent.listing_id,
+                draft=PublicAppointmentDraft(
+                    public_listing_id=intent.public_listing_id,
                     mode="offline",
                     source=intent.source,
                 ),
