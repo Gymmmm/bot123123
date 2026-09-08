@@ -1,16 +1,21 @@
-"""Pure public channel-entry flow for the side-by-side V3 User Bot.
+"""Pure published-listing flow for the side-by-side V3 User Bot.
 
-One service owns the sequence from public payload to published-only route
-resolution and then to a Telegram-neutral details/photos response or appointment
-intent. Runtime handlers should not repeat these business decisions.
+Channel deep links and internal User Bot callbacks share one published-only
+route gate and one presentation path. Entry surfaces keep their own source
+metadata so appointment attribution is not silently rewritten.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Literal
 
-from .listing_responses import PublicDetailsResponse, PublicPhotosResponse, build_details_response, build_photos_response
-from .route_service import DecisionStatus, PublicRouteService
+from .listing_responses import (
+    PublicDetailsResponse,
+    PublicPhotosResponse,
+    build_details_response,
+    build_photos_response,
+)
+from .route_service import DecisionStatus, PublicRouteDecision, PublicRouteService
 
 
 FlowAction = Literal["details", "photos", "book"]
@@ -43,8 +48,13 @@ class PublicListingFlowService:
     def __init__(self, routes: PublicRouteService):
         self.routes = routes
 
-    def resolve(self, payload: object) -> PublicListingFlowResult:
-        decision = self.routes.resolve(payload)
+    @staticmethod
+    def _render(
+        decision: PublicRouteDecision,
+        *,
+        source: str,
+        start_payload: str,
+    ) -> PublicListingFlowResult:
         route = decision.route
         action = route.action if route is not None else None
         public_id = route.public_listing_id if route is not None else ""
@@ -79,11 +89,32 @@ class PublicListingFlowService:
                 book=PublicBookIntent(
                     listing_id=view.listing_id,
                     public_listing_id=public_id,
-                    source="channel_deeplink",
-                    start_payload=str(payload or "").strip(),
+                    source=str(source or "").strip(),
+                    start_payload=str(start_payload or "").strip(),
                 ),
             )
         raise AssertionError(f"unsupported_public_flow_action:{route.action}")
+
+    def resolve(self, payload: object) -> PublicListingFlowResult:
+        clean_payload = str(payload or "").strip()
+        return self._render(
+            self.routes.resolve(clean_payload),
+            source="channel_deeplink",
+            start_payload=clean_payload,
+        )
+
+    def resolve_action(
+        self,
+        public_listing_id: object,
+        action: object,
+        *,
+        source: str = "listing_callback",
+    ) -> PublicListingFlowResult:
+        return self._render(
+            self.routes.resolve_action(public_listing_id, action),
+            source=source,
+            start_payload="",
+        )
 
 
 __all__ = [
