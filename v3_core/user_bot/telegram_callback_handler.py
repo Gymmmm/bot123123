@@ -1,11 +1,13 @@
 """Thin async Telegram callback handler for the side-by-side V3 User Bot.
 
-Only callbacks in the explicit ``v3u:`` namespace are handled.  The router and
-response adapter make every business decision before this layer.  This handler
+Only callbacks in the explicit ``v3u:`` namespace are handled. The router and
+response adapter make every business decision before this layer. This handler
 performs Telegram edit/send operations for details, photos, and search cards,
 and returns transition intents untouched for later orchestration.
 
-It is deliberately not registered in the production Application yet.
+The search-card renderer is public so initial search results and later card
+navigation share one Telegram/session contract. This module is deliberately not
+registered in the production Application yet.
 """
 from __future__ import annotations
 
@@ -90,17 +92,23 @@ async def _render_photos(update: Any, context: Any, response: TelegramCallbackRe
     )
 
 
-async def _render_card(
+async def render_search_card_response(
     update: Any,
     context: Any,
-    query: Any,
     response: TelegramCallbackResponse,
+    *,
+    query: Any | None = None,
 ) -> None:
-    message = getattr(query, "message", None)
+    """Render one search card and persist only its refreshed public-id session."""
+    if response.kind != "card":
+        raise ValueError("search_card_renderer_requires_card_response")
+
+    message = getattr(query, "message", None) if query is not None else None
     has_photo = bool(getattr(message, "photo", None))
     photo_path = Path(response.photo_path) if response.photo_path else None
+    sent = None
 
-    if has_photo and photo_path is not None:
+    if query is not None and has_photo and photo_path is not None:
         await query.edit_message_media(
             media=InputMediaPhoto(
                 media=photo_path.read_bytes(),
@@ -109,19 +117,19 @@ async def _render_card(
             ),
             reply_markup=response.keyboard,
         )
-    elif has_photo:
+    elif query is not None and has_photo:
         await query.edit_message_caption(
             caption=response.text,
             parse_mode=ParseMode.HTML,
             reply_markup=response.keyboard,
         )
-    elif photo_path is None:
+    elif query is not None and photo_path is None:
         await query.edit_message_text(
             response.text,
             parse_mode=ParseMode.HTML,
             reply_markup=response.keyboard,
         )
-    else:
+    elif photo_path is not None:
         with photo_path.open("rb") as handle:
             sent = await context.bot.send_photo(
                 chat_id=_chat_id(update),
@@ -130,8 +138,18 @@ async def _render_card(
                 parse_mode=ParseMode.HTML,
                 reply_markup=response.keyboard,
             )
-        user_data = getattr(context, "user_data", None)
-        if isinstance(user_data, dict):
+    else:
+        sent = await context.bot.send_message(
+            chat_id=_chat_id(update),
+            text=response.text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=response.keyboard,
+        )
+
+    user_data = getattr(context, "user_data", None)
+    if isinstance(user_data, dict):
+        user_data[SEARCH_SESSION_KEY] = list(response.session_public_listing_ids)
+        if sent is not None:
             sent_chat_id = getattr(sent, "chat_id", _chat_id(update))
             sent_message_id = getattr(sent, "message_id", None)
             if sent_message_id is not None:
@@ -139,10 +157,6 @@ async def _render_card(
                     "chat_id": sent_chat_id,
                     "message_id": sent_message_id,
                 }
-
-    user_data = getattr(context, "user_data", None)
-    if isinstance(user_data, dict):
-        user_data[SEARCH_SESSION_KEY] = list(response.session_public_listing_ids)
 
 
 async def handle_v3_callback(
@@ -172,7 +186,7 @@ async def handle_v3_callback(
     elif response.kind == "photos":
         await _render_photos(update, context, response)
     elif response.kind == "card":
-        await _render_card(update, context, query, response)
+        await render_search_card_response(update, context, response, query=query)
 
     return TelegramCallbackHandlerOutcome(
         handled=True,
@@ -185,4 +199,5 @@ __all__ = [
     "SEARCH_SESSION_KEY",
     "TelegramCallbackHandlerOutcome",
     "handle_v3_callback",
+    "render_search_card_response",
 ]
