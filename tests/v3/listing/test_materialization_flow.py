@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from qiaolian_v3.ingest.source_service import SourceIngestService
 from qiaolian_v3.listing.materializer import CanonicalListingMaterializer
 from qiaolian_v3.media.source_media import SourceMedia
@@ -29,7 +31,6 @@ def test_source_to_canonical_to_listing_to_rent_offer_without_drafts_or_package(
     assert offer['monthly_rent_usd'] == 800
     assert offer['sale_price_usd'] is None
     assert conn.execute('SELECT COUNT(*) FROM v3_publication_packages').fetchone()[0] == 0
-    # The Phase-1 structural fixture has no drafts table; Phase 3 must not create one.
     assert conn.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='drafts'").fetchone()[0] == 0
 
 
@@ -48,14 +49,49 @@ def test_sale_materializes_directly_as_store_only_offer_not_skipped_non_rental()
     assert conn.execute('SELECT COUNT(*) FROM v3_publication_packages').fetchone()[0] == 0
 
 
-def test_ambiguous_rent_and_sale_can_materialize_both_explicit_offers_without_fake_deal_type():
+def test_unresolved_rent_sale_unknown_stops_before_listing_and_offer_materialization():
     conn = migrated_connection()
     source = _source(conn, '区域：BKK1\n公寓可出租，也可出售\n2房2卫\n租金：$680/月\n售价：$100,000', 'mixed-evidence')
     parsed = CanonicalParserService(conn).parse_revision(source.revision_id)
     assert parsed.deal_type == 'unknown'
-    materialized = CanonicalListingMaterializer(conn).materialize(parsed.canonical_record_id)
-    offers = conn.execute('SELECT * FROM listing_offers WHERE listing_id=? ORDER BY offer_type', (materialized.listing_id,)).fetchall()
-    assert [(r['offer_type'], r['monthly_rent_usd'], r['sale_price_usd']) for r in offers] == [
-        ('rent', 680, None), ('sale', None, 100000)
-    ]
-    assert next(r for r in offers if r['offer_type'] == 'sale')['publication_policy'] == 'store_only'
+
+    with pytest.raises(ValueError, match='unresolved_deal_type'):
+        CanonicalListingMaterializer(conn).materialize(parsed.canonical_record_id)
+
+    assert conn.execute('SELECT COUNT(*) FROM v3_listings').fetchone()[0] == 0
+    assert conn.execute('SELECT COUNT(*) FROM listing_offers').fetchone()[0] == 0
+
+
+def test_different_source_posts_with_same_weak_property_facts_remain_distinct_listings():
+    conn = migrated_connection()
+    text = '区域：BKK1\n项目：同一项目\n公寓出租\n2房2卫\n面积：88㎡\n楼层：19楼\n租金：$800/月'
+    first = _source(conn, text, 'source-a')
+    second = _source(conn, text, 'source-b')
+
+    first_parsed = CanonicalParserService(conn).parse_revision(first.revision_id)
+    second_parsed = CanonicalParserService(conn).parse_revision(second.revision_id)
+    first_listing = CanonicalListingMaterializer(conn).materialize(first_parsed.canonical_record_id)
+    second_listing = CanonicalListingMaterializer(conn).materialize(second_parsed.canonical_record_id)
+
+    assert first_listing.listing_id != second_listing.listing_id
+    assert first_listing.public_listing_id != second_listing.public_listing_id
+
+
+def test_same_source_post_changed_revision_keeps_same_listing_id():
+    conn = migrated_connection()
+    first = _source(conn, '区域：BKK1\n公寓出租\n2房2卫\n租金：$800/月', 'stable-source')
+    first_parsed = CanonicalParserService(conn).parse_revision(first.revision_id)
+    first_listing = CanonicalListingMaterializer(conn).materialize(first_parsed.canonical_record_id)
+
+    second = _source(conn, '区域：BKK1\n公寓出租\n2房2卫\n租金：$850/月', 'stable-source')
+    second_parsed = CanonicalParserService(conn).parse_revision(second.revision_id)
+    second_listing = CanonicalListingMaterializer(conn).materialize(second_parsed.canonical_record_id)
+
+    assert second.revision_id != first.revision_id
+    assert second_listing.listing_id == first_listing.listing_id
+    assert second_listing.public_listing_id == first_listing.public_listing_id
+    current = conn.execute(
+        "SELECT * FROM listing_offers WHERE listing_id=? AND offer_type='rent' AND is_current=1",
+        (first_listing.listing_id,),
+    ).fetchone()
+    assert current['monthly_rent_usd'] == 850
