@@ -1,11 +1,8 @@
 """Async Telegram adapter for V3 custom date/time/area/budget text input.
 
-The pure ``TransitionTextActionService`` decides whether a message belongs to an
-explicit awaiting state. This adapter renders the next local step or, when an
-executor is injected, crosses the appointment/search submit boundary.
-
-Session mutation is deferred until the required Telegram operation succeeds.
-Lead persistence is injected and best-effort; admin/channel effects stay outside.
+The pure ``TransitionTextActionService`` owns awaiting-state decisions. At the
+appointment boundary the ordering is durable appointment -> lead ->
+availability/channel/admin effects -> user success page.
 """
 from __future__ import annotations
 
@@ -15,35 +12,27 @@ from typing import Any
 
 from telegram.constants import ParseMode
 
-from .appointment_service import AppointmentUser
-from .appointment_submit_executor import (
-    AppointmentSubmitExecution,
-    AppointmentSubmitExecutor,
+from .appointment_runtime_effects import (
+    AppointmentRuntimeEffectExecutor,
+    AppointmentRuntimeEffectResult,
 )
+from .appointment_service import AppointmentUser
+from .appointment_submit_executor import AppointmentSubmitExecution, AppointmentSubmitExecutor
 from .appointment_success_view import build_appointment_success_view
 from .lead_effects import LeadEffectExecutor, LeadEffectResult
 from .lead_service import LeadUser
 from .search_no_match_view import build_search_no_match_view
 from .search_submit_executor import SearchSubmitExecution, SearchSubmitExecutor
-from .telegram_search_results import (
-    TelegramSearchPresentation,
-    present_search_flow_result,
-)
+from .telegram_search_results import TelegramSearchPresentation, present_search_flow_result
 from .telegram_transition_ui import build_transition_keyboard
-from .transition_actions import (
-    APPOINTMENT_AWAITING_DATE_KEY,
-    APPOINTMENT_AWAITING_TIME_KEY,
-)
+from .transition_actions import APPOINTMENT_AWAITING_DATE_KEY, APPOINTMENT_AWAITING_TIME_KEY
 from .transition_session import (
     APPOINTMENT_SESSION_KEY,
     SEARCH_PREF_SESSION_KEY,
     SessionMutationPlan,
     apply_session_mutation,
 )
-from .transition_text_actions import (
-    TransitionTextActionResult,
-    TransitionTextActionService,
-)
+from .transition_text_actions import TransitionTextActionResult, TransitionTextActionService
 from .transition_views import TransitionView, TransitionViewService
 
 
@@ -52,6 +41,7 @@ class TelegramTransitionTextOutcome:
     handled: bool
     result: TransitionTextActionResult | None = None
     appointment_execution: AppointmentSubmitExecution | None = None
+    appointment_effects: AppointmentRuntimeEffectResult | None = None
     search_execution: SearchSubmitExecution | None = None
     search_presentation: TelegramSearchPresentation | None = None
     lead_effect: LeadEffectResult | None = None
@@ -59,11 +49,7 @@ class TelegramTransitionTextOutcome:
 
 async def _reply_view(message: Any, view: TransitionView) -> None:
     keyboard = build_transition_keyboard(view) if view.rows else None
-    await message.reply_text(
-        view.text,
-        parse_mode=ParseMode.HTML,
-        reply_markup=keyboard,
-    )
+    await message.reply_text(view.text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
 
 def _telegram_appointment_user(update: Any) -> AppointmentUser:
@@ -81,11 +67,7 @@ def _telegram_appointment_user(update: Any) -> AppointmentUser:
             )
             if part
         )
-    return AppointmentUser(
-        user_id=int(user.id),
-        username=username,
-        display_name=display_name,
-    )
+    return AppointmentUser(user_id=int(user.id), username=username, display_name=display_name)
 
 
 def _lead_user(user: AppointmentUser) -> LeadUser:
@@ -116,6 +98,7 @@ async def handle_v3_transition_text(
     appointment_executor: AppointmentSubmitExecutor | None = None,
     search_executor: SearchSubmitExecutor | None = None,
     lead_effects: LeadEffectExecutor | None = None,
+    appointment_runtime_effects: AppointmentRuntimeEffectExecutor | None = None,
 ) -> TelegramTransitionTextOutcome:
     message = getattr(update, "effective_message", None)
     text = str(getattr(message, "text", "") or "") if message is not None else ""
@@ -126,12 +109,10 @@ async def handle_v3_transition_text(
     result = actions.apply(text, user_data)
     if result.status == "not_applicable":
         return TelegramTransitionTextOutcome(handled=False, result=result)
-
     if result.status == "invalid":
         if result.prompt:
             await message.reply_text(result.prompt, parse_mode=ParseMode.HTML)
         return TelegramTransitionTextOutcome(handled=True, result=result)
-
     if not result.ok:
         return TelegramTransitionTextOutcome(handled=True, result=result)
 
@@ -161,14 +142,20 @@ async def handle_v3_transition_text(
         if result.appointment is None:
             raise ValueError("appointment_submit_text_action_missing_draft")
         appointment_user = _telegram_appointment_user(update)
-        execution = appointment_executor.execute(
-            user=appointment_user,
-            draft=result.appointment,
-        )
+        lead_user = _lead_user(appointment_user)
+        execution = appointment_executor.execute(user=appointment_user, draft=result.appointment)
         lead_effect = None
         if lead_effects is not None:
             lead_effect = lead_effects.record_appointment(
-                user=_lead_user(appointment_user),
+                user=lead_user,
+                execution=execution,
+                draft=result.appointment,
+            )
+        runtime_effect = None
+        if appointment_runtime_effects is not None:
+            runtime_effect = await appointment_runtime_effects.execute(
+                bot=getattr(context, "bot", None),
+                user=lead_user,
                 execution=execution,
                 draft=result.appointment,
             )
@@ -183,6 +170,7 @@ async def handle_v3_transition_text(
             handled=True,
             result=result,
             appointment_execution=execution,
+            appointment_effects=runtime_effect,
             lead_effect=lead_effect,
         )
 
@@ -212,7 +200,4 @@ async def handle_v3_transition_text(
     return TelegramTransitionTextOutcome(handled=True, result=result)
 
 
-__all__ = [
-    "TelegramTransitionTextOutcome",
-    "handle_v3_transition_text",
-]
+__all__ = ["TelegramTransitionTextOutcome", "handle_v3_transition_text"]
