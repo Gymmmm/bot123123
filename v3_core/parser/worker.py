@@ -5,7 +5,11 @@ from collections import Counter
 from dataclasses import dataclass
 import sqlite3
 
-from v3_core.pipeline import V3CorePipeline
+from v3_core.ingest.source_repository import SourceRepository
+from v3_core.inventory.identity import IdentityService
+from v3_core.inventory.service import InventoryMaterializationService
+from v3_core.parser.service import CanonicalParseService
+from v3_core.storage.inventory_repository import InventoryRepository
 
 
 @dataclass(frozen=True)
@@ -17,11 +21,16 @@ class WorkerItemResult:
 
 
 class CanonicalWorker:
-    def __init__(self, pipeline: V3CorePipeline):
-        self.pipeline = pipeline
+    def __init__(self, db_path: str):
+        self.db_path = str(db_path)
+        self.sources = SourceRepository(self.db_path)
+        self.inventory = InventoryRepository(self.db_path)
+        self.identities = IdentityService(self.db_path)
+        self.parser = CanonicalParseService(self.sources, self.inventory)
+        self.materializer = InventoryMaterializationService(self.inventory)
 
     def pending_ids(self, *, limit: int = 100) -> list[int]:
-        with sqlite3.connect(self.pipeline.db_path) as conn:
+        with sqlite3.connect(self.db_path) as conn:
             rows = conn.execute(
                 """SELECT id FROM source_posts
                    WHERE parse_status='pending'
@@ -32,8 +41,17 @@ class CanonicalWorker:
 
     def process_one(self, source_post_id: int) -> WorkerItemResult:
         try:
-            _parsed, materialized = self.pipeline.parse_and_materialize(
-                source_post_id=int(source_post_id),
+            parsed = self.parser.parse_source_post(int(source_post_id))
+            facts = self.inventory.canonical_facts(parsed.canonical_record_id)
+            identity = self.identities.allocate(
+                canonical_record_id=parsed.canonical_record_id,
+                facts=facts,
+            )
+            materialized = self.materializer.materialize(
+                canonical_record_id=parsed.canonical_record_id,
+                listing_id=identity.listing_id,
+                public_listing_id=identity.public_listing_id,
+                create_review=True,
             )
             return WorkerItemResult(
                 source_post_id=int(source_post_id),
