@@ -18,3 +18,7 @@ jobs:
         run: python qiaolian_production/tools/audit_listing_taxonomy_symbols.py
       - name: Audit canonical facts symbols
         run: python qiaolian_production/tools/audit_user_symbol_module.py canonical_facts
+      - name: Audit canonical fact projection symbols
+        run: python qiaolian_production/tools/audit_user_symbol_module.py canonical_fact_projection
+      - name: Audit canonical listing materializer symbols
+        run: python qiaolian_production/tools/audit_user_symbol_module.py canonical_listing_materializer
