@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   check:
@@ -68,30 +68,56 @@ jobs:
         run: python qiaolian_production/tools/audit_publisher_messages.py
       - name: Audit user bot module reachability
         run: python qiaolian_production/tools/audit_user_modules.py
+      - name: Audit retained taxonomy surface
+        run: |
+          python qiaolian_production/tools/audit_listing_taxonomy_symbols.py
+          for module in canonical_facts canonical_fact_projection canonical_listing_materializer public_listing_id area_normalization publishability_contract status_labels; do
+            python qiaolian_production/tools/audit_user_symbol_module.py "$module"
+          done
+      - name: Audit retained user helper surface
+        run: |
+          set -e
+          for module in \
+            public_listing_id area_normalization publishability_contract status_labels \
+            location_mapping text_utils utils_formatting v2_safe_adapter \
+            channel_links channel_post channel_status_sync session_deeplink runtime_guard cover_styles \
+            attribution attribution_hooks attribution_runtime attribution_store utils talk_engine jobs flows \
+            messages messages_more texts appointment_flow appointment_ui appointments_view \
+            callback_appointment callback_search callback_service callback_admin callback_contract \
+            callback_listing callback_navigation callback_preference callbacks search search_text_handlers \
+            message_handlers start_routes listing
+          do
+            python qiaolian_production/tools/audit_user_symbol_module.py "$module"
+          done
+          python qiaolian_production/tools/audit_user_db_methods.py
       - name: Verify committed canonical facts slice
         run: |
-          python qiaolian_production/tools/audit_user_symbol_module.py canonical_facts
           python qiaolian_production/tools/audit_user_symbol_module.py canonical_facts --write
           python -m py_compile qiaolian_production/user/qiaolian_dual/canonical_facts.py
           git diff --exit-code -- qiaolian_production/user/qiaolian_dual/canonical_facts.py
-      - name: Verify committed user channel and attribution helper slices
+      - name: Verify committed user helper slices
         run: |
-          python qiaolian_production/tools/audit_user_symbol_module.py channel_post
-          python qiaolian_production/tools/audit_user_symbol_module.py channel_post --write
-          python -m py_compile qiaolian_production/user/qiaolian_dual/channel_post.py
-          git diff --exit-code -- qiaolian_production/user/qiaolian_dual/channel_post.py
-          python qiaolian_production/tools/audit_user_symbol_module.py attribution
-          python qiaolian_production/tools/audit_user_symbol_module.py attribution --write
-          python -m py_compile qiaolian_production/user/qiaolian_dual/attribution.py
-          git diff --exit-code -- qiaolian_production/user/qiaolian_dual/attribution.py
-      - name: Slice canonical projection candidates
+          set -e
+          for module in channel_post attribution message_handlers listing; do
+            python qiaolian_production/tools/audit_user_symbol_module.py "$module" --write
+          done
+          python qiaolian_production/tools/audit_user_db_methods.py --write
+          python -m compileall -q qiaolian_production/user/qiaolian_dual
+          git diff --exit-code -- \
+            qiaolian_production/user/qiaolian_dual/channel_post.py \
+            qiaolian_production/user/qiaolian_dual/attribution.py \
+            qiaolian_production/user/qiaolian_dual/message_handlers.py \
+            qiaolian_production/user/qiaolian_dual/listing.py \
+            qiaolian_production/user/qiaolian_dual/db.py
+      - name: Verify committed canonical projection slices
         run: |
-          python qiaolian_production/tools/audit_user_symbol_module.py canonical_fact_projection
           python qiaolian_production/tools/audit_user_symbol_module.py canonical_fact_projection --write
-          python -m py_compile qiaolian_production/user/qiaolian_dual/canonical_fact_projection.py
-          python qiaolian_production/tools/audit_user_symbol_module.py canonical_listing_materializer
           python qiaolian_production/tools/audit_user_symbol_module.py canonical_listing_materializer --write
+          python -m py_compile qiaolian_production/user/qiaolian_dual/canonical_fact_projection.py
           python -m py_compile qiaolian_production/user/qiaolian_dual/canonical_listing_materializer.py
+          git diff --exit-code -- \
+            qiaolian_production/user/qiaolian_dual/canonical_fact_projection.py \
+            qiaolian_production/user/qiaolian_dual/canonical_listing_materializer.py
       - name: Import collector from extracted tree only
         env:
           DB_PATH: '${{ runner.temp }}/qiaolian-extraction.db'
@@ -180,17 +206,3 @@ jobs:
           if leaks: raise SystemExit('user local-source leaks: '+repr(sorted(leaks)))
           print('USER_BUILD_OK')
           PY
-      - name: Commit canonical projection production slices
-        if: success()
-        run: |
-          targets=(
-            qiaolian_production/user/qiaolian_dual/canonical_fact_projection.py
-            qiaolian_production/user/qiaolian_dual/canonical_listing_materializer.py
-          )
-          if ! git diff --quiet -- "${targets[@]}"; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add "${targets[@]}"
-            git commit -m "refactor: slim canonical user fact helpers"
-            git push origin HEAD:refactor/production-extraction
-          fi
