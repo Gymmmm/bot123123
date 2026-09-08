@@ -115,42 +115,50 @@ def build_media_selection(
         if path.is_file() and path.suffix.lower() in IMAGE_EXTS and path not in source_paths:
             source_paths.append(path)
 
-    duplicates: list[dict[str, str]] = []
-    unique: list[Path] = []
-    seen_exact: dict[str, Path] = {}
-    seen_near: list[tuple[int | None, Path]] = []
-    for path in source_paths:
-        digest = _sha256(path)
-        dhash = _dhash(path)
-        duplicate_of = seen_exact.get(digest)
-        kind = 'exact' if duplicate_of is not None else ''
-        if duplicate_of is None:
-            for previous_hash, previous_path in seen_near:
-                if _hamming(dhash, previous_hash) <= NEAR_DUPLICATE_HAMMING:
-                    duplicate_of = previous_path
-                    kind = 'near'
-                    break
-        if duplicate_of is not None:
-            duplicates.append({'file': str(path), 'duplicate_of': str(duplicate_of), 'kind': kind})
-            continue
-        seen_exact[digest] = path
-        seen_near.append((dhash, path))
-        unique.append(path)
-
     rejected: list[str] = []
-    ranked: list[tuple[float, int, str]] = []
-    gallery: list[str] = []
-    for index, path in enumerate(unique):
+    usable_entries: list[tuple[Path, float, int]] = []
+    for index, path in enumerate(source_paths):
         usable, score, _reason = _quality(path)
         if not usable:
             rejected.append(str(path))
             continue
-        resolved = str(path)
-        gallery.append(resolved)
-        ranked.append((score, -index, resolved))
+        usable_entries.append((path, score, index))
 
-    ranked.sort(reverse=True)
+    duplicates: list[dict[str, str]] = []
+    representatives: list[tuple[Path, float, int, str, int | None]] = []
+    for path, score, index in usable_entries:
+        digest = _sha256(path)
+        dhash = _dhash(path)
+        match_index: int | None = None
+        kind = ''
+        for rep_index, (rep_path, rep_score, rep_source_index, rep_digest, rep_dhash) in enumerate(representatives):
+            if digest == rep_digest:
+                match_index = rep_index
+                kind = 'exact'
+                break
+            if _hamming(dhash, rep_dhash) <= NEAR_DUPLICATE_HAMMING:
+                match_index = rep_index
+                kind = 'near'
+                break
+        if match_index is None:
+            representatives.append((path, score, index, digest, dhash))
+            continue
+
+        rep_path, rep_score, rep_source_index, rep_digest, rep_dhash = representatives[match_index]
+        if score > rep_score:
+            duplicates.append({'file': str(rep_path), 'duplicate_of': str(path), 'kind': kind})
+            representatives[match_index] = (path, score, index, digest, dhash)
+        else:
+            duplicates.append({'file': str(path), 'duplicate_of': str(rep_path), 'kind': kind})
+
+    representatives.sort(key=lambda item: item[2])
+    gallery = [str(path) for path, _score, _index, _digest, _dhash in representatives]
+    ranked = sorted(
+        ((score, -index, str(path)) for path, score, index, _digest, _dhash in representatives),
+        reverse=True,
+    )
     candidates = [path for _score, _order, path in ranked]
+
     if gallery:
         manual = str(Path(str(manual_cover_path)).expanduser().resolve()) if manual_cover_path else ''
         if manual and manual in gallery:
