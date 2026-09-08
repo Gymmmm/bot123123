@@ -1,2 +1,0 @@
-# 在现有 /opt/qiaolian_dual_bots/.venv 上追加安装即可
-python-telegram-bot[job-queue]>=21.0
