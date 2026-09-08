@@ -1,9 +1,8 @@
 """Single media-selection contract for publication packages.
 
-This module does not alter raw media.  It reuses the existing photo ranker for
-quality/reject decisions, applies the same source-order gallery policy as
-``media_pipeline_v1_1``, and returns original source paths.  Final gallery bytes
-remain the responsibility of ``photo_formatter_v1_1`` in the package builder.
+This module does not alter raw media.  It reuses the extracted photo ranker for
+quality/reject decisions, applies the same source-order gallery policy as the
+extracted media pipeline, and returns original source paths.
 """
 from __future__ import annotations
 
@@ -11,8 +10,8 @@ import hashlib
 from pathlib import Path
 from typing import Any, Iterable
 
-from media_pipeline_v1_1 import IMAGE_EXTS
-from photo_ranker import NEAR_DUPLICATE_HAMMING, _dhash, _hamming, rank_photo_paths
+from .media_pipeline_v1_1 import IMAGE_EXTS
+from .photo_ranker import NEAR_DUPLICATE_HAMMING, _dhash, _hamming, rank_photo_paths
 
 
 def _sha256(path: Path) -> str:
@@ -74,7 +73,11 @@ def select_publication_media(
         cover = manual
     else:
         cover = next(
-            (str(Path(item["file"]).resolve()) for item in ranking if not item.get("reject") and str(Path(item["file"]).resolve()) in gallery),
+            (
+                str(Path(item["file"]).resolve())
+                for item in ranking
+                if not item.get("reject") and str(Path(item["file"]).resolve()) in gallery
+            ),
             gallery[0],
         )
 
