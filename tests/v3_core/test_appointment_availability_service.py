@@ -25,7 +25,7 @@ class MemoryAvailability:
         return True
 
 
-def test_active_listing_becomes_reserved_when_open_appointment_exists():
+def test_active_listing_becomes_reserved_with_one_to_four_open_appointments():
     repo = MemoryAvailability(status="active", active_count=2)
     result = AppointmentAvailabilityService(repository=repo).recompute("LST_1")
 
@@ -35,6 +35,17 @@ def test_active_listing_becomes_reserved_when_open_appointment_exists():
     assert result.changed
     assert repo.updates == [("LST_1", "reserved")]
     assert set(repo.count_calls[0][1]) == {"pending", "assigned", "contacted", "confirmed"}
+
+
+def test_fifth_open_appointment_locks_listing_to_pending():
+    repo = MemoryAvailability(status="reserved", active_count=5)
+    result = AppointmentAvailabilityService(repository=repo).recompute("LST_1")
+
+    assert result.previous_status == "reserved"
+    assert result.next_status == "pending"
+    assert result.active_appointment_count == 5
+    assert result.changed
+    assert repo.updates == [("LST_1", "pending")]
 
 
 def test_reserved_listing_returns_active_after_last_open_appointment_is_gone():
@@ -57,8 +68,21 @@ def test_same_active_or_reserved_status_is_idempotent():
         assert repo.updates == []
 
 
-def test_manual_or_terminal_inventory_states_are_never_overwritten():
-    for status in ("pending", "rented", "offline", "inactive"):
+def test_pending_is_sticky_and_never_auto_reopened():
+    for active_count in (0, 3, 5, 8):
+        repo = MemoryAvailability(status="pending", active_count=active_count)
+        result = AppointmentAvailabilityService(repository=repo).recompute("LST_1")
+
+        assert result.protected_status
+        assert not result.changed
+        assert result.next_status == "pending"
+        assert result.active_appointment_count == active_count
+        assert len(repo.count_calls) == 1
+        assert repo.updates == []
+
+
+def test_terminal_inventory_states_are_never_overwritten():
+    for status in ("rented", "offline", "inactive"):
         repo = MemoryAvailability(status=status, active_count=5)
         result = AppointmentAvailabilityService(repository=repo).recompute("LST_1")
 
