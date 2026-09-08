@@ -13,6 +13,7 @@ from v3_core.ingest.source_repository import SOURCE_DDL
 from v3_core.publishing.delivery_state import DDL as DELIVERY_DDL
 from v3_core.publishing.package_store import DDL as PACKAGE_DDL
 from v3_core.publishing.publication_instances import DDL as PUBLICATION_INSTANCE_DDL
+from v3_core.storage.appointment_repository import SQLiteAppointmentRepository
 from v3_core.storage.schema import DDL as INVENTORY_DDL
 
 
@@ -28,6 +29,7 @@ REQUIRED_V3_TABLES = frozenset(
         "publication_packages_v3",
         "publication_delivery_attempts_v3",
         "publication_instances",
+        "appointments_v3",
     }
 )
 
@@ -37,6 +39,7 @@ DDL_BLOCKS = (
     PACKAGE_DDL,
     DELIVERY_DDL,
     PUBLICATION_INSTANCE_DDL,
+    SQLiteAppointmentRepository.DDL,
 )
 
 
@@ -47,6 +50,7 @@ def initialize_v3_storage(db_path: str | Path) -> Path:
     conn = sqlite3.connect(str(path), timeout=30)
     try:
         conn.execute("PRAGMA busy_timeout=30000")
+        conn.execute("PRAGMA foreign_keys=ON")
         conn.execute("BEGIN IMMEDIATE")
         for ddl in DDL_BLOCKS:
             conn.executescript(ddl)
