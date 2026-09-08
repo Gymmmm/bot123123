@@ -2,7 +2,6 @@ from __future__ import annotations
 import json
 import re
 from html import escape
-from urllib.parse import quote
 
 # 补齐 keyboards.py 依赖的常量
 AREA_OPTIONS = {
@@ -24,12 +23,6 @@ TYPE_LABELS = {
     "shop": "商铺",
     "office": "办公室",
 }
-
-def deep_link(username: str, payload: str) -> str:
-    if not username:
-        return "#"
-    username = username.lstrip("@")
-    return f"https://t.me/{username}?start={quote(payload)}"
 
 
 def _coerce_text_list(val, *, limit: int, pad: str = "—") -> list[str]:
