@@ -141,3 +141,39 @@ def test_all_formal_cover_templates_are_preflighted(tmp_path):
         "template:black_gold",
         "template:video_vertical",
     }.issubset(names)
+
+
+def test_user_bot_preflight_requires_full_runtime_configuration(tmp_path):
+    db = tmp_path / "v3.db"
+    initialize_v3_storage(db)
+    env = {
+        "USER_BOT_TOKEN": "user-token",
+        "PUBLISHER_BOT_TOKEN": "publisher-token",
+        "USER_BOT_USERNAME": "qiaolian_test_bot",
+        "ADMIN_IDS": "1001,1002",
+        "CHANNEL_URL": "https://t.me/qiaolian_test_channel",
+        "ADVISOR_TG": "@qiaolian_advisor",
+    }
+
+    ready = run_preflight(
+        repo_root=REPO_ROOT,
+        db_path=db,
+        component="user",
+        env=env,
+    )
+    assert ready.ok, ready.as_dict()
+    assert _check(ready, "entrypoint:user").ok
+    assert _check(ready, "user:admin_ids").ok
+    assert _check(ready, "user:advisor_contact").ok
+    assert _check(ready, "user:asset:handover.pdf").ok
+
+    broken_env = dict(env)
+    broken_env.pop("PUBLISHER_BOT_TOKEN")
+    blocked = run_preflight(
+        repo_root=REPO_ROOT,
+        db_path=db,
+        component="user",
+        env=broken_env,
+    )
+    assert not blocked.ok
+    assert not _check(blocked, "env:PUBLISHER_BOT_TOKEN").ok
