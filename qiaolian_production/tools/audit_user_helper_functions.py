@@ -30,6 +30,10 @@ TARGET_MODULES = {
     "runtime_guard",
     "session_deeplink",
     "status_labels",
+    "talk_engine",
+    "text_utils",
+    "user_ux_patch",
+    "utils",
     "utils_formatting",
     "v2_safe_adapter",
 }
