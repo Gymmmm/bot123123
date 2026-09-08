@@ -32,20 +32,6 @@ def public_brand_name() -> str:
     return (BRAND_NAME or "侨联地产").replace("测试", "").strip() or "侨联地产"
 
 
-def listing_summary(item: dict) -> str:
-    tags = compact_join(item.get("tags", []), " / ")
-    lines = [
-        f"🏠 <b>{e(item.get('title'))}</b>",
-        f"<b>金额：</b><b>${e(item.get('price'))}/月</b>",
-        f"<b>区域：</b>{e(item.get('area'))} · {e(item.get('community'))}",
-    ]
-    if item.get("layout"):
-        lines.append(f"<b>户型：</b>{e(item.get('layout'))}")
-    if item.get("size_sqm"):
-        lines.append(f"<b>面积：</b>{e(item.get('size_sqm'))}㎡")
-    if tags:
-        lines.append(f"<b>标签：</b>{e(tags)}")
-    return "\n".join(lines)
 
 
 def listing_detail(item: dict) -> str:
@@ -85,12 +71,6 @@ def listing_detail(item: dict) -> str:
     return "\n".join(lines)
 
 
-def viewing_delivery_assurance_text() -> str:
-    return (
-        "\n🛡️ <b>看房与交付保障</b>\n"
-        "看中后：费用逐项核对。\n"
-        "入住时：验房、水电表和钥匙/门卡确认留档。"
-    )
 
 
 def discussion_entry_welcome_text(first_name: str = "", listing_id: str = "") -> str:
@@ -113,8 +93,6 @@ def advisor_text() -> str:
     )
 
 
-def advisor_contact_supplement_text() -> str:
-    return "顾问会直接通过 Telegram 联系你，无需另外填写手机号或微信。"
 
 
 def deposit_text() -> str:
@@ -252,14 +230,6 @@ def smart_find_play_footer_hint_text(*, used_fallback: bool) -> str:
     return "\n\n如需更精准，可点「帮我找房」再按类型筛选。"
 
 
-def repeat_tenant_ack_text() -> str:
-    ch = (CHANNEL_URL or "").strip()
-    ch_line = f"\n\n📢 实拍频道：<a href=\"{e(ch)}\">点这里关注上新</a>" if ch else ""
-    return (
-        "✅ <b>已登记为侨联老客回流</b>\n\n"
-        "收到，顾问会继续为您处理换房、续租或升级户型。"
-        + ch_line
-    )
 
 
 def find_area_budget_hint_text() -> str:
