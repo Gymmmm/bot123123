@@ -1,9 +1,9 @@
 """Non-fatal V3 lead side-effect execution.
 
 Locked production treats lead persistence as best-effort: a lead write failure is
-logged and does not undo a successful search/appointment flow. This executor
-preserves that contract while keeping lead writes outside Telegram handlers and
-business services.
+logged and does not undo a successful search/appointment/contact flow. This
+executor preserves that contract while keeping lead writes outside Telegram
+handlers and business services.
 """
 from __future__ import annotations
 
@@ -12,11 +12,14 @@ from datetime import datetime
 from typing import Callable, Literal
 
 from .appointment_submit_executor import AppointmentSubmitExecution
+from .consult import ConsultIntent
 from .lead_service import (
     LeadRecordResult,
     LeadService,
     LeadUser,
     appointment_lead_request,
+    general_contact_lead_request,
+    listing_contact_lead_request,
     search_lead_request,
 )
 from .public_appointment import PublicAppointmentDraft
@@ -73,6 +76,28 @@ class LeadEffectExecutor:
         if request is None:
             return LeadEffectResult(status="skipped")
         return self._record(user=user, request=request)
+
+    def record_general_contact(
+        self,
+        *,
+        user: LeadUser,
+        source: str = "hub",
+    ) -> LeadEffectResult:
+        return self._record(
+            user=user,
+            request=general_contact_lead_request(source=source),
+        )
+
+    def record_listing_contact(
+        self,
+        *,
+        user: LeadUser,
+        intent: ConsultIntent,
+    ) -> LeadEffectResult:
+        return self._record(
+            user=user,
+            request=listing_contact_lead_request(intent),
+        )
 
 
 __all__ = ["LeadEffectExecutor", "LeadEffectResult", "LeadEffectStatus"]
