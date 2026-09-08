@@ -30,6 +30,19 @@ def _tiny_checkerboard(path: Path):
     return str(path)
 
 
+def _same_photo_pair(tmp_path: Path):
+    high = tmp_path / 'same-high.jpg'
+    low = tmp_path / 'same-low.jpg'
+    image = Image.new('RGB', (1200, 800), (150, 150, 150))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((120, 80, 760, 420), fill=(40, 180, 120))
+    draw.ellipse((700, 300, 1080, 680), fill=(220, 80, 60))
+    draw.line((0, 760, 1199, 40), fill=(20, 20, 20), width=20)
+    image.save(high, quality=95)
+    image.resize((360, 240), Image.Resampling.LANCZOS).save(low, quality=85)
+    return str(low), str(high)
+
+
 def test_bad_images_are_filtered_and_four_usable_images_are_required(tmp_path):
     good = [_image(tmp_path / f'g{i}.jpg', value=100 + i * 23) for i in range(4)]
     bad = _tiny_checkerboard(tmp_path / 'tiny.jpg')
@@ -37,6 +50,14 @@ def test_bad_images_are_filtered_and_four_usable_images_are_required(tmp_path):
     assert result.usable_count == 4
     assert str(Path(bad).resolve()) in result.rejected_paths
     assert result.meets_photo_minimum is True
+
+
+def test_low_res_first_near_duplicate_cannot_evict_high_res_usable_copy(tmp_path):
+    low, high = _same_photo_pair(tmp_path)
+    result = build_media_selection([low, high])
+    assert str(Path(low).resolve()) in result.rejected_paths
+    assert str(Path(high).resolve()) in result.gallery_paths
+    assert result.usable_count == 1
 
 
 def test_manual_cover_has_precedence_when_usable(tmp_path):
