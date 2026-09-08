@@ -98,10 +98,10 @@ def test_published_rent_view_exposes_frozen_gallery_and_bookability(tmp_path):
     assert view.action_allowed("details")
     assert view.action_allowed("photos")
     assert view.action_allowed("book")
-    assert not view.action_allowed("consult")
+    assert view.action_allowed("consult")
 
 
-def test_rented_listing_keeps_details_and_photos_but_blocks_book(tmp_path):
+def test_rented_listing_keeps_details_photos_and_consult_but_blocks_book(tmp_path):
     db = tmp_path / "v3.db"
     initialize_v3_storage(db)
     _seed_published_rent(db, listing_status="rented", offer_status="inactive")
@@ -111,6 +111,7 @@ def test_rented_listing_keeps_details_and_photos_but_blocks_book(tmp_path):
     assert view is not None
     assert view.action_allowed("details")
     assert view.action_allowed("photos")
+    assert view.action_allowed("consult")
     assert not view.action_allowed("book")
 
 
@@ -125,6 +126,7 @@ def test_photos_requires_frozen_package_gallery(tmp_path):
     assert view.action_allowed("details")
     assert not view.action_allowed("photos")
     assert view.action_allowed("book")
+    assert view.action_allowed("consult")
 
 
 def test_reader_is_strictly_read_only_and_does_not_create_missing_db(tmp_path):
