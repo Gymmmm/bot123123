@@ -45,6 +45,11 @@ class ServiceEffectExecutor:
         user: LeadUser,
         submission: RepairSubmission,
     ) -> ServiceEffectResult:
+        if not submission.created:
+            return ServiceEffectResult(
+                lead=LeadEffectResult(status="skipped"),
+                admin=AdminNotificationResult((), (), ()),
+            )
         ticket = submission.ticket
         lead = self._record(
             user=user,
@@ -54,6 +59,7 @@ class ServiceEffectExecutor:
                 listing_id=ticket.property_name,
                 payload={
                     "ticket_id": ticket.id,
+                    "request_token": ticket.request_token,
                     "issue_key": ticket.issue_key,
                     "issue_label": ticket.issue_type,
                     "time_slot": ticket.time_slot,
