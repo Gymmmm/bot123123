@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from v3_core.user_bot.callback_router import CallbackRouter
+from v3_core.user_bot.consult import ConsultIntent, ConsultResult
 from v3_core.user_bot.public_flow import (
     PublicBookIntent,
     PublicListingFlowResult,
@@ -33,7 +34,28 @@ class SessionStub:
         return self.result
 
 
-def _router(*, listing_result=None, navigation=None):
+class ConsultStub:
+    def __init__(self, result=None):
+        self.result = result or ConsultResult(
+            status="ok",
+            public_listing_id="QL-RF-A2B3",
+            intent=ConsultIntent(
+                listing_id="LST_1",
+                public_listing_id="QL-RF-A2B3",
+                source="listing_callback",
+                inventory_status="rented",
+                offer_status="inactive",
+                publication_instance_id="PUB_1",
+            ),
+        )
+        self.calls = []
+
+    def resolve(self, public_listing_id, *, source="listing_callback"):
+        self.calls.append((public_listing_id, source))
+        return self.result
+
+
+def _router(*, listing_result=None, navigation=None, consult_result=None, wire_consult=True):
     listing = ListingFlowStub(listing_result)
     session = SessionStub(
         navigation
@@ -50,7 +72,13 @@ def _router(*, listing_result=None, navigation=None):
             ),
         )
     )
-    return CallbackRouter(listings=listing, search_sessions=session), listing, session
+    consult = ConsultStub(consult_result) if wire_consult else None
+    router = CallbackRouter(
+        listings=listing,
+        search_sessions=session,
+        consults=consult,
+    )
+    return router, listing, session, consult
 
 
 def test_details_callback_delegates_to_shared_listing_flow_with_callback_source():
@@ -59,7 +87,7 @@ def test_details_callback_delegates_to_shared_listing_flow_with_callback_source(
         action="details",
         public_listing_id="QL-RF-A2B3",
     )
-    router, listing, session = _router(listing_result=result)
+    router, listing, session, consult = _router(listing_result=result)
 
     dispatched = router.dispatch("v3u:listing:details:QL-RF-A2B3")
 
@@ -68,6 +96,7 @@ def test_details_callback_delegates_to_shared_listing_flow_with_callback_source(
     assert dispatched.listing is result
     assert listing.calls == [("QL-RF-A2B3", "details", "listing_callback")]
     assert session.calls == []
+    assert consult is not None and consult.calls == []
 
 
 def test_book_callback_returns_book_intent_without_executing_appointment():
@@ -82,7 +111,7 @@ def test_book_callback_returns_book_intent_without_executing_appointment():
             start_payload="",
         ),
     )
-    router, listing, _ = _router(listing_result=result)
+    router, listing, _, _ = _router(listing_result=result)
 
     dispatched = router.dispatch("v3u:listing:book:QL-RF-A2B3")
 
@@ -93,8 +122,44 @@ def test_book_callback_returns_book_intent_without_executing_appointment():
     assert listing.calls == [("QL-RF-A2B3", "book", "listing_callback")]
 
 
+def test_consult_callback_returns_pure_intent_even_for_rented_published_listing():
+    router, listing, session, consult = _router()
+
+    dispatched = router.dispatch("v3u:listing:consult:QL-RF-A2B3")
+
+    assert dispatched.ok
+    assert dispatched.action == "consult"
+    assert dispatched.consult is not None
+    assert dispatched.consult.intent is not None
+    assert dispatched.consult.intent.public_listing_id == "QL-RF-A2B3"
+    assert dispatched.consult.intent.inventory_status == "rented"
+    assert dispatched.consult.intent.source == "listing_callback"
+    assert consult is not None
+    assert consult.calls == [("QL-RF-A2B3", "listing_callback")]
+    assert listing.calls == []
+    assert session.calls == []
+
+
+def test_missing_consult_listing_preserves_not_found_without_falling_through():
+    result = ConsultResult(
+        status="not_found",
+        public_listing_id="QL-RF-A2B3",
+        reason="listing_not_publicly_published",
+    )
+    router, listing, session, consult = _router(consult_result=result)
+
+    dispatched = router.dispatch("v3u:listing:consult:QL-RF-A2B3")
+
+    assert dispatched.status == "not_found"
+    assert dispatched.reason == "listing_not_publicly_published"
+    assert dispatched.consult is result
+    assert consult is not None and len(consult.calls) == 1
+    assert listing.calls == []
+    assert session.calls == []
+
+
 def test_blocked_or_missing_listing_status_is_preserved():
-    blocked_router, _, _ = _router(
+    blocked_router, _, _, _ = _router(
         listing_result=PublicListingFlowResult(
             status="blocked",
             action="book",
@@ -102,7 +167,7 @@ def test_blocked_or_missing_listing_status_is_preserved():
             reason="listing_not_bookable",
         )
     )
-    missing_router, _, _ = _router(
+    missing_router, _, _, _ = _router(
         listing_result=PublicListingFlowResult(
             status="not_found",
             action="details",
@@ -133,7 +198,7 @@ def test_card_callback_delegates_only_to_live_session_navigation():
             total=2,
         ),
     )
-    router, listing, session = _router(navigation=navigation)
+    router, listing, session, consult = _router(navigation=navigation)
 
     dispatched = router.dispatch(
         "v3u:card:1:QL-BK-C4D5",
@@ -146,14 +211,15 @@ def test_card_callback_delegates_only_to_live_session_navigation():
     assert dispatched.navigation.card is not None
     assert dispatched.navigation.card.public_listing_id == "QL-BK-C4D5"
     assert listing.calls == []
+    assert consult is not None and consult.calls == []
     assert len(session.calls) == 1
 
 
 def test_stale_and_expired_search_callbacks_have_distinct_fail_closed_results():
-    stale_router, _, _ = _router(
+    stale_router, _, _, _ = _router(
         navigation=SearchSessionNavigation(status="invalid_callback")
     )
-    expired_router, _, _ = _router(
+    expired_router, _, _, _ = _router(
         navigation=SearchSessionNavigation(
             status="expired",
             requested_public_listing_id="QL-RF-A2B3",
@@ -176,7 +242,7 @@ def test_stale_and_expired_search_callbacks_have_distinct_fail_closed_results():
 
 
 def test_change_search_is_an_explicit_intent_not_a_side_effect():
-    router, listing, session = _router()
+    router, listing, session, consult = _router()
 
     dispatched = router.dispatch("v3u:change_search")
 
@@ -185,25 +251,27 @@ def test_change_search_is_an_explicit_intent_not_a_side_effect():
     assert dispatched.change_search
     assert listing.calls == []
     assert session.calls == []
+    assert consult is not None and consult.calls == []
 
 
-def test_consult_and_similar_are_recognized_but_fail_until_services_exist():
-    router, listing, session = _router()
+def test_similar_remains_unsupported_and_missing_consult_service_fails_closed():
+    router, listing, session, consult = _router(wire_consult=False)
 
-    consult = router.dispatch("v3u:listing:consult:QL-RF-A2B3")
+    consult_result = router.dispatch("v3u:listing:consult:QL-RF-A2B3")
     similar = router.dispatch("v3u:listing:similar:QL-RF-A2B3")
 
-    for result in (consult, similar):
+    for result in (consult_result, similar):
         assert result.status == "unsupported"
         assert result.reason == "unsupported_not_wired"
-    assert consult.action == "consult"
+    assert consult_result.action == "consult"
     assert similar.action == "similar"
+    assert consult is None
     assert listing.calls == []
     assert session.calls == []
 
 
 def test_legacy_or_malformed_callback_never_falls_through_to_services():
-    router, listing, session = _router()
+    router, listing, session, consult = _router()
 
     for raw in (
         "findcard:1:LST_2",
@@ -217,3 +285,4 @@ def test_legacy_or_malformed_callback_never_falls_through_to_services():
 
     assert listing.calls == []
     assert session.calls == []
+    assert consult is not None and consult.calls == []
