@@ -44,34 +44,10 @@ def rental_home_keyboard() -> InlineKeyboardMarkup:
     ])
 
 
-def handover_text() -> str:
-    return (
-        '🔐 <b>押金与入住留档</b>\n\n'
-        '很多退租时的分歧，都来自入住时没有留下足够清楚的记录。\n\n'
-        '入住前，建议将房屋现状、家具家电、表计读数及相关费用规则进行确认并留档。\n\n'
-        '这些资料不会替代合同，但可以作为后续交接、费用核对和争议沟通时的重要参考。'
-    )
-
-def handover_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton('🔒 押金保障', callback_data='hub:rental:deposit'), InlineKeyboardButton('📄 入住交接留档', callback_data='hub:rental:handover:details')],
-        [InlineKeyboardButton('💡 费用说明', callback_data='hub:rental:fees'), InlineKeyboardButton('📥 下载完整资料', callback_data='hub:rental:handover:pdf')],
-        [InlineKeyboardButton('⬅️ 返回', callback_data='hub:rental')],
-    ])
-
-def preview_followup_text() -> str:
-    return (
-        '📸 <b>这是入住交接留档单示例。</b>\n\n'
-        '建议入住当天现场填写，并将双方确认后的内容拍照保存。'
-    )
 
 
-def preview_followup_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton('📄 查看押金说明', callback_data='hub:rental:deposit'), InlineKeyboardButton('📥 下载完整版 PDF', callback_data='hub:rental:handover:pdf')],
-        [InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')],
-        [InlineKeyboardButton('⬅️ 返回', callback_data='hub:rental:handover')],
-    ])
+
+
 
 
 def details_text() -> str:
@@ -94,20 +70,7 @@ def details_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton('⬅️ 返回', callback_data='hub:rental:handover')],
     ])
 
-def deposit_text() -> str:
-    return (
-        '🔒 <b>押金保障</b>\n\n'
-        '入住前，侨联协助完成房屋现状留档，包含设施状态、已有瑕疵、水电表读数等信息。\n\n'
-        '退租时，侨联可作为第三方协助核对房屋状态、费用明细及扣费依据。如出现明显争议，优先协助沟通协调。\n\n'
-        '押金保障不是退租那天才开始，而是从入住第一天就把细节留清楚。'
-    )
 
-def deposit_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton('📄 入住交接留档', callback_data='hub:rental:handover:details')],
-        [InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')],
-        [InlineKeyboardButton('⬅️ 返回', callback_data='hub:rental:handover')],
-    ])
 
 def fees_text() -> str:
     return (
