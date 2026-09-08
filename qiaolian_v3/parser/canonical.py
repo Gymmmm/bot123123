@@ -141,19 +141,6 @@ def canonicalize_source(
     return facts
 
 
-def draft_projection(facts: dict[str, Any]) -> dict[str, Any]:
-    return _locked.draft_projection(facts)
-
-
-def is_buildable(facts: dict[str, Any]) -> bool:
-    return not bool((facts.get("quality") or {}).get("blocking_flags"))
-
-
-def has_confirmed_physical_area(facts: dict[str, Any]) -> bool:
-    return bool(facts.get("canonical_area_key")) and facts.get("publication_location_level") == "level_2_physical_confirmed"
-
-
 __all__ = [
     "SCHEMA_VERSION", "PARSER_REVISION", "canonical_business_projection", "canonicalize_source",
-    "draft_projection", "is_buildable", "has_confirmed_physical_area",
 ]
