@@ -303,14 +303,3 @@ def get_cover_candidates_from_paths(paths: Iterable[str | Path], limit: int = 5)
 def get_best_cover_from_paths(paths: Iterable[str | Path]) -> dict[str, Any] | None:
     candidates = get_cover_candidates_from_paths(paths, limit=1)
     return candidates[0] if candidates else None
-
-
-def get_cover_candidates(folder: str | Path, limit: int = 5) -> list[dict[str, Any]]:
-    data = rank_photos(folder)
-    valid = [item for item in data["ranked"] if not item.get("reject")]
-    return (valid or data["ranked"])[: max(1, int(limit))]
-
-
-def get_best_cover(folder: str | Path) -> dict[str, Any] | None:
-    candidates = get_cover_candidates(folder, limit=1)
-    return candidates[0] if candidates else None
