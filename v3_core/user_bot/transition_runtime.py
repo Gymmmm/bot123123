@@ -17,6 +17,7 @@ from .appointment_submit_executor import (
     AppointmentSubmitExecutor,
     build_sqlite_appointment_submit_executor,
 )
+from .lead_effects import LeadEffectExecutor
 from .lead_service import LeadService, build_sqlite_lead_service
 from .public_inventory import PublicInventoryReader
 from .search_submit_executor import (
@@ -39,11 +40,13 @@ class UserBotTransitionRuntime:
     appointment_history: AppointmentHistoryService
     searches: SearchSubmitExecutor
     leads: LeadService
+    lead_effects: LeadEffectExecutor
 
 
 def build_transition_runtime(db_path: str | Path) -> UserBotTransitionRuntime:
     path = Path(db_path).expanduser().resolve()
     inventory = PublicInventoryReader(path)
+    leads = build_sqlite_lead_service(path)
     return UserBotTransitionRuntime(
         db_path=path,
         inventory=inventory,
@@ -56,7 +59,8 @@ def build_transition_runtime(db_path: str | Path) -> UserBotTransitionRuntime:
             inventory=inventory,
         ),
         searches=build_sqlite_search_submit_executor(path),
-        leads=build_sqlite_lead_service(path),
+        leads=leads,
+        lead_effects=LeadEffectExecutor(leads),
     )
 
 
