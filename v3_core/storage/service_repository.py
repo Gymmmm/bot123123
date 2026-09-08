@@ -32,6 +32,7 @@ CREATE INDEX IF NOT EXISTS idx_tenant_bindings_v3_user_status
 
 CREATE TABLE IF NOT EXISTS repair_tickets_v3 (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    request_token TEXT NOT NULL UNIQUE,
     user_id INTEGER NOT NULL,
     binding_id INTEGER,
     property_name TEXT NOT NULL DEFAULT '',
@@ -58,6 +59,7 @@ class TenantBinding:
 @dataclass(frozen=True)
 class RepairTicket:
     id: int
+    request_token: str
     user_id: int
     binding_id: int | None
     property_name: str
@@ -67,6 +69,12 @@ class RepairTicket:
     time_slot: str
     status: str
     created_at: str
+
+
+@dataclass(frozen=True)
+class RepairTicketWrite:
+    ticket: RepairTicket
+    created: bool
 
 
 class SQLiteTenantServiceRepository:
@@ -80,6 +88,22 @@ class SQLiteTenantServiceRepository:
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA busy_timeout=30000")
         return conn
+
+    @staticmethod
+    def _ticket(row: sqlite3.Row) -> RepairTicket:
+        return RepairTicket(
+            id=int(row["id"]),
+            request_token=str(row["request_token"] or ""),
+            user_id=int(row["user_id"]),
+            binding_id=int(row["binding_id"]) if row["binding_id"] is not None else None,
+            property_name=str(row["property_name"] or ""),
+            issue_key=str(row["issue_key"] or ""),
+            issue_type=str(row["issue_type"] or ""),
+            description=str(row["description"] or ""),
+            time_slot=str(row["time_slot"] or ""),
+            status=str(row["status"] or "new"),
+            created_at=str(row["created_at"] or ""),
+        )
 
     def get_active_binding(self, user_id: int) -> TenantBinding | None:
         with self._connect() as conn:
@@ -102,6 +126,7 @@ class SQLiteTenantServiceRepository:
     def create_repair_ticket(
         self,
         *,
+        request_token: str,
         user_id: int,
         binding: TenantBinding | None,
         issue_key: str,
@@ -109,8 +134,11 @@ class SQLiteTenantServiceRepository:
         description: str,
         time_slot: str,
         created_at: str,
-    ) -> RepairTicket:
+    ) -> RepairTicketWrite:
+        clean_token = str(request_token or "").strip()
         clean_user_id = int(user_id or 0)
+        if not clean_token:
+            raise ValueError("service_request_token_required")
         if clean_user_id <= 0:
             raise ValueError("service_user_id_required")
         issue_key = str(issue_key or "").strip()
@@ -124,12 +152,20 @@ class SQLiteTenantServiceRepository:
         property_name = str(binding.property_name or "") if binding is not None else ""
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
+            existing = conn.execute(
+                "SELECT * FROM repair_tickets_v3 WHERE request_token=? LIMIT 1",
+                (clean_token,),
+            ).fetchone()
+            if existing is not None:
+                conn.commit()
+                return RepairTicketWrite(ticket=self._ticket(existing), created=False)
             cur = conn.execute(
                 """INSERT INTO repair_tickets_v3
-                   (user_id,binding_id,property_name,issue_key,issue_type,
+                   (request_token,user_id,binding_id,property_name,issue_key,issue_type,
                     description,time_slot,status,created_at)
-                   VALUES (?,?,?,?,?,?,?,'new',?)""",
+                   VALUES (?,?,?,?,?,?,?,?,'new',?)""",
                 (
+                    clean_token,
                     clean_user_id,
                     binding_id,
                     property_name,
@@ -141,24 +177,20 @@ class SQLiteTenantServiceRepository:
                 ),
             )
             ticket_id = int(cur.lastrowid)
+            row = conn.execute(
+                "SELECT * FROM repair_tickets_v3 WHERE id=?",
+                (ticket_id,),
+            ).fetchone()
             conn.commit()
-        return RepairTicket(
-            id=ticket_id,
-            user_id=clean_user_id,
-            binding_id=binding_id,
-            property_name=property_name,
-            issue_key=issue_key,
-            issue_type=issue_type,
-            description=description,
-            time_slot=time_slot,
-            status="new",
-            created_at=created_at,
-        )
+        if row is None:
+            raise RuntimeError("service_ticket_insert_missing_row")
+        return RepairTicketWrite(ticket=self._ticket(row), created=True)
 
 
 __all__ = [
     "DDL",
     "RepairTicket",
+    "RepairTicketWrite",
     "SQLiteTenantServiceRepository",
     "TenantBinding",
 ]
