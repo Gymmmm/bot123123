@@ -10,6 +10,7 @@ TARGET_MODULES = {
     "attribution_hooks",
     "channel_links",
     "channel_post",
+    "channel_status_sync",
     "cover_styles",
     "location_mapping",
     "public_listing_id",
