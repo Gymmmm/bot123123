@@ -6,9 +6,9 @@ from typing import Iterable
 
 class DedupeDecision(str, Enum):
     NEW = 'NEW'
-    UPDATE = 'UPDATE'
-    DUPLICATE = 'DUPLICATE'
-    REVIEW = 'REVIEW'
+    UPDATE_EXISTING = 'UPDATE_EXISTING'
+    DUPLICATE_IGNORE = 'DUPLICATE_IGNORE'
+    NEEDS_REVIEW = 'NEEDS_REVIEW'
 
 
 def _normalized(values: Iterable[str]) -> tuple[str, ...]:
@@ -34,12 +34,7 @@ def classify_listing_candidate(
     unit_identity: str | None = None,
     existing_unit_identity: str | None = None,
 ) -> DedupeDecision:
-    """Conservative listing relation classifier.
-
-    Same SourcePost revisions remain one listing. Different SourcePosts never
-    auto-merge from weak semantic similarity alone; only strong unit identity or
-    strong media overlap can establish the same physical listing in Phase 4.
-    """
+    """Conservative NEW/UPDATE_EXISTING/DUPLICATE_IGNORE/NEEDS_REVIEW classifier."""
     if existing_source_post_id is None:
         return DedupeDecision.NEW
 
@@ -47,17 +42,21 @@ def classify_listing_candidate(
     existing_media = _normalized(existing_media_identities)
     if int(source_post_id) == int(existing_source_post_id):
         if str(canonical_hash) == str(existing_canonical_hash or '') and current_media == existing_media:
-            return DedupeDecision.DUPLICATE
-        return DedupeDecision.UPDATE
+            return DedupeDecision.DUPLICATE_IGNORE
+        return DedupeDecision.UPDATE_EXISTING
 
     strong_unit = bool(unit_identity and existing_unit_identity and str(unit_identity) == str(existing_unit_identity))
     strong_media = _strong_media_overlap(current_media, existing_media)
     if not (strong_unit or strong_media):
-        return DedupeDecision.REVIEW
+        return DedupeDecision.NEEDS_REVIEW
 
     if str(canonical_hash) == str(existing_canonical_hash or '') and set(current_media) == set(existing_media):
-        return DedupeDecision.DUPLICATE
-    return DedupeDecision.UPDATE
+        return DedupeDecision.DUPLICATE_IGNORE
+    if strong_unit:
+        return DedupeDecision.UPDATE_EXISTING
+    # Media overlap without a stable unit identity is strong enough to suspect
+    # sameness, but changed business facts still require human confirmation.
+    return DedupeDecision.NEEDS_REVIEW
 
 
 __all__ = ['DedupeDecision', 'classify_listing_candidate']
