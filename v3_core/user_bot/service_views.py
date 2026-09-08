@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from html import escape as he
 
-from .service_flow import SERVICE_REQUEST_LABELS, SERVICE_SLOT_LABELS, ServiceRequestDraft
+from .service_flow import ServiceRequestDraft
 
 
 @dataclass(frozen=True)
@@ -212,7 +212,7 @@ _RFCITY_FOOTER = (
 )
 
 _RFCITY_TEXTS = {
-    "restaurant": "🍴 <b>富力餐厅 · 小吃</b>\n\n小明菜煎饼：@XMCaiJianBing\n金饭碗融合食：@JFW_8888\n木森快餐：@hei32567\n邻居家盒饭：@linjujia8899\n麻了个面：@fq666520\n兰州拉面：@LZLM_RF\n云南老妈米线：+855962510133\n重庆小面：@CY_ccxm\n味之道重庆小面：@WZD8889\n川妹子餐厅：@cuan_meizi\nA4沙县小吃：+855964039606\n太二酸菜鱼：@taiersuancaiyu\n幺妹麻辣烫：@Ruilin585\n沙县小吃(正门)：@cheng1149\n猪事顺杀猪粉：@zssflzd\n广州海鲜城富力店：+855016248811\n麦德仕汉堡炸鸡：@MDS0188838388\n川遇菜馆：+8550969794108\n小仙女手工凉皮：@ba52152025\n鼎阁重庆老火锅：@xh918888\n四海食府：待补充\n羊汤一品：+8550883019759\n麻小姬·麻椒鸡：@Wwen52025",
+    "restaurant": "🍴 <b>富力餐厅 · 小吃</b>\n\n小明菜煎饼：@XMCaiJianBing\n金饭碗融合食：@JFW_8888\n木森快餐：@hei32567\n邻居家盒饭：@linjujia8899\n麻了个面：@fq666520\n兰州拉面：@LZLM_RF\n云南老妈米线：+855962510133\n重庆小面：@CY_ccxm\n味之道重庆小面：@WZD8889\n川妹子餐厅：@cuan_meizi\nA4沙县小吃：+855964039606\n太二酸菜鱼：@taiersuancaiyu\n幺妹麻辣烫：@Ruilin585\n沙县小吃(正门)：@cheng1149\n猪事顺杀猪粉：@zssflzd\n广州海鲜城富力店：+855016248811\n麦德仕汉堡炸鸡：@MDS0188838388\n川遇菜馆：+8550969794108\n小仙女手工凉皮：@ba521520\n鼎阁重庆老火锅：@xh918888\n四海食府：待补充\n羊汤一品：+8550883019759\n麻小姬·麻椒鸡：@Wwen52025",
     "bbq": "🔥 <b>富力烧烤 · 夜宵</b>\n\n留一手烤鱼：@clgxyxy\n东北吉林烧烤：@Jinniu99998888\n江湖烧烤：@jianghushaokao\nA8烤鹅翅：@FUAN68899",
     "drinks": "🥤 <b>富力奶茶 · 饮品</b>\n\n麦诺咖啡：@mnppsc\n霸王茶姬：@Jolyne777\nA8 ManMan 糖水饮品：@manmanC3121",
     "supermarket": "🛒 <b>富力超市 · 便利店</b>\n\n喜来优品超市：@xilai1818\n够意思超市：@gouyisi\n文轩888便利店：@WENXUAN188\n富田生鲜超市：@FUTIAN668899\n中柬易购生活超市：@Yin_zhuochao\n糖巢省钱超市：@WGTC99\n钉当猫百货伟哥数码：@yuna666666\n如意烟酒：@w1025\n1919商行(烟酒茶)：@FL191919\n庆丰优选超市：@gtffgfffdff\nB11世纪超市：@b11shijichaoshi",
