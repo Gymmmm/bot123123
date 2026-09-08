@@ -729,13 +729,8 @@ def draft_projection(facts: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def is_buildable(facts: dict[str, Any]) -> bool:
-    """Level-1 publication eligibility; Level-2 geography is not required."""
-    return not bool((facts.get("quality") or {}).get("blocking_flags"))
 
 
-def has_confirmed_physical_area(facts: dict[str, Any]) -> bool:
-    return bool(facts.get("canonical_area_key")) and facts.get("publication_location_level") == "level_2_physical_confirmed"
 
 
-__all__ = ["SCHEMA_VERSION", "PARSER_REVISION", "canonicalize_source", "draft_projection", "is_buildable", "has_confirmed_physical_area"]
+__all__ = ['SCHEMA_VERSION', 'PARSER_REVISION', 'canonicalize_source', 'draft_projection']
