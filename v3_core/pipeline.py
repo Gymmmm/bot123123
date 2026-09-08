@@ -1,6 +1,6 @@
 """Side-by-side V3 core facade.
 
-This is intentionally not wired to production systemd services yet.  It gives
+This is intentionally not wired to production systemd services yet. It gives
 migration code one explicit API for the extracted architecture without routing
 through drafts, runtime patches, CSV publishing, or the legacy publisher.
 """
@@ -11,6 +11,7 @@ from typing import Any
 from v3_core.ingest.intake_service import IntakeResult, IntakeService, SourceIntake
 from v3_core.ingest.source_reader import SourceReader
 from v3_core.ingest.source_repository import SourceRepository
+from v3_core.inventory.identity import IdentityService, ListingIdentity
 from v3_core.inventory.service import InventoryMaterializationService, MaterializationResult
 from v3_core.media.service import MediaPreparationService, PreparedSourceMedia
 from v3_core.parser.service import CanonicalParseResult, CanonicalParseService
@@ -39,6 +40,7 @@ class V3CorePipeline:
         self.source_reader = SourceReader(self.db_path)
         self.inventory = InventoryRepository(self.db_path)
         self.inventory_reader = InventoryReader(self.db_path)
+        self.identities = IdentityService(self.db_path)
         self.intake = IntakeService(
             self.sources,
             min_listing_images=min_listing_images,
@@ -72,18 +74,29 @@ class V3CorePipeline:
     def parse_source(self, source_post_id: int) -> CanonicalParseResult:
         return self.parser.parse_source_post(int(source_post_id))
 
+    def allocate_identity(self, *, canonical_record_id: str) -> ListingIdentity:
+        facts = self.inventory.canonical_facts(canonical_record_id)
+        return self.identities.allocate(
+            canonical_record_id=canonical_record_id,
+            facts=facts,
+        )
+
     def materialize_inventory(
         self,
         *,
         canonical_record_id: str,
-        listing_id: str,
-        public_listing_id: str,
+        listing_id: str | None = None,
+        public_listing_id: str | None = None,
         create_review: bool = True,
     ) -> MaterializationResult:
+        if not listing_id or not public_listing_id:
+            identity = self.allocate_identity(canonical_record_id=canonical_record_id)
+            listing_id = listing_id or identity.listing_id
+            public_listing_id = public_listing_id or identity.public_listing_id
         return self.materializer.materialize(
             canonical_record_id=canonical_record_id,
-            listing_id=listing_id,
-            public_listing_id=public_listing_id,
+            listing_id=str(listing_id),
+            public_listing_id=str(public_listing_id),
             create_review=create_review,
         )
 
@@ -91,8 +104,8 @@ class V3CorePipeline:
         self,
         *,
         source_post_id: int,
-        listing_id: str,
-        public_listing_id: str,
+        listing_id: str | None = None,
+        public_listing_id: str | None = None,
         create_review: bool = True,
     ) -> tuple[CanonicalParseResult, MaterializationResult]:
         parsed = self.parse_source(source_post_id)
