@@ -1,5 +1,6 @@
 import re
 
+
 def extract_house_info(text: str) -> dict:
     """
     智能提取房源信息（项目、户型、面积、楼层、价格、亮点）。
@@ -12,9 +13,9 @@ def extract_house_info(text: str) -> dict:
         "size": "",
         "floor": "",
         "price": "",
-        "highlights": []
+        "highlights": [],
     }
-    
+
     if not text:
         return info
 
@@ -22,12 +23,12 @@ def extract_house_info(text: str) -> dict:
     price_match = re.search(r'(\$\s?\d+[\d,]*)|(\d+[\d,]*\s?\$)|(\d+[\d,]*\s?/月)', text)
     if price_match:
         info["price"] = price_match.group(0).strip()
-    
+
     # 2. 提取面积 (匹配 45㎡, 45sqm, 45平 等)
     size_match = re.search(r'(\d+)\s?(㎡|sqm|平|平方米)', text, re.IGNORECASE)
     if size_match:
         info["size"] = f"{size_match.group(1)}㎡"
-        
+
     # 3. 提取楼层 (匹配 8楼, 8th floor, 第8层 等)
     floor_match = re.search(r'(\d+)\s?(楼|层|floor)', text, re.IGNORECASE)
     if floor_match:
@@ -47,7 +48,7 @@ def extract_house_info(text: str) -> dict:
         clean_line = re.sub(r'[^\w\s\u4e00-\u9fa5]', '', first_line).strip()
         if clean_line and len(clean_line) < 15:
             info["project"] = clean_line
-    
+
     # 6. 提取卖点 (匹配带 ✅, •, -, * 的行)
     highlights = []
     for line in lines:
@@ -59,7 +60,3 @@ def extract_house_info(text: str) -> dict:
     info["highlights"] = highlights[:3]
 
     return info
-
-if __name__ == "__main__":
-    test_text = "🏠 富力城｜1房1卫\n💰 $680/月 ｜ 45㎡ ｜ 8楼\n✅ 家具基本全新\n✅ 小区泳池 / 健身房\n✅ 步行3分钟到超市"
-    print(extract_house_info(test_text))
