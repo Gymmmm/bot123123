@@ -36,56 +36,17 @@ jobs:
           python qiaolian_production/tools/audit_meihua_symbols.py --write
           python -m py_compile qiaolian_production/shared/meihua_publisher.py
           git diff --exit-code -- qiaolian_production/shared/meihua_publisher.py
-          python - <<'PY'
-          import sys
-          from pathlib import Path
-          repo = Path.cwd().resolve()
-          prod = (repo / 'qiaolian_production').resolve()
-          for path in (prod / 'shared', prod / 'user', prod / 'collector', prod / 'publisher'):
-              sys.path.insert(0, str(path))
-          sys.path[:] = [p for p in sys.path if Path(p or '.').resolve() != repo]
-          import meihua_publisher as mp
-          required = {
-              'MeihuaPublisher', '_album_paths_for_draft', '_parsed_normalized',
-              '_public_clean_text', 'add_detail_logo_watermark',
-              'assert_public_output_safe', 'build_caption', 'build_channel_caption',
-              'build_chinese_listing_post', 'build_discussion_detail_text',
-              'default_caption_variant_for_property', 'evaluate_publish_gate',
-              'send_discussion_three_segments', 'system_listing_id_from_draft',
-          }
-          missing = sorted(name for name in required if not hasattr(mp, name))
-          if missing:
-              raise SystemExit('missing meihua production symbols: ' + repr(missing))
-          assert mp.default_caption_variant_for_property('公寓') == 'a'
-          assert mp.default_caption_variant_for_property('别墅') == 'b'
-          assert mp.default_caption_variant_for_property('办公室') == 'c'
-          print('MEIHUA_COMMITTED_SLICE_OK')
-          PY
-      - name: Slice and compile publication package candidate
+      - name: Verify committed publication package slice
         run: |
           python qiaolian_production/tools/audit_publication_package_symbols.py
           python qiaolian_production/tools/audit_publication_package_symbols.py --write
           python -m py_compile qiaolian_production/collector/publication_package.py
-          python - <<'PY'
-          import sys
-          from pathlib import Path
-          repo = Path.cwd().resolve()
-          prod = (repo / 'qiaolian_production').resolve()
-          for path in (prod / 'shared', prod / 'user', prod / 'collector', prod / 'publisher'):
-              sys.path.insert(0, str(path))
-          sys.path[:] = [p for p in sys.path if Path(p or '.').resolve() != repo]
-          import publication_package as pp
-          required = {
-              'PACKAGE_ROOT', 'ROOT', '_paths', '_select_cover_source',
-              'approve_package', 'approved_package', 'build_package',
-              'ensure_source_media_assets', 'evaluate_publishability',
-              'format_button_post_text', 'render_cover_preview',
-          }
-          missing = sorted(name for name in required if not hasattr(pp, name))
-          if missing:
-              raise SystemExit('missing publication package production symbols: ' + repr(missing))
-          print('PACKAGE_SLICE_IMPORT_OK')
-          PY
+          git diff --exit-code -- qiaolian_production/collector/publication_package.py
+      - name: Slice and compile PublisherBot candidate
+        run: |
+          python qiaolian_production/tools/audit_publisher_bot_methods.py
+          python qiaolian_production/tools/audit_publisher_bot_methods.py --write
+          python -m py_compile qiaolian_production/publisher/qiaolian_publisher_v2/bot.py
       - name: Import collector from extracted tree only
         env:
           DB_PATH: '${{ runner.temp }}/qiaolian-extraction.db'
@@ -96,19 +57,14 @@ jobs:
           python - <<'PY'
           import sys
           from pathlib import Path
-
           repo = Path.cwd().resolve()
           prod = (repo / 'qiaolian_production').resolve()
           import qiaolian_production.run_collector as entry
           entry._activate_paths()
           entry.configure_environment()
           sys.path[:] = [p for p in sys.path if Path(p or '.').resolve() != repo]
-
-          import collector_bot
-          import ai_parser
-          import publication_package
+          import collector_bot, ai_parser, publication_package
           assert collector_bot and ai_parser and publication_package
-
           leaks = []
           for name, module in tuple(sys.modules.items()):
               raw = getattr(module, '__file__', None)
@@ -121,7 +77,7 @@ jobs:
               raise SystemExit('collector local-source leaks: ' + repr(sorted(leaks)))
           print('COLLECTOR_IMPORT_OK')
           PY
-      - name: Import publisher from extracted tree only
+      - name: Import publisher candidate with all production patches
         env:
           DB_PATH: '${{ runner.temp }}/qiaolian-extraction.db'
           SQLITE_PATH: '${{ runner.temp }}/qiaolian-extraction.db'
@@ -135,24 +91,21 @@ jobs:
           python - <<'PY'
           import sys
           from pathlib import Path
-
           repo = Path.cwd().resolve()
           prod = (repo / 'qiaolian_production').resolve()
           import qiaolian_production.run_publisher as entry
           entry._activate_paths()
           entry.configure_environment()
           sys.path[:] = [p for p in sys.path if Path(p or '.').resolve() != repo]
-
           loaded = entry._load_runtime()
-          assert loaded and loaded[0]
           main, install_cover_picker, install_daily_broadcast_patch, install_media_selection_patch, install_review_queue_patch, install_release_contract_patch = loaded
           install_cover_picker()
           install_media_selection_patch()
           install_review_queue_patch()
           install_release_contract_patch()
           install_daily_broadcast_patch()
-          assert main
-
+          from qiaolian_publisher_v2.bot import PublisherBot
+          assert PublisherBot and main
           leaks = []
           for name, module in tuple(sys.modules.items()):
               raw = getattr(module, '__file__', None)
@@ -176,20 +129,17 @@ jobs:
           python - <<'PY'
           import sys
           from pathlib import Path
-
           repo = Path.cwd().resolve()
           prod = (repo / 'qiaolian_production').resolve()
           import qiaolian_production.run_user as entry
           entry._activate_paths()
           entry.configure_environment()
           sys.path[:] = [p for p in sys.path if Path(p or '.').resolve() != repo]
-
           loaded = entry._load_runtime()
           assert loaded and loaded[0]
           import qiaolian_dual.user_bot as user_bot
           app = user_bot.build_application()
           assert app is not None
-
           leaks = []
           for name, module in tuple(sys.modules.items()):
               raw = getattr(module, '__file__', None)
@@ -202,16 +152,17 @@ jobs:
               raise SystemExit('user local-source leaks: ' + repr(sorted(leaks)))
           print('USER_BUILD_OK')
           PY
-      - name: Commit validated publication package slice
+      - name: Commit validated PublisherBot slice
         if: github.event_name == 'push'
         run: |
-          if git diff --quiet -- qiaolian_production/collector/publication_package.py; then
-            echo 'PACKAGE_SLICE_ALREADY_COMMITTED=1'
+          TARGET=qiaolian_production/publisher/qiaolian_publisher_v2/bot.py
+          if git diff --quiet -- "$TARGET"; then
+            echo 'PUBLISHER_BOT_SLICE_ALREADY_COMMITTED=1'
             exit 0
           fi
           git diff --check
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add qiaolian_production/collector/publication_package.py
-          git commit -m 'refactor: slim publication package production runtime'
+          git add "$TARGET"
+          git commit -m 'refactor: slim PublisherBot production methods'
           git push origin HEAD:refactor/production-extraction
