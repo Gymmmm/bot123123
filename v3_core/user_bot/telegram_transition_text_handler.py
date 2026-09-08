@@ -1,4 +1,4 @@
-"""Async Telegram adapter for V3 custom date/time/budget text input.
+"""Async Telegram adapter for V3 custom date/time/area/budget text input.
 
 The pure ``TransitionTextActionService`` decides whether a message belongs to an
 explicit awaiting state. This adapter renders the next local step or, when an
@@ -10,6 +10,7 @@ are never imported from the legacy runtime.
 """
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
 
@@ -34,6 +35,7 @@ from .transition_actions import (
 )
 from .transition_session import (
     APPOINTMENT_SESSION_KEY,
+    SEARCH_PREF_SESSION_KEY,
     SessionMutationPlan,
     apply_session_mutation,
 )
@@ -129,6 +131,19 @@ async def handle_v3_transition_text(
             raise ValueError("appointment_time_text_action_missing_draft")
         view = views.appointment_time(result.appointment)
         await _reply_view(message, view)
+        if result.mutation is not None:
+            apply_session_mutation(user_data, result.mutation)
+        return TelegramTransitionTextOutcome(handled=True, result=result)
+
+    if result.next_step == "search_budget":
+        preview = deepcopy(user_data)
+        if result.mutation is not None:
+            apply_session_mutation(preview, result.mutation)
+        pref = preview.get(SEARCH_PREF_SESSION_KEY)
+        area_display = ""
+        if isinstance(pref, dict):
+            area_display = str(pref.get("area_display") or "").strip()
+        await _reply_view(message, views.search_budget(area_display))
         if result.mutation is not None:
             apply_session_mutation(user_data, result.mutation)
         return TelegramTransitionTextOutcome(handled=True, result=result)
