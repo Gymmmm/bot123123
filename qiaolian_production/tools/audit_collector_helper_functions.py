@@ -7,7 +7,9 @@ ROOT = Path(__file__).resolve().parents[1]
 COLLECTOR_DIR = ROOT / "collector"
 TARGET_MODULES = {
     "ai_parser",
+    "collector_bot",
     "collector_db_compat",
+    "publication_package",
     "source_sanitizer",
 }
 DYNAMIC_NAMES = {"getattr", "setattr", "hasattr", "globals", "locals", "eval", "exec"}
