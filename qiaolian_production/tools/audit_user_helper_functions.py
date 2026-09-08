@@ -10,6 +10,7 @@ TARGET_MODULES = {
     "admin_consult",
     "admin_contract",
     "admin_contract_ui",
+    "appointment_flow",
     "appointment_ui",
     "appointments_view",
     "area_normalization",
