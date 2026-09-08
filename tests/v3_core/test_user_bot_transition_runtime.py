@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from v3_core.user_bot.appointment_history import AppointmentHistoryService
 from v3_core.user_bot.appointment_submit_executor import AppointmentSubmitExecutor
+from v3_core.user_bot.keyword_search_actions import KeywordSearchActionService
 from v3_core.user_bot.lead_effects import LeadEffectExecutor
 from v3_core.user_bot.lead_service import LeadService
 from v3_core.user_bot.search_submit_executor import SearchSubmitExecutor
@@ -20,6 +21,7 @@ def test_transition_runtime_wires_submit_and_read_boundaries_without_creating_da
     assert isinstance(runtime.views, TransitionViewService)
     assert isinstance(runtime.callback_actions, TransitionActionService)
     assert isinstance(runtime.text_actions, TransitionTextActionService)
+    assert isinstance(runtime.keyword_actions, KeywordSearchActionService)
     assert isinstance(runtime.appointments, AppointmentSubmitExecutor)
     assert isinstance(runtime.appointment_history, AppointmentHistoryService)
     assert isinstance(runtime.searches, SearchSubmitExecutor)
