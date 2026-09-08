@@ -4,8 +4,8 @@ import json
 from pathlib import Path
 from typing import Any, Sequence
 
-from photo_formatter_v1_1 import format_gallery_photo, ordered_source_files
-from photo_ranker import rank_photos
+from .photo_formatter_v1_1 import format_gallery_photo, ordered_source_files
+from .photo_ranker import rank_photos
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 
@@ -56,8 +56,6 @@ def process_listing_media(
     output_dir.mkdir(parents=True, exist_ok=True)
     gallery_dir.mkdir(parents=True, exist_ok=True)
 
-    # Quality ranking is isolated from gallery ordering. It is used only for
-    # cover candidate, duplicate detection and severe reject decisions.
     ranked_result = rank_photos(input_folder)
 
     duplicate_files = {
