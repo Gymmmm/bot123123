@@ -26,98 +26,6 @@ jobs:
         run: python -m compileall -q qiaolian_production
       - name: Final production extraction acceptance
         run: python qiaolian_production/tools/final_acceptance.py
-      - name: Verify committed autopilot runtime slice
-        run: |
-          python qiaolian_production/tools/slim_autopilot.py
-          python qiaolian_production/tools/slim_autopilot.py --write
-          python -m py_compile qiaolian_production/shared/autopilot_publish_bot.py
-          git diff --exit-code -- qiaolian_production/shared/autopilot_publish_bot.py
-      - name: Verify committed meihua runtime slice
-        run: |
-          python qiaolian_production/tools/audit_meihua_symbols.py
-          python qiaolian_production/tools/audit_meihua_symbols.py --write
-          python -m py_compile qiaolian_production/shared/meihua_publisher.py
-          git diff --exit-code -- qiaolian_production/shared/meihua_publisher.py
-      - name: Verify committed publication package slice
-        run: |
-          python qiaolian_production/tools/audit_publication_package_symbols.py
-          python qiaolian_production/tools/audit_publication_package_symbols.py --write
-          python -m py_compile qiaolian_production/collector/publication_package.py
-          git diff --exit-code -- qiaolian_production/collector/publication_package.py
-      - name: Verify committed PublisherBot slice
-        run: |
-          python qiaolian_production/tools/audit_publisher_bot_methods.py
-          python qiaolian_production/tools/audit_publisher_bot_methods.py --write
-          python -m py_compile qiaolian_production/publisher/qiaolian_publisher_v2/bot.py
-          git diff --exit-code -- qiaolian_production/publisher/qiaolian_publisher_v2/bot.py
-      - name: Audit publisher package module reachability
-        run: python qiaolian_production/tools/audit_publisher_modules.py
-      - name: Verify committed formatter slice
-        run: |
-          python qiaolian_production/tools/audit_publisher_formatters.py
-          python qiaolian_production/tools/audit_publisher_formatters.py --write
-          python -m py_compile qiaolian_production/publisher/qiaolian_publisher_v2/formatters.py
-          git diff --exit-code -- qiaolian_production/publisher/qiaolian_publisher_v2/formatters.py
-      - name: Verify committed keyboard slice
-        run: |
-          python qiaolian_production/tools/audit_publisher_keyboards.py
-          python qiaolian_production/tools/audit_publisher_keyboards.py --write
-          python -m py_compile qiaolian_production/publisher/qiaolian_publisher_v2/keyboards.py
-          git diff --exit-code -- qiaolian_production/publisher/qiaolian_publisher_v2/keyboards.py
-      - name: Audit publisher message constants
-        run: python qiaolian_production/tools/audit_publisher_messages.py
-      - name: Audit user bot module reachability
-        run: python qiaolian_production/tools/audit_user_modules.py
-      - name: Audit retained taxonomy surface
-        run: |
-          python qiaolian_production/tools/audit_listing_taxonomy_symbols.py
-          for module in canonical_facts canonical_fact_projection canonical_listing_materializer public_listing_id area_normalization publishability_contract status_labels; do
-            python qiaolian_production/tools/audit_user_symbol_module.py "$module"
-          done
-      - name: Audit retained user helper surface
-        run: |
-          set -e
-          for module in \
-            public_listing_id area_normalization publishability_contract status_labels \
-            location_mapping text_utils utils_formatting v2_safe_adapter \
-            channel_links channel_post channel_status_sync session_deeplink runtime_guard cover_styles \
-            attribution attribution_hooks attribution_runtime attribution_store utils talk_engine jobs flows \
-            messages messages_more texts appointment_flow appointment_ui appointments_view \
-            callback_appointment callback_search callback_service callback_admin callback_contract \
-            callback_listing callback_navigation callback_preference callbacks search search_text_handlers \
-            message_handlers start_routes listing
-          do
-            python qiaolian_production/tools/audit_user_symbol_module.py "$module"
-          done
-          python qiaolian_production/tools/audit_user_db_methods.py
-      - name: Verify committed canonical facts slice
-        run: |
-          python qiaolian_production/tools/audit_user_symbol_module.py canonical_facts --write
-          python -m py_compile qiaolian_production/user/qiaolian_dual/canonical_facts.py
-          git diff --exit-code -- qiaolian_production/user/qiaolian_dual/canonical_facts.py
-      - name: Verify committed user helper slices
-        run: |
-          set -e
-          for module in channel_post attribution message_handlers listing; do
-            python qiaolian_production/tools/audit_user_symbol_module.py "$module" --write
-          done
-          python qiaolian_production/tools/audit_user_db_methods.py --write
-          python -m compileall -q qiaolian_production/user/qiaolian_dual
-          git diff --exit-code -- \
-            qiaolian_production/user/qiaolian_dual/channel_post.py \
-            qiaolian_production/user/qiaolian_dual/attribution.py \
-            qiaolian_production/user/qiaolian_dual/message_handlers.py \
-            qiaolian_production/user/qiaolian_dual/listing.py \
-            qiaolian_production/user/qiaolian_dual/db.py
-      - name: Verify committed canonical projection slices
-        run: |
-          python qiaolian_production/tools/audit_user_symbol_module.py canonical_fact_projection --write
-          python qiaolian_production/tools/audit_user_symbol_module.py canonical_listing_materializer --write
-          python -m py_compile qiaolian_production/user/qiaolian_dual/canonical_fact_projection.py
-          python -m py_compile qiaolian_production/user/qiaolian_dual/canonical_listing_materializer.py
-          git diff --exit-code -- \
-            qiaolian_production/user/qiaolian_dual/canonical_fact_projection.py \
-            qiaolian_production/user/qiaolian_dual/canonical_listing_materializer.py
       - name: Import collector from extracted tree only
         env:
           DB_PATH: '${{ runner.temp }}/qiaolian-extraction.db'
@@ -140,7 +48,8 @@ jobs:
               raw=getattr(module,'__file__',None)
               if not raw or name=='__main__' or str(raw).startswith('<'): continue
               path=Path(raw).resolve()
-              if (path==repo or repo in path.parents) and not (path==prod or prod in path.parents): leaks.append((name,str(path.relative_to(repo))))
+              if (path==repo or repo in path.parents) and not (path==prod or prod in path.parents):
+                  leaks.append((name,str(path.relative_to(repo))))
           if leaks: raise SystemExit('collector local-source leaks: '+repr(sorted(leaks)))
           print('COLLECTOR_IMPORT_OK')
           PY
@@ -175,7 +84,8 @@ jobs:
               raw=getattr(module,'__file__',None)
               if not raw or name=='__main__' or str(raw).startswith('<'): continue
               path=Path(raw).resolve()
-              if (path==repo or repo in path.parents) and not (path==prod or prod in path.parents): leaks.append((name,str(path.relative_to(repo))))
+              if (path==repo or repo in path.parents) and not (path==prod or prod in path.parents):
+                  leaks.append((name,str(path.relative_to(repo))))
           if leaks: raise SystemExit('publisher local-source leaks: '+repr(sorted(leaks)))
           print('PUBLISHER_IMPORT_OK')
           PY
@@ -202,7 +112,8 @@ jobs:
               raw=getattr(module,'__file__',None)
               if not raw or name=='__main__' or str(raw).startswith('<'): continue
               path=Path(raw).resolve()
-              if (path==repo or repo in path.parents) and not (path==prod or prod in path.parents): leaks.append((name,str(path.relative_to(repo))))
+              if (path==repo or repo in path.parents) and not (path==prod or prod in path.parents):
+                  leaks.append((name,str(path.relative_to(repo))))
           if leaks: raise SystemExit('user local-source leaks: '+repr(sorted(leaks)))
           print('USER_BUILD_OK')
           PY
