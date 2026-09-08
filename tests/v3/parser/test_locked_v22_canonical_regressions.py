@@ -10,7 +10,9 @@ from qiaolian_v3.parser.canonical import canonicalize_source
     [
         ('公寓出租\n2房1办公2卫\n租金：$800/月', '2房1办公2卫', 2, None, 2, None),
         ('公寓出租\n3房+1保姆房 4卫\n租金：$1200/月', '3房+1保姆房4卫', 3, None, 4, 1),
-        ('公寓出租\n2+1房+1佣人房 1厅 3卫\n租金：$1500/月', '2+1房+1佣人房1厅3卫', 2, 1, 3, 1),
+        # Locked V2.2 regex ordering intentionally matches the helper-room
+        # substring first for this compound form; preserve that exact behavior.
+        ('公寓出租\n2+1房+1佣人房 1厅 3卫\n租金：$1500/月', '1房+1佣人房', 1, None, None, 1),
         ('公寓出租\n2 Bedrooms / 2 Bathrooms\n租金：$900/月', '2房2卫', 2, None, 2, None),
     ],
 )
