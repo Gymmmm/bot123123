@@ -6,6 +6,7 @@ through drafts, runtime patches, CSV publishing, or the legacy publisher.
 """
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from v3_core.ingest.intake_service import IntakeResult, IntakeService, SourceIntake
@@ -13,6 +14,7 @@ from v3_core.ingest.source_reader import SourceReader
 from v3_core.ingest.source_repository import SourceRepository
 from v3_core.inventory.identity import IdentityService, ListingIdentity
 from v3_core.inventory.service import InventoryMaterializationService, MaterializationResult
+from v3_core.media.cover_service import CoverRenderService, RenderedCover
 from v3_core.media.service import MediaPreparationService, PreparedSourceMedia
 from v3_core.parser.service import CanonicalParseResult, CanonicalParseService
 from v3_core.publishing.delivery_coordinator import (
@@ -34,6 +36,7 @@ class V3CorePipeline:
         db_path: str,
         user_bot_username: str,
         min_listing_images: int = 4,
+        cover_output_dir: str | None = None,
     ):
         self.db_path = str(db_path)
         self.sources = SourceRepository(self.db_path)
@@ -48,6 +51,15 @@ class V3CorePipeline:
         self.parser = CanonicalParseService(self.sources, self.inventory)
         self.materializer = InventoryMaterializationService(self.inventory)
         self.media = MediaPreparationService(self.source_reader)
+        cover_dir = (
+            Path(cover_output_dir).expanduser().resolve()
+            if cover_output_dir
+            else Path(self.db_path).expanduser().resolve().parent / "covers_v3"
+        )
+        self.covers = CoverRenderService(
+            reader=self.inventory_reader,
+            output_dir=cover_dir,
+        )
         self.packages = FrozenPackageStore(self.db_path)
         self.package_builder = PackageBuildService(
             reader=self.inventory_reader,
@@ -128,6 +140,23 @@ class V3CorePipeline:
             manual_cover_path=manual_cover_path,
         )
 
+    def render_cover(
+        self,
+        *,
+        listing_id: str,
+        offer_id: str,
+        media: PreparedSourceMedia,
+        cover_style: str = "classic_blue",
+        output_path: str | None = None,
+    ) -> RenderedCover:
+        return self.covers.render(
+            listing_id=listing_id,
+            offer_id=offer_id,
+            media=media,
+            style=cover_style,
+            output_path=output_path,
+        )
+
     def approve_review(self, *, review_id: str, operator_user_id: str) -> dict[str, Any]:
         return self.inventory.approve_review(
             review_id=review_id,
@@ -140,14 +169,22 @@ class V3CorePipeline:
         listing_id: str,
         offer_id: str,
         cover_style: str,
-        rendered_cover_path: str,
         media: PreparedSourceMedia,
+        rendered_cover_path: str | None = None,
     ) -> FrozenPackage:
+        cover_path = str(rendered_cover_path or "").strip()
+        if not cover_path:
+            cover_path = self.render_cover(
+                listing_id=listing_id,
+                offer_id=offer_id,
+                media=media,
+                cover_style=cover_style,
+            ).output_path
         return self.package_builder.build(
             listing_id=listing_id,
             offer_id=offer_id,
             cover_style=cover_style,
-            cover_path=rendered_cover_path,
+            cover_path=cover_path,
             gallery=list(media.gallery_paths),
             source_identity=dict(media.source_identity),
         )
