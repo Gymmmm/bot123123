@@ -144,7 +144,6 @@ def _last_pref(criteria: SearchCriteria) -> dict[str, Any]:
         "location_keys": list(criteria.location_keys),
         "budget_min": criteria.budget_min,
         "budget_max": criteria.budget_max,
-        "room_type": criteria.room_type,
     }
 
 
