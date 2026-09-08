@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 USER_DIR = ROOT / "user" / "qiaolian_dual"
 TARGET_MODULES = {
+    "appointment_ui",
     "area_normalization",
     "attribution",
     "attribution_hooks",
