@@ -19,6 +19,7 @@ from .lead_service import (
     LeadUser,
     appointment_lead_request,
     general_contact_lead_request,
+    keyword_search_lead_request,
     listing_contact_lead_request,
     search_lead_request,
 )
@@ -64,6 +65,18 @@ class LeadEffectExecutor:
         intent: SearchSubmitIntent,
     ) -> LeadEffectResult:
         return self._record(user=user, request=search_lead_request(intent))
+
+    def record_keyword_search(
+        self,
+        *,
+        user: LeadUser,
+        intent: SearchSubmitIntent,
+        match_mode: str,
+    ) -> LeadEffectResult:
+        return self._record(
+            user=user,
+            request=keyword_search_lead_request(intent, match_mode=match_mode),
+        )
 
     def record_appointment(
         self,
