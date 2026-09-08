@@ -1,0 +1,23 @@
+name: user-flow-helper-audit
+
+on:
+  push:
+    branches:
+      - refactor/production-extraction
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Audit user flow modules
+        run: |
+          set -e
+          for module in callback_rental area_admin app user_bot db; do
+            echo "=== ${module} ==="
+            python qiaolian_production/tools/audit_user_symbol_module.py "${module}"
+          done
