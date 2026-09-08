@@ -19,7 +19,7 @@ jobs:
           python-version: '3.12'
       - name: Audit user bot modules
         run: python qiaolian_production/tools/audit_user_modules.py
-      - name: Audit pure user helper symbols
+      - name: Audit user helper symbols
         run: |
           set -e
           for module in \
@@ -47,7 +47,13 @@ jobs:
             flows \
             messages \
             messages_more \
-            texts
+            texts \
+            appointment_flow \
+            appointment_ui \
+            appointments_view \
+            callback_appointment \
+            callback_search \
+            callback_service
           do
             echo "=== ${module} ==="
             python qiaolian_production/tools/audit_user_symbol_module.py "${module}"
