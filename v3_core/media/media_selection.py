@@ -10,7 +10,7 @@ import hashlib
 from pathlib import Path
 from typing import Any, Iterable
 
-from .photo_formatter_v1_1 import IMAGE_EXTS
+from .photo_formatter import IMAGE_EXTS
 from .ranker import NEAR_DUPLICATE_HAMMING, _dhash, _hamming, rank_photo_paths
 
 
