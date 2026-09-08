@@ -21,6 +21,20 @@ def top_level_symbols(tree: ast.Module) -> dict[str, ast.AST]:
     return out
 
 
+def top_level_import_bindings(tree: ast.Module) -> set[str]:
+    """Names intentionally re-exported by normal top-level imports."""
+    out: set[str] = set()
+    for node in tree.body:
+        if isinstance(node, ast.ImportFrom):
+            for item in node.names:
+                if item.name != "*":
+                    out.add(item.asname or item.name)
+        elif isinstance(node, ast.Import):
+            for item in node.names:
+                out.add(item.asname or item.name.split(".")[0])
+    return out
+
+
 def referenced_names(node: ast.AST) -> set[str]:
     return {n.id for n in ast.walk(node) if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load)}
 
@@ -134,8 +148,9 @@ def main() -> None:
     source = target.read_text(encoding="utf-8")
     tree = ast.parse(source, filename=str(target))
     symbols = top_level_symbols(tree)
+    imported = top_level_import_bindings(tree)
     roots, unsafe = scan_roots(target, short_module)
-    missing = sorted(name for name in roots if name not in symbols)
+    missing = sorted(name for name in roots if name not in symbols and name not in imported)
 
     live = {name for name in roots if name in symbols}
     stack = list(live)
@@ -156,6 +171,7 @@ def main() -> None:
     prefix = short_module.upper().replace(".", "_")
     print(f"{prefix}_EXTERNAL_ROOTS=" + ",".join(sorted(roots)))
     print(f"{prefix}_EXTERNAL_ROOT_COUNT={len(roots)}")
+    print(f"{prefix}_REEXPORTED_IMPORTS=" + ",".join(sorted(roots & imported)))
     print(f"{prefix}_TOP_LEVEL_SYMBOLS={len(symbols)}")
     print(f"{prefix}_LIVE_TOP_LEVEL_SYMBOLS={len(live)}")
     print(f"{prefix}_DEAD_TOP_LEVEL_DEFS={len(dead)}")
