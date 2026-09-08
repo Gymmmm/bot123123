@@ -97,24 +97,12 @@ def _appointment_date_view(
     if draft.mode == "video":
         heading = f"🎥 <b>视频看房｜{he(public_id)}</b>"
         question = "哪天方便视频看房？"
-        mode_choice = TransitionChoice(
-            "🚶 改为实地看房",
-            "appointment_mode",
-            "offline",
-        )
+        mode_choice = TransitionChoice("🚶 改为实地看房", "appointment_mode", "offline")
     else:
         heading = f"📅 <b>预约看房｜{he(public_id)}</b>"
         question = "哪天方便看房？"
-        mode_choice = TransitionChoice(
-            "🎥 改为视频看房",
-            "appointment_mode",
-            "video",
-        )
-    text = (
-        f"{heading}\n\n"
-        f"🏠 <b>{he(subject)}</b>{price_line}\n\n"
-        f"{question}"
-    )
+        mode_choice = TransitionChoice("🎥 改为视频看房", "appointment_mode", "video")
+    text = f"{heading}\n\n🏠 <b>{he(subject)}</b>{price_line}\n\n{question}"
 
     today_value = today.strftime("%m-%d")
     tomorrow_value = (today + timedelta(days=1)).strftime("%m-%d")
@@ -130,11 +118,7 @@ def _appointment_date_view(
         ),
         (mode_choice,),
         (
-            TransitionChoice(
-                "⬅️ 返回房源",
-                "listing_details",
-                public_listing_id=public_id,
-            ),
+            TransitionChoice("⬅️ 返回房源", "listing_details", public_listing_id=public_id),
             TransitionChoice("🏠 返回首页", "home"),
         ),
     )
@@ -219,7 +203,11 @@ def budget_bounds(code: object) -> tuple[str, int | None, int | None]:
     raise ValueError("unsupported_budget_choice")
 
 
-def _search_budget_view(area_display: str = "") -> TransitionView:
+def _search_budget_view(
+    area_display: str = "",
+    *,
+    back_label: str = "⬅️ 返回找房",
+) -> TransitionView:
     clean_area = str(area_display or "").strip()
     area_line = f"\n已选：{he(clean_area)}" if clean_area else ""
     choices = tuple(
@@ -237,7 +225,7 @@ def _search_budget_view(area_display: str = "") -> TransitionView:
         (choices[2], choices[3]),
         (choices[4], choices[5]),
         (TransitionChoice("✍️ 自己输入", "budget_custom"),),
-        (TransitionChoice("⬅️ 返回找房", "change_search"),),
+        (TransitionChoice(back_label, "change_search"),),
     )
     return TransitionView(
         kind="search_budget",
@@ -247,14 +235,8 @@ def _search_budget_view(area_display: str = "") -> TransitionView:
 
 
 def _search_area_view() -> TransitionView:
-    choices = tuple(
-        TransitionChoice(label, "area_choice", code)
-        for code, label in AREA_OPTIONS
-    )
-    rows = tuple(
-        tuple(choices[index : index + 2])
-        for index in range(0, len(choices), 2)
-    ) + (
+    choices = tuple(TransitionChoice(label, "area_choice", code) for code, label in AREA_OPTIONS)
+    rows = tuple(tuple(choices[index : index + 2]) for index in range(0, len(choices), 2)) + (
         (TransitionChoice("📍 其他区域", "area_other"),),
         (TransitionChoice("⬅️ 返回找房", "change_search"),),
     )
@@ -266,10 +248,7 @@ def _search_area_view() -> TransitionView:
 
 
 def _search_layout_view() -> TransitionView:
-    choices = tuple(
-        TransitionChoice(label, "layout_choice", code)
-        for code, label in LAYOUT_OPTIONS
-    )
+    choices = tuple(TransitionChoice(label, "layout_choice", code) for code, label in LAYOUT_OPTIONS)
     rows = (
         (choices[0], choices[1]),
         (choices[2], choices[3]),
@@ -286,7 +265,7 @@ def _search_layout_view() -> TransitionView:
 def _similar_view(plan: TransitionPlan) -> TransitionView:
     if plan.similar is None:
         raise ValueError("similar_transition_missing_intent")
-    return _search_budget_view(plan.similar.intent.area_display)
+    return _search_budget_view(plan.similar.intent.area_display, back_label="⬅️ 返回")
 
 
 _SEARCH_ENTRY_TEXT = (
@@ -327,11 +306,7 @@ class TransitionViewService:
         *,
         today: date | None = None,
     ) -> TransitionView:
-        return _appointment_date_view(
-            draft,
-            self.inventory,
-            today=today or date.today(),
-        )
+        return _appointment_date_view(draft, self.inventory, today=today or date.today())
 
     def appointment_time(self, draft: PublicAppointmentDraft) -> TransitionView:
         return _appointment_time_view(draft, self.inventory)
