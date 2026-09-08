@@ -41,6 +41,13 @@ class PackageBuildService:
         offer = self.reader.offer(offer_id)
         if str(offer["listing_id"]) != str(listing_id):
             raise ValueError("offer_listing_mismatch")
+        if str(offer.get("offer_type") or "") != "rent":
+            raise ValueError("publication_package_requires_rent_offer")
+        if str(offer.get("publication_policy") or "") != "telegram_rent":
+            raise ValueError("publication_package_requires_telegram_rent_policy")
+        if str(offer.get("offer_status") or "") != "active":
+            raise ValueError("publication_package_requires_active_offer")
+
         canonical = self.reader.canonical(str(listing["canonical_record_id"]))
         facts = dict(canonical["facts"])
         public_id = str(listing.get("public_listing_id") or "")
