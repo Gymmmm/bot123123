@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import pytest
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from v3_core.ingest.intake_service import SourceIntake
 from v3_core.pipeline import V3CorePipeline
@@ -11,7 +11,17 @@ def _images(tmp_path: Path, prefix: str):
     out = []
     for index, value in enumerate((45, 85, 125, 165), start=1):
         path = tmp_path / f"{prefix}-{index}.jpg"
-        Image.new("RGB", (800, 600), (value, value, value)).save(path, "JPEG")
+        image = Image.new("RGB", (960, 720), (value + 45, value + 35, value + 25))
+        draw = ImageDraw.Draw(image)
+        draw.rectangle((55, 55, 905, 665), outline=(238, 238, 230), width=10)
+        draw.rectangle((120, 135, 480, 430), fill=(185, 205, 220), outline=(60, 75, 90), width=8)
+        draw.rectangle((545, 150, 835, 510), fill=(215, 190, 150), outline=(80, 65, 45), width=8)
+        draw.line((80, 590, 880, 590), fill=(65, 65, 65), width=12)
+        draw.line((180, 590, 260, 470), fill=(95, 75, 55), width=9)
+        draw.line((760, 590, 680, 470), fill=(95, 75, 55), width=9)
+        for x in range(110, 880, 80):
+            draw.line((x, 85, x + 35, 115), fill=(110 + value % 60, 90, 80), width=4)
+        image.save(path, "JPEG", quality=94)
         out.append(
             {
                 "local_path": str(path),
