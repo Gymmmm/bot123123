@@ -10,6 +10,7 @@ TARGET_MODULES = {
     "attribution",
     "attribution_hooks",
     "attribution_runtime",
+    "attribution_store",
     "channel_links",
     "channel_post",
     "channel_status_sync",
@@ -40,8 +41,6 @@ class ModuleInfo:
                 if isinstance(child, ast.Name) and child.id in self.functions:
                     self.internal_refs[name].add(child.id)
 
-        # Functions referenced by module-level executable statements are roots too.
-        # This covers initialization such as LOCATION_MAP = _build_location_map().
         self.module_roots: set[str] = set()
         for node in self.tree.body:
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
@@ -64,12 +63,8 @@ dynamic_modules: set[str] = set()
 
 
 def imported_target(node: ast.ImportFrom) -> str:
-    """Return the qiaolian_dual module targeted by an ImportFrom node when known."""
     raw = node.module or ""
     if node.level:
-        # All current audit targets are direct children of qiaolian_dual. Relative
-        # imports such as `from .location_mapping import get_display_location`
-        # therefore resolve directly from node.module.
         return raw
     if raw.startswith("qiaolian_dual."):
         return raw[len("qiaolian_dual."):]
@@ -106,7 +101,6 @@ for path in ROOT.rglob("*.py"):
                         imported_names[alias.asname or alias.name] = (target, alias.name)
                         external_roots[target].add(alias.name)
             elif node.level and not node.module:
-                # `from . import module_name` imports the module object itself.
                 for alias in node.names:
                     if alias.name in infos:
                         aliases[alias.asname or alias.name] = alias.name
