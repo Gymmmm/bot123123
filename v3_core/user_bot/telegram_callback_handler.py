@@ -1,13 +1,16 @@
 """Thin async Telegram callback handler for the side-by-side V3 User Bot.
 
-Only callbacks in the explicit ``v3u:`` namespace are handled. The router and
-response adapter make every business decision before this layer. This handler
-performs Telegram edit/send operations for details, photos, and search cards,
-and returns transition intents untouched for later orchestration.
+Only callbacks owned by the existing listing/card router are handled here.
+Renderable details/photos/cards are applied directly. Side-effect-free transition
+entries (book, similar, change-search) may also be rendered when a
+``TransitionViewService`` is injected; session mutations are applied only after
+the Telegram edit succeeds.
 
-The search-card renderer is public so initial search results and later card
-navigation share one Telegram/session contract. This module is deliberately not
-registered in the production Application yet.
+Child callbacks in the explicit ``v3u:t:`` transition namespace are deliberately
+not claimed by this router handler. They belong to the separate transition-action
+handler. Consult also remains an intent only until its effect executor exists.
+
+This module is deliberately not registered in the production Application yet.
 """
 from __future__ import annotations
 
@@ -24,6 +27,11 @@ from .telegram_callback_response import (
     TelegramCallbackResponse,
     adapt_callback_response,
 )
+from .telegram_transition_ui import build_transition_keyboard
+from .transition_callbacks import parse_transition_callback
+from .transition_plan import build_transition_plan
+from .transition_session import apply_session_mutation, build_transition_session
+from .transition_views import TransitionView, TransitionViewService
 
 
 SEARCH_SESSION_KEY = "v3_find_card_public_ids"
@@ -89,6 +97,23 @@ async def _render_photos(update: Any, context: Any, response: TelegramCallbackRe
         text=response.text,
         parse_mode=ParseMode.HTML,
         reply_markup=response.keyboard,
+    )
+
+
+async def _render_transition_view(query: Any, view: TransitionView) -> None:
+    keyboard = build_transition_keyboard(view)
+    message = getattr(query, "message", None)
+    if getattr(message, "photo", None):
+        await query.edit_message_caption(
+            caption=view.text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=keyboard,
+        )
+        return
+    await query.edit_message_text(
+        view.text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=keyboard,
     )
 
 
@@ -164,11 +189,17 @@ async def handle_v3_callback(
     context: Any,
     *,
     router: CallbackRouter,
+    transition_views: TransitionViewService | None = None,
 ) -> TelegramCallbackHandlerOutcome:
-    """Handle one V3 callback and leave transition orchestration to the caller."""
+    """Handle one router-owned V3 callback without swallowing child transitions."""
     query = getattr(update, "callback_query", None)
     raw = str(getattr(query, "data", "") or "") if query is not None else ""
     if query is None or not raw.startswith(f"{PREFIX}:"):
+        return TelegramCallbackHandlerOutcome(handled=False)
+
+    # ``v3u:t:*`` has its own parser/state machine. Do not let the listing/card
+    # router turn it into a malformed-callback error or consume it first.
+    if parse_transition_callback(raw) is not None:
         return TelegramCallbackHandlerOutcome(handled=False)
 
     dispatched = router.dispatch(
@@ -178,7 +209,7 @@ async def handle_v3_callback(
     response = adapt_callback_response(dispatched)
 
     # Always stop Telegram's callback spinner for callbacks owned by this
-    # handler. Error/transition copy is intentionally handled elsewhere.
+    # handler. Consult/error copy is intentionally handled elsewhere.
     await query.answer()
 
     if response.kind == "details":
@@ -187,6 +218,20 @@ async def handle_v3_callback(
         await _render_photos(update, context, response)
     elif response.kind == "card":
         await render_search_card_response(update, context, response, query=query)
+    elif (
+        response.kind == "transition"
+        and response.transition in {"book", "similar", "change_search"}
+        and transition_views is not None
+    ):
+        plan = build_transition_plan(response)
+        mutation = build_transition_session(plan)
+        view = transition_views.build(plan)
+        await _render_transition_view(query, view)
+        user_data = getattr(context, "user_data", None)
+        if not isinstance(user_data, dict):
+            raise ValueError("telegram_user_data_missing_for_transition")
+        # Telegram edit succeeded: session may now advance to the rendered step.
+        apply_session_mutation(user_data, mutation)
 
     return TelegramCallbackHandlerOutcome(
         handled=True,
