@@ -49,6 +49,7 @@ def detect_orientation(width: int, height: int) -> str:
 
 
 def enhance_property_photo(image: Image.Image) -> Image.Image:
+    """Light factual enhancement only; never alter geometry or scene contents."""
     image = ImageOps.autocontrast(image, cutoff=0.5)
     image = ImageEnhance.Brightness(image).enhance(1.035)
     image = ImageEnhance.Contrast(image).enhance(1.045)
@@ -64,7 +65,13 @@ def apply_logo_opacity(logo: Image.Image, opacity: float = LOGO_OPACITY) -> Imag
     return logo
 
 
-def contain_image(src: Image.Image, canvas_size: tuple[int, int], padding: int = PADDING, bg_color: tuple[int, int, int] = BG_COLOR) -> tuple[Image.Image, tuple[int, int, int, int]]:
+def contain_image(
+    src: Image.Image,
+    canvas_size: tuple[int, int],
+    padding: int = PADDING,
+    bg_color: tuple[int, int, int] = BG_COLOR,
+) -> tuple[Image.Image, tuple[int, int, int, int]]:
+    """Contain the complete source without crop/stretch and return its real image box."""
     canvas_w, canvas_h = canvas_size
     max_w = max(1, canvas_w - padding * 2)
     max_h = max(1, canvas_h - padding * 2)
@@ -122,16 +129,35 @@ def resolve_logo(logo_path: str | Path | None, canvas_width: int) -> Image.Image
     return _fallback_brand_logo(canvas_width)
 
 
-def _resize_gallery_logo(logo: Image.Image, *, canvas_width: int, image_box: tuple[int, int, int, int], width_ratio: float) -> Image.Image:
+def _resize_gallery_logo(
+    logo: Image.Image,
+    *,
+    canvas_width: int,
+    image_box: tuple[int, int, int, int],
+    width_ratio: float,
+) -> Image.Image:
     image_w = max(1, image_box[2])
     image_h = max(1, image_box[3])
-    target_w = min(max(1, int(canvas_width * width_ratio)), max(1, int(image_w * LOGO_MAX_PHOTO_WIDTH_RATIO)))
+    target_w = min(
+        max(1, int(canvas_width * width_ratio)),
+        max(1, int(image_w * LOGO_MAX_PHOTO_WIDTH_RATIO)),
+    )
     target_h_cap = max(1, int(image_h * LOGO_MAX_PHOTO_HEIGHT_RATIO))
-    scale = min(target_w / max(1, logo.width), target_h_cap / max(1, logo.height))
-    return logo.resize((max(1, int(round(logo.width * scale))), max(1, int(round(logo.height * scale)))), Image.Resampling.LANCZOS)
+    scale = min(
+        target_w / max(1, logo.width),
+        target_h_cap / max(1, logo.height),
+    )
+    return logo.resize(
+        (max(1, int(round(logo.width * scale))), max(1, int(round(logo.height * scale)))),
+        Image.Resampling.LANCZOS,
+    )
 
 
-def _logo_anchor(image_box: tuple[int, int, int, int], logo_size: tuple[int, int], position: str) -> tuple[int, int]:
+def _logo_anchor(
+    image_box: tuple[int, int, int, int],
+    logo_size: tuple[int, int],
+    position: str,
+) -> tuple[int, int]:
     image_x, image_y, image_w, image_h = image_box
     logo_w, logo_h = logo_size
     margin_x = max(8, int(image_w * LOGO_MARGIN_X_RATIO))
@@ -145,7 +171,12 @@ def _logo_anchor(image_box: tuple[int, int, int, int], logo_size: tuple[int, int
     return image_x + margin_x, image_y + margin_y
 
 
-def paste_logo(canvas: Image.Image, logo: Image.Image, image_box: tuple[int, int, int, int], position: str = "top_left") -> tuple[Image.Image, tuple[int, int, int, int]]:
+def paste_logo(
+    canvas: Image.Image,
+    logo: Image.Image,
+    image_box: tuple[int, int, int, int],
+    position: str = "top_left",
+) -> tuple[Image.Image, tuple[int, int, int, int]]:
     x, y = _logo_anchor(image_box, logo.size, position)
     image_x, image_y, image_w, image_h = image_box
     x = max(image_x, min(x, image_x + image_w - logo.width))
@@ -155,10 +186,19 @@ def paste_logo(canvas: Image.Image, logo: Image.Image, image_box: tuple[int, int
     return overlay.convert("RGB"), (x, y, logo.width, logo.height)
 
 
-def format_gallery_photo(input_path: str | Path, output_path: str | Path, logo_path: str | Path | None = None, logo_position: str = "top_left", quality: int = JPEG_QUALITY, add_logo: bool = True, enhance: bool = True) -> dict:
+def format_gallery_photo(
+    input_path: str | Path,
+    output_path: str | Path,
+    logo_path: str | Path | None = None,
+    logo_position: str = "top_left",
+    quality: int = JPEG_QUALITY,
+    add_logo: bool = True,
+    enhance: bool = True,
+) -> dict:
     input_path = Path(input_path)
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
+
     with Image.open(input_path) as source:
         src = ImageOps.exif_transpose(source).convert("RGB")
         if enhance:
@@ -167,14 +207,40 @@ def format_gallery_photo(input_path: str | Path, output_path: str | Path, logo_p
         preset = CANVAS_PRESETS[orientation]
         canvas_size = preset["size"]
         canvas, image_box = contain_image(src, canvas_size)
+
     logo_box = None
     if add_logo:
         logo = resolve_logo(logo_path, canvas_size[0])
-        logo = _resize_gallery_logo(logo, canvas_width=canvas_size[0], image_box=image_box, width_ratio=preset["logo_width_ratio"])
+        logo = _resize_gallery_logo(
+            logo,
+            canvas_width=canvas_size[0],
+            image_box=image_box,
+            width_ratio=preset["logo_width_ratio"],
+        )
         logo = apply_logo_opacity(logo)
         canvas, logo_box = paste_logo(canvas, logo, image_box, position=logo_position)
-    canvas.save(output_path, "JPEG", quality=quality, optimize=True, progressive=True, subsampling=0)
-    return {"input": str(input_path), "output": str(output_path), "orientation": orientation, "canvas": {"width": canvas_size[0], "height": canvas_size[1]}, "image_box": {"x": image_box[0], "y": image_box[1], "width": image_box[2], "height": image_box[3]}, "logo_box": ({"x": logo_box[0], "y": logo_box[1], "width": logo_box[2], "height": logo_box[3]} if logo_box else None), "logo_position": logo_position if add_logo else None, "enhanced": bool(enhance)}
+
+    canvas.save(
+        output_path,
+        "JPEG",
+        quality=quality,
+        optimize=True,
+        progressive=True,
+        subsampling=0,
+    )
+    return {
+        "input": str(input_path),
+        "output": str(output_path),
+        "orientation": orientation,
+        "canvas": {"width": canvas_size[0], "height": canvas_size[1]},
+        "image_box": {"x": image_box[0], "y": image_box[1], "width": image_box[2], "height": image_box[3]},
+        "logo_box": (
+            {"x": logo_box[0], "y": logo_box[1], "width": logo_box[2], "height": logo_box[3]}
+            if logo_box else None
+        ),
+        "logo_position": logo_position if add_logo else None,
+        "enhanced": bool(enhance),
+    }
 
 
 def _natural_key(path: Path) -> tuple:
@@ -201,11 +267,18 @@ def _manifest_items(value: object) -> list[str]:
     return out
 
 
-def ordered_source_files(input_folder: str | Path, *, source_order: Sequence[str | Path | dict] | None = None, source_manifest: str | Path | None = None) -> list[Path]:
+def ordered_source_files(
+    input_folder: str | Path,
+    *,
+    source_order: Sequence[str | Path | dict] | None = None,
+    source_manifest: str | Path | None = None,
+) -> list[Path]:
+    """Prefer collector/source order. Natural filename sorting is fallback only."""
     folder = Path(input_folder).resolve()
     available = [p for p in folder.iterdir() if p.is_file() and p.suffix.lower() in IMAGE_EXTS]
     by_name = {p.name: p for p in available}
     ordered: list[Path] = []
+
     manifest_order: list[object] = list(source_order or [])
     if not manifest_order and source_manifest:
         manifest_path = Path(source_manifest)
@@ -214,6 +287,7 @@ def ordered_source_files(input_folder: str | Path, *, source_order: Sequence[str
                 manifest_order = _manifest_items(json.loads(manifest_path.read_text(encoding="utf-8")))
             except Exception:
                 manifest_order = []
+
     for item in manifest_order:
         if isinstance(item, dict):
             raw = str(item.get("local_path") or item.get("path") or item.get("file") or item.get("name") or "")
@@ -231,24 +305,57 @@ def ordered_source_files(input_folder: str | Path, *, source_order: Sequence[str
         fallback = by_name.get(Path(raw).name)
         if fallback and fallback not in ordered:
             ordered.append(fallback)
+
     for path in sorted(available, key=_natural_key):
         if path not in ordered:
             ordered.append(path)
     return ordered
 
 
-def format_gallery_folder(input_folder: str | Path, output_folder: str | Path, logo_path: str | Path | None = None, logo_position: str = "top_left", *, source_order: Sequence[str | Path | dict] | None = None, source_manifest: str | Path | None = None, enhance: bool = True) -> list[dict]:
+def format_gallery_folder(
+    input_folder: str | Path,
+    output_folder: str | Path,
+    logo_path: str | Path | None = None,
+    logo_position: str = "top_left",
+    *,
+    source_order: Sequence[str | Path | dict] | None = None,
+    source_manifest: str | Path | None = None,
+    enhance: bool = True,
+) -> list[dict]:
     output_folder = Path(output_folder)
     output_folder.mkdir(parents=True, exist_ok=True)
-    files = ordered_source_files(input_folder, source_order=source_order, source_manifest=source_manifest)
+    files = ordered_source_files(
+        input_folder,
+        source_order=source_order,
+        source_manifest=source_manifest,
+    )
     results: list[dict] = []
     for index, src in enumerate(files, start=1):
         dst = output_folder / f"{index:02d}.jpg"
-        info = format_gallery_photo(src, dst, logo_path=logo_path, logo_position=logo_position, enhance=enhance)
+        info = format_gallery_photo(
+            src,
+            dst,
+            logo_path=logo_path,
+            logo_position=logo_position,
+            enhance=enhance,
+        )
         info["order"] = index
         info["source_order"] = src.name
         results.append(info)
     return results
 
 
-__all__ = ["IMAGE_EXTS", "detect_orientation", "enhance_property_photo", "format_gallery_photo", "format_gallery_folder", "ordered_source_files"]
+if __name__ == "__main__":
+    import sys
+
+    input_folder = sys.argv[1] if len(sys.argv) > 1 else "houses/QC0089"
+    output_folder = sys.argv[2] if len(sys.argv) > 2 else "processed/QC0089/gallery"
+    logo_path = sys.argv[3] if len(sys.argv) > 3 else None
+    source_manifest = sys.argv[4] if len(sys.argv) > 4 else None
+    result = format_gallery_folder(
+        input_folder,
+        output_folder,
+        logo_path=logo_path,
+        source_manifest=source_manifest,
+    )
+    print(json.dumps(result, ensure_ascii=False, indent=2))
