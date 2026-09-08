@@ -90,6 +90,14 @@ def detect_location_keys(text: str) -> tuple[str, ...]:
                 if key not in matched:
                     matched.append(key)
                 break
+
+    # The canonical taxonomy intentionally contains both the broad BKK market
+    # label and the specific BKK1/BKK2/BKK3 locations.  Production detect_area()
+    # takes the first specific match, so a query such as "BKK1" must not widen
+    # itself to the parent BKK search bucket.  Preserve multiple explicit child
+    # matches (for example "BKK2 / BKK3").
+    if "BKK" in matched and any(key in matched for key in ("BKK1", "BKK2", "BKK3")):
+        matched = [key for key in matched if key != "BKK"]
     return tuple(matched)
 
 
