@@ -18,9 +18,21 @@ def _image(path: Path, size=(1200, 800), value=140):
     return str(path)
 
 
+def _tiny_checkerboard(path: Path):
+    image = Image.new('RGB', (320, 240), 'white')
+    draw = ImageDraw.Draw(image)
+    cell = 30
+    for y in range(0, 240, cell):
+        for x in range(0, 320, cell):
+            if ((x // cell) + (y // cell)) % 2:
+                draw.rectangle((x, y, min(x + cell - 1, 319), min(y + cell - 1, 239)), fill='black')
+    image.save(path)
+    return str(path)
+
+
 def test_bad_images_are_filtered_and_four_usable_images_are_required(tmp_path):
     good = [_image(tmp_path / f'g{i}.jpg', value=100 + i * 23) for i in range(4)]
-    bad = _image(tmp_path / 'tiny.jpg', size=(320, 240), value=211)
+    bad = _tiny_checkerboard(tmp_path / 'tiny.jpg')
     result = build_media_selection(good + [bad])
     assert result.usable_count == 4
     assert str(Path(bad).resolve()) in result.rejected_paths
