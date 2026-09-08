@@ -41,7 +41,7 @@ class TelegramServiceOutcome:
     ticket_id: int | None = None
 
 
-def _keyboard(view: ServiceView) -> InlineKeyboardMarkup | None:
+def build_service_keyboard(view: ServiceView) -> InlineKeyboardMarkup | None:
     if not view.rows:
         return None
     return InlineKeyboardMarkup(
@@ -52,8 +52,8 @@ def _keyboard(view: ServiceView) -> InlineKeyboardMarkup | None:
     )
 
 
-async def _edit(query: Any, view: ServiceView) -> None:
-    markup = _keyboard(view)
+async def render_service_view(query: Any, view: ServiceView) -> None:
+    markup = build_service_keyboard(view)
     message = getattr(query, "message", None)
     if getattr(message, "photo", None):
         await query.edit_message_caption(
@@ -73,7 +73,7 @@ async def _reply(message: Any, view: ServiceView) -> None:
     await message.reply_text(
         view.text,
         parse_mode=ParseMode.HTML,
-        reply_markup=_keyboard(view),
+        reply_markup=build_service_keyboard(view),
     )
 
 
@@ -142,38 +142,38 @@ async def handle_v3_service_callback(
     await query.answer()
 
     if action == "repair":
-        await _edit(query, repair_home_view())
+        await render_service_view(query, repair_home_view())
         return TelegramServiceOutcome(True, action, True)
     if action == "property":
-        await _edit(query, property_view())
+        await render_service_view(query, property_view())
         return TelegramServiceOutcome(True, action, True)
     if action == "local":
-        await _edit(query, local_life_view())
+        await render_service_view(query, local_life_view())
         return TelegramServiceOutcome(True, action, True)
     if action == "general":
-        await _edit(query, general_prompt_view())
+        await render_service_view(query, general_prompt_view())
         user_data[SERVICE_GENERAL_WAIT_KEY] = True
         user_data.pop(SERVICE_NEARBY_WAIT_KEY, None)
         return TelegramServiceOutcome(True, action, True)
     if action == "nearby":
-        await _edit(query, nearby_view())
+        await render_service_view(query, nearby_view())
         return TelegramServiceOutcome(True, action, True)
     if action == "nearby_other":
-        await _edit(query, general_prompt_view(nearby=True))
+        await render_service_view(query, general_prompt_view(nearby=True))
         user_data[SERVICE_NEARBY_WAIT_KEY] = True
         user_data.pop(SERVICE_GENERAL_WAIT_KEY, None)
         return TelegramServiceOutcome(True, action, True)
     if action == "rfcity":
-        await _edit(query, rfcity_home_view())
+        await render_service_view(query, rfcity_home_view())
         return TelegramServiceOutcome(True, action, True)
     if action.startswith("rfcity:"):
         category = action.split(":", 1)[1]
-        await _edit(query, rfcity_category_view(category))
+        await render_service_view(query, rfcity_category_view(category))
         return TelegramServiceOutcome(True, action, True)
     if action.startswith("issue:"):
         issue_key = action.split(":", 1)[1]
         draft = service.begin_request(issue_key, request_token=uuid4().hex)
-        await _edit(query, issue_prompt_view(draft))
+        await render_service_view(query, issue_prompt_view(draft))
         _store_draft(user_data, draft)
         user_data.pop(SERVICE_GENERAL_WAIT_KEY, None)
         user_data.pop(SERVICE_NEARBY_WAIT_KEY, None)
@@ -192,7 +192,7 @@ async def handle_v3_service_callback(
                 user=user,
                 submission=submission,
             )
-        await _edit(query, repair_success_view(urgent=submission.urgent))
+        await render_service_view(query, repair_success_view(urgent=submission.urgent))
         user_data.pop(SERVICE_REQUEST_SESSION_KEY, None)
         return TelegramServiceOutcome(
             True,
@@ -260,6 +260,8 @@ __all__ = [
     "SERVICE_NEARBY_WAIT_KEY",
     "SERVICE_REQUEST_SESSION_KEY",
     "TelegramServiceOutcome",
+    "build_service_keyboard",
     "handle_v3_service_callback",
     "handle_v3_service_text",
+    "render_service_view",
 ]
