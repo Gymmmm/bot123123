@@ -9,7 +9,7 @@ from v3_core.user_bot.telegram_callback_response import TelegramCallbackResponse
 from v3_core.user_bot.transition_plan import build_transition_plan
 
 
-def test_book_transition_starts_offline_appointment_at_date_without_side_effects():
+def test_book_transition_starts_public_id_offline_appointment_at_date_without_side_effects():
     response = TelegramCallbackResponse(
         kind="transition",
         status="ok",
@@ -30,7 +30,9 @@ def test_book_transition_starts_offline_appointment_at_date_without_side_effects
     assert not plan.includes("record_lead")
     assert plan.book is not None
     assert plan.book.public_listing_id == "QL-RF-A2B3"
-    assert plan.book.draft.listing_id == "LST_1"
+    assert plan.book.draft.public_listing_id == "QL-RF-A2B3"
+    assert not hasattr(plan.book.draft, "listing_id")
+    assert "LST_1" not in repr(plan.book.draft)
     assert plan.book.draft.mode == "offline"
     assert plan.book.draft.source == "listing_callback"
     assert plan.book.draft.step == "date"
