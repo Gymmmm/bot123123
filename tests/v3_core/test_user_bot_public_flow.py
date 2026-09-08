@@ -111,16 +111,59 @@ def test_book_payload_returns_intent_not_a_telegram_side_effect():
     assert result.photos is None
 
 
-def test_rented_book_is_blocked_before_appointment_flow_is_created():
-    result = _service(_view(status="rented", offer_status="inactive")).resolve(
-        "property_QL-RF-A2B3_book"
+def test_direct_details_uses_the_same_published_gate_and_frozen_response():
+    service = _service(_view())
+
+    deep_link = service.resolve("property_QL-RF-A2B3_details")
+    callback = service.resolve_action("QL-RF-A2B3", "details")
+
+    assert deep_link.ok and callback.ok
+    assert callback.action == "details"
+    assert callback.public_listing_id == "QL-RF-A2B3"
+    assert callback.details is not None
+    assert deep_link.details is not None
+    assert callback.details.text == deep_link.details.text
+
+
+def test_direct_book_preserves_listing_callback_source_in_intent():
+    result = _service(_view()).resolve_action(
+        "QL-RF-A2B3",
+        "book",
+        source="listing_callback",
     )
 
-    assert not result.ok
-    assert result.status == "blocked"
-    assert result.action == "book"
-    assert result.reason == "listing_not_bookable"
-    assert result.book is None
+    assert result.ok
+    assert result.book is not None
+    assert result.book.listing_id == "LST_1"
+    assert result.book.public_listing_id == "QL-RF-A2B3"
+    assert result.book.source == "listing_callback"
+    assert result.book.start_payload == ""
+
+
+def test_rented_book_is_blocked_before_appointment_flow_is_created():
+    service = _service(_view(status="rented", offer_status="inactive"))
+
+    deep_link = service.resolve("property_QL-RF-A2B3_book")
+    callback = service.resolve_action("QL-RF-A2B3", "book")
+
+    for result in (deep_link, callback):
+        assert not result.ok
+        assert result.status == "blocked"
+        assert result.action == "book"
+        assert result.reason == "listing_not_bookable"
+        assert result.book is None
+
+
+def test_direct_action_rejects_invalid_identity_and_non_public_action():
+    service = _service(_view())
+
+    invalid_id = service.resolve_action("LST_1", "details")
+    unsupported = service.resolve_action("QL-RF-A2B3", "consult")
+
+    assert invalid_id.status == "invalid_link"
+    assert invalid_id.reason == "invalid_public_listing_id"
+    assert unsupported.status == "invalid_link"
+    assert unsupported.reason == "unsupported_public_action"
 
 
 def test_invalid_or_unpublished_payload_never_builds_a_response():
