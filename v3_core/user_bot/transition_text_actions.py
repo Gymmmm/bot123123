@@ -137,7 +137,6 @@ def _last_search_pref(intent: SearchSubmitIntent) -> dict[str, Any]:
         "location_keys": list(intent.criteria.location_keys),
         "budget_min": intent.criteria.budget_min,
         "budget_max": intent.criteria.budget_max,
-        "room_type": intent.criteria.room_type,
     }
 
 
