@@ -22,6 +22,7 @@ from tools.migrations.rebuild_channel import RebuildPreview, generate_preview, l
 FIXTURE_PATH = 'tests/v3/fixtures/phase5_channel_house_groups.tsv'
 TARGET_CHANNEL_ID = '-100123'
 BOT_USERNAME = 'QiaoLianBot'
+OFFICIAL_COVER_ROOT = Path('artifacts/v3/workpack_c/covers')
 # Deterministic acceptance entropy only. Production ID generation still uses the
 # formal assign_public_listing_id() code path; this sequence just makes the
 # committed preview reproducible and reviewable.
@@ -201,7 +202,6 @@ def _materialize_rent_package(
     conn: sqlite3.Connection,
     canonical_id: int,
     facts: dict[str, Any],
-    cover_root: Path,
     *,
     frozen: bool,
 ) -> FrozenPublicationPackage:
@@ -214,7 +214,7 @@ def _materialize_rent_package(
         "UPDATE listing_offers SET publication_policy='telegram_rent' WHERE id=? AND offer_type='rent'",
         (offer_id,),
     )
-    cover = _write_cover(cover_root, public_id, facts)
+    cover = _write_cover(OFFICIAL_COVER_ROOT, public_id, facts)
     package = build_frozen_rent_package(
         listing_id=materialized.listing_id,
         offer_id=offer_id,
@@ -236,12 +236,12 @@ def _materialize_rent_package(
     return package
 
 
-def build_official_preview(workdir: Path) -> RebuildPreview:
+def build_official_preview(workdir: Path | None = None) -> RebuildPreview:
     """Build the official Workpack-C preview from production-derived DB state only."""
+    del workdir  # kept only for call-site compatibility; official paths are repository-relative.
     conn = sqlite3.connect(':memory:')
     conn.row_factory = sqlite3.Row
     MigrationRunner(conn).migrate()
-    cover_root = workdir / 'covers'
 
     with _deterministic_public_ids():
         rent_packages: list[FrozenPublicationPackage] = []
@@ -249,7 +249,7 @@ def build_official_preview(workdir: Path) -> RebuildPreview:
             canonical_id, facts = _persist_source(conn, source)
             if str(facts.get('deal_type')) != 'rent':
                 raise AssertionError('real_rent_fixture_must_parse_as_rent')
-            rent_packages.append(_materialize_rent_package(conn, canonical_id, facts, cover_root, frozen=True))
+            rent_packages.append(_materialize_rent_package(conn, canonical_id, facts, frozen=True))
 
         sale_id, sale_facts = _persist_source(conn, SALE_SOURCE)
         if str(sale_facts.get('deal_type')) != 'sale':
@@ -263,7 +263,7 @@ def build_official_preview(workdir: Path) -> RebuildPreview:
         unfrozen_id, unfrozen_facts = _persist_source(conn, UNFROZEN_RENT_SOURCE)
         if str(unfrozen_facts.get('deal_type')) != 'rent':
             raise AssertionError('unfrozen_negative_control_must_parse_as_rent')
-        unfrozen_package = _materialize_rent_package(conn, unfrozen_id, unfrozen_facts, cover_root, frozen=False)
+        unfrozen_package = _materialize_rent_package(conn, unfrozen_id, unfrozen_facts, frozen=False)
 
     mappings = [
         {'package_id': rent_packages[0].package_id, 'channel_id': TARGET_CHANNEL_ID, 'message_id': 5001, 'current_content_hash': _sha('TEST_SLOT_5001')},
@@ -282,12 +282,12 @@ def build_official_preview(workdir: Path) -> RebuildPreview:
 
 def write_official_preview(output: Path) -> RebuildPreview:
     output.parent.mkdir(parents=True, exist_ok=True)
-    preview = build_official_preview(output.parent)
+    preview = build_official_preview()
     output.write_text(json.dumps(preview.to_dict(), ensure_ascii=False, sort_keys=True, indent=2) + '\n', encoding='utf-8')
     return preview
 
 
 __all__ = [
-    'FIXTURE_PATH', 'REAL_RENT_SOURCES', 'SALE_SOURCE', 'UNKNOWN_SOURCE', 'UNFROZEN_RENT_SOURCE',
+    'FIXTURE_PATH', 'OFFICIAL_COVER_ROOT', 'REAL_RENT_SOURCES', 'SALE_SOURCE', 'UNKNOWN_SOURCE', 'UNFROZEN_RENT_SOURCE',
     'build_official_preview', 'write_official_preview',
 ]
