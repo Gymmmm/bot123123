@@ -83,9 +83,48 @@ def scan_roots(target: Path, short_module: str) -> tuple[set[str], list[str]]:
     return roots, unsafe
 
 
+def write_slice(target: Path, source: str, tree: ast.Module, symbols: dict[str, ast.AST], dead: list[str]) -> None:
+    if not dead:
+        return
+    lines = source.splitlines(keepends=True)
+    remove_lines: set[int] = set()
+    for name in dead:
+        node = symbols[name]
+        for lineno in range(node.lineno, getattr(node, "end_lineno", node.lineno) + 1):
+            remove_lines.add(lineno)
+    output = [line for lineno, line in enumerate(lines, start=1) if lineno not in remove_lines]
+    text = "".join(output)
+
+    # Keep an explicit __all__ export list consistent with the sliced module.
+    sliced_tree = ast.parse(text, filename=str(target))
+    text_lines = text.splitlines(keepends=True)
+    for node in sliced_tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        if not any(isinstance(t, ast.Name) and t.id == "__all__" for t in node.targets):
+            continue
+        if not isinstance(node.value, (ast.List, ast.Tuple)):
+            raise SystemExit("unsafe dynamic __all__ while writing slice")
+        values: list[str] = []
+        for elt in node.value.elts:
+            if not isinstance(elt, ast.Constant) or not isinstance(elt.value, str):
+                raise SystemExit("unsafe non-string __all__ while writing slice")
+            if elt.value not in dead:
+                values.append(elt.value)
+        replacement = "__all__ = " + repr(values) + "\n"
+        start = node.lineno - 1
+        end = getattr(node, "end_lineno", node.lineno)
+        text_lines[start:end] = [replacement]
+        text = "".join(text_lines)
+        break
+
+    target.write_text(text.rstrip() + "\n", encoding="utf-8")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("module", help="qiaolian_dual module path without .py, e.g. canonical_facts")
+    parser.add_argument("--write", action="store_true", help="remove audited dead top-level defs from the target module")
     args = parser.parse_args()
     short_module = args.module.replace("/", ".").removesuffix(".py")
     target = PACKAGE.joinpath(*short_module.split(".")).with_suffix(".py")
@@ -127,6 +166,9 @@ def main() -> None:
         raise SystemExit(f"missing {short_module} roots: {missing!r}")
     if unsafe:
         raise SystemExit(f"unsafe {short_module} references: {sorted(set(unsafe))!r}")
+    if args.write:
+        write_slice(target, source, tree, symbols, dead)
+        print(f"{prefix}_SLICE_WRITTEN={1 if dead else 0}")
 
 
 if __name__ == "__main__":
