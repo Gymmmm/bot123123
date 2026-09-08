@@ -7,7 +7,9 @@ ROOT = Path(__file__).resolve().parents[1]
 USER_DIR = ROOT / "user" / "qiaolian_dual"
 TARGET_MODULES = {
     "area_normalization",
+    "attribution",
     "attribution_hooks",
+    "attribution_runtime",
     "channel_links",
     "channel_post",
     "channel_status_sync",
@@ -18,6 +20,7 @@ TARGET_MODULES = {
     "runtime_guard",
     "status_labels",
     "utils_formatting",
+    "v2_safe_adapter",
 }
 DYNAMIC_NAMES = {"getattr", "setattr", "hasattr", "globals", "locals", "eval", "exec"}
 
