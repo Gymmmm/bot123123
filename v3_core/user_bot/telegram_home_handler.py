@@ -1,8 +1,8 @@
 """Telegram adapter for V3 home-surface callbacks.
 
-Only actions with complete V3 behavior are rendered here. Search remains deferred
-until its free-text awaiting handler is extracted; rental/service remain deferred
-until their fixed-SHA subflows are extracted. This prevents dead home buttons.
+Search, appointments and contact render only after their complete V3 behavior is
+available. Rental/service stay explicitly deferred until their fixed-SHA subflows
+are extracted. Full home is still not exposed while either is deferred.
 """
 from __future__ import annotations
 
@@ -17,6 +17,10 @@ from .home_callbacks import HomeAction, parse_home_callback
 from .home_views import build_appointment_history_home_view, build_contact_view
 from .lead_service import LeadUser
 from .telegram_home_ui import build_home_keyboard
+from .telegram_transition_ui import build_transition_keyboard
+from .transition_plan import ChangeSearchTransition, TransitionPlan
+from .transition_session import apply_session_mutation, build_transition_session
+from .transition_views import TransitionView, TransitionViewService
 
 
 @dataclass(frozen=True)
@@ -67,11 +71,38 @@ async def _edit_home_view(query: Any, view) -> None:
     )
 
 
+async def _edit_transition_view(query: Any, view: TransitionView) -> None:
+    markup = build_transition_keyboard(view) if view.rows else None
+    message = getattr(query, "message", None)
+    if getattr(message, "photo", None):
+        await query.edit_message_caption(
+            caption=view.text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=markup,
+        )
+        return
+    await query.edit_message_text(
+        view.text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=markup,
+    )
+
+
+def _search_entry_plan() -> TransitionPlan:
+    return TransitionPlan(
+        kind="change_search",
+        next_step="search_entry",
+        effects=("render_search_entry",),
+        change_search=ChangeSearchTransition(source="user_search", goal="any"),
+    )
+
+
 async def handle_v3_home_callback(
     update: Any,
     context: Any,
     *,
     appointment_history: AppointmentHistoryService,
+    search_views: TransitionViewService | None = None,
     contact_effects: ContactEffectExecutor | None = None,
     advisor_url: str = "",
 ) -> TelegramHomeOutcome:
@@ -83,6 +114,28 @@ async def handle_v3_home_callback(
 
     await query.answer()
     action = callback.action
+
+    if action == "search":
+        if search_views is None:
+            return TelegramHomeOutcome(
+                handled=True,
+                action=action,
+                deferred=True,
+            )
+        user_data = getattr(context, "user_data", None)
+        if not isinstance(user_data, dict):
+            raise ValueError("telegram_user_data_missing_for_home_search")
+        plan = _search_entry_plan()
+        view = search_views.build(plan)
+        mutation = build_transition_session(plan)
+        # Render first: a Telegram failure must not create a stale keyword wait.
+        await _edit_transition_view(query, view)
+        apply_session_mutation(user_data, mutation)
+        return TelegramHomeOutcome(
+            handled=True,
+            action=action,
+            rendered=True,
+        )
 
     if action == "appointments":
         user = _lead_user(update)
@@ -116,8 +169,8 @@ async def handle_v3_home_callback(
             contact_effect=effect,
         )
 
-    # Search/rental/service are intentionally not rendered until their complete
-    # V3 subflows exist. Full home will not be exposed before these are live.
+    # Rental/service are intentionally not rendered until their complete V3
+    # subflows exist. Full home will not be exposed before both are live.
     return TelegramHomeOutcome(
         handled=True,
         action=action,
