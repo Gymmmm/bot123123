@@ -9,12 +9,14 @@ TARGET_MODULES = {
     "area_normalization",
     "attribution_hooks",
     "channel_links",
+    "channel_post",
     "cover_styles",
     "location_mapping",
     "public_listing_id",
     "publishability_contract",
     "runtime_guard",
     "status_labels",
+    "utils_formatting",
 }
 DYNAMIC_NAMES = {"getattr", "setattr", "hasattr", "globals", "locals", "eval", "exec"}
 
