@@ -4,19 +4,13 @@ import json
 from pathlib import Path
 from typing import Any, Sequence
 
+from .media_selection import select_publication_media
 from .photo_formatter_v1_1 import format_gallery_photo, ordered_source_files
-from .photo_ranker import rank_photos
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 
 
 def _resolve_ranked_path(value: str | Path, input_folder: str | Path) -> Path:
-    """Resolve ranker paths consistently, including bare filenames.
-
-    Ranker output can be absolute, cwd-relative, or folder-relative. We always
-    prefer the listing input folder for relative names so duplicate/reject
-    filtering cannot silently miss files because the process cwd changed.
-    """
     folder = Path(input_folder).resolve()
     raw = Path(str(value or ""))
     if raw.is_absolute():
@@ -56,30 +50,30 @@ def process_listing_media(
     output_dir.mkdir(parents=True, exist_ok=True)
     gallery_dir.mkdir(parents=True, exist_ok=True)
 
-    ranked_result = rank_photos(input_folder)
-
-    duplicate_files = {
-        _resolve_ranked_path(item.get("file", ""), input_folder)
-        for item in ranked_result.get("duplicates", [])
-        if item.get("file")
-    }
-    rejected_files = {
-        _resolve_ranked_path(item.get("file", ""), input_folder)
-        for item in ranked_result.get("ranked", [])
-        if item.get("file") and item.get("reject")
-    }
-
     source_files = get_source_order_files(
         input_folder,
         source_order=source_order,
         source_manifest=source_manifest,
     )
+    selected = select_publication_media(source_files)
+
+    duplicate_files = {
+        _resolve_ranked_path(item.get("file", ""), input_folder)
+        for item in selected.get("duplicates", [])
+        if item.get("file")
+    }
+    rejected_files = {
+        _resolve_ranked_path(value, input_folder)
+        for value in selected.get("rejected_paths", [])
+        if value
+    }
 
     gallery: list[dict[str, Any]] = []
     order = 1
+    usable = {Path(path).resolve() for path in selected.get("gallery_paths", [])}
     for src in source_files:
         resolved = src.resolve()
-        if resolved in duplicate_files or resolved in rejected_files:
+        if resolved not in usable:
             continue
         dst = gallery_dir / f"{order:02d}.jpg"
         info = format_gallery_photo(
@@ -93,14 +87,15 @@ def process_listing_media(
         gallery.append(info)
         order += 1
 
-    cover_candidate = None
-    for item in ranked_result.get("ranked", []):
-        candidate_path = _resolve_ranked_path(item.get("file", ""), input_folder)
-        if not item.get("reject") and candidate_path not in duplicate_files:
-            cover_candidate = item
-            break
-    if cover_candidate is None and ranked_result.get("ranked"):
-        cover_candidate = ranked_result["ranked"][0]
+    cover_path = str(selected.get("cover_path") or "")
+    cover_candidate = next(
+        (
+            item
+            for item in selected.get("ranking", [])
+            if str(Path(item.get("file", "")).resolve()) == str(Path(cover_path).resolve())
+        ),
+        None,
+    )
 
     report = {
         "version": "media_pipeline_v1_1",
@@ -113,8 +108,8 @@ def process_listing_media(
         "source_order_authority": "manifest_or_explicit_order_then_natural_filename_fallback",
         "cover_candidate": cover_candidate,
         "gallery": gallery,
-        "duplicates": ranked_result.get("duplicates", []),
-        "ranking": ranked_result.get("ranked", []),
+        "duplicates": selected.get("duplicates", []),
+        "ranking": selected.get("ranking", []),
     }
 
     report_path = output_dir / "media_report_v1_1.json"
