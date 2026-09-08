@@ -1,8 +1,8 @@
 """Single media-selection contract for publication packages.
 
-This module does not alter raw media.  It reuses the extracted photo ranker for
-quality/reject decisions, applies the same source-order gallery policy as the
-extracted media pipeline, and returns original source paths.
+This module does not alter raw media.  It reuses the extracted photo-ranking
+rules for quality/reject decisions, preserves source-order gallery semantics,
+and returns original source paths.
 """
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from .media_pipeline_v1_1 import IMAGE_EXTS
-from .photo_ranker import NEAR_DUPLICATE_HAMMING, _dhash, _hamming, rank_photo_paths
+from .ranker import NEAR_DUPLICATE_HAMMING, _dhash, _hamming, rank_photo_paths
 
 
 def _sha256(path: Path) -> str:
@@ -30,7 +30,7 @@ def select_publication_media(
     """Return one cover source plus a source-ordered usable gallery.
 
     Exact and near duplicates keep the first source occurrence. Severe rejects
-    are removed from the gallery.  A manually selected cover is honoured only
+    are removed from the gallery. A manually selected cover is honoured only
     when it survives those safety gates; otherwise the best ranked usable photo
     is selected automatically.
     """
@@ -56,19 +56,31 @@ def select_publication_media(
                     kind = "near"
                     break
         if duplicate_of is not None:
-            duplicates.append({"file": str(path), "duplicate_of": str(duplicate_of), "kind": kind})
+            duplicates.append({
+                "file": str(path),
+                "duplicate_of": str(duplicate_of),
+                "kind": kind,
+            })
             continue
         seen_exact[digest] = path
         seen_near.append((dhash, path))
         unique.append(path)
 
     ranking = rank_photo_paths(unique)
-    rejected = {str(Path(item["file"]).resolve()) for item in ranking if item.get("reject")}
+    rejected = {
+        str(Path(item["file"]).resolve())
+        for item in ranking
+        if item.get("reject")
+    }
     gallery = [str(path) for path in unique if str(path) not in rejected]
     if not gallery:
         raise ValueError("missing_usable_images")
 
-    manual = str(Path(str(manual_cover_path)).expanduser().resolve()) if manual_cover_path else ""
+    manual = (
+        str(Path(str(manual_cover_path)).expanduser().resolve())
+        if manual_cover_path
+        else ""
+    )
     if manual and manual in gallery:
         cover = manual
     else:
@@ -76,7 +88,8 @@ def select_publication_media(
             (
                 str(Path(item["file"]).resolve())
                 for item in ranking
-                if not item.get("reject") and str(Path(item["file"]).resolve()) in gallery
+                if not item.get("reject")
+                and str(Path(item["file"]).resolve()) in gallery
             ),
             gallery[0],
         )
