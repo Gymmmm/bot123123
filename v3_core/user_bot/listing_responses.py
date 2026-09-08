@@ -67,31 +67,41 @@ def _format_size(value: float | None) -> str:
     return f"{numeric}㎡"
 
 
-def _details_actions(*, bookable: bool) -> tuple[tuple[SemanticAction, ...], ...]:
+def _details_actions(
+    *,
+    bookable: bool,
+    public_listing_id: str,
+) -> tuple[tuple[SemanticAction, ...], ...]:
+    target = str(public_listing_id or "").strip()
     if bookable:
         return (
             (
-                SemanticAction("📅 预约看房", "book"),
-                SemanticAction("📸 更多实拍", "photos"),
+                SemanticAction("📅 预约看房", "book", target),
+                SemanticAction("📸 更多实拍", "photos", target),
             ),
-            (SemanticAction("💬 联系我们", "consult"),),
+            (SemanticAction("💬 联系我们", "consult", target),),
         )
     return (
         (
-            SemanticAction("📸 更多实拍", "photos"),
-            SemanticAction("💬 联系我们", "consult"),
+            SemanticAction("📸 更多实拍", "photos", target),
+            SemanticAction("💬 联系我们", "consult", target),
         ),
-        (SemanticAction("🏘 看相近房源", "similar"),),
+        (SemanticAction("🏘 看相近房源", "similar", target),),
     )
 
 
-def _photo_actions(*, bookable: bool) -> tuple[tuple[SemanticAction, ...], ...]:
-    first = [SemanticAction("🏠 房源详情", "details")]
+def _photo_actions(
+    *,
+    bookable: bool,
+    public_listing_id: str,
+) -> tuple[tuple[SemanticAction, ...], ...]:
+    target = str(public_listing_id or "").strip()
+    first = [SemanticAction("🏠 房源详情", "details", target)]
     if bookable:
-        first.append(SemanticAction("📅 预约看房", "book"))
+        first.append(SemanticAction("📅 预约看房", "book", target))
     return (
         tuple(first),
-        (SemanticAction("💬 联系我们", "consult"),),
+        (SemanticAction("💬 联系我们", "consult", target),),
     )
 
 
@@ -127,7 +137,10 @@ def build_details_response(view: PublishedListingView) -> PublicDetailsResponse:
 
     return PublicDetailsResponse(
         text="\n".join(lines),
-        action_rows=_details_actions(bookable=details.bookable),
+        action_rows=_details_actions(
+            bookable=details.bookable,
+            public_listing_id=details.public_listing_id,
+        ),
     )
 
 
@@ -165,7 +178,10 @@ def build_photos_response(view: PublishedListingView) -> PublicPhotosResponse:
     return PublicPhotosResponse(
         media_groups=groups,
         text=text,
-        action_rows=_photo_actions(bookable=details.bookable),
+        action_rows=_photo_actions(
+            bookable=details.bookable,
+            public_listing_id=details.public_listing_id,
+        ),
     )
 
 
