@@ -17,6 +17,7 @@ from .transition_actions import (
     APPOINTMENT_AWAITING_DATE_KEY,
     APPOINTMENT_AWAITING_TIME_KEY,
     LAST_SEARCH_PREF_KEY,
+    SEARCH_AWAITING_AREA_KEY,
     SEARCH_AWAITING_BUDGET_KEY,
     SearchSubmitIntent,
 )
@@ -24,7 +25,12 @@ from .transition_session import APPOINTMENT_SESSION_KEY, SEARCH_PREF_SESSION_KEY
 
 
 TextActionStatus = Literal["ok", "invalid", "expired", "not_applicable"]
-TextNextStep = Literal["appointment_time", "appointment_submit", "search_submit"]
+TextNextStep = Literal[
+    "appointment_time",
+    "appointment_submit",
+    "search_budget",
+    "search_submit",
+]
 
 
 @dataclass(frozen=True)
@@ -125,6 +131,16 @@ def _search_submit_from_text(
     )
 
 
+def _last_search_pref(intent: SearchSubmitIntent) -> dict[str, Any]:
+    return {
+        "property_type": intent.criteria.property_type,
+        "location_keys": list(intent.criteria.location_keys),
+        "budget_min": intent.criteria.budget_min,
+        "budget_max": intent.criteria.budget_max,
+        "room_type": intent.criteria.room_type,
+    }
+
+
 class TransitionTextActionService:
     def apply(self, text: object, session: Mapping[str, Any]) -> TransitionTextActionResult:
         value = str(text or "").strip()[:40]
@@ -190,6 +206,35 @@ class TransitionTextActionService:
                 ),
             )
 
+        if bool(session.get(SEARCH_AWAITING_AREA_KEY)):
+            raw_pref = session.get(SEARCH_PREF_SESSION_KEY)
+            if not isinstance(raw_pref, Mapping):
+                return TransitionTextActionResult(
+                    status="expired",
+                    reason="search_session_expired",
+                )
+            location_keys = detect_location_keys(value)
+            if not location_keys:
+                return TransitionTextActionResult(
+                    status="invalid",
+                    reason="search_area_unrecognized",
+                    prompt=(
+                        "位置没有识别出来。请试试：<code>BKK1</code>、"
+                        "<code>永旺1附近</code>、<code>富力城</code>。"
+                    ),
+                )
+            pref = dict(raw_pref)
+            pref["location_keys"] = list(location_keys)
+            pref["area_display"] = value
+            return TransitionTextActionResult(
+                status="ok",
+                next_step="search_budget",
+                mutation=SessionMutationPlan(
+                    set_values={SEARCH_PREF_SESSION_KEY: pref},
+                    delete_keys=(SEARCH_AWAITING_AREA_KEY, SEARCH_AWAITING_BUDGET_KEY),
+                ),
+            )
+
         if bool(session.get(SEARCH_AWAITING_BUDGET_KEY)):
             raw_pref = session.get(SEARCH_PREF_SESSION_KEY)
             if not isinstance(raw_pref, Mapping):
@@ -214,15 +259,8 @@ class TransitionTextActionService:
                 next_step="search_submit",
                 search=intent,
                 mutation=SessionMutationPlan(
-                    set_values={
-                        LAST_SEARCH_PREF_KEY: {
-                            "property_type": intent.criteria.property_type,
-                            "location_keys": list(intent.criteria.location_keys),
-                            "budget_min": budget_min,
-                            "budget_max": budget_max,
-                        }
-                    },
-                    delete_keys=(SEARCH_PREF_SESSION_KEY, SEARCH_AWAITING_BUDGET_KEY),
+                    set_values={LAST_SEARCH_PREF_KEY: _last_search_pref(intent)},
+                    delete_keys=(SEARCH_PREF_SESSION_KEY, SEARCH_AWAITING_AREA_KEY, SEARCH_AWAITING_BUDGET_KEY),
                 ),
             )
 
