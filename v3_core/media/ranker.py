@@ -19,7 +19,7 @@ except ImportError:
     cv2 = None
 
 from .legacy_score import score_image
-from .photo_formatter_v1_1 import IMAGE_EXTS
+from .photo_formatter import IMAGE_EXTS
 
 NEAR_DUPLICATE_HAMMING = 2
 SEVERE_REJECT_SCORE = -45.0
