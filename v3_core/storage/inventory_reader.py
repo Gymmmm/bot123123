@@ -57,6 +57,31 @@ class InventoryReader:
         listing = self.listing(listing_id)
         return self.canonical(str(listing["canonical_record_id"]))
 
+    def review(self, review_id: str) -> dict[str, Any]:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM review_items WHERE review_id=?",
+                (str(review_id),),
+            ).fetchone()
+        if row is None:
+            raise KeyError(review_id)
+        return dict(row)
+
+    def reviews_by_status(self, status: str = "pending", *, limit: int = 20) -> list[dict[str, Any]]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """SELECT r.*,l.public_listing_id,l.display_title,l.project_name,
+                          l.public_location_display,o.offer_type,o.monthly_rent_usd,
+                          o.sale_price_usd,o.publication_policy,o.offer_status
+                   FROM review_items r
+                   LEFT JOIN listings_v3 l ON l.listing_id=r.listing_id
+                   LEFT JOIN listing_offers o ON o.offer_id=r.offer_id
+                   WHERE r.review_status=?
+                   ORDER BY r.created_at ASC,r.review_id ASC LIMIT ?""",
+                (str(status), max(1, int(limit))),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def review_approved(self, *, offer_id: str) -> bool:
         with self._connect() as conn:
             row = conn.execute(
