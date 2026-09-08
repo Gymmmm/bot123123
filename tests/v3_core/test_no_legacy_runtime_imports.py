@@ -28,10 +28,25 @@ FORBIDDEN_ROOTS = {
     "release_contract_patch",
 }
 
+RETIRED_V3_MODULES = {
+    "canonical_fact_projection",
+    "canonical_listing_materializer",
+    "channel_links",
+    "channel_post",
+    "media_consistency",
+    "media_pipeline_v1_1",
+    "photo_formatter_v1_1",
+}
+
 
 def _forbidden(module: str) -> bool:
     root = str(module or "").split(".", 1)[0]
     return root in FORBIDDEN_ROOTS
+
+
+def _retired_relative(module: str | None) -> bool:
+    leaf = str(module or "").rsplit(".", 1)[-1]
+    return leaf in RETIRED_V3_MODULES
 
 
 def test_v3_python_modules_do_not_import_legacy_runtime_namespaces():
@@ -44,12 +59,13 @@ def test_v3_python_modules_do_not_import_legacy_runtime_namespaces():
                     if _forbidden(alias.name):
                         failures.append(f"{path}:{node.lineno}: import {alias.name}")
             elif isinstance(node, ast.ImportFrom):
-                # Relative V3 imports such as ``from .media_consistency import``
-                # are internal and intentionally allowed. Only absolute imports
-                # can jump back into root/V2 production modules.
                 if node.level == 0 and node.module and _forbidden(node.module):
                     failures.append(
                         f"{path}:{node.lineno}: from {node.module} import ..."
+                    )
+                elif node.level > 0 and _retired_relative(node.module):
+                    failures.append(
+                        f"{path}:{node.lineno}: retired relative import {node.module}"
                     )
 
     assert not failures, "legacy runtime imports found:\n" + "\n".join(failures)
