@@ -129,6 +129,30 @@ def search_lead_request(intent: SearchSubmitIntent) -> LeadRequest:
     )
 
 
+def keyword_search_lead_request(
+    intent: SearchSubmitIntent,
+    *,
+    match_mode: str,
+) -> LeadRequest:
+    """Preserve fixed-SHA ``awaiting_keyword_find`` lead identity."""
+    area = str(intent.area_display or "").strip()
+    if area == "不限":
+        area = ""
+    touch = dict(intent.touch_payload or {})
+    return LeadRequest(
+        action="keyword_find_play",
+        source=str(intent.source or "smart_find_play"),
+        area=area,
+        property_type=str(intent.criteria.property_type or ""),
+        budget_min=int(intent.criteria.budget_min) if intent.criteria.budget_min is not None else None,
+        budget_max=int(intent.criteria.budget_max) if intent.criteria.budget_max is not None else None,
+        payload={
+            "message": str(touch.get("message") or intent.criteria.raw_text or ""),
+            "match_mode": str(match_mode or "no_match"),
+        },
+    )
+
+
 def appointment_lead_request(
     execution: AppointmentSubmitExecution,
     draft: PublicAppointmentDraft,
@@ -175,6 +199,7 @@ __all__ = [
     "appointment_lead_request",
     "build_sqlite_lead_service",
     "general_contact_lead_request",
+    "keyword_search_lead_request",
     "listing_contact_lead_request",
     "search_lead_request",
 ]
