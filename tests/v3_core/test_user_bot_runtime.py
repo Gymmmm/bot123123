@@ -14,7 +14,7 @@ def test_runtime_factory_wires_one_public_service_graph_without_creating_db(tmp_
     assert not db.exists()
     assert runtime.routes.inventory is runtime.inventory
     assert runtime.listings.routes is runtime.routes
-    assert runtime.search.search.reader is runtime.search_reader
+    assert runtime.search.reader is runtime.search_reader
     assert runtime.search_flow.search is runtime.search
     assert runtime.search_sessions.inventory is runtime.inventory
     assert runtime.consults.inventory is runtime.inventory
