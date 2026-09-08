@@ -11,7 +11,6 @@ from telegram.constants import ParseMode
 from .assurance_views import (
     AssuranceView,
     assurance_asset_bundle,
-    build_assurance_home_view,
     build_moving_view,
 )
 
@@ -24,7 +23,7 @@ class TelegramAssuranceOutcome:
     assets_sent: bool = False
 
 
-def _keyboard(view: AssuranceView) -> InlineKeyboardMarkup | None:
+def build_assurance_keyboard(view: AssuranceView) -> InlineKeyboardMarkup | None:
     if not view.rows:
         return None
     rows = []
@@ -39,8 +38,8 @@ def _keyboard(view: AssuranceView) -> InlineKeyboardMarkup | None:
     return InlineKeyboardMarkup(rows)
 
 
-async def _edit(query: Any, view: AssuranceView) -> None:
-    markup = _keyboard(view)
+async def render_assurance_view(query: Any, view: AssuranceView) -> None:
+    markup = build_assurance_keyboard(view)
     message = getattr(query, "message", None)
     if getattr(message, "photo", None):
         await query.edit_message_caption(
@@ -112,12 +111,14 @@ async def handle_v3_assurance_callback(
             rendered=True,
             assets_sent=True,
         )
-    await _edit(query, build_moving_view())
+    await render_assurance_view(query, build_moving_view())
     return TelegramAssuranceOutcome(handled=True, action=action, rendered=True)
 
 
 __all__ = [
     "TelegramAssuranceOutcome",
+    "build_assurance_keyboard",
     "handle_v3_assurance_callback",
+    "render_assurance_view",
     "send_assurance_bundle",
 ]
