@@ -219,8 +219,6 @@ def package_snapshot(facts: dict[str, Any], listing_id: str, media_hashes: list[
     }
 
 
-def facts_equal(left: dict[str, Any], right: dict[str, Any]) -> bool:
-    return bool(left and right and left.get("canonical_facts_hash") and left.get("canonical_facts_hash") == right.get("canonical_facts_hash"))
 
 
-__all__ = ["facts_equal", "facts_hash", "listing_projection", "package_gate", "package_snapshot", "validate_facts"]
+__all__ = ['facts_hash', 'listing_projection', 'package_gate', 'package_snapshot', 'validate_facts']

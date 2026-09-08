@@ -172,24 +172,6 @@ def materialize_listing(conn: sqlite3.Connection, *, draft_id: str, listing_id: 
     return {"listing_id": listing_id, "gate": gate, "projection": values}
 
 
-def verify_draft_listing_consistency(conn: sqlite3.Connection, draft_id: str) -> list[str]:
-    ensure_canonical_projection_schema(conn)
-    row = conn.execute("SELECT d.listing_id,d.normalized_data,d.canonical_projection_hash AS dh,l.canonical_projection_hash AS lh FROM drafts d LEFT JOIN listings l ON l.listing_id=d.listing_id WHERE d.draft_id=?", (draft_id,)).fetchone()
-    if not row:
-        return ["draft_not_found"]
-    if not row[0]:
-        return ["draft_listing_missing"]
-    if row[3] is None:
-        return ["listing_not_found"]
-    errors: list[str] = []
-    try:
-        facts = json.loads(row[1] or "{}")
-        expected = canonical_projection_hash(facts)
-        if row[2] != expected or row[3] != expected:
-            errors.append("canonical_projection_hash_mismatch")
-    except Exception:
-        errors.append("canonical_facts_json_invalid")
-    return errors
 
 
-__all__ = ["ensure_canonical_projection_schema", "canonical_projection_hash", "canonical_provenance", "materialize_draft_facts", "materialize_listing", "verify_draft_listing_consistency"]
+__all__ = ['ensure_canonical_projection_schema', 'canonical_projection_hash', 'canonical_provenance', 'materialize_draft_facts', 'materialize_listing']
