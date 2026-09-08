@@ -8,12 +8,11 @@ from tests.v3.db._helpers import migrated_connection
 
 
 def _source(conn, text: str, external_post_id: str = '100'):
-    result = SourceIngestService(conn).ingest_telegram(
+    return SourceIngestService(conn).ingest_telegram(
         source_name='fixture', source_external_identity='-100123', external_post_id=external_post_id,
         raw_text=text, media=[SourceMedia.from_bytes(b'photo', sort_order=0, message_id=1)],
         source_created_at='2026-09-01T10:00:00+00:00', fetched_at='2026-09-01T10:01:00+00:00',
     )
-    return result
 
 
 def test_source_to_canonical_to_listing_to_rent_offer_without_drafts_or_package():
@@ -30,7 +29,8 @@ def test_source_to_canonical_to_listing_to_rent_offer_without_drafts_or_package(
     assert offer['monthly_rent_usd'] == 800
     assert offer['sale_price_usd'] is None
     assert conn.execute('SELECT COUNT(*) FROM v3_publication_packages').fetchone()[0] == 0
-    assert conn.execute('SELECT COUNT(*) FROM drafts').fetchone()[0] == 0
+    # The Phase-1 structural fixture has no drafts table; Phase 3 must not create one.
+    assert conn.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='drafts'").fetchone()[0] == 0
 
 
 def test_sale_materializes_directly_as_store_only_offer_not_skipped_non_rental():
