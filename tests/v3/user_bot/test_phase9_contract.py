@@ -9,12 +9,13 @@ import pytest
 
 from qiaolian_v3.db.migration_runner import MigrationRunner
 from qiaolian_v3.legacy.callback_compat import resolve_legacy_callback
+from qiaolian_v3.listing.public_id import normalize_public_id
 from qiaolian_v3.user_bot import HOME_ROWS, REACHABLE_SERVICES, start_screen
-from qiaolian_v3.user_bot.appointments import AppointmentFlow
 from qiaolian_v3.user_bot.deeplinks import build_property_payload, parse_start_payload, require_ql_identity
 from qiaolian_v3.user_bot.listing_actions import action_policy
 from qiaolian_v3.user_bot.photos import PhotoService
 from qiaolian_v3.user_bot.repository import AppointmentRepository, UserListingRepository
+from qiaolian_v3.user_bot.router import UserBotHandler, UserBotRouter, UserUpdate
 from qiaolian_v3.user_bot.service import UserBotService
 
 
@@ -39,6 +40,7 @@ def db() -> sqlite3.Connection:
 
 
 def seed_listing(conn: sqlite3.Connection, *, listing_id: int, ql: str, status: str = 'active', project: str = '富力城', location: str = 'BKK1', gallery=None):
+    ql = require_ql_identity(ql)
     source_id = listing_id
     post_id = listing_id
     revision_id = listing_id
@@ -69,15 +71,26 @@ def test_start_home_and_reachable_services_match_locked_user_experience():
     assert {'property_coordination','life_services','nearby_needs','local:rfcity','lease','repair'} <= set(REACHABLE_SERVICES)
 
 
-def test_ql_deep_links_and_frozen_three_button_compatibility():
-    for action, prefix in [('details','property_details'),('photos','propertyphotos'),('book','property_book')]:
-        payload = build_property_payload(action, 'QL000001')
-        assert payload == f'{prefix}_QL000001'
+def test_formal_ql_contract_uses_single_normalizer_and_rejects_old_numeric_ids():
+    assert require_ql_identity('ql-rf-a2b3') == 'QL-RF-A2B3'
+    assert require_ql_identity('QL-BK-C3D4') == 'QL-BK-C3D4'
+    assert normalize_public_id('QL-RF-A2B3') == require_ql_identity('QL-RF-A2B3')
+    for invalid in ('QL000001', 'QL000101', 'QC0350', 'QJ77', 'L12'):
+        with pytest.raises(ValueError, match='requires_ql'):
+            require_ql_identity(invalid)
+
+
+def test_formal_property_deep_links_and_phase6_three_button_compatibility():
+    ql = 'QL-RF-A2B3'
+    for action in ('details', 'photos', 'book'):
+        payload = build_property_payload(action, ql)
+        assert payload == f'property_{ql}_{action}'
         target = parse_start_payload(payload)
-        assert target.action == action and target.public_listing_id == 'QL000001'
-    assert parse_start_payload('details_QL000001').action == 'details'
-    assert parse_start_payload('photos_QL000001').action == 'photos'
-    assert parse_start_payload('book_QL000001').action == 'book'
+        assert target.action == action and target.public_listing_id == ql
+        frozen = parse_start_payload(f'{action}_{ql}')
+        assert frozen.action == action and frozen.public_listing_id == ql
+    assert parse_start_payload('property_QL000001_details') is None
+    assert parse_start_payload('details_QL000001') is None
 
 
 def test_legacy_qc_qj_l_are_compat_only_and_new_business_never_generates_them():
@@ -86,8 +99,6 @@ def test_legacy_qc_qj_l_are_compat_only_and_new_business_never_generates_them():
     assert parse_start_payload('photos_QJ77').legacy.normalized_legacy_key == 'l_77'
     assert parse_start_payload('book_L12').legacy.normalized_legacy_key == 'l_12'
     with pytest.raises(ValueError, match='requires_ql'):
-        require_ql_identity('QC0350')
-    with pytest.raises(ValueError, match='requires_ql'):
         build_property_payload('details', 'QJ77')
 
 
@@ -95,7 +106,7 @@ def test_old_callback_compatibility_is_read_only_resolver():
     assert resolve_legacy_callback('details:QC0350').normalized_legacy_key == 'l_350'
     assert resolve_legacy_callback('photos|QJ77').action == 'photos'
     assert resolve_legacy_callback('book_L12').action == 'book'
-    assert resolve_legacy_callback('details:QL000001') is None
+    assert resolve_legacy_callback('details:QL-RF-A2B3') is None
 
 
 def test_listing_status_policy_keeps_details_photos_contact_and_limits_booking():
@@ -109,48 +120,73 @@ def test_listing_status_policy_keeps_details_photos_contact_and_limits_booking()
 def test_photos_are_current_approved_gallery_not_discussion():
     conn = db()
     gallery = ('approved-1.jpg','approved-2.jpg','approved-3.jpg','approved-4.jpg')
-    seed_listing(conn, listing_id=1, ql='QL000001', gallery=gallery)
+    seed_listing(conn, listing_id=1, ql='QL-RF-A2B3', gallery=gallery)
     service = PhotoService(UserListingRepository(conn))
-    assert service.more_photos('QL000001') == gallery
+    assert service.more_photos('QL-RF-A2B3') == gallery
 
 
 def test_single_result_search_returns_similar_behavior():
     conn = db()
-    seed_listing(conn, listing_id=1, ql='QL000001', project='富力城', location='BKK1')
-    seed_listing(conn, listing_id=2, ql='QL000002', project='另一个公寓', location='BKK1')
+    seed_listing(conn, listing_id=1, ql='QL-RF-A2B3', project='富力城', location='BKK1')
+    seed_listing(conn, listing_id=2, ql='QL-BK-C3D4', project='另一个公寓', location='BKK1')
     result = UserListingRepository(conn).search(query='富力城')
     assert len(result['results']) == 1
-    assert result['results'][0].public_listing_id == 'QL000001'
-    assert any(item.public_listing_id == 'QL000002' for item in result['similar'])
+    assert result['results'][0].public_listing_id == 'QL-RF-A2B3'
+    assert any(item.public_listing_id == 'QL-BK-C3D4' for item in result['similar'])
 
 
-def test_appointment_date_time_submit_persist_status_sync_and_lease_reminder():
+def test_user_handler_routes_home_find_services_and_real_appointment_callback_flow():
     conn = db()
-    seed_listing(conn, listing_id=1, ql='QL000001')
+    gallery = ('approved-1.jpg','approved-2.jpg','approved-3.jpg','approved-4.jpg')
+    seed_listing(conn, listing_id=1, ql='QL-RF-A2B3', gallery=gallery)
+    service = UserBotService(UserListingRepository(conn), AppointmentRepository(conn))
+    handler = UserBotHandler(UserBotRouter(service))
+
+    assert handler.handle(UserUpdate(user_id=99, callback_data='home')).route == 'home'
+    found = handler.handle(UserUpdate(user_id=99, callback_data='find_home', data={'query':'富力城'}))
+    assert found.route == 'find_home' and len(found.payload['results']) == 1
+    details = handler.handle(UserUpdate(user_id=99, callback_data='details:QL-RF-A2B3'))
+    assert details.route == 'details'
+    photos = handler.handle(UserUpdate(user_id=99, callback_data='photos:QL-RF-A2B3'))
+    assert photos.route == 'photos' and photos.payload['gallery'] == gallery
+
+    step = handler.handle(UserUpdate(user_id=99, callback_data='book:QL-RF-A2B3'))
+    assert step.route == 'appointment_date'
+    step = handler.handle(UserUpdate(user_id=99, callback_data='appointment_date:2026-09-12'))
+    assert step.route == 'appointment_time'
+    step = handler.handle(UserUpdate(user_id=99, callback_data='appointment_time:15:30'))
+    assert step.route == 'appointment_submit'
+    done = handler.handle(UserUpdate(
+        user_id=99, callback_data='appointment_submit', data={'username':'gym','display_name':'Gym'}
+    ))
+    assert done.route == 'appointment_confirmed'
+    assert conn.execute('SELECT listing_id,appointment_date,appointment_time FROM appointments').fetchone()[:] == ('QL-RF-A2B3','2026-09-12','15:30')
+    assert handler.handle(UserUpdate(user_id=99, callback_data='my_appointments')).payload[0].public_listing_id == 'QL-RF-A2B3'
+
+    for callback in ('contact_us','guarantee','move_in_services','lease','repair','property_coordination','life_services','nearby_needs','local:rfcity'):
+        assert handler.handle(UserUpdate(user_id=99, callback_data=callback)).route == callback
+
+
+def test_start_deep_link_enters_router_booking_flow():
+    conn = db()
+    seed_listing(conn, listing_id=1, ql='QL-RF-A2B3')
+    handler = UserBotHandler(UserBotRouter(UserBotService(UserListingRepository(conn), AppointmentRepository(conn))))
+    result = handler.handle(UserUpdate(user_id=7, start_payload='property_QL-RF-A2B3_book'))
+    assert result.route == 'appointment_date'
+
+
+def test_appointment_status_sync_and_lease_reminder_are_preserved():
+    conn = db()
+    seed_listing(conn, listing_id=1, ql='QL-RF-A2B3')
     repo = AppointmentRepository(conn)
-    flow = AppointmentFlow(repo)
-    draft = flow.start(user_id=99, public_listing_id='QL000001')
-    draft = flow.select_date(draft, '2026-09-12')
-    draft = flow.select_time(draft, '15:30')
-    appointment = flow.submit(draft, username='gym', display_name='Gym')
-    assert appointment.public_listing_id == 'QL000001'
-    assert appointment.status == 'pending'
-    assert repo.list_for_user(99)[0].id == appointment.id
+    appointment = repo.create(
+        user_id=99, username='gym', display_name='Gym', public_listing_id='QL-RF-A2B3',
+        appointment_date='2026-09-12', appointment_time='15:30',
+    )
     assert repo.sync_status(appointment.id, 'confirmed').status == 'confirmed'
     conn.execute("INSERT INTO tenant_bindings(user_id,binding_code,property_name,lease_end_date) VALUES (99,'T1','富力城','2026-09-25')")
     reminder = repo.lease_reminders(99, today=date(2026,9,9), within_days=30)
     assert reminder[0]['days_remaining'] == 16
-
-
-def test_service_routes_and_book_policy_are_preserved():
-    conn = db()
-    seed_listing(conn, listing_id=1, ql='QL000001', status='rented', gallery=('a','b','c','d'))
-    service = UserBotService(UserListingRepository(conn), AppointmentRepository(conn))
-    assert service.start().route == 'home'
-    assert service.start('property_details_QL000001').route == 'details'
-    assert service.start('propertyphotos_QL000001').payload['gallery'] == ('a','b','c','d')
-    assert service.start('property_book_QL000001').payload['allowed'] is False
-    assert {'contact_us','guarantee','move_in_services','lease','repair','property_coordination','life_services','nearby_needs','local:rfcity'} <= set(service.service_routes())
 
 
 def test_user_bot_has_no_patch_monkey_patch_or_csv_excel_truth_dependency():
