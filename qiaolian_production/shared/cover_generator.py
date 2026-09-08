@@ -9,13 +9,10 @@ import logging
 import os
 from pathlib import Path
 import sqlite3
-from typing import Optional, Sequence
+from typing import Optional
 import uuid
 
 from PIL import Image, ImageFilter, ImageOps
-
-from html_cover_renderer import render_html_cover
-from qiaolian_dual.cover_styles import cover_template_path, normalize_cover_style
 
 
 log = logging.getLogger("cover_generator")
@@ -117,78 +114,6 @@ def _score_image(img_path: str, *, property_type: str = "") -> tuple[float, str]
         score += 12
         reasons.append("适合低密住宅")
     return score, " | ".join(reasons)
-
-
-def choose_best_cover_image(
-    images: Sequence[str], *, property_type: str = ""
-) -> tuple[Optional[str], int, str]:
-    """严格只在传入的同组图片中选择封面。"""
-    candidates: list[tuple[float, int, str, str]] = []
-    for index, raw_path in enumerate(images or []):
-        if not isinstance(raw_path, str) or raw_path.startswith(("http://", "https://")):
-            continue
-        path = _remap_server_path(raw_path)
-        if "dummy" in path.lower() or not Path(path).is_file():
-            continue
-        score, reason = _score_image(path, property_type=property_type)
-        candidates.append((score, index, path, reason))
-    if not candidates:
-        return None, -1, "无可用本地实拍图"
-    score, index, path, reason = max(candidates, key=lambda item: item[0])
-    if score < -10:
-        return None, -1, f"图片质量不足(最高分={score:.1f})"
-    return path, index, f"第{index + 1}张（共{len(images)}张）| 得分={score:.1f} | {reason}"
-
-
-def generate_house_cover(
-    output_path: str,
-    project: str = "",
-    property_type: str = "",
-    area: str = "",
-    size: str = "",
-    floor: str = "",
-    price=None,
-    layout: str = "",
-    highlights: Optional[Sequence[str]] = None,
-    base_image_path: Optional[str] = None,
-    source_type: str = "",
-    source_name: str = "",
-    style: str = "classic_blue",
-) -> str:
-    """兼容旧调用；所有样式均由正式 HTML 模板生成。"""
-    _ = source_type, source_name
-    output = Path(output_path)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    fallback: Optional[Path] = None
-    source = Path(_remap_server_path(base_image_path or ""))
-    if not source.is_file():
-        fallback = output.with_name(f".{output.stem}_fallback.png")
-        Image.new("RGB", (1600, 1200), (18, 47, 102)).save(fallback)
-        source = fallback
-    values = list(highlights or [])[:3]
-    values.extend([""] * (3 - len(values)))
-    try:
-        render_html_cover(
-            template_path=str(cover_template_path(normalize_cover_style(style))),
-            source_image=str(source),
-            output_path=str(output),
-            data={
-                "project": project,
-                "property_type": property_type,
-                "area": area,
-                "size": size,
-                "floor": floor,
-                "price": price,
-                "layout": layout,
-                "h1": values[0],
-                "h2": values[1],
-                "h3": values[2],
-            },
-        )
-    finally:
-        if fallback:
-            fallback.unlink(missing_ok=True)
-    return str(output)
 
 
 class CoverGenerator:
@@ -330,6 +255,4 @@ class CoverGenerator:
 __all__ = [
     "CoverGenerator",
     "_score_image",
-    "choose_best_cover_image",
-    "generate_house_cover",
 ]
