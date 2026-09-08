@@ -1,3 +1,6 @@
+import json
+import sqlite3
+
 import pytest
 
 from v3_core.publishing.package_service import (
@@ -100,7 +103,39 @@ def test_rent_package_freezes_caption_actions_and_file_hashes(tmp_path):
     assert "QL-RF-A2B3" in package.post_text
     assert len(package.post_text) <= 1024
     assert len(package.frozen_file_hashes) == 5
+    assert package.snapshot["canonical_facts"] == facts
     assert store.verify_frozen(package.package_id).content_hash == package.content_hash
+
+
+def test_frozen_canonical_facts_do_not_drift_with_later_canonical_row_changes(tmp_path):
+    facts = _facts()
+    db, _, _, store, builder, _, _, offers = _inventory(tmp_path, facts)
+    cover, gallery = _files(tmp_path)
+    package = builder.build(
+        listing_id="l_1",
+        offer_id=str(offers[0]["offer_id"]),
+        cover_style="classic_blue",
+        cover_path=cover,
+        gallery=gallery,
+    )
+
+    changed = dict(facts)
+    changed["project_name"] = "后台后来改名"
+    changed["monthly_rent_usd"] = 9999
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            "UPDATE canonical_records SET facts_json=? WHERE canonical_record_id=?",
+            (
+                json.dumps(changed, ensure_ascii=False, sort_keys=True),
+                package.canonical_record_id,
+            ),
+        )
+        conn.commit()
+
+    frozen = store.get(package.package_id)
+    assert frozen is not None
+    assert frozen.snapshot["canonical_facts"]["project_name"] == "富力城"
+    assert frozen.snapshot["canonical_facts"]["monthly_rent_usd"] == 800
 
 
 def test_package_cannot_approve_until_offer_review_is_approved(tmp_path):
