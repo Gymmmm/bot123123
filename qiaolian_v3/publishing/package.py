@@ -5,6 +5,8 @@ import hashlib
 import json
 from typing import Any, Iterable
 
+from qiaolian_v3.listing.public_id import normalize_public_id
+
 
 class PackageBlocked(RuntimeError):
     pass
@@ -84,9 +86,9 @@ def build_frozen_rent_package(
     if not cover:
         raise PackageBlocked('missing_cover')
     username = str(bot_username or '').lstrip('@').strip()
-    public_id = str(public_listing_id or '').strip()
-    if not username or not public_id:
-        raise PackageBlocked('missing_deep_link_identity')
+    public_id = normalize_public_id(public_listing_id)
+    if not username or public_id is None:
+        raise PackageBlocked('missing_or_invalid_deep_link_identity')
     keyboard = tuple(
         (text, f'https://t.me/{username}?start={action}_{public_id}')
         for text, action in zip(BUTTON_TEXTS, ('details', 'photos', 'book'))
