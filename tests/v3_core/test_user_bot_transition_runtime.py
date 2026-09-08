@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from v3_core.user_bot.appointment_history import AppointmentHistoryService
 from v3_core.user_bot.appointment_submit_executor import AppointmentSubmitExecutor
+from v3_core.user_bot.lead_effects import LeadEffectExecutor
+from v3_core.user_bot.lead_service import LeadService
 from v3_core.user_bot.search_submit_executor import SearchSubmitExecutor
 from v3_core.user_bot.transition_actions import TransitionActionService
 from v3_core.user_bot.transition_runtime import build_transition_runtime
@@ -21,11 +23,14 @@ def test_transition_runtime_wires_submit_and_read_boundaries_without_creating_da
     assert isinstance(runtime.appointments, AppointmentSubmitExecutor)
     assert isinstance(runtime.appointment_history, AppointmentHistoryService)
     assert isinstance(runtime.searches, SearchSubmitExecutor)
+    assert isinstance(runtime.leads, LeadService)
+    assert isinstance(runtime.lead_effects, LeadEffectExecutor)
     assert not db.exists()
 
 
-def test_transition_runtime_shares_public_inventory_with_views_and_history(tmp_path):
+def test_transition_runtime_shares_public_inventory_and_lead_service_instances(tmp_path):
     runtime = build_transition_runtime(tmp_path / "v3.db")
 
     assert runtime.views.inventory is runtime.inventory
     assert runtime.appointment_history.inventory is runtime.inventory
+    assert runtime.lead_effects.service is runtime.leads
