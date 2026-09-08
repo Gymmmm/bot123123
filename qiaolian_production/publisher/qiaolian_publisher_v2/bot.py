@@ -165,13 +165,13 @@ class PublisherBot:
         self.db = Database(settings.sqlite_path)
         self._channel_chat_id: int | None = None
 
-    @staticmethod
-    def _build_maps_url(project: str, area: str, custom_url: str = "") -> str | None:
-        """仅在手填链接时返回地图 URL，默认不再自动生成搜索链接。"""
-        _ = (project, area)
-        if custom_url and custom_url.startswith("http"):
-            return custom_url
-        return None
+
+
+
+
+
+
+
 
     def _is_admin(self, update: Update) -> bool:
         user = update.effective_user
@@ -222,22 +222,22 @@ class PublisherBot:
                 continue
         raise PermissionError("没有可写的封面渲染目录（QIAOLIAN_RENDER_TMP / /opt / /tmp 均不可写）")
 
-    async def _resolve_cover_background(self, msg: Message, draft: Draft, out_dir: Path) -> str:
-        """优先下载管理员刚上传的实拍图，作为封面背景底图。"""
-        if draft.media_type != "photo" or not str(draft.media_file_id or "").strip():
-            return ""
-        suffix = str(draft.media_file_id)[-10:].replace("/", "_")
-        bg_path = out_dir / f"cover_bg_{draft.listing_id}_{suffix}.jpg"
-        if bg_path.exists() and bg_path.stat().st_size > 0:
-            return str(bg_path)
-        try:
-            tf = await msg.get_bot().get_file(draft.media_file_id)
-            await tf.download_to_drive(custom_path=str(bg_path))
-            if bg_path.exists() and bg_path.stat().st_size > 0:
-                return str(bg_path)
-        except Exception as e:
-            logger.warning("下载封面底图失败，回退纯模板: %s", e)
-        return ""
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     async def capture_discussion_forward(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """
@@ -567,57 +567,57 @@ class PublisherBot:
             reply_markup=admin_menu(),
         )
 
-    def _draft_post_dict_from_db(self, wanted_draft_id: str) -> dict[str, Any] | None:
-        wanted = str(wanted_draft_id or "").strip()
-        with sqlite3.connect(self.settings.sqlite_path) as conn:
-            conn.row_factory = sqlite3.Row
-            cur = conn.cursor()
-            if wanted:
-                row = cur.execute(
-                    """
-                    SELECT id, draft_id, listing_id, title, project, community, area, property_type,
-                           price, layout, size, floor, deposit, available_date,
-                           highlights, drawbacks, advisor_comment, cost_notes, google_maps_url
-                    FROM drafts
-                    WHERE draft_id=?
-                    LIMIT 1
-                    """,
-                    (wanted,),
-                ).fetchone()
-            else:
-                row = cur.execute(
-                    """
-                    SELECT id, draft_id, listing_id, title, project, community, area, property_type,
-                           price, layout, size, floor, deposit, available_date,
-                           highlights, drawbacks, advisor_comment, cost_notes, google_maps_url
-                    FROM drafts
-                    WHERE review_status IN ('pending','ready','published')
-                    ORDER BY updated_at DESC, id DESC
-                    LIMIT 1
-                    """
-                ).fetchone()
-            if not row:
-                return None
-            listing_key = str(row["listing_id"] or "").strip() or f"l_{int(time.time())}"
-            return {
-                "draft_id": str(row["draft_id"] or "").strip(),
-                "listing_id": listing_key,
-                "type": TYPE_LABELS.get(str(row["property_type"] or "").strip(), str(row["property_type"] or "公寓")),
-                "area": str(row["area"] or "").strip(),
-                "project": str(row["project"] or row["community"] or row["title"] or "").strip(),
-                "title": str(row["title"] or "").strip(),
-                "price": str(row["price"] or "").strip(),
-                "layout": str(row["layout"] or "").strip(),
-                "size": str(row["size"] or "").strip(),
-                "floor": str(row["floor"] or "").strip(),
-                "deposit": str(row["deposit"] or "押一付一").strip(),
-                "available_date": str(row["available_date"] or "随时入住").strip(),
-                "highlights": row["highlights"],
-                "drawbacks": row["drawbacks"],
-                "advisor_comment": str(row["advisor_comment"] or "").strip(),
-                "cost_notes": str(row["cost_notes"] or "").strip(),
-                "google_maps_url": str(row["google_maps_url"] or "").strip(),
-            }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     async def cmd_send_variants(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Legacy direct-to-channel variant publishing is intentionally disabled."""
@@ -899,10 +899,10 @@ class PublisherBot:
         draft.media_file_id = best.photo[-1].file_id
         return best
 
-    @staticmethod
-    def _legacy_direct_new_enabled() -> bool:
-        """The legacy direct publisher is permanently disabled in production."""
-        return False
+
+
+
+
 
     def _persist_new_as_pending(
         self, draft: Draft, *, local_paths: list[str], operator_user_id: int
@@ -1312,8 +1312,8 @@ class PublisherBot:
             f"已更新房态\n\n{self._display_listing_id(listing_id)}｜{row['status'] or '-'} → {status}\n\n自动同步不会覆盖管理员手动设置。"
         )
 
-    async def start_polling(self):
-        pass # Placeholder for actual run_polling if needed
+
+
 
 def main() -> None:
     settings = get_settings()
