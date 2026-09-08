@@ -77,9 +77,11 @@ jobs:
           for module in channel_post attribution message_handlers listing; do
             python qiaolian_production/tools/audit_user_symbol_module.py "${module}" --write
           done
+          python qiaolian_production/tools/audit_user_db_methods.py --write
           python -m compileall -q qiaolian_production/user/qiaolian_dual
           git diff --exit-code -- \
             qiaolian_production/user/qiaolian_dual/channel_post.py \
             qiaolian_production/user/qiaolian_dual/attribution.py \
             qiaolian_production/user/qiaolian_dual/message_handlers.py \
-            qiaolian_production/user/qiaolian_dual/listing.py
+            qiaolian_production/user/qiaolian_dual/listing.py \
+            qiaolian_production/user/qiaolian_dual/db.py
