@@ -1,63 +1,73 @@
 {
   "failures": [
     {
+      "canonical_record_id": 303,
       "listing_id": 103,
-      "public_ql_id": "QL000103",
+      "public_ql_id": "QL-PP-P6R4",
       "reason": "sale_target_blocked",
+      "source_identity": "SuxingFC|phase5:SuxingFC:sale:78000|production-derived:SuxingFC:sale",
       "target_key": "-100123:5003"
     },
     {
-      "listing_id": 104,
-      "public_ql_id": "QL000104",
+      "canonical_record_id": 304,
+      "listing_id": 0,
+      "public_ql_id": "",
       "reason": "unknown_target_blocked",
+      "source_identity": "SuxingFC|phase5:SuxingFC:unknown:apartment|production-derived:SuxingFC:unknown",
       "target_key": "-100123:5004"
     },
     {
+      "canonical_record_id": 305,
       "listing_id": 105,
-      "public_ql_id": "QL000105",
+      "public_ql_id": "QL-PP-T7V5",
       "reason": "unfrozen_package_blocked",
+      "source_identity": "jinbianfangchanzushou|phase5:jinbianfangchanzushou:penthouse:800|production-derived:jinbianfangchanzushou:800",
       "target_key": "-100123:5005"
     }
   ],
   "manifest": [
     {
-      "after_content_hash": "after-hash-101",
-      "before_content_hash": "before-hash-5001",
+      "after_content_hash": "a283c70dd55fc6871fcaac70029af66368eda0db7d92b3116444f442427fb5f1",
+      "before_content_hash": "a00fe8fdc1e2b9d07511d140ce1212833e9e1e39634e7abd2b3a03e53ff58618",
       "buttons": [
-        {"text": "🏠 房源详情", "url": "https://t.me/QiaoLianBot?start=details_QL000101"},
-        {"text": "📸 更多实拍", "url": "https://t.me/QiaoLianBot?start=photos_QL000101"},
-        {"text": "📅 预约看房", "url": "https://t.me/QiaoLianBot?start=book_QL000101"}
+        {"text": "🏠 房源详情", "url": "https://t.me/QiaoLianBot?start=details_QL-PP-H4K7"},
+        {"text": "📸 更多实拍", "url": "https://t.me/QiaoLianBot?start=photos_QL-PP-H4K7"},
+        {"text": "📅 预约看房", "url": "https://t.me/QiaoLianBot?start=book_QL-PP-H4K7"}
       ],
-      "caption": "🏠 富力城｜1房\n💰 $800/月",
+      "canonical_record_id": 301,
+      "caption": "🏠 太子幸福广场｜1房｜55㎡\n💰 $430/月\n🆔 QL-PP-H4K7",
       "channel_id": "-100123",
-      "cover": "covers/QL000101.jpg",
-      "frozen_package_id": "PKG_RENT_101",
+      "cover": "artifacts/v3/workpack_c/covers/QL-PP-H4K7.svg",
+      "frozen_package_id": "PKG_A283C70DD55FC6871FCA",
       "listing_id": 101,
       "message_id": 5001,
       "offer_id": 201,
-      "public_ql_id": "QL000101",
+      "public_ql_id": "QL-PP-H4K7",
+      "source_identity": "SuxingFC|phase5:SuxingFC:太子幸福广场:430|production-derived:SuxingFC:430",
       "target_key": "-100123:5001"
     },
     {
-      "after_content_hash": "after-hash-102",
-      "before_content_hash": "before-hash-5002",
+      "after_content_hash": "4f53243a39e9ffed7c0987a549bd9c05111d5949404971d8e6df3520fd5467c7",
+      "before_content_hash": "7ade9f17f83f136ab9532d638532b9761502a4a979c19518396c1d63483f90a8",
       "buttons": [
-        {"text": "🏠 房源详情", "url": "https://t.me/QiaoLianBot?start=details_QL000102"},
-        {"text": "📸 更多实拍", "url": "https://t.me/QiaoLianBot?start=photos_QL000102"},
-        {"text": "📅 预约看房", "url": "https://t.me/QiaoLianBot?start=book_QL000102"}
+        {"text": "🏠 房源详情", "url": "https://t.me/QiaoLianBot?start=details_QL-PP-M5N8"},
+        {"text": "📸 更多实拍", "url": "https://t.me/QiaoLianBot?start=photos_QL-PP-M5N8"},
+        {"text": "📅 预约看房", "url": "https://t.me/QiaoLianBot?start=book_QL-PP-M5N8"}
       ],
-      "caption": "🏠 BKK1公寓｜2房\n💰 $950/月",
+      "canonical_record_id": 302,
+      "caption": "🏠 时代广场｜2房2卫｜80㎡\n💰 $1000/月\n🆔 QL-PP-M5N8",
       "channel_id": "-100123",
-      "cover": "covers/QL000102.jpg",
-      "frozen_package_id": "PKG_RENT_102",
+      "cover": "artifacts/v3/workpack_c/covers/QL-PP-M5N8.svg",
+      "frozen_package_id": "PKG_4F53243A39E9FFED7C09",
       "listing_id": 102,
       "message_id": 5002,
       "offer_id": 202,
-      "public_ql_id": "QL000102",
+      "public_ql_id": "QL-PP-M5N8",
+      "source_identity": "SuxingFC|phase5:SuxingFC:时代广场:1000|production-derived:SuxingFC:1000",
       "target_key": "-100123:5002"
     }
   ],
-  "preview_hash": "c2beed370a354ba09ab9a62a35633556e1290be4928970b73acc2ae275480172",
+  "preview_hash": "0246b5a05823ffe42d15f5e46dc58df23ade7d3b6e8bdf0903da8b640fad6eff",
   "publication_status_mutations": 0,
   "target_set": [
     "-100123:5001",
