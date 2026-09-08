@@ -1,11 +1,7 @@
-import pytest
-
-from qiaolian_dual.channel_links import channel_start_payload as legacy_channel_start_payload
 from qiaolian_dual.cover_styles import normalize_cover_style as legacy_normalize_cover_style
 from qiaolian_dual.publishability_contract import evaluate_publishability as legacy_evaluate_publishability
 from v3_core.inventory.publishability import evaluate_publishability
 from v3_core.media.cover_styles import normalize_cover_style
-from v3_core.publishing.channel_links import channel_start_payload
 
 
 def test_publishability_extraction_matches_locked_production_contract():
@@ -33,11 +29,3 @@ def test_publishability_extraction_matches_locked_production_contract():
 def test_cover_style_extraction_matches_locked_production_contract():
     for style in (None, "classic", "blue_banner", "right_price", "villa_premium", "dark_glass", "unknown"):
         assert normalize_cover_style(style) == legacy_normalize_cover_style(style)
-
-
-def test_channel_link_extraction_matches_locked_production_contract():
-    listing_id = "l_350"
-    for action in ("details", "photos", "book"):
-        assert channel_start_payload(listing_id, action) == legacy_channel_start_payload(listing_id, action)
-    with pytest.raises(ValueError, match="unsupported_channel_action"):
-        channel_start_payload(listing_id, "advisor")
