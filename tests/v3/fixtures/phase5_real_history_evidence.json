@@ -1,0 +1,33 @@
+{
+  "exact_duplicate": {
+    "status": "AVAILABLE",
+    "source_identity": {
+      "source_name": "zufang555",
+      "source_post_id": 728,
+      "source_url": "https://t.me/c/2498584369/6443"
+    },
+    "snapshot_a": {
+      "commit": "d70e8efa2bac6059e97b65cf45a9507a081aff66",
+      "path": "reports_zufang555_full.csv",
+      "raw_historical_text": "249永旺一 🇨🇳 Aeon1公寓｜1房｜金边\n区域：金边\n户型：1房\n历史导出价格字段：1800"
+    },
+    "snapshot_b": {
+      "commit": "7f9865a73a28e7953211f6d16436791f866b734d",
+      "path": "reports_zufang555_full.csv",
+      "raw_historical_text": "249永旺一 🇨🇳 Aeon1公寓｜1房｜金边\n区域：金边\n户型：1房\n历史导出价格字段：1800"
+    },
+    "provenance_note": "The same source identity and exported historical row is present unchanged in both existing repository snapshots. No Telegram message, media, or aggregate count is synthesized."
+  },
+  "changed_revision": {
+    "status": "REAL_REVISION_EVIDENCE_UNAVAILABLE",
+    "searched_existing_history": [
+      "reports_zufang555_full.csv git history",
+      "docs/channel_house_group.tsv git history",
+      "docs/channel_captions_full_2026-04-19.md git history",
+      "houses.csv git history",
+      "existing repository source/revision fixtures and tests"
+    ],
+    "reason": "No existing repository history/export/fixture contains two different raw historical versions for one traceable source identity. Phase 5 therefore refuses to manufacture a changed revision or append a fake price update.",
+    "unit_regression_only": "_scenario_metrics remains synthetic and is explicitly excluded from real-history acceptance evidence."
+  }
+}
