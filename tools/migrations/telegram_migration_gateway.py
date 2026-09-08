@@ -87,7 +87,7 @@ def _media_identity(message: Any) -> dict[str, str]:
 def _dhash_bytes(data: bytes) -> int:
     with Image.open(io.BytesIO(data)) as image:
         gray = image.convert("L").resize((9, 8))
-        pixels = list(gray.getdata())
+        pixels = list(gray.get_flattened_data())
     value = 0
     for row in range(8):
         for col in range(8):
