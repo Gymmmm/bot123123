@@ -110,14 +110,21 @@ def validate_card_navigation(
     callback: UserBotCallback,
     session_public_listing_ids: tuple[str, ...] | list[str],
 ) -> bool:
-    """Reject stale/tampered card callbacks like fixed-SHA ``findcard`` did."""
+    """Reject stale/tampered card callbacks like fixed-SHA ``findcard`` did.
+
+    Session positions are authoritative for the callback check. Invalid stored
+    identities therefore invalidate the session instead of being filtered out,
+    because filtering would shift later indices and could validate the wrong
+    target.
+    """
     if callback.kind != "card" or callback.target_index is None:
         return False
-    ids = tuple(
-        normalized
-        for value in session_public_listing_ids
-        if (normalized := normalize_public_id(value)) is not None
-    )
+    ids: list[str] = []
+    for value in session_public_listing_ids:
+        normalized = normalize_public_id(value)
+        if normalized is None:
+            return False
+        ids.append(normalized)
     index = int(callback.target_index)
     return (
         0 <= index < len(ids)
