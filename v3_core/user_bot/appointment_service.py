@@ -66,8 +66,8 @@ class AppointmentSubmissionResult:
     appointment_id: int
     lead_action: str | None
     lead_source: str
-    # Legacy Database._sync_listing_appointment_state performed this implicitly.
-    # V3 callers must run it explicitly after a successful transaction.
+    # Legacy Database._sync_listing_appointment_state performed this implicitly
+    # on create/update. V3 callers must run it explicitly after a write.
     should_recompute_listing_availability: bool = True
     should_sync_channel: bool = True
     should_notify_admin: bool = True
@@ -143,11 +143,11 @@ class AppointmentSubmissionService:
                 appointment_id=int(duplicate["id"]),
                 lead_action=None,
                 lead_source=draft.source,
-                # Reusing an existing unfinished appointment does not change the
-                # active appointment set, so no availability/channel recompute is
-                # required and production likewise performs no create/update.
+                # Production performs no appointment write here, so there is no
+                # hidden DB-level availability recompute. It still invokes channel
+                # sync and sends the admin notification afterwards.
                 should_recompute_listing_availability=False,
-                should_sync_channel=False,
+                should_sync_channel=True,
                 should_notify_admin=True,
             )
 
