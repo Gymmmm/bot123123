@@ -28,6 +28,8 @@ jobs:
         run: python qiaolian_production/tools/final_acceptance.py
       - name: Audit user helper reachability
         run: python qiaolian_production/tools/audit_user_helper_functions.py
+      - name: Audit user import symbol integrity
+        run: python qiaolian_production/tools/audit_user_imports.py
       - name: Import collector from extracted tree only
         env:
           DB_PATH: '${{ runner.temp }}/qiaolian-extraction.db'
