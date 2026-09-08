@@ -16,6 +16,7 @@ from typing import Literal
 from .listing_presenter import build_public_listing_details
 from .public_appointment import PublicAppointmentDraft
 from .public_inventory import PublicInventoryReader
+from .search_navigation import AREA_OPTIONS, LAYOUT_OPTIONS
 from .transition_plan import TransitionPlan
 
 
@@ -35,6 +36,9 @@ TransitionChoiceKind = Literal[
     "search_budget",
     "search_layout",
     "search_available",
+    "area_choice",
+    "area_other",
+    "layout_choice",
 ]
 
 
@@ -185,6 +189,18 @@ def _custom_time_prompt() -> TransitionView:
     )
 
 
+def _custom_area_prompt() -> TransitionView:
+    return TransitionView(
+        kind="search_custom_area",
+        text=(
+            "📍 <b>其他位置</b>\n\n"
+            "直接输入区域或附近地标。\n"
+            "例如：<code>BKK1</code>、<code>永旺1附近</code>。"
+        ),
+        rows=(),
+    )
+
+
 _BUDGET_OPTIONS = (
     ("b1", "$400以内", None, 400),
     ("b2", "$400–600", 400, 600),
@@ -203,12 +219,9 @@ def budget_bounds(code: object) -> tuple[str, int | None, int | None]:
     raise ValueError("unsupported_budget_choice")
 
 
-def _similar_view(plan: TransitionPlan) -> TransitionView:
-    if plan.similar is None:
-        raise ValueError("similar_transition_missing_intent")
-    intent = plan.similar.intent
-    area_line = f"\n\n已选：{he(intent.area_display)}" if intent.area_display else ""
-    text = f"💰 <b>每月预算大概多少？</b>{area_line}"
+def _search_budget_view(area_display: str = "") -> TransitionView:
+    clean_area = str(area_display or "").strip()
+    area_line = f"\n已选：{he(clean_area)}" if clean_area else ""
     choices = tuple(
         TransitionChoice(
             label,
@@ -224,9 +237,56 @@ def _similar_view(plan: TransitionPlan) -> TransitionView:
         (choices[2], choices[3]),
         (choices[4], choices[5]),
         (TransitionChoice("✍️ 自己输入", "budget_custom"),),
-        (TransitionChoice("⬅️ 返回", "change_search"),),
+        (TransitionChoice("⬅️ 返回找房", "change_search"),),
     )
-    return TransitionView(kind="search_budget", text=text, rows=rows)
+    return TransitionView(
+        kind="search_budget",
+        text=f"💰 <b>每月预算大概多少？</b>\n\n单位：USD / 月{area_line}",
+        rows=rows,
+    )
+
+
+def _search_area_view() -> TransitionView:
+    choices = tuple(
+        TransitionChoice(label, "area_choice", code)
+        for code, label in AREA_OPTIONS
+    )
+    rows = tuple(
+        tuple(choices[index : index + 2])
+        for index in range(0, len(choices), 2)
+    ) + (
+        (TransitionChoice("📍 其他区域", "area_other"),),
+        (TransitionChoice("⬅️ 返回找房", "change_search"),),
+    )
+    return TransitionView(
+        kind="search_area",
+        text="📍 <b>想住哪里？</b>\n\n选一个大概位置就行。",
+        rows=rows,
+    )
+
+
+def _search_layout_view() -> TransitionView:
+    choices = tuple(
+        TransitionChoice(label, "layout_choice", code)
+        for code, label in LAYOUT_OPTIONS
+    )
+    rows = (
+        (choices[0], choices[1]),
+        (choices[2], choices[3]),
+        (choices[4], choices[5]),
+        (TransitionChoice("⬅️ 返回找房", "change_search"),),
+    )
+    return TransitionView(
+        kind="search_layout",
+        text="🛏 <b>想要什么户型？</b>",
+        rows=rows,
+    )
+
+
+def _similar_view(plan: TransitionPlan) -> TransitionView:
+    if plan.similar is None:
+        raise ValueError("similar_transition_missing_intent")
+    return _search_budget_view(plan.similar.intent.area_display)
 
 
 _SEARCH_ENTRY_TEXT = (
@@ -283,6 +343,22 @@ class TransitionViewService:
     @staticmethod
     def custom_time_prompt() -> TransitionView:
         return _custom_time_prompt()
+
+    @staticmethod
+    def custom_area_prompt() -> TransitionView:
+        return _custom_area_prompt()
+
+    @staticmethod
+    def search_area() -> TransitionView:
+        return _search_area_view()
+
+    @staticmethod
+    def search_budget(area_display: str = "") -> TransitionView:
+        return _search_budget_view(area_display)
+
+    @staticmethod
+    def search_layout() -> TransitionView:
+        return _search_layout_view()
 
     def build(
         self,
