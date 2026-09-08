@@ -9,6 +9,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from v3_core.storage.service_repository import SQLiteTenantServiceRepository
+
 from .appointment_history import (
     AppointmentHistoryService,
     SQLiteAppointmentHistoryReader,
@@ -25,6 +27,7 @@ from .search_submit_executor import (
     SearchSubmitExecutor,
     build_sqlite_search_submit_executor,
 )
+from .service_flow import TenantService
 from .transition_actions import TransitionActionService
 from .transition_text_actions import TransitionTextActionService
 from .transition_views import TransitionViewService
@@ -43,6 +46,7 @@ class UserBotTransitionRuntime:
     searches: SearchSubmitExecutor
     leads: LeadService
     lead_effects: LeadEffectExecutor
+    tenant_service: TenantService
 
 
 def build_transition_runtime(db_path: str | Path) -> UserBotTransitionRuntime:
@@ -64,6 +68,7 @@ def build_transition_runtime(db_path: str | Path) -> UserBotTransitionRuntime:
         searches=build_sqlite_search_submit_executor(path),
         leads=leads,
         lead_effects=LeadEffectExecutor(leads),
+        tenant_service=TenantService(SQLiteTenantServiceRepository(path)),
     )
 
 
