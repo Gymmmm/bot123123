@@ -40,11 +40,27 @@ from .transition_actions import (
 from .transition_callbacks import parse_transition_callback
 from .transition_session import (
     APPOINTMENT_SESSION_KEY,
+    AWAITING_KEYWORD_SESSION_KEY,
     SEARCH_PREF_SESSION_KEY,
     SessionMutationPlan,
     apply_session_mutation,
 )
 from .transition_views import TransitionView, TransitionViewService
+
+
+_GUIDED_SEARCH_CALLBACKS = frozenset(
+    {
+        "search_area",
+        "area_choice",
+        "area_other",
+        "search_budget",
+        "budget_choice",
+        "budget_custom",
+        "search_layout",
+        "layout_choice",
+        "search_available",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -133,6 +149,17 @@ def _navigation_view(
     raise ValueError(f"unsupported_transition_navigation:{navigation}")
 
 
+def _apply_success_mutation(
+    user_data: dict[str, Any],
+    result: TransitionActionResult,
+    callback_kind: str,
+) -> None:
+    if result.mutation is not None:
+        apply_session_mutation(user_data, result.mutation)
+    if str(callback_kind or "") in _GUIDED_SEARCH_CALLBACKS:
+        user_data.pop(AWAITING_KEYWORD_SESSION_KEY, None)
+
+
 def _telegram_appointment_user(update: Any) -> AppointmentUser:
     user = getattr(update, "effective_user", None)
     if user is None or getattr(user, "id", None) is None:
@@ -203,16 +230,14 @@ async def handle_v3_transition_action(
     view = _view_for_result(views, result)
     if view is not None:
         await _edit_view(query, view)
-        if result.mutation is not None:
-            apply_session_mutation(user_data, result.mutation)
+        _apply_success_mutation(user_data, result, callback.kind)
         return TelegramTransitionActionOutcome(handled=True, result=result)
 
     if result.next_step == "navigation":
         navigation_view = _navigation_view(views, result, user_data)
         if navigation_view is not None:
             await _edit_view(query, navigation_view)
-            if result.mutation is not None:
-                apply_session_mutation(user_data, result.mutation)
+            _apply_success_mutation(user_data, result, callback.kind)
             return TelegramTransitionActionOutcome(handled=True, result=result)
 
     if result.next_step == "appointment_submit" and appointment_executor is not None:
@@ -266,8 +291,7 @@ async def handle_v3_transition_action(
                 user=_lead_user(_telegram_appointment_user(update)),
                 intent=result.search,
             )
-        if result.mutation is not None:
-            apply_session_mutation(user_data, result.mutation)
+        _apply_success_mutation(user_data, result, callback.kind)
         return TelegramTransitionActionOutcome(
             handled=True,
             result=result,
