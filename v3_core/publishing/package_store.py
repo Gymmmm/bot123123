@@ -50,6 +50,9 @@ ON publication_packages_v3(status, created_at);
 """
 
 
+CHANNEL_ACTION_ORDER = ("details", "photos", "book")
+
+
 @dataclass(frozen=True)
 class FrozenPackage:
     package_id: str
@@ -73,6 +76,27 @@ class FrozenPackage:
 
 def _canonical_json(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def _ordered_actions(value: Any) -> dict[str, str]:
+    if isinstance(value, str):
+        try:
+            decoded = json.loads(value or "{}")
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise ValueError("package_actions_invalid_json") from exc
+    else:
+        decoded = value
+    if not isinstance(decoded, dict):
+        raise ValueError("package_actions_invalid")
+    keys = set(str(key) for key in decoded)
+    if keys != set(CHANNEL_ACTION_ORDER):
+        raise ValueError("package_actions_must_be_details_photos_book")
+    return {key: str(decoded[key]) for key in CHANNEL_ACTION_ORDER}
+
+
+def _actions_json(actions: dict[str, str]) -> str:
+    ordered = _ordered_actions(actions)
+    return json.dumps(ordered, ensure_ascii=False, sort_keys=False, separators=(",", ":"))
 
 
 def _file_hash(path: str) -> str:
@@ -110,7 +134,7 @@ def _content_payload(
         "cover_path": cover_path,
         "gallery": list(gallery),
         "post_text": post_text,
-        "actions": dict(actions),
+        "actions": _ordered_actions(actions),
         "snapshot": dict(snapshot),
         "frozen_file_hashes": dict(frozen_file_hashes),
         "source_identity": dict(source_identity),
@@ -148,7 +172,7 @@ class FrozenPackageStore:
             cover_path=str(row["cover_path"]),
             gallery=tuple(json.loads(str(row["gallery_json"] or "[]"))),
             post_text=str(row["post_text"]),
-            actions=dict(json.loads(str(row["actions_json"] or "{}"))),
+            actions=_ordered_actions(str(row["actions_json"] or "{}")),
             snapshot=dict(json.loads(str(row["snapshot_json"] or "{}"))),
             frozen_file_hashes=dict(
                 json.loads(str(row["frozen_file_hashes_json"] or "{}"))
@@ -200,9 +224,7 @@ class FrozenPackageStore:
             raise ValueError("package_missing:" + ",".join(missing))
         if len(str(post_text)) > 1024:
             raise ValueError("channel_caption_too_long")
-        action_keys = tuple(actions.keys())
-        if action_keys != ("details", "photos", "book"):
-            raise ValueError("package_actions_must_be_details_photos_book")
+        ordered_actions = _ordered_actions(actions)
 
         paths = [str(cover_path), *[str(path) for path in gallery or []]]
         unique_paths = list(dict.fromkeys(paths))
@@ -235,7 +257,7 @@ class FrozenPackageStore:
                 cover_path=str(cover_path),
                 gallery=[str(path) for path in gallery or []],
                 post_text=str(post_text),
-                actions=dict(actions),
+                actions=ordered_actions,
                 snapshot=dict(snapshot),
                 frozen_file_hashes=frozen_hashes,
                 source_identity=dict(source_identity),
@@ -266,7 +288,7 @@ class FrozenPackageStore:
                     str(cover_path),
                     _canonical_json(list(gallery or [])),
                     str(post_text),
-                    _canonical_json(dict(actions)),
+                    _actions_json(ordered_actions),
                     _canonical_json(dict(snapshot)),
                     _canonical_json(frozen_hashes),
                     _canonical_json(dict(source_identity)),
@@ -361,4 +383,4 @@ class FrozenPackageStore:
         return self._model(row)
 
 
-__all__ = ["FrozenPackage", "FrozenPackageStore"]
+__all__ = ["CHANNEL_ACTION_ORDER", "FrozenPackage", "FrozenPackageStore"]
