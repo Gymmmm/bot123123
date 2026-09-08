@@ -9,3 +9,5 @@ Required sample coverage: rent, sale, unknown, insufficient photos, conflicting 
 Required per-sample output: source identity, canonical facts, deal type, dedupe result, quality result, listing/offer projection, blocking reasons, warnings.
 
 Acceptance: sale 100% store-only; zero sale AUTO_PUBLISH; exact duplicate creates no second listing target; source updates are not duplicate-skipped; no obvious false-rent caused by sale price, deposit, or utility fees.
+
+Fixture provenance: 104 independent historical production-derived group rows from commit `7f9865a73a28e7953211f6d16436791f866b734d`; aggregate `总条数` values are retained as evidence and are never expanded into synthetic source messages.
