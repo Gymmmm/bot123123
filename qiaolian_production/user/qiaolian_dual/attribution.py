@@ -77,11 +77,6 @@ def entry_action_zh(v):
             "listing_detail_view": "房源详情", "appointment_submit": "提交预约",
             "direct_start": "打开 Bot", "discussion_entry": "历史讨论区入口"}.get(str(v or ""), "其他")
 
-def public_deep_link_ok(arg: str) -> bool:
-    raw = str(arg or "").strip()
-    if raw in {"find_area", "find_budget", "find_layout", "latest", "advisor"}:
-        return True
-    return raw.startswith("property_") and raw.endswith(("_details", "_photos", "_book"))
 
 def classify_start_arg(arg: str | None) -> dict[str, Any]:
     raw = str(arg or "").strip()

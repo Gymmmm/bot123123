@@ -154,9 +154,6 @@ def format_channel_listing_post(
     return '\n'.join(lines).strip()[:1024]
 
 
-def format_button_post_text(d: dict, listing_id: str = '', tag_lines: Iterable[str] | None = None, caption_variant: str = 'a') -> str:
-    del tag_lines, caption_variant
-    return format_channel_listing_post(d, listing_id=listing_id or (d.get('listing_id') if isinstance(d, dict) else '') or '', status=d.get('status') if isinstance(d, dict) else None)
 
 
-__all__ = ['format_channel_listing_post', 'format_button_post_text']
+__all__ = ['format_channel_listing_post']
