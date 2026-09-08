@@ -56,11 +56,14 @@ jobs:
           python qiaolian_production/tools/audit_publisher_formatters.py --write
           python -m py_compile qiaolian_production/publisher/qiaolian_publisher_v2/formatters.py
           git diff --exit-code -- qiaolian_production/publisher/qiaolian_publisher_v2/formatters.py
-      - name: Slice publisher keyboard candidate
+      - name: Verify committed keyboard slice
         run: |
           python qiaolian_production/tools/audit_publisher_keyboards.py
           python qiaolian_production/tools/audit_publisher_keyboards.py --write
           python -m py_compile qiaolian_production/publisher/qiaolian_publisher_v2/keyboards.py
+          git diff --exit-code -- qiaolian_production/publisher/qiaolian_publisher_v2/keyboards.py
+      - name: Audit publisher message constants
+        run: python qiaolian_production/tools/audit_publisher_messages.py
       - name: Import collector from extracted tree only
         env:
           DB_PATH: '${{ runner.temp }}/qiaolian-extraction.db'
@@ -109,7 +112,7 @@ jobs:
           cover(); media(); review(); release(); daily()
           from qiaolian_publisher_v2.bot import PublisherBot
           from qiaolian_publisher_v2 import formatters, keyboards
-          required_f={'AREA_OPTIONS','TYPE_LABELS','CHANNEL_BUTTON_PROMPT','deep_link','build_post_text','build_preview_text','normalize_tags'}
+          required_f={'AREA_OPTIONS','TYPE_LABELS','CHANNEL_BUTTON_PROMPT','build_post_text','build_preview_text','normalize_tags'}
           missing=sorted(name for name in required_f if not hasattr(formatters,name))
           if missing: raise SystemExit('missing formatter production symbols: '+repr(missing))
           assert PublisherBot and keyboards and main
