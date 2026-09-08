@@ -1,8 +1,7 @@
 """Telegram adapter for V3 home-surface callbacks.
 
-Search, appointments and contact render only after their complete V3 behavior is
-available. Rental/service stay explicitly deferred until their fixed-SHA subflows
-are extracted. Full home is still not exposed while either is deferred.
+All five fixed-SHA public home actions now enter complete V3-owned surfaces.
+Business/storage effects remain in their dedicated adapters.
 """
 from __future__ import annotations
 
@@ -12,11 +11,15 @@ from typing import Any
 from telegram.constants import ParseMode
 
 from .appointment_history import AppointmentHistoryService, AppointmentHistoryView
+from .assurance_views import build_assurance_home_view
 from .contact_effects import ContactEffectExecutor, ContactEffectResult
 from .home_callbacks import HomeAction, parse_home_callback
 from .home_views import build_appointment_history_home_view, build_contact_view
 from .lead_service import LeadUser
+from .service_views import service_home_view
+from .telegram_assurance_handler import render_assurance_view
 from .telegram_home_ui import build_home_keyboard
+from .telegram_service_handler import render_service_view
 from .telegram_transition_ui import build_transition_keyboard
 from .transition_plan import ChangeSearchTransition, TransitionPlan
 from .transition_session import apply_session_mutation, build_transition_session
@@ -128,7 +131,6 @@ async def handle_v3_home_callback(
         plan = _search_entry_plan()
         view = search_views.build(plan)
         mutation = build_transition_session(plan)
-        # Render first: a Telegram failure must not create a stale keyword wait.
         await _edit_transition_view(query, view)
         apply_session_mutation(user_data, mutation)
         return TelegramHomeOutcome(
@@ -147,6 +149,14 @@ async def handle_v3_home_callback(
             rendered=True,
             appointment_history=history,
         )
+
+    if action == "rental":
+        await render_assurance_view(query, build_assurance_home_view())
+        return TelegramHomeOutcome(handled=True, action=action, rendered=True)
+
+    if action == "service":
+        await render_service_view(query, service_home_view())
+        return TelegramHomeOutcome(handled=True, action=action, rendered=True)
 
     if action == "contact":
         if contact_effects is None:
@@ -169,13 +179,7 @@ async def handle_v3_home_callback(
             contact_effect=effect,
         )
 
-    # Rental/service are intentionally not rendered until their complete V3
-    # subflows exist. Full home will not be exposed before both are live.
-    return TelegramHomeOutcome(
-        handled=True,
-        action=action,
-        deferred=True,
-    )
+    return TelegramHomeOutcome(handled=True, action=action, deferred=True)
 
 
 __all__ = ["TelegramHomeOutcome", "handle_v3_home_callback"]
