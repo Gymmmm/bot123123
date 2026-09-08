@@ -208,14 +208,49 @@ async def test_contact_without_effect_executor_is_deferred_and_never_claims_succ
 
 
 @pytest.mark.asyncio
-async def test_unfinished_rental_and_service_home_actions_are_explicitly_deferred():
-    for action in ("rental", "service"):
-        query = FakeQuery(f"v3u:home:{action}")
-        outcome = await handle_v3_home_callback(
-            _update(query),
-            _context(),
-            appointment_history=FakeHistory(),
-            search_views=_search_views(),
-        )
-        assert outcome.handled and outcome.deferred and not outcome.rendered
-        assert [call[0] for call in query.calls] == ["answer"]
+@pytest.mark.parametrize(
+    ("action", "expected_text", "expected_callbacks"),
+    [
+        (
+            "rental",
+            "侨联保障",
+            {
+                "v3u:assure:handover",
+                "v3u:assure:deposit",
+                "v3u:assure:moving",
+                "v3u:home:contact",
+                "v3u:t:home",
+            },
+        ),
+        (
+            "service",
+            "入住服务",
+            {
+                "v3u:service:repair",
+                "v3u:service:property",
+                "v3u:service:local",
+                "v3u:service:general",
+                "v3u:t:home",
+            },
+        ),
+    ],
+)
+async def test_assurance_and_service_home_actions_are_complete_v3_surfaces(
+    action,
+    expected_text,
+    expected_callbacks,
+):
+    query = FakeQuery(f"v3u:home:{action}")
+    outcome = await handle_v3_home_callback(
+        _update(query),
+        _context(),
+        appointment_history=FakeHistory(),
+        search_views=_search_views(),
+    )
+    assert outcome.handled and outcome.rendered and not outcome.deferred
+    assert [call[0] for call in query.calls] == ["answer", "edit_text"]
+    assert expected_text in query.calls[-1][1][0]
+    markup = query.calls[-1][2]["reply_markup"]
+    callbacks = {button.callback_data for row in markup.inline_keyboard for button in row}
+    assert callbacks == expected_callbacks
+    assert not any(value.startswith(("hub:", "service:")) for value in callbacks)
