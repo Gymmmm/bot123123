@@ -67,28 +67,32 @@ def _published_view(*, listing_status="active", offer_status="active"):
     )
 
 
-def test_book_view_matches_fixed_sha_date_entry_and_uses_public_identity_only():
-    inventory = InventoryStub(_published_view())
-    service = TransitionViewService(inventory)
-    plan = TransitionPlan(
+def _book_plan(*, mode="offline"):
+    return TransitionPlan(
         kind="book",
         next_step="appointment_date",
         effects=("render_appointment_date",),
         book=BookTransition(
             draft=PublicAppointmentDraft(
                 public_listing_id=PUBLIC_ID,
-                mode="offline",
+                mode=mode,
                 source="listing_callback",
             )
         ),
     )
 
-    view = service.build(plan, today=date(2026, 9, 8))
+
+def test_book_view_matches_fixed_sha_date_entry_and_uses_public_identity_only():
+    inventory = InventoryStub(_published_view())
+    service = TransitionViewService(inventory)
+
+    view = service.build(_book_plan(), today=date(2026, 9, 8))
 
     assert view.kind == "appointment_date"
     assert "预约看房｜QL-RF-A2B3" in view.text
     assert "富力城" in view.text
     assert "$800/月" in view.text
+    assert "哪天方便看房" in view.text
     assert "LST_1" not in view.text
     assert inventory.calls == [PUBLIC_ID]
     assert [button.label for row in view.rows for button in row] == [
@@ -106,18 +110,68 @@ def test_book_view_matches_fixed_sha_date_entry_and_uses_public_identity_only():
     assert view.rows[-1][0].public_listing_id == PUBLIC_ID
 
 
+def test_video_mode_date_view_switches_fixed_sha_heading_question_and_toggle():
+    service = TransitionViewService(InventoryStub(_published_view()))
+
+    view = service.build(_book_plan(mode="video"), today=date(2026, 9, 8))
+
+    assert "视频看房｜QL-RF-A2B3" in view.text
+    assert "哪天方便视频看房" in view.text
+    toggle = view.rows[2][0]
+    assert toggle.label == "🚶 改为实地看房"
+    assert toggle.kind == "appointment_mode"
+    assert toggle.value == "offline"
+
+
+def test_appointment_time_view_matches_fixed_sha_time_order():
+    service = TransitionViewService(InventoryStub(_published_view()))
+    draft = PublicAppointmentDraft(
+        public_listing_id=PUBLIC_ID,
+        mode="offline",
+        date="09-10",
+        source="listing_callback",
+    )
+
+    view = service.appointment_time(draft)
+
+    assert view.kind == "appointment_time"
+    assert "选择时间" in view.text
+    assert "9月10日" in view.text
+    assert "富力城" in view.text
+    assert "LST_1" not in view.text
+    assert [(row[0].label, row[0].kind, row[0].value) for row in view.rows[:4]] == [
+        ("上午 09:00–12:00", "appointment_time", "am"),
+        ("下午 14:00–17:00", "appointment_time", "pm"),
+        ("晚上 17:00–19:00", "appointment_time", "evening"),
+        ("✍️ 其他时间", "appointment_other_time", ""),
+    ]
+    assert [choice.label for choice in view.rows[-1]] == ["⬅️ 修改日期", "🏠 返回首页"]
+
+
+def test_custom_appointment_prompts_match_fixed_sha_and_need_no_keyboard():
+    service = TransitionViewService(InventoryStub(None))
+
+    date_prompt = service.custom_date_prompt()
+    time_prompt = service.custom_time_prompt()
+
+    assert date_prompt.rows == ()
+    assert date_prompt.text == (
+        "📅 <b>请输入日期</b>\n\n"
+        "例如：<code>0905</code>、<code>9月5日</code> 或 <code>下周三</code>"
+    )
+    assert time_prompt.rows == ()
+    assert time_prompt.text == (
+        "🕐 <b>其他时间</b>\n\n"
+        "直接输入，例如：<code>20:00</code> 或 <code>晚上8点</code>"
+    )
+
+
 def test_book_view_rechecks_live_bookability_before_rendering_date_step():
     inventory = InventoryStub(_published_view(listing_status="rented", offer_status="inactive"))
     service = TransitionViewService(inventory)
-    plan = TransitionPlan(
-        kind="book",
-        next_step="appointment_date",
-        effects=("render_appointment_date",),
-        book=BookTransition(draft=PublicAppointmentDraft(public_listing_id=PUBLIC_ID)),
-    )
 
     with pytest.raises(ValueError, match="listing_not_bookable"):
-        service.build(plan, today=date(2026, 9, 8))
+        service.build(_book_plan(), today=date(2026, 9, 8))
 
 
 def test_similar_view_preserves_fixed_sha_budget_order_and_frozen_area_only():
