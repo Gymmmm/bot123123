@@ -18,6 +18,7 @@ from .callbacks import (
     encode_change_search_callback,
     encode_listing_callback,
 )
+from .search_navigation import AREA_OPTIONS, LAYOUT_OPTIONS
 from .transition_views import TransitionChoice, TransitionChoiceKind
 
 
@@ -29,6 +30,8 @@ _VALUE_KINDS = frozenset(
         "appointment_mode",
         "appointment_time",
         "budget_choice",
+        "area_choice",
+        "layout_choice",
     }
 )
 _FLAG_KINDS = frozenset(
@@ -42,9 +45,12 @@ _FLAG_KINDS = frozenset(
         "search_budget",
         "search_layout",
         "search_available",
+        "area_other",
     }
 )
 _BUDGET_CODES = frozenset({"b1", "b2", "b3", "b4", "b5", "b6"})
+_AREA_CODES = frozenset(code for code, _ in AREA_OPTIONS)
+_LAYOUT_CODES = frozenset(code for code, _ in LAYOUT_OPTIONS)
 _MODES = frozenset({"offline", "video"})
 _TIMES = frozenset({"am", "pm", "evening"})
 _DATE_RE = re.compile(r"^\d{2}-\d{2}$")
@@ -76,6 +82,14 @@ def _validate_value(kind: str, value: object) -> str:
     if kind == "budget_choice":
         if clean not in _BUDGET_CODES:
             raise ValueError("invalid_transition_budget_choice")
+        return clean
+    if kind == "area_choice":
+        if clean not in _AREA_CODES:
+            raise ValueError("invalid_transition_area_choice")
+        return clean
+    if kind == "layout_choice":
+        if clean not in _LAYOUT_CODES:
+            raise ValueError("invalid_transition_layout_choice")
         return clean
     raise ValueError("transition_callback_kind_has_no_value")
 
