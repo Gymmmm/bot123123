@@ -4,6 +4,7 @@ from v3_core.user_bot.transition_actions import (
     APPOINTMENT_AWAITING_DATE_KEY,
     APPOINTMENT_AWAITING_TIME_KEY,
     LAST_SEARCH_PREF_KEY,
+    SEARCH_AWAITING_AREA_KEY,
     SEARCH_AWAITING_BUDGET_KEY,
 )
 from v3_core.user_bot.transition_session import APPOINTMENT_SESSION_KEY, SEARCH_PREF_SESSION_KEY
@@ -78,6 +79,45 @@ def test_invalid_custom_time_returns_fixed_sha_retry_copy():
     assert result.mutation is None
 
 
+def test_custom_area_resolves_canonical_keys_then_advances_to_budget():
+    session = {
+        SEARCH_AWAITING_AREA_KEY: True,
+        SEARCH_PREF_SESSION_KEY: {
+            "source": "home_area",
+            "goal": "any",
+            "location_keys": [],
+            "area_display": "",
+            "touch_payload": {},
+        },
+    }
+
+    result = TransitionTextActionService().apply("永旺1附近", session)
+
+    assert result.ok and result.next_step == "search_budget"
+    assert result.search is None
+    assert result.mutation is not None
+    pref = result.mutation.set_values[SEARCH_PREF_SESSION_KEY]
+    assert pref["area_display"] == "永旺1附近"
+    assert pref["location_keys"]
+    assert SEARCH_AWAITING_AREA_KEY in result.mutation.delete_keys
+    assert "LST_" not in repr(result)
+
+
+def test_custom_area_failure_keeps_waiting_state_for_retry():
+    session = {
+        SEARCH_AWAITING_AREA_KEY: True,
+        SEARCH_PREF_SESSION_KEY: {"source": "home_area", "goal": "any"},
+    }
+
+    result = TransitionTextActionService().apply("完全不存在的地方", session)
+
+    assert result.status == "invalid"
+    assert result.reason == "search_area_unrecognized"
+    assert "BKK1" in result.prompt
+    assert "永旺1附近" in result.prompt
+    assert result.mutation is None
+
+
 def test_custom_budget_success_returns_search_intent_and_public_only_last_pref():
     session = {
         SEARCH_AWAITING_BUDGET_KEY: True,
@@ -132,9 +172,11 @@ def test_missing_backing_session_expires_and_plain_text_is_not_claimed():
     service = TransitionTextActionService()
 
     expired_date = service.apply("0905", {APPOINTMENT_AWAITING_DATE_KEY: True})
+    expired_area = service.apply("BKK1", {SEARCH_AWAITING_AREA_KEY: True})
     expired_budget = service.apply("800以内", {SEARCH_AWAITING_BUDGET_KEY: True})
     plain = service.apply("BKK1 一房 600", {})
 
     assert expired_date.status == "expired"
+    assert expired_area.status == "expired"
     assert expired_budget.status == "expired"
     assert plain.status == "not_applicable"
