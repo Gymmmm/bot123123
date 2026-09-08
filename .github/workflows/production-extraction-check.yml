@@ -66,6 +66,11 @@ jobs:
         run: python qiaolian_production/tools/audit_publisher_messages.py
       - name: Audit user bot module reachability
         run: python qiaolian_production/tools/audit_user_modules.py
+      - name: Slice canonical facts candidate
+        run: |
+          python qiaolian_production/tools/audit_user_symbol_module.py canonical_facts
+          python qiaolian_production/tools/audit_user_symbol_module.py canonical_facts --write
+          python -m py_compile qiaolian_production/user/qiaolian_dual/canonical_facts.py
       - name: Import collector from extracted tree only
         env:
           DB_PATH: '${{ runner.temp }}/qiaolian-extraction.db'
@@ -154,3 +159,14 @@ jobs:
           if leaks: raise SystemExit('user local-source leaks: '+repr(sorted(leaks)))
           print('USER_BUILD_OK')
           PY
+      - name: Commit canonical facts production slice
+        if: success()
+        run: |
+          target=qiaolian_production/user/qiaolian_dual/canonical_facts.py
+          if ! git diff --quiet -- "$target"; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add "$target"
+            git commit -m "refactor: slim canonical facts runtime"
+            git push origin HEAD:refactor/production-extraction
+          fi
