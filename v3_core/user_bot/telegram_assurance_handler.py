@@ -104,6 +104,12 @@ async def handle_v3_assurance_callback(
         return TelegramAssuranceOutcome(handled=False)
     await query.answer()
     if action in {"handover", "deposit"}:
+        # Locked production replaces the old panel before sending the private
+        # PNG/PDF bundle. Failure to delete is non-fatal there as well.
+        try:
+            await query.message.delete()
+        except Exception:
+            pass
         await send_assurance_bundle(update, context, repo_root=repo_root, kind=action)
         return TelegramAssuranceOutcome(
             handled=True,
