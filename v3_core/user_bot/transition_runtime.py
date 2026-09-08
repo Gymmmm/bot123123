@@ -17,6 +17,7 @@ from .appointment_submit_executor import (
     AppointmentSubmitExecutor,
     build_sqlite_appointment_submit_executor,
 )
+from .keyword_search_actions import KeywordSearchActionService
 from .lead_effects import LeadEffectExecutor
 from .lead_service import LeadService, build_sqlite_lead_service
 from .public_inventory import PublicInventoryReader
@@ -36,6 +37,7 @@ class UserBotTransitionRuntime:
     views: TransitionViewService
     callback_actions: TransitionActionService
     text_actions: TransitionTextActionService
+    keyword_actions: KeywordSearchActionService
     appointments: AppointmentSubmitExecutor
     appointment_history: AppointmentHistoryService
     searches: SearchSubmitExecutor
@@ -53,6 +55,7 @@ def build_transition_runtime(db_path: str | Path) -> UserBotTransitionRuntime:
         views=TransitionViewService(inventory),
         callback_actions=TransitionActionService(),
         text_actions=TransitionTextActionService(),
+        keyword_actions=KeywordSearchActionService(),
         appointments=build_sqlite_appointment_submit_executor(path),
         appointment_history=AppointmentHistoryService(
             reader=SQLiteAppointmentHistoryReader(path),
