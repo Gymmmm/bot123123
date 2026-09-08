@@ -281,77 +281,77 @@ class Database:
             return f"l_{max(numbers) + 1}"
         return "l_1001"
 
-    def create_listing(self, data: dict[str, Any]) -> None:
-        tags_json = json.dumps(data.get("tags", []), ensure_ascii=False)
-        with self.connect() as conn:
-            conn.execute(
-                '''
-                INSERT INTO listings (
-                    listing_id, title, property_type, area, community, price, currency, layout, size_sqm,
-                    tags_json, highlights, hidden_costs, drawbacks, deposit_rule, available_date,
-                    media_file_id, media_type, channel_message_id, source_post_url, status, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''',
-                (
-                    data["listing_id"],
-                    data["title"],
-                    data["property_type"],
-                    data["area"],
-                    data["community"],
-                    int(data["price"]),
-                    data.get("currency", "USD"),
-                    data.get("layout", ""),
-                    data.get("size_sqm", ""),
-                    tags_json,
-                    data.get("highlights", ""),
-                    data.get("hidden_costs", ""),
-                    data.get("drawbacks", ""),
-                    data.get("deposit_rule", ""),
-                    data.get("available_date", ""),
-                    data.get("media_file_id", ""),
-                    data.get("media_type", ""),
-                    data.get("channel_message_id"),
-                    data.get("source_post_url", ""),
-                    data.get("status", "active"),
-                    data["created_at"],
-                    data["updated_at"],
-                ),
-            )
 
-    def update_listing_publish_meta(self, listing_id: str, *, channel_message_id: int | None, source_post_url: str) -> None:
-        with self.connect() as conn:
-            conn.execute(
-                "UPDATE listings SET channel_message_id=?, source_post_url=?, updated_at=datetime('now', 'localtime') WHERE listing_id=?",
-                (channel_message_id, source_post_url, listing_id),
-            )
 
-    def update_listing_status(self, listing_id: str, status: str) -> bool:
-        if status not in LISTING_STATUSES:
-            return False
-        with self.connect() as conn:
-            cur = conn.execute(
-                "UPDATE listings SET status=?, updated_at=datetime('now', 'localtime') WHERE listing_id=?",
-                (status, listing_id),
-            )
-            return cur.rowcount > 0
 
-    def list_listings_by_status(self, status: str, limit: int = 20) -> list[dict[str, Any]]:
-        """管理员房态列表。status=all 时返回最近房源。"""
-        normalized = str(status or "").strip().lower()
-        with self.connect() as conn:
-            if normalized == "all":
-                rows = conn.execute(
-                    "SELECT * FROM listings ORDER BY updated_at DESC, created_at DESC LIMIT ?",
-                    (int(limit),),
-                ).fetchall()
-            elif normalized in LISTING_STATUSES:
-                rows = conn.execute(
-                    "SELECT * FROM listings WHERE status=? ORDER BY updated_at DESC, created_at DESC LIMIT ?",
-                    (normalized, int(limit)),
-                ).fetchall()
-            else:
-                return []
-        return [row_to_dict(row) or {} for row in rows]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
     def get_listing(self, listing_id: str) -> dict[str, Any] | None:
@@ -488,17 +488,17 @@ class Database:
                 (user_id, listing_id, created_at),
             )
 
-    def unfavorite_listing(self, user_id: int, listing_id: str) -> None:
-        with self.connect() as conn:
-            conn.execute("DELETE FROM favorites WHERE user_id=? AND listing_id=?", (user_id, listing_id))
 
-    def is_favorite(self, user_id: int, listing_id: str) -> bool:
-        with self.connect() as conn:
-            row = conn.execute(
-                "SELECT 1 FROM favorites WHERE user_id=? AND listing_id=?",
-                (user_id, listing_id),
-            ).fetchone()
-        return row is not None
+
+
+
+
+
+
+
+
+
+
 
     def list_favorites(self, user_id: int) -> list[dict[str, Any]]:
         with self.connect() as conn:
@@ -791,20 +791,20 @@ class Database:
             ).fetchall()
         return [row_to_dict(row) or {} for row in rows]
 
-    def list_bindings_with_rent_day(self, day: int) -> list[dict[str, Any]]:
-        with self.connect() as conn:
-            rows = conn.execute(
-                """
-                SELECT b.*, u.first_name, u.username
-                FROM tenant_bindings b
-                LEFT JOIN users u ON u.user_id = b.user_id
-                WHERE b.status='active'
-                  AND b.rent_day = ?
-                ORDER BY b.id ASC
-                """,
-                (day,),
-            ).fetchall()
-        return [row_to_dict(row) or {} for row in rows]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     def list_bindings_expiring_on(self, date_str: str) -> list[dict[str, Any]]:
         with self.connect() as conn:
@@ -859,13 +859,13 @@ class Database:
             )
             return int(cur.lastrowid)
 
-    def get_repair_ticket(self, ticket_id: int) -> dict[str, Any] | None:
-        with self.connect() as conn:
-            row = conn.execute(
-                "SELECT * FROM repair_tickets WHERE id=? LIMIT 1",
-                (int(ticket_id),),
-            ).fetchone()
-        return row_to_dict(row)
+
+
+
+
+
+
+
 
     def update_repair_ticket_status(self, ticket_id: int, status: str) -> dict[str, Any] | None:
         allowed = {"accepted", "scheduled", "in_progress", "done", "need_info"}
@@ -990,21 +990,21 @@ class Database:
         sub = self.get_subscription(user_id)
         return int(sub.get("lease_reminder_enabled", 1) or 1) == 1
 
-    def toggle_daily_subscription(self, user_id: int, updated_at: str) -> dict[str, Any]:
-        current = self.get_subscription(user_id)
-        new_value = 0 if int(current.get("daily_enabled", 1)) else 1
-        with self.connect() as conn:
-            conn.execute(
-                '''
-                INSERT INTO subscriptions (user_id, daily_enabled, area_alerts_json, lease_reminder_enabled, updated_at)
-                VALUES (?, ?, ?, ?, ?)
-                ON CONFLICT(user_id) DO UPDATE SET
-                    daily_enabled=excluded.daily_enabled,
-                    updated_at=excluded.updated_at
-                ''',
-                (user_id, new_value, current.get("area_alerts_json", "[]"), current.get("lease_reminder_enabled", 1), updated_at),
-            )
-        return self.get_subscription(user_id)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     def toggle_lease_reminder(self, user_id: int, updated_at: str) -> dict[str, Any]:
         current = self.get_subscription(user_id)
@@ -1022,20 +1022,20 @@ class Database:
             )
         return self.get_subscription(user_id)
 
-    def stats(self) -> dict[str, int]:
-        with self.connect() as conn:
-            listings = conn.execute("SELECT COUNT(*) AS c FROM listings").fetchone()["c"]
-            active = conn.execute("SELECT COUNT(*) AS c FROM listings WHERE status='active'").fetchone()["c"]
-            leads = conn.execute("SELECT COUNT(*) AS c FROM leads").fetchone()["c"]
-            appointments = conn.execute("SELECT COUNT(*) AS c FROM appointments").fetchone()["c"]
-            favorites = conn.execute("SELECT COUNT(*) AS c FROM favorites").fetchone()["c"]
-        return {
-            "listings": int(listings),
-            "active_listings": int(active),
-            "leads": int(leads),
-            "appointments": int(appointments),
-            "favorites": int(favorites),
-        }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 db = Database()
