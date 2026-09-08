@@ -1,3 +1,5 @@
+from itertools import product
+
 from qiaolian_dual.canonical_facts import canonicalize_source as legacy_canonicalize_source
 from v3_core.inventory.canonical_facts import canonicalize_source as v3_canonicalize_source
 
@@ -23,6 +25,27 @@ def _assert_same(raw: str, **kwargs):
 
 def test_v3_canonical_parser_matches_locked_production_matrix():
     for raw in CASES:
+        _assert_same(raw)
+
+
+def test_v3_canonical_parser_matches_combinatorial_contract_space():
+    projects = ("富力城", "BKK1", "钻石岛")
+    layouts = ("1房1厅", "2房1厅2卫", "Studio")
+    prices = ("租金 $500/月", "月租900美元/月", "现价 $1200/月 原价 $1500/月")
+    terms = ("押1付1 租期1年", "押2付1 合同6个月", "")
+    sizes = ("面积55㎡ 8楼", "面积95㎡ 19楼", "")
+    for project, layout, price, term, size in product(projects, layouts, prices, terms, sizes):
+        raw = "\n".join(value for value in (project, "公寓出租", layout, price, term, size) if value)
+        _assert_same(raw)
+
+
+def test_v3_canonical_parser_matches_sale_and_mixed_variants():
+    for raw in (
+        "富力城 2房1厅 出售 售价 $100,000 面积90㎡",
+        "BKK1 1房1厅 租金$650/月 售价$88,000",
+        "钻石岛 3房2卫 for sale sale price $250,000",
+        "永旺1 2房1厅 for rent USD 900 per month",
+    ):
         _assert_same(raw)
 
 
