@@ -50,11 +50,17 @@ jobs:
           git diff --exit-code -- qiaolian_production/publisher/qiaolian_publisher_v2/bot.py
       - name: Audit publisher package module reachability
         run: python qiaolian_production/tools/audit_publisher_modules.py
-      - name: Slice publisher formatter candidate
+      - name: Verify committed formatter slice
         run: |
           python qiaolian_production/tools/audit_publisher_formatters.py
           python qiaolian_production/tools/audit_publisher_formatters.py --write
           python -m py_compile qiaolian_production/publisher/qiaolian_publisher_v2/formatters.py
+          git diff --exit-code -- qiaolian_production/publisher/qiaolian_publisher_v2/formatters.py
+      - name: Slice publisher keyboard candidate
+        run: |
+          python qiaolian_production/tools/audit_publisher_keyboards.py
+          python qiaolian_production/tools/audit_publisher_keyboards.py --write
+          python -m py_compile qiaolian_production/publisher/qiaolian_publisher_v2/keyboards.py
       - name: Import collector from extracted tree only
         env:
           DB_PATH: '${{ runner.temp }}/qiaolian-extraction.db'
@@ -68,21 +74,17 @@ jobs:
           repo = Path.cwd().resolve()
           prod = (repo / 'qiaolian_production').resolve()
           import qiaolian_production.run_collector as entry
-          entry._activate_paths()
-          entry.configure_environment()
+          entry._activate_paths(); entry.configure_environment()
           sys.path[:] = [p for p in sys.path if Path(p or '.').resolve() != repo]
           import collector_bot, ai_parser, publication_package
           assert collector_bot and ai_parser and publication_package
-          leaks = []
-          for name, module in tuple(sys.modules.items()):
-              raw = getattr(module, '__file__', None)
-              if not raw or name == '__main__' or str(raw).startswith('<'):
-                  continue
-              path = Path(raw).resolve()
-              if (path == repo or repo in path.parents) and not (path == prod or prod in path.parents):
-                  leaks.append((name, str(path.relative_to(repo))))
-          if leaks:
-              raise SystemExit('collector local-source leaks: ' + repr(sorted(leaks)))
+          leaks=[]
+          for name,module in tuple(sys.modules.items()):
+              raw=getattr(module,'__file__',None)
+              if not raw or name=='__main__' or str(raw).startswith('<'): continue
+              path=Path(raw).resolve()
+              if (path==repo or repo in path.parents) and not (path==prod or prod in path.parents): leaks.append((name,str(path.relative_to(repo))))
+          if leaks: raise SystemExit('collector local-source leaks: '+repr(sorted(leaks)))
           print('COLLECTOR_IMPORT_OK')
           PY
       - name: Import publisher with all production patches
@@ -99,36 +101,25 @@ jobs:
           python - <<'PY'
           import sys
           from pathlib import Path
-          repo = Path.cwd().resolve()
-          prod = (repo / 'qiaolian_production').resolve()
+          repo=Path.cwd().resolve(); prod=(repo/'qiaolian_production').resolve()
           import qiaolian_production.run_publisher as entry
-          entry._activate_paths()
-          entry.configure_environment()
-          sys.path[:] = [p for p in sys.path if Path(p or '.').resolve() != repo]
-          loaded = entry._load_runtime()
-          main, install_cover_picker, install_daily_broadcast_patch, install_media_selection_patch, install_review_queue_patch, install_release_contract_patch = loaded
-          install_cover_picker()
-          install_media_selection_patch()
-          install_review_queue_patch()
-          install_release_contract_patch()
-          install_daily_broadcast_patch()
+          entry._activate_paths(); entry.configure_environment()
+          sys.path[:]=[p for p in sys.path if Path(p or '.').resolve()!=repo]
+          main,cover,daily,media,review,release=entry._load_runtime()
+          cover(); media(); review(); release(); daily()
           from qiaolian_publisher_v2.bot import PublisherBot
-          from qiaolian_publisher_v2 import formatters
-          required = {'AREA_OPTIONS','TYPE_LABELS','CHANNEL_BUTTON_PROMPT','deep_link','build_post_text','build_preview_text','normalize_tags'}
-          missing = sorted(name for name in required if not hasattr(formatters, name))
-          if missing:
-              raise SystemExit('missing formatter production symbols: ' + repr(missing))
-          assert PublisherBot and main
-          leaks = []
-          for name, module in tuple(sys.modules.items()):
-              raw = getattr(module, '__file__', None)
-              if not raw or name == '__main__' or str(raw).startswith('<'):
-                  continue
-              path = Path(raw).resolve()
-              if (path == repo or repo in path.parents) and not (path == prod or prod in path.parents):
-                  leaks.append((name, str(path.relative_to(repo))))
-          if leaks:
-              raise SystemExit('publisher local-source leaks: ' + repr(sorted(leaks)))
+          from qiaolian_publisher_v2 import formatters, keyboards
+          required_f={'AREA_OPTIONS','TYPE_LABELS','CHANNEL_BUTTON_PROMPT','deep_link','build_post_text','build_preview_text','normalize_tags'}
+          missing=sorted(name for name in required_f if not hasattr(formatters,name))
+          if missing: raise SystemExit('missing formatter production symbols: '+repr(missing))
+          assert PublisherBot and keyboards and main
+          leaks=[]
+          for name,module in tuple(sys.modules.items()):
+              raw=getattr(module,'__file__',None)
+              if not raw or name=='__main__' or str(raw).startswith('<'): continue
+              path=Path(raw).resolve()
+              if (path==repo or repo in path.parents) and not (path==prod or prod in path.parents): leaks.append((name,str(path.relative_to(repo))))
+          if leaks: raise SystemExit('publisher local-source leaks: '+repr(sorted(leaks)))
           print('PUBLISHER_IMPORT_OK')
           PY
       - name: Build user bot from extracted tree only
@@ -142,26 +133,19 @@ jobs:
           python - <<'PY'
           import sys
           from pathlib import Path
-          repo = Path.cwd().resolve()
-          prod = (repo / 'qiaolian_production').resolve()
+          repo=Path.cwd().resolve(); prod=(repo/'qiaolian_production').resolve()
           import qiaolian_production.run_user as entry
-          entry._activate_paths()
-          entry.configure_environment()
-          sys.path[:] = [p for p in sys.path if Path(p or '.').resolve() != repo]
-          loaded = entry._load_runtime()
-          assert loaded and loaded[0]
+          entry._activate_paths(); entry.configure_environment()
+          sys.path[:]=[p for p in sys.path if Path(p or '.').resolve()!=repo]
+          loaded=entry._load_runtime(); assert loaded and loaded[0]
           import qiaolian_dual.user_bot as user_bot
-          app = user_bot.build_application()
-          assert app is not None
-          leaks = []
-          for name, module in tuple(sys.modules.items()):
-              raw = getattr(module, '__file__', None)
-              if not raw or name == '__main__' or str(raw).startswith('<'):
-                  continue
-              path = Path(raw).resolve()
-              if (path == repo or repo in path.parents) and not (path == prod or prod in path.parents):
-                  leaks.append((name, str(path.relative_to(repo))))
-          if leaks:
-              raise SystemExit('user local-source leaks: ' + repr(sorted(leaks)))
+          assert user_bot.build_application() is not None
+          leaks=[]
+          for name,module in tuple(sys.modules.items()):
+              raw=getattr(module,'__file__',None)
+              if not raw or name=='__main__' or str(raw).startswith('<'): continue
+              path=Path(raw).resolve()
+              if (path==repo or repo in path.parents) and not (path==prod or prod in path.parents): leaks.append((name,str(path.relative_to(repo))))
+          if leaks: raise SystemExit('user local-source leaks: '+repr(sorted(leaks)))
           print('USER_BUILD_OK')
           PY
