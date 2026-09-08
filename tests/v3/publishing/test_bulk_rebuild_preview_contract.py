@@ -112,11 +112,10 @@ def test_target_set_is_frozen_and_any_data_or_mapping_drift_invalidates_preview(
         validate_preview(preview, original[:-1])
 
 
-def test_no_preview_no_apply_and_phase11_apply_is_permanently_blocked_here():
-    assert not hasattr(rebuild_channel, 'apply')
-    assert not hasattr(rebuild_channel, 'apply_preview')
-    with pytest.raises(SystemExit, match='PHASE_11_NOT_STARTED'):
-        rebuild_channel.main(['--apply'])
+def test_phase11_apply_requires_explicit_preview_hash_and_gateway():
+    assert hasattr(rebuild_channel, 'apply_preview')
+    with pytest.raises(SystemExit, match='phase11_apply_requires_preview_hash_and_gateway'):
+        rebuild_channel.main(['--db', ':memory:', '--output', 'unused.json', '--apply'])
 
 
 def test_official_cli_is_db_backed_and_generic_json_mode_is_not_an_acceptance_path(tmp_path):
