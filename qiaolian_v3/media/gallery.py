@@ -41,7 +41,7 @@ def _dhash(path: Path, hash_size: int = 8) -> int | None:
         with Image.open(path) as source:
             image = ImageOps.exif_transpose(source).convert('L')
             image = image.resize((hash_size + 1, hash_size), Image.Resampling.LANCZOS)
-            pixels = list(image.getdata())
+            pixels = list(image.get_flattened_data())
     except Exception:
         return None
     width = hash_size + 1
@@ -75,7 +75,6 @@ def _quality(path: Path) -> tuple[bool, float, str]:
             contrast = float(stat.stddev[0])
             if mean < 20 or mean > 245:
                 return False, -900.0, 'bad_brightness'
-            # Stable cover ranking only; gallery order remains source order.
             ratio = width / max(height, 1)
             orientation = 100.0 if 1.05 <= ratio <= 1.85 else (70.0 if ratio >= 0.9 else 45.0)
             resolution = min((width * height) / 2_000_000 * 100.0, 100.0)
