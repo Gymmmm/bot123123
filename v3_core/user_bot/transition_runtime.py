@@ -17,6 +17,7 @@ from .appointment_submit_executor import (
     AppointmentSubmitExecutor,
     build_sqlite_appointment_submit_executor,
 )
+from .lead_service import LeadService, build_sqlite_lead_service
 from .public_inventory import PublicInventoryReader
 from .search_submit_executor import (
     SearchSubmitExecutor,
@@ -37,6 +38,7 @@ class UserBotTransitionRuntime:
     appointments: AppointmentSubmitExecutor
     appointment_history: AppointmentHistoryService
     searches: SearchSubmitExecutor
+    leads: LeadService
 
 
 def build_transition_runtime(db_path: str | Path) -> UserBotTransitionRuntime:
@@ -54,6 +56,7 @@ def build_transition_runtime(db_path: str | Path) -> UserBotTransitionRuntime:
             inventory=inventory,
         ),
         searches=build_sqlite_search_submit_executor(path),
+        leads=build_sqlite_lead_service(path),
     )
 
 
