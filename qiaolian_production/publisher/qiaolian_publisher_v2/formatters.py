@@ -31,19 +31,6 @@ def deep_link(username: str, payload: str) -> str:
     username = username.lstrip("@")
     return f"https://t.me/{username}?start={quote(payload)}"
 
-def _format_list_items(data: str | list) -> list[str]:
-    items = []
-    if isinstance(data, list):
-        items = data
-    elif isinstance(data, str) and data.strip():
-        try:
-            parsed = json.loads(data)
-            if isinstance(parsed, list):
-                items = parsed
-        except Exception:
-            items = [i.strip() for i in data.split(",") if i.strip()]
-    return [f"• {escape(item)}" for item in items if item.strip()]
-
 
 def _coerce_text_list(val, *, limit: int, pad: str = "—") -> list[str]:
     """highlights / drawbacks 兼容 list、JSON 字符串、逗号分隔。"""
@@ -95,41 +82,6 @@ def _format_size_for_caption(size_raw: str) -> str:
 # 封面图/视频上的一句话（Telegram 相册不能挂按钮，故按钮挂在单张封面上）
 CHANNEL_BUTTON_PROMPT = "👇 <b>喜欢这套就直接点下面按钮</b>"
 
-
-def _generate_tags(area: str, layout: str, highlights: str) -> str:
-    tags = ["#金边租房", "#实拍房源"]
-    
-    # 根据区域添加标签
-    if area and area != "未知区域":
-        if area == "富力城": # 特殊处理项目名
-            tags.append("#富力城")
-        elif area == "BKK1":
-            tags.append("#BKK1")
-        else:
-            tags.append(f"#{area}")
-
-    # 根据户型添加标签
-    if "公寓" in layout or "房" in layout:
-        tags.append("#金边公寓")
-    
-    # 根据亮点添加标签
-    if "拎包入住" in highlights:
-        tags.append("#拎包入住")
-    if "视频看房" in highlights or "视频" in highlights:
-        tags.append("#视频看房")
-
-    # 确保标签数量在 4-6 个之间，并去重
-    unique_tags = []
-    for tag in tags:
-        if tag not in unique_tags:
-            unique_tags.append(tag)
-    
-    # 补充通用标签直到达到4个
-    if len(unique_tags) < 4:
-        if "#金边公寓" not in unique_tags: unique_tags.append("#金边公寓")
-        if "#拎包入住" not in unique_tags and len(unique_tags) < 4: unique_tags.append("#拎包入住")
-
-    return " ".join(unique_tags[:6]) # 最多取前6个
 
 def build_post_text(data: dict, contact_handle: str) -> str:
     """
@@ -221,77 +173,11 @@ def build_post_text(data: dict, contact_handle: str) -> str:
         body += cost_line
     return body
 
+
 def build_preview_text(data: dict, contact_handle: str = "") -> str:
     text = build_post_text(data, contact_handle)
     return "📋 发布预览（频道先发长文，再发封面图+按钮）\n\n" + text
 
-
-def build_post_variants(data: dict) -> list[tuple[str, str]]:
-    """
-    生成同一房源的多文案版本（仅正文）。
-    返回: [(variant_name, html_text), ...]
-    """
-    base = build_post_text(data, contact_handle="")
-    area = escape((data.get("area") or "金边").strip())
-    title = escape((data.get("title") or data.get("project") or "精选房源").strip())
-    layout = escape((data.get("layout") or "户型待定").strip())
-    size = escape(_format_size_for_caption(str(data.get("size") or data.get("size_sqm") or "")))
-    price = escape(_format_price_display(str(data.get("price") or "")))
-    h = _coerce_text_list(data.get("highlights"), limit=3, pad="实拍房源")
-    h1, h2, _h3 = (escape(x) for x in h)
-
-    variants: list[tuple[str, str]] = [
-        ("标准长文", base),
-        (
-            "精简卡片",
-            "\n".join(
-                [
-                    f"🏠 <b>{area} · {layout}</b>",
-                    f"💰 <b>{price}</b> · 约{size}",
-                    f"✨ {h1} · {h2}",
-                    "👇 点下方按钮咨询/预约看房",
-                ]
-            ),
-        ),
-        (
-            "亮点优先",
-            "\n".join(
-                [
-                    f"✨ <b>{title}</b>",
-                    f"📍 {area}｜{layout}",
-                    f"• {h1}",
-                    f"• {h2}",
-                    f"💰 <b>{price}</b>",
-                    "👇 点下方按钮直接咨询",
-                ]
-            ),
-        ),
-        (
-            "通勤导向",
-            "\n".join(
-                [
-                    f"🚇 <b>{area} 通勤友好房源</b>",
-                    f"🏠 {title}｜{layout}",
-                    f"📐 约{size}",
-                    f"💰 <b>{price}</b>",
-                    "适合上班族/情侣，支持预约实地看房",
-                    "👇 点下方按钮领取实拍细节",
-                ]
-            ),
-        ),
-        (
-            "种草短文",
-            "\n".join(
-                [
-                    f"🌟 <b>{area} · 今日上新</b>",
-                    f"{layout}｜约{size}｜<b>{price}</b>",
-                    f"主打：{h1}、{h2}",
-                    "想看同户型对比，点下方按钮咨询顾问",
-                ]
-            ),
-        ),
-    ]
-    return variants
 
 def normalize_tags(tags_str: str) -> str:
     """标准化标签字符串，确保每个标签都以 # 开头并以空格分隔。"""
