@@ -52,17 +52,62 @@ def _facts(deal_type="rent"):
     }
 
 
+def _draw_distinct_room(path: Path, index: int) -> None:
+    """Create sharp, visibly different 4:3 room-like fixtures for the real ranker."""
+    palettes = (
+        ((216, 202, 180), (170, 208, 232), (62, 73, 84)),
+        ((196, 214, 190), (238, 205, 158), (70, 82, 58)),
+        ((220, 194, 194), (184, 214, 204), (86, 58, 64)),
+        ((194, 205, 226), (232, 222, 168), (54, 68, 92)),
+        ((226, 213, 188), (194, 190, 230), (76, 64, 52)),
+        ((202, 222, 218), (235, 190, 176), (55, 82, 78)),
+    )
+    wall, window, dark = palettes[index % len(palettes)]
+    image = Image.new("RGB", (960, 720), wall)
+    draw = ImageDraw.Draw(image)
+
+    # Every fixture has a different large-scale luminance geometry so dHash
+    # cannot collapse the set as near duplicates.
+    if index == 0:
+        draw.rectangle((70, 70, 430, 420), fill=window, outline=dark, width=10)
+        draw.rectangle((555, 330, 900, 610), fill=(128, 96, 70), outline=dark, width=10)
+        draw.line((0, 585, 960, 585), fill=dark, width=12)
+    elif index == 1:
+        draw.rectangle((510, 65, 900, 380), fill=window, outline=dark, width=10)
+        draw.polygon(((80, 610), (350, 300), (540, 610)), fill=(148, 112, 82), outline=dark)
+        for x in range(90, 500, 80):
+            draw.line((x, 620, x + 240, 330), fill=dark, width=6)
+    elif index == 2:
+        draw.rectangle((85, 95, 875, 215), fill=window, outline=dark, width=10)
+        draw.rectangle((110, 365, 500, 625), fill=(150, 118, 88), outline=dark, width=10)
+        draw.rectangle((610, 295, 860, 625), fill=(112, 124, 110), outline=dark, width=10)
+        draw.line((480, 230, 480, 700), fill=dark, width=9)
+    elif index == 3:
+        for x in range(60, 900, 150):
+            draw.rectangle((x, 80, x + 88, 520), fill=window if (x // 150) % 2 else (235, 235, 225), outline=dark, width=7)
+        draw.rectangle((180, 555, 800, 665), fill=(132, 102, 78), outline=dark, width=9)
+    elif index == 4:
+        draw.ellipse((90, 90, 430, 430), fill=window, outline=dark, width=11)
+        draw.rectangle((520, 100, 885, 265), fill=(236, 232, 215), outline=dark, width=9)
+        draw.polygon(((520, 650), (690, 300), (900, 650)), fill=(146, 112, 82), outline=dark)
+        draw.line((45, 520, 520, 690), fill=dark, width=9)
+    else:
+        draw.rectangle((70, 80, 300, 630), fill=(235, 235, 225), outline=dark, width=9)
+        draw.rectangle((360, 90, 890, 330), fill=window, outline=dark, width=10)
+        for y in range(390, 660, 55):
+            draw.line((330, y, 900, y - 90), fill=dark, width=7)
+        draw.rectangle((90, 500, 275, 650), fill=(142, 108, 80), outline=dark, width=8)
+
+    image.save(path, "JPEG", quality=95)
+
+
 def _images(tmp_path: Path, prefix: str):
     result = []
-    for index in range(4):
+    # Use six intentionally distinct source images. Production still requires
+    # at least four usable images after exact/near dedupe and severe rejects.
+    for index in range(6):
         path = tmp_path / f"{prefix}-{index}.jpg"
-        image = Image.new("RGB", (960, 720), (150, 135 + index * 5, 115))
-        draw = ImageDraw.Draw(image)
-        draw.rectangle((80, 70, 880, 650), outline=(245, 245, 238), width=12)
-        draw.rectangle((140, 140, 500, 450), fill=(175, 205, 225), outline=(50, 70, 90), width=8)
-        draw.line((90, 580, 870, 580), fill=(55, 55, 55), width=10)
-        draw.line((180 + index * 17, 110, 690, 540 - index * 8), fill=(110, 75, 45), width=7)
-        image.save(path, "JPEG", quality=94)
+        _draw_distinct_room(path, index)
         result.append(
             {
                 "local_path": str(path),
@@ -168,7 +213,7 @@ def test_review_must_be_approved_before_package_build(tmp_path):
     assert package.status == "package_ready"
     assert package.cover_style == "black_gold"
     assert tuple(package.actions) == ("details", "photos", "book")
-    assert len(package.gallery) == 4
+    assert len(package.gallery) >= 4
 
 
 def test_package_requires_second_approval_before_delivery(tmp_path):
