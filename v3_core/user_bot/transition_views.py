@@ -14,6 +14,7 @@ from html import escape as he
 from typing import Literal
 
 from .listing_presenter import build_public_listing_details
+from .public_appointment import PublicAppointmentDraft
 from .public_inventory import PublicInventoryReader
 from .transition_plan import TransitionPlan
 
@@ -22,6 +23,9 @@ TransitionChoiceKind = Literal[
     "appointment_date",
     "appointment_other_date",
     "appointment_mode",
+    "appointment_time",
+    "appointment_other_time",
+    "appointment_back_date",
     "listing_details",
     "home",
     "budget_choice",
@@ -55,29 +59,57 @@ def _format_price(value: int | None) -> str:
     return f"${int(value):,}/月" if value is not None and int(value) > 0 else ""
 
 
-def _appointment_view(
-    plan: TransitionPlan,
+def _date_display(value: object) -> str:
+    raw = str(value or "").strip()
+    bits = raw.replace("/", "-").split("-")
+    if len(bits) >= 2 and all(part.isdigit() for part in bits[-2:]):
+        return f"{int(bits[-2])}月{int(bits[-1])}日"
+    return raw or "待安排"
+
+
+def _resolve_bookable_details(
     inventory: PublicInventoryReader,
-    *,
-    today: date,
-) -> TransitionView:
-    if plan.book is None:
-        raise ValueError("book_transition_missing_public_draft")
-    public_id = plan.book.draft.public_listing_id
-    view = inventory.resolve(public_id)
+    public_listing_id: str,
+):
+    view = inventory.resolve(public_listing_id)
     if view is None:
         raise ValueError("listing_not_publicly_published")
     if not view.bookable:
         raise ValueError("listing_not_bookable")
-    details = build_public_listing_details(view)
+    return build_public_listing_details(view)
+
+
+def _appointment_date_view(
+    draft: PublicAppointmentDraft,
+    inventory: PublicInventoryReader,
+    *,
+    today: date,
+) -> TransitionView:
+    public_id = draft.public_listing_id
+    details = _resolve_bookable_details(inventory, public_id)
     subject = details.subject or details.location or "这套房"
     price = _format_price(details.monthly_rent_usd)
     price_line = f"\n💰 <b>{he(price)}</b>" if price else ""
-    heading = f"📅 <b>预约看房｜{he(public_id)}</b>"
+    if draft.mode == "video":
+        heading = f"🎥 <b>视频看房｜{he(public_id)}</b>"
+        question = "哪天方便视频看房？"
+        mode_choice = TransitionChoice(
+            "🚶 改为实地看房",
+            "appointment_mode",
+            "offline",
+        )
+    else:
+        heading = f"📅 <b>预约看房｜{he(public_id)}</b>"
+        question = "哪天方便看房？"
+        mode_choice = TransitionChoice(
+            "🎥 改为视频看房",
+            "appointment_mode",
+            "video",
+        )
     text = (
         f"{heading}\n\n"
         f"🏠 <b>{he(subject)}</b>{price_line}\n\n"
-        "哪天方便看房？"
+        f"{question}"
     )
 
     today_value = today.strftime("%m-%d")
@@ -92,7 +124,7 @@ def _appointment_view(
             TransitionChoice("后天", "appointment_date", after_value),
             TransitionChoice("📅 其他日期", "appointment_other_date"),
         ),
-        (TransitionChoice("🎥 改为视频看房", "appointment_mode", "video"),),
+        (mode_choice,),
         (
             TransitionChoice(
                 "⬅️ 返回房源",
@@ -105,6 +137,54 @@ def _appointment_view(
     return TransitionView(kind="appointment_date", text=text, rows=rows)
 
 
+def _appointment_time_view(
+    draft: PublicAppointmentDraft,
+    inventory: PublicInventoryReader,
+) -> TransitionView:
+    if not draft.date:
+        raise ValueError("appointment_time_view_requires_date")
+    details = _resolve_bookable_details(inventory, draft.public_listing_id)
+    subject = details.subject or details.location or "这套房"
+    text = (
+        "🕐 <b>选择时间</b>\n\n"
+        f"📅 {he(_date_display(draft.date))}\n"
+        f"🏠 {he(subject)}"
+    )
+    rows = (
+        (TransitionChoice("上午 09:00–12:00", "appointment_time", "am"),),
+        (TransitionChoice("下午 14:00–17:00", "appointment_time", "pm"),),
+        (TransitionChoice("晚上 17:00–19:00", "appointment_time", "evening"),),
+        (TransitionChoice("✍️ 其他时间", "appointment_other_time"),),
+        (
+            TransitionChoice("⬅️ 修改日期", "appointment_back_date"),
+            TransitionChoice("🏠 返回首页", "home"),
+        ),
+    )
+    return TransitionView(kind="appointment_time", text=text, rows=rows)
+
+
+def _custom_date_prompt() -> TransitionView:
+    return TransitionView(
+        kind="appointment_custom_date",
+        text=(
+            "📅 <b>请输入日期</b>\n\n"
+            "例如：<code>0905</code>、<code>9月5日</code> 或 <code>下周三</code>"
+        ),
+        rows=(),
+    )
+
+
+def _custom_time_prompt() -> TransitionView:
+    return TransitionView(
+        kind="appointment_custom_time",
+        text=(
+            "🕐 <b>其他时间</b>\n\n"
+            "直接输入，例如：<code>20:00</code> 或 <code>晚上8点</code>"
+        ),
+        rows=(),
+    )
+
+
 _BUDGET_OPTIONS = (
     ("b1", "$400以内", None, 400),
     ("b2", "$400–600", 400, 600),
@@ -113,6 +193,14 @@ _BUDGET_OPTIONS = (
     ("b5", "$1200–1500", 1200, 1500),
     ("b6", "$1500+", 1500, None),
 )
+
+
+def budget_bounds(code: object) -> tuple[str, int | None, int | None]:
+    clean = str(code or "").strip()
+    for opt_code, label, budget_min, budget_max in _BUDGET_OPTIONS:
+        if opt_code == clean:
+            return (label, budget_min, budget_max)
+    raise ValueError("unsupported_budget_choice")
 
 
 def _similar_view(plan: TransitionPlan) -> TransitionView:
@@ -173,6 +261,29 @@ class TransitionViewService:
     def __init__(self, inventory: PublicInventoryReader):
         self.inventory = inventory
 
+    def appointment_date(
+        self,
+        draft: PublicAppointmentDraft,
+        *,
+        today: date | None = None,
+    ) -> TransitionView:
+        return _appointment_date_view(
+            draft,
+            self.inventory,
+            today=today or date.today(),
+        )
+
+    def appointment_time(self, draft: PublicAppointmentDraft) -> TransitionView:
+        return _appointment_time_view(draft, self.inventory)
+
+    @staticmethod
+    def custom_date_prompt() -> TransitionView:
+        return _custom_date_prompt()
+
+    @staticmethod
+    def custom_time_prompt() -> TransitionView:
+        return _custom_time_prompt()
+
     def build(
         self,
         plan: TransitionPlan,
@@ -180,11 +291,9 @@ class TransitionViewService:
         today: date | None = None,
     ) -> TransitionView:
         if plan.kind == "book":
-            return _appointment_view(
-                plan,
-                self.inventory,
-                today=today or date.today(),
-            )
+            if plan.book is None:
+                raise ValueError("book_transition_missing_public_draft")
+            return self.appointment_date(plan.book.draft, today=today)
         if plan.kind == "similar":
             return _similar_view(plan)
         if plan.kind == "change_search":
@@ -199,4 +308,5 @@ __all__ = [
     "TransitionChoiceKind",
     "TransitionView",
     "TransitionViewService",
+    "budget_bounds",
 ]
