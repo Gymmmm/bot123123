@@ -42,11 +42,14 @@ jobs:
           python qiaolian_production/tools/audit_publication_package_symbols.py --write
           python -m py_compile qiaolian_production/collector/publication_package.py
           git diff --exit-code -- qiaolian_production/collector/publication_package.py
-      - name: Slice and compile PublisherBot candidate
+      - name: Verify committed PublisherBot slice
         run: |
           python qiaolian_production/tools/audit_publisher_bot_methods.py
           python qiaolian_production/tools/audit_publisher_bot_methods.py --write
           python -m py_compile qiaolian_production/publisher/qiaolian_publisher_v2/bot.py
+          git diff --exit-code -- qiaolian_production/publisher/qiaolian_publisher_v2/bot.py
+      - name: Audit publisher package module reachability
+        run: python qiaolian_production/tools/audit_publisher_modules.py
       - name: Import collector from extracted tree only
         env:
           DB_PATH: '${{ runner.temp }}/qiaolian-extraction.db'
@@ -77,7 +80,7 @@ jobs:
               raise SystemExit('collector local-source leaks: ' + repr(sorted(leaks)))
           print('COLLECTOR_IMPORT_OK')
           PY
-      - name: Import publisher candidate with all production patches
+      - name: Import publisher with all production patches
         env:
           DB_PATH: '${{ runner.temp }}/qiaolian-extraction.db'
           SQLITE_PATH: '${{ runner.temp }}/qiaolian-extraction.db'
@@ -152,17 +155,3 @@ jobs:
               raise SystemExit('user local-source leaks: ' + repr(sorted(leaks)))
           print('USER_BUILD_OK')
           PY
-      - name: Commit validated PublisherBot slice
-        if: github.event_name == 'push'
-        run: |
-          TARGET=qiaolian_production/publisher/qiaolian_publisher_v2/bot.py
-          if git diff --quiet -- "$TARGET"; then
-            echo 'PUBLISHER_BOT_SLICE_ALREADY_COMMITTED=1'
-            exit 0
-          fi
-          git diff --check
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add "$TARGET"
-          git commit -m 'refactor: slim PublisherBot production methods'
-          git push origin HEAD:refactor/production-extraction
