@@ -7,7 +7,8 @@ from typing import Any
 
 from qiaolian_v3.db.repositories.reviews import ReviewRepository
 from qiaolian_v3.ingest.manual_intake import ManualIntakePreview, ManualIntakeService
-from qiaolian_v3.publishing.gate import AutoPublishGateResult
+from qiaolian_v3.publishing.delivery import DeliveryCoordinator
+from qiaolian_v3.publishing.gate import GateResult
 from qiaolian_v3.publishing.package import FrozenPublicationPackage, build_frozen_rent_package
 from qiaolian_v3.publishing.publisher import RentPublisher
 
@@ -19,7 +20,7 @@ class AdminConfirmBlocked(RuntimeError):
 class ExplicitAdminApprovalGate:
     """Explicit-admin-only gate; it never participates in auto-publish planning."""
 
-    def evaluate(self, package: FrozenPublicationPackage) -> AutoPublishGateResult:
+    def evaluate(self, package: FrozenPublicationPackage) -> GateResult:
         reasons: list[str] = []
         if not package.frozen:
             reasons.append('package_not_frozen')
@@ -31,7 +32,7 @@ class ExplicitAdminApprovalGate:
             reasons.append('source_not_admin_import')
         if package.quality_result != 'ADMIN_APPROVED':
             reasons.append('explicit_admin_approval_required')
-        return AutoPublishGateResult(allowed=not reasons, reasons=tuple(reasons))
+        return GateResult(allowed=not reasons, reasons=tuple(reasons))
 
 
 @dataclass(frozen=True)
@@ -106,7 +107,7 @@ class AdminManualIntakeController:
                 package_id,idempotency_key,listing_id,offer_id,canonical_record_id,package_version,
                 target_channel_id,status,approval_mode,approved_by,approved_at,
                 cover_path,gallery_json,caption_html,keyboard_json,content_hash,canonical_hash
-            ) VALUES (?,?,?, ?,?,1,?,'frozen','admin',?,CURRENT_TIMESTAMP,?,?,?,?,?,?)''',
+            ) VALUES (?,?,?,?,?,1,?,'frozen','admin',?,CURRENT_TIMESTAMP,?,?,?,?,?,?)''',
             (
                 package.package_id, package.package_id, package.listing_id, package.offer_id,
                 package.canonical_record_id, package.target_channel_id, str(operator_id),
@@ -119,7 +120,7 @@ class AdminManualIntakeController:
         self.conn.commit()
         publisher = RentPublisher(
             gateway=gateway,
-            delivery=__import__('qiaolian_v3.publishing.delivery', fromlist=['DeliveryCoordinator']).DeliveryCoordinator(self.conn),
+            delivery=DeliveryCoordinator(self.conn),
             dry_run=bool(dry_run),
             gate=ExplicitAdminApprovalGate(),
         )
