@@ -1,9 +1,9 @@
 """Explicit listing availability recomputation from appointment state.
 
-Locked production hides this rule inside ``Database._sync_listing_appointment_state``.
-V3 keeps it visible: appointments may only toggle inventory ``active`` and
-``reserved``. They must never overwrite manual/terminal states such as pending,
-rented or offline.
+This mirrors locked production's appointment lock rule: bookable inventory is
+``active`` with no open appointments, ``reserved`` with 1-4, and ``pending`` at
+5 or more. Manual/terminal ``pending``/``rented``/``inactive``/``offline`` states
+are never relaxed automatically.
 """
 from __future__ import annotations
 
@@ -13,7 +13,8 @@ from typing import Protocol, Sequence
 from .appointments import ACTIVE_APPOINTMENT_STATUSES
 
 
-AUTO_APPOINTMENT_INVENTORY_STATUSES = frozenset({"active", "reserved"})
+APPOINTMENT_LOCK_COUNT = 5
+AUTO_APPOINTMENT_INVENTORY_STATUSES = frozenset({"active", "reserved", "pending"})
 
 
 class AppointmentAvailabilityRepository(Protocol):
@@ -51,6 +52,15 @@ class AppointmentAvailabilityService:
         previous = str(self.repository.get_inventory_status(clean_listing_id) or "").strip().lower()
         if not previous:
             raise ValueError("listing_not_found")
+        if previous in {"rented", "offline", "inactive"}:
+            return AppointmentAvailabilityResult(
+                listing_id=clean_listing_id,
+                previous_status=previous,
+                next_status=previous,
+                active_appointment_count=0,
+                changed=False,
+                protected_status=True,
+            )
         if previous not in AUTO_APPOINTMENT_INVENTORY_STATUSES:
             return AppointmentAvailabilityResult(
                 listing_id=clean_listing_id,
@@ -68,7 +78,26 @@ class AppointmentAvailabilityService:
             )
             or 0
         )
-        next_status = "reserved" if active_count > 0 else "active"
+
+        # Locked production treats pending as sticky/manual: once pending, open
+        # appointment count must not silently re-open the listing.
+        if previous == "pending":
+            return AppointmentAvailabilityResult(
+                listing_id=clean_listing_id,
+                previous_status=previous,
+                next_status=previous,
+                active_appointment_count=active_count,
+                changed=False,
+                protected_status=True,
+            )
+
+        if active_count >= APPOINTMENT_LOCK_COUNT:
+            next_status = "pending"
+        elif active_count >= 1:
+            next_status = "reserved"
+        else:
+            next_status = "active"
+
         if next_status == previous:
             return AppointmentAvailabilityResult(
                 listing_id=clean_listing_id,
@@ -93,6 +122,7 @@ class AppointmentAvailabilityService:
 
 
 __all__ = [
+    "APPOINTMENT_LOCK_COUNT",
     "AUTO_APPOINTMENT_INVENTORY_STATUSES",
     "AppointmentAvailabilityRepository",
     "AppointmentAvailabilityResult",
