@@ -19,13 +19,24 @@ from .listing_presenter import build_public_listing_details
 from .public_inventory import PublishedListingView
 
 
-InternalListingAction = Literal["details", "photos", "book", "consult", "similar"]
+InternalListingAction = Literal[
+    "details",
+    "photos",
+    "book",
+    "consult",
+    "similar",
+    "previous",
+    "next",
+    "change_search",
+]
 
 
 @dataclass(frozen=True)
 class SemanticAction:
     label: str
     action: InternalListingAction
+    target_public_listing_id: str = ""
+    target_index: int | None = None
 
 
 @dataclass(frozen=True)
