@@ -10,6 +10,8 @@
 *.sqlite3
 *.pem
 *.key
+*.swp
+*.swo
 data/
 media/
 logs/
