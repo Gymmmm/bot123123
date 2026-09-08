@@ -53,7 +53,18 @@ jobs:
             appointments_view \
             callback_appointment \
             callback_search \
-            callback_service
+            callback_service \
+            callback_admin \
+            callback_contract \
+            callback_listing \
+            callback_navigation \
+            callback_preference \
+            callbacks \
+            search \
+            search_text_handlers \
+            message_handlers \
+            start_routes \
+            listing
           do
             echo "=== ${module} ==="
             python qiaolian_production/tools/audit_user_symbol_module.py "${module}"
