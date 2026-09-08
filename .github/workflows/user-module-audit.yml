@@ -16,3 +16,20 @@ jobs:
           python-version: '3.12'
       - name: Audit user bot modules
         run: python qiaolian_production/tools/audit_user_modules.py
+      - name: Audit pure user helper symbols
+        run: |
+          set -e
+          for module in \
+            public_listing_id \
+            area_normalization \
+            publishability_contract \
+            status_labels \
+            location_mapping \
+            text_utils \
+            utils_formatting \
+            v2_safe_adapter \
+            channel_links
+          do
+            echo "=== ${module} ==="
+            python qiaolian_production/tools/audit_user_symbol_module.py "${module}"
+          done
