@@ -1,0 +1,70 @@
+{
+  "failures": [
+    {
+      "listing_id": 103,
+      "public_ql_id": "QL000103",
+      "reason": "sale_target_blocked",
+      "target_key": "-100123:5003"
+    },
+    {
+      "listing_id": 104,
+      "public_ql_id": "QL000104",
+      "reason": "unknown_target_blocked",
+      "target_key": "-100123:5004"
+    },
+    {
+      "listing_id": 105,
+      "public_ql_id": "QL000105",
+      "reason": "unfrozen_package_blocked",
+      "target_key": "-100123:5005"
+    }
+  ],
+  "manifest": [
+    {
+      "after_content_hash": "after-hash-101",
+      "before_content_hash": "before-hash-5001",
+      "buttons": [
+        {"text": "🏠 房源详情", "url": "https://t.me/QiaoLianBot?start=details_QL000101"},
+        {"text": "📸 更多实拍", "url": "https://t.me/QiaoLianBot?start=photos_QL000101"},
+        {"text": "📅 预约看房", "url": "https://t.me/QiaoLianBot?start=book_QL000101"}
+      ],
+      "caption": "🏠 富力城｜1房\n💰 $800/月",
+      "channel_id": "-100123",
+      "cover": "covers/QL000101.jpg",
+      "frozen_package_id": "PKG_RENT_101",
+      "listing_id": 101,
+      "message_id": 5001,
+      "offer_id": 201,
+      "public_ql_id": "QL000101",
+      "target_key": "-100123:5001"
+    },
+    {
+      "after_content_hash": "after-hash-102",
+      "before_content_hash": "before-hash-5002",
+      "buttons": [
+        {"text": "🏠 房源详情", "url": "https://t.me/QiaoLianBot?start=details_QL000102"},
+        {"text": "📸 更多实拍", "url": "https://t.me/QiaoLianBot?start=photos_QL000102"},
+        {"text": "📅 预约看房", "url": "https://t.me/QiaoLianBot?start=book_QL000102"}
+      ],
+      "caption": "🏠 BKK1公寓｜2房\n💰 $950/月",
+      "channel_id": "-100123",
+      "cover": "covers/QL000102.jpg",
+      "frozen_package_id": "PKG_RENT_102",
+      "listing_id": 102,
+      "message_id": 5002,
+      "offer_id": 202,
+      "public_ql_id": "QL000102",
+      "target_key": "-100123:5002"
+    }
+  ],
+  "preview_hash": "c2beed370a354ba09ab9a62a35633556e1290be4928970b73acc2ae275480172",
+  "publication_status_mutations": 0,
+  "target_set": [
+    "-100123:5001",
+    "-100123:5002",
+    "-100123:5003",
+    "-100123:5004",
+    "-100123:5005"
+  ],
+  "telegram_writes": 0
+}
