@@ -19,6 +19,7 @@ TARGET_MODULES = {
     "public_listing_id",
     "publishability_contract",
     "runtime_guard",
+    "session_deeplink",
     "status_labels",
     "utils_formatting",
     "v2_safe_adapter",
