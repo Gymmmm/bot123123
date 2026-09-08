@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from v3_core.publishing.formatting import display_layout
+
 from .public_inventory import PublishedListingView
 
 
@@ -27,6 +29,7 @@ class PublicListingDetails:
     listing_id: str
     public_listing_id: str
     project_name: str
+    property_type: str
     layout: str
     subject: str
     location: str
@@ -72,7 +75,8 @@ def build_public_listing_details(view: PublishedListingView) -> PublicListingDet
     listing = view.frozen_listing
     offer = view.frozen_offer
     project = str(listing.get("project_name") or "").strip()
-    layout = str(listing.get("layout") or "").strip()
+    property_type = str(listing.get("property_type") or "").strip()
+    layout = display_layout(listing.get("layout") or property_type, property_type)
     subject = "｜".join(value for value in (project, layout) if value)
     location = str(listing.get("public_location_display") or "").strip()
     inventory_status = str(view.listing.get("inventory_status") or "pending").strip().lower()
@@ -85,13 +89,16 @@ def build_public_listing_details(view: PublishedListingView) -> PublicListingDet
         listing_id=view.listing_id,
         public_listing_id=view.public_listing_id,
         project_name=project,
+        property_type=property_type,
         layout=layout,
         subject=subject,
         location=location,
         monthly_rent_usd=_optional_int(offer.get("monthly_rent_usd")),
         size_sqm=_optional_float(listing.get("size_sqm")),
         floor=str(listing.get("floor") or "").strip(),
-        deposit_terms=str(offer.get("deposit_terms") or "").strip(),
+        deposit_terms=str(
+            offer.get("payment_terms") or offer.get("deposit_terms") or ""
+        ).strip(),
         contract_term=str(offer.get("contract_term") or "").strip(),
         inventory_status=inventory_status,
         status_icon=status_icon,
