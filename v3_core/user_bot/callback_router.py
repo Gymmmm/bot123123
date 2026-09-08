@@ -4,9 +4,9 @@ Unlike fixed-SHA's catch-all callback entry, V3 parses one explicit callback
 contract and delegates only to already-extracted services. The router has no
 Telegram calls, no database writes and no lead/session mutation.
 
-Consult and similar-listing callbacks are intentionally recognized but not wired
-here until their own services have been extracted; they fail explicitly instead
-of falling through to legacy behavior.
+Consult resolves to a pure intent when a ConsultService is supplied. Similar-
+listing callbacks remain explicitly unsupported until that user-flow contract is
+wired, so they never fall through to legacy behavior.
 """
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from .callbacks import UserBotCallback, parse_callback
+from .consult import ConsultResult, ConsultService
 from .public_flow import PublicListingFlowResult, PublicListingFlowService
 from .search_session import SearchSessionNavigation, SearchSessionService
 
@@ -36,6 +37,7 @@ class CallbackDispatchResult:
     reason: str = ""
     listing: PublicListingFlowResult | None = None
     navigation: SearchSessionNavigation | None = None
+    consult: ConsultResult | None = None
     change_search: bool = False
 
     @property
@@ -49,9 +51,11 @@ class CallbackRouter:
         *,
         listings: PublicListingFlowService,
         search_sessions: SearchSessionService,
+        consults: ConsultService | None = None,
     ):
         self.listings = listings
         self.search_sessions = search_sessions
+        self.consults = consults
 
     def dispatch(
         self,
@@ -103,6 +107,46 @@ class CallbackRouter:
             )
 
         if callback.kind == "listing":
+            if callback.action == "consult":
+                if self.consults is None:
+                    return CallbackDispatchResult(
+                        status="unsupported",
+                        callback=callback,
+                        action="consult",
+                        reason="unsupported_not_wired",
+                    )
+                consult = self.consults.resolve(
+                    callback.public_listing_id,
+                    source="listing_callback",
+                )
+                if consult.ok:
+                    return CallbackDispatchResult(
+                        status="ok",
+                        callback=callback,
+                        action="consult",
+                        consult=consult,
+                    )
+                status: CallbackDispatchStatus = (
+                    "not_found"
+                    if consult.status == "not_found"
+                    else "invalid_callback"
+                )
+                return CallbackDispatchResult(
+                    status=status,
+                    callback=callback,
+                    action="consult",
+                    reason=consult.reason,
+                    consult=consult,
+                )
+
+            if callback.action == "similar":
+                return CallbackDispatchResult(
+                    status="unsupported",
+                    callback=callback,
+                    action="similar",
+                    reason="unsupported_not_wired",
+                )
+
             if callback.action not in {"details", "photos", "book"}:
                 return CallbackDispatchResult(
                     status="unsupported",
@@ -124,7 +168,7 @@ class CallbackRouter:
                     listing=listing,
                 )
             if listing.status == "not_found":
-                status: CallbackDispatchStatus = "not_found"
+                status = "not_found"
             elif listing.status == "blocked":
                 status = "blocked"
             else:
