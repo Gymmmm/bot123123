@@ -76,6 +76,11 @@ class PackageBuildService:
             "offer_id": str(offer_id),
             "canonical_record_id": str(canonical["canonical_record_id"]),
             "canonical_facts_hash": str(canonical["facts_hash"]),
+            # Freeze the complete canonical evidence used to build this public
+            # product. User Bot detail/adviser copy must never reach back into a
+            # later canonical row and silently change what an existing channel
+            # publication means.
+            "canonical_facts": facts,
             "listing": {
                 key: listing.get(key)
                 for key in (
