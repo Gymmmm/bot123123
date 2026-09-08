@@ -28,7 +28,16 @@ jobs:
             text_utils \
             utils_formatting \
             v2_safe_adapter \
-            channel_links
+            channel_links \
+            channel_post \
+            channel_status_sync \
+            session_deeplink \
+            runtime_guard \
+            cover_styles \
+            attribution \
+            attribution_resolver \
+            attribution_service \
+            utils
           do
             echo "=== ${module} ==="
             python qiaolian_production/tools/audit_user_symbol_module.py "${module}"
