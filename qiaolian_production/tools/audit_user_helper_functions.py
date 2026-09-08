@@ -31,6 +31,16 @@ class ModuleInfo:
                 if isinstance(child, ast.Name) and child.id in self.functions:
                     self.internal_refs[name].add(child.id)
 
+        # Functions referenced by module-level executable statements are roots too.
+        # This covers initialization such as LOCATION_MAP = _build_location_map().
+        self.module_roots: set[str] = set()
+        for node in self.tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                continue
+            for child in ast.walk(node):
+                if isinstance(child, ast.Name) and child.id in self.functions:
+                    self.module_roots.add(child.id)
+
 
 infos = {
     module: ModuleInfo(USER_DIR / f"{module}.py")
@@ -38,8 +48,27 @@ infos = {
     if (USER_DIR / f"{module}.py").exists()
 }
 
-external_roots: dict[str, set[str]] = {module: set() for module in infos}
+external_roots: dict[str, set[str]] = {
+    module: set(info.module_roots) for module, info in infos.items()
+}
 dynamic_modules: set[str] = set()
+
+
+def imported_target(node: ast.ImportFrom) -> str:
+    """Return the qiaolian_dual module targeted by an ImportFrom node when known."""
+    raw = node.module or ""
+    if node.level:
+        # All current audit targets are direct children of qiaolian_dual. Relative
+        # imports such as `from .location_mapping import get_display_location`
+        # therefore resolve directly from node.module.
+        return raw
+    if raw.startswith("qiaolian_dual."):
+        return raw[len("qiaolian_dual."):]
+    marker = ".qiaolian_dual."
+    if marker in raw:
+        return raw.split(marker, 1)[1]
+    return ""
+
 
 for path in ROOT.rglob("*.py"):
     try:
@@ -59,15 +88,19 @@ for path in ROOT.rglob("*.py"):
                     if raw == suffix or raw.endswith(f".{suffix}"):
                         aliases[alias.asname or raw.rsplit(".", 1)[-1]] = module
         elif isinstance(node, ast.ImportFrom):
-            raw = node.module or ""
-            for module in infos:
-                if raw == f"qiaolian_dual.{module}" or raw.endswith(f".qiaolian_dual.{module}"):
-                    for alias in node.names:
-                        if alias.name == "*":
-                            dynamic_modules.add(module)
-                        elif alias.name in infos[module].functions:
-                            imported_names[alias.asname or alias.name] = (module, alias.name)
-                            external_roots[module].add(alias.name)
+            target = imported_target(node)
+            if target in infos:
+                for alias in node.names:
+                    if alias.name == "*":
+                        dynamic_modules.add(target)
+                    elif alias.name in infos[target].functions:
+                        imported_names[alias.asname or alias.name] = (target, alias.name)
+                        external_roots[target].add(alias.name)
+            elif node.level and not node.module:
+                # `from . import module_name` imports the module object itself.
+                for alias in node.names:
+                    if alias.name in infos:
+                        aliases[alias.asname or alias.name] = alias.name
 
     for node in ast.walk(tree):
         if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
