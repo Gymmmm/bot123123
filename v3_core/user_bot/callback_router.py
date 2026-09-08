@@ -4,9 +4,9 @@ Unlike fixed-SHA's catch-all callback entry, V3 parses one explicit callback
 contract and delegates only to already-extracted services. The router has no
 Telegram calls, no database writes and no lead/session mutation.
 
-Consult resolves to a pure intent when a ConsultService is supplied. Similar-
-listing callbacks remain explicitly unsupported until that user-flow contract is
-wired, so they never fall through to legacy behavior.
+Consult resolves to a pure intent and similar-listing resolves to a guided-search
+intent when their services are supplied. Missing services fail explicitly instead
+of falling through to legacy behavior.
 """
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from .callbacks import UserBotCallback, parse_callback
 from .consult import ConsultResult, ConsultService
 from .public_flow import PublicListingFlowResult, PublicListingFlowService
 from .search_session import SearchSessionNavigation, SearchSessionService
+from .similar_intent import SimilarIntentResult, SimilarIntentService
 
 
 CallbackDispatchStatus = Literal[
@@ -38,6 +39,7 @@ class CallbackDispatchResult:
     listing: PublicListingFlowResult | None = None
     navigation: SearchSessionNavigation | None = None
     consult: ConsultResult | None = None
+    similar: SimilarIntentResult | None = None
     change_search: bool = False
 
     @property
@@ -52,10 +54,12 @@ class CallbackRouter:
         listings: PublicListingFlowService,
         search_sessions: SearchSessionService,
         consults: ConsultService | None = None,
+        similars: SimilarIntentService | None = None,
     ):
         self.listings = listings
         self.search_sessions = search_sessions
         self.consults = consults
+        self.similars = similars
 
     def dispatch(
         self,
@@ -140,11 +144,35 @@ class CallbackRouter:
                 )
 
             if callback.action == "similar":
+                if self.similars is None:
+                    return CallbackDispatchResult(
+                        status="unsupported",
+                        callback=callback,
+                        action="similar",
+                        reason="unsupported_not_wired",
+                    )
+                similar = self.similars.resolve(
+                    callback.public_listing_id,
+                    source="similar_listing",
+                )
+                if similar.ok:
+                    return CallbackDispatchResult(
+                        status="ok",
+                        callback=callback,
+                        action="similar",
+                        similar=similar,
+                    )
+                status = (
+                    "not_found"
+                    if similar.status == "not_found"
+                    else "invalid_callback"
+                )
                 return CallbackDispatchResult(
-                    status="unsupported",
+                    status=status,
                     callback=callback,
                     action="similar",
-                    reason="unsupported_not_wired",
+                    reason=similar.reason,
+                    similar=similar,
                 )
 
             if callback.action not in {"details", "photos", "book"}:
