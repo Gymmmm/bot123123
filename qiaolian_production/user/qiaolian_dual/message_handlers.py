@@ -127,43 +127,7 @@ async def handle_main_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     await render_panel(update, text='我可以为您找房。直接发「BKK1、500以内、一房、视频看房」这类关键词，或从下方选择一个入口开始。', reply_markup=main_keyboard(), context=context, prefer_edit_anchor=True)
     return MAIN
 
-async def handle_find_area(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    from .keyboards_search import find_budget_keyboard
-    from .search import detect_area
-    from .session_deeplink import _remember_video_pref
-    from .texts import render_panel
-    area = detect_area((update.effective_message.text or '').strip())
-    current = context.user_data.get('search_pref') or {}
-    goal = current.get('goal') or 'any'
-    context.user_data['search_pref'] = {'area': area, 'source': current.get('source', 'user_search'), 'goal': goal, 'touch_payload': current.get('touch_payload') or {}}
-    _remember_video_pref(context, area=area)
-    await render_panel(update, text=find_area_budget_hint_text(), parse_mode=ParseMode.HTML, reply_markup=find_budget_keyboard(goal), context=context, prefer_edit_anchor=True)
-    return FIND_BUDGET
 
-async def handle_find_budget(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    from .admin_contract import _budget_text, _user_contact_text, _user_mention_html
-    from .keyboards_common import no_match_followup_keyboard
-    from .results_admin import _notify_admins, send_find_results_as_cards
-    from .search import create_lead, detect_property_type, detect_room_type, parse_budget_range, search_listings_with_fallback
-    from .session_deeplink import _remember_video_pref
-    from .texts import render_panel
-    user = update.effective_user
-    text = (update.effective_message.text or '').strip()
-    pref = context.user_data.pop('search_pref', {})
-    budget_min, budget_max = parse_budget_range(text)
-    property_type = detect_property_type(text)
-    area = pref.get('area', '')
-    goal = str(pref.get('goal') or '')
-    room_hint = detect_room_type(text) or ('' if goal in {'', 'any', '住宅'} else goal)
-    _remember_video_pref(context, area=area or None, budget_min=budget_min, budget_max=budget_max, layout=room_hint or None)
-    create_lead(user, action='search_pref_submit', source=pref.get('source', 'user_search'), area=area, property_type=property_type, budget_min=budget_min, budget_max=budget_max, payload={'message': text, 'area_hint': area, 'goal': goal, **(pref.get('touch_payload') or {})})
-    await _notify_admins(context, title='新找房条件', lines=[f'用户：{_user_mention_html(user)}', f'联系方式：{he(_user_contact_text(user))}', f"来源：{he(str(pref.get('source', 'user_search')))}", f"类型意向：{he(goal or '-')}", f"区域：{he(area or '-')}", f'预算：{he(_budget_text(budget_min, budget_max))}', f"户型：{he(property_type or '-')}", f'条件：<code>{he(text[:700])}</code>'])
-    matches, match_mode = search_listings_with_fallback(property_type=property_type or None, area=area, budget_min=budget_min, budget_max=budget_max, text_fragment=text, limit=3)
-    if matches:
-        await send_find_results_as_cards(update, context, matches, match_mode)
-    else:
-        await render_panel(update, text=find_no_match_text(), parse_mode=ParseMode.HTML, reply_markup=no_match_followup_keyboard(), context=context, prefer_edit_anchor=True)
-    return MAIN
 
 async def cmd_find(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     from .flows import show_search_entry

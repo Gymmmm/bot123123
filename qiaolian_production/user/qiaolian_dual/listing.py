@@ -82,8 +82,6 @@ def _known_value(*values) -> str:
     return ''
 
 
-def _critical_fee(value: str) -> str:
-    return value if value else '待确认'
 
 
 def listing_cost_text(listing_id: str) -> str:
