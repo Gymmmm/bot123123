@@ -23,10 +23,19 @@ from .transition_views import TransitionChoice, TransitionChoiceKind
 
 TRANSITION_PREFIX = f"{PREFIX}:t"
 
-_VALUE_KINDS = frozenset({"appointment_date", "appointment_mode", "budget_choice"})
+_VALUE_KINDS = frozenset(
+    {
+        "appointment_date",
+        "appointment_mode",
+        "appointment_time",
+        "budget_choice",
+    }
+)
 _FLAG_KINDS = frozenset(
     {
         "appointment_other_date",
+        "appointment_other_time",
+        "appointment_back_date",
         "home",
         "budget_custom",
         "search_area",
@@ -37,6 +46,7 @@ _FLAG_KINDS = frozenset(
 )
 _BUDGET_CODES = frozenset({"b1", "b2", "b3", "b4", "b5", "b6"})
 _MODES = frozenset({"offline", "video"})
+_TIMES = frozenset({"am", "pm", "evening"})
 _DATE_RE = re.compile(r"^\d{2}-\d{2}$")
 
 
@@ -58,6 +68,10 @@ def _validate_value(kind: str, value: object) -> str:
     if kind == "appointment_mode":
         if clean not in _MODES:
             raise ValueError("invalid_transition_appointment_mode")
+        return clean
+    if kind == "appointment_time":
+        if clean not in _TIMES:
+            raise ValueError("invalid_transition_appointment_time")
         return clean
     if kind == "budget_choice":
         if clean not in _BUDGET_CODES:
