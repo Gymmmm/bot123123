@@ -38,8 +38,10 @@ class ModuleInfo:
 
         self.module_roots: set[str] = set()
         for node in self.tree.body:
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
+            # Class methods execute through exported runtime objects and may call
+            # module-level helpers. Treat those helper references as roots.
             for child in ast.walk(node):
                 if isinstance(child, ast.Name) and child.id in self.functions:
                     self.module_roots.add(child.id)
