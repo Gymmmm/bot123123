@@ -1,0 +1,82 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+from PIL import Image, ImageDraw
+
+from qiaolian_v3.media.gallery import build_media_selection
+
+
+def _image(path: Path, size=(1200, 800), value=140):
+    image = Image.new('RGB', size, (value, value, value))
+    draw = ImageDraw.Draw(image)
+    width, height = size
+    offset = max(10, value % max(20, width // 4))
+    draw.rectangle((offset, offset, max(offset + 10, width // 2), max(offset + 10, height // 3)), fill=(255 - value, value // 2, (value * 3) % 255))
+    draw.line((0, height - 1 - offset % max(1, height), width - 1, offset % max(1, height)), fill=(value // 2, 255 - value, value), width=max(1, width // 100))
+    image.save(path)
+    return str(path)
+
+
+def _tiny_checkerboard(path: Path):
+    image = Image.new('RGB', (320, 240), 'white')
+    draw = ImageDraw.Draw(image)
+    cell = 30
+    for y in range(0, 240, cell):
+        for x in range(0, 320, cell):
+            if ((x // cell) + (y // cell)) % 2:
+                draw.rectangle((x, y, min(x + cell - 1, 319), min(y + cell - 1, 239)), fill='black')
+    image.save(path)
+    return str(path)
+
+
+def _same_photo_pair(tmp_path: Path):
+    high = tmp_path / 'same-high.jpg'
+    low = tmp_path / 'same-low.jpg'
+    image = Image.new('RGB', (1200, 800), (150, 150, 150))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((120, 80, 760, 420), fill=(40, 180, 120))
+    draw.ellipse((700, 300, 1080, 680), fill=(220, 80, 60))
+    draw.line((0, 760, 1199, 40), fill=(20, 20, 20), width=20)
+    image.save(high, quality=95)
+    image.resize((360, 240), Image.Resampling.LANCZOS).save(low, quality=85)
+    return str(low), str(high)
+
+
+def test_bad_images_are_filtered_and_four_usable_images_are_required(tmp_path):
+    good = [_image(tmp_path / f'g{i}.jpg', value=100 + i * 23) for i in range(4)]
+    bad = _tiny_checkerboard(tmp_path / 'tiny.jpg')
+    result = build_media_selection(good + [bad])
+    assert result.usable_count == 4
+    assert str(Path(bad).resolve()) in result.rejected_paths
+    assert result.meets_photo_minimum is True
+
+
+def test_low_res_first_near_duplicate_cannot_evict_high_res_usable_copy(tmp_path):
+    low, high = _same_photo_pair(tmp_path)
+    result = build_media_selection([low, high])
+    assert str(Path(low).resolve()) in result.rejected_paths
+    assert str(Path(high).resolve()) in result.gallery_paths
+    assert result.usable_count == 1
+
+
+def test_manual_cover_has_precedence_when_usable(tmp_path):
+    paths = [_image(tmp_path / f'{i}.jpg', value=100 + i * 23) for i in range(4)]
+    result = build_media_selection(paths, manual_cover_path=paths[-1])
+    assert result.cover_path == str(Path(paths[-1]).resolve())
+    assert result.cover_source == 'manual'
+
+
+def test_right_price_is_manual_only(tmp_path):
+    paths = [_image(tmp_path / f'{i}.jpg', value=100 + i * 23) for i in range(4)]
+    automatic = build_media_selection(paths, requested_cover_style='right_price')
+    assert automatic.cover_style == 'classic_blue'
+    assert 'right_price_requires_manual_selection' in automatic.warnings
+
+    manual = build_media_selection(
+        paths,
+        manual_cover_path=paths[0],
+        requested_cover_style='right_price',
+        manual_style_selected=True,
+    )
+    assert manual.cover_style == 'right_price'
