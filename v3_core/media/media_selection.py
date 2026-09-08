@@ -1,6 +1,6 @@
 """Single media-selection contract for publication packages.
 
-This module does not alter raw media.  It reuses the extracted photo-ranking
+This module does not alter raw media. It reuses the extracted photo-ranking
 rules for quality/reject decisions, preserves source-order gallery semantics,
 and returns original source paths.
 """
@@ -10,7 +10,7 @@ import hashlib
 from pathlib import Path
 from typing import Any, Iterable
 
-from .media_pipeline_v1_1 import IMAGE_EXTS
+from .photo_formatter_v1_1 import IMAGE_EXTS
 from .ranker import NEAR_DUPLICATE_HAMMING, _dhash, _hamming, rank_photo_paths
 
 
