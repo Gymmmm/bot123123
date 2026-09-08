@@ -23,9 +23,11 @@ def test_committed_phase10_acceptance_artifact_is_real_derived_formal_and_self_c
     assert data['telegram_writes'] == 0
     assert data['publication_status_mutations'] == 0
     assert len(data['manifest']) == 2
+    assert {record['source_identity'].split('|', 2)[:2][1] for record in data['manifest']} == {'148', '161'}
 
     for record in data['manifest']:
-        assert 'production-derived' in record['source_identity']
+        assert record['source_identity'].startswith('Jinbianzufanz|')
+        assert len(record['source_identity'].rsplit('|', 1)[1]) == 64
         assert record['canonical_record_id'] > 0
         assert record['listing_id'] > 0 and record['offer_id'] > 0
         assert normalize_public_id(record['public_ql_id']) == record['public_ql_id']
