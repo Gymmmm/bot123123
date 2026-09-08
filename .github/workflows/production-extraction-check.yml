@@ -72,6 +72,16 @@ jobs:
           python qiaolian_production/tools/audit_user_symbol_module.py canonical_facts --write
           python -m py_compile qiaolian_production/user/qiaolian_dual/canonical_facts.py
           git diff --exit-code -- qiaolian_production/user/qiaolian_dual/canonical_facts.py
+      - name: Verify committed user channel and attribution helper slices
+        run: |
+          python qiaolian_production/tools/audit_user_symbol_module.py channel_post
+          python qiaolian_production/tools/audit_user_symbol_module.py channel_post --write
+          python -m py_compile qiaolian_production/user/qiaolian_dual/channel_post.py
+          git diff --exit-code -- qiaolian_production/user/qiaolian_dual/channel_post.py
+          python qiaolian_production/tools/audit_user_symbol_module.py attribution
+          python qiaolian_production/tools/audit_user_symbol_module.py attribution --write
+          python -m py_compile qiaolian_production/user/qiaolian_dual/attribution.py
+          git diff --exit-code -- qiaolian_production/user/qiaolian_dual/attribution.py
       - name: Slice canonical projection candidates
         run: |
           python qiaolian_production/tools/audit_user_symbol_module.py canonical_fact_projection
