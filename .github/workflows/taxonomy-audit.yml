@@ -16,3 +16,5 @@ jobs:
           python-version: '3.12'
       - name: Audit listing taxonomy symbols
         run: python qiaolian_production/tools/audit_listing_taxonomy_symbols.py
+      - name: Audit canonical facts symbols
+        run: python qiaolian_production/tools/audit_user_symbol_module.py canonical_facts
