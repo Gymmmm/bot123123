@@ -102,7 +102,7 @@ def _seed_listing(
                    (instance_id,package_id,listing_id,offer_id,platform,
                     channel_chat_id,channel_message_id,publish_status,post_text)
                    VALUES (?,?,?,?, 'telegram','-100123',?,'published','caption')""",
-                (instance_id, package_id, listing_id, offer_id, str(1000 + len(suffix))),
+                (instance_id, package_id, listing_id, offer_id, str(1000 + ord(suffix))),
             )
         conn.commit()
 
@@ -110,11 +110,11 @@ def _seed_listing(
 def _db(tmp_path):
     db = tmp_path / "v3.db"
     initialize_v3_storage(db)
-    _seed_listing(db, suffix="A", public_id="QL-BK-A111", rent=800, layout="2房1厅")
+    _seed_listing(db, suffix="A", public_id="QL-BK-A2B3", rent=800, layout="2房1厅")
     _seed_listing(
         db,
         suffix="B",
-        public_id="QL-BK-B222",
+        public_id="QL-BK-C4D5",
         property_type="别墅",
         location_key="BKK1",
         rent=1200,
@@ -122,7 +122,7 @@ def _db(tmp_path):
     _seed_listing(
         db,
         suffix="C",
-        public_id="QL-BK-C333",
+        public_id="QL-BK-E6F7",
         property_type="公寓",
         location_key="BKK2",
         rent=750,
@@ -131,7 +131,7 @@ def _db(tmp_path):
     _seed_listing(
         db,
         suffix="D",
-        public_id="QL-BK-D444",
+        public_id="QL-BK-G8H9",
         property_type="公寓",
         location_key="BKK1",
         rent=700,
@@ -141,7 +141,7 @@ def _db(tmp_path):
     _seed_listing(
         db,
         suffix="E",
-        public_id="QL-BK-E555",
+        public_id="QL-BK-J2K3",
         property_type="公寓",
         location_key="BKK1",
         rent=650,
@@ -150,7 +150,7 @@ def _db(tmp_path):
     _seed_listing(
         db,
         suffix="F",
-        public_id="QL-BK-F666",
+        public_id="QL-BK-L4M5",
         property_type="公寓",
         location_key="BKK1",
         rent=None,
@@ -165,7 +165,7 @@ def test_search_returns_only_current_durably_published_rent_inventory(tmp_path):
 
     items = reader.search(location_keys=("BKK1",), budget_max=900, limit=10)
 
-    assert [item.public_listing_id for item in items] == ["QL-BK-A111"]
+    assert [item.public_listing_id for item in items] == ["QL-BK-A2B3"]
     assert all(item.bookable for item in items)
 
 
@@ -180,7 +180,7 @@ def test_strict_search_uses_type_location_and_budget_but_not_room_hint(tmp_path)
     assert criteria.room_type == "1房"
     # Fixed-SHA parity: room hint is recorded but not yet a DB filter. The
     # published BKK1 apartment is a 2-room listing and still matches.
-    assert [item.public_listing_id for item in result.items] == ["QL-BK-A111"]
+    assert [item.public_listing_id for item in result.items] == ["QL-BK-A2B3"]
 
 
 def test_strict_search_never_auto_relaxes_conditions(tmp_path):
@@ -212,7 +212,7 @@ def test_similar_search_relaxes_type_before_area(tmp_path):
     result = service.similar(criteria)
 
     assert result.mode == "no_type"
-    assert [item.public_listing_id for item in result.items] == ["QL-BK-C333"]
+    assert [item.public_listing_id for item in result.items] == ["QL-BK-E6F7"]
 
 
 def test_similar_search_relaxes_area_second(tmp_path):
@@ -228,7 +228,7 @@ def test_similar_search_relaxes_area_second(tmp_path):
     result = service.similar(criteria)
 
     assert result.mode == "no_area"
-    assert [item.public_listing_id for item in result.items] == ["QL-BK-B222"]
+    assert [item.public_listing_id for item in result.items] == ["QL-BK-C4D5"]
 
 
 def test_similar_search_falls_back_to_budget_only_last(tmp_path):
@@ -245,8 +245,8 @@ def test_similar_search_falls_back_to_budget_only_last(tmp_path):
 
     assert result.mode == "budget_only"
     assert {item.public_listing_id for item in result.items} == {
-        "QL-BK-A111",
-        "QL-BK-C333",
+        "QL-BK-A2B3",
+        "QL-BK-E6F7",
     }
 
 
