@@ -1,7 +1,7 @@
 """Strict read-only public inventory view for the V3 User Bot.
 
 A public listing is resolvable only when it is backed by a durable published
-Telegram publication instance for a rent offer.  Guessing a public QL id must
+Telegram publication instance for a rent offer. Guessing a public QL id must
 not expose inventory that has never crossed the approved publication boundary.
 The adapter opens SQLite with ``mode=ro`` and never initializes schema.
 """
@@ -14,6 +14,14 @@ import sqlite3
 from typing import Any
 
 from v3_core.publishing.public_ids import normalize_public_id
+
+
+def _json_object(raw: object) -> dict[str, Any]:
+    try:
+        value = json.loads(str(raw or "{}"))
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return {}
+    return dict(value) if isinstance(value, dict) else {}
 
 
 @dataclass(frozen=True)
@@ -30,6 +38,21 @@ class PublishedListingView:
     @property
     def listing_id(self) -> str:
         return str(self.listing.get("listing_id") or "")
+
+    @property
+    def snapshot(self) -> dict[str, Any]:
+        """Frozen public facts captured when the publication package was built."""
+        return _json_object(self.package.get("snapshot_json"))
+
+    @property
+    def frozen_listing(self) -> dict[str, Any]:
+        value = self.snapshot.get("listing")
+        return dict(value) if isinstance(value, dict) else {}
+
+    @property
+    def frozen_offer(self) -> dict[str, Any]:
+        value = self.snapshot.get("offer")
+        return dict(value) if isinstance(value, dict) else {}
 
     @property
     def gallery(self) -> tuple[str, ...]:
