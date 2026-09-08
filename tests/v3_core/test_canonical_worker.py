@@ -23,8 +23,9 @@ def _photos(tmp_path: Path):
 
 
 def test_collector_intake_remains_pending_until_independent_worker_runs(tmp_path):
+    db_path = str(tmp_path / "worker.sqlite3")
     pipeline = V3CorePipeline(
-        db_path=str(tmp_path / "worker.sqlite3"),
+        db_path=db_path,
         user_bot_username="QiaolianBot",
     )
     intake = pipeline.ingest_source(
@@ -41,7 +42,7 @@ def test_collector_intake_remains_pending_until_independent_worker_runs(tmp_path
     source = pipeline.sources.get_source_post(int(intake.source_post_pk))
     assert source["parse_status"] == "pending"
 
-    worker = CanonicalWorker(pipeline)
+    worker = CanonicalWorker(db_path)
     assert worker.pending_ids() == [int(intake.source_post_pk)]
     result = worker.process_one(int(intake.source_post_pk))
 
