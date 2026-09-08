@@ -28,13 +28,19 @@ def test_codec_uses_only_v3_namespaces_and_reuses_existing_listing_and_change_se
         TransitionChoice("💰 按预算", "search_budget"),
         TransitionChoice("🏠 按户型", "search_layout"),
         TransitionChoice("🏘 当前可约", "search_available"),
+        TransitionChoice("BKK1", "area_choice", "bkk1"),
+        TransitionChoice("📍 其他区域", "area_other"),
+        TransitionChoice("两房", "layout_choice", "2br"),
     )
 
     encoded = [encode_transition_choice(choice) for choice in choices]
 
     assert all(value.startswith(f"{TRANSITION_PREFIX}:") for value in encoded)
     assert all(len(value.encode("utf-8")) <= 64 for value in encoded)
-    assert not any(value.startswith(("apdate:", "apmode:", "aptime:", "findbudget:", "hub:")) for value in encoded)
+    assert not any(
+        value.startswith(("apdate:", "apmode:", "aptime:", "findbudget:", "findarea:", "roompick:", "hub:"))
+        for value in encoded
+    )
     assert encode_transition_choice(
         TransitionChoice("⬅️ 返回房源", "listing_details", public_listing_id=PUBLIC_ID)
     ) == f"v3u:listing:details:{PUBLIC_ID}"
@@ -52,6 +58,11 @@ def test_value_callbacks_round_trip_and_reject_malformed_values():
         ("appointment_time", "pm"),
         ("appointment_time", "evening"),
         ("budget_choice", "b6"),
+        ("area_choice", "bkk1"),
+        ("area_choice", "rf"),
+        ("layout_choice", "studio"),
+        ("layout_choice", "4br"),
+        ("layout_choice", "any"),
     ):
         raw = encode_transition_choice(TransitionChoice("x", kind, value))
         parsed = parse_transition_callback(raw)
@@ -66,6 +77,8 @@ def test_value_callbacks_round_trip_and_reject_malformed_values():
         "v3u:t:appointment_mode:walk",
         "v3u:t:appointment_time:noon",
         "v3u:t:budget_choice:b7",
+        "v3u:t:area_choice:unknown",
+        "v3u:t:layout_choice:5br",
         "v3u:t:budget_choice",
         "v3u:t:home:extra",
     ):
@@ -83,6 +96,7 @@ def test_flag_callbacks_round_trip_without_values():
         "search_budget",
         "search_layout",
         "search_available",
+        "area_other",
     ):
         raw = encode_transition_choice(TransitionChoice("x", kind))
         parsed = parse_transition_callback(raw)
@@ -98,6 +112,8 @@ def test_non_transition_v3_and_legacy_callbacks_are_not_claimed_by_transition_pa
         "apdate:09-08",
         "aptime:pm",
         "findbudget:b2",
+        "findarea:bkk1",
+        "roompick:2房",
         "home",
         "",
     ):
@@ -111,6 +127,10 @@ def test_encoder_fails_closed_on_unsupported_or_invalid_choice():
         encode_transition_choice(TransitionChoice("时间", "appointment_time", "noon"))
     with pytest.raises(ValueError, match="invalid_transition_budget_choice"):
         encode_transition_choice(TransitionChoice("预算", "budget_choice", "b9"))
+    with pytest.raises(ValueError, match="invalid_transition_area_choice"):
+        encode_transition_choice(TransitionChoice("区域", "area_choice", "bad"))
+    with pytest.raises(ValueError, match="invalid_transition_layout_choice"):
+        encode_transition_choice(TransitionChoice("户型", "layout_choice", "5br"))
     with pytest.raises(ValueError, match="flag_transition_callback_must_not_have_value"):
         encode_transition_choice(TransitionChoice("首页", "home", "x"))
     with pytest.raises(ValueError, match="unsupported_transition_choice"):
