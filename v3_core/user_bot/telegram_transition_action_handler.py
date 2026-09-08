@@ -11,6 +11,7 @@ search remains read-only until a separate V3 lead/admin effect executor exists.
 """
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
 
@@ -38,6 +39,7 @@ from .transition_actions import (
 from .transition_callbacks import parse_transition_callback
 from .transition_session import (
     APPOINTMENT_SESSION_KEY,
+    SEARCH_PREF_SESSION_KEY,
     SessionMutationPlan,
     apply_session_mutation,
 )
@@ -86,6 +88,8 @@ def _view_for_result(
         return views.custom_date_prompt()
     if result.next_step == "appointment_custom_time":
         return views.custom_time_prompt()
+    if result.next_step == "search_custom_area":
+        return views.custom_area_prompt()
     if result.next_step == "search_custom_budget":
         return TransitionView(
             kind="search_custom_budget",
@@ -96,6 +100,35 @@ def _view_for_result(
             rows=(),
         )
     return None
+
+
+def _navigation_view(
+    views: TransitionViewService,
+    result: TransitionActionResult,
+    user_data: dict[str, Any],
+) -> TransitionView | None:
+    navigation = result.navigation
+    if not navigation or navigation == "home":
+        # Full fixed-SHA home still includes appointment/rental/service/adviser
+        # surfaces that are not all extracted into V3 yet. Keep home as an
+        # explicit outer boundary instead of rendering a partial/dead homepage.
+        return None
+
+    preview = deepcopy(user_data)
+    if result.mutation is not None:
+        apply_session_mutation(preview, result.mutation)
+
+    if navigation == "search_area":
+        return views.search_area()
+    if navigation == "search_layout":
+        return views.search_layout()
+    if navigation == "search_budget":
+        pref = preview.get(SEARCH_PREF_SESSION_KEY)
+        area_display = ""
+        if isinstance(pref, dict):
+            area_display = str(pref.get("area_display") or "").strip()
+        return views.search_budget(area_display)
+    raise ValueError(f"unsupported_transition_navigation:{navigation}")
 
 
 def _telegram_appointment_user(update: Any) -> AppointmentUser:
@@ -165,6 +198,14 @@ async def handle_v3_transition_action(
             apply_session_mutation(user_data, result.mutation)
         return TelegramTransitionActionOutcome(handled=True, result=result)
 
+    if result.next_step == "navigation":
+        navigation_view = _navigation_view(views, result, user_data)
+        if navigation_view is not None:
+            await _edit_view(query, navigation_view)
+            if result.mutation is not None:
+                apply_session_mutation(user_data, result.mutation)
+            return TelegramTransitionActionOutcome(handled=True, result=result)
+
     if result.next_step == "appointment_submit" and appointment_executor is not None:
         if result.appointment is None:
             raise ValueError("appointment_submit_action_missing_draft")
@@ -211,7 +252,7 @@ async def handle_v3_transition_action(
             search_presentation=presentation,
         )
 
-    # Navigation, or a submit boundary without its injected executor, remains
+    # Full home, or a submit boundary without its injected executor, remains
     # deferred. Do not apply its session mutation yet.
     return TelegramTransitionActionOutcome(handled=True, result=result)
 
