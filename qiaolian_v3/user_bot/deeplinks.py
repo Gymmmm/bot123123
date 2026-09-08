@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 
 from qiaolian_v3.legacy.deeplink_compat import LegacyDeepLink, resolve_legacy_deeplink
-
-QL_RE = re.compile(r'^QL\d{6,}$', re.I)
+from qiaolian_v3.listing.public_id import normalize_public_id
 
 
 @dataclass(frozen=True)
@@ -16,31 +14,23 @@ class DeepLinkTarget:
 
 
 def require_ql_identity(value: str) -> str:
-    raw = str(value or '').strip().upper()
-    if not QL_RE.fullmatch(raw):
+    normalized = normalize_public_id(value)
+    if normalized is None:
         raise ValueError('new_business_requires_ql_public_id')
-    return raw
+    return normalized
 
 
-def parse_start_payload(payload: str) -> DeepLinkTarget | None:
-    raw = str(payload or '').strip()
-    if not raw:
+def _formal_property_target(raw: str) -> DeepLinkTarget | None:
+    if not raw.startswith('property_'):
         return None
-    prefixes = (
-        ('property_details_', 'details'),
-        ('propertyphotos_', 'photos'),
-        ('property_book_', 'book'),
-        # Frozen Phase-6 three-button payloads remain supported unchanged.
-        ('details_', 'details'),
-        ('photos_', 'photos'),
-        ('book_', 'book'),
-    )
-    for prefix, action in prefixes:
-        if not raw.startswith(prefix):
+    body = raw[len('property_'):]
+    for suffix, action in (('_details', 'details'), ('_photos', 'photos'), ('_book', 'book')):
+        if not body.endswith(suffix):
             continue
-        ref = raw[len(prefix):]
-        if QL_RE.fullmatch(ref.upper()):
-            return DeepLinkTarget(action=action, public_listing_id=ref.upper())
+        ref = body[:-len(suffix)]
+        normalized = normalize_public_id(ref)
+        if normalized is not None:
+            return DeepLinkTarget(action=action, public_listing_id=normalized)
         legacy = resolve_legacy_deeplink(action, ref)
         if legacy is not None:
             return DeepLinkTarget(action=action, public_listing_id=None, legacy=legacy)
@@ -48,16 +38,48 @@ def parse_start_payload(payload: str) -> DeepLinkTarget | None:
     return None
 
 
+def parse_start_payload(payload: str) -> DeepLinkTarget | None:
+    raw = str(payload or '').strip()
+    if not raw:
+        return None
+
+    formal = _formal_property_target(raw)
+    if formal is not None:
+        return formal
+
+    # Phase-6 frozen channel buttons remain a permanent compatibility surface.
+    for prefix, action in (('details_', 'details'), ('photos_', 'photos'), ('book_', 'book')):
+        if not raw.startswith(prefix):
+            continue
+        ref = raw[len(prefix):]
+        normalized = normalize_public_id(ref)
+        if normalized is not None:
+            return DeepLinkTarget(action=action, public_listing_id=normalized)
+        legacy = resolve_legacy_deeplink(action, ref)
+        if legacy is not None:
+            return DeepLinkTarget(action=action, public_listing_id=None, legacy=legacy)
+        return None
+
+    # Older property_* forms are read-only legacy compatibility only.
+    for prefix, action in (
+        ('property_details_', 'details'),
+        ('propertyphotos_', 'photos'),
+        ('property_book_', 'book'),
+    ):
+        if raw.startswith(prefix):
+            legacy = resolve_legacy_deeplink(action, raw[len(prefix):])
+            if legacy is not None:
+                return DeepLinkTarget(action=action, public_listing_id=None, legacy=legacy)
+            return None
+    return None
+
+
 def build_property_payload(action: str, public_listing_id: str) -> str:
     ql = require_ql_identity(public_listing_id)
-    prefix = {
-        'details': 'property_details',
-        'photos': 'propertyphotos',
-        'book': 'property_book',
-    }.get(str(action))
-    if prefix is None:
+    normalized_action = str(action)
+    if normalized_action not in {'details', 'photos', 'book'}:
         raise ValueError('unsupported_property_action')
-    return f'{prefix}_{ql}'
+    return f'property_{ql}_{normalized_action}'
 
 
-__all__ = ['DeepLinkTarget', 'QL_RE', 'build_property_payload', 'parse_start_payload', 'require_ql_identity']
+__all__ = ['DeepLinkTarget', 'build_property_payload', 'parse_start_payload', 'require_ql_identity']
