@@ -1,9 +1,10 @@
 """Explicit V3 appointment submission orchestration.
 
-Production currently mixes validation, SQLite writes, lead creation, channel
-sync and Telegram rendering inside the callback handler.  V3 makes the business
-transaction explicit and leaves lead/notification/channel-sync side effects to
-the caller after a successful result.
+Production currently mixes validation, SQLite writes, lead creation, listing
+availability recomputation, channel sync and Telegram rendering inside the
+callback/DB layers. V3 makes the business transaction explicit and leaves
+lead/notification/availability/channel-sync side effects to the caller after a
+successful result.
 """
 from __future__ import annotations
 
@@ -65,6 +66,9 @@ class AppointmentSubmissionResult:
     appointment_id: int
     lead_action: str | None
     lead_source: str
+    # Legacy Database._sync_listing_appointment_state performed this implicitly.
+    # V3 callers must run it explicitly after a successful transaction.
+    should_recompute_listing_availability: bool = True
     should_sync_channel: bool = True
     should_notify_admin: bool = True
 
@@ -139,6 +143,12 @@ class AppointmentSubmissionService:
                 appointment_id=int(duplicate["id"]),
                 lead_action=None,
                 lead_source=draft.source,
+                # Reusing an existing unfinished appointment does not change the
+                # active appointment set, so no availability/channel recompute is
+                # required and production likewise performs no create/update.
+                should_recompute_listing_availability=False,
+                should_sync_channel=False,
+                should_notify_admin=True,
             )
 
         appointment_id = self.repository.create(
