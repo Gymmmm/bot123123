@@ -50,6 +50,11 @@ jobs:
           git diff --exit-code -- qiaolian_production/publisher/qiaolian_publisher_v2/bot.py
       - name: Audit publisher package module reachability
         run: python qiaolian_production/tools/audit_publisher_modules.py
+      - name: Slice publisher formatter candidate
+        run: |
+          python qiaolian_production/tools/audit_publisher_formatters.py
+          python qiaolian_production/tools/audit_publisher_formatters.py --write
+          python -m py_compile qiaolian_production/publisher/qiaolian_publisher_v2/formatters.py
       - name: Import collector from extracted tree only
         env:
           DB_PATH: '${{ runner.temp }}/qiaolian-extraction.db'
@@ -108,6 +113,11 @@ jobs:
           install_release_contract_patch()
           install_daily_broadcast_patch()
           from qiaolian_publisher_v2.bot import PublisherBot
+          from qiaolian_publisher_v2 import formatters
+          required = {'AREA_OPTIONS','TYPE_LABELS','CHANNEL_BUTTON_PROMPT','deep_link','build_post_text','build_preview_text','normalize_tags'}
+          missing = sorted(name for name in required if not hasattr(formatters, name))
+          if missing:
+              raise SystemExit('missing formatter production symbols: ' + repr(missing))
           assert PublisherBot and main
           leaks = []
           for name, module in tuple(sys.modules.items()):
