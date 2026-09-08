@@ -88,6 +88,16 @@ def test_stale_or_tampered_card_callback_is_rejected_by_session_position():
     assert wrong_index is not None and not validate_card_navigation(wrong_index, ids)
 
 
+def test_invalid_session_identity_rejects_callback_instead_of_shifting_indices():
+    callback = parse_callback("v3u:card:1:QL-BK-C4D5")
+    assert callback is not None
+
+    assert not validate_card_navigation(
+        callback,
+        ("not-a-public-id", "QL-BK-C4D5"),
+    )
+
+
 def test_legacy_internal_callbacks_do_not_enter_v3_contract():
     for raw in (
         "findcard:1:LST_2",
