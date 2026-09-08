@@ -8,7 +8,10 @@ admin notification is deliberately a separate effect.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Protocol
+
+from v3_core.storage.lead_repository import SQLiteLeadRepository
 
 from .appointment_submit_executor import AppointmentSubmitExecution
 from .consult import ConsultIntent
@@ -101,6 +104,11 @@ class LeadService:
         )
 
 
+def build_sqlite_lead_service(db_path: str | Path) -> LeadService:
+    """Build a V3 lead writer without opening or initializing the database."""
+    return LeadService(SQLiteLeadRepository(db_path))
+
+
 def search_lead_request(intent: SearchSubmitIntent) -> LeadRequest:
     area = str(intent.area_display or "").strip()
     if area == "不限":
@@ -165,6 +173,7 @@ __all__ = [
     "LeadService",
     "LeadUser",
     "appointment_lead_request",
+    "build_sqlite_lead_service",
     "general_contact_lead_request",
     "listing_contact_lead_request",
     "search_lead_request",
