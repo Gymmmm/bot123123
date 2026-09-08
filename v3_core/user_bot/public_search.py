@@ -2,12 +2,12 @@
 
 Search is deliberately stricter than public deep-link resolution: a historical
 published listing may still expose details/photos, but renter search results must
-be currently bookable.  Therefore every search hit requires an active/reserved
+be currently bookable. Therefore every search hit requires an active/reserved
 listing, an active rent offer, the telegram_rent publication policy, an approved
 or published frozen package, and a durable published Telegram publication
 instance.
 
-This module is read-only.  It opens SQLite with ``mode=ro`` and never initializes
+This module is read-only. It opens SQLite with ``mode=ro`` and never initializes
 schema or writes user/lead state.
 """
 from __future__ import annotations
@@ -18,12 +18,14 @@ import sqlite3
 
 from .public_inventory import PublicInventoryReader, PublishedListingView
 from .search_query import SearchCriteria
+from .search_results import augment_strict_single_result
 
 
 @dataclass(frozen=True)
 class SearchExecution:
     items: tuple[PublishedListingView, ...]
     mode: str
+    has_similar: bool = False
 
 
 class PublicSearchReader:
@@ -127,7 +129,7 @@ class PublicSearchReader:
 
 
 class PublicSearchService:
-    """Preserve fixed-SHA strict and explicit-similar fallback semantics."""
+    """Preserve fixed-SHA strict, single-result UX and explicit similar rules."""
 
     def __init__(self, reader: PublicSearchReader):
         self.reader = reader
@@ -173,6 +175,37 @@ class PublicSearchService:
             if items:
                 return SearchExecution(items=items, mode=mode)
         return SearchExecution(items=(), mode="no_match")
+
+    def strict_for_results(
+        self,
+        criteria: SearchCriteria,
+        *,
+        limit: int = 5,
+    ) -> SearchExecution:
+        """Apply the production one-result carousel enhancement only after a hit.
+
+        A strict no-match stays a no-match. When strict returns exactly one
+        listing, the same explicit-similar search policy is queried and unique
+        published views may be appended so previous/next navigation remains
+        useful. Tracking mode remains ``strict`` because the first result is the
+        actual strict match.
+        """
+        strict = self.strict(criteria, limit=limit)
+        if strict.mode != "strict" or len(strict.items) != 1:
+            return strict
+
+        similar = self.similar(criteria, limit=limit)
+        augmented = augment_strict_single_result(
+            strict.items,
+            similar.items,
+            match_mode="strict",
+            limit=limit,
+        )
+        return SearchExecution(
+            items=tuple(augmented.items),
+            mode="strict",
+            has_similar=augmented.has_similar,
+        )
 
 
 __all__ = [
