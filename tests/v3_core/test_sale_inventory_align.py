@@ -171,14 +171,16 @@ def test_aligner_inactivates_sale_when_canonical_price_removed(tmp_path: Path):
 def test_daily_scan_runs_once_per_phnom_penh_day(tmp_path: Path):
     db = initialize_v3_storage(tmp_path / "v3.sqlite")
     aligner = SaleInventoryAligner(db)
-    now = datetime(2026, 9, 10, 8, 0, tzinfo=ZoneInfo("Asia/Phnom_Penh"))
-    first = aligner.align_if_due(now=now)
-    second = aligner.align_if_due(now=now)
-    next_day = aligner.align_if_due(now=datetime(2026, 9, 11, 0, 5, tzinfo=ZoneInfo("Asia/Phnom_Penh")))
+    day = datetime(2026, 9, 10, 8, 0, tzinfo=ZoneInfo("Asia/Phnom_Penh"))
+    first = aligner.align_if_due(now=day)
+    second = aligner.align_if_due(now=day)
     assert first["skipped"] == 0
     assert second["skipped"] == 1
+    assert due_for_daily_scan(aligner.runtime, now=day) is False
+    next_day = aligner.align_if_due(
+        now=datetime(2026, 9, 11, 0, 5, tzinfo=ZoneInfo("Asia/Phnom_Penh"))
+    )
     assert next_day["skipped"] == 0
-    assert due_for_daily_scan(aligner.runtime, now=now) is False
 
 
 def test_canonical_worker_does_daily_sale_scan(tmp_path: Path):
