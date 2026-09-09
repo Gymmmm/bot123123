@@ -25,8 +25,10 @@ class AssuranceView:
 
 ASSURANCE_HOME_TEXT = (
     "🛡 <b>侨联保障</b>\n\n"
-    "签约前核对费用；入住时把房屋、表计和物品状态留档；退租时按记录逐项核对。\n\n"
-    "发生问题时，侨联协助沟通。"
+    "签约前把费用说清楚。\n"
+    "入住时把房屋、表计、物品留档。\n"
+    "退租时按留档一项一项对。\n\n"
+    "有对不上的，侨联帮你跟房东、物业把话谈完。"
 )
 
 MOVING_TEXT = (
@@ -35,7 +37,20 @@ MOVING_TEXT = (
     "• 协调搬家时间\n"
     "• 对接车辆和人手\n"
     "• 提供必要的现场支持\n\n"
-    "搬家不是租约的终点，而是生活真正开始的节点。我们能做的，是让这一小段过渡，稍微从容一些。"
+    "需要时直接联系我们，说清时间和地点就可以。"
+)
+
+HANDOVER_TEXT = (
+    "📋 <b>入住怎么交</b>\n\n"
+    "入住当天按清单对房屋、表计、物品。\n"
+    "双方确认后各留一份，退租时按这份对。"
+)
+
+DEPOSIT_TEXT = (
+    "🔐 <b>押金怎么退</b>\n\n"
+    "签约前先核对金额、退还条件和会扣什么。\n"
+    "退租时按合同和入住留档对。\n"
+    "最终退多少，以合同和当场核对为准。"
 )
 
 
@@ -45,12 +60,12 @@ def build_assurance_home_view() -> AssuranceView:
         text=ASSURANCE_HOME_TEXT,
         rows=(
             (
-                AssuranceChoice("📋 入住交接", callback_data="v3u:assure:handover"),
-                AssuranceChoice("🔐 押金与退租", callback_data="v3u:assure:deposit"),
+                AssuranceChoice("📋 入住怎么交", callback_data="v3u:assure:handover"),
+                AssuranceChoice("🔐 押金怎么退", callback_data="v3u:assure:deposit"),
             ),
             (
-                AssuranceChoice("🚚 搬家协助", callback_data="v3u:assure:moving"),
                 AssuranceChoice("💬 联系我们", callback_data="v3u:home:contact"),
+                AssuranceChoice("🏠 返回首页", callback_data="v3u:t:home"),
             ),
         ),
     )
@@ -62,7 +77,7 @@ def build_moving_view() -> AssuranceView:
         text=MOVING_TEXT,
         rows=(
             (AssuranceChoice("💬 联系我们", callback_data="v3u:home:contact"),),
-            (AssuranceChoice("⬅️ 返回侨联保障", callback_data="v3u:home:rental"),),
+            (AssuranceChoice("⬅️ 返回入住服务", callback_data="v3u:home:service"),),
         ),
     )
 
@@ -74,6 +89,7 @@ class AssuranceAssetBundle:
     pdf_path: Path
     title: str
     instruction: str
+    filename: str
 
 
 def assurance_asset_bundle(repo_root: str | Path, kind: str) -> AssuranceAssetBundle:
@@ -87,20 +103,24 @@ def assurance_asset_bundle(repo_root: str | Path, kind: str) -> AssuranceAssetBu
             kind="handover",
             image_path=generated / "handover.png",
             pdf_path=generated / "handover.pdf",
-            title="入住交接",
-            instruction="请在入住当天逐项核对并填写，双方确认后各自保存，退租时再按留档记录核对。",
+            title="入住怎么交",
+            instruction=HANDOVER_TEXT,
+            filename="入住交接清单.pdf",
         )
     return AssuranceAssetBundle(
         kind="deposit",
         image_path=generated / "deposit.png",
         pdf_path=generated / "deposit.pdf",
-        title="押金说明",
-        instruction="请在签约前核对押金金额、退还条件和扣费依据；退租时结合合同与入住留档逐项确认。最终押金退还金额仍以合同和实际核对结果为准。",
+        title="押金怎么退",
+        instruction=DEPOSIT_TEXT,
+        filename="押金与退租说明.pdf",
     )
 
 
 __all__ = [
     "ASSURANCE_HOME_TEXT",
+    "DEPOSIT_TEXT",
+    "HANDOVER_TEXT",
     "MOVING_TEXT",
     "AssuranceAssetBundle",
     "AssuranceChoice",

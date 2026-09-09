@@ -63,7 +63,7 @@ def build_home_view(*, channel_url: str = "") -> HomeView:
     if clean_channel:
         rows.append(
             (
-                HomeChoice("房源频道", "root", url=clean_channel),
+                HomeChoice("🏠 最新房源", "root", url=clean_channel),
                 HomeChoice("💬 联系我们", "contact"),
             )
         )
