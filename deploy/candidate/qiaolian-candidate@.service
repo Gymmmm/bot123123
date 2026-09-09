@@ -1,0 +1,17 @@
+[Unit]
+Description=Qiaolian candidate %i
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/qiaolian_candidate_runtime/repo
+EnvironmentFile=/opt/qiaolian_candidate_runtime/runtime.env
+ExecStart=/opt/qiaolian_candidate_runtime/.venv/bin/python /opt/qiaolian_candidate_runtime/repo/run_candidate_runtime.py %i
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=20
+KillSignal=SIGINT
+
+[Install]
+WantedBy=multi-user.target
