@@ -9,7 +9,7 @@ from dataclasses import dataclass
 import logging
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Awaitable, Callable
 
 from dotenv import load_dotenv
 from telegram import BotCommand, BotCommandScopeChat
@@ -24,11 +24,9 @@ from telegram.ext import (
 )
 
 from v3_core.storage.appointment_repository import SQLiteAppointmentRepository
-from qiaolian_dual.admin_consult import cmd_admin_home, handle_admin_query
-from qiaolian_dual.admin_contract import _all_user_admin_ids, _is_admin_user
 
 from .admin_notifications import TelegramAdminNotifier
-from .admin_appointments import AdminAppointmentReader, handle_admin_callback
+from .admin_appointments import AdminAppointmentReader, handle_admin_callback, show_admin_home
 from .appointment_availability import AppointmentAvailabilityService
 from .appointment_runtime_effects import AppointmentRuntimeEffectExecutor
 from .channel_status_sync import V3AppointmentChannelSynchronizer
@@ -168,6 +166,10 @@ def build_v3_user_bot_application(
     config: V3UserBotConfig,
     *,
     dependencies: V3UserBotDependencies | None = None,
+    admin_command_ids: tuple[int, ...] | None = None,
+    admin_authorizer: Callable[[int], bool] | None = None,
+    admin_home_handler: Callable[[Any, Any], Awaitable[None]] | None = None,
+    admin_query_handler: Callable[[Any, Any], Awaitable[None]] | None = None,
 ) -> Application:
     config.validate()
     deps = dependencies or build_v3_user_bot_dependencies(config)
@@ -180,7 +182,7 @@ def build_v3_user_bot_application(
             BotCommand("start", "打开侨联小管家"),
             BotCommand("admin", "咨询后台"),
         ]
-        for admin_id in sorted(set(config.admin_ids) | _all_user_admin_ids()):
+        for admin_id in sorted(set(admin_command_ids or config.admin_ids)):
             await application.bot.set_my_commands(
                 admin_commands,
                 scope=BotCommandScopeChat(chat_id=admin_id),
@@ -196,12 +198,16 @@ def build_v3_user_bot_application(
     def is_admin(update: Any) -> bool:
         user = getattr(update, "effective_user", None)
         chat = getattr(update, "effective_chat", None)
-        return bool(user and _is_admin_user(int(user.id)) and chat and chat.type == "private")
+        authorized = admin_authorizer or (lambda user_id: user_id in config.admin_ids)
+        return bool(user and authorized(int(user.id)) and chat and chat.type == "private")
 
     async def admin(update, context):
         if not is_admin(update):
             return
-        await cmd_admin_home(update, context)
+        if admin_home_handler is not None:
+            await admin_home_handler(update, context)
+        else:
+            await show_admin_home(update.effective_message)
 
     async def admin_callbacks(update, context):
         query = getattr(update, "callback_query", None)
@@ -214,7 +220,10 @@ def build_v3_user_bot_application(
         if raw == "adminq:appointments" or raw.startswith("adminq:appointment:"):
             await handle_admin_callback(update, admin_appointments)
             return
-        await handle_admin_query(update, context)
+        if admin_query_handler is not None:
+            await admin_query_handler(update, context)
+        else:
+            await handle_admin_callback(update, admin_appointments)
 
     async def start(update, context):
         await handle_v3_start(
@@ -322,9 +331,12 @@ def build_v3_user_bot_application(
     return app
 
 
-def run_v3_user_bot(config: V3UserBotConfig | None = None) -> None:
+def run_v3_user_bot(
+    config: V3UserBotConfig | None = None,
+    **application_options: Any,
+) -> None:
     resolved = config or V3UserBotConfig.from_env()
-    application = build_v3_user_bot_application(resolved)
+    application = build_v3_user_bot_application(resolved, **application_options)
     application.run_polling(allowed_updates=["message", "callback_query"])
 
 

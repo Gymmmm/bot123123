@@ -62,8 +62,10 @@ def test_v3_application_registers_admin_command_and_adminq_callbacks():
     assert 'BotCommand("admin", "咨询后台")' in source
     assert "BotCommandScopeChat(chat_id=admin_id)" in source
     assert ".post_init(configure_command_menu)" in source
-    assert "await cmd_admin_home(update, context)" in source
-    assert "await handle_admin_query(update, context)" in source
+    entrypoint = Path("run_v3_user_bot.py").read_text(encoding="utf-8")
+    assert "admin_home_handler=cmd_admin_home" in entrypoint
+    assert "admin_query_handler=handle_admin_query" in entrypoint
+    assert "admin_authorizer=_is_admin_user" in entrypoint
 
 
 def test_v3_reuses_complete_existing_admin_console():
