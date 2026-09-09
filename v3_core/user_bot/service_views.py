@@ -230,7 +230,7 @@ def rfcity_home_view() -> ServiceView:
     return ServiceView(
         kind="rfcity_home",
         text=(
-            "🏙 <b>R&amp;F City 便民导航</b>\n\n"
+            "🏙 <b>富力生活导航</b>\n\n"
             "富力生活常用服务都在这里：\n"
             "吃饭、超市、快递、物业、酒店、休闲。\n\n"
             "先看房，也可以先看生活是否方便。"
@@ -265,7 +265,7 @@ def rfcity_category_view(category: str) -> ServiceView:
     return ServiceView(
         kind="rfcity_category",
         text=text + _RFCITY_FOOTER,
-        rows=((ServiceChoice("⬅️ 返回生活服务", "v3u:service:local"),),),
+        rows=((ServiceChoice("⬅️ 返回富力导航", "v3u:service:rfcity"),),),
     )
 
 
