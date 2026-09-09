@@ -1,10 +1,11 @@
 """Explicit admin operations for the V3 publisher.
 
-This module owns review-state changes and canonical fact corrections.  Telegram
-handlers must not update V3 tables directly.  Corrections are recorded in
+This module owns review-state changes and canonical fact corrections. Telegram
+handlers must not update V3 tables directly. Corrections are recorded in
 ``canonical_overrides``, refresh the canonical hash, rematerialize listing/offer
-projections, invalidate any mutable package_ready artifact, and return the
-review to pending.  Approved/published packages remain immutable.
+projections, invalidate mutable package-ready artifacts, and return every review
+sharing that canonical record to pending. Approved/published packages remain
+immutable.
 """
 from __future__ import annotations
 
@@ -28,6 +29,7 @@ EDITABLE_FACT_FIELDS: dict[str, tuple[str, str]] = {
     "size_sqm": ("面积㎡", "float"),
     "floor": ("楼层", "text"),
     "monthly_rent_usd": ("月租 USD", "int"),
+    "sale_price_usd": ("售价 USD", "int"),
     "deposit_payment_terms": ("押付方式", "text"),
     "contract_term_display": ("租期", "text"),
     "available_date": ("可租日期", "text"),
@@ -47,6 +49,7 @@ class QueueCounts:
     package_approved: int = 0
     published: int = 0
     failed_before_send: int = 0
+    sent: int = 0
     unknown: int = 0
 
 
@@ -116,7 +119,9 @@ class PublisherAdminOperations:
             or ""
         ).strip()
         layout = str(facts.get("layout") or "").strip()
-        property_type = str(facts.get("property_type_display") or facts.get("property_type") or "未知").strip()
+        property_type = str(
+            facts.get("property_type_display") or facts.get("property_type") or "未知"
+        ).strip()
         parts: list[str] = []
         for value in (project, area, layout, "" if property_type == "未知" else property_type):
             if value and value not in parts:
@@ -128,10 +133,8 @@ class PublisherAdminOperations:
         layout = str(facts.get("layout") or "")
         bedroom = re.search(r"(\d{1,2})\s*房", layout)
         bathroom = re.search(r"(\d{1,2})\s*卫", layout)
-        if bedroom:
-            facts["bedrooms"] = int(bedroom.group(1))
-        if bathroom:
-            facts["bathrooms"] = int(bathroom.group(1))
+        facts["bedrooms"] = int(bedroom.group(1)) if bedroom else None
+        facts["bathrooms"] = int(bathroom.group(1)) if bathroom else None
 
     def _assert_not_frozen(self, offer_id: str) -> None:
         with self._connect() as conn:
@@ -142,7 +145,22 @@ class PublisherAdminOperations:
                 (str(offer_id),),
             ).fetchone()
         if row is not None:
-            raise ValueError(f"publisher_offer_has_frozen_package:{row['status']}:{row['package_id']}")
+            raise ValueError(
+                f"publisher_offer_has_frozen_package:{row['status']}:{row['package_id']}"
+            )
+
+    def _assert_listing_not_frozen(self, listing_id: str) -> None:
+        with self._connect() as conn:
+            row = conn.execute(
+                """SELECT package_id,status FROM publication_packages_v3
+                   WHERE listing_id=? AND status IN ('approved','published')
+                   ORDER BY package_version DESC LIMIT 1""",
+                (str(listing_id),),
+            ).fetchone()
+        if row is not None:
+            raise ValueError(
+                f"publisher_listing_has_frozen_package:{row['status']}:{row['package_id']}"
+            )
 
     def set_review_status(
         self,
@@ -171,7 +189,12 @@ class PublisherAdminOperations:
                    SET review_status=?,operator_user_id=?,review_note=?,approved_at=NULL,
                        updated_at=CURRENT_TIMESTAMP
                    WHERE review_id=? AND review_status IN ('pending','approved','hold','rejected')""",
-                (target, str(operator_user_id or ""), str(note or "")[:1000], str(review_id)),
+                (
+                    target,
+                    str(operator_user_id or ""),
+                    str(note or "")[:1000],
+                    str(review_id),
+                ),
             )
             if cur.rowcount != 1:
                 raise KeyError(review_id)
@@ -187,7 +210,9 @@ class PublisherAdminOperations:
                        WHERE offer_id=? AND status='package_ready'""",
                     (offer_id,),
                 )
-            row = conn.execute("SELECT * FROM review_items WHERE review_id=?", (str(review_id),)).fetchone()
+            row = conn.execute(
+                "SELECT * FROM review_items WHERE review_id=?", (str(review_id),)
+            ).fetchone()
             conn.commit()
         assert row is not None
         return dict(row)
@@ -207,8 +232,10 @@ class PublisherAdminOperations:
         canonical_id = str(review.get("canonical_record_id") or "")
         if not listing_id or not offer_id or not canonical_id:
             raise ValueError("review_has_no_materialized_offer")
-        self._assert_not_frozen(offer_id)
+        self._assert_listing_not_frozen(listing_id)
 
+        original_offer = self.reader.offer(offer_id)
+        original_offer_type = str(original_offer.get("offer_type") or "")
         canonical = self.reader.canonical(canonical_id)
         facts = dict(canonical.get("facts") or {})
         old_value = facts.get(field_name)
@@ -225,38 +252,34 @@ class PublisherAdminOperations:
             facts["display_title"] = self._display_title(facts)
         facts["canonical_facts_hash"] = self._stable_hash(facts)
 
-        self.inventory.add_override(
-            canonical_record_id=canonical_id,
-            field_name=field_name,
-            old_value=old_value,
-            new_value=new_value,
-            reason=str(reason or "publisher_admin_edit"),
-            operator_id=str(operator_user_id or ""),
-        )
-
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             conn.execute(
                 """UPDATE canonical_records
                    SET facts_json=?,facts_hash=?,review_status='needs_review'
                    WHERE canonical_record_id=?""",
-                (self._json(facts), str(facts["canonical_facts_hash"]), canonical_id),
+                (
+                    self._json(facts),
+                    str(facts["canonical_facts_hash"]),
+                    canonical_id,
+                ),
             )
             conn.execute(
                 """UPDATE review_items
                    SET review_status='pending',operator_user_id=?,approved_at=NULL,
-                       review_note=?,updated_at=CURRENT_TIMESTAMP WHERE review_id=?""",
+                       review_note=?,updated_at=CURRENT_TIMESTAMP
+                   WHERE canonical_record_id=?""",
                 (
                     str(operator_user_id or ""),
                     f"edited:{field_name}"[:1000],
-                    str(review_id),
+                    canonical_id,
                 ),
             )
             conn.execute(
                 """UPDATE publication_packages_v3 SET status='superseded',
                    updated_at=CURRENT_TIMESTAMP
-                   WHERE offer_id=? AND status='package_ready'""",
-                (offer_id,),
+                   WHERE listing_id=? AND status='package_ready'""",
+                (listing_id,),
             )
             conn.commit()
 
@@ -268,17 +291,51 @@ class PublisherAdminOperations:
             facts=facts,
         )
         offers = self.inventory.sync_offers(listing_id=listing_id, facts=facts)
-        rent_offer = next((row for row in offers if str(row["offer_type"]) == "rent"), None)
-        if rent_offer is None:
-            raise ValueError("publisher_edit_removed_rent_offer")
-        new_offer_id = str(rent_offer["offer_id"])
+        replacement = next(
+            (row for row in offers if str(row["offer_type"]) == original_offer_type),
+            None,
+        )
+        if replacement is None:
+            raise ValueError(f"publisher_edit_removed_original_offer:{original_offer_type}")
+        new_offer_id = str(replacement["offer_id"])
+        if new_offer_id != offer_id:
+            with self._connect() as conn:
+                conn.execute(
+                    """UPDATE review_items SET offer_id=?,updated_at=CURRENT_TIMESTAMP
+                       WHERE review_id=?""",
+                    (new_offer_id, str(review_id)),
+                )
+                conn.commit()
+
+        # A newly-added explicit rent/sale price may materialize a second offer.
+        # Every active offer must have its own review row before publication.
         with self._connect() as conn:
-            conn.execute(
-                """UPDATE review_items SET offer_id=?,updated_at=CURRENT_TIMESTAMP
-                   WHERE review_id=?""",
-                (new_offer_id, str(review_id)),
-            )
-            conn.commit()
+            existing = {
+                str(row["offer_id"])
+                for row in conn.execute(
+                    "SELECT offer_id FROM review_items WHERE canonical_record_id=?",
+                    (canonical_id,),
+                ).fetchall()
+            }
+        for row in offers:
+            candidate_offer_id = str(row["offer_id"])
+            if candidate_offer_id not in existing:
+                self.inventory.create_review_item(
+                    canonical_record_id=canonical_id,
+                    listing_id=listing_id,
+                    offer_id=candidate_offer_id,
+                    review_score=int(review.get("review_score") or 0),
+                    review_note=f"created_after_edit:{field_name}",
+                )
+
+        self.inventory.add_override(
+            canonical_record_id=canonical_id,
+            field_name=field_name,
+            old_value=old_value,
+            new_value=new_value,
+            reason=str(reason or "publisher_admin_edit"),
+            operator_id=str(operator_user_id or ""),
+        )
         return self.reader.review(review_id)
 
     def queue_counts(self) -> QueueCounts:
@@ -304,13 +361,17 @@ class PublisherAdminOperations:
             package_approved=packages.get("approved", 0),
             published=packages.get("published", 0),
             failed_before_send=deliveries.get("failed_before_send", 0),
+            sent=deliveries.get("sent", 0),
             unknown=deliveries.get("unknown", 0),
         )
 
-    def package_rows(self, status: str, *, limit: int = 10, offset: int = 0) -> list[dict[str, Any]]:
+    def package_rows(
+        self, status: str, *, limit: int = 10, offset: int = 0
+    ) -> list[dict[str, Any]]:
         with self._connect() as conn:
             rows = conn.execute(
-                """SELECT p.*,l.public_listing_id,l.display_title,o.monthly_rent_usd
+                """SELECT p.*,l.public_listing_id,l.display_title,o.monthly_rent_usd,
+                          o.sale_price_usd
                    FROM publication_packages_v3 p
                    LEFT JOIN listings_v3 l ON l.listing_id=p.listing_id
                    LEFT JOIN listing_offers o ON o.offer_id=p.offer_id
@@ -319,7 +380,9 @@ class PublisherAdminOperations:
             ).fetchall()
         return [dict(row) for row in rows]
 
-    def delivery_rows(self, state: str, *, limit: int = 10, offset: int = 0) -> list[dict[str, Any]]:
+    def delivery_rows(
+        self, state: str, *, limit: int = 10, offset: int = 0
+    ) -> list[dict[str, Any]]:
         with self._connect() as conn:
             rows = conn.execute(
                 """SELECT d.*,l.public_listing_id,l.display_title
