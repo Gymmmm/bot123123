@@ -147,16 +147,26 @@ def source_stats(limit=20):
 
 def list_today_appointments(today_prefix, limit=20):
     with db.connect() as conn:
-        rows = conn.execute("SELECT * FROM appointments WHERE appointment_date LIKE ? OR created_at LIKE ? ORDER BY id DESC LIMIT ?",
-                            (f"%{today_prefix}%", f"{today_prefix}%", int(limit))).fetchall()
+        table = "appointments_v3" if "appointments_v3" in db._table_names() else "appointments"
+        rows = conn.execute(
+            f"""SELECT a.*,l.public_listing_id
+                FROM {table} a
+                LEFT JOIN listings_v3 l ON l.listing_id=a.listing_id
+                WHERE a.appointment_date LIKE ?
+                   OR date(datetime(a.created_at,'+7 hours'))=?
+                ORDER BY a.id DESC LIMIT ?""",
+            (f"%{today_prefix}%", str(today_prefix), int(limit)),
+        ).fetchall()
     return [row_to_dict(r) or {} for r in rows]
 
 
 def list_service_tickets(limit=20):
-    if "repair_tickets" not in db._table_names():
+    tables = db._table_names()
+    table = "repair_tickets_v3" if "repair_tickets_v3" in tables else "repair_tickets"
+    if table not in tables:
         return []
     with db.connect() as conn:
-        rows = conn.execute("SELECT * FROM repair_tickets ORDER BY id DESC LIMIT ?", (int(limit),)).fetchall()
+        rows = conn.execute(f"SELECT * FROM {table} ORDER BY id DESC LIMIT ?", (int(limit),)).fetchall()
     return [row_to_dict(r) or {} for r in rows]
 
 

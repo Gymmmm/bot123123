@@ -74,8 +74,13 @@ def lead_status_zh(v): return LEAD_STATUS_ZH.get(str(v or "new").strip() or "new
 def entry_action_zh(v):
     return {"details": "房源详情", "photos": "更多实拍", "book": "预约看房", "appoint": "预约看房",
             "consult": "联系我们", "consult_click": "联系我们", "consult_menu_click": "联系我们",
-            "listing_detail_view": "房源详情", "appointment_submit": "提交预约",
-            "direct_start": "打开 Bot", "discussion_entry": "历史讨论区入口"}.get(str(v or ""), "其他")
+            "listing_detail_view": "房源详情", "photos_click": "更多实拍",
+            "appointment_click": "预约看房", "appointment_submit": "提交预约",
+            "smart_search": "智能找房", "find_home": "开始找房",
+            "search_pref_submit": "提交找房条件", "index_advisor": "联系中文顾问",
+            "index_area": "按区域找房", "index_budget": "按预算找房",
+            "index_layout": "按户型找房", "index_latest": "查看最新房源",
+            "direct_start": "打开 Bot", "discussion_entry": "历史讨论区入口"}.get(str(v or ""), "其他操作")
 
 def public_deep_link_ok(arg: str) -> bool:
     raw = str(arg or "").strip()

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
+import sqlite3
 from types import SimpleNamespace
 
 import pytest
@@ -14,6 +15,7 @@ from v3_core.status_labels import (
 )
 from v3_core.user_bot.admin_appointments import admin_home_keyboard, handle_admin_callback
 from qiaolian_dual.admin_consult import admin_home_keyboard as complete_admin_home_keyboard
+from qiaolian_dual import admin_consult, attribution_store
 
 
 def _callbacks(markup):
@@ -95,3 +97,57 @@ def test_v3_public_string_literals_have_no_obvious_informal_pronouns():
         for node in ast.walk(tree):
             if isinstance(node, ast.Constant) and isinstance(node.value, str):
                 assert not any(token in node.value for token in forbidden), f"{path}:{node.lineno}"
+
+
+class _AdminDb:
+    def __init__(self, path):
+        self.path = path
+
+    def connect(self):
+        conn = sqlite3.connect(self.path)
+        conn.row_factory = sqlite3.Row
+        return conn
+
+    def _table_names(self):
+        with self.connect() as conn:
+            return {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+
+
+def test_complete_admin_console_reads_real_v3_appointments_and_service_tickets(tmp_path, monkeypatch):
+    path = tmp_path / "admin-v3.sqlite3"
+    with sqlite3.connect(path) as conn:
+        conn.executescript("""
+            CREATE TABLE appointments(id INTEGER PRIMARY KEY, appointment_date TEXT, created_at TEXT);
+            CREATE TABLE appointments_v3(
+                id INTEGER PRIMARY KEY,user_id INTEGER,username TEXT,display_name TEXT,
+                listing_id TEXT,appointment_date TEXT,appointment_time TEXT,status TEXT,created_at TEXT
+            );
+            CREATE TABLE listings_v3(listing_id TEXT PRIMARY KEY,public_listing_id TEXT);
+            CREATE TABLE repair_tickets(id INTEGER PRIMARY KEY);
+            CREATE TABLE repair_tickets_v3(
+                id INTEGER PRIMARY KEY,issue_type TEXT,status TEXT,created_at TEXT
+            );
+            INSERT INTO listings_v3 VALUES ('l_15','QL-PP-D2W2');
+            INSERT INTO appointments_v3 VALUES
+                (1,123,'gym','Gym','l_15','09-10','evening','pending','2026-09-09 11:10:34');
+            INSERT INTO repair_tickets_v3 VALUES
+                (1,'物业协调','new','2026-09-09 11:12:00');
+        """)
+    monkeypatch.setattr(attribution_store, "db", _AdminDb(path))
+
+    appointments = attribution_store.list_today_appointments("2026-09-09")
+    services = attribution_store.list_service_tickets()
+
+    assert len(appointments) == 1
+    assert appointments[0]["public_listing_id"] == "QL-PP-D2W2"
+    assert len(services) == 1
+    assert services[0]["issue_type"] == "物业协调"
+
+
+def test_admin_deeplinks_and_recorded_actions_are_all_readable_chinese():
+    details = admin_consult._deeplink_zh("property_QC0004_details", "l_4")
+    photos = admin_consult._deeplink_zh("property_QC0006_photos", "l_6")
+    assert details.startswith("频道房源详情｜房源详情｜") and "property_" not in details
+    assert photos.startswith("频道更多实拍｜更多实拍｜") and "property_" not in photos
+    assert admin_consult._deeplink_zh("advisor") == "频道联系顾问｜联系中文顾问"
+    assert admin_consult.entry_action_zh("search_pref_submit") == "提交找房条件"

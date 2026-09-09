@@ -3,13 +3,14 @@ from __future__ import annotations
 
 from datetime import datetime
 import re
+from zoneinfo import ZoneInfo
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
 from .common import answer_callback_once, db, he
-from .attribution import admin_source_group_zh, entry_action_zh, lead_status_zh, source_type_zh
+from .attribution import admin_source_group_zh, classify_start_arg, entry_action_zh, lead_status_zh, source_type_zh
 from .attribution_store import (
     get_user_attribution,
     list_leads_by_status,
@@ -19,6 +20,27 @@ from .attribution_store import (
     source_stats,
     update_lead_status,
 )
+from v3_core.status_labels import APPOINTMENT_STATUS_LABELS, status_label
+
+
+SERVICE_STATUS_ZH = {
+    "new": "待处理",
+    "pending": "待处理",
+    "assigned": "已安排",
+    "contacted": "已联系",
+    "processing": "处理中",
+    "done": "已完成",
+    "closed": "已关闭",
+    "cancelled": "已取消",
+}
+APPOINTMENT_TIME_ZH = {
+    "am": "上午",
+    "morning": "上午",
+    "pm": "下午",
+    "afternoon": "下午",
+    "evening": "晚上",
+    "anytime": "时间待定",
+}
 
 
 def _is_admin(user_id: int) -> bool:
@@ -83,6 +105,23 @@ def _lead_source_type(lead: dict) -> str:
     return str(lead.get("first_source_type") or lead.get("source_type") or "other")
 
 
+def _deeplink_zh(payload: str, listing_id: str = "") -> str:
+    """Translate a persisted real deeplink into an admin-readable description."""
+    raw = str(payload or "").strip()
+    if not raw:
+        return "Bot 内直接操作"
+    classified = classify_start_arg(raw)
+    source = source_type_zh(classified.get("source_type"))
+    action = entry_action_zh(classified.get("entry_action"))
+    target = str(classified.get("listing_hint") or listing_id or "").strip()
+    parts = [source]
+    if action not in parts:
+        parts.append(action)
+    if target:
+        parts.append(_display_listing_id(target))
+    return "｜".join(parts)
+
+
 def format_lead_card(lead: dict) -> str:
     user_id = int(lead.get("user_id") or 0)
     attr = get_user_attribution(user_id) or {}
@@ -108,8 +147,7 @@ def format_lead_card(lead: dict) -> str:
         f"首次进入：{he(source_type_zh(first_type))}",
         f"本次动作：{he(entry_action_zh(action))}",
     ])
-    if deep:
-        lines.append(f"入口：<code>{he(deep)}</code>")
+    lines.append(f"入口：{he(_deeplink_zh(deep, listing_id))}")
     if latest_type and latest_type != first_type:
         lines.append(f"最近来源：{he(source_type_zh(latest_type))}")
     return "\n".join(lines)
@@ -129,8 +167,7 @@ def format_consult_notify(*, user_id: int, title: str, lines: list[str], current
         f"首次进入｜{he(source_type_zh(first_type))}",
         f"本次动作｜{he(entry_action_zh(action))}",
     ])
-    if deep:
-        cleaned.append(f"入口｜<code>{he(deep)}</code>")
+    cleaned.append(f"入口｜{he(_deeplink_zh(deep, str(attr.get('latest_listing_id') or '')))}")
     if latest_type != first_type:
         cleaned.append(f"最近来源｜{he(source_type_zh(latest_type))}")
     return title, cleaned
@@ -217,13 +254,28 @@ async def handle_admin_query(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await query.edit_message_text("🏠 <b>房源线索</b>\n\n最近带具体房源的咨询。", parse_mode=ParseMode.HTML, reply_markup=_lead_list_keyboard(rows))
         return
     if action == "appointments":
-        today = datetime.now().strftime("%Y-%m-%d")
+        today = datetime.now(ZoneInfo("Asia/Phnom_Penh")).strftime("%Y-%m-%d")
         rows = list_today_appointments(today, 20)
         text = ["📅 <b>今日预约</b>", ""]
         if not rows:
             text.append("今天暂时没有预约。")
         for row in rows[:12]:
-            text.append(f"• #{int(row.get('id') or 0)}｜{he(_display_listing_id(str(row.get('listing_id') or '-')))}｜{he(str(row.get('appointment_time') or '待定'))}｜{he(str(row.get('status') or 'pending'))}")
+            public_id = str(row.get("public_listing_id") or row.get("listing_id") or "-")
+            customer = str(row.get("display_name") or row.get("username") or "客户")
+            _, appointment_status = status_label(
+                APPOINTMENT_STATUS_LABELS,
+                row.get("status"),
+                ("🟡", "等待确认"),
+            )
+            appointment_time = APPOINTMENT_TIME_ZH.get(
+                str(row.get("appointment_time") or "").strip().lower(),
+                str(row.get("appointment_time") or "时间待定"),
+            )
+            text.append(
+                f"• #{int(row.get('id') or 0)}｜{he(customer)}｜{he(_display_listing_id(public_id))}｜"
+                f"{he(str(row.get('appointment_date') or '日期待定'))} {he(appointment_time)}｜"
+                f"{he(appointment_status)}"
+            )
         await query.edit_message_text("\n".join(text), parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ 返回咨询后台", callback_data="adminq:home")]]))
         return
     if action == "services":
@@ -232,7 +284,8 @@ async def handle_admin_query(update: Update, context: ContextTypes.DEFAULT_TYPE)
         if not rows:
             text.append("暂时没有服务工单。")
         for row in rows[:12]:
-            text.append(f"• #{int(row.get('id') or 0)}｜{he(str(row.get('issue_type') or '服务'))}｜{he(str(row.get('status') or 'new'))}")
+            status = SERVICE_STATUS_ZH.get(str(row.get("status") or "new").lower(), "待处理")
+            text.append(f"• #{int(row.get('id') or 0)}｜{he(str(row.get('issue_type') or '服务'))}｜{he(status)}")
         await query.edit_message_text("\n".join(text), parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ 返回咨询后台", callback_data="adminq:home")]]))
         return
     if action == "sources":
