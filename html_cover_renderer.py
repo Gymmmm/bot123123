@@ -304,6 +304,11 @@ def render_html_cover(
             page.evaluate("document.fonts.ready")
             poster = page.locator(".poster")
             poster.wait_for(state="visible")
+            rendered_font = poster.evaluate(
+                "el => getComputedStyle(el).fontFamily"
+            )
+            if "Noto Sans CJK SC" not in str(rendered_font):
+                raise RuntimeError(f"cover_noto_font_not_applied:{rendered_font}")
             poster.evaluate(
                 r"""root => {
                     const overflows = el =>
