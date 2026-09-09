@@ -5,7 +5,11 @@ from dataclasses import dataclass
 from html import escape as he
 from typing import Any
 
-from .admin_notification_plans import user_contact_text, user_mention_html
+from .admin_notification_plans import (
+    user_contact_text,
+    user_facing_source_label,
+    user_mention_html,
+)
 from .admin_notifications import AdminNotification, AdminNotificationResult, TelegramAdminNotifier
 from .consult import ConsultIntent
 from .lead_effects import LeadEffectExecutor, LeadEffectResult
@@ -52,7 +56,7 @@ class ListingContactEffectExecutor:
                 lines=(
                     f"用户：{user_mention_html(user)}",
                     f"联系方式：{he(user_contact_text(user))}",
-                    f"入口：{he(intent.source or 'listing_callback')}",
+                    f"入口：{he(user_facing_source_label(intent.source or 'listing_callback'))}",
                     f"咨询房源：{he(intent.public_listing_id)}",
                 ),
             ),
