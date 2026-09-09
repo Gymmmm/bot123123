@@ -13,6 +13,7 @@ from v3_core.status_labels import (
     REVIEW_STATUS_LABELS,
 )
 from v3_core.user_bot.admin_appointments import admin_home_keyboard, handle_admin_callback
+from qiaolian_dual.admin_consult import admin_home_keyboard as complete_admin_home_keyboard
 
 
 def _callbacks(markup):
@@ -61,6 +62,19 @@ def test_v3_application_registers_admin_command_and_adminq_callbacks():
     assert 'BotCommand("admin", "咨询后台")' in source
     assert "BotCommandScopeChat(chat_id=admin_id)" in source
     assert ".post_init(configure_command_menu)" in source
+    assert "await cmd_admin_home(update, context)" in source
+    assert "await handle_admin_query(update, context)" in source
+
+
+def test_v3_reuses_complete_existing_admin_console():
+    assert _callbacks(complete_admin_home_keyboard()) == [
+        "adminq:new",
+        "adminq:appointments",
+        "adminq:listings",
+        "adminq:services",
+        "adminq:sources",
+        "adminq:history",
+    ]
 
 
 def test_v3_statuses_are_centralized():
