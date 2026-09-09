@@ -16,9 +16,9 @@ from typing import Any, Callable
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 
 from v3_core.publishing.channel_contract import channel_action_url
+from v3_core.status_labels import inventory_status_bookable, inventory_status_presentation
 
 from .appointments import ACTIVE_APPOINTMENT_STATUSES
-from .listing_presenter import inventory_status_bookable, inventory_status_presentation
 
 logger = logging.getLogger(__name__)
 
