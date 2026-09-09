@@ -108,6 +108,7 @@ jobs:
           RUNTIME="$ROOT/runtime"
           RUNTIME_ENV="$ROOT/runtime.env"
           VENV="$ROOT/.venv"
+          PYTHON_BOOTSTRAP="$OLD/.venv/bin/python"
           SERVICES=(qiaolian-v3@collector.service qiaolian-v3@canonical.service qiaolian-v3@publisher.service qiaolian-v3@user.service)
           trap 'rm -f -- "$BUNDLE_PATH"' EXIT
 
@@ -115,7 +116,8 @@ jobs:
           test -f "$OLD/.env"
           test -d "$OLD/data" && test -d "$OLD/media"
           test -d "$OLD/telethon_sessions" && test -d "$OLD/.playwright-browsers"
-          test -x /opt/qiaolian-python-3.12/bin/python3
+          test -x "$PYTHON_BOOTSTRAP"
+          test "$($PYTHON_BOOTSTRAP -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')" = "3.12"
 
           install -d -m 0755 "$ROOT/releases"
           if [ ! -d "$RELEASE/.git" ]; then
@@ -125,7 +127,7 @@ jobs:
           test "$(git -C "$RELEASE" rev-parse HEAD)" = "$EXPECTED_SHA"
 
           if [ ! -x "$VENV/bin/python" ]; then
-            /opt/qiaolian-python-3.12/bin/python3 -m venv "$VENV"
+            "$PYTHON_BOOTSTRAP" -m venv "$VENV"
           fi
           "$VENV/bin/python" -m pip install --disable-pip-version-check --upgrade pip
           "$VENV/bin/python" -m pip install --disable-pip-version-check -r "$RELEASE/requirements.txt"
