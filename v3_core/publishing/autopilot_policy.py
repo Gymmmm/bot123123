@@ -180,7 +180,12 @@ class ProductionAutoPublishRepository(AutoPublishRepository):
             conn.commit()
 
     def probable_duplicate(self, listing_id: str, offer_id: str) -> bool:
-        """Block another active rental projected from the exact same facts."""
+        """Block later active rentals projected from the exact same facts.
+
+        The earliest active inventory identity wins deterministically. This
+        prevents both copies from being rejected when two sources post the same
+        property before either copy has reached Telegram.
+        """
         with self._connect() as conn:
             current = conn.execute(
                 """SELECT l.canonical_facts_hash FROM listings_v3 l
@@ -190,16 +195,21 @@ class ProductionAutoPublishRepository(AutoPublishRepository):
             ).fetchone()
             if current is None or not str(current["canonical_facts_hash"] or ""):
                 return False
-            row = conn.execute(
-                """SELECT 1 FROM listings_v3 l
+            winner = conn.execute(
+                """SELECT l.listing_id FROM listings_v3 l
                    JOIN listing_offers o ON o.listing_id=l.listing_id
-                   WHERE l.listing_id<>? AND l.canonical_facts_hash=?
+                   WHERE l.canonical_facts_hash=?
                      AND l.inventory_status IN ('active','reserved')
                      AND o.offer_type='rent' AND o.offer_status='active'
+                   ORDER BY l.created_at ASC,
+                     CASE WHEN l.listing_id GLOB 'l_[0-9]*'
+                          THEN CAST(SUBSTR(l.listing_id,3) AS INTEGER)
+                          ELSE 2147483647 END ASC,
+                     l.listing_id ASC
                    LIMIT 1""",
-                (str(listing_id), str(current["canonical_facts_hash"])),
+                (str(current["canonical_facts_hash"]),),
             ).fetchone()
-        return row is not None
+        return winner is not None and str(winner["listing_id"]) != str(listing_id)
 
 
 class ProductionAutoPublishService(AutoPublishService):
