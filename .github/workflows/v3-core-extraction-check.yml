@@ -27,6 +27,7 @@ jobs:
             run_v3_collector.py \
             run_v3_canonical_worker.py \
             run_v3_publisher_bot.py \
+            run_v3_user_bot.py \
             run_v3_preflight.py
       - name: Run V3 extraction contracts
         env:
