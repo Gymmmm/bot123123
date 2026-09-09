@@ -2,6 +2,7 @@ import json
 
 from v3_core.ingest.intake_service import IntakeService, SourceIntake
 from v3_core.ingest.source_repository import SourceRepository
+from v3_core.storage.bootstrap import initialize_v3_storage
 
 
 def _images(count: int):
@@ -18,6 +19,7 @@ def _images(count: int):
 
 def test_intake_persists_raw_evidence_and_sanitized_copy_without_parsing(tmp_path):
     db = tmp_path / "v3.sqlite3"
+    initialize_v3_storage(db)
     repository = SourceRepository(str(db))
     service = IntakeService(repository, min_listing_images=4)
 
@@ -47,6 +49,7 @@ def test_intake_persists_raw_evidence_and_sanitized_copy_without_parsing(tmp_pat
 
 def test_intake_duplicate_returns_existing_source_post(tmp_path):
     db = tmp_path / "v3.sqlite3"
+    initialize_v3_storage(db)
     repository = SourceRepository(str(db))
     service = IntakeService(repository, min_listing_images=4)
     source = SourceIntake(
@@ -68,6 +71,7 @@ def test_intake_duplicate_returns_existing_source_post(tmp_path):
 
 def test_insufficient_media_is_preserved_but_not_parse_pending(tmp_path):
     db = tmp_path / "v3.sqlite3"
+    initialize_v3_storage(db)
     repository = SourceRepository(str(db))
     service = IntakeService(repository, min_listing_images=4)
 
