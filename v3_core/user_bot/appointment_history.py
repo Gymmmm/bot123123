@@ -16,20 +16,11 @@ from typing import Iterable
 from zoneinfo import ZoneInfo
 
 from v3_core.publishing.public_ids import normalize_public_id
+from v3_core.status_labels import APPOINTMENT_STATUS_LABELS
 
 from .appointments import APPOINTMENT_MODE_LABELS, APPOINTMENT_TIME_LABELS
 from .listing_presenter import build_public_listing_details
 from .public_inventory import PublicInventoryReader
-
-
-_STATUS_LABELS = {
-    "pending": ("🟡", "等待确认"),
-    "assigned": ("🟡", "等待确认"),
-    "contacted": ("🟡", "等待确认"),
-    "confirmed": ("🟢", "预约已确认"),
-    "done": ("🔵", "看房已完成"),
-    "cancelled": ("⚪", "已取消"),
-}
 
 
 @dataclass(frozen=True)
@@ -169,7 +160,7 @@ def _item(record: AppointmentHistoryRecord, inventory: PublicInventoryReader) ->
 
 
 def _lines(item: AppointmentHistoryItem) -> list[str]:
-    status_icon, status_label = _STATUS_LABELS.get(item.status, ("🟡", "等待确认"))
+    status_icon, status_label = APPOINTMENT_STATUS_LABELS.get(item.status, ("🟡", "等待确认"))
     mode = APPOINTMENT_MODE_LABELS.get(item.viewing_mode, item.viewing_mode or "待确认")
     mode_icon = "🎥" if item.viewing_mode == "video" else "🚶"
     return [

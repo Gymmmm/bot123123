@@ -66,7 +66,7 @@ def build_appointment_success_view(
         lines.extend(
             [
                 "顾问会先确认最新房态和具体时间，",
-                "确认后通过 Telegram 联系你。",
+                "确认后通过 Telegram 联系您。",
             ]
         )
 

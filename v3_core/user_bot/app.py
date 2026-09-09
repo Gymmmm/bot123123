@@ -25,6 +25,7 @@ from telegram.ext import (
 from v3_core.storage.appointment_repository import SQLiteAppointmentRepository
 
 from .admin_notifications import TelegramAdminNotifier
+from .admin_appointments import AdminAppointmentReader, handle_admin_callback, show_admin_home
 from .appointment_availability import AppointmentAvailabilityService
 from .appointment_runtime_effects import AppointmentRuntimeEffectExecutor
 from .channel_status_sync import V3AppointmentChannelSynchronizer
@@ -167,7 +168,27 @@ def build_v3_user_bot_application(
 ) -> Application:
     config.validate()
     deps = dependencies or build_v3_user_bot_dependencies(config)
+    admin_appointments = AdminAppointmentReader(config.db_path)
     app = ApplicationBuilder().token(config.user_bot_token).build()
+
+    def is_admin(update: Any) -> bool:
+        user = getattr(update, "effective_user", None)
+        chat = getattr(update, "effective_chat", None)
+        return bool(user and int(user.id) in config.admin_ids and chat and chat.type == "private")
+
+    async def admin(update, context):
+        if not is_admin(update):
+            return
+        await show_admin_home(update.effective_message)
+
+    async def admin_callbacks(update, context):
+        query = getattr(update, "callback_query", None)
+        if query is None:
+            return
+        if not is_admin(update):
+            await query.answer("无管理员权限", show_alert=True)
+            return
+        await handle_admin_callback(update, admin_appointments)
 
     async def start(update, context):
         await handle_v3_start(
@@ -267,6 +288,8 @@ def build_v3_user_bot_application(
         logger.exception("V3 User Bot update failed", exc_info=context.error)
 
     app.add_handler(CommandHandler("start", start), group=0)
+    app.add_handler(CommandHandler("admin", admin), group=0)
+    app.add_handler(CallbackQueryHandler(admin_callbacks, pattern=r"^adminq:"), group=0)
     app.add_handler(CallbackQueryHandler(callbacks, pattern=r"^v3u:"), group=0)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text), group=0)
     app.add_error_handler(errors)

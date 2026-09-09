@@ -69,7 +69,6 @@ def test_assurance_home_uses_only_v3_callbacks():
         "v3u:assure:deposit",
         "v3u:assure:moving",
         "v3u:home:contact",
-        "v3u:t:home",
     ]
     assert not any(value.startswith("hub:") for value in callbacks)
 

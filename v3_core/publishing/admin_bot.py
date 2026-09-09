@@ -38,6 +38,7 @@ from v3_core.publishing.publication_instances import PublicationInstanceReposito
 from v3_core.publishing.telegram_adapter import TelegramChannelAdapter, deliver_approved_package
 from v3_core.storage.inventory_reader import InventoryReader
 from v3_core.storage.inventory_repository import InventoryRepository
+from v3_core.status_labels import DELIVERY_STATE_LABELS, PACKAGE_STATUS_LABELS, REVIEW_STATUS_LABELS
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -63,28 +64,6 @@ FIELD_CODES = {
     "hi": "highlights",
 }
 FIELD_CODE_BY_NAME = {value: key for key, value in FIELD_CODES.items()}
-
-REVIEW_STATUS_LABELS = {
-    "pending": "待审核",
-    "approved": "已批准事实",
-    "hold": "暂缓",
-    "rejected": "已拒绝",
-}
-PACKAGE_STATUS_LABELS = {
-    "package_ready": "待冻结发布包",
-    "approved": "待发布",
-    "published": "已发布",
-    "superseded": "已替换",
-}
-DELIVERY_STATE_LABELS = {
-    "prepared": "待发送",
-    "sending": "发送中",
-    "sent": "已发送待提交",
-    "committed": "已提交",
-    "failed_before_send": "发送前失败",
-    "unknown": "状态未知",
-}
-
 
 @dataclass(frozen=True)
 class PublisherAdminSettings:

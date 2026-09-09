@@ -52,7 +52,6 @@ def build_assurance_home_view() -> AssuranceView:
                 AssuranceChoice("🚚 搬家协助", callback_data="v3u:assure:moving"),
                 AssuranceChoice("💬 联系我们", callback_data="v3u:home:contact"),
             ),
-            (AssuranceChoice("🏠 返回首页", callback_data="v3u:t:home"),),
         ),
     )
 

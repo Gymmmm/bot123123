@@ -216,11 +216,10 @@ async def test_contact_without_effect_executor_is_deferred_and_never_claims_succ
             "侨联保障",
             {
                 "v3u:assure:handover",
-                "v3u:assure:deposit",
-                "v3u:assure:moving",
-                "v3u:home:contact",
-                "v3u:t:home",
-            },
+                    "v3u:assure:deposit",
+                    "v3u:assure:moving",
+                    "v3u:home:contact",
+                },
         ),
         (
             "service",
