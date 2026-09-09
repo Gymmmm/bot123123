@@ -1,0 +1,22 @@
+[Unit]
+Description=Qiaolian V3 candidate %i
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/qiaolian_v3_candidate/repo
+EnvironmentFile=/opt/qiaolian_v3_candidate/runtime.env
+ExecStart=/opt/qiaolian_v3_candidate/.venv/bin/python /opt/qiaolian_v3_candidate/repo/run_candidate_runtime.py %i
+Restart=on-failure
+RestartSec=3
+TimeoutStartSec=60
+TimeoutStopSec=25
+KillSignal=SIGINT
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/opt/qiaolian_v3_candidate
+
+[Install]
+WantedBy=multi-user.target
