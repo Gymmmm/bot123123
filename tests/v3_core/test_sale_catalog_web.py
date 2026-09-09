@@ -205,8 +205,12 @@ def test_sale_frontend_uses_api_not_hardcoded_demo_inventory():
     html = (root / "web" / "sale" / "index.html").read_text(encoding="utf-8")
     assert "/api/v3/sale/listings" in html
     assert "正式 <span>出售房源</span>" in html
+    assert "仅出售" in html
+    assert "本页只放出售库存" in html
+    assert "?text=" in html
+    assert "searchParams.set('id'" in html
     assert "The Bridge 2房公寓" not in html
-    assert "炳发城精装3房公寓" not in html
+    assert "炳发城精装㽓公寓" not in html
     assert "钻石岛江景公寓" not in html
     assert "listing_id" not in html
     assert "offer_id" not in html
