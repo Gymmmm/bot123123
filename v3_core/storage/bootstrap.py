@@ -13,6 +13,7 @@ from v3_core.ingest.source_repository import SOURCE_DDL
 from v3_core.inventory.identity import DDL as IDENTITY_DDL
 from v3_core.ops.runtime_state import DDL as RUNTIME_DDL
 from v3_core.publishing.autopilot import DDL as AUTOPILOT_DDL
+from v3_core.publishing.autopilot_anomalies import DDL as AUTOPILOT_ANOMALY_DDL
 from v3_core.publishing.autopilot_policy import DDL as AUTOPILOT_POLICY_DDL
 from v3_core.publishing.broadcast import DDL as BROADCAST_DDL
 from v3_core.publishing.delivery_state import DDL as DELIVERY_DDL
@@ -48,6 +49,7 @@ REQUIRED_V3_TABLES = frozenset(
         "publisher_auto_items_v3",
         "publisher_auto_versions_v3",
         "publisher_auto_validations_v3",
+        "publisher_review_exceptions_v3",
         "v3_component_status",
         "collector_source_state_v3",
         "publisher_autopilot_lock_v3",
@@ -68,6 +70,7 @@ DDL_BLOCKS = (
     RUNTIME_DDL,
     AUTOPILOT_DDL,
     AUTOPILOT_POLICY_DDL,
+    AUTOPILOT_ANOMALY_DDL,
 )
 
 
