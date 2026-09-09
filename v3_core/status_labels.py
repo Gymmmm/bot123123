@@ -17,45 +17,7 @@ APPOINTMENT_STATUS_LABELS = {
     "done": ("🔵", "看房已完成"), "cancelled": ("⚪", "已取消"),
 }
 
-# Reused by User Bot details, new channel posts and published-message status sync.
-# The third item is whether the current inventory state may expose booking UI.
-LISTING_STATUS_PRESENTATION = {
-    "active": ("🟢", "当前可预约", True),
-    "reserved": ("🟡", "已有预约 · 仍可预约", True),
-    "pending": ("🔵", "房态确认中", False),
-    "rented": ("🔴", "已租出", False),
-    "inactive": ("⚫", "已下架", False),
-    "offline": ("⚫", "已下架", False),
-}
-
 
 def status_label(mapping, value: object, default: str = "待确认"):
     return mapping.get(str(value or "").strip().lower(), default)
 
-
-def listing_status_presentation(value: object) -> tuple[str, str, bool]:
-    clean = str(value or "").strip().lower()
-    return LISTING_STATUS_PRESENTATION.get(clean, LISTING_STATUS_PRESENTATION["pending"])
-
-
-def listing_status_line(value: object, public_listing_id: object = "") -> str:
-    icon, label, _ = listing_status_presentation(value)
-    public_id = str(public_listing_id or "").strip()
-    return f"{icon} {label}" + (f"　{public_id}" if public_id else "")
-
-
-def listing_is_bookable(value: object) -> bool:
-    return bool(listing_status_presentation(value)[2])
-
-
-__all__ = [
-    "APPOINTMENT_STATUS_LABELS",
-    "DELIVERY_STATE_LABELS",
-    "LISTING_STATUS_PRESENTATION",
-    "PACKAGE_STATUS_LABELS",
-    "REVIEW_STATUS_LABELS",
-    "listing_is_bookable",
-    "listing_status_line",
-    "listing_status_presentation",
-    "status_label",
-]
