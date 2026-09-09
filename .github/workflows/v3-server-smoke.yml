@@ -19,32 +19,24 @@ jobs:
           printf '%s\n' "$KEY" > ~/.ssh/key
           chmod 600 ~/.ssh/key
           ssh-keyscan -H 50.114.74.120 >> ~/.ssh/known_hosts
-      - name: Start collector user and publisher together
+      - name: Prepare persistent V3 database
         run: |
           ssh -i ~/.ssh/key root@50.114.74.120 'bash -s' <<'REMOTE'
           set -e
-          SRC=/opt/qiaolian_dual_bots
           APP=/opt/qiaolian_v3_test
-          git -C "$APP" fetch origin v3/server-test
-          git -C "$APP" checkout -f origin/v3/server-test
-          cp "$SRC/.env" "$APP/.env"
-          [ -f "$SRC/sources.json" ] && cp "$SRC/sources.json" "$APP/sources.json" || true
-          mkdir -p "$APP/telethon_sessions" "$APP/data" "$APP/logs"
-          cp -a "$SRC/telethon_sessions/." "$APP/telethon_sessions/" 2>/dev/null || true
-          if [ ! -x "$APP/.venv/bin/python" ]; then cp -a "$SRC/.venv" "$APP/.venv"; fi
-          DB="$APP/data/v3_smoke.db"
+          DB="$APP/data/qiaolian.db"
+          mkdir -p "$APP/data" "$APP/backups"
           cd "$APP"
-          if [ ! -f "$DB" ]; then DB_PATH="$DB" QL_DB_PATH="$DB" PYTHONPATH="$APP" "$APP/.venv/bin/python" scripts/bootstrap_db.py; fi
-          pkill -f '/opt/qiaolian_v3_test/.*collector_bot.py' || true
-          pkill -f '/opt/qiaolian_v3_test/.*run_user_bot.py' || true
-          pkill -f '/opt/qiaolian_v3_test/.*run_publisher_bot_v2.py' || true
-          nohup env DB_PATH="$DB" QL_DB_PATH="$DB" PYTHONPATH="$APP" "$APP/.venv/bin/python" "$APP/collector_bot.py" > "$APP/logs/collector.log" 2>&1 &
-          nohup env DB_PATH="$DB" QL_DB_PATH="$DB" PYTHONPATH="$APP" "$APP/.venv/bin/python" "$APP/run_user_bot.py" > "$APP/logs/user.log" 2>&1 &
-          nohup env DB_PATH="$DB" QL_DB_PATH="$DB" PYTHONPATH="$APP" "$APP/.venv/bin/python" "$APP/v2/run_publisher_bot_v2.py" > "$APP/logs/publisher.log" 2>&1 &
-          sleep 8
-          echo '=== PROCESS STATUS ==='
-          pgrep -af 'qiaolian_v3_test.*(collector_bot|run_user_bot|run_publisher_bot_v2)' || true
-          echo '=== USER LOG ==='; tail -30 "$APP/logs/user.log" || true
-          echo '=== PUBLISHER LOG ==='; tail -30 "$APP/logs/publisher.log" || true
-          echo '=== COLLECTOR LOG ==='; tail -30 "$APP/logs/collector.log" || true
+          if [ -f "$DB" ]; then
+            cp -a "$DB" "$APP/backups/qiaolian-$(date +%Y%m%d-%H%M%S).db"
+          fi
+          DB_PATH="$DB" QL_DB_PATH="$DB" PYTHONPATH="$APP" "$APP/.venv/bin/python" scripts/bootstrap_db.py
+          DB_PATH="$DB" "$APP/.venv/bin/python" - <<'PY'
+          import sqlite3
+          p='/opt/qiaolian_v3_test/data/qiaolian.db'
+          c=sqlite3.connect(p)
+          print('FINAL_DB', p)
+          print('TABLES', c.execute("select count(*) from sqlite_master where type='table'").fetchone()[0])
+          print('SOURCE_POSTS', c.execute('select count(*) from source_posts').fetchone()[0])
+          PY
           REMOTE
