@@ -1,0 +1,42 @@
+name: v3-live-smoke-ops
+on:
+  push:
+    branches: [ops/v3-live-smoke-20260909]
+    paths: [.github/ops-control/v3-live-smoke-ops.txt]
+permissions:
+  contents: read
+env:
+  PROD_HOST: 50.114.74.120
+  PROD_PORT: '22'
+  PROD_SSH_USER: root
+  PROD_SSH_KNOWN_HOSTS: '50.114.74.120 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILuFtkSn5SJKY7mZ52Lc/QydPRTvHFpsj87M/HcIkb/L'
+  PROD_SSH_HOST_FINGERPRINT: 'SHA256:sgqLYOUAZ482H3y5jREQ6q2BVvNFPXYiOg4ruyFVnsA'
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure SSH
+        env:
+          PROD_SSH_PRIVATE_KEY: '${{ secrets.PROD_SSH_PRIVATE_KEY }}'
+        run: |
+          set -Eeuo pipefail
+          ssh-keyscan -T 10 -p "$PROD_PORT" -t ed25519 "$PROD_HOST" 2>/dev/null | grep -v '^#' > "$RUNNER_TEMP/observed"
+          ssh-keygen -lf "$RUNNER_TEMP/observed" | grep -F "$PROD_SSH_HOST_FINGERPRINT"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
+          printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
+      - name: Upload smoke scripts
+        run: |
+          set -Eeuo pipefail
+          scp -P "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes ops/v3_smoke_collect10.py "$PROD_SSH_USER@$PROD_HOST:/tmp/v3_smoke_collect10.py"
+          scp -P "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes ops/v3_smoke_publish10.py "$PROD_SSH_USER@$PROD_HOST:/tmp/v3_smoke_publish10.py"
+          scp -P "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes ops/v3_smoke_runner.sh "$PROD_SSH_USER@$PROD_HOST:/tmp/v3_smoke_runner.sh"
+      - name: Execute smoke
+        run: |
+          ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes "$PROD_SSH_USER@$PROD_HOST" 'bash /tmp/v3_smoke_runner.sh'
+      - name: Remove SSH material
+        if: always()
+        run: rm -f "$HOME/.ssh/qiaolian_production"
