@@ -108,7 +108,7 @@ jobs:
           RUNTIME="$ROOT/runtime"
           RUNTIME_ENV="$ROOT/runtime.env"
           VENV="$ROOT/.venv"
-          PYTHON_BOOTSTRAP="$OLD/.venv/bin/python"
+          PYTHON_BOOTSTRAP=""
           SERVICES=(qiaolian-v3@collector.service qiaolian-v3@canonical.service qiaolian-v3@publisher.service qiaolian-v3@user.service)
           trap 'rm -f -- "$BUNDLE_PATH"' EXIT
 
@@ -130,7 +130,13 @@ jobs:
           test -d "$OLD/media" || { echo "DEPLOY_BLOCKED missing_production_media"; exit 1; }
           test -d "$OLD/telethon_sessions" || { echo "DEPLOY_BLOCKED missing_telethon_sessions"; exit 1; }
           test -d "$OLD/.playwright-browsers" || { echo "DEPLOY_BLOCKED missing_playwright_browsers"; exit 1; }
-          test -x "$PYTHON_BOOTSTRAP" || { echo "DEPLOY_BLOCKED missing_python_bootstrap"; exit 1; }
+          for python_candidate in "$OLD/.venv/bin/python" /opt/qiaolian-python-3.12/bin/python3 /usr/local/bin/python3.12 /usr/bin/python3.12; do
+            if [ -x "$python_candidate" ]; then
+              PYTHON_BOOTSTRAP="$python_candidate"
+              break
+            fi
+          done
+          test -n "$PYTHON_BOOTSTRAP" || { echo "DEPLOY_BLOCKED missing_python_bootstrap"; exit 1; }
           PYTHON_VERSION=$($PYTHON_BOOTSTRAP -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
           test "$PYTHON_VERSION" = "3.12" || { echo "DEPLOY_BLOCKED python_version=$PYTHON_VERSION"; exit 1; }
           echo "DEPLOY_PREREQUISITES_OK python=$PYTHON_VERSION"
