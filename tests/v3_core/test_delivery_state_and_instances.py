@@ -5,6 +5,7 @@ from v3_core.publishing.delivery_state import (
     PublicationDeliveryStateRepository,
 )
 from v3_core.publishing.publication_instances import PublicationInstanceRepository
+from v3_core.storage.bootstrap import initialize_v3_storage
 
 
 def _receipt(message_id: int, *, caption: str = "房源") -> dict:
@@ -18,6 +19,7 @@ def _receipt(message_id: int, *, caption: str = "房源") -> dict:
 
 def test_delivery_state_machine_is_idempotent_and_blocks_unsafe_retry(tmp_path):
     db = tmp_path / "v3.sqlite3"
+    initialize_v3_storage(db)
     repo = PublicationDeliveryStateRepository(str(db))
 
     attempt = repo.prepare(
@@ -59,6 +61,7 @@ def test_delivery_state_machine_is_idempotent_and_blocks_unsafe_retry(tmp_path):
 
 def test_unknown_delivery_requires_reconciliation_before_retry(tmp_path):
     db = tmp_path / "v3.sqlite3"
+    initialize_v3_storage(db)
     repo = PublicationDeliveryStateRepository(str(db))
     attempt = repo.prepare(
         package_id="PKG_2",
@@ -79,6 +82,7 @@ def test_unknown_delivery_requires_reconciliation_before_retry(tmp_path):
 
 def test_publication_instance_keeps_exact_telegram_message_identity(tmp_path):
     db = tmp_path / "v3.sqlite3"
+    initialize_v3_storage(db)
     repo = PublicationInstanceRepository(str(db))
 
     instance = repo.record_telegram_publication(
