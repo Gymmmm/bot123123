@@ -4,10 +4,13 @@ A delivery attempt records *an attempt to cross the Telegram API boundary*.
 A publication instance records *the durable external object that now exists*.
 Keeping these responsibilities separate preserves exact message-id edits without
 turning the delivery state machine into another listing/post truth table.
+Construction never initializes schema; additive DDL belongs to the explicit V3
+storage bootstrap.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 import sqlite3
 from typing import Any
 import uuid
@@ -57,13 +60,12 @@ ON publication_instances(package_id, publish_status, updated_at);
 
 
 class PublicationInstanceRepository:
-    def __init__(self, db_path: str):
-        self.db_path = str(db_path)
-        with self._connect() as conn:
-            conn.executescript(DDL)
+    def __init__(self, db_path: str | Path):
+        self.db_path = Path(db_path).expanduser().resolve()
 
     def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path, timeout=30)
+        uri = f"file:{self.db_path.as_posix()}?mode=rw"
+        conn = sqlite3.connect(uri, uri=True, timeout=30)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA busy_timeout=30000")
         return conn
@@ -203,6 +205,7 @@ class PublicationInstanceRepository:
 
 
 __all__ = [
+    "DDL",
     "PublicationInstance",
     "PublicationInstanceRepository",
 ]
