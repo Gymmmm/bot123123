@@ -23,6 +23,7 @@ from telegram.ext import (
     filters,
 )
 
+from v3_core.ops.runtime_state import RuntimeStateRepository
 from v3_core.storage.appointment_repository import SQLiteAppointmentRepository
 
 from .admin_notifications import TelegramAdminNotifier
@@ -174,6 +175,8 @@ def build_v3_user_bot_application(
     config.validate()
     deps = dependencies or build_v3_user_bot_dependencies(config)
     admin_appointments = AdminAppointmentReader(config.db_path)
+    runtime_state = RuntimeStateRepository(config.db_path)
+
     async def configure_command_menu(application: Application) -> None:
         # Keep the public menu simple. Telegram's per-chat scope makes the
         # administrator console visible only to configured administrators.
@@ -187,6 +190,7 @@ def build_v3_user_bot_application(
                 admin_commands,
                 scope=BotCommandScopeChat(chat_id=admin_id),
             )
+        runtime_state.heartbeat("user", state="running", event=True)
 
     app = (
         ApplicationBuilder()
@@ -202,6 +206,7 @@ def build_v3_user_bot_application(
         return bool(user and authorized(int(user.id)) and chat and chat.type == "private")
 
     async def admin(update, context):
+        runtime_state.heartbeat("user", state="running", event=True)
         if not is_admin(update):
             return
         if admin_home_handler is not None:
@@ -210,6 +215,7 @@ def build_v3_user_bot_application(
             await show_admin_home(update.effective_message)
 
     async def admin_callbacks(update, context):
+        runtime_state.heartbeat("user", state="running", event=True)
         query = getattr(update, "callback_query", None)
         if query is None:
             return
@@ -226,6 +232,7 @@ def build_v3_user_bot_application(
             await handle_admin_callback(update, admin_appointments)
 
     async def start(update, context):
+        runtime_state.heartbeat("user", state="running", event=True)
         await handle_v3_start(
             update,
             context,
@@ -238,6 +245,7 @@ def build_v3_user_bot_application(
         )
 
     async def callbacks(update, context):
+        runtime_state.heartbeat("user", state="running", event=True)
         query = getattr(update, "callback_query", None)
         raw = str(getattr(query, "data", "") or "") if query is not None else ""
         if raw == "v3u:t:home":
@@ -291,6 +299,7 @@ def build_v3_user_bot_application(
         )
 
     async def text(update, context):
+        runtime_state.heartbeat("user", state="running", event=True)
         outcome = await handle_v3_transition_text(
             update,
             context,
@@ -319,7 +328,11 @@ def build_v3_user_bot_application(
             lead_effects=deps.transition.lead_effects,
         )
 
+    async def heartbeat(context):
+        runtime_state.heartbeat("user", state="running")
+
     async def errors(update, context):
+        runtime_state.heartbeat("user", state="running", error=f"{type(context.error).__name__}: {context.error}")
         logger.exception("V3 User Bot update failed", exc_info=context.error)
 
     app.add_handler(CommandHandler("start", start), group=0)
@@ -328,6 +341,8 @@ def build_v3_user_bot_application(
     app.add_handler(CallbackQueryHandler(callbacks, pattern=r"^v3u:"), group=0)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text), group=0)
     app.add_error_handler(errors)
+    if app.job_queue is not None:
+        app.job_queue.run_repeating(heartbeat, interval=30, first=5, name="v3_user_runtime_heartbeat")
     return app
 
 
