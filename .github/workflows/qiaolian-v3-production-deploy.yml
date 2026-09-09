@@ -203,13 +203,16 @@ jobs:
           printf '%s\n' "$EXPECTED_SHA" > "$BACKUP/candidate_sha.txt"
           printf '%s\n' "$PREVIOUS_SHA" > "$BACKUP/previous_v3_sha.txt"
 
-          echo 'DEPLOY: exact candidate into immutable release directory'
+          echo 'DEPLOY: exact candidate into isolated release repository'
+          rm -rf "$RELEASE"
           install -d -o qiaolianbot -g qiaolianbot -m 0755 "$APP/releases" "$RELEASE"
-          git -c safe.directory="$RELEASE" -C "$RELEASE" rev-parse --git-dir >/dev/null 2>&1 || git -c safe.directory="$RELEASE" -C "$RELEASE" init
+          git -c safe.directory="$RELEASE" -C "$RELEASE" init
           git -c safe.directory="$RELEASE" -C "$RELEASE" fetch "$BUNDLE_PATH" refs/heads/actions-v3-production
           test "$(git -c safe.directory="$RELEASE" -C "$RELEASE" rev-parse FETCH_HEAD)" = "$EXPECTED_SHA"
           git -c safe.directory="$RELEASE" -C "$RELEASE" checkout -f --detach "$EXPECTED_SHA"
           test "$(git -c safe.directory="$RELEASE" -C "$RELEASE" rev-parse HEAD)" = "$EXPECTED_SHA"
+          test -f "$RELEASE/deploy/v3/run_component.sh"
+          test -f "$RELEASE/deploy/v3/qiaolian-v3@.service"
           chmod 0755 "$RELEASE/deploy/v3/run_component.sh"
 
           echo 'PYTHON: shared isolated V3 venv'
@@ -254,6 +257,7 @@ jobs:
           source "$RUNTIME_ENV"
           set +a
           export QIAOLIAN_CODE_ROOT="$RELEASE"
+          export COLLECTOR_SOURCES_JSON="$RELEASE/sources.json"
           export DB_PATH="$DB"
           export SQLITE_PATH="$DB"
           export CHANNEL_DISCUSSION_ENABLED=false
