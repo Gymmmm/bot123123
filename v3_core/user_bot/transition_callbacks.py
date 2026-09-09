@@ -18,6 +18,7 @@ from .callbacks import (
     encode_change_search_callback,
     encode_listing_callback,
 )
+from .home_callbacks import encode_home_callback
 from .search_navigation import AREA_OPTIONS, LAYOUT_OPTIONS
 from .transition_views import TransitionChoice, TransitionChoiceKind
 
@@ -101,6 +102,8 @@ def encode_transition_choice(choice: TransitionChoice) -> str:
         return encode_listing_callback("details", choice.public_listing_id)
     if kind == "change_search":
         return encode_change_search_callback()
+    if kind == "contact":
+        return encode_home_callback("contact")
     if kind in _VALUE_KINDS:
         value = _validate_value(kind, choice.value)
         return f"{TRANSITION_PREFIX}:{kind}:{value}"
