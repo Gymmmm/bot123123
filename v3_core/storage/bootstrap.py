@@ -11,6 +11,7 @@ import sqlite3
 
 from v3_core.ingest.source_repository import SOURCE_DDL
 from v3_core.inventory.identity import DDL as IDENTITY_DDL
+from v3_core.publishing.autopilot import DDL as AUTOPILOT_DDL
 from v3_core.publishing.broadcast import DDL as BROADCAST_DDL
 from v3_core.publishing.delivery_state import DDL as DELIVERY_DDL
 from v3_core.publishing.package_store import DDL as PACKAGE_DDL
@@ -40,6 +41,12 @@ REQUIRED_V3_TABLES = frozenset(
         "repair_tickets_v3",
         "publisher_settings_v3",
         "publisher_broadcast_log_v3",
+        "publisher_autopilot_settings_v3",
+        "publisher_post_windows_v3",
+        "publisher_auto_items_v3",
+        "v3_component_status",
+        "collector_source_state_v3",
+        "publisher_autopilot_lock_v3",
     }
 )
 
@@ -54,6 +61,7 @@ DDL_BLOCKS = (
     LEAD_DDL,
     SERVICE_DDL,
     BROADCAST_DDL,
+    AUTOPILOT_DDL,
 )
 
 
