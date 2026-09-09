@@ -11,6 +11,7 @@ import sqlite3
 
 from v3_core.ingest.source_repository import SOURCE_DDL
 from v3_core.inventory.identity import DDL as IDENTITY_DDL
+from v3_core.ops.runtime_state import DDL as RUNTIME_DDL
 from v3_core.publishing.autopilot import DDL as AUTOPILOT_DDL
 from v3_core.publishing.broadcast import DDL as BROADCAST_DDL
 from v3_core.publishing.delivery_state import DDL as DELIVERY_DDL
@@ -61,6 +62,7 @@ DDL_BLOCKS = (
     LEAD_DDL,
     SERVICE_DDL,
     BROADCAST_DDL,
+    RUNTIME_DDL,
     AUTOPILOT_DDL,
 )
 
