@@ -1,11 +1,13 @@
 """Source evidence repository extracted from ``collector_db_compat``.
 
-This repository owns only immutable-ish intake evidence and source media.  It
-has no draft, listing, package, post, or publish-log methods.
+This repository owns only immutable-ish intake evidence and source media. It
+has no draft, listing, package, post, or publish-log methods. Construction never
+initializes schema; additive DDL is executed only by ``initialize_v3_storage``.
 """
 from __future__ import annotations
 
 import json
+from pathlib import Path
 import sqlite3
 import uuid
 from typing import Any
@@ -73,13 +75,12 @@ ON media_assets(owner_type, owner_ref_id, sort_order);
 
 
 class SourceRepository:
-    def __init__(self, db_path: str):
-        self.db_path = str(db_path)
-        with self._connect() as conn:
-            conn.executescript(SOURCE_DDL)
+    def __init__(self, db_path: str | Path):
+        self.db_path = Path(db_path).expanduser().resolve()
 
     def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path, timeout=30)
+        uri = f"file:{self.db_path.as_posix()}?mode=rw"
+        conn = sqlite3.connect(uri, uri=True, timeout=30)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA busy_timeout=30000")
@@ -213,4 +214,4 @@ class SourceRepository:
             conn.commit()
 
 
-__all__ = ["SourceRepository", "SOURCE_DDL"]
+__all__ = ["SOURCE_DDL", "SourceRepository"]
