@@ -15,10 +15,11 @@ from telegram.ext import CommandHandler, ContextTypes, MessageHandler, filters
 
 from v3_core.ops.runtime_state import RuntimeStateRepository
 from .admin_bot import PublisherAdminBot, PublisherAdminSettings, REPO_ROOT, load_settings
-from .autopilot_policy import ProductionAutoPublishRepository, ProductionAutoPublishService
+from .autopilot_anomalies import FinalAutoPublishRepository, FinalAutoPublishService
 from .broadcast import BroadcastService, BroadcastSettingsRepository
 from .broadcast_admin import BROADCAST_EDIT_STATE_KEY, BroadcastAdminController
-from .simple_admin import NEW_LISTING_STATE_KEY, SIMPLE_EDIT_STATE_KEY, SimplePublisherAdminController
+from .simple_admin import NEW_LISTING_STATE_KEY, SIMPLE_EDIT_STATE_KEY
+from .simple_admin_production import ProductionSimplePublisherAdminController
 
 
 class V3PublisherApplication(PublisherAdminBot):
@@ -39,15 +40,15 @@ class V3PublisherApplication(PublisherAdminBot):
             channel_chat_id=settings.channel_chat_id,
             timezone_name=timezone_name,
         )
-        self.auto_repository = ProductionAutoPublishRepository(settings.db_path)
+        self.auto_repository = FinalAutoPublishRepository(settings.db_path)
         self.auto_repository.ensure_defaults()
         self.runtime = RuntimeStateRepository(settings.db_path)
-        self.autopilot = ProductionAutoPublishService(
+        self.autopilot = FinalAutoPublishService(
             workflow=self.workflow,
             repository=self.auto_repository,
             channel_chat_id=settings.channel_chat_id,
         )
-        self.simple = SimplePublisherAdminController(
+        self.simple = ProductionSimplePublisherAdminController(
             db_path=settings.db_path,
             repo_root=REPO_ROOT,
             workflow=self.workflow,
