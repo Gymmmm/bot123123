@@ -1,7 +1,7 @@
 from qiaolian_dual.cover_styles import normalize_cover_style as legacy_normalize_cover_style
 from qiaolian_dual.publishability_contract import evaluate_publishability as legacy_evaluate_publishability
 from v3_core.inventory.publishability import evaluate_publishability
-from v3_core.media.cover_styles import normalize_cover_style
+from v3_core.media.cover_styles import normalize_cover_style, recommended_cover_style
 
 
 def test_publishability_extraction_matches_locked_production_contract():
@@ -29,3 +29,10 @@ def test_publishability_extraction_matches_locked_production_contract():
 def test_cover_style_extraction_matches_locked_production_contract():
     for style in (None, "classic", "blue_banner", "right_price", "villa_premium", "dark_glass", "unknown"):
         assert normalize_cover_style(style) == legacy_normalize_cover_style(style)
+
+
+def test_production_cover_recommendation_uses_right_price_except_for_villas():
+    assert recommended_cover_style("公寓", "2房1厅") == "right_price"
+    assert recommended_cover_style("商铺") == "right_price"
+    assert recommended_cover_style("独栋别墅") == "black_gold"
+    assert recommended_cover_style("Villa") == "black_gold"

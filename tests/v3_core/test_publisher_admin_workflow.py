@@ -223,6 +223,8 @@ def test_package_requires_second_approval_before_delivery(tmp_path):
     workflow.approve_review(review_id=review_id, operator_user_id="admin")
     package = workflow.build_package_for_review(review_id=review_id)
 
+    assert package.cover_style == "right_price"
+
     with pytest.raises(Exception):
         workflow.prepare_send(package_id=package.package_id, channel_chat_id="-100123")
 

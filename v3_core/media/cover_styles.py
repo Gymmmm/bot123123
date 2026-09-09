@@ -48,6 +48,12 @@ ACCEPTED_COVER_STYLE_KEYS = frozenset(
 )
 
 
+def recommended_cover_style(*values: object) -> str:
+    """Return the production default, reserving black gold for villas."""
+    identity = " ".join(str(value or "").strip().lower() for value in values)
+    return "black_gold" if ("别墅" in identity or "villa" in identity) else "right_price"
+
+
 def normalize_cover_style(style: str | None, *, allow_video: bool = True) -> str:
     """把旧名称收敛到最终三套；空值固定使用经典蓝卡。"""
     value = str(style or "classic_blue").strip().lower()
@@ -68,4 +74,5 @@ __all__ = [
     "STYLE_LABELS",
     "cover_template_path",
     "normalize_cover_style",
+    "recommended_cover_style",
 ]

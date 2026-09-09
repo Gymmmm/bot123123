@@ -149,7 +149,7 @@ class PublisherWorkflowService:
         self,
         *,
         review_id: str,
-        cover_style: str = "classic_blue",
+        cover_style: str | None = None,
         manual_cover_path: str | None = None,
         excluded_gallery_paths: Iterable[str] = (),
     ) -> FrozenPackage:

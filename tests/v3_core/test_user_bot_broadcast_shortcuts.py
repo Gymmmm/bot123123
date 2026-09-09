@@ -181,4 +181,7 @@ async def test_unknown_start_payload_still_falls_through_to_public_property_vali
 
     assert outcome.handled and outcome.kind == "invalid_link"
     assert listings.calls == ["not_a_real_shortcut"]
-    assert "链接已经失效" in message.calls[-1][0][0]
+    assert message.calls[-1][0][0] == (
+        "这个链接已经失效或房源信息已更新。\n\n"
+        "您可以重新找房，或直接联系我们。"
+    )

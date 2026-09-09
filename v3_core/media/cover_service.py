@@ -12,7 +12,7 @@ from typing import Callable
 
 from v3_core.storage.inventory_reader import InventoryReader
 from .cover_renderer import CoverRenderData, render_cover
-from .cover_styles import normalize_cover_style
+from .cover_styles import normalize_cover_style, recommended_cover_style
 from .service import PreparedSourceMedia
 
 
@@ -69,7 +69,7 @@ class CoverRenderService:
         listing_id: str,
         offer_id: str,
         media: PreparedSourceMedia,
-        style: str = "classic_blue",
+        style: str | None = None,
         output_path: str | Path | None = None,
     ) -> RenderedCover:
         listing = self.reader.listing(listing_id)
@@ -78,7 +78,14 @@ class CoverRenderService:
             raise ValueError("cover_offer_listing_mismatch")
         canonical = self.reader.canonical(str(listing["canonical_record_id"]))
         facts = dict(canonical["facts"])
-        normalized_style = normalize_cover_style(style, allow_video=False)
+        selected_style = style or recommended_cover_style(
+            listing.get("property_type"),
+            listing.get("property_subtype"),
+            listing.get("display_title"),
+            facts.get("property_type"),
+            facts.get("property_subtype"),
+        )
+        normalized_style = normalize_cover_style(selected_style, allow_video=False)
         public_id = str(listing.get("public_listing_id") or "").strip()
         if not public_id:
             raise ValueError("cover_requires_public_listing_id")

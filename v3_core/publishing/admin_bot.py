@@ -484,6 +484,7 @@ class PublisherAdminBot:
         if package.status == "package_ready":
             rows.append([InlineKeyboardButton("✅ 批准并冻结发布包", callback_data=f"v3p|{package.package_id}")])
             if review_id:
+                rows.append([InlineKeyboardButton("🎨 更换封面模板", callback_data=f"v3choose|{review_id}")])
                 rows.append([
                     InlineKeyboardButton("🖼 调整封面/实拍", callback_data=f"v3media|{review_id}"),
                     InlineKeyboardButton("✏️ 修改资料", callback_data=f"v3edit|{review_id}"),
@@ -694,6 +695,20 @@ class PublisherAdminBot:
                 await self._send_media(query.message, context, review_id, index)
                 return
             if action == "v3styles" and len(parts) == 2:
+                detail = self.workflow.review_detail(parts[1])
+                if str(detail.review.get("review_status") or "") != "approved":
+                    raise ValueError("review_must_be_approved_before_package")
+                review_id = parts[1]
+                state = self._media_state(context, review_id)
+                package = await asyncio.to_thread(
+                    self.workflow.build_package_for_review,
+                    review_id=review_id,
+                    manual_cover_path=str(state.get("cover_path") or "") or None,
+                    excluded_gallery_paths=tuple(state.get("excluded") or ()),
+                )
+                await self._send_package_preview(query.message, package, review_id=review_id)
+                return
+            if action == "v3choose" and len(parts) == 2:
                 detail = self.workflow.review_detail(parts[1])
                 if str(detail.review.get("review_status") or "") != "approved":
                     raise ValueError("review_must_be_approved_before_package")
