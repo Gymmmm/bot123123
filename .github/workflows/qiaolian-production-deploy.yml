@@ -113,7 +113,19 @@ jobs:
           trap 'rm -f -- "$BUNDLE_PATH"' EXIT
 
           test -f "$BUNDLE_PATH" || { echo "DEPLOY_BLOCKED missing_release_bundle"; exit 1; }
-          test -f "$OLD/.env" || { echo "DEPLOY_BLOCKED missing_production_env"; exit 1; }
+          ENV_SOURCE="$RUNTIME_ENV"
+          [ -f "$ENV_SOURCE" ] || ENV_SOURCE="$ROOT/.env"
+          [ -f "$ENV_SOURCE" ] || ENV_SOURCE="$OLD/.env"
+          if [ ! -f "$ENV_SOURCE" ]; then
+            for legacy_service in qiaolian-user-bot.service qiaolian-publisher-bot.service qiaolian-collector.service; do
+              SERVICE_ENV=$(systemctl show "$legacy_service" -p EnvironmentFiles --value 2>/dev/null | awk '{print $1}')
+              if [ -n "$SERVICE_ENV" ] && [ -f "$SERVICE_ENV" ]; then
+                ENV_SOURCE="$SERVICE_ENV"
+                break
+              fi
+            done
+          fi
+          test -f "$ENV_SOURCE" || { echo "DEPLOY_BLOCKED missing_production_env"; exit 1; }
           test -d "$OLD/data" || { echo "DEPLOY_BLOCKED missing_production_data"; exit 1; }
           test -d "$OLD/media" || { echo "DEPLOY_BLOCKED missing_production_media"; exit 1; }
           test -d "$OLD/telethon_sessions" || { echo "DEPLOY_BLOCKED missing_telethon_sessions"; exit 1; }
@@ -148,10 +160,6 @@ jobs:
             install -m 0640 -o qiaolianbot -g qiaolianbot "$SOURCE_CONFIG" "$RUNTIME/sources.json"
           fi
 
-          ENV_SOURCE="$RUNTIME_ENV"
-          [ -f "$ENV_SOURCE" ] || ENV_SOURCE="$ROOT/.env"
-          [ -f "$ENV_SOURCE" ] || ENV_SOURCE="$OLD/.env"
-          test -f "$ENV_SOURCE"
           ENV_NEXT=$(mktemp "$ROOT/runtime.env.XXXXXX")
           awk -F= '
             BEGIN { split("QIAOLIAN_CODE_ROOT QIAOLIAN_VENV QIAOLIAN_RUNTIME_ROOT DATA_DIR DB_PATH SQLITE_PATH MEDIA_ROOT COLLECTOR_DOWNLOAD_DIR TELETHON_SESSION_PATH COLLECTOR_SOURCES_JSON V3_COVER_OUTPUT_DIR PLAYWRIGHT_BROWSERS_PATH V3_CANONICAL_WORKER_INTERVAL_SECONDS CHANNEL_DISCUSSION_ENABLED", keys, " "); for (i in keys) managed[keys[i]]=1 }
