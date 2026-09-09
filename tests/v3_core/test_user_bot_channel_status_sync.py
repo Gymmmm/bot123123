@@ -70,7 +70,7 @@ async def test_sync_edits_only_latest_exact_publication_message_and_locks_at_fiv
     call = fake.calls[0]
     assert call["chat_id"] == "-100123"
     assert call["message_id"] == 222
-    assert "已有5份预约看房，房态待确认" in call["caption"]
+    assert "🔵 房态确认中" in call["caption"]
     buttons = [button.text for row in call["reply_markup"].inline_keyboard for button in row]
     assert buttons == ["🏠 房源详情", "📸 更多实拍"]
 
@@ -85,5 +85,5 @@ async def test_sync_edits_only_latest_exact_publication_message_and_locks_at_fiv
             "SELECT post_text FROM publication_instances WHERE instance_id='PUB_OLD'"
         ).fetchone()[0]
     assert status == "pending"
-    assert "已有5份预约看房" in newest
-    assert "已有5份预约看房" not in old
+    assert "🔵 房态确认中" in newest
+    assert "🔵 房态确认中" not in old
