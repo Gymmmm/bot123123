@@ -112,12 +112,16 @@ jobs:
           SERVICES=(qiaolian-v3@collector.service qiaolian-v3@canonical.service qiaolian-v3@publisher.service qiaolian-v3@user.service)
           trap 'rm -f -- "$BUNDLE_PATH"' EXIT
 
-          test -f "$BUNDLE_PATH"
-          test -f "$OLD/.env"
-          test -d "$OLD/data" && test -d "$OLD/media"
-          test -d "$OLD/telethon_sessions" && test -d "$OLD/.playwright-browsers"
-          test -x "$PYTHON_BOOTSTRAP"
-          test "$($PYTHON_BOOTSTRAP -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')" = "3.12"
+          test -f "$BUNDLE_PATH" || { echo "DEPLOY_BLOCKED missing_release_bundle"; exit 1; }
+          test -f "$OLD/.env" || { echo "DEPLOY_BLOCKED missing_production_env"; exit 1; }
+          test -d "$OLD/data" || { echo "DEPLOY_BLOCKED missing_production_data"; exit 1; }
+          test -d "$OLD/media" || { echo "DEPLOY_BLOCKED missing_production_media"; exit 1; }
+          test -d "$OLD/telethon_sessions" || { echo "DEPLOY_BLOCKED missing_telethon_sessions"; exit 1; }
+          test -d "$OLD/.playwright-browsers" || { echo "DEPLOY_BLOCKED missing_playwright_browsers"; exit 1; }
+          test -x "$PYTHON_BOOTSTRAP" || { echo "DEPLOY_BLOCKED missing_python_bootstrap"; exit 1; }
+          PYTHON_VERSION=$($PYTHON_BOOTSTRAP -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+          test "$PYTHON_VERSION" = "3.12" || { echo "DEPLOY_BLOCKED python_version=$PYTHON_VERSION"; exit 1; }
+          echo "DEPLOY_PREREQUISITES_OK python=$PYTHON_VERSION"
 
           install -d -m 0755 "$ROOT/releases"
           if [ ! -d "$RELEASE/.git" ]; then
