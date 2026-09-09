@@ -10,6 +10,22 @@ from .lead_service import LeadUser
 from .public_appointment import PublicAppointmentDraft
 
 
+CONTACT_SOURCE_LABELS = {
+    "hub": "首页联系我们",
+    "listing_callback": "房源咨询",
+    "daily_broadcast": "每日广播咨询",
+    "user_search": "找房咨询",
+    "channel": "频道房源",
+    "channel_deeplink": "频道房源",
+    "search_result": "找房结果",
+}
+
+
+def display_contact_source(source: object) -> str:
+    clean = str(source or "").strip().lower()
+    return CONTACT_SOURCE_LABELS.get(clean, "用户咨询")
+
+
 def user_mention_html(user: LeadUser) -> str:
     name = he(str(user.display_name or user.user_id))
     if int(user.user_id or 0) > 0:
@@ -34,7 +50,7 @@ def general_contact_notification(
         lines=(
             f"用户：{user_mention_html(user)}",
             f"联系方式：{he(user_contact_text(user))}",
-            f"入口：{he(str(source or '用户咨询'))}",
+            f"入口：{he(display_contact_source(source))}",
         ),
     )
 
@@ -67,7 +83,9 @@ def appointment_notification(
 
 
 __all__ = [
+    "CONTACT_SOURCE_LABELS",
     "appointment_notification",
+    "display_contact_source",
     "general_contact_notification",
     "user_contact_text",
     "user_mention_html",
