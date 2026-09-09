@@ -8,6 +8,7 @@ from v3_core.publishing.package_service import (
     PackageBuildService,
 )
 from v3_core.publishing.package_store import FrozenPackageStore
+from v3_core.storage.bootstrap import initialize_v3_storage
 from v3_core.storage.inventory_reader import InventoryReader
 from v3_core.storage.inventory_repository import InventoryRepository
 
@@ -57,6 +58,7 @@ def _files(tmp_path):
 
 def _inventory(tmp_path, facts, *, listing_id="l_1", public_id="QL-RF-A2B3"):
     db = tmp_path / "v3.sqlite3"
+    initialize_v3_storage(db)
     inventory = InventoryRepository(str(db))
     canonical = inventory.store_canonical(source_post_id="source-1", facts=facts)
     inventory.upsert_listing(
