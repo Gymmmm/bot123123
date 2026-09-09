@@ -152,4 +152,4 @@ def test_publisher_dashboard_exposes_broadcast_center(tmp_path):
     )
     bot = V3PublisherApplication(settings)
     labels = [button.text for row in bot._dashboard_keyboard().inline_keyboard for button in row]
-    assert "📢 广播中心" in labels
+    assert "📣 每日广播" in labels
