@@ -8,6 +8,7 @@ from v3_core.inventory.service import InventoryMaterializationService
 from v3_core.publishing.admin_operations import PublisherAdminOperations
 from v3_core.publishing.delivery_state import PublicationDeliveryStateRepository
 from v3_core.publishing.package_store import FrozenPackageStore
+from v3_core.storage.bootstrap import initialize_v3_storage
 from v3_core.storage.inventory_reader import InventoryReader
 from v3_core.storage.inventory_repository import InventoryRepository
 
@@ -43,6 +44,7 @@ def _facts(*, rent=800, sale=None):
 
 def _setup(tmp_path: Path, *, rent=800, sale=None):
     db = tmp_path / "admin.sqlite3"
+    initialize_v3_storage(db)
     sources = SourceRepository(str(db))
     inventory = InventoryRepository(str(db))
     reader = InventoryReader(str(db))
