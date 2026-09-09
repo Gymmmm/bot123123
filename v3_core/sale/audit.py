@@ -88,7 +88,6 @@ class SaleInventoryAudit:
                    FROM listings_v3 l
                    JOIN listing_offers o ON o.listing_id=l.listing_id
                    WHERE o.offer_type='sale' AND o.offer_status='active'
-                     AND l.data_status='current'
                      AND TRIM(COALESCE(l.project_name,''))=''
                      AND TRIM(COALESCE(l.public_location_display,''))=''
                      AND TRIM(COALESCE(l.canonical_area_display,''))=''""",
@@ -100,7 +99,6 @@ class SaleInventoryAudit:
                    JOIN canonical_records c ON c.canonical_record_id=l.canonical_record_id
                    JOIN listing_offers o ON o.listing_id=l.listing_id
                    WHERE o.offer_type='sale' AND o.offer_status='active'
-                     AND l.data_status='current'
                      AND NOT EXISTS (
                          SELECT 1 FROM media_assets m
                          WHERE m.owner_type='source_post'
