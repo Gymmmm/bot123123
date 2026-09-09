@@ -10,28 +10,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from v3_core.publishing.formatting import display_layout
+from v3_core.status_labels import inventory_status_presentation
 
 from .public_inventory import PublishedListingView
-
-
-_STATUS_PRESENTATION = {
-    "active": ("🟢", "当前可预约"),
-    "reserved": ("🟡", "已有预约 · 仍可预约"),
-    "pending": ("🔵", "房态确认中"),
-    "rented": ("🔴", "已租出"),
-    "inactive": ("⚫", "已下架"),
-    "offline": ("⚫", "已下架"),
-}
-
-
-def inventory_status_presentation(value: object) -> tuple[str, str]:
-    """Return the existing User Bot inventory-status wording for public surfaces."""
-    clean = str(value or "pending").strip().lower()
-    return _STATUS_PRESENTATION.get(clean, ("🔵", "房态确认中"))
-
-
-def inventory_status_bookable(value: object) -> bool:
-    return str(value or "").strip().lower() in {"active", "reserved"}
 
 
 @dataclass(frozen=True)
@@ -115,9 +96,4 @@ def build_public_listing_details(view: PublishedListingView) -> PublicListingDet
     )
 
 
-__all__ = [
-    "PublicListingDetails",
-    "build_public_listing_details",
-    "inventory_status_bookable",
-    "inventory_status_presentation",
-]
+__all__ = ["PublicListingDetails", "build_public_listing_details"]
