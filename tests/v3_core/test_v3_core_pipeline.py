@@ -5,6 +5,7 @@ from PIL import Image, ImageDraw
 
 from v3_core.ingest.intake_service import SourceIntake
 from v3_core.pipeline import V3CorePipeline
+from v3_core.storage.bootstrap import initialize_v3_storage
 
 
 def _images(tmp_path: Path, prefix: str):
@@ -34,8 +35,10 @@ def _images(tmp_path: Path, prefix: str):
 
 
 def test_rent_source_reaches_approved_frozen_send_command(tmp_path):
+    db = tmp_path / "v3.sqlite3"
+    initialize_v3_storage(db)
     pipeline = V3CorePipeline(
-        db_path=str(tmp_path / "v3.sqlite3"),
+        db_path=str(db),
         user_bot_username="QiaolianBot",
     )
     intake = pipeline.ingest_source(
@@ -87,8 +90,10 @@ def test_rent_source_reaches_approved_frozen_send_command(tmp_path):
 
 
 def test_sale_source_is_saved_but_cannot_build_rental_package(tmp_path):
+    db = tmp_path / "sale.sqlite3"
+    initialize_v3_storage(db)
     pipeline = V3CorePipeline(
-        db_path=str(tmp_path / "sale.sqlite3"),
+        db_path=str(db),
         user_bot_username="QiaolianBot",
     )
     intake = pipeline.ingest_source(
