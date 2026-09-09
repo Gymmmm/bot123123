@@ -48,3 +48,14 @@ jobs:
         env:
           PYTHONPATH: '${{ github.workspace }}'
         run: python -m pytest -q
+      - name: Checkout exact production baseline for full-suite comparison
+        if: always()
+        uses: actions/checkout@v4
+        with:
+          ref: 8fb094baba9eb7ef350e55b414960708e4d18b38
+          clean: true
+      - name: Run baseline complete project pytest
+        if: always()
+        env:
+          PYTHONPATH: '${{ github.workspace }}'
+        run: python -m pytest -q
