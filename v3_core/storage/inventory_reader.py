@@ -1,21 +1,23 @@
-"""Read-only V3 inventory queries used by publication services."""
+"""Read-only V3 inventory queries used by publication services.
+
+Construction never initializes or migrates schema. The reader opens an existing
+SQLite database in ``mode=ro`` so a missing DB cannot be created by runtime.
+"""
 from __future__ import annotations
 
 import json
+from pathlib import Path
 import sqlite3
 from typing import Any
 
-from .schema import ensure_v3_schema
-
 
 class InventoryReader:
-    def __init__(self, db_path: str):
-        self.db_path = str(db_path)
-        with self._connect() as conn:
-            ensure_v3_schema(conn)
+    def __init__(self, db_path: str | Path):
+        self.db_path = Path(db_path).expanduser().resolve()
 
     def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path, timeout=30)
+        uri = f"file:{self.db_path.as_posix()}?mode=ro"
+        conn = sqlite3.connect(uri, uri=True, timeout=30)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA busy_timeout=30000")
         return conn
