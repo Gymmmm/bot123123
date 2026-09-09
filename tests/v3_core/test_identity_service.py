@@ -1,6 +1,9 @@
 import sqlite3
 
+import pytest
+
 from v3_core.inventory.identity import IdentityService
+from v3_core.storage.bootstrap import initialize_v3_storage
 
 
 def test_identity_continues_after_legacy_listing_numbers(tmp_path):
@@ -12,6 +15,7 @@ def test_identity_continues_after_legacy_listing_numbers(tmp_path):
             [("l_349",), ("l_350",)],
         )
         conn.commit()
+    initialize_v3_storage(db)
 
     service = IdentityService(str(db))
     identity = service.allocate(
@@ -24,7 +28,9 @@ def test_identity_continues_after_legacy_listing_numbers(tmp_path):
 
 
 def test_identity_is_idempotent_for_same_canonical_record(tmp_path):
-    service = IdentityService(str(tmp_path / "identity-idem.sqlite3"))
+    db = tmp_path / "identity-idem.sqlite3"
+    initialize_v3_storage(db)
+    service = IdentityService(str(db))
     first = service.allocate(
         canonical_record_id="CAN_SAME",
         facts={"public_location_display": "BKK1"},
@@ -37,3 +43,11 @@ def test_identity_is_idempotent_for_same_canonical_record(tmp_path):
     assert second == first
     assert first.listing_id == "l_1"
     assert first.public_listing_id.startswith("QL-BK-")
+
+
+def test_identity_runtime_does_not_create_missing_database(tmp_path):
+    db = tmp_path / "missing.sqlite3"
+    service = IdentityService(db)
+    with pytest.raises(sqlite3.OperationalError):
+        service.allocate(canonical_record_id="CAN_MISSING", facts={})
+    assert not db.exists()
