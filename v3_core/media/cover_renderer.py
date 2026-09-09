@@ -210,6 +210,40 @@ def render_cover(
             poster = page.locator(".poster").first
             if not poster.count():
                 raise RuntimeError("cover_template_missing_poster")
+            page.add_style_tag(
+                content='''
+                html, body, input, button, select, textarea, .poster, .poster * {
+                    font-family: "Noto Sans CJK SC", "Noto Sans SC", sans-serif !important;
+                }
+                '''
+            )
+            page.evaluate("document.fonts.ready")
+            rendered_font = poster.evaluate("el => getComputedStyle(el).fontFamily")
+            if "Noto Sans CJK SC" not in str(rendered_font):
+                raise RuntimeError(f"cover_noto_font_not_applied:{rendered_font}")
+            poster.evaluate(
+                r'''root => {
+                    const empty = el => !String(el?.textContent || '').replace(/\s+/g, ' ').trim();
+                    for (const row of root.querySelectorAll('[data-field], [data-fields]')) {
+                        const ids = (row.dataset.fields || row.dataset.field || '')
+                            .split(',').map(x => x.trim()).filter(Boolean);
+                        if (ids.length && !ids.some(id => {
+                            const target = root.querySelector('#' + CSS.escape(id));
+                            return target && !empty(target);
+                        })) row.style.display = 'none';
+                    }
+                    const overflows = el =>
+                        el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1;
+                    for (const el of root.querySelectorAll('[data-autofit]')) {
+                        const minimum = Number(el.dataset.autofit) || 20;
+                        let size = Number.parseFloat(getComputedStyle(el).fontSize) || minimum;
+                        while (overflows(el) && size > minimum) {
+                            size = Math.max(minimum, size - 2);
+                            el.style.fontSize = `${size}px`;
+                        }
+                    }
+                }'''
+            )
             page.evaluate(
                 """() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))"""
             )
