@@ -36,6 +36,13 @@ class CanonicalWorker:
             rows = conn.execute(
                 """SELECT id FROM source_posts
                    WHERE parse_status='pending'
+                      OR (
+                          parse_status='parsed'
+                          AND NOT EXISTS (
+                              SELECT 1 FROM canonical_records c
+                              WHERE c.source_post_id=CAST(source_posts.id AS TEXT)
+                          )
+                      )
                    ORDER BY id ASC LIMIT ?""",
                 (max(1, int(limit)),),
             ).fetchall()

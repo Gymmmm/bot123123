@@ -54,3 +54,28 @@ def test_collector_intake_remains_pending_until_independent_worker_runs(tmp_path
     assert listing["public_listing_id"].startswith("QL-RF-")
     source = pipeline.sources.get_source_post(int(intake.source_post_pk))
     assert source["parse_status"] == "parsed"
+
+
+def test_worker_recovers_legacy_parsed_source_without_canonical_record(tmp_path):
+    db_path = str(tmp_path / "legacy-orphan.sqlite3")
+    initialize_v3_storage(db_path)
+    pipeline = V3CorePipeline(db_path=db_path, user_bot_username="QiaolianBot")
+    intake = pipeline.ingest_source(
+        SourceIntake(
+            source_type="telegram_channel",
+            source_name="legacy-import",
+            source_post_id="701",
+            source_url="https://t.me/c/1/701",
+            raw_text="钻石岛 公寓 1房1厅 月租 $500/月",
+            raw_images=_photos(tmp_path),
+        )
+    )
+    pipeline.sources.update_parse_status(int(intake.source_post_pk), "parsed")
+
+    worker = CanonicalWorker(db_path)
+    assert worker.pending_ids() == [int(intake.source_post_pk)]
+    result = worker.process_one(int(intake.source_post_pk))
+
+    assert result.status == "materialized"
+    assert pipeline.inventory_reader.listing(result.listing_id)["public_listing_id"]
+    assert worker.pending_ids() == []
