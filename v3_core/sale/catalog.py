@@ -61,6 +61,21 @@ JOIN listing_offers o ON o.offer_id=(
 WHERE l.data_status='current'
   AND l.inventory_status IN ('active','reserved')
   AND TRIM(COALESCE(l.public_listing_id,''))<>''
+  AND (
+      TRIM(COALESCE(l.project_name,''))<>'' OR
+      TRIM(COALESCE(l.public_location_display,''))<>'' OR
+      TRIM(COALESCE(l.canonical_area_display,''))<>''
+  )
+  AND EXISTS (
+      SELECT 1 FROM media_assets m
+      WHERE m.owner_type='source_post'
+        AND CAST(m.owner_ref_id AS TEXT)=CAST(c.source_post_id AS TEXT)
+        AND m.asset_type='photo'
+        AND m.status='active'
+        AND TRIM(COALESCE(m.local_path,''))<>''
+        AND (TRIM(COALESCE(m.mime_type,''))='' OR LOWER(m.mime_type) LIKE 'image/%')
+        AND LOWER(COALESCE(m.mime_type,''))<>'image/svg+xml'
+  )
 """
 
 
@@ -282,7 +297,10 @@ class SaleCatalogRepository:
             row = conn.execute(_BASE_SELECT + "\nAND UPPER(l.public_listing_id)=? LIMIT 1", (public_id,)).fetchone()
             if row is None:
                 return None
-            return self._public_row(row, self._media_for_source(conn, row["source_post_id"]))
+            media = self._media_for_source(conn, row["source_post_id"])
+            if not media:
+                return None
+            return self._public_row(row, media)
 
     def media_asset(self, asset_id: str) -> tuple[Path, str] | None:
         """Resolve only image media belonging to a currently public sale listing."""
@@ -309,6 +327,11 @@ class SaleCatalogRepository:
                      AND l.data_status='current'
                      AND l.inventory_status IN ('active','reserved')
                      AND TRIM(COALESCE(l.public_listing_id,''))<>''
+                     AND (
+                       TRIM(COALESCE(l.project_name,''))<>'' OR
+                       TRIM(COALESCE(l.public_location_display,''))<>'' OR
+                       TRIM(COALESCE(l.canonical_area_display,''))<>''
+                     )
                    LIMIT 1""",
                 (asset_id,),
             ).fetchone()
