@@ -12,6 +12,8 @@ from typing import Any, Protocol
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 
+from v3_core.user_bot.listing_presenter import inventory_status_bookable
+
 from .delivery_coordinator import TelegramSendCommand
 from .package_store import CHANNEL_ACTION_ORDER
 
@@ -20,20 +22,24 @@ class TelegramBotLike(Protocol):
     async def send_photo(self, **kwargs: Any) -> Any: ...
 
 
-def build_channel_keyboard(actions: dict[str, str]) -> InlineKeyboardMarkup:
+def build_channel_keyboard(
+    actions: dict[str, str],
+    *,
+    inventory_status: object = "active",
+) -> InlineKeyboardMarkup:
     if tuple(actions) != CHANNEL_ACTION_ORDER:
         raise ValueError("telegram_actions_must_be_details_photos_book")
     if any(not str(actions[key] or "").strip() for key in CHANNEL_ACTION_ORDER):
         raise ValueError("telegram_action_url_missing")
-    return InlineKeyboardMarkup(
+    rows = [
         [
-            [
-                InlineKeyboardButton("🏠 房源详情", url=actions["details"]),
-                InlineKeyboardButton("📸 更多实拍", url=actions["photos"]),
-            ],
-            [InlineKeyboardButton("📅 预约看房", url=actions["book"])],
+            InlineKeyboardButton("🏠 房源详情", url=actions["details"]),
+            InlineKeyboardButton("📸 更多实拍", url=actions["photos"]),
         ]
-    )
+    ]
+    if inventory_status_bookable(inventory_status):
+        rows.append([InlineKeyboardButton("📅 预约看房", url=actions["book"])])
+    return InlineKeyboardMarkup(rows)
 
 
 class TelegramChannelAdapter:
@@ -46,7 +52,10 @@ class TelegramChannelAdapter:
             raise FileNotFoundError(f"frozen_cover_missing:{cover}")
         if len(str(command.caption)) > 1024:
             raise ValueError("telegram_caption_too_long")
-        keyboard = build_channel_keyboard(command.actions)
+        keyboard = build_channel_keyboard(
+            command.actions,
+            inventory_status=command.inventory_status,
+        )
 
         with cover.open("rb") as handle:
             message = await self.bot.send_photo(
