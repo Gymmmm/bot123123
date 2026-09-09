@@ -1,7 +1,12 @@
-"""Repository for the migration-safe V3 canonical inventory tables."""
+"""Repository for the migration-safe V3 canonical inventory tables.
+
+Construction never initializes or migrates schema. Additive DDL is executed
+only by ``initialize_v3_storage`` before runtime starts.
+"""
 from __future__ import annotations
 
 import json
+from pathlib import Path
 import sqlite3
 import uuid
 from typing import Any
@@ -10,7 +15,6 @@ from v3_core.inventory.materializer_v3 import (
     listing_projection_v3,
     offer_projections_v3,
 )
-from .schema import ensure_v3_schema
 
 
 def _json(value: Any) -> str:
@@ -18,13 +22,12 @@ def _json(value: Any) -> str:
 
 
 class InventoryRepository:
-    def __init__(self, db_path: str):
-        self.db_path = str(db_path)
-        with self._connect() as conn:
-            ensure_v3_schema(conn)
+    def __init__(self, db_path: str | Path):
+        self.db_path = Path(db_path).expanduser().resolve()
 
     def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path, timeout=30)
+        uri = f"file:{self.db_path.as_posix()}?mode=rw"
+        conn = sqlite3.connect(uri, uri=True, timeout=30)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA busy_timeout=30000")
         conn.execute("PRAGMA foreign_keys=ON")
