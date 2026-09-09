@@ -5,6 +5,7 @@ from PIL import Image, ImageDraw
 
 from v3_core.ingest.intake_service import SourceIntake
 from v3_core.pipeline import V3CorePipeline
+from v3_core.storage.bootstrap import initialize_v3_storage
 
 
 def _images(tmp_path: Path, prefix: str):
@@ -33,11 +34,17 @@ def _images(tmp_path: Path, prefix: str):
     return out
 
 
-def test_rent_source_reaches_approved_frozen_send_command(tmp_path):
-    pipeline = V3CorePipeline(
-        db_path=str(tmp_path / "v3.sqlite3"),
+def _pipeline(tmp_path: Path, name: str) -> V3CorePipeline:
+    db_path = tmp_path / name
+    initialize_v3_storage(db_path)
+    return V3CorePipeline(
+        db_path=str(db_path),
         user_bot_username="QiaolianBot",
     )
+
+
+def test_rent_source_reaches_approved_frozen_send_command(tmp_path):
+    pipeline = _pipeline(tmp_path, "v3.sqlite3")
     intake = pipeline.ingest_source(
         SourceIntake(
             source_type="telegram_channel",
@@ -87,10 +94,7 @@ def test_rent_source_reaches_approved_frozen_send_command(tmp_path):
 
 
 def test_sale_source_is_saved_but_cannot_build_rental_package(tmp_path):
-    pipeline = V3CorePipeline(
-        db_path=str(tmp_path / "sale.sqlite3"),
-        user_bot_username="QiaolianBot",
-    )
+    pipeline = _pipeline(tmp_path, "sale.sqlite3")
     intake = pipeline.ingest_source(
         SourceIntake(
             source_type="telegram_channel",
