@@ -6,6 +6,9 @@ on:
       - codex/v3-sale-catalog-web-20260909
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   sale-catalog:
     runs-on: ubuntu-latest
@@ -24,118 +27,14 @@ jobs:
           python -m compileall -q \
             v3_core \
             tests/v3_core \
-            run_v3_sale_web.py \
-            run_v3_sale_align.py
+            run_v3_sale_web.py
       - name: Run sale catalog contracts
         env:
           PYTHONPATH: '${{ github.workspace }}'
         run: |
-          python -m pytest -q tests/v3_core/test_sale_catalog_web.py tests/v3_core/test_sale_inventory_align.py
+          python -m pytest -q tests/v3_core/test_sale_catalog_web.py
       - name: Run complete V3 regression suite
         env:
           PYTHONPATH: '${{ github.workspace }}'
         run: |
           python -m pytest -q tests/v3_core
-
-  preview-existing:
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    env:
-      PROD_HOST: 50.114.74.120
-      PROD_PORT: '22'
-      PROD_SSH_USER: root
-      PROD_SSH_KNOWN_HOSTS: '50.114.74.120 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILuFtkSn5SJKY7mZ52Lc/QydPRTvHFpsj87M/HcIkb/L'
-      PROD_SSH_HOST_FINGERPRINT: 'SHA256:sgqLYOUAZ482H3y5jREQ6q2BVvNFPXYiOg4ruyFVnsA'
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - name: Verify production SSH host key
-        run: |
-          set -Eeuo pipefail
-          ssh-keyscan -T 10 -p "$PROD_PORT" -t ed25519 "$PROD_HOST" 2>/dev/null | grep -v '^#' > "$RUNNER_TEMP/known_hosts_observed"
-          ssh-keygen -lf "$RUNNER_TEMP/known_hosts_observed" | grep -F "$PROD_SSH_HOST_FINGERPRINT"
-      - name: Configure production SSH
-        env:
-          PROD_SSH_PRIVATE_KEY: '${{ secrets.PROD_SSH_PRIVATE_KEY }}'
-        run: |
-          set -Eeuo pipefail
-          test -n "$PROD_SSH_PRIVATE_KEY"
-          install -d -m 700 "$HOME/.ssh"
-          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
-          printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
-          chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
-      - name: Pack and upload sale preview
-        run: |
-          set -Eeuo pipefail
-          tar -czf "$RUNNER_TEMP/sale-preview.tgz" v3_core run_v3_sale_web.py run_v3_sale_align.py web/sale
-          scp -P "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" \
-            -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 \
-            "$RUNNER_TEMP/sale-preview.tgz" \
-            "$PROD_SSH_USER@$PROD_HOST:/tmp/qiaolian-sale-preview.tgz"
-      - name: Align existing inventory and start sale preview
-        run: |
-          set -Eeuo pipefail
-          ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" \
-            -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 \
-            "$PROD_SSH_USER@$PROD_HOST" bash <<'REMOTE'
-          set -Eeuo pipefail
-          export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
-          APP=/opt/qiaolian_v3
-          OLD=/opt/qiaolian_dual_bots
-          DB="$OLD/data/qiaolian_dual_bot.db"
-          PREVIEW="$APP/sale_preview"
-          test -s "$DB"
-          test -x "$APP/.venv/bin/python"
-          install -d -m 0755 "$PREVIEW"
-          tar -xzf /tmp/qiaolian-sale-preview.tgz -C "$PREVIEW"
-          chown -R qiaolianbot:qiaolianbot "$PREVIEW"
-          rm -f /tmp/qiaolian-sale-preview.tgz
-          echo '=== BEFORE ==='
-          sqlite3 "$DB" "SELECT COUNT(*) AS source_posts FROM source_posts;"
-          sqlite3 "$DB" "SELECT COUNT(*) AS canonical_records FROM canonical_records;"
-          sqlite3 "$DB" "SELECT COUNT(*) AS listings_v3 FROM listings_v3;"
-          sqlite3 "$DB" "SELECT COUNT(*) AS sale_offers FROM listing_offers WHERE offer_type='sale' AND offer_status='active';"
-          sqlite3 "$DB" "SELECT COUNT(*) AS rent_publishable FROM listing_offers WHERE offer_type='rent' AND publishable=1;"
-          sqlite3 "$DB" "SELECT COUNT(*) FROM source_posts WHERE raw_text GLOB '*售价*' OR raw_text GLOB '*出售*';"
-          echo '=== ALIGN ==='
-          cd "$PREVIEW"
-          runuser -u qiaolianbot -- "$APP/.venv/bin/python" run_v3_sale_align.py --db "$DB" --force
-          echo '=== AFTER ==='
-          sqlite3 "$DB" "SELECT COUNT(*) AS sale_offers FROM listing_offers WHERE offer_type='sale' AND offer_status='active';"
-          sqlite3 "$DB" "SELECT COUNT(*) AS sale_not_store_only FROM listing_offers WHERE offer_type='sale' AND publication_policy<>'store_only';"
-          sqlite3 "$DB" "SELECT COUNT(*) AS sale_publishable FROM listing_offers WHERE offer_type='sale' AND publishable<>0;"
-          sqlite3 "$DB" "SELECT COUNT(*) AS rent_publishable FROM listing_offers WHERE offer_type='rent' AND publishable=1;"
-          test "$(sqlite3 "$DB" "SELECT COUNT(*) FROM listing_offers WHERE offer_type='sale' AND publication_policy<>'store_only';")" = 0
-          test "$(sqlite3 "$DB" "SELECT COUNT(*) FROM listing_offers WHERE offer_type='sale' AND publishable<>0;")" = 0
-          echo '=== CATALOG SAMPLE ==='
-          PYTHONPATH="$PREVIEW" runuser -u qiaolianbot -- "$APP/.venv/bin/python" - <<'PY'
-          from v3_core.sale.catalog import SaleCatalogRepository
-          payload = SaleCatalogRepository("/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db").list_sale_listings(limit=8)
-          print("total", payload["total"])
-          for item in payload["items"]:
-              print(item.get("public_id"), item.get("title"), item.get("sale_price_usd"), item.get("area"))
-          PY
-          echo '=== START PREVIEW WEB ==='
-          pkill -f 'run_v3_sale_web.py' >/dev/null 2>&1 || true
-          sleep 1
-          nohup runuser -u qiaolianbot -- env \
-            PYTHONPATH="$PREVIEW" \
-            DB_PATH="$DB" \
-            SQLITE_PATH="$DB" \
-            V3_SALE_WEB_HOST=0.0.0.0 \
-            V3_SALE_WEB_PORT=8091 \
-            V3_SALE_WEB_INDEX="$PREVIEW/web/sale/index.html" \
-            "$APP/.venv/bin/python" "$PREVIEW/run_v3_sale_web.py" \
-            > "$PREVIEW/sale_web.log" 2>&1 &
-          sleep 2
-          curl -fsS http://127.0.0.1:8091/healthz
-          echo
-          curl -fsS 'http://127.0.0.1:8091/api/v3/sale/listings?limit=5'
-          echo
-          echo 'PREVIEW_OK http://50.114.74.120:8091/'
-          REMOTE
-      - name: Remove temporary SSH material
-        if: always()
-        run: rm -f "$HOME/.ssh/qiaolian_production"
