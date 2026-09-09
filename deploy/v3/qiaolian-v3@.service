@@ -5,6 +5,8 @@ Wants=network-online.target
 
 [Service]
 Type=simple
+User=qiaolianbot
+Group=qiaolianbot
 WorkingDirectory=/opt/qiaolian_v3/current
 EnvironmentFile=/opt/qiaolian_v3/runtime.env
 ExecStart=/bin/bash /opt/qiaolian_v3/current/deploy/v3/run_component.sh %i
@@ -12,6 +14,7 @@ Restart=on-failure
 RestartSec=3
 TimeoutStopSec=30
 KillSignal=SIGINT
+UMask=0027
 
 [Install]
 WantedBy=multi-user.target
