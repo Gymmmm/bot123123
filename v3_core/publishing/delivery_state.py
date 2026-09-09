@@ -1,14 +1,17 @@
 """V3 durable publication delivery state machine.
 
 Extracted from the production ``publication_delivery.py`` contract at
-8e4605cf.  This module owns only the external-send boundary.  It deliberately
+8e4605cf. This module owns only the external-send boundary. It deliberately
 does not update listings, review rows, packages, or external publication
 instances; those projections are committed by their own repositories.
+Construction never initializes schema; additive DDL belongs to the explicit V3
+storage bootstrap.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+from pathlib import Path
 import sqlite3
 import uuid
 from typing import Any
@@ -77,13 +80,12 @@ def validate_result(value: Any) -> dict[str, Any]:
 
 
 class PublicationDeliveryStateRepository:
-    def __init__(self, db_path: str):
-        self.db_path = str(db_path)
-        with self._connect() as conn:
-            conn.executescript(DDL)
+    def __init__(self, db_path: str | Path):
+        self.db_path = Path(db_path).expanduser().resolve()
 
     def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path, timeout=30)
+        uri = f"file:{self.db_path.as_posix()}?mode=rw"
+        conn = sqlite3.connect(uri, uri=True, timeout=30)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA busy_timeout=30000")
         return conn
@@ -288,6 +290,7 @@ class PublicationDeliveryStateRepository:
 
 
 __all__ = [
+    "DDL",
     "DeliveryAttempt",
     "DeliveryBlocked",
     "PublicationDeliveryStateRepository",
