@@ -185,12 +185,18 @@ jobs:
           ACTIVATED_AT=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
           systemctl restart "${SERVICES[@]}"
           sleep 10
+          HEALTH_FAILED=0
           for service in "${SERVICES[@]}"; do
-            systemctl is-active --quiet "$service"
-            test "$(systemctl show "$service" -p MainPID --value)" -gt 0
-            test "$(systemctl show "$service" -p NRestarts --value)" -eq 0
+            ACTIVE=$(systemctl is-active "$service" 2>/dev/null || true)
+            PID=$(systemctl show "$service" -p MainPID --value 2>/dev/null || echo 0)
+            RESTARTS=$(systemctl show "$service" -p NRestarts --value 2>/dev/null || echo unknown)
+            echo "SERVICE_HEALTH unit=$service active=$ACTIVE pid=$PID restarts=$RESTARTS"
+            [ "$ACTIVE" = active ] || HEALTH_FAILED=1
+            [ "${PID:-0}" -gt 0 ] 2>/dev/null || HEALTH_FAILED=1
+            [ "$RESTARTS" = 0 ] || HEALTH_FAILED=1
           done
-          if journalctl -u qiaolian-v3@collector.service -u qiaolian-v3@canonical.service -u qiaolian-v3@publisher.service -u qiaolian-v3@user.service --since "$ACTIVATED_AT" --no-pager | grep -Eq 'Traceback|ModuleNotFoundError|Main process exited|Failed with result'; then
+          if [ "$HEALTH_FAILED" -ne 0 ] || journalctl -u qiaolian-v3@collector.service -u qiaolian-v3@canonical.service -u qiaolian-v3@publisher.service -u qiaolian-v3@user.service --since "$ACTIVATED_AT" --no-pager | grep -Eq 'Traceback|ModuleNotFoundError|Main process exited|Failed with result'; then
+            systemctl --no-pager --full status "${SERVICES[@]}" || true
             journalctl -u qiaolian-v3@collector.service -u qiaolian-v3@canonical.service -u qiaolian-v3@publisher.service -u qiaolian-v3@user.service --since "$ACTIVATED_AT" --no-pager
             exit 1
           fi
