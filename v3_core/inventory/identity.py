@@ -6,7 +6,8 @@ numeric IDs continue after both legacy `listings` and V3 `listings_v3` so the
 side-by-side migration cannot collide with production inventory.
 
 Construction never initializes schema. ``listing_identity_reservations_v3`` is
-created only by ``initialize_v3_storage``.
+created only by ``initialize_v3_storage``. Canonical revisions produced from the
+same source post reuse the existing listing/public identity.
 """
 from __future__ import annotations
 
@@ -121,22 +122,57 @@ class IdentityService:
                 maximum = max(maximum, _numeric_id(row[0]))
         return maximum
 
+    @staticmethod
+    def _source_revision_identity(
+        conn: sqlite3.Connection,
+        canonical_record_id: str,
+    ) -> sqlite3.Row | None:
+        current = conn.execute(
+            "SELECT source_post_id FROM canonical_records WHERE canonical_record_id=?",
+            (str(canonical_record_id),),
+        ).fetchone()
+        if current is None:
+            return None
+        return conn.execute(
+            """SELECT r.listing_id,r.public_id
+               FROM listing_identity_reservations_v3 r
+               JOIN canonical_records c ON c.canonical_record_id=r.canonical_record_id
+               WHERE c.source_post_id=?
+               ORDER BY r.created_at ASC
+               LIMIT 1""",
+            (str(current["source_post_id"]),),
+        ).fetchone()
+
     def allocate(
         self,
         *,
         canonical_record_id: str,
         facts: dict[str, Any],
     ) -> ListingIdentity:
+        canonical_id = str(canonical_record_id)
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             existing = conn.execute(
                 """SELECT listing_id,public_id FROM listing_identity_reservations_v3
                    WHERE canonical_record_id=? ORDER BY created_at LIMIT 1""",
-                (str(canonical_record_id),),
+                (canonical_id,),
             ).fetchone()
             if existing:
                 conn.commit()
                 return ListingIdentity(str(existing["listing_id"]), str(existing["public_id"]))
+
+            revision = self._source_revision_identity(conn, canonical_id)
+            if revision is not None:
+                conn.execute(
+                    """UPDATE listing_identity_reservations_v3
+                       SET canonical_record_id=? WHERE listing_id=?""",
+                    (canonical_id, str(revision["listing_id"])),
+                )
+                conn.commit()
+                return ListingIdentity(
+                    str(revision["listing_id"]),
+                    str(revision["public_id"]),
+                )
 
             number = self._max_listing_number(conn) + 1
             listing_id = f"l_{number}"
@@ -148,7 +184,7 @@ class IdentityService:
                         """INSERT INTO listing_identity_reservations_v3
                            (listing_id,public_id,canonical_record_id)
                            VALUES (?,?,?)""",
-                        (listing_id, public_id, str(canonical_record_id)),
+                        (listing_id, public_id, canonical_id),
                     )
                     conn.commit()
                     return ListingIdentity(listing_id, public_id)

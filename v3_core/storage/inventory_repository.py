@@ -304,22 +304,47 @@ class InventoryRepository:
         review_score: int = 0,
         review_note: str = "",
     ) -> sqlite3.Row:
-        review_id = "REV_" + uuid.uuid4().hex
+        listing_key = str(listing_id or "")
+        offer_key = str(offer_id or "")
         with self._connect() as conn:
-            conn.execute(
-                """INSERT INTO review_items
-                   (review_id,canonical_record_id,listing_id,offer_id,review_status,
-                    review_score,review_note)
-                   VALUES (?,?,?,?, 'pending',?,?)""",
-                (
-                    review_id,
-                    str(canonical_record_id),
-                    str(listing_id or ""),
-                    str(offer_id or ""),
-                    int(review_score or 0),
-                    str(review_note or ""),
-                ),
-            )
+            conn.execute("BEGIN IMMEDIATE")
+            existing = conn.execute(
+                """SELECT review_id FROM review_items
+                   WHERE listing_id=? AND offer_id=?
+                   ORDER BY created_at DESC,review_id DESC LIMIT 1""",
+                (listing_key, offer_key),
+            ).fetchone()
+            if existing is None:
+                review_id = "REV_" + uuid.uuid4().hex
+                conn.execute(
+                    """INSERT INTO review_items
+                       (review_id,canonical_record_id,listing_id,offer_id,review_status,
+                        review_score,review_note)
+                       VALUES (?,?,?,?, 'pending',?,?)""",
+                    (
+                        review_id,
+                        str(canonical_record_id),
+                        listing_key,
+                        offer_key,
+                        int(review_score or 0),
+                        str(review_note or ""),
+                    ),
+                )
+            else:
+                review_id = str(existing["review_id"])
+                conn.execute(
+                    """UPDATE review_items
+                       SET canonical_record_id=?,review_status='pending',
+                           review_score=?,review_note=?,operator_user_id='',
+                           approved_at=NULL,updated_at=CURRENT_TIMESTAMP
+                       WHERE review_id=?""",
+                    (
+                        str(canonical_record_id),
+                        int(review_score or 0),
+                        str(review_note or ""),
+                        review_id,
+                    ),
+                )
             row = conn.execute(
                 "SELECT * FROM review_items WHERE review_id=?", (review_id,)
             ).fetchone()
