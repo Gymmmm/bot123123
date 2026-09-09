@@ -8,8 +8,10 @@ from pathlib import Path
 
 try:
     from .runtime_env import configure_environment, patch_legacy_path_globals
+    from .bootstrap_schema import ensure_runtime_schema
 except ImportError:  # direct script execution
     from runtime_env import configure_environment, patch_legacy_path_globals
+    from bootstrap_schema import ensure_runtime_schema
 
 
 def _root() -> Path:
@@ -27,6 +29,7 @@ def _activate_paths() -> None:
 def _load_runtime():
     _activate_paths()
     app_root = configure_environment()
+    ensure_runtime_schema(os.environ["DB_PATH"])
     patch_legacy_path_globals(app_root, publisher_runtime=True)
 
     from qiaolian_publisher_v2.cover_picker_patch import install_cover_picker
