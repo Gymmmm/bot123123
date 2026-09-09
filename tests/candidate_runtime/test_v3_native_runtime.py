@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import sqlite3
 
 import pytest
@@ -9,7 +8,24 @@ from candidate_runtime.bootstrap import database_integrity, initialize_runtime_s
 from candidate_runtime.runtime_env import configure_candidate_environment
 
 
+_MUTABLE_ENV = (
+    "DATA_DIR",
+    "DB_PATH",
+    "SQLITE_PATH",
+    "MEDIA_ROOT",
+    "COLLECTOR_DOWNLOAD_DIR",
+    "TELETHON_SESSION_PATH",
+    "CANDIDATE_BACKUP_DIR",
+)
+
+
+def _clean_runtime_env(monkeypatch) -> None:
+    for key in _MUTABLE_ENV:
+        monkeypatch.delenv(key, raising=False)
+
+
 def test_empty_db_recovery_uses_native_v3_tables(tmp_path, monkeypatch):
+    _clean_runtime_env(monkeypatch)
     runtime = tmp_path / "runtime"
     monkeypatch.setenv("QIAOLIAN_RUNTIME_ROOT", str(runtime))
     monkeypatch.setenv("DB_PATH", "data/candidate.db")
@@ -27,6 +43,7 @@ def test_empty_db_recovery_uses_native_v3_tables(tmp_path, monkeypatch):
 
 
 def test_runtime_rejects_mutable_path_outside_root(tmp_path, monkeypatch):
+    _clean_runtime_env(monkeypatch)
     runtime = tmp_path / "runtime"
     monkeypatch.setenv("QIAOLIAN_RUNTIME_ROOT", str(runtime))
     monkeypatch.setenv("DB_PATH", str(tmp_path / "outside.db"))
@@ -35,6 +52,7 @@ def test_runtime_rejects_mutable_path_outside_root(tmp_path, monkeypatch):
 
 
 def test_existing_db_is_backed_up_before_additive_initialize(tmp_path, monkeypatch):
+    _clean_runtime_env(monkeypatch)
     runtime = tmp_path / "runtime"
     monkeypatch.setenv("QIAOLIAN_RUNTIME_ROOT", str(runtime))
     monkeypatch.setenv("DB_PATH", "data/candidate.db")
