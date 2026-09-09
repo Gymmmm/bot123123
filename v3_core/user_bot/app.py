@@ -1,6 +1,6 @@
 """Independent python-telegram-bot Application wiring for the V3 User Bot.
 
-Nothing in this module initializes schema or changes production services.  It
+Nothing in this module initializes schema or changes production services. It
 only composes V3-owned handlers against an already initialized additive V3 DB.
 """
 from __future__ import annotations
@@ -176,6 +176,9 @@ def build_v3_user_bot_application(
             listings=deps.read.listings,
             transition_views=deps.transition.views,
             channel_url=config.channel_url,
+            search_executor=deps.transition.searches,
+            contact_effects=deps.contact_effects,
+            advisor_url=config.advisor_url,
         )
 
     async def callbacks(update, context):
