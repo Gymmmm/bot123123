@@ -59,7 +59,7 @@ def _actions(rows):
     return [[item.action for item in row] for row in rows]
 
 
-def test_details_response_preserves_locked_production_layout_and_frozen_adviser_notes():
+def test_details_response_preserves_layout_and_frozen_adviser_notes():
     view = _view(canonical_facts={"highlights": ["采光好", "钥匙已备"]})
 
     response = build_details_response(view)
@@ -74,7 +74,7 @@ def test_details_response_preserves_locked_production_layout_and_frozen_adviser_
         "🏢 楼层：19楼\n"
         "🔑 租约：押1付1 · 1年\n"
         "🟢 房态：当前可预约\n"
-        "📸 实拍：QL-RF-A2B3\n"
+        "🆔 房源编号：QL-RF-A2B3\n"
         "\n"
         "💬 <b>侨联说</b>\n"
         "\n"
@@ -99,7 +99,6 @@ def test_photos_response_chunks_existing_frozen_gallery_by_ten(tmp_path):
         path = tmp_path / f"room-{index}.jpg"
         path.write_bytes(str(index).encode())
         files.append(str(path))
-    # A cover-looking path and a duplicate must never be sent as gallery media.
     cover = tmp_path / "cover.jpg"
     cover.write_bytes(b"cover")
     gallery = [str(cover), *files, files[0]]

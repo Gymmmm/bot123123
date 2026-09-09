@@ -8,7 +8,7 @@ must not enlarge the new V3 state machine.
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from datetime import datetime
+from datetime import date, datetime
 import re
 from typing import Literal
 
@@ -73,6 +73,19 @@ class AppointmentDraft:
 def normalize_mode(value: object) -> AppointmentMode:
     clean = str(value or "offline").strip().lower()
     return clean if clean in APPOINTMENT_MODE_LABELS else "offline"  # type: ignore[return-value]
+
+
+def appointment_date_matches(value: object, target: date) -> bool:
+    """Read legacy/current appointment dates without rewriting stored data."""
+    raw = str(value or "").strip()
+    if not raw:
+        return False
+    candidates = {
+        target.strftime("%Y-%m-%d"),
+        target.strftime("%m-%d"),
+        f"{target.month}月{target.day}日",
+    }
+    return raw in candidates
 
 
 def normalize_custom_date(value: object) -> str:
@@ -143,6 +156,7 @@ __all__ = [
     "APPOINTMENT_TIME_LABELS",
     "AppointmentDraft",
     "TERMINAL_APPOINTMENT_STATUSES",
+    "appointment_date_matches",
     "display_time",
     "duplicate_identity",
     "editable_status",

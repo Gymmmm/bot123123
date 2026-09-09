@@ -61,6 +61,7 @@ def _command(tmp_path):
         cover_path=str(cover),
         caption="🏠 <b>富力城｜2房1厅</b>",
         actions=dict(ACTIONS),
+        inventory_status="active",
     )
 
 

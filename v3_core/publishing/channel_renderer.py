@@ -9,6 +9,8 @@ import html
 import re
 from typing import Any
 
+from v3_core.status_labels import inventory_status_presentation
+
 from .formatting import display_floor, display_layout
 from .public_ids import normalize_public_id
 
@@ -67,16 +69,8 @@ def _property_line(value: Any) -> str:
 
 
 def _status_line(status: str, public_id: str) -> str:
-    clean = str(status or "active").strip().lower()
-    if clean in {"active", "reserved"}:
-        label = "🟢 当前可预约"
-    elif clean == "rented":
-        label = "🔴 已租出"
-    elif clean in {"inactive", "offline"}:
-        label = "⚫ 已下架"
-    else:
-        label = "🔵 房态待确认"
-    return f"{label}　{public_id}"
+    icon, label = inventory_status_presentation(status)
+    return f"{icon} {label}　{public_id}"
 
 
 def render_channel_caption(

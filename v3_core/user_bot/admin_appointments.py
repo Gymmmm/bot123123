@@ -13,6 +13,8 @@ from telegram.constants import ParseMode
 
 from v3_core.status_labels import APPOINTMENT_STATUS_LABELS, status_label
 
+from .appointments import APPOINTMENT_MODE_LABELS, appointment_date_matches
+
 
 class AdminAppointmentReader:
     def __init__(self, db_path: str | Path):
@@ -26,17 +28,19 @@ class AdminAppointmentReader:
 
     def list_today(self, now: datetime | None = None) -> tuple[dict[str, Any], ...]:
         current = now or datetime.now(ZoneInfo("Asia/Phnom_Penh"))
-        candidates = (current.strftime("%Y-%m-%d"), f"{current.month}月{current.day}日")
+        target = current.date()
         with self._connect() as conn:
             rows = conn.execute(
                 """SELECT a.*,l.public_listing_id,l.display_title,l.project_name
                    FROM appointments_v3 a
                    LEFT JOIN listings_v3 l ON l.listing_id=a.listing_id
-                   WHERE a.appointment_date IN (?,?)
-                   ORDER BY a.appointment_time,a.id""",
-                candidates,
+                   ORDER BY a.appointment_time,a.id"""
             ).fetchall()
-        return tuple(dict(row) for row in rows)
+        return tuple(
+            dict(row)
+            for row in rows
+            if appointment_date_matches(row["appointment_date"], target)
+        )
 
     def get(self, appointment_id: int) -> dict[str, Any] | None:
         with self._connect() as conn:
@@ -56,6 +60,24 @@ def admin_home_keyboard() -> InlineKeyboardMarkup:
 
 def _home_row():
     return [InlineKeyboardButton("⬅️ 返回咨询后台", callback_data="adminq:home")]
+
+
+def build_admin_appointment_detail_text(row: dict[str, Any]) -> str:
+    icon, label = status_label(
+        APPOINTMENT_STATUS_LABELS,
+        row.get("status"),
+        ("🟡", "等待确认"),
+    )
+    mode_key = str(row.get("viewing_mode") or "offline").strip().lower()
+    mode_label = APPOINTMENT_MODE_LABELS.get(mode_key, APPOINTMENT_MODE_LABELS["offline"])
+    return (
+        f"📅 <b>预约详情</b>\n\n{icon} {escape(label)}\n"
+        f"客户：{escape(str(row.get('display_name') or row.get('username') or '未填写'))}\n"
+        f"房源：{escape(str(row.get('public_listing_id') or '待生成'))}\n"
+        f"时间：{escape(str(row.get('appointment_date') or '待安排'))} · {escape(str(row.get('appointment_time') or '待安排'))}\n"
+        f"方式：{escape(mode_label)}\n"
+        f"联系：{escape(str(row.get('contact_value') or '未填写'))}"
+    )
 
 
 async def show_admin_home(message: Any) -> None:
@@ -84,18 +106,15 @@ async def handle_admin_callback(update: Any, reader: AdminAppointmentReader) -> 
     if data.startswith("adminq:appointment:"):
         raw_id = data.rsplit(":", 1)[-1]
         row = reader.get(int(raw_id)) if raw_id.isdigit() else None
-        if row is None:
-            text = "预约记录已失效。"
-        else:
-            icon, label = status_label(APPOINTMENT_STATUS_LABELS, row.get("status"), ("🟡", "等待确认"))
-            text = (
-                f"📅 <b>预约详情</b>\n\n{icon} {escape(label)}\n"
-                f"客户：{escape(str(row.get('display_name') or row.get('username') or '未填写'))}\n"
-                f"房源：{escape(str(row.get('public_listing_id') or '待生成'))}\n"
-                f"时间：{escape(str(row.get('appointment_date') or '待安排'))} · {escape(str(row.get('appointment_time') or '待安排'))}\n"
-                f"方式：{escape(str(row.get('viewing_mode') or 'offline'))}\n"
-                f"联系：{escape(str(row.get('contact_value') or '未填写'))}"
-            )
+        text = "预约记录已失效。" if row is None else build_admin_appointment_detail_text(row)
         markup = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ 返回今日预约", callback_data="adminq:appointments")], _home_row()])
         await query.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=markup)
 
+
+__all__ = [
+    "AdminAppointmentReader",
+    "admin_home_keyboard",
+    "build_admin_appointment_detail_text",
+    "handle_admin_callback",
+    "show_admin_home",
+]

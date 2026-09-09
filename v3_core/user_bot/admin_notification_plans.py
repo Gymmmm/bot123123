@@ -8,6 +8,7 @@ from .appointment_submit_executor import AppointmentSubmitExecution
 from .appointments import APPOINTMENT_MODE_LABELS, display_time
 from .lead_service import LeadUser
 from .public_appointment import PublicAppointmentDraft
+from .source_display import source_display_label
 
 
 def user_mention_html(user: LeadUser) -> str:
@@ -34,7 +35,7 @@ def general_contact_notification(
         lines=(
             f"用户：{user_mention_html(user)}",
             f"联系方式：{he(user_contact_text(user))}",
-            f"入口：{he(str(source or '用户咨询'))}",
+            f"入口：{he(source_display_label(source))}",
         ),
     )
 

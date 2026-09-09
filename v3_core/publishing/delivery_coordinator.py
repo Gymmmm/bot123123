@@ -30,6 +30,7 @@ class TelegramSendCommand:
     cover_path: str
     caption: str
     actions: dict[str, str]
+    inventory_status: str
 
 
 @dataclass(frozen=True)
@@ -84,6 +85,10 @@ class PublicationDeliveryCoordinator:
         if attempt.state not in {"prepared", "failed_before_send"}:
             raise DeliveryBlocked(f"delivery attempt is not sendable: {attempt.state}")
 
+        # Caption/facts remain frozen in the approved package.  Only the live
+        # inventory status is read here so Telegram booking UI cannot expose a
+        # stale appointment action after the listing status changes.
+        listing = self.reader.listing(package.listing_id)
         return TelegramSendCommand(
             attempt_id=attempt.attempt_id,
             package_id=package.package_id,
@@ -91,6 +96,7 @@ class PublicationDeliveryCoordinator:
             cover_path=package.cover_path,
             caption=package.post_text,
             actions=dict(package.actions),
+            inventory_status=str(listing.get("inventory_status") or "pending").strip().lower(),
         )
 
     def mark_sending(self, attempt_id: str) -> None:

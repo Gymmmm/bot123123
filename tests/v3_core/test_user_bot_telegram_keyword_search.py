@@ -174,7 +174,7 @@ async def test_keyword_search_telegram_failure_preserves_waiting_and_skips_lead(
 
 
 @pytest.mark.asyncio
-async def test_keyword_no_match_renders_v3_followup_then_records_no_match_lead():
+async def test_keyword_no_match_renders_contact_then_records_no_match_lead():
     message = FakeMessage("BKK1 一房 800以内")
     user_data = _session()
     effects = FakeLeadEffects()
@@ -191,7 +191,7 @@ async def test_keyword_no_match_renders_v3_followup_then_records_no_match_lead()
     assert "暂时没有完全符合条件" in message.calls[-1][1][0]
     markup = message.calls[-1][2]["reply_markup"]
     callbacks = [button.callback_data for row in markup.inline_keyboard for button in row]
-    assert callbacks == ["v3u:change_search", "v3u:t:home"]
+    assert callbacks == ["v3u:change_search", "v3u:home:contact", "v3u:t:home"]
     assert effects.calls[0][2] == "no_match"
     assert AWAITING_KEYWORD_SESSION_KEY not in user_data
 

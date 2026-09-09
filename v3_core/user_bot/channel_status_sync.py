@@ -16,6 +16,7 @@ from typing import Any, Callable
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 
 from v3_core.publishing.channel_contract import channel_action_url
+from v3_core.status_labels import inventory_status_bookable, inventory_status_presentation
 
 from .appointments import ACTIVE_APPOINTMENT_STATUSES
 
@@ -43,17 +44,8 @@ def derive_appointment_inventory_status(current_status: str, active_count: int) 
 
 
 def appointment_status_label(status: str, active_count: int = 0) -> str:
-    clean = str(status or "").strip().lower()
-    if clean == "pending" and int(active_count or 0) >= APPOINTMENT_LOCK_COUNT:
-        return "🔵 已有5份预约看房，房态待确认"
-    return {
-        "active": "🟢 当前可预约",
-        "reserved": "🟡 已有预约 · 仍可预约",
-        "pending": "🔵 房态待确认",
-        "rented": "🔴 已租出",
-        "inactive": "⚫ 已下架",
-        "offline": "⚫ 已下架",
-    }.get(clean, "🔵 房态待确认")
+    icon, label = inventory_status_presentation(status)
+    return f"{icon} {label}"
 
 
 def caption_with_appointment_status(
@@ -105,7 +97,7 @@ def appointment_channel_keyboard(
         url=channel_action_url(username, public_listing_id, "photos"),
     )
     rows = [[details, photos]]
-    if str(status or "").strip().lower() in {"active", "reserved"}:
+    if inventory_status_bookable(status):
         rows.append(
             [
                 InlineKeyboardButton(

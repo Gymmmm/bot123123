@@ -10,18 +10,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from v3_core.publishing.formatting import display_layout
+from v3_core.status_labels import inventory_status_presentation
 
 from .public_inventory import PublishedListingView
-
-
-_STATUS_PRESENTATION = {
-    "active": ("🟢", "当前可预约"),
-    "reserved": ("🟡", "已有预约 · 仍可预约"),
-    "pending": ("🔵", "房态确认中"),
-    "rented": ("🔴", "已租出"),
-    "inactive": ("⚫", "已下架"),
-    "offline": ("⚫", "已下架"),
-}
 
 
 @dataclass(frozen=True)
@@ -80,10 +71,7 @@ def build_public_listing_details(view: PublishedListingView) -> PublicListingDet
     subject = "｜".join(value for value in (project, layout) if value)
     location = str(listing.get("public_location_display") or "").strip()
     inventory_status = str(view.listing.get("inventory_status") or "pending").strip().lower()
-    status_icon, status_label = _STATUS_PRESENTATION.get(
-        inventory_status,
-        ("🔵", "房态确认中"),
-    )
+    status_icon, status_label = inventory_status_presentation(inventory_status)
 
     return PublicListingDetails(
         listing_id=view.listing_id,

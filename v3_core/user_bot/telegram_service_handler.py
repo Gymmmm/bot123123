@@ -12,6 +12,7 @@ from .lead_service import LeadUser
 from .service_effects import ServiceEffectExecutor, ServiceEffectResult
 from .service_flow import ServiceRequestDraft, TenantService
 from .service_views import (
+    ServiceChoice,
     ServiceView,
     general_prompt_view,
     general_success_view,
@@ -123,6 +124,15 @@ def _store_draft(user_data: dict[str, Any], draft: ServiceRequestDraft) -> None:
     }
 
 
+def _rfcity_category_product_view(category: str) -> ServiceView:
+    view = rfcity_category_view(category)
+    return ServiceView(
+        kind=view.kind,
+        text=view.text,
+        rows=((ServiceChoice("⬅️ 返回富力导航", "v3u:service:rfcity"),),),
+    )
+
+
 async def handle_v3_service_callback(
     update: Any,
     context: Any,
@@ -168,7 +178,7 @@ async def handle_v3_service_callback(
         return TelegramServiceOutcome(True, action, True)
     if action.startswith("rfcity:"):
         category = action.split(":", 1)[1]
-        await render_service_view(query, rfcity_category_view(category))
+        await render_service_view(query, _rfcity_category_product_view(category))
         return TelegramServiceOutcome(True, action, True)
     if action.startswith("issue:"):
         issue_key = action.split(":", 1)[1]
@@ -235,7 +245,6 @@ async def handle_v3_service_text(
         await message.reply_text("请简单说一下需要什么帮助。")
         return TelegramServiceOutcome(True, "nearby_text" if nearby else "general_text", True)
 
-    # Render acknowledgement first so a Telegram retry cannot duplicate lead/admin.
     await _reply(message, general_success_view(nearby=nearby))
     effect = None
     if effects is not None:

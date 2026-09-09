@@ -154,7 +154,7 @@ async def test_matched_search_renders_public_card_then_consumes_guided_pref():
 
 
 @pytest.mark.asyncio
-async def test_no_match_renders_locked_copy_with_v3_only_followups():
+async def test_no_match_renders_locked_copy_with_contact_followup():
     query = FakeQuery("v3u:t:budget_choice:b2")
     user_data = _user_data()
 
@@ -175,7 +175,7 @@ async def test_no_match_renders_locked_copy_with_v3_only_followups():
     assert "BKK1｜$400–600" in text
     markup = query.calls[-1][2]["reply_markup"]
     callbacks = [button.callback_data for row in markup.inline_keyboard for button in row]
-    assert callbacks == ["v3u:change_search", "v3u:t:home"]
+    assert callbacks == ["v3u:change_search", "v3u:home:contact", "v3u:t:home"]
     assert not any(value.startswith("find") for value in callbacks)
     assert not any(value.startswith("appointment_menu:") for value in callbacks)
 
