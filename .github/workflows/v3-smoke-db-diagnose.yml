@@ -1,0 +1,28 @@
+name: v3-smoke-db-diagnose
+on:
+  push:
+    branches: [ops/v3-live-smoke-20260909]
+    paths: [.github/ops-control/v3-smoke-db-diagnose.txt]
+permissions:
+  contents: read
+env:
+  PROD_HOST: 50.114.74.120
+  PROD_PORT: '22'
+  PROD_SSH_USER: root
+  PROD_SSH_KNOWN_HOSTS: '50.114.74.120 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILuFtkSn5SJKY7mZ52Lc/QydPRTvHFpsj87M/HcIkb/L'
+  PROD_SSH_HOST_FINGERPRINT: 'SHA256:sgqLYOUAZ482H3y5jREQ6q2BVvNFPXYiOg4ruyFVnsA'
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          PROD_SSH_PRIVATE_KEY: '${{ secrets.PROD_SSH_PRIVATE_KEY }}'
+        run: |
+          set -Eeuo pipefail
+          ssh-keyscan -T 10 -p "$PROD_PORT" -t ed25519 "$PROD_HOST" 2>/dev/null | grep -v '^#' > "$RUNNER_TEMP/observed"
+          ssh-keygen -lf "$RUNNER_TEMP/observed" | grep -F "$PROD_SSH_HOST_FINGERPRINT"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
+          printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
+          ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes "$PROD_SSH_USER@$PROD_HOST" 'sqlite3 -header -column /opt/qiaolian_v3_smoke/data/v3_smoke.db "select parse_status,count(*) n from source_posts group by parse_status; select review_status,count(*) n from drafts group by review_status; select count(*) as publication_packages from publication_packages; select id,source_post_id,parse_status,substr(coalesce(parse_error,\"\"),1,180) parse_error from source_posts order by id desc limit 12; select id,draft_id,review_status,substr(coalesce(review_note,\"\"),1,180) review_note from drafts order by id desc limit 12;"'
