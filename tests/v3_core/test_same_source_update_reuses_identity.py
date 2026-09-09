@@ -83,7 +83,9 @@ def test_same_source_edit_updates_in_place_and_reuses_listing_offer_review(tmp_p
         reviews = conn.execute("SELECT * FROM review_items").fetchall()
         sources_rows = conn.execute("SELECT * FROM source_posts").fetchall()
         canonicals = conn.execute(
-            "SELECT * FROM canonical_records WHERE source_post_id=? ORDER BY created_at,id",
+            """SELECT * FROM canonical_records
+               WHERE source_post_id=?
+               ORDER BY created_at,canonical_record_id""",
             (str(first.source_post_pk),),
         ).fetchall()
 
