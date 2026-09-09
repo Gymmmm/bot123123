@@ -12,7 +12,7 @@ from typing import Any, Protocol
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 
-from v3_core.user_bot.listing_presenter import inventory_status_bookable
+from v3_core.status_labels import inventory_status_bookable
 
 from .delivery_coordinator import TelegramSendCommand
 from .package_store import CHANNEL_ACTION_ORDER
