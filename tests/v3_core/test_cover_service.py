@@ -4,6 +4,7 @@ from PIL import Image, ImageDraw
 
 from v3_core.media.cover_service import CoverRenderService
 from v3_core.media.service import PreparedSourceMedia
+from v3_core.storage.bootstrap import initialize_v3_storage
 from v3_core.storage.inventory_reader import InventoryReader
 from v3_core.storage.inventory_repository import InventoryRepository
 
@@ -53,6 +54,7 @@ def _source_image(path: Path) -> str:
 
 def test_cover_service_passes_only_resolved_v3_identity_and_facts(tmp_path):
     db = tmp_path / "cover.sqlite3"
+    initialize_v3_storage(db)
     repo = InventoryRepository(str(db))
     facts = _facts()
     canonical = repo.store_canonical(source_post_id="source-1", facts=facts)
@@ -116,6 +118,7 @@ def test_cover_service_passes_only_resolved_v3_identity_and_facts(tmp_path):
 
 def test_cover_service_rejects_offer_from_another_listing(tmp_path):
     db = tmp_path / "cover-mismatch.sqlite3"
+    initialize_v3_storage(db)
     repo = InventoryRepository(str(db))
     facts = _facts()
     canonical = repo.store_canonical(source_post_id="source-1", facts=facts)
