@@ -4,6 +4,7 @@ import pytest
 
 from v3_core.inventory.materializer_v3 import offer_projections_v3
 from v3_core.publishing.eligibility import evaluate_offer_eligibility
+from v3_core.storage.bootstrap import initialize_v3_storage
 from v3_core.storage.inventory_repository import InventoryRepository
 
 
@@ -52,6 +53,7 @@ def test_mixed_source_creates_two_offers_not_mixed_listing():
 
 def test_repository_stores_canonical_listing_and_separate_offers(tmp_path):
     db = tmp_path / "v3.sqlite3"
+    initialize_v3_storage(db)
     repo = InventoryRepository(str(db))
     facts = _facts(deal_type="mixed", sale_price_usd=160000)
 
@@ -78,6 +80,7 @@ def test_repository_stores_canonical_listing_and_separate_offers(tmp_path):
 
 def test_sale_offer_can_never_be_marked_publishable(tmp_path):
     db = tmp_path / "v3.sqlite3"
+    initialize_v3_storage(db)
     repo = InventoryRepository(str(db))
     facts = _facts(monthly_rent_usd=None, sale_price_usd=160000, deal_type="sale")
     canonical = repo.store_canonical(source_post_id=456, facts=facts)
