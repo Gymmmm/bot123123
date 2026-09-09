@@ -119,6 +119,41 @@ class SourceRepository:
                     return int(row["id"]), "source_url"
         return None, ""
 
+    @staticmethod
+    def _insert_source_images(
+        conn: sqlite3.Connection,
+        source_post_id: int,
+        images: list[Any],
+    ) -> int:
+        written = 0
+        for index, item in enumerate(images or []):
+            if not isinstance(item, dict) or not item.get("local_path"):
+                continue
+            asset_id = "AST_" + uuid.uuid4().hex[:16].upper()
+            conn.execute(
+                """INSERT INTO media_assets
+                   (asset_id,owner_type,owner_ref_id,owner_ref_key,asset_type,
+                    source_type,source_file_id,local_path,file_hash,
+                    telegram_file_id,telegram_file_unique_id,media_type,
+                    is_watermarked,is_cover,sort_order,status)
+                   VALUES (?,'source_post',?,?, 'photo','telegram',?,?,?,?,?,
+                           'photo',0,? ,?,'active')""",
+                (
+                    asset_id,
+                    int(source_post_id),
+                    str(source_post_id),
+                    str(item.get("telegram_file_id") or ""),
+                    str(item.get("local_path") or ""),
+                    str(item.get("file_hash") or ""),
+                    str(item.get("telegram_file_id") or ""),
+                    str(item.get("telegram_file_unique_id") or ""),
+                    1 if index == 0 else 0,
+                    index,
+                ),
+            )
+            written += 1
+        return written
+
     def save_source_post(
         self,
         *,
@@ -164,35 +199,59 @@ class SourceRepository:
             return int(cur.lastrowid)
 
     def save_source_images(self, source_post_id: int, images: list[Any]) -> int:
-        written = 0
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
-            for index, item in enumerate(images or []):
-                if not isinstance(item, dict) or not item.get("local_path"):
-                    continue
-                asset_id = "AST_" + uuid.uuid4().hex[:16].upper()
-                conn.execute(
-                    """INSERT INTO media_assets
-                       (asset_id,owner_type,owner_ref_id,owner_ref_key,asset_type,
-                        source_type,source_file_id,local_path,file_hash,
-                        telegram_file_id,telegram_file_unique_id,media_type,
-                        is_watermarked,is_cover,sort_order,status)
-                       VALUES (?,'source_post',?,?, 'photo','telegram',?,?,?,?,?,
-                               'photo',0,? ,?,'active')""",
-                    (
-                        asset_id,
-                        int(source_post_id),
-                        str(source_post_id),
-                        str(item.get("telegram_file_id") or ""),
-                        str(item.get("local_path") or ""),
-                        str(item.get("file_hash") or ""),
-                        str(item.get("telegram_file_id") or ""),
-                        str(item.get("telegram_file_unique_id") or ""),
-                        1 if index == 0 else 0,
-                        index,
-                    ),
-                )
-                written += 1
+            written = self._insert_source_images(conn, int(source_post_id), images)
+            conn.commit()
+        return written
+
+    def replace_source_post(
+        self,
+        *,
+        source_post_pk: int,
+        source_id: str | None,
+        source_url: str,
+        source_author: str,
+        raw_text: str,
+        raw_images: list[Any],
+        raw_videos: list[Any],
+        raw_contact: str,
+        raw_meta: dict[str, Any],
+        dedupe_hash: str,
+        parse_status: str = "pending",
+    ) -> int:
+        """Replace mutable evidence for the same external source identity atomically."""
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            cur = conn.execute(
+                """UPDATE source_posts
+                   SET source_id=?,source_url=?,source_author=?,raw_text=?,
+                       raw_images_json=?,raw_videos_json=?,raw_contact=?,raw_meta_json=?,
+                       dedupe_hash=?,parse_status=?,fetched_at=CURRENT_TIMESTAMP,
+                       updated_at=CURRENT_TIMESTAMP
+                   WHERE id=?""",
+                (
+                    source_id,
+                    str(source_url or ""),
+                    str(source_author or ""),
+                    str(raw_text or ""),
+                    json.dumps(raw_images or [], ensure_ascii=False),
+                    json.dumps(raw_videos or [], ensure_ascii=False),
+                    str(raw_contact or ""),
+                    json.dumps(raw_meta or {}, ensure_ascii=False, sort_keys=True),
+                    str(dedupe_hash),
+                    str(parse_status),
+                    int(source_post_pk),
+                ),
+            )
+            if cur.rowcount != 1:
+                conn.rollback()
+                raise KeyError(source_post_pk)
+            conn.execute(
+                "DELETE FROM media_assets WHERE owner_type='source_post' AND owner_ref_id=?",
+                (int(source_post_pk),),
+            )
+            written = self._insert_source_images(conn, int(source_post_pk), raw_images)
             conn.commit()
         return written
 
