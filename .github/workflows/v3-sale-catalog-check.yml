@@ -24,12 +24,13 @@ jobs:
           python -m compileall -q \
             v3_core \
             tests/v3_core \
-            run_v3_sale_web.py
+            run_v3_sale_web.py \
+            run_v3_sale_align.py
       - name: Run sale catalog contracts
         env:
           PYTHONPATH: '${{ github.workspace }}'
         run: |
-          python -m pytest -q tests/v3_core/test_sale_catalog_web.py
+          python -m pytest -q tests/v3_core/test_sale_catalog_web.py tests/v3_core/test_sale_inventory_align.py
       - name: Run complete V3 regression suite
         env:
           PYTHONPATH: '${{ github.workspace }}'
