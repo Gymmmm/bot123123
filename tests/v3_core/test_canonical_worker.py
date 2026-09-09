@@ -5,6 +5,7 @@ from PIL import Image, ImageDraw
 from v3_core.ingest.intake_service import SourceIntake
 from v3_core.parser.worker import CanonicalWorker
 from v3_core.pipeline import V3CorePipeline
+from v3_core.storage.bootstrap import initialize_v3_storage
 
 
 def _photos(tmp_path: Path):
@@ -24,6 +25,7 @@ def _photos(tmp_path: Path):
 
 def test_collector_intake_remains_pending_until_independent_worker_runs(tmp_path):
     db_path = str(tmp_path / "worker.sqlite3")
+    initialize_v3_storage(db_path)
     pipeline = V3CorePipeline(
         db_path=db_path,
         user_bot_username="QiaolianBot",
