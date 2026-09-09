@@ -86,7 +86,7 @@ def _details_actions(
             SemanticAction("📸 更多实拍", "photos", target),
             SemanticAction("💬 联系中文顾问", "consult", target),
         ),
-        (SemanticAction("🋩 看相近房源", "similar", target),),
+        (SemanticAction("🏘 看相近房源", "similar", target),),
     )
 
 
