@@ -15,10 +15,12 @@ import uuid
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from v3_core.inventory.canonical_facts import canonicalize_source
 from v3_core.inventory.identity import IdentityService
 from v3_core.inventory.materializer_v3 import offer_projections_v3
 from v3_core.inventory.service import InventoryMaterializationService
 from v3_core.ops.runtime_state import RuntimeStateRepository
+from v3_core.parser.authoritative_enrichment import enrich_authoritative_facts
 from v3_core.storage.inventory_repository import InventoryRepository
 
 SALE_ALIGN_COMPONENT = "sale_align"
@@ -97,7 +99,6 @@ class SaleInventoryAligner:
         return conn
 
     def enforce_sale_policy(self) -> int:
-        """Force every sale offer onto the locked store-only contract."""
         with self._connect() as conn:
             cur = conn.execute(
                 """UPDATE listing_offers
@@ -162,6 +163,73 @@ class SaleInventoryAligner:
         )
         return int(cur.rowcount or 0)
 
+    def harvest_sale_sources(self) -> dict[str, int]:
+        """Re-read collected source text and project explicit sale prices."""
+        stats = {"sources_seen": 0, "sources_with_sale": 0}
+        with self._connect() as conn:
+            rows = conn.execute(
+                """SELECT id, raw_text,
+                          COALESCE(json_extract(raw_meta_json,'$.sanitized_text'), raw_text) AS sanitized_text
+                   FROM source_posts
+                   WHERE raw_text GLOB '*售价*'
+                      OR raw_text GLOB '*出售*'
+                      OR raw_text GLOB '*卖价*'
+                      OR lower(raw_text) GLOB '*sale price*'"""
+            ).fetchall()
+        for row in rows:
+            stats["sources_seen"] += 1
+            raw_text = str(row["raw_text"] or "")
+            sanitized = str(row["sanitized_text"] or raw_text)
+            try:
+                facts = canonicalize_source(
+                    raw_text=raw_text,
+                    sanitized_text=sanitized,
+                    source_identity={"source_post_id": int(row["id"])},
+                    media_summary={"image_count": 0, "video_count": 0, "media_type": "none"},
+                )
+                facts = enrich_authoritative_facts(sanitized, facts)
+            except Exception:
+                continue
+            sale_price = _positive_int(facts.get("sale_price_usd"))
+            if sale_price is None:
+                continue
+            stats["sources_with_sale"] += 1
+            canonical = self.inventory.store_canonical(
+                source_post_id=int(row["id"]),
+                facts=facts,
+            )
+            with self._connect() as conn:
+                existing = conn.execute(
+                    """SELECT l.listing_id,l.public_listing_id
+                       FROM listings_v3 l
+                       JOIN canonical_records c
+                         ON c.canonical_record_id=l.canonical_record_id
+                       WHERE c.source_post_id=?
+                       ORDER BY l.updated_at DESC LIMIT 1""",
+                    (str(row["id"]),),
+                ).fetchone()
+            if existing is None:
+                identity = self.identities.allocate(
+                    canonical_record_id=str(canonical["canonical_record_id"]),
+                    facts=facts,
+                )
+                listing_id = identity.listing_id
+                public_id = identity.public_listing_id
+            else:
+                listing_id = str(existing["listing_id"])
+                public_id = str(existing["public_listing_id"])
+            self.inventory.upsert_listing(
+                listing_id=listing_id,
+                public_listing_id=public_id,
+                canonical_record_id=str(canonical["canonical_record_id"]),
+                facts=facts,
+            )
+            with self._connect() as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                self._upsert_sale_offer(conn, listing_id, sale_price)
+                conn.commit()
+        return stats
+
     def align_existing_listings(self) -> dict[str, int]:
         stats = {"listings_seen": 0, "sale_upserted": 0, "sale_inactivated": 0}
         with self._connect() as conn:
@@ -189,7 +257,6 @@ class SaleInventoryAligner:
         return stats
 
     def materialize_orphaned_sale_records(self) -> dict[str, int]:
-        """Create listings for canonical sale facts that never received inventory."""
         created = 0
         with self._connect() as conn:
             rows = conn.execute(
@@ -220,12 +287,15 @@ class SaleInventoryAligner:
 
     def align(self) -> dict[str, int]:
         stats = {"policy_repaired": self.enforce_sale_policy()}
+        stats.update(self.harvest_sale_sources())
         stats.update(self.align_existing_listings())
         stats.update(self.materialize_orphaned_sale_records())
         stats["policy_repaired"] += self.enforce_sale_policy()
         return stats
 
-    def align_if_due(self, *,
+    def align_if_due(
+        self,
+        *,
         force: bool = False,
         now: datetime | None = None,
     ) -> dict[str, Any]:
