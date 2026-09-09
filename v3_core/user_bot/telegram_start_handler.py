@@ -1,4 +1,4 @@
-"""Independent V3 /start handler for home and official channel deep links."""
+"""Independent V3 /start handler for home, broadcast shortcuts, and channel deep links."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -8,14 +8,24 @@ from typing import Any
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 from telegram.constants import ParseMode
 
-from .home_views import build_home_view
+from .contact_effects import ContactEffectExecutor
+from .home_views import build_contact_view, build_home_view
+from .lead_service import LeadUser
 from .public_flow import PublicListingFlowResult, PublicListingFlowService
+from .search_no_match_view import build_search_no_match_view
+from .search_query import SearchCriteria
+from .search_submit_executor import SearchSubmitExecutor
 from .telegram_home_ui import build_home_keyboard
+from .telegram_search_results import present_search_flow_result
 from .telegram_transition_ui import build_transition_keyboard
 from .telegram_ui import build_action_keyboard
-from .transition_plan import BookTransition, TransitionPlan
+from .transition_actions import SearchSubmitIntent
+from .transition_plan import BookTransition, ChangeSearchTransition, TransitionPlan
 from .transition_session import apply_session_mutation, build_transition_session
 from .transition_views import TransitionViewService
+
+
+BROADCAST_START_SHORTCUTS = frozenset({"find_home", "latest", "advisor"})
 
 
 @dataclass(frozen=True)
@@ -32,6 +42,27 @@ def _chat_id(update: Any) -> int | str:
     if value is None:
         raise ValueError("telegram_effective_chat_missing_for_start")
     return value
+
+
+def _lead_user(update: Any) -> LeadUser:
+    user = getattr(update, "effective_user", None)
+    if user is None or getattr(user, "id", None) is None:
+        raise ValueError("telegram_effective_user_missing_for_start")
+    display_name = str(getattr(user, "full_name", "") or "").strip()
+    if not display_name:
+        display_name = " ".join(
+            value
+            for value in (
+                str(getattr(user, "first_name", "") or "").strip(),
+                str(getattr(user, "last_name", "") or "").strip(),
+            )
+            if value
+        )
+    return LeadUser(
+        user_id=int(user.id),
+        username=str(getattr(user, "username", "") or ""),
+        display_name=display_name,
+    )
 
 
 def _book_plan(result: PublicListingFlowResult) -> TransitionPlan:
@@ -51,6 +82,15 @@ def _book_plan(result: PublicListingFlowResult) -> TransitionPlan:
                 source=intent.source,
             )
         ),
+    )
+
+
+def _search_entry_plan() -> TransitionPlan:
+    return TransitionPlan(
+        kind="change_search",
+        next_step="search_entry",
+        effects=("render_search_entry",),
+        change_search=ChangeSearchTransition(source="daily_broadcast", goal="any"),
     )
 
 
@@ -97,6 +137,72 @@ async def _render_invalid_link(message: Any) -> None:
     )
 
 
+async def _handle_broadcast_shortcut(
+    update: Any,
+    context: Any,
+    *,
+    payload: str,
+    transition_views: TransitionViewService,
+    search_executor: SearchSubmitExecutor | None,
+    contact_effects: ContactEffectExecutor | None,
+    advisor_url: str,
+) -> TelegramStartOutcome | None:
+    if payload not in BROADCAST_START_SHORTCUTS:
+        return None
+    message = getattr(update, "effective_message", None)
+    user_data = getattr(context, "user_data", None)
+    if message is None or not isinstance(user_data, dict):
+        raise ValueError("broadcast_shortcut_missing_telegram_context")
+
+    if payload == "find_home":
+        plan = _search_entry_plan()
+        view = transition_views.build(plan)
+        await message.reply_text(
+            view.text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=build_transition_keyboard(view),
+        )
+        apply_session_mutation(user_data, build_transition_session(plan))
+        return TelegramStartOutcome(True, "broadcast_find_home", payload)
+
+    if payload == "latest":
+        if search_executor is None:
+            await _render_invalid_link(message)
+            return TelegramStartOutcome(True, "broadcast_latest_unavailable", payload)
+        intent = SearchSubmitIntent(
+            criteria=SearchCriteria(raw_text=""),
+            source="daily_broadcast_latest",
+            goal="any",
+            area_display="",
+            budget_label="",
+            touch_payload={"daily_broadcast": True, "latest": True},
+        )
+        execution = search_executor.execute(intent, limit=5)
+        presentation = await present_search_flow_result(update, context, execution.result)
+        if presentation.status == "no_match":
+            view = build_search_no_match_view(intent)
+            await message.reply_text(
+                view.text,
+                parse_mode=ParseMode.HTML,
+                reply_markup=build_transition_keyboard(view),
+            )
+        return TelegramStartOutcome(True, "broadcast_latest", payload)
+
+    if contact_effects is not None:
+        await contact_effects.execute_general(
+            bot=getattr(context, "bot", None),
+            user=_lead_user(update),
+            source="daily_broadcast",
+        )
+    view = build_contact_view(advisor_url=advisor_url)
+    await message.reply_text(
+        view.text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=build_home_keyboard(view),
+    )
+    return TelegramStartOutcome(True, "broadcast_advisor", payload)
+
+
 async def handle_v3_start(
     update: Any,
     context: Any,
@@ -104,6 +210,9 @@ async def handle_v3_start(
     listings: PublicListingFlowService,
     transition_views: TransitionViewService,
     channel_url: str = "",
+    search_executor: SearchSubmitExecutor | None = None,
+    contact_effects: ContactEffectExecutor | None = None,
+    advisor_url: str = "",
 ) -> TelegramStartOutcome:
     message = getattr(update, "effective_message", None)
     if message is None:
@@ -124,6 +233,18 @@ async def handle_v3_start(
         return TelegramStartOutcome(handled=True, kind="home")
 
     payload = str(args[0] or "").strip()
+    broadcast = await _handle_broadcast_shortcut(
+        update,
+        context,
+        payload=payload,
+        transition_views=transition_views,
+        search_executor=search_executor,
+        contact_effects=contact_effects,
+        advisor_url=advisor_url,
+    )
+    if broadcast is not None:
+        return broadcast
+
     result = listings.resolve(payload)
     if not result.ok:
         await _render_invalid_link(message)
@@ -155,4 +276,8 @@ async def handle_v3_start(
     raise AssertionError(f"unsupported_v3_start_action:{result.action}")
 
 
-__all__ = ["TelegramStartOutcome", "handle_v3_start"]
+__all__ = [
+    "BROADCAST_START_SHORTCUTS",
+    "TelegramStartOutcome",
+    "handle_v3_start",
+]
