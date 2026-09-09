@@ -30,6 +30,7 @@ class TelegramSendCommand:
     cover_path: str
     caption: str
     actions: dict[str, str]
+    inventory_status: str
 
 
 @dataclass(frozen=True)
@@ -84,6 +85,9 @@ class PublicationDeliveryCoordinator:
         if attempt.state not in {"prepared", "failed_before_send"}:
             raise DeliveryBlocked(f"delivery attempt is not sendable: {attempt.state}")
 
+        frozen_listing = package.snapshot.get("listing") if isinstance(package.snapshot, dict) else {}
+        if not isinstance(frozen_listing, dict):
+            frozen_listing = {}
         return TelegramSendCommand(
             attempt_id=attempt.attempt_id,
             package_id=package.package_id,
@@ -91,6 +95,7 @@ class PublicationDeliveryCoordinator:
             cover_path=package.cover_path,
             caption=package.post_text,
             actions=dict(package.actions),
+            inventory_status=str(frozen_listing.get("inventory_status") or "pending").strip().lower(),
         )
 
     def mark_sending(self, attempt_id: str) -> None:
