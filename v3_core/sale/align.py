@@ -2,20 +2,27 @@
 
 New collector rows already pass through parse -> identity -> materialize.
 This module repairs the existing shared database so sale facts become sale
-offers without touching rent publication flags.
+offers without touching rent publication flags. A full scan is enough once
+per Asia/Phnom_Penh day.
 """
 from __future__ import annotations
 
+from datetime import datetime
 import json
 from pathlib import Path
 import sqlite3
 import uuid
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from v3_core.inventory.identity import IdentityService
 from v3_core.inventory.materializer_v3 import offer_projections_v3
 from v3_core.inventory.service import InventoryMaterializationService
+from v3_core.ops.runtime_state import RuntimeStateRepository
 from v3_core.storage.inventory_repository import InventoryRepository
+
+SALE_ALIGN_COMPONENT = "sale_align"
+SALE_ALIGN_TIMEZONE = ZoneInfo("Asia/Phnom_Penh")
 
 
 def _positive_int(value: Any) -> int | None:
@@ -36,6 +43,39 @@ def _load_facts(raw: Any) -> dict[str, Any]:
     return payload if isinstance(payload, dict) else {}
 
 
+def local_scan_date(now: datetime | None = None) -> str:
+    current = now or datetime.now(SALE_ALIGN_TIMEZONE)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=SALE_ALIGN_TIMEZONE)
+    return current.astimezone(SALE_ALIGN_TIMEZONE).date().isoformat()
+
+
+def due_for_daily_scan(
+    runtime: RuntimeStateRepository,
+    *,
+    now: datetime | None = None,
+) -> bool:
+    today = local_scan_date(now)
+    row = runtime.component_rows().get(SALE_ALIGN_COMPONENT) or {}
+    try:
+        meta = json.loads(str(row.get("meta_json") or "{}"))
+    except (TypeError, ValueError, json.JSONDecodeError):
+        meta = {}
+    if not isinstance(meta, dict):
+        meta = {}
+    return str(meta.get("last_scan_date") or "") != today
+
+
+def mark_daily_scan(
+    runtime: RuntimeStateRepository,
+    stats: dict[str, Any],
+    *,
+    now: datetime | None = None,
+) -> None:
+    meta = {"last_scan_date": local_scan_date(now), **dict(stats or {})}
+    runtime.heartbeat(SALE_ALIGN_COMPONENT, state="running", event=True, meta=meta)
+
+
 class SaleInventoryAligner:
     """Write-path helper that keeps sale inventory aligned to collected facts."""
 
@@ -44,6 +84,7 @@ class SaleInventoryAligner:
         self.inventory = InventoryRepository(self.db_path)
         self.identities = IdentityService(self.db_path)
         self.materializer = InventoryMaterializationService(self.inventory)
+        self.runtime = RuntimeStateRepository(self.db_path)
 
     def _connect(self) -> sqlite3.Connection:
         if not self.db_path.is_file():
@@ -184,5 +225,21 @@ class SaleInventoryAligner:
         stats["policy_repaired"] += self.enforce_sale_policy()
         return stats
 
+    def align_if_due(self, *,
+        force: bool = False,
+        now: datetime | None = None,
+    ) -> dict[str, Any]:
+        if not force and not due_for_daily_scan(self.runtime, now=now):
+            return {"skipped": 1, "reason": "already_scanned_today"}
+        stats = self.align()
+        mark_daily_scan(self.runtime, stats, now=now)
+        return {"skipped": 0, **stats}
 
-__all__ = ["SaleInventoryAligner"]
+
+__all__ = [
+    "SALE_ALIGN_COMPONENT",
+    "SaleInventoryAligner",
+    "due_for_daily_scan",
+    "local_scan_date",
+    "mark_daily_scan",
+]

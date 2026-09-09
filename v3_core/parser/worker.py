@@ -10,6 +10,7 @@ from v3_core.inventory.identity import IdentityService
 from v3_core.inventory.service import InventoryMaterializationService
 from v3_core.ops.runtime_state import RuntimeStateRepository
 from v3_core.parser.service import CanonicalParseService
+from v3_core.sale.align import SaleInventoryAligner
 from v3_core.storage.inventory_repository import InventoryRepository
 
 
@@ -30,6 +31,7 @@ class CanonicalWorker:
         self.runtime = RuntimeStateRepository(self.db_path)
         self.parser = CanonicalParseService(self.sources, self.inventory)
         self.materializer = InventoryMaterializationService(self.inventory)
+        self.sale_aligner = SaleInventoryAligner(self.db_path)
 
     def pending_ids(self, *, limit: int = 100) -> list[int]:
         with sqlite3.connect(self.db_path) as conn:
@@ -83,6 +85,18 @@ class CanonicalWorker:
             result = self.process_one(source_post_id)
             stats[result.status] += 1
         stats["selected"] = len(ids)
+        try:
+            aligned = self.sale_aligner.align_if_due()
+            stats["sale_align_skipped"] = int(aligned.get("skipped") or 0)
+            stats["sale_align_upserted"] = int(aligned.get("sale_upserted") or 0)
+        except Exception as exc:
+            stats["sale_align_failed"] = 1
+            self.runtime.heartbeat(
+                "sale_align",
+                state="running",
+                event=True,
+                error=f"{type(exc).__name__}:{exc}"[:1000],
+            )
         self.runtime.heartbeat("canonical", state="running", meta=dict(stats))
         return dict(stats)
 

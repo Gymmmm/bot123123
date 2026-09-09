@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from datetime import datetime
 import json
 from pathlib import Path
 import sqlite3
+from zoneinfo import ZoneInfo
 
-from v3_core.sale.align import SaleInventoryAligner
+from v3_core.parser.worker import CanonicalWorker
+from v3_core.sale.align import SaleInventoryAligner, due_for_daily_scan
 from v3_core.sale.catalog import SaleCatalogRepository
 from v3_core.storage.bootstrap import initialize_v3_storage
 from v3_core.storage.inventory_repository import InventoryRepository
@@ -165,7 +168,37 @@ def test_aligner_inactivates_sale_when_canonical_price_removed(tmp_path: Path):
     assert SaleCatalogRepository(db).list_sale_listings()["total"] == 0
 
 
+def test_daily_scan_runs_once_per_phnom_penh_day(tmp_path: Path):
+    db = initialize_v3_storage(tmp_path / "v3.sqlite")
+    aligner = SaleInventoryAligner(db)
+    now = datetime(2026, 9, 10, 8, 0, tzinfo=ZoneInfo("Asia/Phnom_Penh"))
+    first = aligner.align_if_due(now=now)
+    second = aligner.align_if_due(now=now)
+    next_day = aligner.align_if_due(now=datetime(2026, 9, 11, 0, 5, tzinfo=ZoneInfo("Asia/Phnom_Penh")))
+    assert first["skipped"] == 0
+    assert second["skipped"] == 1
+    assert next_day["skipped"] == 0
+    assert due_for_daily_scan(aligner.runtime, now=now) is False
+
+
+def test_canonical_worker_does_daily_sale_scan(tmp_path: Path):
+    db = initialize_v3_storage(tmp_path / "worker.sqlite")
+    repo = InventoryRepository(db)
+    facts = _facts(deal_type="sale", monthly_rent_usd=None, sale_price_usd=199000)
+    repo.store_canonical(source_post_id=44, facts=facts)
+
+    stats = CanonicalWorker(str(db)).run_once()
+    assert stats["sale_align_skipped"] == 0
+    catalog = SaleCatalogRepository(db).list_sale_listings()
+    assert catalog["total"] == 1
+    assert catalog["items"][0]["sale_price_usd"] == 199000
+
+    again = CanonicalWorker(str(db)).run_once()
+    assert again["sale_align_skipped"] == 1
+
+
 def test_sale_align_entrypoint_imports_without_running():
     import run_v3_sale_align
 
     assert callable(run_v3_sale_align.main)
+    assert callable(run_v3_sale_align.run_daily_loop)
