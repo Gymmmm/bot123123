@@ -1,9 +1,12 @@
 """V3 listing/public identity allocation.
 
 Preserves the production protocols `l_<number>` and
-`QL-<location>-<letter><digit><letter><digit>` without reading drafts.  New
+`QL-<location>-<letter><digit><letter><digit>` without reading drafts. New
 numeric IDs continue after both legacy `listings` and V3 `listings_v3` so the
 side-by-side migration cannot collide with production inventory.
+
+Construction never initializes schema. ``listing_identity_reservations_v3`` is
+created only by ``initialize_v3_storage``.
 """
 from __future__ import annotations
 
@@ -11,6 +14,7 @@ from dataclasses import dataclass
 import re
 import secrets
 import sqlite3
+from pathlib import Path
 from typing import Any
 
 
@@ -83,13 +87,12 @@ def _random_code() -> str:
 
 
 class IdentityService:
-    def __init__(self, db_path: str):
-        self.db_path = str(db_path)
-        with self._connect() as conn:
-            conn.executescript(DDL)
+    def __init__(self, db_path: str | Path):
+        self.db_path = Path(db_path).expanduser().resolve()
 
     def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path, timeout=30)
+        uri = f"file:{self.db_path.as_posix()}?mode=rw"
+        conn = sqlite3.connect(uri, uri=True, timeout=30)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA busy_timeout=30000")
         return conn
@@ -160,4 +163,4 @@ class IdentityService:
             raise RuntimeError("listing_identity_collision_limit")
 
 
-__all__ = ["IdentityService", "ListingIdentity", "LOCATION_CODES"]
+__all__ = ["DDL", "IdentityService", "ListingIdentity", "LOCATION_CODES"]
