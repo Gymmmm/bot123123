@@ -1,6 +1,6 @@
 # V3 Core Extraction — 租后服务 / 运营补齐审计
 
-基线：`codex/v3-core-extraction-20260908` @ `554915233145620c631690a408832bbc8809e7de`
+当前合并基线：`codex/v3-core-extraction-20260908` @ `c1c8aa2381412745036ab25976d87ffafd9d5efc`（初始审计自 `554915233145620c631690a408832bbc8809e7de` 开始，期间持续 refresh 到当前基线）。
 
 ## 已有能力
 
