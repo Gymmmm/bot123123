@@ -6,17 +6,17 @@ from pathlib import Path
 import sqlite3
 from typing import Any
 
-from .source_repository import SOURCE_DDL
-
 
 class SourceReader:
     def __init__(self, db_path: str):
-        self.db_path = str(db_path)
-        with self._connect() as conn:
-            conn.executescript(SOURCE_DDL)
+        self.db_path = str(Path(db_path).expanduser().resolve())
 
     def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path, timeout=30)
+        path = Path(self.db_path)
+        if not path.is_file():
+            raise FileNotFoundError(path)
+        uri = f"file:{path.as_posix()}?mode=ro"
+        conn = sqlite3.connect(uri, uri=True, timeout=30)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA busy_timeout=30000")
         return conn
