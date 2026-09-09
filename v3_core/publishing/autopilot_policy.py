@@ -8,7 +8,10 @@ therefore to the existing frozen-package/delivery coordinator chain.
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime
+import os
 from typing import Any
+import uuid
 
 from .autopilot import (
     AutoPublishRepository,
@@ -56,6 +59,52 @@ class ProductionAutoPublishRepository(AutoPublishRepository):
     @staticmethod
     def _token(facts_hash: Any, source_hash: Any) -> str:
         return f"{str(facts_hash or '')}:{str(source_hash or '')}"
+
+    def ensure_defaults(self) -> None:
+        """Apply environment defaults only once; DB changes win after that."""
+        defaults = {
+            "enabled": os.getenv("V3_AUTO_PUBLISH_ENABLED", "true"),
+            "min_media": os.getenv("V3_AUTO_PUBLISH_MIN_MEDIA", "4"),
+            "timezone": os.getenv("V3_AUTO_PUBLISH_TIMEZONE", "Asia/Phnom_Penh"),
+            "interval_seconds": os.getenv("V3_AUTO_PUBLISH_INTERVAL_SECONDS", "1800"),
+        }
+        default_windows = str(
+            os.getenv("V3_AUTO_PUBLISH_WINDOWS", "09:00-21:00")
+        ).strip()
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            marker = conn.execute(
+                "SELECT 1 FROM publisher_autopilot_settings_v3 WHERE setting_key='windows_initialized'"
+            ).fetchone()
+            for key, value in defaults.items():
+                conn.execute(
+                    "INSERT OR IGNORE INTO publisher_autopilot_settings_v3(setting_key,setting_value) VALUES (?,?)",
+                    (key, str(value)),
+                )
+            conn.execute(
+                "INSERT OR IGNORE INTO publisher_autopilot_settings_v3(setting_key,setting_value) VALUES ('windows_initialized','1')"
+            )
+            if marker is None:
+                count = int(
+                    conn.execute("SELECT COUNT(*) FROM publisher_post_windows_v3").fetchone()[0]
+                )
+                if count == 0:
+                    for part in default_windows.split(","):
+                        if "-" not in part:
+                            continue
+                        start, end = [x.strip() for x in part.split("-", 1)]
+                        try:
+                            start = datetime.strptime(start, "%H:%M").strftime("%H:%M")
+                            end = datetime.strptime(end, "%H:%M").strftime("%H:%M")
+                        except ValueError:
+                            continue
+                        if start >= end:
+                            continue
+                        conn.execute(
+                            "INSERT INTO publisher_post_windows_v3(window_id,start_time,end_time,enabled) VALUES (?,?,?,1)",
+                            ("WIN_" + uuid.uuid4().hex[:16], start, end),
+                        )
+            conn.commit()
 
     def sync_candidates(self) -> int:
         with self._connect() as conn:
@@ -111,8 +160,6 @@ class ProductionAutoPublishRepository(AutoPublishRepository):
                     elif current_state == "published" or ignored:
                         state, code, text = current_state, "", ""
                     elif changed:
-                        # A text or media revision must be checked again. Same
-                        # source identity/listing/public id remain unchanged.
                         state, code, text = "queued", "", ""
                     else:
                         state, code, text = current_state or "queued", None, None
@@ -180,12 +227,7 @@ class ProductionAutoPublishRepository(AutoPublishRepository):
             conn.commit()
 
     def probable_duplicate(self, listing_id: str, offer_id: str) -> bool:
-        """Block later active rentals projected from the exact same facts.
-
-        The earliest active inventory identity wins deterministically. This
-        prevents both copies from being rejected when two sources post the same
-        property before either copy has reached Telegram.
-        """
+        """Block later active rentals projected from the exact same facts."""
         with self._connect() as conn:
             current = conn.execute(
                 """SELECT l.canonical_facts_hash FROM listings_v3 l
@@ -294,8 +336,6 @@ class ProductionAutoPublishService(AutoPublishService):
         item = self.repository.next_ready_item()
         if item is None:
             return AutoPublishResult("idle")
-        # Re-run the original strict checks at the send boundary.  This keeps
-        # package approval/delivery safety authoritative even after queue wait.
         return await super().process_one(
             bot=bot,
             force_offer_id=str(item["offer_id"]),
