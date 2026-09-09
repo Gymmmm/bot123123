@@ -177,7 +177,8 @@ class BroadcastSettingsRepository:
         self.db_path = Path(db_path).expanduser().resolve()
 
     def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(str(self.db_path), timeout=30)
+        uri = f"file:{self.db_path.as_posix()}?mode=rw"
+        conn = sqlite3.connect(uri, uri=True, timeout=30)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA busy_timeout=30000")
         return conn
