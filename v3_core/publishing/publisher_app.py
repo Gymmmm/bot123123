@@ -15,7 +15,7 @@ from telegram.ext import CommandHandler, ContextTypes, MessageHandler, filters
 
 from v3_core.ops.runtime_state import RuntimeStateRepository
 from .admin_bot import PublisherAdminBot, PublisherAdminSettings, REPO_ROOT, load_settings
-from .autopilot import AutoPublishRepository, AutoPublishService
+from .autopilot_policy import ProductionAutoPublishRepository, ProductionAutoPublishService
 from .broadcast import BroadcastService, BroadcastSettingsRepository
 from .broadcast_admin import BROADCAST_EDIT_STATE_KEY, BroadcastAdminController
 from .simple_admin import NEW_LISTING_STATE_KEY, SIMPLE_EDIT_STATE_KEY, SimplePublisherAdminController
@@ -39,10 +39,10 @@ class V3PublisherApplication(PublisherAdminBot):
             channel_chat_id=settings.channel_chat_id,
             timezone_name=timezone_name,
         )
-        self.auto_repository = AutoPublishRepository(settings.db_path)
+        self.auto_repository = ProductionAutoPublishRepository(settings.db_path)
         self.auto_repository.ensure_defaults()
         self.runtime = RuntimeStateRepository(settings.db_path)
-        self.autopilot = AutoPublishService(
+        self.autopilot = ProductionAutoPublishService(
             workflow=self.workflow,
             repository=self.auto_repository,
             channel_chat_id=settings.channel_chat_id,
