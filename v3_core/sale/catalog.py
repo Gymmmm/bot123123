@@ -53,6 +53,8 @@ JOIN listing_offers o ON o.offer_id=(
       AND o2.offer_status='active'
       AND o2.sale_price_usd IS NOT NULL
       AND o2.sale_price_usd>0
+      AND o2.publication_policy='store_only'
+      AND o2.publishable=0
     ORDER BY o2.updated_at DESC,o2.created_at DESC,o2.offer_id DESC
     LIMIT 1
 )
@@ -302,6 +304,8 @@ class SaleCatalogRepository:
                      AND o.offer_type='sale'
                      AND o.offer_status='active'
                      AND o.sale_price_usd>0
+                     AND o.publication_policy='store_only'
+                     AND o.publishable=0
                      AND l.data_status='current'
                      AND l.inventory_status IN ('active','reserved')
                      AND TRIM(COALESCE(l.public_listing_id,''))<>''
