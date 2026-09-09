@@ -200,9 +200,8 @@ def test_sale_media_resolver_cannot_expose_rent_or_non_image_asset(tmp_path: Pat
     assert repo.media_asset("AST_SALEMEDIA") is not None
     assert repo.media_asset("AST_RENTMEDIA") is None
     assert repo.media_asset("AST_SVG") is None
-    svg_item = repo.get_sale_listing("QL-5003")
-    assert svg_item is not None
-    assert svg_item["gallery_urls"] == []
+    assert repo.get_sale_listing("QL-5003") is None
+    assert "QL-5003" not in {item["public_id"] for item in repo.list_sale_listings()["items"]}
 
 
 def test_sale_offer_remains_store_only_and_not_rent_publishable():
