@@ -29,6 +29,7 @@ def build_search_no_match_view(intent: SearchSubmitIntent) -> TransitionView:
         ),
         rows=(
             (TransitionChoice("✏️ 调整条件", "change_search"),),
+            (TransitionChoice("💬 联系我们", "contact"),),  # type: ignore[arg-type]
             (TransitionChoice("🏠 返回首页", "home"),),
         ),
     )
