@@ -8,22 +8,7 @@ from .appointment_submit_executor import AppointmentSubmitExecution
 from .appointments import APPOINTMENT_MODE_LABELS, display_time
 from .lead_service import LeadUser
 from .public_appointment import PublicAppointmentDraft
-
-
-_SOURCE_DISPLAY_LABELS = {
-    "hub": "首页联系我们",
-    "listing_callback": "房源咨询",
-    "daily_broadcast": "每日广播咨询",
-    "user_search": "找房咨询",
-    "channel": "频道房源",
-    "channel_deeplink": "频道房源",
-    "search_result": "找房结果",
-}
-
-
-def user_facing_source_label(value: object) -> str:
-    clean = str(value or "").strip().lower()
-    return _SOURCE_DISPLAY_LABELS.get(clean, "用户咨询")
+from .source_display import source_display_label
 
 
 def user_mention_html(user: LeadUser) -> str:
@@ -50,7 +35,7 @@ def general_contact_notification(
         lines=(
             f"用户：{user_mention_html(user)}",
             f"联系方式：{he(user_contact_text(user))}",
-            f"入口：{he(user_facing_source_label(source))}",
+            f"入口：{he(source_display_label(source))}",
         ),
     )
 
@@ -86,6 +71,5 @@ __all__ = [
     "appointment_notification",
     "general_contact_notification",
     "user_contact_text",
-    "user_facing_source_label",
     "user_mention_html",
 ]
