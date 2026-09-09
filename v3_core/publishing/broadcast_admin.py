@@ -1,7 +1,8 @@
 """Telegram-facing V3 Publisher broadcast controller.
 
-The controller owns only admin UI, Telegram sends, and JobQueue execution.
-Configuration, live-card generation and schedule claiming live in broadcast.py.
+The normal administrator view intentionally exposes only today's broadcast,
+preview/send, automatic enable/disable, schedule selection, and home.  Existing
+broadcast templates/settings remain available underneath for compatibility.
 """
 from __future__ import annotations
 
@@ -12,7 +13,7 @@ from typing import Any
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 
-from .broadcast import BUTTON_LABELS, TEMPLATES, BroadcastService
+from .broadcast import BUTTON_LABELS, BroadcastService
 
 
 BROADCAST_EDIT_STATE_KEY = "v3_publisher_broadcast_edit"
@@ -35,69 +36,51 @@ class BroadcastAdminController:
 
     @staticmethod
     def dashboard_button() -> InlineKeyboardButton:
-        return InlineKeyboardButton("📢 广播中心", callback_data="v3bc")
+        return InlineKeyboardButton("📣 每日广播", callback_data="v3bc")
 
     def _footer_markup(self) -> InlineKeyboardMarkup | None:
         rows = self.service.footer_rows()
         if not rows:
             return None
         return InlineKeyboardMarkup(
-            [
-                [InlineKeyboardButton(button.label, url=button.url) for button in row]
-                for row in rows
-            ]
+            [[InlineKeyboardButton(button.label, url=button.url) for button in row] for row in rows]
         )
 
-    @staticmethod
-    def _center_keyboard() -> InlineKeyboardMarkup:
+    def _center_keyboard(self) -> InlineKeyboardMarkup:
+        enabled = self.service.config().enabled
         return InlineKeyboardMarkup(
             [
-                [InlineKeyboardButton("🌤 每日天气汇率", callback_data="v3bc|tpl|live")],
-                [
-                    InlineKeyboardButton("📅 每周找房", callback_data="v3bc|tpl|weekly"),
-                    InlineKeyboardButton("🏠 周末看房", callback_data="v3bc|tpl|weekend"),
-                ],
-                [
-                    InlineKeyboardButton("📋 看房准备", callback_data="v3bc|tpl|viewing"),
-                    InlineKeyboardButton("📝 签约提醒", callback_data="v3bc|tpl|contract"),
-                ],
-                [InlineKeyboardButton("✏️ 自定义文案", callback_data="v3bc|custom")],
-                [InlineKeyboardButton("⬅️ 返回发布后台", callback_data="v3h")],
-            ]
-        )
-
-    @staticmethod
-    def _daily_keyboard(enabled: bool) -> InlineKeyboardMarkup:
-        return InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton("📋 选择模板", callback_data="v3bc"),
-                    InlineKeyboardButton("✏️ 编辑文案", callback_data="v3bc|custom"),
-                ],
-                [
-                    InlineKeyboardButton("💱 调整汇率", callback_data="v3bc|fx"),
-                    InlineKeyboardButton("🔘 底部按钮", callback_data="v3bc|buttons"),
-                ],
-                [
-                    InlineKeyboardButton("👀 预览", callback_data="v3bc|preview"),
-                    InlineKeyboardButton("📤 立即发送", callback_data="v3bc|send"),
-                ],
-                [
-                    InlineKeyboardButton("⏰ 09:30", callback_data="v3bc|time|0930"),
-                    InlineKeyboardButton("⏰ 12:30", callback_data="v3bc|time|1230"),
-                    InlineKeyboardButton("⏰ 18:30", callback_data="v3bc|time|1830"),
-                ],
-                [InlineKeyboardButton("✏️ 其他时间", callback_data="v3bc|time|custom")],
+                [InlineKeyboardButton("查看今日广播", callback_data="v3bc|today")],
+                [InlineKeyboardButton("立即预览", callback_data="v3bc|preview")],
+                [InlineKeyboardButton("发布今日广播", callback_data="v3bc|send")],
                 [
                     InlineKeyboardButton(
-                        "⏸ 暂停定时" if enabled else "▶️ 开启定时",
+                        "暂停自动广播" if enabled else "开启自动广播",
                         callback_data="v3bc|off" if enabled else "v3bc|on",
                     )
                 ],
-                [InlineKeyboardButton("⬅️ 返回广播中心", callback_data="v3bc")],
+                [InlineKeyboardButton("选择广播时间", callback_data="v3bc|time_menu")],
+                [InlineKeyboardButton("🏠 返回首页", callback_data="v3h")],
             ]
         )
 
+    @staticmethod
+    def _time_keyboard() -> InlineKeyboardMarkup:
+        return InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("09:30", callback_data="v3bc|time|0930"),
+                    InlineKeyboardButton("12:30", callback_data="v3bc|time|1230"),
+                    InlineKeyboardButton("18:30", callback_data="v3bc|time|1830"),
+                ],
+                [InlineKeyboardButton("其他时间", callback_data="v3bc|time|custom")],
+                [InlineKeyboardButton("⬅️ 返回每日广播", callback_data="v3bc")],
+                [InlineKeyboardButton("🏠 返回首页", callback_data="v3h")],
+            ]
+        )
+
+    # Hidden compatibility keyboards.  Existing settings stay usable from old
+    # callbacks, but are intentionally not linked from the normal admin UI.
     @staticmethod
     def _fx_keyboard() -> InlineKeyboardMarkup:
         return InlineKeyboardMarkup(
@@ -112,7 +95,7 @@ class BroadcastAdminController:
                     InlineKeyboardButton("+0.10", callback_data="v3bc|fxset|10"),
                     InlineKeyboardButton("+0.20", callback_data="v3bc|fxset|20"),
                 ],
-                [InlineKeyboardButton("⬅️ 返回广播页面", callback_data="v3bc|open")],
+                [InlineKeyboardButton("⬅️ 返回每日广播", callback_data="v3bc")],
             ]
         )
 
@@ -129,32 +112,33 @@ class BroadcastAdminController:
                     InlineKeyboardButton("💬 租房置业咨询", callback_data="v3bc|btn|contact"),
                     InlineKeyboardButton("组合按钮", callback_data="v3bc|btn|combo"),
                 ],
-                [InlineKeyboardButton("⬅️ 返回广播页面", callback_data="v3bc|open")],
+                [InlineKeyboardButton("⬅️ 返回每日广播", callback_data="v3bc")],
             ]
         )
 
-    async def show_center(self, message: Any) -> None:
+    async def show_center(self, message: Any, *, notice: str = "") -> None:
+        config = self.service.config()
+        prefix = f"✅ {escape(notice)}\n\n" if notice else ""
         await message.reply_text(
-            "📢 <b>广播中心</b>\n\n"
-            "每日天气汇率使用实时数据；其他模板可直接预览、手动发送，或设为每日定时内容。\n"
-            "定时默认关闭，只有管理员明确开启后才会自动发送。",
+            prefix
+            + "<b>📣 每日广播</b>\n\n"
+            f"自动广播：<b>{'已开启' if config.enabled else '已暂停'}</b>\n"
+            f"广播时间：<b>{escape(config.send_time)}</b>（{escape(self.timezone_name)}）\n\n"
+            "每日广播和房源自动发布相互独立。",
             parse_mode=ParseMode.HTML,
             reply_markup=self._center_keyboard(),
         )
 
     async def show_daily(self, message: Any, *, notice: str = "") -> None:
-        config = self.service.config()
-        prefix = f"✅ {escape(notice)}\n\n" if notice else ""
+        await self.show_center(message, notice=notice)
+
+    async def _render_today(self, message: Any, *, title: str) -> None:
+        body = await asyncio.to_thread(self.service.body)
         await message.reply_text(
-            prefix
-            + "📢 <b>广播页面</b>\n\n"
-            f"当前模板：<b>{escape(self.service.template_title(config.template_key))}</b>\n"
-            f"汇率偏移：<b>{config.fx_offset:+.2f}</b>\n"
-            f"定时：<b>{'已开启' if config.enabled else '未开启'}</b> · "
-            f"{escape(config.send_time)}（{escape(self.timezone_name)}）\n"
-            f"底部按钮：<b>{escape(BUTTON_LABELS.get(config.button_key, '不带按钮'))}</b>",
+            f"<b>{escape(title)}</b>\n\n" + body,
             parse_mode=ParseMode.HTML,
-            reply_markup=self._daily_keyboard(config.enabled),
+            disable_web_page_preview=True,
+            reply_markup=self._footer_markup(),
         )
 
     async def _send_channel(self, context: Any, body: str, *, trigger_type: str) -> Any:
@@ -196,8 +180,7 @@ class BroadcastAdminController:
             body = await asyncio.to_thread(self.service.body)
             await self._send_channel(context, body, trigger_type="scheduled")
         except Exception:
-            # The claim intentionally remains consumed for today.  An ambiguous
-            # Telegram failure must never trigger an automatic duplicate loop.
+            # Ambiguous Telegram results consume today's claim and never loop-send.
             return
         self.service.mark_scheduled_sent(local_date)
 
@@ -210,8 +193,7 @@ class BroadcastAdminController:
         if kind == "custom":
             self.service.set_custom_html(text)
             context.user_data.pop(BROADCAST_EDIT_STATE_KEY, None)
-            await update.effective_message.reply_text("✅ 广播文案已保存，不会立即发送。")
-            await self.show_daily(update.effective_message)
+            await self.show_center(update.effective_message, notice="广播文案已保存")
             return True
         if kind == "time":
             try:
@@ -220,8 +202,7 @@ class BroadcastAdminController:
                 await update.effective_message.reply_text("时间格式不正确，请发送例如：09:00。")
                 return True
             context.user_data.pop(BROADCAST_EDIT_STATE_KEY, None)
-            await update.effective_message.reply_text(f"✅ 定时时间已保存：{escape(normalized)}")
-            await self.show_daily(update.effective_message)
+            await self.show_center(update.effective_message, notice=f"广播时间已保存：{normalized}")
             return True
         context.user_data.pop(BROADCAST_EDIT_STATE_KEY, None)
         return False
@@ -236,86 +217,74 @@ class BroadcastAdminController:
         parts = raw.split("|")
         action = parts[1] if len(parts) > 1 else "center"
 
-        if action == "center":
+        if action in {"center", "open"}:
             await self.show_center(query.message)
             return True
-        if action == "open":
-            await self.show_daily(query.message)
-            return True
-        if action == "tpl" and len(parts) == 3:
-            self.service.set_template(parts[2])
-            await self.show_daily(query.message, notice=f"已选择 {self.service.template_title(parts[2])}")
-            return True
-        if action == "custom":
-            context.user_data[BROADCAST_EDIT_STATE_KEY] = {"kind": "custom"}
-            await query.message.reply_text("请直接发送新的广播文案。保存后不会立即发送；发送 /cancel 可取消。")
-            return True
-        if action == "fx":
-            config = self.service.config()
-            await query.message.reply_text(
-                "💱 <b>汇率偏移</b>\n\n"
-                f"当前：<b>{config.fx_offset:+.2f}</b>\n\n"
-                "例如 -0.20 = 实时市场 USD/CNY 减 0.20。",
-                parse_mode=ParseMode.HTML,
-                reply_markup=self._fx_keyboard(),
-            )
-            return True
-        if action == "fxset" and len(parts) == 3:
-            try:
-                value = int(parts[2]) / 100.0
-            except ValueError:
-                raise ValueError("broadcast_invalid_fx_callback")
-            self.service.set_fx_offset(value)
-            await self.show_daily(query.message)
-            return True
-        if action == "buttons":
-            await query.message.reply_text(
-                "🔘 <b>选择帖子底部按钮</b>",
-                parse_mode=ParseMode.HTML,
-                reply_markup=self._button_keyboard(),
-            )
-            return True
-        if action == "btn" and len(parts) == 3:
-            self.service.set_button(parts[2])
-            await self.show_daily(query.message, notice=BUTTON_LABELS[parts[2]])
+        if action == "today":
+            await self._render_today(query.message, title="今日广播")
             return True
         if action == "preview":
-            body = await asyncio.to_thread(self.service.body)
-            await query.message.reply_text(
-                "<b>👀 频道发送预览</b>\n\n" + body,
-                parse_mode=ParseMode.HTML,
-                disable_web_page_preview=True,
-                reply_markup=self._footer_markup(),
-            )
+            await self._render_today(query.message, title="广播预览")
             return True
         if action == "send":
             body = await asyncio.to_thread(self.service.body)
             sent = await self._send_channel(context, body, trigger_type="manual")
             await query.message.reply_text(
-                "✅ <b>广播已发送</b>\n"
-                f"message: <code>{escape(str(getattr(sent, 'message_id', '')))}</code>",
+                f"✅ 今日广播已发布。频道消息：{escape(str(getattr(sent, 'message_id', '')))}",
                 parse_mode=ParseMode.HTML,
-                reply_markup=self._daily_keyboard(self.service.config().enabled),
+                reply_markup=self._center_keyboard(),
             )
+            return True
+        if action == "time_menu":
+            await query.message.reply_text("选择广播时间：", reply_markup=self._time_keyboard())
             return True
         if action == "time" and len(parts) == 3:
             choice = parts[2]
             if choice == "custom":
                 context.user_data[BROADCAST_EDIT_STATE_KEY] = {"kind": "time"}
-                await query.message.reply_text("请直接发送时间，例如：09:00。仅保存时间，不会立即发送。")
+                await query.message.reply_text("请直接发送时间，例如：09:00。")
                 return True
             if len(choice) == 4 and choice.isdigit():
                 self.service.set_time(f"{choice[:2]}:{choice[2:]}")
-                await self.show_daily(query.message)
+                await self.show_center(query.message, notice="广播时间已更新")
                 return True
             raise ValueError("broadcast_invalid_time_callback")
         if action == "on":
             self.service.set_enabled(True)
-            await self.show_daily(query.message, notice="定时广播已开启")
+            await self.show_center(query.message, notice="自动广播已开启")
             return True
         if action == "off":
             self.service.set_enabled(False)
-            await self.show_daily(query.message, notice="定时广播已暂停")
+            await self.show_center(query.message, notice="自动广播已暂停")
+            return True
+
+        # Compatibility-only actions retained for previously issued admin buttons.
+        if action == "tpl" and len(parts) == 3:
+            self.service.set_template(parts[2])
+            await self.show_center(query.message, notice="广播内容已更新")
+            return True
+        if action == "custom":
+            context.user_data[BROADCAST_EDIT_STATE_KEY] = {"kind": "custom"}
+            await query.message.reply_text("请直接发送新的广播文案。发送 /cancel 可取消。")
+            return True
+        if action == "fx":
+            config = self.service.config()
+            await query.message.reply_text(
+                f"当前汇率偏移：<b>{config.fx_offset:+.2f}</b>",
+                parse_mode=ParseMode.HTML,
+                reply_markup=self._fx_keyboard(),
+            )
+            return True
+        if action == "fxset" and len(parts) == 3:
+            self.service.set_fx_offset(int(parts[2]) / 100.0)
+            await self.show_center(query.message, notice="汇率设置已更新")
+            return True
+        if action == "buttons":
+            await query.message.reply_text("选择广播底部按钮：", reply_markup=self._button_keyboard())
+            return True
+        if action == "btn" and len(parts) == 3:
+            self.service.set_button(parts[2])
+            await self.show_center(query.message, notice=BUTTON_LABELS[parts[2]])
             return True
         return True
 
