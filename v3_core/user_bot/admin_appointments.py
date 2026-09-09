@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from html import escape
-import json
 from pathlib import Path
 import sqlite3
 from typing import Any
@@ -27,55 +26,18 @@ class AdminAppointmentReader:
         conn.row_factory = sqlite3.Row
         return conn
 
-    @staticmethod
-    def _public_id_from_row(row: dict[str, Any]) -> str:
-        direct = str(row.get("public_listing_id") or "").strip()
-        if direct:
-            return direct
-        raw_snapshot = str(row.get("publication_snapshot_json") or "").strip()
-        if not raw_snapshot:
-            return ""
-        try:
-            snapshot = json.loads(raw_snapshot)
-        except (TypeError, ValueError, json.JSONDecodeError):
-            return ""
-        if not isinstance(snapshot, dict):
-            return ""
-        return str(snapshot.get("public_listing_id") or "").strip()
-
-    @classmethod
-    def _normalize_row(cls, row: sqlite3.Row | dict[str, Any]) -> dict[str, Any]:
-        result = dict(row)
-        if not str(result.get("public_listing_id") or "").strip():
-            mapped = cls._public_id_from_row(result)
-            if mapped:
-                result["public_listing_id"] = mapped
-        return result
-
-    @staticmethod
-    def _select_sql(where: str) -> str:
-        return f"""SELECT a.*,l.public_listing_id,l.display_title,l.project_name,
-                   (SELECT p.snapshot_json
-                      FROM publication_instances pi
-                      JOIN publication_packages_v3 p ON p.package_id=pi.package_id
-                     WHERE pi.listing_id=a.listing_id
-                       AND pi.platform='telegram'
-                       AND pi.publish_status='published'
-                     ORDER BY pi.updated_at DESC,pi.id DESC LIMIT 1
-                   ) AS publication_snapshot_json
-                   FROM appointments_v3 a
-                   LEFT JOIN listings_v3 l ON l.listing_id=a.listing_id
-                   WHERE {where}"""
-
     def list_today(self, now: datetime | None = None) -> tuple[dict[str, Any], ...]:
         current = now or datetime.now(ZoneInfo("Asia/Phnom_Penh"))
         target = current.date()
         with self._connect() as conn:
             rows = conn.execute(
-                self._select_sql("1=1") + " ORDER BY a.appointment_time,a.id"
+                """SELECT a.*,l.public_listing_id,l.display_title,l.project_name
+                   FROM appointments_v3 a
+                   LEFT JOIN listings_v3 l ON l.listing_id=a.listing_id
+                   ORDER BY a.appointment_time,a.id"""
             ).fetchall()
         return tuple(
-            self._normalize_row(row)
+            dict(row)
             for row in rows
             if appointment_date_matches(row["appointment_date"], target)
         )
@@ -83,10 +45,13 @@ class AdminAppointmentReader:
     def get(self, appointment_id: int) -> dict[str, Any] | None:
         with self._connect() as conn:
             row = conn.execute(
-                self._select_sql("a.id=?") + " LIMIT 1",
+                """SELECT a.*,l.public_listing_id,l.display_title,l.project_name
+                   FROM appointments_v3 a
+                   LEFT JOIN listings_v3 l ON l.listing_id=a.listing_id
+                   WHERE a.id=? LIMIT 1""",
                 (int(appointment_id),),
             ).fetchone()
-        return self._normalize_row(row) if row is not None else None
+        return dict(row) if row is not None else None
 
 
 def admin_home_keyboard() -> InlineKeyboardMarkup:
