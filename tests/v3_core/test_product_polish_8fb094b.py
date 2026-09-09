@@ -166,6 +166,7 @@ def test_no_match_page_has_existing_contact_flow_action():
 def _published_view() -> PublishedListingView:
     snapshot = {
         "schema": "v3_publication_snapshot.v1",
+        "canonical_facts": {},
         "listing": {
             "project_name": "富力城",
             "property_type": "公寓",
