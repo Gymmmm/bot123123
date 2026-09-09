@@ -14,6 +14,7 @@ from v3_core.publishing.delivery_state import PublicationDeliveryStateRepository
 from v3_core.publishing.package_service import PackageApprovalService, PackageBuildService
 from v3_core.publishing.package_store import FrozenPackageStore
 from v3_core.publishing.publication_instances import PublicationInstanceRepository
+from v3_core.storage.bootstrap import initialize_v3_storage
 from v3_core.storage.inventory_reader import InventoryReader
 from v3_core.storage.inventory_repository import InventoryRepository
 
@@ -121,6 +122,7 @@ def _images(tmp_path: Path, prefix: str):
 
 def _workflow(tmp_path: Path, *, deal_type="rent"):
     db = tmp_path / f"publisher-{deal_type}.sqlite3"
+    initialize_v3_storage(db)
     sources = SourceRepository(str(db))
     inventory = InventoryRepository(str(db))
     reader = InventoryReader(str(db))
