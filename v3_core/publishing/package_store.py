@@ -1,8 +1,10 @@
 """V3 frozen publication package store.
 
-The package freezes bytes and public presentation before approval.  It does not
-read drafts or render at send time.  Approved/published packages are immutable;
+The package freezes bytes and public presentation before approval. It does not
+read drafts or render at send time. Approved/published packages are immutable;
 rebuilds create a new version and may supersede only package_ready rows.
+Construction never initializes schema; additive DDL is owned by the explicit V3
+storage bootstrap.
 """
 from __future__ import annotations
 
@@ -148,13 +150,12 @@ def _content_hash(payload: dict[str, Any]) -> str:
 
 
 class FrozenPackageStore:
-    def __init__(self, db_path: str):
-        self.db_path = str(db_path)
-        with self._connect() as conn:
-            conn.executescript(DDL)
+    def __init__(self, db_path: str | Path):
+        self.db_path = Path(db_path).expanduser().resolve()
 
     def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path, timeout=30)
+        uri = f"file:{self.db_path.as_posix()}?mode=rw"
+        conn = sqlite3.connect(uri, uri=True, timeout=30)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA busy_timeout=30000")
         return conn
@@ -383,4 +384,4 @@ class FrozenPackageStore:
         return self._model(row)
 
 
-__all__ = ["CHANNEL_ACTION_ORDER", "FrozenPackage", "FrozenPackageStore"]
+__all__ = ["CHANNEL_ACTION_ORDER", "DDL", "FrozenPackage", "FrozenPackageStore"]
