@@ -210,7 +210,7 @@ def test_sale_frontend_uses_api_not_hardcoded_demo_inventory():
     assert "?text=" in html
     assert "searchParams.set('id'" in html
     assert "The Bridge 2房公寓" not in html
-    assert "炳发城精装㽓公寓" not in html
+    assert "炳发城精装3房公寓" not in html
     assert "钻石岛江景公寓" not in html
     assert "listing_id" not in html
     assert "offer_id" not in html
