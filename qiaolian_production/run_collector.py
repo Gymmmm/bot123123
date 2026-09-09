@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
 try:
     from .runtime_env import configure_environment, patch_legacy_path_globals
+    from .bootstrap_schema import ensure_runtime_schema
 except ImportError:  # direct script execution
     from runtime_env import configure_environment, patch_legacy_path_globals
+    from bootstrap_schema import ensure_runtime_schema
 
 
 def _root() -> Path:
@@ -24,6 +27,7 @@ def _activate_paths() -> None:
 def run() -> None:
     _activate_paths()
     app_root = configure_environment()
+    ensure_runtime_schema(os.environ["DB_PATH"])
     patch_legacy_path_globals(app_root)
     from collector_bot import main
 
