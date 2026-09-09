@@ -5,6 +5,7 @@ from PIL import Image, ImageDraw
 from v3_core.ingest.source_reader import SourceReader
 from v3_core.ingest.source_repository import SourceRepository
 from v3_core.media.service import MediaPreparationService
+from v3_core.storage.bootstrap import initialize_v3_storage
 
 
 def _image(path: Path, value: int):
@@ -25,6 +26,7 @@ def _image(path: Path, value: int):
 
 def test_media_preparation_reads_source_order_and_selects_one_cover(tmp_path):
     db = tmp_path / "media.sqlite3"
+    initialize_v3_storage(db)
     repo = SourceRepository(str(db))
     paths = [_image(tmp_path / f"{i}.jpg", 30 + i * 20) for i in range(4)]
     source_id = repo.save_source_post(
@@ -59,6 +61,7 @@ def test_media_preparation_reads_source_order_and_selects_one_cover(tmp_path):
 
 def test_manual_cover_is_honoured_only_when_it_is_usable_source_media(tmp_path):
     db = tmp_path / "media-manual.sqlite3"
+    initialize_v3_storage(db)
     repo = SourceRepository(str(db))
     paths = [_image(tmp_path / f"m{i}.jpg", 50 + i * 25) for i in range(4)]
     source_id = repo.save_source_post(
