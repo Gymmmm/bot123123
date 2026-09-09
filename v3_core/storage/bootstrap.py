@@ -15,6 +15,7 @@ from v3_core.publishing.broadcast import DDL as BROADCAST_DDL
 from v3_core.publishing.delivery_state import DDL as DELIVERY_DDL
 from v3_core.publishing.package_store import DDL as PACKAGE_DDL
 from v3_core.publishing.publication_instances import DDL as PUBLICATION_INSTANCE_DDL
+from v3_core.storage.aftercare_repository import DDL as AFTERCARE_DDL
 from v3_core.storage.appointment_repository import SQLiteAppointmentRepository
 from v3_core.storage.lead_repository import DDL as LEAD_DDL
 from v3_core.storage.schema import DDL as INVENTORY_DDL
@@ -38,6 +39,9 @@ REQUIRED_V3_TABLES = frozenset(
         "leads_v3",
         "tenant_bindings_v3",
         "repair_tickets_v3",
+        "rental_cases_v3",
+        "operations_tasks_v3",
+        "operations_task_events_v3",
         "publisher_settings_v3",
         "publisher_broadcast_log_v3",
     }
@@ -53,6 +57,7 @@ DDL_BLOCKS = (
     SQLiteAppointmentRepository.DDL,
     LEAD_DDL,
     SERVICE_DDL,
+    AFTERCARE_DDL,
     BROADCAST_DDL,
 )
 
