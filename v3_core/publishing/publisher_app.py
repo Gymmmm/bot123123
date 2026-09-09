@@ -14,6 +14,8 @@ from telegram.constants import ParseMode
 from telegram.ext import CommandHandler, ContextTypes, MessageHandler, filters
 
 from v3_core.ops.runtime_state import RuntimeStateRepository
+from v3_core.user_bot.channel_status_sync import sync_published_listing_status
+
 from .admin_bot import PublisherAdminBot, PublisherAdminSettings, REPO_ROOT, load_settings
 from .autopilot_anomalies import FinalAutoPublishRepository, FinalAutoPublishService
 from .broadcast import BroadcastService, BroadcastSettingsRepository
@@ -87,7 +89,23 @@ class V3PublisherApplication(PublisherAdminBot):
                 return
             await query.answer()
             try:
-                await self.simple.handle_callback(update, context)
+                handled = await self.simple.handle_callback(update, context)
+                if handled and raw.startswith("v3smp|status|"):
+                    parts = raw.split("|", 3)
+                    if len(parts) == 4:
+                        status, listing_id = parts[2], parts[3]
+                        sync = await sync_published_listing_status(
+                            bot=context.bot,
+                            db_path=self.settings.db_path,
+                            user_bot_username=self.settings.user_bot_username,
+                            listing_id=listing_id,
+                            status=status,
+                        )
+                        if sync.attempted and not sync.synced:
+                            await query.message.reply_text(
+                                "⚠️ 房源状态已更新，但频道帖子同步失败，请稍后重试。",
+                                reply_markup=InlineKeyboardMarkup([self._home_button()]),
+                            )
             except Exception as exc:
                 await query.message.reply_text(
                     "操作失败，房源没有被强行发布：\n" + escape(type(exc).__name__ + ": " + str(exc)),
