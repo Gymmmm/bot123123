@@ -35,7 +35,8 @@ jobs:
         run: |
           python -m pytest -q \
             tests/v3_core/test_sale_catalog_web.py \
-            tests/v3_core/test_sale_inventory_audit.py
+            tests/v3_core/test_sale_inventory_audit.py \
+            tests/v3_core/test_sale_public_policy_guard.py
       - name: Run complete V3 regression suite
         env:
           PYTHONPATH: '${{ github.workspace }}'
