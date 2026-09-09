@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from html import escape
+import json
 from pathlib import Path
 import sqlite3
 from typing import Any
@@ -12,6 +13,8 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 
 from v3_core.status_labels import APPOINTMENT_STATUS_LABELS, status_label
+
+from .appointments import APPOINTMENT_MODE_LABELS, appointment_date_matches
 
 
 class AdminAppointmentReader:
@@ -24,30 +27,66 @@ class AdminAppointmentReader:
         conn.row_factory = sqlite3.Row
         return conn
 
-    def list_today(self, now: datetime | None = None) -> tuple[dict[str, Any], ...]:
-        current = now or datetime.now(ZoneInfo("Asia/Phnom_Penh"))
-        candidates = (current.strftime("%Y-%m-%d"), f"{current.month}月{current.day}日")
-        with self._connect() as conn:
-            rows = conn.execute(
-                """SELECT a.*,l.public_listing_id,l.display_title,l.project_name
+    @staticmethod
+    def _public_id_from_row(row: dict[str, Any]) -> str:
+        direct = str(row.get("public_listing_id") or "").strip()
+        if direct:
+            return direct
+        raw_snapshot = str(row.get("publication_snapshot_json") or "").strip()
+        if not raw_snapshot:
+            return ""
+        try:
+            snapshot = json.loads(raw_snapshot)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return ""
+        if not isinstance(snapshot, dict):
+            return ""
+        return str(snapshot.get("public_listing_id") or "").strip()
+
+    @classmethod
+    def _normalize_row(cls, row: sqlite3.Row | dict[str, Any]) -> dict[str, Any]:
+        result = dict(row)
+        if not str(result.get("public_listing_id") or "").strip():
+            mapped = cls._public_id_from_row(result)
+            if mapped:
+                result["public_listing_id"] = mapped
+        return result
+
+    @staticmethod
+    def _select_sql(where: str) -> str:
+        return f"""SELECT a.*,l.public_listing_id,l.display_title,l.project_name,
+                   (SELECT p.snapshot_json
+                      FROM publication_instances pi
+                      JOIN publication_packages_v3 p ON p.package_id=pi.package_id
+                     WHERE pi.listing_id=a.listing_id
+                       AND pi.platform='telegram'
+                       AND pi.publish_status='published'
+                     ORDER BY pi.updated_at DESC,pi.id DESC LIMIT 1
+                   ) AS publication_snapshot_json
                    FROM appointments_v3 a
                    LEFT JOIN listings_v3 l ON l.listing_id=a.listing_id
-                   WHERE a.appointment_date IN (?,?)
-                   ORDER BY a.appointment_time,a.id""",
-                candidates,
+                   WHERE {where}"""
+
+    def list_today(self, now: datetime | None = None) -> tuple[dict[str, Any], ...]:
+        current = now or datetime.now(ZoneInfo("Asia/Phnom_Penh"))
+        target = current.date()
+        with self._connect() as conn:
+            rows = conn.execute(
+                self._select_sql("1=1") + " ORDER BY a.appointment_time,a.id"
             ).fetchall()
-        return tuple(dict(row) for row in rows)
+        return tuple(
+            self._normalize_row(row)
+            for row in rows
+            if appointment_date_matches(row["appointment_date"], target)
+        )
 
     def get(self, appointment_id: int) -> dict[str, Any] | None:
         with self._connect() as conn:
             row = conn.execute(
-                """SELECT a.*,l.public_listing_id,l.display_title,l.project_name
-                   FROM appointments_v3 a
-                   LEFT JOIN listings_v3 l ON l.listing_id=a.listing_id
-                   WHERE a.id=? LIMIT 1""",
+                self._select_sql("a.id=?") + " LIMIT 1",
                 (int(appointment_id),),
             ).fetchone()
-        return dict(row) if row is not None else None
+        return self._normalize_row(row) if row is not None else None
 
 
 def admin_home_keyboard() -> InlineKeyboardMarkup:
@@ -56,6 +95,24 @@ def admin_home_keyboard() -> InlineKeyboardMarkup:
 
 def _home_row():
     return [InlineKeyboardButton("⬅️ 返回咨询后台", callback_data="adminq:home")]
+
+
+def build_admin_appointment_detail_text(row: dict[str, Any]) -> str:
+    icon, label = status_label(
+        APPOINTMENT_STATUS_LABELS,
+        row.get("status"),
+        ("🟡", "等待确认"),
+    )
+    mode_key = str(row.get("viewing_mode") or "offline").strip().lower()
+    mode_label = APPOINTMENT_MODE_LABELS.get(mode_key, APPOINTMENT_MODE_LABELS["offline"])
+    return (
+        f"📅 <b>预约详情</b>\n\n{icon} {escape(label)}\n"
+        f"客户：{escape(str(row.get('display_name') or row.get('username') or '未填写'))}\n"
+        f"房源：{escape(str(row.get('public_listing_id') or '待生成'))}\n"
+        f"时间：{escape(str(row.get('appointment_date') or '待安排'))} · {escape(str(row.get('appointment_time') or '待安排'))}\n"
+        f"方式：{escape(mode_label)}\n"
+        f"联系：{escape(str(row.get('contact_value') or '未填写'))}"
+    )
 
 
 async def show_admin_home(message: Any) -> None:
@@ -84,18 +141,15 @@ async def handle_admin_callback(update: Any, reader: AdminAppointmentReader) -> 
     if data.startswith("adminq:appointment:"):
         raw_id = data.rsplit(":", 1)[-1]
         row = reader.get(int(raw_id)) if raw_id.isdigit() else None
-        if row is None:
-            text = "预约记录已失效。"
-        else:
-            icon, label = status_label(APPOINTMENT_STATUS_LABELS, row.get("status"), ("🟡", "等待确认"))
-            text = (
-                f"📅 <b>预约详情</b>\n\n{icon} {escape(label)}\n"
-                f"客户：{escape(str(row.get('display_name') or row.get('username') or '未填写'))}\n"
-                f"房源：{escape(str(row.get('public_listing_id') or '待生成'))}\n"
-                f"时间：{escape(str(row.get('appointment_date') or '待安排'))} · {escape(str(row.get('appointment_time') or '待安排'))}\n"
-                f"方式：{escape(str(row.get('viewing_mode') or 'offline'))}\n"
-                f"联系：{escape(str(row.get('contact_value') or '未填写'))}"
-            )
+        text = "预约记录已失效。" if row is None else build_admin_appointment_detail_text(row)
         markup = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ 返回今日预约", callback_data="adminq:appointments")], _home_row()])
         await query.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=markup)
 
+
+__all__ = [
+    "AdminAppointmentReader",
+    "admin_home_keyboard",
+    "build_admin_appointment_detail_text",
+    "handle_admin_callback",
+    "show_admin_home",
+]
