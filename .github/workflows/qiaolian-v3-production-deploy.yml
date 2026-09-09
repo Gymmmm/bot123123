@@ -17,8 +17,8 @@ concurrency:
 
 env:
   CANDIDATE_REF: release/v3-production-candidate-20260909
-  CANDIDATE_SHA: c1c8aa2381412745036ab25976d87ffafd9d5efc
-  ROLLBACK_SHA: 8e4605cf5cc21dfec3ce30729654b09e39de9abf
+  CANDIDATE_SHA: fc878b5302d1081cc8adbade2af01412dd329506
+  PREVIOUS_V3_SHA: c1c8aa2381412745036ab25976d87ffafd9d5efc
   PROD_HOST: 50.114.74.120
   PROD_PORT: '22'
   PROD_SSH_USER: root
@@ -65,6 +65,8 @@ jobs:
             run_v3_publisher_bot.py \
             run_v3_user_bot.py \
             run_v3_preflight.py
+          bash -n deploy/v3/run_component.sh
+          grep -F -- '--loop' deploy/v3/run_component.sh >/dev/null
           python -m pytest -q tests/v3_core
 
       - name: Build authenticated candidate bundle
@@ -103,7 +105,7 @@ jobs:
             -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 \
             "$RELEASE_BUNDLE" "$PROD_SSH_USER@$PROD_HOST:$REMOTE_BUNDLE"
 
-      - name: Deploy V3, preflight, activate and verify
+      - name: Deploy latest V3 runtime, preflight, activate and verify
         env:
           REMOTE_BUNDLE: '/tmp/qiaolian-v3-${{ github.run_id }}-${{ env.CANDIDATE_SHA }}.bundle'
         run: |
@@ -111,240 +113,192 @@ jobs:
           ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" \
             -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 \
             "$PROD_SSH_USER@$PROD_HOST" \
-            "bash -s -- '$REMOTE_BUNDLE' '$CANDIDATE_SHA' '$ROLLBACK_SHA'" <<'REMOTE'
+            "bash -s -- '$REMOTE_BUNDLE' '$CANDIDATE_SHA' '$PREVIOUS_V3_SHA'" <<'REMOTE'
           set -Eeuo pipefail
           export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
           hash -r
 
           BUNDLE_PATH=$1
           EXPECTED_SHA=$2
-          ROLLBACK_SHA=$3
+          PREVIOUS_SHA=$3
           APP=/opt/qiaolian_v3
+          RELEASE="$APP/releases/$EXPECTED_SHA"
+          CURRENT="$APP/current"
+          RUNTIME_ENV="$APP/runtime.env"
           OLD=/opt/qiaolian_dual_bots
           DB="$OLD/data/qiaolian_dual_bot.db"
-          ENV_FILE="$OLD/.env"
+          ENV_SOURCE="$OLD/.env"
           BACKUP_ROOT=/opt/qiaolian_backups
           STAMP=$(date -u +%Y%m%d-%H%M%S)
           BACKUP="$BACKUP_ROOT/actions-v3-$STAMP"
-          V3_SERVICES=(qiaolian-v3-user-bot.service qiaolian-v3-publisher.service qiaolian-v3-collector.service)
-          OLD_SERVICES=(qiaolian-user-bot.service qiaolian-publisher-bot.service qiaolian-collector.service)
 
-          cleanup_on_error() {
+          NEW_SERVICES=(
+            qiaolian-v3@canonical.service
+            qiaolian-v3@publisher.service
+            qiaolian-v3@user.service
+            qiaolian-v3@collector.service
+          )
+          OLD_V3_SERVICES=(
+            qiaolian-v3-user-bot.service
+            qiaolian-v3-publisher.service
+            qiaolian-v3-collector.service
+          )
+          LEGACY_SERVICES=(
+            qiaolian-user-bot.service
+            qiaolian-publisher-bot.service
+            qiaolian-collector.service
+          )
+
+          OLD_V3_WAS_ACTIVE=0
+          if systemctl is-active --quiet qiaolian-v3-user-bot.service 2>/dev/null || \
+             systemctl is-active --quiet qiaolian-v3-publisher.service 2>/dev/null || \
+             systemctl is-active --quiet qiaolian-v3-collector.service 2>/dev/null; then
+            OLD_V3_WAS_ACTIVE=1
+          fi
+
+          rollback_on_error() {
             rc=$?
             if [ "$rc" -ne 0 ]; then
-              echo "DEPLOY_FAILED rc=$rc - stopping V3 units" >&2
-              systemctl stop qiaolian-v3-collector.service qiaolian-v3-publisher.service qiaolian-v3-user-bot.service qiaolian-v3-canonical-worker.timer 2>/dev/null || true
+              echo "DEPLOY_FAILED rc=$rc - stopping new V3 template units" >&2
+              systemctl disable --now "${NEW_SERVICES[@]}" 2>/dev/null || true
+              if [ "$OLD_V3_WAS_ACTIVE" = 1 ]; then
+                echo 'ROLLBACK: restoring previous V3 services' >&2
+                systemctl enable --now qiaolian-v3-user-bot.service qiaolian-v3-publisher.service qiaolian-v3-collector.service qiaolian-v3-canonical-worker.timer 2>/dev/null || true
+              fi
             fi
             exit "$rc"
           }
-          trap cleanup_on_error EXIT
+          trap rollback_on_error EXIT
 
           echo 'CHECK: prerequisites'
           test -f "$BUNDLE_PATH"
-          test -f "$ENV_FILE"
+          test -f "$ENV_SOURCE"
           test -s "$DB"
           id qiaolianbot >/dev/null
           command -v git >/dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y git
           command -v sqlite3 >/dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y sqlite3
           command -v python3 >/dev/null
 
-          echo 'CHECK: freeze old writers before backup/cutover'
-          systemctl stop "${OLD_SERVICES[@]}" 2>/dev/null || true
+          echo 'FREEZE: stop all old writers before backup and cutover'
+          systemctl stop "${LEGACY_SERVICES[@]}" 2>/dev/null || true
+          systemctl stop "${OLD_V3_SERVICES[@]}" qiaolian-v3-canonical-worker.timer 2>/dev/null || true
+          systemctl stop "${NEW_SERVICES[@]}" 2>/dev/null || true
 
-          echo 'BACKUP: database, env and old systemd units'
+          echo 'BACKUP: DB, env and service definitions'
           install -d -m 0700 "$BACKUP/systemd"
-          cp -a "$ENV_FILE" "$BACKUP/.env"
-          for f in /etc/systemd/system/qiaolian-user-bot.service /etc/systemd/system/qiaolian-publisher-bot.service /etc/systemd/system/qiaolian-collector.service; do
+          cp -a "$ENV_SOURCE" "$BACKUP/legacy.env"
+          [ -f "$APP/.env" ] && cp -a "$APP/.env" "$BACKUP/v3.env" || true
+          [ -f "$RUNTIME_ENV" ] && cp -a "$RUNTIME_ENV" "$BACKUP/runtime.env" || true
+          for f in \
+            /etc/systemd/system/qiaolian-v3-user-bot.service \
+            /etc/systemd/system/qiaolian-v3-publisher.service \
+            /etc/systemd/system/qiaolian-v3-collector.service \
+            /etc/systemd/system/qiaolian-v3-canonical-worker.service \
+            /etc/systemd/system/qiaolian-v3-canonical-worker.timer \
+            /etc/systemd/system/qiaolian-v3@.service; do
             [ -f "$f" ] && cp -a "$f" "$BACKUP/systemd/"
           done
           sqlite3 "$DB" ".backup '$BACKUP/qiaolian_dual_bot.db'"
           sqlite3 "$BACKUP/qiaolian_dual_bot.db" 'PRAGMA quick_check;' | grep -Fx ok
           printf '%s\n' "$EXPECTED_SHA" > "$BACKUP/candidate_sha.txt"
-          printf '%s\n' "$ROLLBACK_SHA" > "$BACKUP/rollback_sha.txt"
+          printf '%s\n' "$PREVIOUS_SHA" > "$BACKUP/previous_v3_sha.txt"
 
-          echo 'DEPLOY: exact candidate into /opt/qiaolian_v3'
-          install -d -o qiaolianbot -g qiaolianbot -m 0755 "$APP"
-          git -c safe.directory="$APP" -C "$APP" rev-parse --git-dir >/dev/null 2>&1 || git -c safe.directory="$APP" -C "$APP" init
-          git -c safe.directory="$APP" -C "$APP" fetch "$BUNDLE_PATH" refs/heads/actions-v3-production
-          test "$(git -c safe.directory="$APP" -C "$APP" rev-parse FETCH_HEAD)" = "$EXPECTED_SHA"
-          git -c safe.directory="$APP" -C "$APP" checkout -f --detach "$EXPECTED_SHA"
-          test "$(git -c safe.directory="$APP" -C "$APP" rev-parse HEAD)" = "$EXPECTED_SHA"
+          echo 'DEPLOY: exact candidate into immutable release directory'
+          install -d -o qiaolianbot -g qiaolianbot -m 0755 "$APP/releases" "$RELEASE"
+          git -c safe.directory="$RELEASE" -C "$RELEASE" rev-parse --git-dir >/dev/null 2>&1 || git -c safe.directory="$RELEASE" -C "$RELEASE" init
+          git -c safe.directory="$RELEASE" -C "$RELEASE" fetch "$BUNDLE_PATH" refs/heads/actions-v3-production
+          test "$(git -c safe.directory="$RELEASE" -C "$RELEASE" rev-parse FETCH_HEAD)" = "$EXPECTED_SHA"
+          git -c safe.directory="$RELEASE" -C "$RELEASE" checkout -f --detach "$EXPECTED_SHA"
+          test "$(git -c safe.directory="$RELEASE" -C "$RELEASE" rev-parse HEAD)" = "$EXPECTED_SHA"
+          chmod 0755 "$RELEASE/deploy/v3/run_component.sh"
 
-          rm -rf "$APP/data" "$APP/media" "$APP/telethon_sessions" "$APP/.playwright-browsers"
-          ln -s "$OLD/data" "$APP/data"
-          ln -s "$OLD/media" "$APP/media"
-          ln -s "$OLD/telethon_sessions" "$APP/telethon_sessions"
-          ln -s "$OLD/.playwright-browsers" "$APP/.playwright-browsers"
-          cp -a "$ENV_FILE" "$APP/.env"
-          chown -h qiaolianbot:qiaolianbot "$APP/data" "$APP/media" "$APP/telethon_sessions" "$APP/.playwright-browsers"
-          chown root:qiaolianbot "$APP/.env"
-          chmod 0640 "$APP/.env"
-
-          echo 'PYTHON: isolated V3 venv and dependencies'
+          echo 'PYTHON: shared isolated V3 venv'
           if [ ! -x "$APP/.venv/bin/python" ]; then
             python3 -m venv "$APP/.venv"
           fi
           "$APP/.venv/bin/python" -m pip install --disable-pip-version-check --upgrade pip
-          "$APP/.venv/bin/python" -m pip install --disable-pip-version-check -r "$APP/requirements.txt"
-          chown -R qiaolianbot:qiaolianbot "$APP/.venv"
+          "$APP/.venv/bin/python" -m pip install --disable-pip-version-check -r "$RELEASE/requirements.txt"
+          chown -R qiaolianbot:qiaolianbot "$APP/.venv" "$RELEASE"
 
-          echo 'COMPILE: production entries'
+          echo 'RUNTIME ENV: preserve existing secrets and pin V3 runtime paths'
+          cp -a "$ENV_SOURCE" "$RUNTIME_ENV"
+          cat >>"$RUNTIME_ENV" <<EOF
+          QIAOLIAN_CODE_ROOT=$CURRENT
+          QIAOLIAN_VENV=$APP/.venv
+          QIAOLIAN_RUNTIME_ROOT=$APP/runtime
+          DB_PATH=$DB
+          SQLITE_PATH=$DB
+          MEDIA_ROOT=$OLD/media
+          COLLECTOR_DOWNLOAD_DIR=$OLD/media/collector_downloads
+          COLLECTOR_SOURCES_JSON=$CURRENT/sources.json
+          V3_COVER_OUTPUT_DIR=$OLD/media/covers_v3
+          CHANNEL_DISCUSSION_ENABLED=false
+          V3_CANONICAL_WORKER_INTERVAL_SECONDS=5
+          PLAYWRIGHT_BROWSERS_PATH=$OLD/.playwright-browsers
+          EOF
+          chown root:qiaolianbot "$RUNTIME_ENV"
+          chmod 0640 "$RUNTIME_ENV"
+
+          echo 'COMPILE: exact release entries'
           "$APP/.venv/bin/python" -m compileall -q \
-            "$APP/v3_core" \
-            "$APP/run_v3_collector.py" \
-            "$APP/run_v3_canonical_worker.py" \
-            "$APP/run_v3_publisher_bot.py" \
-            "$APP/run_v3_user_bot.py" \
-            "$APP/run_v3_preflight.py"
+            "$RELEASE/v3_core" \
+            "$RELEASE/run_v3_collector.py" \
+            "$RELEASE/run_v3_canonical_worker.py" \
+            "$RELEASE/run_v3_publisher_bot.py" \
+            "$RELEASE/run_v3_user_bot.py" \
+            "$RELEASE/run_v3_preflight.py"
+          bash -n "$RELEASE/deploy/v3/run_component.sh"
 
-          echo 'PREFLIGHT: initialize additive schema then read-only check'
+          echo 'PREFLIGHT: release against production DB before activation'
           set -a
-          # shellcheck disable=SC1090
-          source "$APP/.env"
+          source "$RUNTIME_ENV"
           set +a
+          export QIAOLIAN_CODE_ROOT="$RELEASE"
           export DB_PATH="$DB"
+          export SQLITE_PATH="$DB"
           export CHANNEL_DISCUSSION_ENABLED=false
-          export PLAYWRIGHT_BROWSERS_PATH="$OLD/.playwright-browsers"
-          cd "$APP"
+          cd "$RELEASE"
           runuser -u qiaolianbot --preserve-environment -- "$APP/.venv/bin/python" run_v3_preflight.py --initialize --component all --db "$DB"
           runuser -u qiaolianbot --preserve-environment -- "$APP/.venv/bin/python" run_v3_preflight.py --component all --db "$DB"
 
-          echo 'DB SAFETY: sale must remain store_only and non-publishable'
+          echo 'DB SAFETY: sale stays store_only and non-publishable'
           test "$(sqlite3 "$DB" "SELECT COUNT(*) FROM listing_offers WHERE offer_type='sale' AND publication_policy<>'store_only';")" = 0
           test "$(sqlite3 "$DB" "SELECT COUNT(*) FROM listing_offers WHERE offer_type='sale' AND publishable<>0;")" = 0
 
-          echo 'SYSTEMD: install V3 units'
-          cat >/etc/systemd/system/qiaolian-v3-user-bot.service <<EOF
-          [Unit]
-          Description=Qiaolian V3 User Bot
-          After=network-online.target
-          Wants=network-online.target
+          echo 'ACTIVATE RELEASE POINTER'
+          rm -f "$CURRENT"
+          ln -s "$RELEASE" "$CURRENT"
+          chown -h qiaolianbot:qiaolianbot "$CURRENT"
 
+          echo 'SYSTEMD: install repository-owned V3 template'
+          install -m 0644 "$CURRENT/deploy/v3/qiaolian-v3@.service" /etc/systemd/system/qiaolian-v3@.service
+          install -d -m 0755 /etc/systemd/system/qiaolian-v3@.service.d
+          cat >/etc/systemd/system/qiaolian-v3@.service.d/10-runtime.conf <<'EOF'
           [Service]
-          Type=simple
           User=qiaolianbot
           Group=qiaolianbot
-          WorkingDirectory=$APP
-          EnvironmentFile=$APP/.env
-          Environment=DB_PATH=$DB
-          Environment=CHANNEL_DISCUSSION_ENABLED=false
-          Environment=PLAYWRIGHT_BROWSERS_PATH=$OLD/.playwright-browsers
-          ExecStart=$APP/.venv/bin/python $APP/run_v3_user_bot.py
-          Restart=always
-          RestartSec=5
           UMask=0027
           NoNewPrivileges=true
           PrivateTmp=true
           MemoryHigh=600M
           MemoryMax=800M
-
-          [Install]
-          WantedBy=multi-user.target
-          EOF
-
-          cat >/etc/systemd/system/qiaolian-v3-publisher.service <<EOF
-          [Unit]
-          Description=Qiaolian V3 Publisher Bot
-          After=network-online.target
-          Wants=network-online.target
-
-          [Service]
-          Type=simple
-          User=qiaolianbot
-          Group=qiaolianbot
-          WorkingDirectory=$APP
-          EnvironmentFile=$APP/.env
-          Environment=DB_PATH=$DB
-          Environment=CHANNEL_DISCUSSION_ENABLED=false
-          Environment=PLAYWRIGHT_BROWSERS_PATH=$OLD/.playwright-browsers
-          ExecStart=$APP/.venv/bin/python $APP/run_v3_publisher_bot.py
-          Restart=always
-          RestartSec=5
-          UMask=0027
-          NoNewPrivileges=true
-          PrivateTmp=true
-          MemoryHigh=600M
-          MemoryMax=800M
-
-          [Install]
-          WantedBy=multi-user.target
-          EOF
-
-          cat >/etc/systemd/system/qiaolian-v3-collector.service <<EOF
-          [Unit]
-          Description=Qiaolian V3 Collector
-          After=network-online.target qiaolian-v3-user-bot.service qiaolian-v3-publisher.service
-          Wants=network-online.target
-
-          [Service]
-          Type=simple
-          User=qiaolianbot
-          Group=qiaolianbot
-          WorkingDirectory=$APP
-          EnvironmentFile=$APP/.env
-          Environment=DB_PATH=$DB
-          Environment=CHANNEL_DISCUSSION_ENABLED=false
-          Environment=PLAYWRIGHT_BROWSERS_PATH=$OLD/.playwright-browsers
-          ExecStart=$APP/.venv/bin/python $APP/run_v3_collector.py
-          Restart=always
-          RestartSec=5
-          UMask=0077
-          NoNewPrivileges=true
-          PrivateTmp=true
-
-          [Install]
-          WantedBy=multi-user.target
-          EOF
-
-          cat >/etc/systemd/system/qiaolian-v3-canonical-worker.service <<EOF
-          [Unit]
-          Description=Qiaolian V3 Canonical Worker
-          After=network-online.target
-
-          [Service]
-          Type=oneshot
-          User=qiaolianbot
-          Group=qiaolianbot
-          WorkingDirectory=$APP
-          EnvironmentFile=$APP/.env
-          Environment=DB_PATH=$DB
-          Environment=CHANNEL_DISCUSSION_ENABLED=false
-          ExecStart=$APP/.venv/bin/python $APP/run_v3_canonical_worker.py --db $DB --limit 100
-          UMask=0027
-          NoNewPrivileges=true
-          PrivateTmp=true
-          EOF
-
-          cat >/etc/systemd/system/qiaolian-v3-canonical-worker.timer <<EOF
-          [Unit]
-          Description=Run Qiaolian V3 Canonical Worker every 15 seconds
-
-          [Timer]
-          OnBootSec=5s
-          OnUnitActiveSec=15s
-          AccuracySec=1s
-          Unit=qiaolian-v3-canonical-worker.service
-          Persistent=false
-
-          [Install]
-          WantedBy=timers.target
           EOF
 
           systemctl daemon-reload
-          systemctl enable qiaolian-v3-user-bot.service qiaolian-v3-publisher.service qiaolian-v3-collector.service qiaolian-v3-canonical-worker.timer
+          systemctl disable qiaolian-v3-user-bot.service qiaolian-v3-publisher.service qiaolian-v3-collector.service qiaolian-v3-canonical-worker.timer 2>/dev/null || true
+          systemctl enable "${NEW_SERVICES[@]}"
 
-          echo 'ACTIVATE: worker -> publisher -> user -> collector'
+          echo 'START: canonical -> publisher -> user -> collector'
           ACTIVATED_AT=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
-          systemctl start qiaolian-v3-canonical-worker.service
-          systemctl start qiaolian-v3-canonical-worker.timer
-          systemctl start qiaolian-v3-publisher.service
-          systemctl start qiaolian-v3-user-bot.service
-          systemctl start qiaolian-v3-collector.service
+          systemctl start qiaolian-v3@canonical.service
+          systemctl start qiaolian-v3@publisher.service
+          systemctl start qiaolian-v3@user.service
+          systemctl start qiaolian-v3@collector.service
 
-          sleep 8
-          systemctl is-active --quiet qiaolian-v3-canonical-worker.timer
-          for svc in "${V3_SERVICES[@]}"; do
+          sleep 10
+          for svc in "${NEW_SERVICES[@]}"; do
             systemctl is-active --quiet "$svc"
+            systemctl is-enabled --quiet "$svc"
             pid=$(systemctl show "$svc" -p MainPID --value)
             restarts=$(systemctl show "$svc" -p NRestarts --value)
             test "${pid:-0}" -gt 0
@@ -353,18 +307,18 @@ jobs:
 
           echo 'RUNTIME LOG GATE'
           if journalctl \
-              -u qiaolian-v3-user-bot.service \
-              -u qiaolian-v3-publisher.service \
-              -u qiaolian-v3-collector.service \
-              -u qiaolian-v3-canonical-worker.service \
+              -u qiaolian-v3@canonical.service \
+              -u qiaolian-v3@publisher.service \
+              -u qiaolian-v3@user.service \
+              -u qiaolian-v3@collector.service \
               --since "$ACTIVATED_AT" --no-pager \
               | grep -Eq 'Traceback|ModuleNotFoundError|ImportError|database is locked|no such table|Conflict: terminated by other getUpdates request|Main process exited|Failed with result'; then
             journalctl \
-              -u qiaolian-v3-user-bot.service \
-              -u qiaolian-v3-publisher.service \
-              -u qiaolian-v3-collector.service \
-              -u qiaolian-v3-canonical-worker.service \
-              --since "$ACTIVATED_AT" -n 200 --no-pager
+              -u qiaolian-v3@canonical.service \
+              -u qiaolian-v3@publisher.service \
+              -u qiaolian-v3@user.service \
+              -u qiaolian-v3@collector.service \
+              --since "$ACTIVATED_AT" -n 250 --no-pager
             exit 1
           fi
 
@@ -373,9 +327,5 @@ jobs:
           rm -f "$BUNDLE_PATH"
           trap - EXIT
           echo "V3_DEPLOYMENT_OK sha=$EXPECTED_SHA backup=$BACKUP"
-          systemctl --no-pager --full status \
-            qiaolian-v3-user-bot.service \
-            qiaolian-v3-publisher.service \
-            qiaolian-v3-collector.service \
-            qiaolian-v3-canonical-worker.timer || true
+          systemctl --no-pager --full status "${NEW_SERVICES[@]}" || true
           REMOTE
