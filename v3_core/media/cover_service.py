@@ -63,13 +63,6 @@ class CoverRenderService:
         values.extend([""] * (3 - len(values)))
         return values[0], values[1], values[2]
 
-    @staticmethod
-    def _floor(value: object) -> str:
-        text = str(value or "").strip()
-        if text and text.replace(".", "", 1).isdigit():
-            return f"{text}楼"
-        return text
-
     def render(
         self,
         *,
@@ -106,7 +99,7 @@ class CoverRenderService:
                 or ""
             ),
             size=str(listing.get("size_sqm") or ""),
-            floor=self._floor(listing.get("floor")),
+            floor=str(listing.get("floor") or ""),
             price=self._price(offer),
             highlight_1=h1,
             highlight_2=h2,

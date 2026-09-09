@@ -224,6 +224,10 @@ def render_cover(
             poster.evaluate(
                 r'''root => {
                     const empty = el => !String(el?.textContent || '').replace(/\s+/g, ' ').trim();
+                    const floor = root.querySelector('#floor');
+                    if (floor && /^\d+(?:\.\d+)?$/.test(String(floor.textContent || '').trim())) {
+                        floor.textContent = `${String(floor.textContent).trim()}楼`;
+                    }
                     for (const row of root.querySelectorAll('[data-field], [data-fields]')) {
                         const ids = (row.dataset.fields || row.dataset.field || '')
                             .split(',').map(x => x.trim()).filter(Boolean);
