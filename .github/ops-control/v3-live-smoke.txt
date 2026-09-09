@@ -1,0 +1,4 @@
+run=2026-09-09T07:28+07:00
+app_sha=c5a9a462cd129f7cb3563b9324280414f4d42fc9
+collect=10
+publish=10
