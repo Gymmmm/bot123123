@@ -1,0 +1,43 @@
+name: v3-server-smoke
+on:
+  push:
+    branches: [v3/server-test]
+    paths: [.github/workflows/v3-server-smoke.yml]
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure SSH
+        env:
+          KEY: '${{ secrets.PROD_SSH_PRIVATE_KEY }}'
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/key
+          chmod 600 ~/.ssh/key
+          ssh-keyscan -H 50.114.74.120 >> ~/.ssh/known_hosts
+      - name: Deploy isolated fresh-db test
+        run: |
+          ssh -i ~/.ssh/key root@50.114.74.120 'bash -s' <<'REMOTE'
+          set -e
+          SRC=/opt/qiaolian_dual_bots
+          APP=/opt/qiaolian_v3_test
+          if [ ! -d "$APP/.git" ]; then git clone https://github.com/Gymmmm/bot123123.git "$APP"; fi
+          git -C "$APP" fetch origin v3/server-test
+          git -C "$APP" checkout -f origin/v3/server-test
+          cp "$SRC/.env" "$APP/.env"
+          [ -f "$SRC/sources.json" ] && cp "$SRC/sources.json" "$APP/sources.json" || true
+          mkdir -p "$APP/telethon_sessions" "$APP/data"
+          cp -a "$SRC/telethon_sessions/." "$APP/telethon_sessions/" 2>/dev/null || true
+          if [ ! -x "$APP/.venv/bin/python" ]; then python3 -m venv "$APP/.venv"; fi
+          "$APP/.venv/bin/pip" install -q -r "$APP/requirements.txt"
+          DB="$APP/data/v3_smoke.db"
+          rm -f "$DB"
+          cd "$APP"
+          DB_PATH="$DB" PYTHONPATH="$APP" "$APP/.venv/bin/python" scripts/bootstrap_db.py
+          DB_PATH="$DB" PYTHONPATH="$APP" "$APP/.venv/bin/python" -c "from collector_db_compat import DatabaseManager; d=DatabaseManager('$DB'); print('FRESH_DB_OK', d._fetch_one('SELECT count(*) FROM source_posts')[0])"
+          echo V3_ISOLATED_DEPLOY_OK
+          REMOTE
