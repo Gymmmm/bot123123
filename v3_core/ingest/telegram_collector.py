@@ -1,11 +1,12 @@
 """V3 Telethon collector adapter.
 
-Extracted from production `collector_bot.py` at the locked SHA.  It preserves
-Telegram source handling and media acquisition, then stops at `IntakeService`.
-It never imports the parser, drafts, publication packages, or a publisher.
+The adapter preserves the existing intake chain and stops at ``IntakeService``.
+Operational source enable/disable state is read from the shared V3 runtime-state
+repository; the collector never imports parser or publishing business modules.
 """
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -17,6 +18,7 @@ from dotenv import load_dotenv
 from telethon import TelegramClient, events
 from telethon.tl.types import MessageMediaDocument, MessageMediaPhoto
 
+from v3_core.ops.runtime_state import RuntimeStateRepository
 from .intake_service import IntakeResult, IntakeService, SourceIntake
 from .source_repository import SourceRepository
 
@@ -102,9 +104,30 @@ class TelegramCollectorApp:
         self.download_dir.mkdir(parents=True, exist_ok=True)
         Path(self.session_path).parent.mkdir(parents=True, exist_ok=True)
         self.repository = SourceRepository(self.db_path)
+        self.runtime = RuntimeStateRepository(self.db_path)
         self.intake = IntakeService(
             self.repository,
             min_listing_images=max(4, int(min_listing_images or 4)),
+        )
+
+    async def _heartbeat_loop(self) -> None:
+        while True:
+            self.runtime.heartbeat("collector", state="running")
+            await asyncio.sleep(30)
+
+    def _record_result(self, source_name: str, result: IntakeResult | None) -> None:
+        if result is None:
+            return
+        self.runtime.touch_source(
+            source_name,
+            collected=True,
+            duplicate=result.status == "duplicate",
+        )
+        self.runtime.heartbeat(
+            "collector",
+            state="running",
+            event=True,
+            meta={"source": source_name, "status": result.status},
         )
 
     async def download_media(self, client: TelegramClient, message: Any) -> dict[str, Any] | None:
@@ -234,11 +257,7 @@ class TelegramCollectorApp:
         if not raw_images:
             return None
         grouped_id = getattr(anchor, "grouped_id", None)
-        source_post_id = (
-            f"album_{grouped_id}"
-            if grouped_id is not None
-            else f"album_{anchor.id}"
-        )
+        source_post_id = f"album_{grouped_id}" if grouped_id is not None else f"album_{anchor.id}"
         return self.persist(
             source_cfg=source_cfg,
             chat_id=int(event.chat_id),
@@ -258,35 +277,66 @@ class TelegramCollectorApp:
             raise RuntimeError("sources.json 中没有可用源")
         client = TelegramClient(self.session_path, self.api_id, self.api_hash)
         await client.start()
-        for cfg in sources:
-            source_cfg = dict(cfg)
-            entity = await client.get_entity(source_cfg["entity_id"])
+        heartbeat_task = asyncio.create_task(self._heartbeat_loop())
+        configured = 0
+        try:
+            for cfg in sources:
+                source_cfg = dict(cfg)
+                source_name = str(source_cfg["source_name"])
+                self.runtime.ensure_source(source_name, enabled=True)
+                try:
+                    entity = await client.get_entity(source_cfg["entity_id"])
+                except Exception as exc:
+                    self.runtime.touch_source(source_name, error=f"{type(exc).__name__}: {exc}")
+                    log.exception("collector source resolve failed source=%s", source_name)
+                    continue
+                configured += 1
 
-            @client.on(events.NewMessage(chats=entity, func=lambda event: event.grouped_id is None))
-            async def _single(event: Any, config=source_cfg):
-                result = await self.handle_single(event, config)
-                if result:
-                    log.info(
-                        "intake source=%s status=%s post=%s images=%s",
-                        config["source_name"],
-                        result.status,
-                        result.source_post_pk,
-                        result.media_count,
-                    )
+                @client.on(events.NewMessage(chats=entity, func=lambda event: event.grouped_id is None))
+                async def _single(event: Any, config=source_cfg):
+                    name = str(config["source_name"])
+                    if not self.runtime.source_enabled(name):
+                        return
+                    try:
+                        result = await self.handle_single(event, config)
+                    except Exception as exc:
+                        self.runtime.touch_source(name, error=f"{type(exc).__name__}: {exc}")
+                        self.runtime.heartbeat("collector", state="running", event=True, error=f"{type(exc).__name__}: {exc}")
+                        log.exception("collector intake failed source=%s", name)
+                        return
+                    self._record_result(name, result)
+                    if result:
+                        log.info(
+                            "intake source=%s status=%s post=%s images=%s",
+                            name, result.status, result.source_post_pk, result.media_count,
+                        )
 
-            @client.on(events.Album(chats=entity))
-            async def _album(event: Any, config=source_cfg):
-                result = await self.handle_album(event, config)
-                if result:
-                    log.info(
-                        "album intake source=%s status=%s post=%s images=%s",
-                        config["source_name"],
-                        result.status,
-                        result.source_post_pk,
-                        result.media_count,
-                    )
+                @client.on(events.Album(chats=entity))
+                async def _album(event: Any, config=source_cfg):
+                    name = str(config["source_name"])
+                    if not self.runtime.source_enabled(name):
+                        return
+                    try:
+                        result = await self.handle_album(event, config)
+                    except Exception as exc:
+                        self.runtime.touch_source(name, error=f"{type(exc).__name__}: {exc}")
+                        self.runtime.heartbeat("collector", state="running", event=True, error=f"{type(exc).__name__}: {exc}")
+                        log.exception("collector album failed source=%s", name)
+                        return
+                    self._record_result(name, result)
+                    if result:
+                        log.info(
+                            "album intake source=%s status=%s post=%s images=%s",
+                            name, result.status, result.source_post_pk, result.media_count,
+                        )
 
-        await client.run_until_disconnected()
+            if configured == 0:
+                raise RuntimeError("所有采集源均无法连接")
+            self.runtime.heartbeat("collector", state="running", event=True, meta={"configured_sources": configured})
+            await client.run_until_disconnected()
+        finally:
+            heartbeat_task.cancel()
+            self.runtime.heartbeat("collector", state="stopped")
 
 
 def from_environment(repo_root: str | Path | None = None) -> TelegramCollectorApp:
@@ -299,10 +349,7 @@ def from_environment(repo_root: str | Path | None = None) -> TelegramCollectorAp
     return TelegramCollectorApp(
         db_path=os.getenv("DB_PATH", str(root / "data" / "qiaolian_dual_bot.db")),
         sources_path=os.getenv("COLLECTOR_SOURCES_JSON", str(root / "sources.json")),
-        download_dir=os.getenv(
-            "COLLECTOR_DOWNLOAD_DIR",
-            str(root / "media" / "collector_downloads"),
-        ),
+        download_dir=os.getenv("COLLECTOR_DOWNLOAD_DIR", str(root / "media" / "collector_downloads")),
         session_path=session,
         api_id=int(os.getenv("TG_API_ID", "0") or 0),
         api_hash=os.getenv("TG_API_HASH", ""),
