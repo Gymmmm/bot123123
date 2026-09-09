@@ -89,7 +89,7 @@ def appointment_channel_keyboard(
     status: str,
 ) -> InlineKeyboardMarkup:
     details = InlineKeyboardButton(
-        "🏠 房源详情",
+        "🏠 租赁详情",
         url=channel_action_url(username, public_listing_id, "details"),
     )
     photos = InlineKeyboardButton(
