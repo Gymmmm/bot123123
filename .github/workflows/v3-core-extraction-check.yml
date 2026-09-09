@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - codex/v3-core-extraction-20260908
+      - codex/v3-core-extraction-aftercare-ops
   workflow_dispatch:
 
 jobs:
