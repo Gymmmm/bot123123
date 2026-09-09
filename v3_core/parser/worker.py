@@ -8,6 +8,7 @@ import sqlite3
 from v3_core.ingest.source_repository import SourceRepository
 from v3_core.inventory.identity import IdentityService
 from v3_core.inventory.service import InventoryMaterializationService
+from v3_core.ops.runtime_state import RuntimeStateRepository
 from v3_core.parser.service import CanonicalParseService
 from v3_core.storage.inventory_repository import InventoryRepository
 
@@ -26,6 +27,7 @@ class CanonicalWorker:
         self.sources = SourceRepository(self.db_path)
         self.inventory = InventoryRepository(self.db_path)
         self.identities = IdentityService(self.db_path)
+        self.runtime = RuntimeStateRepository(self.db_path)
         self.parser = CanonicalParseService(self.sources, self.inventory)
         self.materializer = InventoryMaterializationService(self.inventory)
 
@@ -53,25 +55,35 @@ class CanonicalWorker:
                 public_listing_id=identity.public_listing_id,
                 create_review=True,
             )
+            self.runtime.heartbeat(
+                "canonical",
+                state="running",
+                event=True,
+                meta={"source_post_id": int(source_post_id), "listing_id": materialized.listing_id},
+            )
             return WorkerItemResult(
                 source_post_id=int(source_post_id),
                 status="materialized",
                 listing_id=materialized.listing_id,
             )
         except Exception as exc:
+            error = f"{type(exc).__name__}:{exc}"[:1000]
+            self.runtime.heartbeat("canonical", state="running", event=True, error=error)
             return WorkerItemResult(
                 source_post_id=int(source_post_id),
                 status="failed",
-                error=f"{type(exc).__name__}:{exc}"[:1000],
+                error=error,
             )
 
     def run_once(self, *, limit: int = 100) -> dict[str, int]:
+        self.runtime.heartbeat("canonical", state="running")
         stats: Counter[str] = Counter()
         ids = self.pending_ids(limit=limit)
         for source_post_id in ids:
             result = self.process_one(source_post_id)
             stats[result.status] += 1
         stats["selected"] = len(ids)
+        self.runtime.heartbeat("canonical", state="running", meta=dict(stats))
         return dict(stats)
 
 
