@@ -67,7 +67,13 @@ class InventoryReader:
             raise KeyError(review_id)
         return dict(row)
 
-    def reviews_by_status(self, status: str = "pending", *, limit: int = 20) -> list[dict[str, Any]]:
+    def reviews_by_status(
+        self,
+        status: str = "pending",
+        *,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
         with self._connect() as conn:
             rows = conn.execute(
                 """SELECT r.*,l.public_listing_id,l.display_title,l.project_name,
@@ -77,8 +83,8 @@ class InventoryReader:
                    LEFT JOIN listings_v3 l ON l.listing_id=r.listing_id
                    LEFT JOIN listing_offers o ON o.offer_id=r.offer_id
                    WHERE r.review_status=?
-                   ORDER BY r.created_at ASC,r.review_id ASC LIMIT ?""",
-                (str(status), max(1, int(limit))),
+                   ORDER BY r.created_at ASC,r.review_id ASC LIMIT ? OFFSET ?""",
+                (str(status), max(1, int(limit)), max(0, int(offset))),
             ).fetchall()
         return [dict(row) for row in rows]
 
