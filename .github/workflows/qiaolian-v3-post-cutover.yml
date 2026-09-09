@@ -1,0 +1,87 @@
+name: qiaolian-v3-post-cutover
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - '.github/workflows/qiaolian-v3-post-cutover.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qiaolian-production
+  cancel-in-progress: false
+
+env:
+  PROD_HOST: 50.114.74.120
+  PROD_PORT: '22'
+  PROD_SSH_USER: root
+  PROD_SSH_KNOWN_HOSTS: '50.114.74.120 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILuFtkSn5SJKY7mZ52Lc/QydPRTvHFpsj87M/HcIkb/L'
+  PROD_SSH_HOST_FINGERPRINT: 'SHA256:sgqLYOUAZ482H3y5jREQ6q2BVvNFPXYiOg4ruyFVnsA'
+  EXPECTED_SHA: c1c8aa2381412745036ab25976d87ffafd9d5efc
+
+jobs:
+  disable-legacy-and-verify-v3:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Verify production SSH host key
+        run: |
+          set -Eeuo pipefail
+          ssh-keyscan -T 10 -p "$PROD_PORT" -t ed25519 "$PROD_HOST" 2>/dev/null | grep -v '^#' > "$RUNNER_TEMP/qiaolian_observed_known_hosts"
+          ssh-keygen -lf "$RUNNER_TEMP/qiaolian_observed_known_hosts" | grep -F "$PROD_SSH_HOST_FINGERPRINT"
+
+      - name: Configure production SSH
+        env:
+          PROD_SSH_PRIVATE_KEY: '${{ secrets.PROD_SSH_PRIVATE_KEY }}'
+        run: |
+          set -Eeuo pipefail
+          test -n "$PROD_SSH_PRIVATE_KEY"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
+          printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
+
+      - name: Disable legacy units and verify V3 remains live
+        run: |
+          set -Eeuo pipefail
+          ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 \
+            "$PROD_SSH_USER@$PROD_HOST" \
+            "bash -s -- '$EXPECTED_SHA'" <<'REMOTE'
+          set -Eeuo pipefail
+          EXPECTED_SHA=$1
+          APP=/opt/qiaolian_v3
+          LEGACY=(qiaolian-user-bot.service qiaolian-publisher-bot.service qiaolian-collector.service)
+          V3=(qiaolian-v3-user-bot.service qiaolian-v3-publisher.service qiaolian-v3-collector.service)
+
+          test -f "$APP/.deployed_sha"
+          test "$(cat "$APP/.deployed_sha")" = "$EXPECTED_SHA"
+          test "$(git -c safe.directory="$APP" -C "$APP" rev-parse HEAD)" = "$EXPECTED_SHA"
+
+          systemctl disable --now "${LEGACY[@]}" 2>/dev/null || true
+
+          for svc in "${LEGACY[@]}"; do
+            test "$(systemctl is-active "$svc" 2>/dev/null || true)" != active
+            test "$(systemctl is-enabled "$svc" 2>/dev/null || true)" != enabled
+          done
+
+          systemctl is-active --quiet qiaolian-v3-canonical-worker.timer
+          systemctl is-enabled --quiet qiaolian-v3-canonical-worker.timer
+          for svc in "${V3[@]}"; do
+            systemctl is-active --quiet "$svc"
+            systemctl is-enabled --quiet "$svc"
+            pid=$(systemctl show "$svc" -p MainPID --value)
+            test "${pid:-0}" -gt 0
+          done
+
+          echo "POST_CUTOVER_OK sha=$EXPECTED_SHA"
+          systemctl --no-pager --full status \
+            qiaolian-v3-user-bot.service \
+            qiaolian-v3-publisher.service \
+            qiaolian-v3-collector.service \
+            qiaolian-v3-canonical-worker.timer || true
+          REMOTE
