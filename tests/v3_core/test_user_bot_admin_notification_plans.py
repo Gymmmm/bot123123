@@ -48,13 +48,14 @@ def test_user_admin_identity_helpers_match_fixed_sha_shape():
     assert user_contact_text(_user(username="")) == "tg://user?id=123"
 
 
-def test_general_contact_plan_preserves_fixed_sha_title_and_lines():
+def test_general_contact_plan_uses_user_facing_source_without_mutating_domain_source():
     note = general_contact_notification(_user(), source="hub")
     assert note.title == "用户联系我们"
     assert note.show_bell is True
     assert "用户：<a href=\"tg://user?id=123\">Alice &amp; Bob</a>" in note.lines
     assert "联系方式：@alice" in note.lines
-    assert "入口：hub" in note.lines
+    assert "入口：首页联系我们" in note.lines
+    assert "入口：hub" not in note.lines
 
 
 def test_appointment_plan_uses_public_id_fallback_and_no_bell():
