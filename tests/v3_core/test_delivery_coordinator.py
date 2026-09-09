@@ -11,6 +11,7 @@ from v3_core.publishing.package_service import (
 )
 from v3_core.publishing.package_store import FrozenPackageStore
 from v3_core.publishing.publication_instances import PublicationInstanceRepository
+from v3_core.storage.bootstrap import initialize_v3_storage
 from v3_core.storage.inventory_reader import InventoryReader
 from v3_core.storage.inventory_repository import InventoryRepository
 
@@ -49,6 +50,7 @@ def _facts():
 
 def _setup(tmp_path):
     db = tmp_path / "delivery.sqlite3"
+    initialize_v3_storage(db)
     inventory = InventoryRepository(str(db))
     reader = InventoryReader(str(db))
     packages = FrozenPackageStore(str(db))
