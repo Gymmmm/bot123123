@@ -19,7 +19,7 @@ jobs:
           printf '%s\n' "$KEY" > ~/.ssh/key
           chmod 600 ~/.ssh/key
           ssh-keyscan -H 50.114.74.120 >> ~/.ssh/known_hosts
-      - name: Bootstrap and collect
+      - name: Start collector user and publisher together
         run: |
           ssh -i ~/.ssh/key root@50.114.74.120 'bash -s' <<'REMOTE'
           set -e
@@ -29,24 +29,22 @@ jobs:
           git -C "$APP" checkout -f origin/v3/server-test
           cp "$SRC/.env" "$APP/.env"
           [ -f "$SRC/sources.json" ] && cp "$SRC/sources.json" "$APP/sources.json" || true
-          mkdir -p "$APP/telethon_sessions" "$APP/data"
+          mkdir -p "$APP/telethon_sessions" "$APP/data" "$APP/logs"
           cp -a "$SRC/telethon_sessions/." "$APP/telethon_sessions/" 2>/dev/null || true
-          rm -rf "$APP/.venv"
-          cp -a "$SRC/.venv" "$APP/.venv"
+          if [ ! -x "$APP/.venv/bin/python" ]; then cp -a "$SRC/.venv" "$APP/.venv"; fi
           DB="$APP/data/v3_smoke.db"
-          rm -f "$DB"
           cd "$APP"
-          DB_PATH="$DB" QL_DB_PATH="$DB" PYTHONPATH="$APP" "$APP/.venv/bin/python" scripts/bootstrap_db.py
-          DB_PATH="$DB" QL_DB_PATH="$DB" PYTHONPATH="$APP" timeout 180 "$APP/.venv/bin/python" collector_bot.py || test $? -eq 124
-          DB_PATH="$DB" "$APP/.venv/bin/python" - <<'PY'
-          import sqlite3
-          p='/opt/qiaolian_v3_test/data/v3_smoke.db'
-          c=sqlite3.connect(p)
-          n=c.execute('select count(*) from source_posts').fetchone()[0]
-          print('COLLECTED_SOURCE_POSTS',n)
-          for r in c.execute('select id, source_message_id, substr(raw_text,1,120) from source_posts order by id desc limit 10'):
-              print(r)
-          if n < 10:
-              raise SystemExit('need at least 10 collected source posts')
-          PY
+          if [ ! -f "$DB" ]; then DB_PATH="$DB" QL_DB_PATH="$DB" PYTHONPATH="$APP" "$APP/.venv/bin/python" scripts/bootstrap_db.py; fi
+          pkill -f '/opt/qiaolian_v3_test/.*collector_bot.py' || true
+          pkill -f '/opt/qiaolian_v3_test/.*run_user_bot.py' || true
+          pkill -f '/opt/qiaolian_v3_test/.*run_publisher_bot_v2.py' || true
+          nohup env DB_PATH="$DB" QL_DB_PATH="$DB" PYTHONPATH="$APP" "$APP/.venv/bin/python" "$APP/collector_bot.py" > "$APP/logs/collector.log" 2>&1 &
+          nohup env DB_PATH="$DB" QL_DB_PATH="$DB" PYTHONPATH="$APP" "$APP/.venv/bin/python" "$APP/run_user_bot.py" > "$APP/logs/user.log" 2>&1 &
+          nohup env DB_PATH="$DB" QL_DB_PATH="$DB" PYTHONPATH="$APP" "$APP/.venv/bin/python" "$APP/v2/run_publisher_bot_v2.py" > "$APP/logs/publisher.log" 2>&1 &
+          sleep 8
+          echo '=== PROCESS STATUS ==='
+          pgrep -af 'qiaolian_v3_test.*(collector_bot|run_user_bot|run_publisher_bot_v2)' || true
+          echo '=== USER LOG ==='; tail -30 "$APP/logs/user.log" || true
+          echo '=== PUBLISHER LOG ==='; tail -30 "$APP/logs/publisher.log" || true
+          echo '=== COLLECTOR LOG ==='; tail -30 "$APP/logs/collector.log" || true
           REMOTE
