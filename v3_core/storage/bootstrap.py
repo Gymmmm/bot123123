@@ -10,6 +10,7 @@ from pathlib import Path
 import sqlite3
 
 from v3_core.ingest.source_repository import SOURCE_DDL
+from v3_core.publishing.broadcast import DDL as BROADCAST_DDL
 from v3_core.publishing.delivery_state import DDL as DELIVERY_DDL
 from v3_core.publishing.package_store import DDL as PACKAGE_DDL
 from v3_core.publishing.publication_instances import DDL as PUBLICATION_INSTANCE_DDL
@@ -35,6 +36,8 @@ REQUIRED_V3_TABLES = frozenset(
         "leads_v3",
         "tenant_bindings_v3",
         "repair_tickets_v3",
+        "publisher_settings_v3",
+        "publisher_broadcast_log_v3",
     }
 )
 
@@ -47,6 +50,7 @@ DDL_BLOCKS = (
     SQLiteAppointmentRepository.DDL,
     LEAD_DDL,
     SERVICE_DDL,
+    BROADCAST_DDL,
 )
 
 
