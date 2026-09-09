@@ -30,6 +30,7 @@ class TelegramSendCommand:
     cover_path: str
     caption: str
     actions: dict[str, str]
+    inventory_status: str = "active"
 
 
 @dataclass(frozen=True)
@@ -61,6 +62,7 @@ class PublicationDeliveryCoordinator:
                 raise DeliveryBlocked("package is already published")
             raise DeliveryBlocked("package is not approved")
 
+        listing = self.reader.listing(package.listing_id)
         offer = self.reader.offer(package.offer_id)
         if str(offer.get("offer_type") or "") != "rent":
             raise DeliveryBlocked("only rent offers may be delivered")
@@ -91,6 +93,7 @@ class PublicationDeliveryCoordinator:
             cover_path=package.cover_path,
             caption=package.post_text,
             actions=dict(package.actions),
+            inventory_status=str(listing.get("inventory_status") or "pending").strip().lower(),
         )
 
     def mark_sending(self, attempt_id: str) -> None:
