@@ -37,7 +37,7 @@ class FakeBot:
         self.calls.append(("photo", kwargs["chat_id"]))
 
     async def send_document(self, **kwargs):
-        self.calls.append(("document", kwargs["chat_id"]))
+        self.calls.append(("document", kwargs["chat_id"], kwargs.get("document")))
 
     async def send_message(self, **kwargs):
         self.calls.append(("message", kwargs["chat_id"], kwargs["text"], kwargs["reply_markup"]))
@@ -67,9 +67,17 @@ def test_assurance_home_uses_only_v3_callbacks():
     assert callbacks == [
         "v3u:assure:handover",
         "v3u:assure:deposit",
-        "v3u:assure:moving",
         "v3u:home:contact",
+        "v3u:t:home",
     ]
+    labels = [choice.label for row in view.rows for choice in row]
+    assert labels == [
+        "📋 入住怎么交",
+        "🔐 押金怎么退",
+        "💬 联系我们",
+        "🏠 返回首页",
+    ]
+    assert "搬家" not in view.text
     assert not any(value.startswith("hub:") for value in callbacks)
 
 
@@ -77,11 +85,12 @@ def test_assurance_asset_bundle_uses_existing_locked_asset_paths(tmp_path):
     bundle = assurance_asset_bundle(tmp_path, "handover")
     assert bundle.image_path == tmp_path / "assets" / "v2_2" / "generated" / "handover.png"
     assert bundle.pdf_path == tmp_path / "assets" / "v2_2" / "generated" / "handover.pdf"
-    assert bundle.title == "入住交接"
+    assert bundle.title == "入住怎么交"
+    assert bundle.filename == "入住交接清单.pdf"
 
 
 @pytest.mark.asyncio
-async def test_asset_callback_replaces_panel_then_sends_png_pdf_and_confirmation(tmp_path):
+async def test_asset_callback_sends_copy_before_png_pdf(tmp_path):
     _write_bundle(tmp_path, "handover")
     calls = []
     query = FakeQuery("v3u:assure:handover", calls)
@@ -92,10 +101,11 @@ async def test_asset_callback_replaces_panel_then_sends_png_pdf_and_confirmation
     )
 
     assert outcome.handled and outcome.assets_sent
-    assert [call[0] for call in calls] == ["answer", "delete", "photo", "document", "message"]
-    markup = calls[-1][3]
+    assert [call[0] for call in calls] == ["answer", "delete", "message", "photo", "document"]
+    markup = calls[2][3]
     callbacks = [button.callback_data for row in markup.inline_keyboard for button in row]
     assert callbacks == ["v3u:home:contact", "v3u:home:rental"]
+    assert "入住怎么交" in calls[2][2]
 
 
 @pytest.mark.asyncio
@@ -111,7 +121,7 @@ async def test_panel_delete_failure_is_non_fatal_like_fixed_sha(tmp_path):
     )
 
     assert outcome.assets_sent
-    assert [call[0] for call in calls] == ["answer", "delete", "photo", "document", "message"]
+    assert [call[0] for call in calls] == ["answer", "delete", "message", "photo", "document"]
 
 
 @pytest.mark.asyncio

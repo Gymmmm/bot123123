@@ -41,7 +41,7 @@ def test_full_home_preserves_fixed_sha_labels_and_never_emits_legacy_callbacks()
         "📅 我的预约",
         "🛡 侨联保障",
         "🛠 入住服务",
-        "房源频道",
+        "🏠 最新房源",
         "💬 联系我们",
     ]
     callbacks = _callbacks(markup)
@@ -52,6 +52,7 @@ def test_full_home_preserves_fixed_sha_labels_and_never_emits_legacy_callbacks()
         "v3u:home:service",
         "v3u:home:contact",
     ]
+    assert markup.inline_keyboard[2][0].url == "https://t.me/qiaolian"
     assert not any(value.startswith("hub:") for value in callbacks)
     assert "home_smart_search" not in callbacks
 

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, InputFile
 from telegram.constants import ParseMode
 
 from .assurance_views import (
@@ -71,21 +71,25 @@ async def send_assurance_bundle(
     if chat is None or getattr(chat, "id", None) is None:
         raise ValueError("telegram_chat_missing_for_assurance_assets")
     chat_id = int(chat.id)
+    markup = InlineKeyboardMarkup(
+        [
+            [InlineKeyboardButton("💬 联系我们", callback_data="v3u:home:contact")],
+            [InlineKeyboardButton("⬅️ 返回侨联保障", callback_data="v3u:home:rental")],
+        ]
+    )
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=bundle.instruction,
+        parse_mode=ParseMode.HTML,
+        reply_markup=markup,
+    )
     with bundle.image_path.open("rb") as image:
         await context.bot.send_photo(chat_id=chat_id, photo=image)
     with bundle.pdf_path.open("rb") as document:
-        await context.bot.send_document(chat_id=chat_id, document=document)
-    await context.bot.send_message(
-        chat_id=chat_id,
-        text=f"✅ <b>{bundle.title}资料已发送</b>\n\n{bundle.instruction}",
-        parse_mode=ParseMode.HTML,
-        reply_markup=InlineKeyboardMarkup(
-            [
-                [InlineKeyboardButton("💬 联系我们", callback_data="v3u:home:contact")],
-                [InlineKeyboardButton("⬅️ 返回侨联保障", callback_data="v3u:home:rental")],
-            ]
-        ),
-    )
+        await context.bot.send_document(
+            chat_id=chat_id,
+            document=InputFile(document, filename=bundle.filename),
+        )
 
 
 async def handle_v3_assurance_callback(
@@ -104,8 +108,6 @@ async def handle_v3_assurance_callback(
         return TelegramAssuranceOutcome(handled=False)
     await query.answer()
     if action in {"handover", "deposit"}:
-        # Locked production replaces the old panel before sending the private
-        # PNG/PDF bundle. Failure to delete is non-fatal there as well.
         try:
             await query.message.delete()
         except Exception:
