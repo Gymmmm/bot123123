@@ -9,7 +9,7 @@ import html
 import re
 from typing import Any
 
-from v3_core.user_bot.listing_presenter import inventory_status_presentation
+from v3_core.status_labels import inventory_status_presentation
 
 from .formatting import display_floor, display_layout
 from .public_ids import normalize_public_id
