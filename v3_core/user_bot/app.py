@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
+from telegram import BotCommand, BotCommandScopeChat
 from telegram.constants import ParseMode
 from telegram.ext import (
     Application,
@@ -169,7 +170,26 @@ def build_v3_user_bot_application(
     config.validate()
     deps = dependencies or build_v3_user_bot_dependencies(config)
     admin_appointments = AdminAppointmentReader(config.db_path)
-    app = ApplicationBuilder().token(config.user_bot_token).build()
+    async def configure_command_menu(application: Application) -> None:
+        # Keep the public menu simple. Telegram's per-chat scope makes the
+        # administrator console visible only to configured administrators.
+        await application.bot.set_my_commands([BotCommand("start", "打开侨联小管家")])
+        admin_commands = [
+            BotCommand("start", "打开侨联小管家"),
+            BotCommand("admin", "咨询后台"),
+        ]
+        for admin_id in config.admin_ids:
+            await application.bot.set_my_commands(
+                admin_commands,
+                scope=BotCommandScopeChat(chat_id=admin_id),
+            )
+
+    app = (
+        ApplicationBuilder()
+        .token(config.user_bot_token)
+        .post_init(configure_command_menu)
+        .build()
+    )
 
     def is_admin(update: Any) -> bool:
         user = getattr(update, "effective_user", None)

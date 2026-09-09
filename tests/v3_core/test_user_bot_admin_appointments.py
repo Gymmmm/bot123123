@@ -58,6 +58,9 @@ def test_v3_application_registers_admin_command_and_adminq_callbacks():
     source = Path("v3_core/user_bot/app.py").read_text(encoding="utf-8")
     assert 'CommandHandler("admin", admin)' in source
     assert 'pattern=r"^adminq:"' in source
+    assert 'BotCommand("admin", "咨询后台")' in source
+    assert "BotCommandScopeChat(chat_id=admin_id)" in source
+    assert ".post_init(configure_command_menu)" in source
 
 
 def test_v3_statuses_are_centralized():
