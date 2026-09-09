@@ -47,6 +47,7 @@ REQUIRED_V3_TABLES = frozenset(
         "publisher_post_windows_v3",
         "publisher_auto_items_v3",
         "publisher_auto_versions_v3",
+        "publisher_auto_validations_v3",
         "v3_component_status",
         "collector_source_state_v3",
         "publisher_autopilot_lock_v3",
