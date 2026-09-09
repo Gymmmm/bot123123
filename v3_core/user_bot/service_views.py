@@ -66,3 +66,22 @@ def repair_home_view() -> ServiceView:
             (ServiceChoice("⬅️ 返回", "v3u:home:service"),),
         ),
     )
+
+
+def property_view() -> ServiceView:
+    return ServiceView(
+        kind="property",
+        text=(
+            "🏢 <b>物业协调</b>\n\n"
+            "如遇噪音、停车、门禁、公共区域或垃圾处理等问题，可以直接说明具体情况。\n\n"
+            "建议包括：\n"
+            "• 发生了什么\n"
+            "• 大概从什么时候开始\n"
+            "• 是否已经与物业沟通过\n\n"
+            "我们会协助整理沟通重点，并根据实际情况对接物业。"
+        ),
+        rows=(
+            (ServiceChoice("💬 联系我们", "v3u:home:contact"),),
+            (ServiceChoice("⬅️ 返回入住服务", "v3u:home:service"),),
+        ),
+    )
