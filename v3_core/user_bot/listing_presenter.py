@@ -24,6 +24,17 @@ _STATUS_PRESENTATION = {
 }
 
 
+def inventory_status_presentation(status: object) -> tuple[str, str]:
+    """Return the single user-facing V3 inventory-status presentation."""
+    clean = str(status or "pending").strip().lower()
+    return _STATUS_PRESENTATION.get(clean, ("🔵", "房态确认中"))
+
+
+def inventory_status_bookable(status: object) -> bool:
+    """Mirror the existing public User Bot bookability status semantics."""
+    return str(status or "").strip().lower() in {"active", "reserved"}
+
+
 @dataclass(frozen=True)
 class PublicListingDetails:
     listing_id: str
@@ -80,10 +91,7 @@ def build_public_listing_details(view: PublishedListingView) -> PublicListingDet
     subject = "｜".join(value for value in (project, layout) if value)
     location = str(listing.get("public_location_display") or "").strip()
     inventory_status = str(view.listing.get("inventory_status") or "pending").strip().lower()
-    status_icon, status_label = _STATUS_PRESENTATION.get(
-        inventory_status,
-        ("🔵", "房态确认中"),
-    )
+    status_icon, status_label = inventory_status_presentation(inventory_status)
 
     return PublicListingDetails(
         listing_id=view.listing_id,
@@ -108,4 +116,9 @@ def build_public_listing_details(view: PublishedListingView) -> PublicListingDet
     )
 
 
-__all__ = ["PublicListingDetails", "build_public_listing_details"]
+__all__ = [
+    "PublicListingDetails",
+    "build_public_listing_details",
+    "inventory_status_bookable",
+    "inventory_status_presentation",
+]
