@@ -10,6 +10,7 @@ from pathlib import Path
 import sqlite3
 
 from v3_core.ingest.source_repository import SOURCE_DDL
+from v3_core.inventory.identity import DDL as IDENTITY_DDL
 from v3_core.publishing.broadcast import DDL as BROADCAST_DDL
 from v3_core.publishing.delivery_state import DDL as DELIVERY_DDL
 from v3_core.publishing.package_store import DDL as PACKAGE_DDL
@@ -29,6 +30,7 @@ REQUIRED_V3_TABLES = frozenset(
         "listings_v3",
         "listing_offers",
         "review_items",
+        "listing_identity_reservations_v3",
         "publication_packages_v3",
         "publication_delivery_attempts_v3",
         "publication_instances",
@@ -44,6 +46,7 @@ REQUIRED_V3_TABLES = frozenset(
 DDL_BLOCKS = (
     SOURCE_DDL,
     INVENTORY_DDL,
+    IDENTITY_DDL,
     PACKAGE_DDL,
     DELIVERY_DDL,
     PUBLICATION_INSTANCE_DDL,
