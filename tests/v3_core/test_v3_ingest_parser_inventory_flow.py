@@ -2,6 +2,7 @@ from v3_core.ingest.intake_service import IntakeService, SourceIntake
 from v3_core.ingest.source_repository import SourceRepository
 from v3_core.inventory.service import InventoryMaterializationService
 from v3_core.parser.service import CanonicalParseService
+from v3_core.storage.bootstrap import initialize_v3_storage
 from v3_core.storage.inventory_repository import InventoryRepository
 
 
@@ -19,6 +20,7 @@ def _images(count: int = 4):
 
 def _services(tmp_path):
     db = tmp_path / "v3-flow.sqlite3"
+    initialize_v3_storage(db)
     sources = SourceRepository(str(db))
     inventory = InventoryRepository(str(db))
     intake = IntakeService(sources, min_listing_images=4)
