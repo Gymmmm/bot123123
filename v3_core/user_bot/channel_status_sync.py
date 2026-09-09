@@ -1,8 +1,8 @@
-"""Best-effort V3 appointment status sync for the exact published Telegram post.
+"""Best-effort V3 status sync for the exact published Telegram post.
 
-This keeps the locked-production appointment status contract while reading only
-V3 tables.  It never searches Telegram history and never edits a guessed post:
-the target chat/message identity comes from ``publication_instances``.
+This keeps the production appointment status contract while reading only V3
+tables. It never searches Telegram history and never edits a guessed post: the
+target chat/message identity comes from ``publication_instances``.
 """
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 from v3_core.publishing.channel_contract import channel_action_url
 
 from .appointments import ACTIVE_APPOINTMENT_STATUSES
+from .listing_presenter import inventory_status_bookable, inventory_status_presentation
 
 logger = logging.getLogger(__name__)
 
@@ -43,17 +44,10 @@ def derive_appointment_inventory_status(current_status: str, active_count: int) 
 
 
 def appointment_status_label(status: str, active_count: int = 0) -> str:
-    clean = str(status or "").strip().lower()
-    if clean == "pending" and int(active_count or 0) >= APPOINTMENT_LOCK_COUNT:
-        return "🔵 已有5份预约看房，房态待确认"
-    return {
-        "active": "🟢 当前可预约",
-        "reserved": "🟡 已有预约 · 仍可预约",
-        "pending": "🔵 房态待确认",
-        "rented": "🔴 已租出",
-        "inactive": "⚫ 已下架",
-        "offline": "⚫ 已下架",
-    }.get(clean, "🔵 房态待确认")
+    """Render inventory status with the same copy used by the public User Bot."""
+    del active_count  # retained for call compatibility; count affects status, not copy.
+    icon, label = inventory_status_presentation(status)
+    return f"{icon} {label}"
 
 
 def caption_with_appointment_status(
@@ -105,7 +99,7 @@ def appointment_channel_keyboard(
         url=channel_action_url(username, public_listing_id, "photos"),
     )
     rows = [[details, photos]]
-    if str(status or "").strip().lower() in {"active", "reserved"}:
+    if inventory_status_bookable(status):
         rows.append(
             [
                 InlineKeyboardButton(
@@ -130,6 +124,110 @@ class ChannelStatusSyncResult:
     error: str = ""
 
 
+def _connect(db_path: str | Path) -> sqlite3.Connection:
+    conn = sqlite3.connect(str(Path(db_path).expanduser().resolve()), timeout=30)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout=30000")
+    return conn
+
+
+def _published_snapshot(db_path: str | Path, listing_id: str) -> dict[str, Any] | None:
+    with _connect(db_path) as conn:
+        row = conn.execute(
+            """SELECT pi.id AS publication_row_id,pi.channel_chat_id,
+                      pi.channel_message_id,pi.post_text,
+                      l.inventory_status,l.public_listing_id
+               FROM publication_instances pi
+               JOIN listings_v3 l ON l.listing_id=pi.listing_id
+               WHERE pi.listing_id=? AND pi.platform='telegram'
+                 AND pi.publish_status='published'
+                 AND CAST(COALESCE(pi.channel_message_id,'0') AS INTEGER)>0
+               ORDER BY pi.updated_at DESC,pi.id DESC
+               LIMIT 1""",
+            (str(listing_id),),
+        ).fetchone()
+    return dict(row) if row is not None else None
+
+
+def _active_appointment_count(db_path: str | Path, listing_id: str) -> int:
+    statuses = tuple(sorted(ACTIVE_APPOINTMENT_STATUSES))
+    placeholders = ",".join("?" for _ in statuses)
+    with _connect(db_path) as conn:
+        row = conn.execute(
+            f"""SELECT COUNT(*) AS count FROM appointments_v3
+                WHERE listing_id=? AND status IN ({placeholders})""",
+            (str(listing_id), *statuses),
+        ).fetchone()
+    return int(row["count"] if row else 0)
+
+
+async def sync_published_listing_status(
+    *,
+    bot: Any,
+    db_path: str | Path,
+    user_bot_username: str,
+    listing_id: str,
+    status: str,
+    active_count: int = 0,
+) -> ChannelStatusSyncResult:
+    """Edit the exact published Telegram post after an explicit listing status change.
+
+    The caller owns the listing-status mutation. This helper only updates the
+    already-published caption/keyboard and persists the edited post text.
+    """
+    clean = str(listing_id or "").strip()
+    target = str(status or "pending").strip().lower()
+    username = str(user_bot_username or "").strip().lstrip("@")
+    if not clean:
+        return ChannelStatusSyncResult(clean, attempted=False, synced=False, error="listing_id_required")
+    if bot is None or not username:
+        return ChannelStatusSyncResult(clean, attempted=False, synced=False, error="channel_sync_not_configured")
+    try:
+        row = _published_snapshot(db_path, clean)
+        if row is None:
+            return ChannelStatusSyncResult(clean, attempted=False, synced=False, error="published_instance_not_found")
+        previous = str(row.get("inventory_status") or "").strip().lower()
+        public_id = str(row.get("public_listing_id") or "").strip()
+        caption = caption_with_appointment_status(
+            str(row.get("post_text") or ""),
+            status=target,
+            active_count=active_count,
+            public_listing_id=public_id,
+        )
+        chat_id = str(row.get("channel_chat_id") or "").strip()
+        message_id = int(str(row.get("channel_message_id") or "0"))
+        await bot.edit_message_caption(
+            chat_id=chat_id,
+            message_id=message_id,
+            caption=caption,
+            parse_mode="HTML",
+            reply_markup=appointment_channel_keyboard(
+                username=username,
+                public_listing_id=public_id,
+                status=target,
+            ),
+        )
+        with _connect(db_path) as conn:
+            conn.execute(
+                "UPDATE publication_instances SET post_text=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                (caption, int(row["publication_row_id"])),
+            )
+            conn.commit()
+        return ChannelStatusSyncResult(
+            clean,
+            attempted=True,
+            synced=True,
+            previous_status=previous,
+            next_status=target,
+            active_appointment_count=max(0, int(active_count or 0)),
+            channel_chat_id=chat_id,
+            channel_message_id=str(message_id),
+        )
+    except Exception as exc:
+        logger.exception("V3 published channel status sync failed: listing_id=%s", clean)
+        return ChannelStatusSyncResult(clean, attempted=True, synced=False, error=str(exc))
+
+
 class V3AppointmentChannelSynchronizer:
     def __init__(
         self,
@@ -145,34 +243,10 @@ class V3AppointmentChannelSynchronizer:
         self.bot_factory = bot_factory or (lambda token: Bot(token=token))
 
     def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(str(self.db_path), timeout=30)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA busy_timeout=30000")
-        return conn
+        return _connect(self.db_path)
 
     def _snapshot(self, listing_id: str) -> tuple[dict[str, Any] | None, int]:
-        statuses = tuple(sorted(ACTIVE_APPOINTMENT_STATUSES))
-        placeholders = ",".join("?" for _ in statuses)
-        with self._connect() as conn:
-            row = conn.execute(
-                """SELECT pi.id AS publication_row_id,pi.channel_chat_id,
-                          pi.channel_message_id,pi.post_text,
-                          l.inventory_status,l.public_listing_id
-                   FROM publication_instances pi
-                   JOIN listings_v3 l ON l.listing_id=pi.listing_id
-                   WHERE pi.listing_id=? AND pi.platform='telegram'
-                     AND pi.publish_status='published'
-                     AND CAST(COALESCE(pi.channel_message_id,'0') AS INTEGER)>0
-                   ORDER BY pi.updated_at DESC,pi.id DESC
-                   LIMIT 1""",
-                (listing_id,),
-            ).fetchone()
-            count_row = conn.execute(
-                f"""SELECT COUNT(*) AS count FROM appointments_v3
-                    WHERE listing_id=? AND status IN ({placeholders})""",
-                (listing_id, *statuses),
-            ).fetchone()
-        return (dict(row) if row is not None else None, int(count_row["count"] if count_row else 0))
+        return _published_snapshot(self.db_path, listing_id), _active_appointment_count(self.db_path, listing_id)
 
     async def sync(self, listing_id: str) -> ChannelStatusSyncResult:
         clean = str(listing_id or "").strip()
@@ -186,48 +260,34 @@ class V3AppointmentChannelSynchronizer:
                 return ChannelStatusSyncResult(clean, attempted=False, synced=False, error="published_instance_not_found")
             previous = str(row.get("inventory_status") or "").strip().lower()
             target = derive_appointment_inventory_status(previous, active_count)
-            public_id = str(row.get("public_listing_id") or "").strip()
-            caption = caption_with_appointment_status(
-                str(row.get("post_text") or ""),
+            bot = self.bot_factory(self.publisher_bot_token)
+            result = await sync_published_listing_status(
+                bot=bot,
+                db_path=self.db_path,
+                user_bot_username=self.user_bot_username,
+                listing_id=clean,
                 status=target,
                 active_count=active_count,
-                public_listing_id=public_id,
             )
-            chat_id = str(row.get("channel_chat_id") or "").strip()
-            message_id = int(str(row.get("channel_message_id") or "0"))
-            bot = self.bot_factory(self.publisher_bot_token)
-            await bot.edit_message_caption(
-                chat_id=chat_id,
-                message_id=message_id,
-                caption=caption,
-                parse_mode="HTML",
-                reply_markup=appointment_channel_keyboard(
-                    username=self.user_bot_username,
-                    public_listing_id=public_id,
-                    status=target,
-                ),
-            )
-            with self._connect() as conn:
-                conn.execute("BEGIN IMMEDIATE")
-                if target != previous:
+            if not result.synced:
+                return result
+            if target != previous:
+                with self._connect() as conn:
                     conn.execute(
                         "UPDATE listings_v3 SET inventory_status=?,updated_at=CURRENT_TIMESTAMP WHERE listing_id=?",
                         (target, clean),
                     )
-                conn.execute(
-                    "UPDATE publication_instances SET post_text=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
-                    (caption, int(row["publication_row_id"])),
-                )
-                conn.commit()
+                    conn.commit()
             return ChannelStatusSyncResult(
                 clean,
-                attempted=True,
-                synced=True,
+                attempted=result.attempted,
+                synced=result.synced,
                 previous_status=previous,
                 next_status=target,
                 active_appointment_count=active_count,
-                channel_chat_id=chat_id,
-                channel_message_id=str(message_id),
+                channel_chat_id=result.channel_chat_id,
+                channel_message_id=result.channel_message_id,
+                error=result.error,
             )
         except Exception as exc:
             logger.exception("V3 channel appointment status sync failed: listing_id=%s", clean)
@@ -242,4 +302,5 @@ __all__ = [
     "appointment_status_label",
     "caption_with_appointment_status",
     "derive_appointment_inventory_status",
+    "sync_published_listing_status",
 ]
