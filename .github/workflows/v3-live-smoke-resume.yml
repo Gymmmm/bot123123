@@ -1,0 +1,175 @@
+name: v3-live-smoke-resume
+
+on:
+  push:
+    branches: [ops/v3-live-smoke-20260909]
+    paths: [.github/ops-control/v3-live-smoke-resume.txt]
+
+permissions:
+  contents: read
+
+env:
+  APP_SHA: c5a9a462cd129f7cb3563b9324280414f4d42fc9
+  PROD_HOST: 50.114.74.120
+  PROD_PORT: '22'
+  PROD_SSH_USER: root
+  PROD_SSH_KNOWN_HOSTS: '50.114.74.120 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILuFtkSn5SJKY7mZ52Lc/QydPRTvHFpsj87M/HcIkb/L'
+  PROD_SSH_HOST_FINGERPRINT: 'SHA256:sgqLYOUAZ482H3y5jREQ6q2BVvNFPXYiOg4ruyFVnsA'
+
+jobs:
+  resume:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Verify SSH host key
+        run: |
+          set -Eeuo pipefail
+          ssh-keyscan -T 10 -p "$PROD_PORT" -t ed25519 "$PROD_HOST" 2>/dev/null | grep -v '^#' > "$RUNNER_TEMP/observed"
+          ssh-keygen -lf "$RUNNER_TEMP/observed" | grep -F "$PROD_SSH_HOST_FINGERPRINT"
+      - name: Configure SSH
+        env:
+          PROD_SSH_PRIVATE_KEY: '${{ secrets.PROD_SSH_PRIVATE_KEY }}'
+        run: |
+          set -Eeuo pipefail
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
+          printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
+      - name: Resume fresh-db live smoke
+        run: |
+          set -Eeuo pipefail
+          ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes "$PROD_SSH_USER@$PROD_HOST" "bash -s -- '$APP_SHA'" <<'REMOTE'
+          set -Eeuo pipefail
+          SHA=$1
+          APP=/opt/qiaolian_v3_smoke
+          DB="$APP/data/v3_smoke.db"
+          test "$(git -C "$APP" rev-parse HEAD)" = "$SHA"
+          test -f "$APP/.env" && test -f "$APP/sources.json"
+
+          systemctl stop qiaolian-user-bot.service qiaolian-publisher-bot.service qiaolian-collector.service 2>/dev/null || true
+          systemctl stop qiaolian-v3-smoke-user.service qiaolian-v3-smoke-publisher.service 2>/dev/null || true
+
+          rm -rf "$APP/.venv"
+          python3 -m venv "$APP/.venv"
+          "$APP/.venv/bin/python" -m pip install -q --disable-pip-version-check --index-url https://pypi.org/simple -r "$APP/requirements.txt"
+          rm -f "$DB" "$DB-wal" "$DB-shm"
+          install -d "$APP/data" "$APP/media/collector_downloads"
+          cd "$APP"
+          DB_PATH="$DB" PYTHONPATH="$APP" "$APP/.venv/bin/python" "$APP/bootstrap_db.py"
+
+          set -a
+          source "$APP/.env"
+          set +a
+          export DB_PATH="$DB" PYTHONPATH="$APP" TELETHON_SESSION_PATH="$APP/telethon_sessions/qiaolian_collector"
+
+          cat > /tmp/v3_collect10.py <<'PY'
+          import asyncio, os
+          from collections import defaultdict
+          from telethon import TelegramClient
+          from collector_bot import SESSION_PATH, _append_image_or_video, _sender_label, load_sources, persist_source_post
+          TARGET=10; SCAN=600
+          def units(messages):
+              by=defaultdict(list); singles=[]
+              for m in messages:
+                  gid=getattr(m,'grouped_id',None)
+                  (by[gid] if gid is not None else singles).append(m)
+              out=[]
+              for parts in by.values():
+                  if any(getattr(x,'media',None) for x in parts): out.append(('album',sorted(parts,key=lambda x:x.id)))
+              for m in singles:
+                  if getattr(m,'media',None): out.append(('single',[m]))
+              return sorted(out,key=lambda u:max(x.id for x in u[1]),reverse=True)
+          async def main():
+              client=TelegramClient(SESSION_PATH,int(os.environ['TG_API_ID']),os.environ['TG_API_HASH'])
+              await client.start(); good=[]; attempts=0
+              for sc in load_sources():
+                  ent=await client.get_entity(sc['entity_id'])
+                  msgs=[m async for m in client.iter_messages(ent,limit=SCAN)]
+                  if not msgs: continue
+                  chat_id=msgs[0].chat_id
+                  for kind,parts in units(msgs):
+                      if len(good)>=TARGET or attempts>=120: break
+                      attempts+=1; images=[]; videos=[]; text=''
+                      for m in parts:
+                          if m.media: await _append_image_or_video(client,m,images,videos)
+                      if len(images)<4: continue
+                      for m in parts:
+                          if (m.message or '').strip(): text=(m.message or '').strip(); break
+                      a=parts[0]; gid=getattr(a,'grouped_id',None)
+                      sid=f'album_{gid}' if kind=='album' and gid is not None else str(a.id)
+                      r=await persist_source_post(client,sc,chat_id=chat_id,source_post_id=sid,anchor_message_id=a.id,raw_text=text,raw_images=images,raw_videos=videos,grouped_id=gid,source_author=_sender_label(a),ingest_kind=kind,message_count=len(parts),classify_after_insert=True)
+                      print('COLLECT_RESULT',sc['source_name'],sid,r)
+                      if r.get('status')=='inserted' and (r.get('classification') or {}).get('status')=='package_ready': good.append(int(r['post_id']))
+                  if len(good)>=TARGET: break
+              await client.disconnect()
+              print('COLLECT_GOOD_IDS',good)
+              if len(good)<TARGET: raise SystemExit(f'only_{len(good)}_publishable_collected')
+          asyncio.run(main())
+          PY
+          "$APP/.venv/bin/python" /tmp/v3_collect10.py | tee /tmp/v3_collect10.log
+
+          cat > /etc/systemd/system/qiaolian-v3-smoke-user.service <<EOF
+          [Unit]
+          Description=Qiaolian V3 smoke user bot
+          [Service]
+          Type=simple
+          WorkingDirectory=$APP
+          Environment=DB_PATH=$DB
+          Environment=PYTHONPATH=$APP
+          ExecStart=$APP/.venv/bin/python $APP/run_user_bot.py
+          Restart=on-failure
+          EOF
+          cat > /etc/systemd/system/qiaolian-v3-smoke-publisher.service <<EOF
+          [Unit]
+          Description=Qiaolian V3 smoke publisher bot
+          [Service]
+          Type=simple
+          WorkingDirectory=$APP
+          Environment=DB_PATH=$DB
+          Environment=PYTHONPATH=$APP
+          ExecStart=$APP/.venv/bin/python $APP/v2/run_publisher_bot_v2.py
+          Restart=on-failure
+          EOF
+          systemctl daemon-reload
+          systemctl start qiaolian-v3-smoke-user.service qiaolian-v3-smoke-publisher.service
+          sleep 5
+          systemctl is-active --quiet qiaolian-v3-smoke-user.service
+          systemctl is-active --quiet qiaolian-v3-smoke-publisher.service
+
+          cat > /tmp/v3_publish10.py <<'PY'
+          import os,sqlite3
+          from meihua_publisher import MeihuaPublisher
+          db=os.environ['DB_PATH']; con=sqlite3.connect(db)
+          rows=con.execute("SELECT draft_id FROM drafts ORDER BY id DESC LIMIT 10").fetchall()
+          if len(rows)<10: raise SystemExit(f'only_{len(rows)}_drafts')
+          ids=[r[0] for r in rows]
+          con.executemany("UPDATE drafts SET review_status='ready',updated_at=CURRENT_TIMESTAMP WHERE draft_id=?",[(x,) for x in ids]); con.commit(); con.close()
+          pub=MeihuaPublisher(db); ok=0
+          for i,did in enumerate(reversed(ids),1):
+              r=bool(pub.publish_draft(did)); print('PUBLISH_RESULT',i,did,r); ok+=int(r)
+          print('PUBLISH_OK_COUNT',ok)
+          if ok!=10: raise SystemExit(f'published_{ok}_of_10')
+          PY
+          AUTOPILOT_DIRECT_PUBLISH_ENABLED=yes "$APP/.venv/bin/python" /tmp/v3_publish10.py | tee /tmp/v3_publish10.log
+
+          sleep 3
+          systemctl is-active --quiet qiaolian-v3-smoke-user.service
+          systemctl is-active --quiet qiaolian-v3-smoke-publisher.service
+          "$APP/.venv/bin/python" - <<'PY'
+          import os,sqlite3
+          c=sqlite3.connect(os.environ['DB_PATH'])
+          for t in ['source_posts','drafts','media_assets','publication_packages','posts','v3_source_posts','canonical_records','v3_publication_packages','v3_channel_posts']:
+              try:n=c.execute(f'SELECT COUNT(*) FROM {t}').fetchone()[0]
+              except Exception:n=-1
+              print('COUNT',t,n)
+          print('POSTS',c.execute("SELECT draft_id,channel_chat_id,channel_message_id,publish_status FROM posts ORDER BY id DESC LIMIT 10").fetchall())
+          PY
+          echo '=== BOT STATUS ==='
+          systemctl --no-pager --full status qiaolian-v3-smoke-user.service qiaolian-v3-smoke-publisher.service || true
+          echo '=== BOT LOGS ==='
+          journalctl -u qiaolian-v3-smoke-user.service -u qiaolian-v3-smoke-publisher.service --since '-15 minutes' --no-pager -n 160 || true
+          echo "SMOKE_COMPLETE sha=$SHA db=$DB"
+          REMOTE
+      - name: Remove SSH material
+        if: always()
+        run: rm -f "$HOME/.ssh/qiaolian_production"
