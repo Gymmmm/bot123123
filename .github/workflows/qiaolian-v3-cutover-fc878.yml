@@ -82,7 +82,7 @@ jobs:
 
           echo 'CHECK: exact release and runtime prerequisites'
           test -d "$RELEASE/.git"
-          test "$(git -c safe.directory="$RELEASE" -C "$RELEASE" rev-parse HEAD)" = "$EXPECTED_SHA"
+          test "$(runuser -u qiaolianbot -- git -C "$RELEASE" rev-parse HEAD)" = "$EXPECTED_SHA"
           test -x "$RELEASE/deploy/v3/run_component.sh"
           test -f "$RELEASE/deploy/v3/qiaolian-v3@.service"
           test -x "$VENV/bin/python"
