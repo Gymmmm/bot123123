@@ -1,6 +1,6 @@
 """Explicit additive V3 storage initialization.
 
-Normal runtime/preflight code must not call this implicitly.  This module exists
+Normal runtime/preflight code must not call this implicitly. This module exists
 so database creation is an intentional operator action (``--initialize``) and
 all additive V3 DDL can be audited in one place.
 """
@@ -16,6 +16,7 @@ from v3_core.publishing.delivery_state import DDL as DELIVERY_DDL
 from v3_core.publishing.package_store import DDL as PACKAGE_DDL
 from v3_core.publishing.publication_instances import DDL as PUBLICATION_INSTANCE_DDL
 from v3_core.storage.aftercare_repository import DDL as AFTERCARE_DDL
+from v3_core.storage.aftercare_lifecycle import DDL as AFTERCARE_LIFECYCLE_DDL
 from v3_core.storage.appointment_repository import SQLiteAppointmentRepository
 from v3_core.storage.lead_repository import DDL as LEAD_DDL
 from v3_core.storage.schema import DDL as INVENTORY_DDL
@@ -40,6 +41,7 @@ REQUIRED_V3_TABLES = frozenset(
         "tenant_bindings_v3",
         "repair_tickets_v3",
         "rental_cases_v3",
+        "rental_case_events_v3",
         "operations_tasks_v3",
         "operations_task_events_v3",
         "publisher_settings_v3",
@@ -58,6 +60,7 @@ DDL_BLOCKS = (
     LEAD_DDL,
     SERVICE_DDL,
     AFTERCARE_DDL,
+    AFTERCARE_LIFECYCLE_DDL,
     BROADCAST_DDL,
 )
 
@@ -90,17 +93,10 @@ def existing_tables(db_path: str | Path) -> frozenset[str]:
     uri = f"file:{path.as_posix()}?mode=ro"
     conn = sqlite3.connect(uri, uri=True, timeout=5)
     try:
-        rows = conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'"
-        ).fetchall()
+        rows = conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
         return frozenset(str(row[0]) for row in rows)
     finally:
         conn.close()
 
 
-__all__ = [
-    "DDL_BLOCKS",
-    "REQUIRED_V3_TABLES",
-    "existing_tables",
-    "initialize_v3_storage",
-]
+__all__ = ["DDL_BLOCKS", "REQUIRED_V3_TABLES", "existing_tables", "initialize_v3_storage"]
