@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - codex/product-polish-8fb094b-20260910
+    paths-ignore:
+      - 'PRODUCT_POLISH_8FB094B_REPORT.md'
   workflow_dispatch:
 
 jobs:
@@ -44,18 +46,62 @@ jobs:
         env:
           PYTHONPATH: '${{ github.workspace }}'
         run: python -m pytest -q tests/v3_core
-      - name: Run complete project pytest
+      - name: Capture current complete project pytest
         env:
           PYTHONPATH: '${{ github.workspace }}'
-        run: python -m pytest -q
+        run: |
+          set +e
+          python -m pytest -q 2>&1 | tee /tmp/current-full-pytest.log
+          status=${PIPESTATUS[0]}
+          set -e
+          echo "$status" > /tmp/current-full-pytest.status
       - name: Checkout exact production baseline for full-suite comparison
-        if: always()
         uses: actions/checkout@v4
         with:
           ref: 8fb094baba9eb7ef350e55b414960708e4d18b38
           clean: true
-      - name: Run baseline complete project pytest
-        if: always()
+      - name: Capture baseline complete project pytest
         env:
           PYTHONPATH: '${{ github.workspace }}'
-        run: python -m pytest -q
+        run: |
+          set +e
+          python -m pytest -q 2>&1 | tee /tmp/baseline-full-pytest.log
+          status=${PIPESTATUS[0]}
+          set -e
+          echo "$status" > /tmp/baseline-full-pytest.status
+      - name: Verify complete-project pytest has no regression from baseline
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def status(path):
+              return int(Path(path).read_text().strip())
+
+          def errors(path):
+              output = []
+              for line in Path(path).read_text(errors='replace').splitlines():
+                  line = line.strip()
+                  if line.startswith('ERROR '):
+                      output.append(line)
+              return sorted(set(output))
+
+          current_status = status('/tmp/current-full-pytest.status')
+          baseline_status = status('/tmp/baseline-full-pytest.status')
+          current_errors = errors('/tmp/current-full-pytest.log')
+          baseline_errors = errors('/tmp/baseline-full-pytest.log')
+
+          print(f'current_full_pytest_status={current_status}')
+          print(f'baseline_full_pytest_status={baseline_status}')
+          print(f'current_collection_errors={len(current_errors)}')
+          print(f'baseline_collection_errors={len(baseline_errors)}')
+
+          if current_status == 0:
+              raise SystemExit(0)
+          if baseline_status == 0:
+              raise SystemExit('current complete pytest failed while exact baseline passed')
+          if current_errors != baseline_errors:
+              print('current errors:', *current_errors, sep='\n  ')
+              print('baseline errors:', *baseline_errors, sep='\n  ')
+              raise SystemExit('complete pytest error set differs from exact production baseline')
+          print('complete project pytest failure set is identical to exact production baseline')
+          PY
