@@ -104,7 +104,7 @@ def encode_transition_choice(choice: TransitionChoice) -> str:
         if home_target in {"contact", "appointments", "search", "rental", "service"}:
             return encode_home_callback(home_target)
         if home_target:
-            raise ValueError("unsupported_home_transition_target")
+            raise ValueError("flag_transition_callback_must_not_have_value")
     if kind in _VALUE_KINDS:
         value = _validate_value(kind, choice.value)
         return f"{TRANSITION_PREFIX}:{kind}:{value}"
