@@ -55,9 +55,9 @@ def build_appointment_success_view(
             f"🆔 {he(draft.public_listing_id)}",
             "",
             "中文顾问会确认房态和具体时间，",
-            "之后通过 Telegram 联系你。",
+            "之后通过 Telegram 与您联系。",
             "",
-            "房源信息已经带上，不用重复发送。",
+            "房源信息已带上，无需重复发送。",
         ]
     )
 
