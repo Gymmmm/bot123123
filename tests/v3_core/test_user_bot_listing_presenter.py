@@ -89,6 +89,37 @@ def test_reserved_remains_bookable_and_uses_current_status_label():
     assert details.status_label == "已有预约 · 仍可预约"
 
 
+def test_placeholder_strings_are_normalized_to_empty_public_fields():
+    view = _view()
+    snapshot = json.loads(view.package["snapshot_json"])
+    snapshot["listing"].update(
+        {
+            "project_name": "暂无",
+            "layout": "未知",
+            "public_location_display": "--",
+            "floor": "unknown",
+        }
+    )
+    snapshot["offer"].update(
+        {
+            "deposit_terms": "N/A",
+            "contract_term": "null",
+        }
+    )
+    view.package["snapshot_json"] = json.dumps(snapshot, ensure_ascii=False)
+
+    details = build_public_listing_details(view)
+
+    assert details.project_name == ""
+    assert details.layout == ""
+    assert details.subject == ""
+    assert details.location == ""
+    assert details.floor == ""
+    assert details.deposit_terms == ""
+    assert details.contract_term == ""
+    assert details.lease_summary == ""
+
+
 def test_missing_or_wrong_snapshot_schema_is_blocked():
     view = _view()
     view.package["snapshot_json"] = "{}"

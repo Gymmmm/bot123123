@@ -4,17 +4,19 @@ The pure ``TransitionActionService`` owns state decisions. This adapter claims
 callbacks from the transition namespace, renders local steps, and executes the
 V3 appointment/search boundaries when their dependencies are injected.
 
-Appointment ordering matches the locked runtime: durable appointment -> lead ->
-availability/channel/admin outer effects -> user success page.
+Issue #25 keeps persistence behind an explicit confirmation callback:
+date -> time -> confirmation -> submit. Durable ordering after submit remains
+appointment -> lead -> availability/channel/admin effects -> user success page.
 """
 from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Mapping
 
 from telegram.constants import ParseMode
 
+from .appointment_confirmation_view import build_appointment_confirmation_view
 from .appointment_runtime_effects import (
     AppointmentRuntimeEffectExecutor,
     AppointmentRuntimeEffectResult,
@@ -27,6 +29,7 @@ from .appointment_submit_executor import (
 from .appointment_success_view import build_appointment_success_view
 from .lead_effects import LeadEffectExecutor, LeadEffectResult
 from .lead_service import LeadUser
+from .public_appointment import PublicAppointmentDraft
 from .search_no_match_view import build_search_no_match_view
 from .search_submit_executor import SearchSubmitExecution, SearchSubmitExecutor
 from .telegram_search_results import TelegramSearchPresentation, present_search_flow_result
@@ -190,6 +193,68 @@ def _appointment_success_cleanup() -> SessionMutationPlan:
     )
 
 
+def _load_confirmation_draft(user_data: Mapping[str, Any]) -> PublicAppointmentDraft | None:
+    raw = user_data.get(APPOINTMENT_SESSION_KEY)
+    if not isinstance(raw, Mapping):
+        return None
+    try:
+        draft = PublicAppointmentDraft(
+            public_listing_id=raw.get("public_listing_id", ""),
+            mode=raw.get("mode", "offline"),
+            date=str(raw.get("date") or ""),
+            time=str(raw.get("time") or ""),
+            source=str(raw.get("source") or "user_bot"),
+        )
+    except (TypeError, ValueError):
+        return None
+    return draft if draft.ready else None
+
+
+async def _submit_confirmed_appointment(
+    update: Any,
+    context: Any,
+    query: Any,
+    *,
+    draft: PublicAppointmentDraft,
+    views: TransitionViewService,
+    user_data: dict[str, Any],
+    appointment_executor: AppointmentSubmitExecutor,
+    lead_effects: LeadEffectExecutor | None,
+    appointment_runtime_effects: AppointmentRuntimeEffectExecutor | None,
+) -> TelegramTransitionActionOutcome:
+    appointment_user = _telegram_appointment_user(update)
+    lead_user = _lead_user(appointment_user)
+    execution = appointment_executor.execute(user=appointment_user, draft=draft)
+    lead_effect = None
+    if lead_effects is not None:
+        lead_effect = lead_effects.record_appointment(
+            user=lead_user,
+            execution=execution,
+            draft=draft,
+        )
+    runtime_effect = None
+    if appointment_runtime_effects is not None:
+        runtime_effect = await appointment_runtime_effects.execute(
+            bot=getattr(context, "bot", None),
+            user=lead_user,
+            execution=execution,
+            draft=draft,
+        )
+    success_view = build_appointment_success_view(
+        draft,
+        views.inventory,
+        submission_kind=execution.submission.kind,
+    )
+    await _edit_view(query, success_view)
+    apply_session_mutation(user_data, _appointment_success_cleanup())
+    return TelegramTransitionActionOutcome(
+        handled=True,
+        appointment_execution=execution,
+        appointment_effects=runtime_effect,
+        lead_effect=lead_effect,
+    )
+
+
 async def handle_v3_transition_action(
     update: Any,
     context: Any,
@@ -211,6 +276,31 @@ async def handle_v3_transition_action(
     if not isinstance(user_data, dict):
         raise ValueError("telegram_user_data_missing_for_transition_action")
 
+    # These two callbacks are the explicit confirmation boundary added by
+    # Issue #25. They operate on the same public appointment session and do not
+    # introduce a second controller or persistence path.
+    if callback.kind in {"appointment_submit", "appointment_back_time"}:
+        await query.answer()
+        draft = _load_confirmation_draft(user_data)
+        if draft is None:
+            return TelegramTransitionActionOutcome(handled=True)
+        if callback.kind == "appointment_back_time":
+            await _edit_view(query, views.appointment_time(draft.with_date(draft.date)))
+            return TelegramTransitionActionOutcome(handled=True)
+        if appointment_executor is None:
+            return TelegramTransitionActionOutcome(handled=True)
+        return await _submit_confirmed_appointment(
+            update,
+            context,
+            query,
+            draft=draft,
+            views=views,
+            user_data=user_data,
+            appointment_executor=appointment_executor,
+            lead_effects=lead_effects,
+            appointment_runtime_effects=appointment_runtime_effects,
+        )
+
     result = actions.apply(callback, user_data)
     await query.answer()
     if not result.ok:
@@ -229,41 +319,15 @@ async def handle_v3_transition_action(
             _apply_success_mutation(user_data, result, callback.kind)
             return TelegramTransitionActionOutcome(handled=True, result=result)
 
-    if result.next_step == "appointment_submit" and appointment_executor is not None:
+    # Existing action service historically names this boundary appointment_submit.
+    # Under Issue #25 it now means "draft ready for confirmation"; persistence is
+    # performed only by the explicit appointment_submit callback above.
+    if result.next_step == "appointment_submit":
         if result.appointment is None:
             raise ValueError("appointment_submit_action_missing_draft")
-        appointment_user = _telegram_appointment_user(update)
-        lead_user = _lead_user(appointment_user)
-        execution = appointment_executor.execute(user=appointment_user, draft=result.appointment)
-        lead_effect = None
-        if lead_effects is not None:
-            lead_effect = lead_effects.record_appointment(
-                user=lead_user,
-                execution=execution,
-                draft=result.appointment,
-            )
-        runtime_effect = None
-        if appointment_runtime_effects is not None:
-            runtime_effect = await appointment_runtime_effects.execute(
-                bot=getattr(context, "bot", None),
-                user=lead_user,
-                execution=execution,
-                draft=result.appointment,
-            )
-        success_view = build_appointment_success_view(
-            result.appointment,
-            views.inventory,
-            submission_kind=execution.submission.kind,
-        )
-        await _edit_view(query, success_view)
-        apply_session_mutation(user_data, _appointment_success_cleanup())
-        return TelegramTransitionActionOutcome(
-            handled=True,
-            result=result,
-            appointment_execution=execution,
-            appointment_effects=runtime_effect,
-            lead_effect=lead_effect,
-        )
+        _apply_success_mutation(user_data, result, callback.kind)
+        await _edit_view(query, build_appointment_confirmation_view(result.appointment, views.inventory))
+        return TelegramTransitionActionOutcome(handled=True, result=result)
 
     if result.next_step == "search_submit" and search_executor is not None:
         if result.search is None:

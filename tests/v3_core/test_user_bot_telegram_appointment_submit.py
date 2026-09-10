@@ -93,7 +93,7 @@ def _user_data():
             "public_listing_id": PUBLIC_ID,
             "mode": "offline",
             "date": "09-10",
-            "time": "",
+            "time": "pm",
             "source": "listing_callback",
         }
     }
@@ -114,7 +114,7 @@ def _update(query):
 
 @pytest.mark.asyncio
 async def test_submit_executor_success_renders_public_success_then_clears_session():
-    query = FakeQuery("v3u:t:appointment_time:pm")
+    query = FakeQuery("v3u:t:appointment_submit")
     user_data = _user_data()
     executor = FakeAppointmentExecutor()
 
@@ -142,7 +142,7 @@ async def test_submit_executor_success_renders_public_success_then_clears_sessio
 
 @pytest.mark.asyncio
 async def test_persistence_failure_keeps_session_and_never_renders_success():
-    query = FakeQuery("v3u:t:appointment_time:pm")
+    query = FakeQuery("v3u:t:appointment_submit")
     user_data = _user_data()
     executor = FakeAppointmentExecutor(fail=True)
 
@@ -156,13 +156,13 @@ async def test_persistence_failure_keeps_session_and_never_renders_success():
         )
 
     assert APPOINTMENT_SESSION_KEY in user_data
-    assert user_data[APPOINTMENT_SESSION_KEY]["time"] == ""
+    assert user_data[APPOINTMENT_SESSION_KEY]["time"] == "pm"
     assert [call[0] for call in query.calls] == ["answer"]
 
 
 @pytest.mark.asyncio
 async def test_telegram_failure_after_persistence_keeps_session_for_idempotent_retry():
-    query = FakeQuery("v3u:t:appointment_time:pm", fail_edit=True)
+    query = FakeQuery("v3u:t:appointment_submit", fail_edit=True)
     user_data = _user_data()
     executor = FakeAppointmentExecutor()
 
@@ -177,5 +177,5 @@ async def test_telegram_failure_after_persistence_keeps_session_for_idempotent_r
 
     assert len(executor.calls) == 1
     assert APPOINTMENT_SESSION_KEY in user_data
-    assert user_data[APPOINTMENT_SESSION_KEY]["time"] == ""
+    assert user_data[APPOINTMENT_SESSION_KEY]["time"] == "pm"
     assert [call[0] for call in query.calls] == ["answer", "edit_text"]

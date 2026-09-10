@@ -96,7 +96,7 @@ def _photo_actions(
     public_listing_id: str,
 ) -> tuple[tuple[SemanticAction, ...], ...]:
     target = str(public_listing_id or "").strip()
-    first = [SemanticAction("🏠 租赁详情", "details", target)]
+    first = [SemanticAction("📋 租赁详情", "details", target)]
     if bookable:
         first.append(SemanticAction("📅 预约看房", "book", target))
     return (
@@ -111,7 +111,7 @@ def build_details_response(view: PublishedListingView) -> PublicDetailsResponse:
     size = _format_size(details.size_sqm)
     floor = display_floor(details.floor)
 
-    lines = ["🏠 <b>租赁详情</b>", ""]
+    lines = ["📋 <b>租赁详情</b>", ""]
     if details.subject:
         lines.append(f"🏠 <b>{he(details.subject)}</b>")
     elif details.location:
@@ -165,16 +165,9 @@ def build_photos_response(view: PublishedListingView) -> PublicPhotosResponse:
     photos = _existing_gallery(details.gallery)
     groups = tuple(tuple(photos[offset : offset + 10]) for offset in range(0, len(photos), 10))
     if groups:
-        text = (
-            "📸 <b>以上是这套房目前保存的现场实拍。</b>\n\n"
-            "想进一步了解，可以继续看详情，或直接预约。"
-        )
+        text = "📸 <b>以上是这套房目前保存的现场实拍。</b>"
     else:
-        text = (
-            f"📸 <b>更多实拍｜{he(details.public_listing_id)}</b>\n\n"
-            "这套房的实拍暂时没有加载出来。\n\n"
-            "可以稍后再试，或直接联系中文顾问。"
-        )
+        text = "📸 <b>这套房源目前的实拍已经全部显示。</b>"
     return PublicPhotosResponse(
         media_groups=groups,
         text=text,

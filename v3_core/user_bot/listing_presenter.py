@@ -15,6 +15,19 @@ from v3_core.status_labels import inventory_status_presentation
 from .public_inventory import PublishedListingView
 
 
+_HIDDEN_PLACEHOLDERS = {
+    "暂无",
+    "未知",
+    "--",
+    "-",
+    "none",
+    "null",
+    "n/a",
+    "na",
+    "unknown",
+}
+
+
 @dataclass(frozen=True)
 class PublicListingDetails:
     listing_id: str
@@ -38,6 +51,13 @@ class PublicListingDetails:
     @property
     def lease_summary(self) -> str:
         return " · ".join(value for value in (self.deposit_terms, self.contract_term) if value)
+
+
+def _visible_text(value: object) -> str:
+    text = str(value or "").strip()
+    if text.lower() in _HIDDEN_PLACEHOLDERS:
+        return ""
+    return text
 
 
 def _optional_int(value: object) -> int | None:
@@ -65,11 +85,12 @@ def build_public_listing_details(view: PublishedListingView) -> PublicListingDet
 
     listing = view.frozen_listing
     offer = view.frozen_offer
-    project = str(listing.get("project_name") or "").strip()
-    property_type = str(listing.get("property_type") or "").strip()
-    layout = display_layout(listing.get("layout") or property_type, property_type)
+    project = _visible_text(listing.get("project_name"))
+    property_type = _visible_text(listing.get("property_type"))
+    raw_layout = _visible_text(listing.get("layout"))
+    layout = _visible_text(display_layout(raw_layout or property_type, property_type))
     subject = "｜".join(value for value in (project, layout) if value)
-    location = str(listing.get("public_location_display") or "").strip()
+    location = _visible_text(listing.get("public_location_display"))
     inventory_status = str(view.listing.get("inventory_status") or "pending").strip().lower()
     status_icon, status_label = inventory_status_presentation(inventory_status)
 
@@ -83,11 +104,11 @@ def build_public_listing_details(view: PublishedListingView) -> PublicListingDet
         location=location,
         monthly_rent_usd=_optional_int(offer.get("monthly_rent_usd")),
         size_sqm=_optional_float(listing.get("size_sqm")),
-        floor=str(listing.get("floor") or "").strip(),
-        deposit_terms=str(
-            offer.get("payment_terms") or offer.get("deposit_terms") or ""
-        ).strip(),
-        contract_term=str(offer.get("contract_term") or "").strip(),
+        floor=_visible_text(listing.get("floor")),
+        deposit_terms=_visible_text(
+            offer.get("payment_terms") or offer.get("deposit_terms")
+        ),
+        contract_term=_visible_text(offer.get("contract_term")),
         inventory_status=inventory_status,
         status_icon=status_icon,
         status_label=status_label,

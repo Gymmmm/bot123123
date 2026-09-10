@@ -1,8 +1,8 @@
 """Async Telegram adapter for V3 custom date/time/area/budget text input.
 
-The pure ``TransitionTextActionService`` owns awaiting-state decisions. At the
-appointment boundary the ordering is durable appointment -> lead ->
-availability/channel/admin effects -> user success page.
+The pure ``TransitionTextActionService`` owns awaiting-state decisions. Issue
+#25 keeps custom-time input on the same confirmation boundary as button time
+choices; persistence occurs only after the explicit submit callback.
 """
 from __future__ import annotations
 
@@ -12,13 +12,13 @@ from typing import Any
 
 from telegram.constants import ParseMode
 
+from .appointment_confirmation_view import build_appointment_confirmation_view
 from .appointment_runtime_effects import (
     AppointmentRuntimeEffectExecutor,
     AppointmentRuntimeEffectResult,
 )
 from .appointment_service import AppointmentUser
 from .appointment_submit_executor import AppointmentSubmitExecution, AppointmentSubmitExecutor
-from .appointment_success_view import build_appointment_success_view
 from .lead_effects import LeadEffectExecutor, LeadEffectResult
 from .lead_service import LeadUser
 from .search_no_match_view import build_search_no_match_view
@@ -29,7 +29,6 @@ from .transition_actions import APPOINTMENT_AWAITING_DATE_KEY, APPOINTMENT_AWAIT
 from .transition_session import (
     APPOINTMENT_SESSION_KEY,
     SEARCH_PREF_SESSION_KEY,
-    SessionMutationPlan,
     apply_session_mutation,
 )
 from .transition_text_actions import TransitionTextActionResult, TransitionTextActionService
@@ -75,17 +74,6 @@ def _lead_user(user: AppointmentUser) -> LeadUser:
         user_id=int(user.user_id),
         username=str(user.username or ""),
         display_name=str(user.display_name or ""),
-    )
-
-
-def _appointment_success_cleanup() -> SessionMutationPlan:
-    return SessionMutationPlan(
-        set_values={},
-        delete_keys=(
-            APPOINTMENT_SESSION_KEY,
-            APPOINTMENT_AWAITING_DATE_KEY,
-            APPOINTMENT_AWAITING_TIME_KEY,
-        ),
     )
 
 
@@ -138,41 +126,22 @@ async def handle_v3_transition_text(
             apply_session_mutation(user_data, result.mutation)
         return TelegramTransitionTextOutcome(handled=True, result=result)
 
-    if result.next_step == "appointment_submit" and appointment_executor is not None:
+    # TransitionTextActionService historically names a ready custom-time draft
+    # appointment_submit. Issue #25 requires one confirmation screen first.
+    # Keep the existing pure service/session contract and move persistence behind
+    # the explicit callback handled by telegram_transition_action_handler.
+    if result.next_step == "appointment_submit":
         if result.appointment is None:
             raise ValueError("appointment_submit_text_action_missing_draft")
-        appointment_user = _telegram_appointment_user(update)
-        lead_user = _lead_user(appointment_user)
-        execution = appointment_executor.execute(user=appointment_user, draft=result.appointment)
-        lead_effect = None
-        if lead_effects is not None:
-            lead_effect = lead_effects.record_appointment(
-                user=lead_user,
-                execution=execution,
-                draft=result.appointment,
-            )
-        runtime_effect = None
-        if appointment_runtime_effects is not None:
-            runtime_effect = await appointment_runtime_effects.execute(
-                bot=getattr(context, "bot", None),
-                user=lead_user,
-                execution=execution,
-                draft=result.appointment,
-            )
-        success_view = build_appointment_success_view(
-            result.appointment,
-            views.inventory,
-            submission_kind=execution.submission.kind,
+        if result.mutation is not None:
+            apply_session_mutation(user_data, result.mutation)
+        user_data.pop(APPOINTMENT_AWAITING_DATE_KEY, None)
+        user_data.pop(APPOINTMENT_AWAITING_TIME_KEY, None)
+        await _reply_view(
+            message,
+            build_appointment_confirmation_view(result.appointment, views.inventory),
         )
-        await _reply_view(message, success_view)
-        apply_session_mutation(user_data, _appointment_success_cleanup())
-        return TelegramTransitionTextOutcome(
-            handled=True,
-            result=result,
-            appointment_execution=execution,
-            appointment_effects=runtime_effect,
-            lead_effect=lead_effect,
-        )
+        return TelegramTransitionTextOutcome(handled=True, result=result)
 
     if result.next_step == "search_submit" and search_executor is not None:
         if result.search is None:
