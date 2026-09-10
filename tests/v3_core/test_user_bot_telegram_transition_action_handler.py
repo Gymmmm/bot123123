@@ -37,7 +37,30 @@ class FakeQuery:
             raise RuntimeError("telegram_edit_failed")
 
 
+class _InventoryStub:
+    def resolve(self, public_listing_id):
+        if public_listing_id != PUBLIC_ID:
+            return None
+        return SimpleNamespace(
+            snapshot={"schema": "v3_publication_snapshot.v1"},
+            frozen_listing={
+                "project_name": "富力城",
+                "property_type": "公寓",
+                "layout": "一房",
+                "public_location_display": "富力城",
+            },
+            frozen_offer={"monthly_rent_usd": 680},
+            listing={"inventory_status": "active"},
+            listing_id="l_1",
+            public_listing_id=PUBLIC_ID,
+            bookable=True,
+            gallery=(),
+        )
+
+
 class ViewsStub:
+    inventory = _InventoryStub()
+
     def appointment_date(self, draft):
         return TransitionView(
             kind="appointment_date",
@@ -151,7 +174,7 @@ async def test_render_failure_does_not_advance_session():
 
 
 @pytest.mark.asyncio
-async def test_time_choice_stops_at_submit_executor_boundary_without_mutating_session():
+async def test_time_choice_renders_confirmation_and_does_not_persist():
     query = FakeQuery("v3u:t:appointment_time:pm")
     user_data = _appt_user_data(date="09-10")
 
@@ -166,8 +189,14 @@ async def test_time_choice_stops_at_submit_executor_boundary_without_mutating_se
     assert outcome.result.next_step == "appointment_submit"
     assert outcome.result.appointment is not None
     assert outcome.result.appointment.time == "pm"
-    assert [call[0] for call in query.calls] == ["answer"]
-    assert user_data[APPOINTMENT_SESSION_KEY]["time"] == ""
+    assert outcome.appointment_execution is None
+    assert [call[0] for call in query.calls] == ["answer", "edit_text"]
+    assert user_data[APPOINTMENT_SESSION_KEY]["time"] == "pm"
+    rendered = query.calls[-1][1][0]
+    assert "确认看房预约" in rendered
+    markup = query.calls[-1][2]["reply_markup"]
+    assert markup.inline_keyboard[0][0].callback_data == "v3u:t:appointment_submit"
+    assert markup.inline_keyboard[1][0].callback_data == "v3u:t:appointment_back_time"
 
 
 @pytest.mark.asyncio
