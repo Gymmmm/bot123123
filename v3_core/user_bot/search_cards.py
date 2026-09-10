@@ -1,9 +1,8 @@
 """Telegram-neutral search result cards for published V3 rent inventory.
 
-Card copy mirrors the fixed-SHA User Bot result card while consuming only
-``PublishedListingView`` objects. Public facts and cover selection come from the
-frozen publication package; only current availability comes from live inventory.
-No legacy listing/media lookup is permitted here.
+Card copy consumes only ``PublishedListingView`` objects. Public facts and cover
+selection come from the frozen publication package; only current availability
+comes from live inventory. No legacy listing/media lookup is permitted here.
 """
 from __future__ import annotations
 
@@ -79,7 +78,7 @@ def _card_actions(
     rows.append(
         (
             SemanticAction(
-                "🏠 房源详情",
+                "🏠 租赁详情",
                 "details",
                 target_public_listing_id=current_public_id,
             ),
@@ -103,7 +102,7 @@ def _card_actions(
     rows.append(
         (
             SemanticAction(
-                "💬 联系我们",
+                "💬 联系中文顾问",
                 "consult",
                 target_public_listing_id=current_public_id,
             ),
@@ -132,7 +131,7 @@ def build_search_card(
 
     lines = [
         f"🏠 <b>{he(project)}｜{he(layout)}</b>",
-        f"💰 <b>{he(price)}</b>",
+        f"💵 <b>{he(price)}</b>",
         "",
     ]
     if details.location:
