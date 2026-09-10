@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from html import escape as he
 from pathlib import Path
 from typing import Literal
+import re
 
 from v3_core.publishing.formatting import display_floor
 
@@ -29,6 +30,10 @@ InternalListingAction = Literal[
     "next",
     "change_search",
 ]
+
+_INTERNAL_ID = re.compile(
+    r"(?i)\b(?:lst_[0-9a-z]+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b"
+)
 
 
 @dataclass(frozen=True)
@@ -57,14 +62,21 @@ class PublicPhotosResponse:
 
 
 def _format_price(value: int | None) -> str:
-    return f"${int(value):,}/月" if value is not None and int(value) > 0 else ""
+    return f"${int(value):,}/\u6708" if value is not None and int(value) > 0 else ""
 
 
 def _format_size(value: float | None) -> str:
     if value is None or value <= 0:
         return ""
     numeric = int(value) if float(value).is_integer() else value
-    return f"{numeric}㎡"
+    return f"{numeric}\u33a1"
+
+
+def _safe_line(text: str) -> str:
+    clean = str(text or "").strip()
+    if not clean or _INTERNAL_ID.search(clean):
+        return ""
+    return clean
 
 
 def _details_actions(
@@ -76,33 +88,24 @@ def _details_actions(
     if bookable:
         return (
             (
-                SemanticAction("📅 预约看房", "book", target),
-                SemanticAction("📸 更多实拍", "photos", target),
+                SemanticAction("\ud83d\udcc5 \u9884\u7ea6\u770b\u623f", "book", target),
+                SemanticAction("\ud83d\udcf8 \u66f4\u591a\u5b9e\u62cd", "photos", target),
             ),
-            (SemanticAction("💬 联系我们", "consult", target),),
+            (SemanticAction("\ud83d\udcac \u8054\u7cfb\u4e2d\u6587\u987e\u95ee", "consult", target),),
         )
     return (
         (
-            SemanticAction("📸 更多实拍", "photos", target),
-            SemanticAction("💬 联系我们", "consult", target),
+            SemanticAction("\ud83d\udcf8 \u66f4\u591a\u5b9e\u62cd", "photos", target),
+            SemanticAction("\ud83d\udcac \u8054\u7cfb\u4e2d\u6587\u987e\u95ee", "consult", target),
         ),
-        (SemanticAction("🏘 看相近房源", "similar", target),),
+        (SemanticAction("\ud83c\udee9 \u770b\u76f8\u8fd1\u623f\u6e90", "similar", target),),
     )
 
 
-def _photo_actions(
-    *,
-    bookable: bool,
-    public_listing_id: str,
-) -> tuple[tuple[SemanticAction, ...], ...]:
-    target = str(public_listing_id or "").strip()
-    first = [SemanticAction("🏠 房源详情", "details", target)]
-    if bookable:
-        first.append(SemanticAction("📅 预约看房", "book", target))
-    return (
-        tuple(first),
-        (SemanticAction("💬 联系我们", "consult", target),),
-    )
+def _append(lines: list[str], value: str) -> None:
+    clean = _safe_line(value)
+    if clean:
+        lines.append(clean)
 
 
 def build_details_response(view: PublishedListingView) -> PublicDetailsResponse:
@@ -111,32 +114,46 @@ def build_details_response(view: PublishedListingView) -> PublicDetailsResponse:
     size = _format_size(details.size_sqm)
     floor = display_floor(details.floor)
 
-    lines = ["🏠 <b>房源详情</b>", ""]
+    lines: list[str] = ["\ud83c\udfe0 <b>\u79df\u8d41\u8be6\u60c5</b>", ""]
     if details.subject:
-        lines.append(f"🏠 <b>{he(details.subject)}</b>")
+        _append(lines, f"\ud83c\udfe0 <b>{he(details.subject)}</b>")
     elif details.location:
-        lines.append(f"🏠 <b>{he(details.location)}</b>")
+        _append(lines, f"\ud83c\udfe0 <b>{he(details.location)}</b>")
     if details.location and details.location != details.project_name:
-        lines.append(f"<b>区域：</b> {he(details.location)}")
+        _append(lines, f"<b>\u533a\u57df\uff1a</b> {he(details.location)}")
+    if details.property_type and details.property_type not in (details.layout, details.subject):
+        _append(lines, f"\ud83c\udff7 \u7c7b\u578b\uff1a{he(details.property_type)}")
     if price:
-        lines.append(f"<b>租金：</b> <b>{he(price)}</b>")
+        _append(lines, f"<b>\u79df\u91d1\uff1a</b> <b>{he(price)}</b>")
     if size:
-        lines.append(f"📐 面积：{he(size)}")
+        _append(lines, f"\ud83d\udcd0 \u9762\u79ef\uff1a{he(size)}")
     if floor:
-        lines.append(f"🏢 楼层：{he(floor)}")
+        _append(lines, f"\ud83c\udfe2 \u697c\u5c42\uff1a{he(floor)}")
     if details.lease_summary:
-        lines.append(f"🔑 租约：{he(details.lease_summary)}")
-    lines.append(f"{details.status_icon} 房态：{he(details.status_label)}")
+        _append(lines, f"\ud83d\udd11 \u79df\u7ea6\uff1a{he(details.lease_summary)}")
+    for fee in details.fee_lines:
+        _append(lines, f"\ud83d\udcb8 {he(fee)}")
+    if details.amenity_line:
+        _append(lines, f"\ud83e\udde3 \u914d\u5957\uff1a{he(details.amenity_line)}")
+    if details.highlight_line:
+        _append(lines, f"\u2728 \u4eae\u70b9\uff1a{he(details.highlight_line)}")
+    _append(lines, f"{details.status_icon} \u623f\u6001\uff1a{he(details.status_label)}")
     if details.public_listing_id:
-        lines.append(f"🆔 房源编号：{he(details.public_listing_id)}")
+        _append(lines, f"\ud83c\udd94 \u623f\u6e90\u7f16\u53f7\uff1a{he(details.public_listing_id)}")
 
     notes = adviser_notes_for_view(view, max_points=2, allow_empty=True).strip()
     if notes:
         safe_notes = "\n".join(he(line) for line in notes.splitlines() if line.strip())
-        lines.extend(["", "💬 <b>侨联说</b>", "", safe_notes])
+        if safe_notes:
+            lines.extend(["", "\ud83d\udcac <b>\u4fa8\u8054\u8bf4</b>", "", safe_notes])
+
+    text = "\n".join(lines).rstrip()
+    if details.listing_id and details.listing_id in text:
+        text = text.replace(details.listing_id, "")
+    text = _INTERNAL_ID.sub("", text)
 
     return PublicDetailsResponse(
-        text="\n".join(lines),
+        text=text,
         action_rows=_details_actions(
             bookable=details.bookable,
             public_listing_id=details.public_listing_id,
@@ -161,24 +178,19 @@ def _existing_gallery(paths: tuple[str, ...]) -> tuple[str, ...]:
 
 
 def build_photos_response(view: PublishedListingView) -> PublicPhotosResponse:
+    from .listing_photos_panel import build_photos_end_actions, build_photos_end_text
+
     details = build_public_listing_details(view)
     photos = _existing_gallery(details.gallery)
     groups = tuple(tuple(photos[offset : offset + 10]) for offset in range(0, len(photos), 10))
-    if groups:
-        text = (
-            "📸 <b>以上是这套房目前保存的现场实拍。</b>\n\n"
-            "想进一步了解，可以继续看详情，或直接预约。"
-        )
-    else:
-        text = (
-            f"📸 <b>更多实拍｜{he(details.public_listing_id)}</b>\n\n"
-            "这套房的实拍暂时没有加载出来。\n\n"
-            "可以稍后再试，或直接联系我们。"
-        )
     return PublicPhotosResponse(
         media_groups=groups,
-        text=text,
-        action_rows=_photo_actions(
+        text=build_photos_end_text(
+            has_media=bool(groups),
+            bookable=details.bookable,
+            public_listing_id=details.public_listing_id,
+        ),
+        action_rows=build_photos_end_actions(
             bookable=details.bookable,
             public_listing_id=details.public_listing_id,
         ),
