@@ -44,7 +44,7 @@ CONTACT_TEXT = (
     "例如：\n"
     "「BKK1 两房，$900以内」\n"
     "「富力城一房，要能做饭」\n\n"
-    "不方便打字，也可以直接联系我们。"
+    "不方便打字，也可以直接联系中文顾问。"
 )
 
 
@@ -64,17 +64,17 @@ def build_home_view(*, channel_url: str = "") -> HomeView:
         rows.append(
             (
                 HomeChoice("🏠 最新房源", "root", url=clean_channel),
-                HomeChoice("💬 联系我们", "contact"),
+                HomeChoice("💬 联系中文顾问", "contact"),
             )
         )
     else:
-        rows.append((HomeChoice("💬 联系我们", "contact"),))
+        rows.append((HomeChoice("💬 联系中文顾问", "contact"),))
     return HomeView(kind="home", text=WELCOME_TEXT, rows=tuple(rows))
 
 
 def build_contact_view(*, advisor_url: str = "") -> HomeView:
     clean_advisor = str(advisor_url or "").strip()
-    first = HomeChoice("💬 联系我们", "contact", url=clean_advisor) if clean_advisor else HomeChoice("💬 联系我们", "contact")
+    first = HomeChoice("💬 联系中文顾问", "contact", url=clean_advisor) if clean_advisor else HomeChoice("💬 联系中文顾问", "contact")
     return HomeView(
         kind="contact",
         text=CONTACT_TEXT,

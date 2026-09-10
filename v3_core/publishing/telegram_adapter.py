@@ -31,7 +31,7 @@ def build_channel_keyboard(
         raise ValueError("telegram_action_url_missing")
     rows = [
         [
-            InlineKeyboardButton("🏠 房源详情", url=actions["details"]),
+            InlineKeyboardButton("🏠 租赁详情", url=actions["details"]),
             InlineKeyboardButton("📸 更多实拍", url=actions["photos"]),
         ]
     ]

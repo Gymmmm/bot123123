@@ -34,7 +34,7 @@ class FakeListings:
 
     def resolve(self, payload):
         self.calls.append(payload)
-        return SimpleNamespace(ok=False)
+        return SimpleNamespace(ok=False, reason="unsupported_public_payload", details=None)
 
 
 class FakeSearchExecutor:
@@ -183,5 +183,5 @@ async def test_unknown_start_payload_still_falls_through_to_public_property_vali
     assert listings.calls == ["not_a_real_shortcut"]
     assert message.calls[-1][0][0] == (
         "这个链接已经失效或房源信息已更新。\n\n"
-        "您可以重新找房，或直接联系我们。"
+        "您可以重新找房，或直接联系中文顾问。"
     )

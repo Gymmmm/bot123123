@@ -59,13 +59,17 @@ def _actions(rows):
     return [[item.action for item in row] for row in rows]
 
 
+def _labels(rows):
+    return [[item.label for item in row] for row in rows]
+
+
 def test_details_response_preserves_layout_and_frozen_adviser_notes():
     view = _view(canonical_facts={"highlights": ["采光好", "钥匙已备"]})
 
     response = build_details_response(view)
 
     assert response.text == (
-        "🏠 <b>房源详情</b>\n"
+        "🏠 <b>租赁详情</b>\n"
         "\n"
         "🏠 <b>富力城｜2房1厅</b>\n"
         "<b>区域：</b> BKK1\n"
@@ -82,6 +86,10 @@ def test_details_response_preserves_layout_and_frozen_adviser_notes():
         "资料明确标注：采光好、钥匙已备；具体状态可以结合实拍确认。"
     )
     assert _actions(response.action_rows) == [["book", "photos"], ["consult"]]
+    assert _labels(response.action_rows) == [
+        ["📅 预约看房", "📸 更多实拍"],
+        ["💬 联系中文顾问"],
+    ]
 
 
 def test_details_response_uses_live_rented_state_but_keeps_frozen_public_facts():
@@ -91,6 +99,10 @@ def test_details_response_uses_live_rented_state_but_keeps_frozen_public_facts()
     assert "<b>租金：</b> <b>$800/月</b>" in response.text
     assert "🔴 房态：已租出" in response.text
     assert _actions(response.action_rows) == [["photos", "consult"], ["similar"]]
+    assert _labels(response.action_rows) == [
+        ["📸 更多实拍", "💬 联系中文顾问"],
+        ["🏘 看相近房源"],
+    ]
 
 
 def test_photos_response_chunks_existing_frozen_gallery_by_ten(tmp_path):
@@ -114,6 +126,10 @@ def test_photos_response_chunks_existing_frozen_gallery_by_ten(tmp_path):
         "想进一步了解，可以继续看详情，或直接预约。"
     )
     assert _actions(response.action_rows) == [["details", "book"], ["consult"]]
+    assert _labels(response.action_rows) == [
+        ["🏠 租赁详情", "📅 预约看房"],
+        ["💬 联系中文顾问"],
+    ]
 
 
 def test_photos_response_drops_missing_files_and_uses_locked_fallback_text(tmp_path):
@@ -125,7 +141,7 @@ def test_photos_response_drops_missing_files_and_uses_locked_fallback_text(tmp_p
     assert response.text == (
         "📸 <b>更多实拍｜QL-RF-A2B3</b>\n\n"
         "这套房的实拍暂时没有加载出来。\n\n"
-        "可以稍后再试，或直接联系我们。"
+        "可以稍后再试，或直接联系中文顾问。"
     )
 
 
@@ -137,3 +153,7 @@ def test_rented_photos_response_keeps_details_and_contact_but_removes_book(tmp_p
     )
 
     assert _actions(response.action_rows) == [["details"], ["consult"]]
+    assert _labels(response.action_rows) == [
+        ["🏠 租赁详情"],
+        ["💬 联系中文顾问"],
+    ]
