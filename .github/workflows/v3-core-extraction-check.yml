@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - codex/v3-core-extraction-20260908
+      - codex/v3-product-polish-round2-5b834f6-20260911
   workflow_dispatch:
 
 jobs:
