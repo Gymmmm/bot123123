@@ -12,10 +12,8 @@ from typing import Any, Protocol
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 
-from v3_core.status_labels import inventory_status_bookable
-
+from .channel_contract import official_channel_button_spec
 from .delivery_coordinator import TelegramSendCommand
-from .package_store import CHANNEL_ACTION_ORDER
 
 
 class TelegramBotLike(Protocol):
@@ -25,18 +23,12 @@ class TelegramBotLike(Protocol):
 def build_channel_keyboard(
     actions: dict[str, str], *, inventory_status: object = "active"
 ) -> InlineKeyboardMarkup:
-    if tuple(actions) != CHANNEL_ACTION_ORDER:
-        raise ValueError("telegram_actions_must_be_details_photos_book")
-    if any(not str(actions[key] or "").strip() for key in CHANNEL_ACTION_ORDER):
-        raise ValueError("telegram_action_url_missing")
     rows = [
-        [
-            InlineKeyboardButton("🏠 房源详情", url=actions["details"]),
-            InlineKeyboardButton("📸 更多实拍", url=actions["photos"]),
-        ]
+        [InlineKeyboardButton(label, url=url) for label, url in row]
+        for row in official_channel_button_spec(
+            actions, inventory_status=inventory_status
+        )
     ]
-    if inventory_status_bookable(inventory_status):
-        rows.append([InlineKeyboardButton("📅 预约看房", url=actions["book"])])
     return InlineKeyboardMarkup(rows)
 
 
