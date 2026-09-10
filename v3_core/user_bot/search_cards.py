@@ -131,7 +131,7 @@ def build_search_card(
 
     lines = [
         f"🏠 <b>{he(project)}｜{he(layout)}</b>",
-        f"💵 <b>{he(price)}</b>",
+        f"💰 <b>{he(price)}</b>",
         "",
     ]
     if details.location:
