@@ -26,7 +26,12 @@ def build_appointment_success_view(
     except (FileNotFoundError, OSError, ValueError):
         subject = ""
 
-    heading = "✅ <b>预约时间已修改</b>" if str(submission_kind or "") == "updated" else "📅 <b>预约已提交</b>"
+    if str(submission_kind or "") == "updated":
+        heading = "✅ <b>预约时间已修改</b>"
+    elif draft.mode == "video":
+        heading = "✅ <b>视频看房申请已提交</b>"
+    else:
+        heading = "✅ <b>预约申请已提交</b>"
     mode_label = APPOINTMENT_MODE_LABELS.get(draft.mode, "实地看房")
     lines = [heading, ""]
     if subject:
