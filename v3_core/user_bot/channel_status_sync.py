@@ -15,8 +15,11 @@ from typing import Any, Callable
 
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 
-from v3_core.publishing.channel_contract import channel_action_url
-from v3_core.status_labels import inventory_status_bookable, inventory_status_presentation
+from v3_core.publishing.channel_contract import (
+    official_channel_action_urls,
+    official_channel_button_spec,
+)
+from v3_core.status_labels import inventory_status_presentation
 
 from .appointments import ACTIVE_APPOINTMENT_STATUSES
 
@@ -88,24 +91,11 @@ def appointment_channel_keyboard(
     public_listing_id: str,
     status: str,
 ) -> InlineKeyboardMarkup:
-    details = InlineKeyboardButton(
-        "🏠 房源详情",
-        url=channel_action_url(username, public_listing_id, "details"),
-    )
-    photos = InlineKeyboardButton(
-        "📸 更多实拍",
-        url=channel_action_url(username, public_listing_id, "photos"),
-    )
-    rows = [[details, photos]]
-    if inventory_status_bookable(status):
-        rows.append(
-            [
-                InlineKeyboardButton(
-                    "📅 预约看房",
-                    url=channel_action_url(username, public_listing_id, "book"),
-                )
-            ]
-        )
+    actions = official_channel_action_urls(username, public_listing_id)
+    rows = [
+        [InlineKeyboardButton(label, url=url) for label, url in row]
+        for row in official_channel_button_spec(actions, inventory_status=status)
+    ]
     return InlineKeyboardMarkup(rows)
 
 
