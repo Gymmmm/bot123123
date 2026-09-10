@@ -225,6 +225,7 @@ async def test_contact_without_effect_executor_is_deferred_and_never_claims_succ
             "service",
             "入住服务",
             {
+                "v3u:service:tenant",
                 "v3u:service:repair",
                 "v3u:service:property",
                 "v3u:assure:moving",
