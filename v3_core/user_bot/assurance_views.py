@@ -1,4 +1,4 @@
-"""Locked-copy V3 views for the public Qiaolian assurance surface."""
+"""V3 views for the public Qiaolian assurance surface."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -25,10 +25,8 @@ class AssuranceView:
 
 ASSURANCE_HOME_TEXT = (
     "🛡 <b>侨联保障</b>\n\n"
-    "签约前把费用说清楚。\n"
-    "入住时把房屋、表计、物品留档。\n"
-    "退租时按留档一项一项对。\n\n"
-    "有对不上的，侨联协助与房东、物业沟通处理。"
+    "签约前把费用和约定说清楚；入住时按清单完成房屋、表计和物品留档；退租时再按同一份留档核对。\n\n"
+    "下面两份资料覆盖入住交接和退租押金。需要沟通时，可直接联系中文顾问。"
 )
 
 MOVING_TEXT = (
@@ -37,20 +35,19 @@ MOVING_TEXT = (
     "• 协调搬家时间\n"
     "• 对接车辆和人手\n"
     "• 提供必要的现场支持\n\n"
-    "需要时直接联系我们，说清时间和地点就可以。"
+    "需要时直接联系中文顾问，并说明时间和地点。"
 )
 
 HANDOVER_TEXT = (
-    "📋 <b>入住怎么交</b>\n\n"
-    "入住当天按清单对房屋、表计、物品。\n"
-    "双方确认后各留一份，退租时按这份对。"
+    "📋 <b>入住交接与留档</b>\n\n"
+    "入住当天按清单核对房屋、表计和物品，并把现场状态留档。\n"
+    "双方确认后各留一份，退租时按同一份记录核对。"
 )
 
 DEPOSIT_TEXT = (
-    "🔐 <b>押金怎么退</b>\n\n"
-    "签约前先核对金额、退还条件和会扣什么。\n"
-    "退租时按合同和入住留档对。\n"
-    "最终退多少，以合同和当场核对为准。"
+    "🔐 <b>押金与退租</b>\n\n"
+    "签约前先核对押金金额、退还条件和可能扣除的项目。\n"
+    "退租时按合同和入住留档逐项核对；最终金额以合同和现场核对结果为准。"
 )
 
 
@@ -59,12 +56,10 @@ def build_assurance_home_view() -> AssuranceView:
         kind="home",
         text=ASSURANCE_HOME_TEXT,
         rows=(
+            (AssuranceChoice("📋 入住交接与留档", callback_data="v3u:assure:handover"),),
+            (AssuranceChoice("🔐 押金与退租", callback_data="v3u:assure:deposit"),),
             (
-                AssuranceChoice("📋 入住怎么交", callback_data="v3u:assure:handover"),
-                AssuranceChoice("🔐 押金怎么退", callback_data="v3u:assure:deposit"),
-            ),
-            (
-                AssuranceChoice("💬 联系我们", callback_data="v3u:home:contact"),
+                AssuranceChoice("💬 联系中文顾问", callback_data="v3u:home:contact"),
                 AssuranceChoice("🏠 返回首页", callback_data="v3u:t:home"),
             ),
         ),
@@ -76,7 +71,7 @@ def build_moving_view() -> AssuranceView:
         kind="moving",
         text=MOVING_TEXT,
         rows=(
-            (AssuranceChoice("💬 联系我们", callback_data="v3u:home:contact"),),
+            (AssuranceChoice("💬 联系中文顾问", callback_data="v3u:home:contact"),),
             (AssuranceChoice("⬅️ 返回入住服务", callback_data="v3u:home:service"),),
         ),
     )
@@ -103,7 +98,7 @@ def assurance_asset_bundle(repo_root: str | Path, kind: str) -> AssuranceAssetBu
             kind="handover",
             image_path=generated / "handover.png",
             pdf_path=generated / "handover.pdf",
-            title="入住怎么交",
+            title="入住交接与留档",
             instruction=HANDOVER_TEXT,
             filename="入住交接清单.pdf",
         )
@@ -111,7 +106,7 @@ def assurance_asset_bundle(repo_root: str | Path, kind: str) -> AssuranceAssetBu
         kind="deposit",
         image_path=generated / "deposit.png",
         pdf_path=generated / "deposit.pdf",
-        title="押金怎么退",
+        title="押金与退租",
         instruction=DEPOSIT_TEXT,
         filename="押金与退租说明.pdf",
     )
