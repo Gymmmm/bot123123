@@ -357,7 +357,7 @@ jobs:
               deal_types = Counter()
               source_identity_mismatch = 0
               source_by_id = {str(r['id']): r for r in db.execute(
-                  'SELECT id,source_type,source_name,source_post_id FROM source_posts'
+                  'SELECT id,source_id,source_type,source_name,source_post_id FROM source_posts'
               )} if 'source_posts' in tables else {}
               for row in current_rows:
                   try: facts = json.loads(row['facts_json'] or '{}')
@@ -373,8 +373,15 @@ jobs:
                           evidence_missing[field] += 1
                   src = source_by_id.get(str(row['source_post_id']))
                   ident = facts.get('source_identity') or {}
-                  if src and any(str(ident.get(k) or '') != str(src[k] or '') for k in ('source_type','source_name','source_post_id')):
-                      source_identity_mismatch += 1
+                  if src:
+                      identity_values = (
+                          (ident.get('source_post_id'), src['id']),
+                          (ident.get('source_id'), src['source_id']),
+                          (ident.get('source_type'), src['source_type']),
+                          (ident.get('source_post_identity'), src['source_post_id']),
+                      )
+                      if any(str(left or '') != str(right or '') for left, right in identity_values):
+                          source_identity_mismatch += 1
               print('canonical.deal_types=' + '|'.join(f'{k}:{v}' for k,v in sorted(deal_types.items())))
               for field in fields:
                   print(f'canonical.coverage.{field}={coverage[field]}/{len(current_rows)}')
@@ -407,7 +414,7 @@ jobs:
               rows = db.execute(
                   '''SELECT p.channel_message_id,p.publish_status,p.published_at,l.public_listing_id,p.post_text
                      FROM publication_instances p
-                     LEFT JOIN listing_public_ids l ON l.listing_id=p.listing_id
+                     LEFT JOIN listings_v3 l ON l.listing_id=p.listing_id
                      ORDER BY p.published_at DESC LIMIT 20'''
               ).fetchall()
               invalid_text = 0
