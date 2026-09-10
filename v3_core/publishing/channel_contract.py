@@ -15,8 +15,8 @@ from .public_ids import normalize_public_id
 CHANNEL_ACTION_ORDER = ("details", "photos", "book")
 CHANNEL_CTA_LABELS = {
     "details": "📋 租赁详情",
-    "photos": "📸 更多实拍",
-    "book": "📅 预约看房",
+    "photos": "🕹️ 更多实拍",
+    "book": "📍 预约看房",
 }
 
 _ACTION_SUFFIX = {
