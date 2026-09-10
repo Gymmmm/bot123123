@@ -10,6 +10,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
 
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 
 from .appointment_runtime_effects import (
@@ -47,8 +48,19 @@ class TelegramTransitionTextOutcome:
     lead_effect: LeadEffectResult | None = None
 
 
-async def _reply_view(message: Any, view: TransitionView) -> None:
+def _view_keyboard(view: TransitionView, channel_url: str = ""):
     keyboard = build_transition_keyboard(view) if view.rows else None
+    clean_channel = str(channel_url or "").strip()
+    if not clean_channel or not view.kind.startswith("appointment"):
+        return keyboard
+    rows = [list(row) for row in (keyboard.inline_keyboard if keyboard else ())]
+    if not any(str(button.text or "") == "📣 返回房源频道" for row in rows for button in row):
+        rows.append([InlineKeyboardButton("📣 返回房源频道", url=clean_channel)])
+    return InlineKeyboardMarkup(rows)
+
+
+async def _reply_view(message: Any, view: TransitionView, *, channel_url: str = "") -> None:
+    keyboard = _view_keyboard(view, channel_url)
     await message.reply_text(view.text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
 
@@ -99,6 +111,7 @@ async def handle_v3_transition_text(
     search_executor: SearchSubmitExecutor | None = None,
     lead_effects: LeadEffectExecutor | None = None,
     appointment_runtime_effects: AppointmentRuntimeEffectExecutor | None = None,
+    channel_url: str = "",
 ) -> TelegramTransitionTextOutcome:
     message = getattr(update, "effective_message", None)
     text = str(getattr(message, "text", "") or "") if message is not None else ""
@@ -120,7 +133,7 @@ async def handle_v3_transition_text(
         if result.appointment is None:
             raise ValueError("appointment_time_text_action_missing_draft")
         view = views.appointment_time(result.appointment)
-        await _reply_view(message, view)
+        await _reply_view(message, view, channel_url=channel_url)
         if result.mutation is not None:
             apply_session_mutation(user_data, result.mutation)
         return TelegramTransitionTextOutcome(handled=True, result=result)
@@ -133,7 +146,7 @@ async def handle_v3_transition_text(
         area_display = ""
         if isinstance(pref, dict):
             area_display = str(pref.get("area_display") or "").strip()
-        await _reply_view(message, views.search_budget(area_display))
+        await _reply_view(message, views.search_budget(area_display), channel_url=channel_url)
         if result.mutation is not None:
             apply_session_mutation(user_data, result.mutation)
         return TelegramTransitionTextOutcome(handled=True, result=result)
@@ -164,7 +177,7 @@ async def handle_v3_transition_text(
             views.inventory,
             submission_kind=execution.submission.kind,
         )
-        await _reply_view(message, success_view)
+        await _reply_view(message, success_view, channel_url=channel_url)
         apply_session_mutation(user_data, _appointment_success_cleanup())
         return TelegramTransitionTextOutcome(
             handled=True,
@@ -180,7 +193,7 @@ async def handle_v3_transition_text(
         execution = search_executor.execute(result.search)
         presentation = await present_search_flow_result(update, context, execution.result)
         if not presentation.matched:
-            await _reply_view(message, build_search_no_match_view(result.search))
+            await _reply_view(message, build_search_no_match_view(result.search), channel_url=channel_url)
         lead_effect = None
         if lead_effects is not None:
             lead_effect = lead_effects.record_search(
