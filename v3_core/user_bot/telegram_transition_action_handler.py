@@ -3,9 +3,6 @@
 The pure ``TransitionActionService`` owns state decisions. This adapter claims
 callbacks from the transition namespace, renders local steps, and executes the
 V3 appointment/search boundaries when their dependencies are injected.
-
-Appointment ordering matches the locked runtime: durable appointment -> lead ->
-availability/channel/admin outer effects -> user success page.
 """
 from __future__ import annotations
 
@@ -13,6 +10,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
 
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 
 from .appointment_runtime_effects import (
@@ -74,8 +72,19 @@ class TelegramTransitionActionOutcome:
     lead_effect: LeadEffectResult | None = None
 
 
-async def _edit_view(query: Any, view: TransitionView) -> None:
+def _view_keyboard(view: TransitionView, channel_url: str = ""):
     keyboard = build_transition_keyboard(view) if view.rows else None
+    clean_channel = str(channel_url or "").strip()
+    if not clean_channel or not view.kind.startswith("appointment"):
+        return keyboard
+    rows = [list(row) for row in (keyboard.inline_keyboard if keyboard else ())]
+    if not any(str(button.text or "") == "📣 返回房源频道" for row in rows for button in row):
+        rows.append([InlineKeyboardButton("📣 返回房源频道", url=clean_channel)])
+    return InlineKeyboardMarkup(rows)
+
+
+async def _edit_view(query: Any, view: TransitionView, *, channel_url: str = "") -> None:
+    keyboard = _view_keyboard(view, channel_url)
     message = getattr(query, "message", None)
     if getattr(message, "photo", None):
         await query.edit_message_caption(
@@ -200,6 +209,7 @@ async def handle_v3_transition_action(
     search_executor: SearchSubmitExecutor | None = None,
     lead_effects: LeadEffectExecutor | None = None,
     appointment_runtime_effects: AppointmentRuntimeEffectExecutor | None = None,
+    channel_url: str = "",
 ) -> TelegramTransitionActionOutcome:
     query = getattr(update, "callback_query", None)
     raw = str(getattr(query, "data", "") or "") if query is not None else ""
@@ -218,14 +228,14 @@ async def handle_v3_transition_action(
 
     view = _view_for_result(views, result)
     if view is not None:
-        await _edit_view(query, view)
+        await _edit_view(query, view, channel_url=channel_url)
         _apply_success_mutation(user_data, result, callback.kind)
         return TelegramTransitionActionOutcome(handled=True, result=result)
 
     if result.next_step == "navigation":
         navigation_view = _navigation_view(views, result, user_data)
         if navigation_view is not None:
-            await _edit_view(query, navigation_view)
+            await _edit_view(query, navigation_view, channel_url=channel_url)
             _apply_success_mutation(user_data, result, callback.kind)
             return TelegramTransitionActionOutcome(handled=True, result=result)
 
@@ -255,7 +265,7 @@ async def handle_v3_transition_action(
             views.inventory,
             submission_kind=execution.submission.kind,
         )
-        await _edit_view(query, success_view)
+        await _edit_view(query, success_view, channel_url=channel_url)
         apply_session_mutation(user_data, _appointment_success_cleanup())
         return TelegramTransitionActionOutcome(
             handled=True,
@@ -271,7 +281,7 @@ async def handle_v3_transition_action(
         execution = search_executor.execute(result.search)
         presentation = await present_search_flow_result(update, context, execution.result)
         if not presentation.matched:
-            await _edit_view(query, build_search_no_match_view(result.search))
+            await _edit_view(query, build_search_no_match_view(result.search), channel_url=channel_url)
         lead_effect = None
         if lead_effects is not None:
             lead_effect = lead_effects.record_search(
