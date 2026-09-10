@@ -8,13 +8,12 @@ the Telegram edit succeeds.
 
 Child callbacks in the explicit ``v3u:t:`` transition namespace are deliberately
 not claimed by this router handler. They belong to the separate transition-action
-handler. Consult also remains an intent only until its effect executor exists.
-
-This module is deliberately not registered in the production Application yet.
+handler. Consult also remains an intent when no direct advisor handoff is
+configured.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +26,7 @@ from .telegram_callback_response import (
     TelegramCallbackResponse,
     adapt_callback_response,
 )
+from .telegram_navigation import polish_listing_keyboard
 from .telegram_transition_ui import build_transition_keyboard
 from .transition_callbacks import parse_transition_callback
 from .transition_plan import build_transition_plan
@@ -190,6 +190,8 @@ async def handle_v3_callback(
     *,
     router: CallbackRouter,
     transition_views: TransitionViewService | None = None,
+    advisor_url: str = "",
+    channel_url: str = "",
 ) -> TelegramCallbackHandlerOutcome:
     """Handle one router-owned V3 callback without swallowing child transitions."""
     query = getattr(update, "callback_query", None)
@@ -197,8 +199,6 @@ async def handle_v3_callback(
     if query is None or not raw.startswith(f"{PREFIX}:"):
         return TelegramCallbackHandlerOutcome(handled=False)
 
-    # ``v3u:t:*`` has its own parser/state machine. Do not let the listing/card
-    # router turn it into a malformed-callback error or consume it first.
     if parse_transition_callback(raw) is not None:
         return TelegramCallbackHandlerOutcome(handled=False)
 
@@ -208,8 +208,21 @@ async def handle_v3_callback(
     )
     response = adapt_callback_response(dispatched)
 
-    # Always stop Telegram's callback spinner for callbacks owned by this
-    # handler. Consult/error copy is intentionally handled elsewhere.
+    # Product polish happens only at the Telegram transport boundary. A configured
+    # advisor becomes a one-tap public-username handoff with the listing ID already
+    # drafted. Details/photos also receive real exits back to channel/home.
+    if response.kind in {"details", "photos", "card"}:
+        response = replace(
+            response,
+            keyboard=polish_listing_keyboard(
+                response.keyboard,
+                advisor_url=advisor_url,
+                channel_url=channel_url,
+                add_home=response.kind in {"details", "photos"},
+                add_channel=response.kind in {"details", "photos"},
+            ),
+        )
+
     await query.answer()
 
     if response.kind == "details":
@@ -230,7 +243,6 @@ async def handle_v3_callback(
         user_data = getattr(context, "user_data", None)
         if not isinstance(user_data, dict):
             raise ValueError("telegram_user_data_missing_for_transition")
-        # Telegram edit succeeded: session may now advance to the rendered step.
         apply_session_mutation(user_data, mutation)
 
     return TelegramCallbackHandlerOutcome(
