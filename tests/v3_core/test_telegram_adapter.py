@@ -68,7 +68,7 @@ def _command(tmp_path):
 def test_keyboard_contract_is_two_plus_one_and_ordered():
     keyboard = build_channel_keyboard(dict(ACTIONS))
     rows = keyboard.inline_keyboard
-    assert [button.text for button in rows[0]] == ["🏠 租赁详情", "📸 更多实拍"]
+    assert [button.text for button in rows[0]] == ["📋 租赁详情", "📸 更多实拍"]
     assert [button.text for button in rows[1]] == ["📅 预约看房"]
     assert rows[0][0].url == ACTIONS["details"]
     assert rows[0][1].url == ACTIONS["photos"]
