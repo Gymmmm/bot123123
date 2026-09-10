@@ -1,0 +1,137 @@
+name: v3-live-readonly-audit-v2
+on:
+  push:
+    branches: [audit/v3-live-20260910]
+    paths: [.github/workflows/v3-live-readonly-audit-v2.yml]
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Configure SSH
+        env:
+          KEY: '${{ secrets.PROD_SSH_PRIVATE_KEY }}'
+        run: |
+          set -euo pipefail
+          test -n "$KEY"
+          mkdir -p ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/qiaolian
+          printf '%s\n' '50.114.74.120 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILuFtkSn5SJKY7mZ52Lc/QydPRTvHFpsj87M/HcIkb/L' > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/qiaolian ~/.ssh/known_hosts
+      - name: Audit production read only
+        run: |
+          ssh -i ~/.ssh/qiaolian -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes root@50.114.74.120 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          APP=/opt/qiaolian_v3
+          CUR=$(readlink -f "$APP/current")
+          UNITS=(qiaolian-v3@collector.service qiaolian-v3@canonical.service qiaolian-v3@publisher.service qiaolian-v3@user.service)
+          echo '===DEPLOYMENT==='
+          echo "current=$CUR"
+          printf 'deployed_sha='; tr -cd '0-9a-fA-F\n' < "$APP/.deployed_sha" | head -1
+          printf 'git_head='; cat "$CUR/.git/HEAD" 2>/dev/null || true
+          printf 'git_ref='; cat "$CUR/.git/refs/heads/actions-production" 2>/dev/null || true
+          echo '===SERVICES==='
+          for u in "${UNITS[@]}"; do
+            echo "[$u]"
+            systemctl show "$u" -p ExecStart -p WorkingDirectory -p MainPID -p ActiveState -p SubState -p NRestarts -p ActiveEnterTimestamp --no-pager
+            p=$(systemctl show "$u" -p MainPID --value)
+            echo "cwd=$(readlink -f /proc/$p/cwd)"
+            printf 'cmd='; tr '\0' ' ' < /proc/$p/cmdline; echo
+          done
+          echo '===TOKEN_COLLISION==='
+          python3 - <<'PY'
+          import os,subprocess,re
+          units=['qiaolian-v3@collector.service','qiaolian-v3@canonical.service','qiaolian-v3@publisher.service','qiaolian-v3@user.service']
+          vp=[]
+          for u in units:
+              try: vp.append(int(subprocess.check_output(['systemctl','show',u,'-p','MainPID','--value'],text=True).strip()))
+              except: pass
+          def toks(p):
+              try: raw=open(f'/proc/{p}/environ','rb').read().split(b'\0')
+              except: return []
+              out=[]
+              for x in raw:
+                  if b'=' in x:
+                      k,v=x.split(b'=',1)
+                      if b'TOKEN' in k.upper() and v: out.append((k.decode(errors='ignore'),v))
+              return out
+          refs=[(p,k,v) for p in vp for k,v in toks(p)]
+          hit=0
+          for n in os.listdir('/proc'):
+              if not n.isdigit() or int(n) in vp: continue
+              p=int(n)
+              for k,v in toks(p):
+                  for rp,rk,rv in refs:
+                      if v==rv:
+                          try: c=open(f'/proc/{p}/cmdline','rb').read().replace(b'\0',b' ').decode(errors='ignore')[:200]
+                          except: c=''
+                          c=re.sub(r'\d{6,}:[A-Za-z0-9_-]{20,}','[REDACTED]',c)
+                          print(f'COLLISION other_pid={p} v3_pid={rp} cmd={c}'); hit+=1
+          if not hit: print('NO_DUPLICATE_TELEGRAM_TOKEN_PROCESS_FOUND')
+          PY
+          set -a; source "$APP/runtime.env"; set +a
+          DB="${DB_PATH:-${SQLITE_PATH:-$CUR/data/qiaolian_dual_bot.db}}"
+          echo '===DATABASE==='
+          echo "db_path=$DB"
+          stat -c 'db_file size=%s mtime=%y owner=%U:%G mode=%A' "$DB"
+          APP_DB="$DB" python3 - <<'PY'
+          import os,sqlite3,json
+          db=sqlite3.connect('file:'+os.environ['APP_DB']+'?mode=ro',uri=True); db.execute('PRAGMA query_only=ON')
+          print('integrity='+db.execute('PRAGMA integrity_check').fetchone()[0])
+          tabs=[r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")]
+          print('tables='+'|'.join(tabs))
+          def cnt(t): return db.execute(f'SELECT COUNT(*) FROM "{t}"').fetchone()[0]
+          targets=['source_posts','listings_v3','review_items','media_assets','publication_packages','publication_delivery_attempts','posts','publish_logs','appointments_v3','bot_settings']
+          for t in targets: print(f'count.{t}='+str(cnt(t)) if t in tabs else f'count.{t}=MISSING')
+          for t in tabs:
+              if any(x in t.lower() for x in ('canonical','service','repair','work_order','lease','tenant')) and t not in targets:
+                  try: print(f'count.{t}={cnt(t)}')
+                  except: pass
+          def cols(t): return [r[1] for r in db.execute(f'PRAGMA table_info("{t}")')]
+          for t in tabs:
+              if any(x in t.lower() for x in ('publication','publish','review')):
+                  for c in cols(t):
+                      if c.lower()=='status' or c.lower().endswith('status'):
+                          rows=db.execute(f'SELECT COALESCE(CAST("{c}" AS TEXT),"<NULL>"),COUNT(*) FROM "{t}" GROUP BY "{c}"').fetchall()
+                          print(f'status.{t}.{c}='+'|'.join(f'{a}:{b}' for a,b in rows))
+          if 'bot_settings' in tabs:
+              cs=cols('bot_settings'); k=next((x for x in cs if x.lower() in ('key','name','setting_key')),None); v=next((x for x in cs if x.lower() in ('value','setting_value')),None)
+              if k and v:
+                  for a,b in db.execute(f'SELECT "{k}","{v}" FROM bot_settings'):
+                      s=str(a or ''); low=s.lower()
+                      if any(x in low for x in ('token','secret','password','api','hash','session')): continue
+                      if any(x in low for x in ('publish','auto','schedule','time','hour','window','broadcast')): print(f'setting.{s}={b}')
+          if 'source_posts' in tabs:
+              cs=cols('source_posts'); sc=next((x for x in cs if x in ('source_channel','source_channel_id','channel_id','source_chat_id')),None); tc=next((x for x in cs if x in ('updated_at','collected_at','created_at')),None)
+              if sc:
+                  q=f'SELECT CAST("{sc}" AS TEXT),COUNT(*)'+(f',MAX("{tc}")' if tc else '')+f' FROM source_posts GROUP BY "{sc}" ORDER BY 2 DESC'
+                  for r in db.execute(q): print('source_activity='+json.dumps(r,ensure_ascii=False))
+          for t in ('listings_v3','listing_offers'):
+              if t in tabs:
+                  for c in ('inventory_status','offer_status','offer_type','publication_policy'):
+                      if c in cols(t):
+                          rows=db.execute(f'SELECT COALESCE(CAST("{c}" AS TEXT),"<NULL>"),COUNT(*) FROM "{t}" GROUP BY "{c}"').fetchall(); print(f'dist.{t}.{c}='+'|'.join(f'{a}:{b}' for a,b in rows))
+          db.close()
+          PY
+          echo '===ERRORS_SINCE_START==='
+          for u in "${UNITS[@]}"; do
+            echo "---$u---"; s=$(systemctl show "$u" -p ActiveEnterTimestamp --value)
+            journalctl -u "$u" --since "$s" --no-pager -o short-iso | python3 -c 'import sys,re; a=sys.stdin.readlines(); p=re.compile(r"Traceback|ERROR|CRITICAL|getUpdates|Conflict|Query is too old|NetworkError|ReadError|database is locked|sqlite.*locked|no such table|callback.*handler|AttributeError|duplicate|publication.*unknown|Main process exited|exception",re.I); h=set(); [h.update(range(max(0,i-3),min(len(a),i+12))) for i,x in enumerate(a) if p.search(x)]; print("NO_MATCHING_EXCEPTIONS") if not h else [print(re.sub(r"\d{6,}:[A-Za-z0-9_-]{20,}","[REDACTED]",a[i]),end="") for i in sorted(h)]'
+          done
+          echo '===UI_TERMS==='
+          python3 - <<'PY'
+          from pathlib import Path
+          r=Path('/opt/qiaolian_v3/current/v3_core'); fs=list(r.rglob('*.py'))
+          for t in ['广播中心','我的租约','绑定租约','侨联保障','入住服务','今日预约','待跟进','已联系','已完成','已取消','新建房源','运行状态','每日广播','今日统计','房源状态','发帖时段','采集源','预约申请已提交','实时视频看房','租赁详情','更多实拍','帮我找房','联系中文顾问']:
+              f=[]
+              for p in fs:
+                  try: x=p.read_text(errors='ignore')
+                  except: continue
+                  if t in x: f.append(str(p.relative_to(r.parent)))
+              print('term.'+t+'='+('|'.join(f[:10]) if f else 'MISSING'))
+          PY
+          REMOTE
+      - if: always()
+        run: rm -f ~/.ssh/qiaolian
