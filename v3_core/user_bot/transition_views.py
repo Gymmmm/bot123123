@@ -11,7 +11,6 @@ from datetime import date, timedelta
 from html import escape as he
 from typing import Literal
 
-from .appointments import display_date
 from .listing_presenter import build_public_listing_details
 from .public_appointment import PublicAppointmentDraft
 from .public_inventory import PublicInventoryReader
@@ -62,6 +61,14 @@ def _format_price(value: int | None) -> str:
     return f"${int(value):,}/月" if value is not None and int(value) > 0 else ""
 
 
+def _date_display(value: object) -> str:
+    raw = str(value or "").strip()
+    bits = raw.replace("/", "-").split("-")
+    if len(bits) >= 2 and all(part.isdigit() for part in bits[-2:]):
+        return f"{int(bits[-2])}月{int(bits[-1])}日"
+    return raw or "待安排"
+
+
 def _resolve_bookable_details(
     inventory: PublicInventoryReader,
     public_listing_id: str,
@@ -84,33 +91,27 @@ def _appointment_date_view(
     details = _resolve_bookable_details(inventory, public_id)
     subject = details.subject or details.location or "这套房"
     price = _format_price(details.monthly_rent_usd)
-    lines = [
-        "🎥 <b>视频看房</b>" if draft.mode == "video" else "📅 <b>预约看房</b>",
-        "",
-        f"🏠 <b>{he(subject)}</b>",
-        f"🆔 {he(public_id)}",
-    ]
-    if price:
-        lines.append(f"💵 <b>{he(price)}</b>")
-    lines.extend(["", "请选择看房日期："])
-    mode_choice = (
-        TransitionChoice("🚶 改为实地看房", "appointment_mode", "offline")
-        if draft.mode == "video"
-        else TransitionChoice("🎥 改为视频看房", "appointment_mode", "video")
-    )
+    price_line = f"\n💰 <b>{he(price)}</b>" if price else ""
+    if draft.mode == "video":
+        heading = f"🎥 <b>视频看房｜{he(public_id)}</b>"
+        question = "哪天方便视频看房？"
+        mode_choice = TransitionChoice("🚶 改为实地看房", "appointment_mode", "offline")
+    else:
+        heading = f"📅 <b>预约看房｜{he(public_id)}</b>"
+        question = "哪天方便看房？"
+        mode_choice = TransitionChoice("🎥 改为视频看房", "appointment_mode", "video")
+    text = f"{heading}\n\n🏠 <b>{he(subject)}</b>{price_line}\n\n{question}"
 
     today_value = today.strftime("%m-%d")
-    tomorrow = today + timedelta(days=1)
-    after = today + timedelta(days=2)
-    tomorrow_value = tomorrow.strftime("%m-%d")
-    after_value = after.strftime("%m-%d")
+    tomorrow_value = (today + timedelta(days=1)).strftime("%m-%d")
+    after_value = (today + timedelta(days=2)).strftime("%m-%d")
     rows = (
         (
-            TransitionChoice(f"今天 · {today.strftime('%m月%d日')}", "appointment_date", today_value),
-            TransitionChoice(f"明天 · {tomorrow.strftime('%m月%d日')}", "appointment_date", tomorrow_value),
+            TransitionChoice("今天", "appointment_date", today_value),
+            TransitionChoice("明天", "appointment_date", tomorrow_value),
         ),
         (
-            TransitionChoice(f"后天 · {after.strftime('%m月%d日')}", "appointment_date", after_value),
+            TransitionChoice("后天", "appointment_date", after_value),
             TransitionChoice("📅 其他日期", "appointment_other_date"),
         ),
         (mode_choice,),
@@ -119,7 +120,7 @@ def _appointment_date_view(
             TransitionChoice("🏠 返回首页", "home"),
         ),
     )
-    return TransitionView(kind="appointment_date", text="\n".join(lines), rows=rows)
+    return TransitionView(kind="appointment_date", text=text, rows=rows)
 
 
 def _appointment_time_view(
@@ -131,10 +132,9 @@ def _appointment_time_view(
     details = _resolve_bookable_details(inventory, draft.public_listing_id)
     subject = details.subject or details.location or "这套房"
     text = (
-        "🕐 <b>选择看房时间</b>\n\n"
-        f"🏠 {he(subject)}\n"
-        f"🆔 {he(draft.public_listing_id)}\n"
-        f"📅 {he(display_date(draft.date))}"
+        "🕐 <b>选择时间</b>\n\n"
+        f"📅 {he(_date_display(draft.date))}\n"
+        f"🏠 {he(subject)}"
     )
     rows = (
         (TransitionChoice("上午 09:00–12:00", "appointment_time", "am"),),
@@ -153,9 +153,8 @@ def _custom_date_prompt() -> TransitionView:
     return TransitionView(
         kind="appointment_custom_date",
         text=(
-            "📅 <b>请输入看房日期</b>\n\n"
-            "例如：<code>0905</code>、<code>9月5日</code> 或 <code>下周三</code>。\n"
-            "提交后会再让您选择具体时间。"
+            "📅 <b>请输入日期</b>\n\n"
+            "例如：<code>0905</code>、<code>9月5日</code> 或 <code>下周三</code>"
         ),
         rows=(),
     )
@@ -165,8 +164,8 @@ def _custom_time_prompt() -> TransitionView:
     return TransitionView(
         kind="appointment_custom_time",
         text=(
-            "🕐 <b>请输入看房时间</b>\n\n"
-            "例如：<code>20:00</code> 或 <code>晚上8点</code>"
+            "🕐 <b>其他时间</b>\n\n"
+            "直接输入，例如：<code>20:00</code> 或 <code>晚上8点</code>"
         ),
         rows=(),
     )
