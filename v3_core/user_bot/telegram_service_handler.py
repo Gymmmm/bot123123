@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from html import escape as he
 from typing import Any
 from uuid import uuid4
 
@@ -26,6 +27,7 @@ from .service_views import (
     rfcity_home_view,
     slot_view,
 )
+from .telegram_navigation import advisor_handoff_url
 
 
 SERVICE_REQUEST_SESSION_KEY = "v3_service_request"
@@ -42,19 +44,71 @@ class TelegramServiceOutcome:
     ticket_id: int | None = None
 
 
-def build_service_keyboard(view: ServiceView) -> InlineKeyboardMarkup | None:
-    if not view.rows:
-        return None
-    return InlineKeyboardMarkup(
-        [
-            [InlineKeyboardButton(choice.label, callback_data=choice.callback_data) for choice in row]
-            for row in view.rows
-        ]
+def _service_home_with_tenant_entry() -> ServiceView:
+    # Keep the existing service surface, add one real entry backed by
+    # tenant_bindings_v3. No new aftercare schema is required.
+    from .service_views import service_home_view
+
+    view = service_home_view()
+    rows = list(view.rows)
+    insert_at = max(0, len(rows) - 1)
+    rows.insert(insert_at, (ServiceChoice("🏠 已入住 / 老租客服务", "v3u:service:tenant"),))
+    return ServiceView(kind=view.kind, text=view.text, rows=tuple(rows))
+
+
+def _tenant_binding_view(service: TenantService, user_id: int) -> ServiceView:
+    binding = service.repository.get_active_binding(int(user_id))
+    if binding is None:
+        return ServiceView(
+            kind="tenant_binding_missing",
+            text=(
+                "🏠 <b>已入住 / 老租客服务</b>\n\n"
+                "当前账号还没有绑定已入住住房。\n\n"
+                "如果您已经入住，联系中文顾问并说明小区或房源，顾问会协助核对后续服务。"
+            ),
+            rows=(
+                (ServiceChoice("💬 联系中文顾问", "v3u:home:contact"),),
+                (ServiceChoice("⬅️ 返回入住服务", "v3u:home:service"),),
+            ),
+        )
+    property_name = str(binding.property_name or "已绑定住房").strip() or "已绑定住房"
+    return ServiceView(
+        kind="tenant_binding",
+        text=(
+            "🏠 <b>已入住 / 老租客服务</b>\n\n"
+            f"当前住房：<b>{he(property_name)}</b>\n\n"
+            "报修、物业协调或其他入住问题，可以直接从这里处理。"
+        ),
+        rows=(
+            (
+                ServiceChoice("🔧 我要报修", "v3u:service:repair"),
+                ServiceChoice("🏢 物业协调", "v3u:service:property"),
+            ),
+            (ServiceChoice("💬 联系中文顾问", "v3u:home:contact"),),
+            (ServiceChoice("⬅️ 返回入住服务", "v3u:home:service"),),
+        ),
     )
 
 
-async def render_service_view(query: Any, view: ServiceView) -> None:
-    markup = build_service_keyboard(view)
+def build_service_keyboard(view: ServiceView, *, advisor_url: str = "") -> InlineKeyboardMarkup | None:
+    if not view.rows:
+        return None
+    clean_advisor = str(advisor_url or "").strip()
+    rows: list[list[InlineKeyboardButton]] = []
+    for row in view.rows:
+        buttons: list[InlineKeyboardButton] = []
+        for choice in row:
+            label = "💬 联系中文顾问" if str(choice.label or "") == "💬 联系我们" else str(choice.label or "")
+            if choice.callback_data == "v3u:home:contact" and clean_advisor:
+                buttons.append(InlineKeyboardButton(label, url=advisor_handoff_url(clean_advisor)))
+            else:
+                buttons.append(InlineKeyboardButton(label, callback_data=choice.callback_data))
+        rows.append(buttons)
+    return InlineKeyboardMarkup(rows)
+
+
+async def render_service_view(query: Any, view: ServiceView, *, advisor_url: str = "") -> None:
+    markup = build_service_keyboard(view, advisor_url=advisor_url)
     message = getattr(query, "message", None)
     if getattr(message, "photo", None):
         await query.edit_message_caption(
@@ -70,11 +124,11 @@ async def render_service_view(query: Any, view: ServiceView) -> None:
     )
 
 
-async def _reply(message: Any, view: ServiceView) -> None:
+async def _reply(message: Any, view: ServiceView, *, advisor_url: str = "") -> None:
     await message.reply_text(
         view.text,
         parse_mode=ParseMode.HTML,
-        reply_markup=build_service_keyboard(view),
+        reply_markup=build_service_keyboard(view, advisor_url=advisor_url),
     )
 
 
@@ -139,6 +193,7 @@ async def handle_v3_service_callback(
     *,
     service: TenantService,
     effects: ServiceEffectExecutor | None = None,
+    advisor_url: str = "",
 ) -> TelegramServiceOutcome:
     query = getattr(update, "callback_query", None)
     raw = str(getattr(query, "data", "") or "") if query is not None else ""
@@ -151,39 +206,43 @@ async def handle_v3_service_callback(
         raise ValueError("telegram_user_data_missing_for_service")
     await query.answer()
 
+    if action == "tenant":
+        user = _lead_user(update)
+        await render_service_view(query, _tenant_binding_view(service, user.user_id), advisor_url=advisor_url)
+        return TelegramServiceOutcome(True, action, True)
     if action == "repair":
-        await render_service_view(query, repair_home_view())
+        await render_service_view(query, repair_home_view(), advisor_url=advisor_url)
         return TelegramServiceOutcome(True, action, True)
     if action == "property":
-        await render_service_view(query, property_view())
+        await render_service_view(query, property_view(), advisor_url=advisor_url)
         return TelegramServiceOutcome(True, action, True)
     if action == "local":
-        await render_service_view(query, local_life_view())
+        await render_service_view(query, local_life_view(), advisor_url=advisor_url)
         return TelegramServiceOutcome(True, action, True)
     if action == "general":
-        await render_service_view(query, general_prompt_view())
+        await render_service_view(query, general_prompt_view(), advisor_url=advisor_url)
         user_data[SERVICE_GENERAL_WAIT_KEY] = True
         user_data.pop(SERVICE_NEARBY_WAIT_KEY, None)
         return TelegramServiceOutcome(True, action, True)
     if action == "nearby":
-        await render_service_view(query, nearby_view())
+        await render_service_view(query, nearby_view(), advisor_url=advisor_url)
         return TelegramServiceOutcome(True, action, True)
     if action == "nearby_other":
-        await render_service_view(query, general_prompt_view(nearby=True))
+        await render_service_view(query, general_prompt_view(nearby=True), advisor_url=advisor_url)
         user_data[SERVICE_NEARBY_WAIT_KEY] = True
         user_data.pop(SERVICE_GENERAL_WAIT_KEY, None)
         return TelegramServiceOutcome(True, action, True)
     if action == "rfcity":
-        await render_service_view(query, rfcity_home_view())
+        await render_service_view(query, rfcity_home_view(), advisor_url=advisor_url)
         return TelegramServiceOutcome(True, action, True)
     if action.startswith("rfcity:"):
         category = action.split(":", 1)[1]
-        await render_service_view(query, _rfcity_category_product_view(category))
+        await render_service_view(query, _rfcity_category_product_view(category), advisor_url=advisor_url)
         return TelegramServiceOutcome(True, action, True)
     if action.startswith("issue:"):
         issue_key = action.split(":", 1)[1]
         draft = service.begin_request(issue_key, request_token=uuid4().hex)
-        await render_service_view(query, issue_prompt_view(draft))
+        await render_service_view(query, issue_prompt_view(draft), advisor_url=advisor_url)
         _store_draft(user_data, draft)
         user_data.pop(SERVICE_GENERAL_WAIT_KEY, None)
         user_data.pop(SERVICE_NEARBY_WAIT_KEY, None)
@@ -202,7 +261,7 @@ async def handle_v3_service_callback(
                 user=user,
                 submission=submission,
             )
-        await render_service_view(query, repair_success_view(urgent=submission.urgent))
+        await render_service_view(query, repair_success_view(urgent=submission.urgent), advisor_url=advisor_url)
         user_data.pop(SERVICE_REQUEST_SESSION_KEY, None)
         return TelegramServiceOutcome(
             True,
@@ -220,6 +279,7 @@ async def handle_v3_service_text(
     *,
     service: TenantService,
     effects: ServiceEffectExecutor | None = None,
+    advisor_url: str = "",
 ) -> TelegramServiceOutcome:
     user_data = getattr(context, "user_data", None)
     message = getattr(update, "effective_message", None)
@@ -233,7 +293,7 @@ async def handle_v3_service_text(
             await message.reply_text("请简单描述发生了什么，例如：B栋3楼走廊灯坏了。")
             return TelegramServiceOutcome(True, "repair_detail", True)
         updated = service.with_detail(draft, text)
-        await _reply(message, slot_view(updated))
+        await _reply(message, slot_view(updated), advisor_url=advisor_url)
         _store_draft(user_data, updated)
         return TelegramServiceOutcome(True, "repair_detail", True)
 
@@ -245,7 +305,7 @@ async def handle_v3_service_text(
         await message.reply_text("请简单说一下需要什么帮助。")
         return TelegramServiceOutcome(True, "nearby_text" if nearby else "general_text", True)
 
-    await _reply(message, general_success_view(nearby=nearby))
+    await _reply(message, general_success_view(nearby=nearby), advisor_url=advisor_url)
     effect = None
     if effects is not None:
         effect = await effects.general(
@@ -273,4 +333,6 @@ __all__ = [
     "handle_v3_service_callback",
     "handle_v3_service_text",
     "render_service_view",
+    "_service_home_with_tenant_entry",
+    "_tenant_binding_view",
 ]
