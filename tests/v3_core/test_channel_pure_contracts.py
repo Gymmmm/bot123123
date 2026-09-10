@@ -20,7 +20,7 @@ from v3_core.publishing.public_ids import (
 
 
 def test_layout_and_floor_match_current_public_display_contract():
-    assert display_layout("2房1厅1卫") == "2房1厅｜2卫"
+    assert display_layout("2房1厅2卫") == "2房1厅｜2卫"
     assert display_layout("2房1办公2卫") == "2房＋书房｜2卫"
     assert display_layout("2房1办公2卫", "办公室") == "2房1办公2卫"
     assert display_floor("19") == "19楼"

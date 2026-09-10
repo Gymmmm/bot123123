@@ -73,6 +73,19 @@ def test_keyboard_contract_is_two_plus_one_and_ordered():
     assert rows[0][0].url == ACTIONS["details"]
     assert rows[0][1].url == ACTIONS["photos"]
     assert rows[1][0].url == ACTIONS["book"]
+    assert {url.rsplit("_", 1)[0] for url in ACTIONS.values()} == {
+        "https://t.me/TestBot?start=property_QL-RF-A2B3"
+    }
+
+
+def test_keyboard_rejects_internal_listing_id_urls():
+    fake = {
+        "details": "https://t.me/TestBot?start=property_l_1_details",
+        "photos": "https://t.me/TestBot?start=property_l_1_photos",
+        "book": "https://t.me/TestBot?start=property_l_1_book",
+    }
+    with pytest.raises(ValueError, match="invalid_public_listing_id"):
+        build_channel_keyboard(fake, inventory_status="active")
 
 
 @pytest.mark.asyncio

@@ -4,8 +4,12 @@ import sqlite3
 
 import pytest
 
+from v3_core.publishing.telegram_adapter import build_channel_keyboard
 from v3_core.storage.bootstrap import initialize_v3_storage
-from v3_core.user_bot.channel_status_sync import V3AppointmentChannelSynchronizer
+from v3_core.user_bot.channel_status_sync import (
+    V3AppointmentChannelSynchronizer,
+    appointment_channel_keyboard,
+)
 
 
 class FakeBot:
@@ -73,6 +77,12 @@ async def test_sync_edits_only_latest_exact_publication_message_and_locks_at_fiv
     assert "🔵 房态确认中" in call["caption"]
     buttons = [button.text for row in call["reply_markup"].inline_keyboard for button in row]
     assert buttons == ["🏠 房源详情", "📸 更多实拍"]
+    assert "📅 预约看房" not in buttons
+    urls = [button.url for row in call["reply_markup"].inline_keyboard for button in row]
+    assert urls == [
+        "https://t.me/qiaolian_rent_bot?start=property_QL-RF-A2B3_details",
+        "https://t.me/qiaolian_rent_bot?start=property_QL-RF-A2B3_photos",
+    ]
 
     with sqlite3.connect(db_path) as conn:
         status = conn.execute(
@@ -87,3 +97,61 @@ async def test_sync_edits_only_latest_exact_publication_message_and_locks_at_fiv
     assert status == "pending"
     assert "🔵 房态确认中" in newest
     assert "🔵 房态确认中" not in old
+
+
+def _labels(markup):
+    return [button.text for row in markup.inline_keyboard for button in row]
+
+
+def _urls(markup):
+    return [button.url for row in markup.inline_keyboard for button in row]
+
+
+def test_sync_and_publish_keyboards_share_bookable_contract():
+    sync = appointment_channel_keyboard(
+        username="qiaolian_rent_bot",
+        public_listing_id="QL-RF-A2B3",
+        status="active",
+    )
+    publish = build_channel_keyboard(
+        {
+            "details": "https://t.me/qiaolian_rent_bot?start=property_QL-RF-A2B3_details",
+            "photos": "https://t.me/qiaolian_rent_bot?start=property_QL-RF-A2B3_photos",
+            "book": "https://t.me/qiaolian_rent_bot?start=property_QL-RF-A2B3_book",
+        },
+        inventory_status="active",
+    )
+    assert _labels(sync) == ["🏠 房源详情", "📸 更多实拍", "📅 预约看房"]
+    assert _labels(publish) == _labels(sync)
+    assert _urls(publish) == _urls(sync)
+    assert all(url.endswith(suffix) for url, suffix in zip(
+        _urls(sync),
+        ("_details", "_photos", "_book"),
+        strict=True,
+    ))
+    assert all("QL-RF-A2B3" in url for url in _urls(sync))
+
+
+def test_unbookable_sync_keyboard_keeps_details_drops_book():
+    markup = appointment_channel_keyboard(
+        username="qiaolian_rent_bot",
+        public_listing_id="QL-RF-A2B3",
+        status="rented",
+    )
+    assert _labels(markup) == ["🏠 房源详情", "📸 更多实拍"]
+    assert _urls(markup)[0].endswith("property_QL-RF-A2B3_details")
+
+
+def test_missing_public_listing_id_does_not_mint_internal_deeplink():
+    with pytest.raises(ValueError, match="invalid_public_listing_id"):
+        appointment_channel_keyboard(
+            username="qiaolian_rent_bot",
+            public_listing_id="l_1",
+            status="active",
+        )
+    with pytest.raises(ValueError, match="invalid_public_listing_id"):
+        appointment_channel_keyboard(
+            username="qiaolian_rent_bot",
+            public_listing_id="",
+            status="active",
+        )
