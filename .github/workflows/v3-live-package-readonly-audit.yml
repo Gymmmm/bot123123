@@ -1,0 +1,249 @@
+name: v3-live-package-readonly-audit
+
+on:
+  push:
+    branches: [audit/v3-live-final-20260910]
+    paths: [.github/workflows/v3-live-package-readonly-audit.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Configure production SSH
+        env:
+          PROD_SSH_PRIVATE_KEY: '${{ secrets.PROD_SSH_PRIVATE_KEY }}'
+        run: |
+          set -Eeuo pipefail
+          test -n "$PROD_SSH_PRIVATE_KEY"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian-production"
+          printf '%s\n' '50.114.74.120 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILuFtkSn5SJKY7mZ52Lc/QydPRTvHFpsj87M/HcIkb/L' > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/qiaolian-production" "$HOME/.ssh/known_hosts"
+
+      - name: Audit frozen packages and canonical identities without writes
+        run: |
+          set -Eeuo pipefail
+          ssh -i "$HOME/.ssh/qiaolian-production" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=20 root@50.114.74.120 'bash -s' <<'REMOTE'
+          set -Eeuo pipefail
+          readonly APP=/opt/qiaolian_v3
+          readonly RELEASE="$(readlink -f "$APP/current")"
+          readonly ENV_FILE="$APP/runtime.env"
+          export AUDIT_RELEASE="$RELEASE"
+          export AUDIT_DB="$(python3 - "$ENV_FILE" <<'PY'
+          import shlex, sys
+          from pathlib import Path
+          values = {}
+          for raw in Path(sys.argv[1]).read_text(errors='ignore').splitlines():
+              line = raw.strip()
+              if not line or line.startswith('#') or '=' not in line:
+                  continue
+              key, value = line.split('=', 1)
+              try:
+                  parsed = shlex.split(value, comments=False, posix=True)
+                  values[key.strip()] = parsed[0] if parsed else ''
+              except ValueError:
+                  values[key.strip()] = value.strip().strip('"').strip("'")
+          print(values.get('DB_PATH') or values.get('SQLITE_PATH') or '')
+          PY
+          )"
+          test -n "$AUDIT_DB" -a -f "$AUDIT_DB"
+
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import sqlite3
+          import sys
+          from pathlib import Path
+          from urllib.parse import parse_qs, urlparse
+
+          release = Path(os.environ['AUDIT_RELEASE'])
+          db_path = os.environ['AUDIT_DB']
+          sys.path.insert(0, str(release))
+          from v3_core.publishing.package_store import _content_hash, _content_payload
+
+          db = sqlite3.connect(f'file:{db_path}?mode=ro', uri=True)
+          db.row_factory = sqlite3.Row
+          db.execute('PRAGMA query_only=ON')
+
+          print('=== CANONICAL SOURCE IDENTITY DIFFERENCES ===')
+          current = db.execute(
+              '''SELECT c.canonical_record_id,c.source_post_id,c.facts_json,
+                        s.id source_row_id,s.source_id,s.source_type,s.source_name,
+                        s.source_post_id source_native_post_id
+                 FROM canonical_records c
+                 JOIN (SELECT source_post_id,MAX(rowid) max_rowid
+                       FROM canonical_records GROUP BY source_post_id) x ON x.max_rowid=c.rowid
+                 JOIN source_posts s ON CAST(s.id AS TEXT)=CAST(c.source_post_id AS TEXT)
+                 ORDER BY s.id'''
+          ).fetchall()
+          mismatches = []
+          for row in current:
+              try:
+                  facts = json.loads(row['facts_json'] or '{}')
+              except Exception:
+                  facts = {}
+              ident = facts.get('source_identity') or {}
+              expected = {
+                  'source_post_id': row['source_row_id'],
+                  'source_id': row['source_id'],
+                  'source_type': row['source_type'],
+                  'source_post_identity': row['source_native_post_id'],
+              }
+              bad = [key for key, value in expected.items()
+                     if str(ident.get(key) or '') != str(value or '')]
+              if bad:
+                  mismatches.append((row, ident, expected, bad))
+          print(f'identity_mismatch_count={len(mismatches)}')
+          for row, ident, expected, bad in mismatches:
+              safe = {
+                  'source_row_id': row['source_row_id'],
+                  'source_name': row['source_name'],
+                  'source_native_post_id': row['source_native_post_id'],
+                  'mismatch_fields': bad,
+                  'actual_nonempty': {key: bool(ident.get(key)) for key in bad},
+                  'expected_nonempty': {key: bool(expected.get(key)) for key in bad},
+              }
+              print('identity_mismatch=' + json.dumps(safe, ensure_ascii=False, sort_keys=True))
+
+          print('=== AUTO EXCEPTIONS ===')
+          for table in ('publisher_auto_items_v3', 'publisher_review_exceptions_v3'):
+              cols = {r[1] for r in db.execute(f'PRAGMA table_info("{table}")')}
+              group_cols = [c for c in ('state','reason_code','ignored','resolved') if c in cols]
+              for col in group_cols:
+                  rows = db.execute(
+                      f'SELECT COALESCE(CAST("{col}" AS TEXT),"<NULL>"),COUNT(*) '
+                      f'FROM "{table}" GROUP BY "{col}" ORDER BY 1'
+                  ).fetchall()
+                  print(f'{table}.{col}=' + '|'.join(f'{r[0]}:{r[1]}' for r in rows))
+              if {'state','reason_code','ignored'} <= cols:
+                  rows = db.execute(
+                      f'''SELECT state,COALESCE(NULLIF(reason_code,''),'<none>') reason,
+                                 ignored,COUNT(*) n FROM "{table}"
+                          GROUP BY state,reason,ignored ORDER BY state,reason,ignored'''
+                  ).fetchall()
+                  for row in rows:
+                      print(f'auto_reason state={row[0]} reason={row[1]} ignored={row[2]} count={row[3]}')
+
+          print('=== FROZEN PACKAGE CONTRACT ===')
+          packages = db.execute(
+              '''SELECT p.*,l.public_listing_id,l.property_type,o.offer_type,o.publication_policy,
+                        o.publishable
+                 FROM publication_packages_v3 p
+                 JOIN listings_v3 l ON l.listing_id=p.listing_id
+                 JOIN listing_offers o ON o.offer_id=p.offer_id
+                 ORDER BY p.created_at,p.id'''
+          ).fetchall()
+          style_counts = {}
+          immutable_hash_mismatch = 0
+          frozen_file_hash_mismatch = 0
+          action_contract_mismatch = 0
+          style_policy_mismatch = 0
+          for row in packages:
+              style_counts[row['cover_style']] = style_counts.get(row['cover_style'], 0) + 1
+              try: gallery = list(json.loads(row['gallery_json'] or '[]'))
+              except Exception: gallery = []
+              try: actions = dict(json.loads(row['actions_json'] or '{}'))
+              except Exception: actions = {}
+              try: snapshot = dict(json.loads(row['snapshot_json'] or '{}'))
+              except Exception: snapshot = {}
+              try: file_hashes = dict(json.loads(row['frozen_file_hashes_json'] or '{}'))
+              except Exception: file_hashes = {}
+              try: source_identity = dict(json.loads(row['source_identity_json'] or '{}'))
+              except Exception: source_identity = {}
+              payload = _content_payload(
+                  package_id=str(row['package_id']), listing_id=str(row['listing_id']),
+                  offer_id=str(row['offer_id']), canonical_record_id=str(row['canonical_record_id']),
+                  package_version=int(row['package_version']), cover_style=str(row['cover_style']),
+                  cover_path=str(row['cover_path']), gallery=gallery,
+                  post_text=str(row['post_text']), actions=actions, snapshot=snapshot,
+                  frozen_file_hashes=file_hashes, source_identity=source_identity,
+                  public_token=str(row['public_token']),
+                  canonical_facts_hash=str(row['canonical_facts_hash']))
+              content_ok = _content_hash(payload) == str(row['content_hash'])
+              if not content_ok:
+                  immutable_hash_mismatch += 1
+              files_ok = True
+              for path_value, expected_hash in file_hashes.items():
+                  target = Path(path_value)
+                  if not target.is_file() or hashlib.sha256(target.read_bytes()).hexdigest() != str(expected_hash):
+                      files_ok = False
+                      break
+              if not files_ok:
+                  frozen_file_hash_mismatch += 1
+              action_payloads = {}
+              for key, url in actions.items():
+                  parsed = urlparse(str(url))
+                  action_payloads[key] = (parse_qs(parsed.query).get('start') or [''])[0]
+              public_id = str(row['public_listing_id'])
+              action_ok = (
+                  list(actions.keys()) == ['details','photos','book']
+                  and action_payloads.get('details') == f'listing_{public_id}'
+                  and action_payloads.get('photos') == f'photos_{public_id}'
+                  and action_payloads.get('book') == f'book_{public_id}'
+              )
+              if not action_ok:
+                  action_contract_mismatch += 1
+              identity = (str(row['property_type'] or '') + ' ' + str(snapshot.get('property_type_display') or '')).lower()
+              expected_style = 'black_gold' if ('别墅' in identity or 'villa' in identity) else 'right_price'
+              policy_ok = str(row['cover_style']) == expected_style
+              if row['status'] == 'published' and not policy_ok:
+                  style_policy_mismatch += 1
+              if row['status'] in ('approved','published'):
+                  print('frozen_package=' + json.dumps({
+                      'public_listing_id': public_id,
+                      'status': row['status'],
+                      'offer_type': row['offer_type'],
+                      'publication_policy': row['publication_policy'],
+                      'publishable': row['publishable'],
+                      'cover_style': row['cover_style'],
+                      'expected_cover_style': expected_style,
+                      'style_policy_ok': policy_ok,
+                      'gallery_count': len(gallery),
+                      'action_keys': list(actions.keys()),
+                      'action_payloads': action_payloads,
+                      'content_hash_ok': content_ok,
+                      'frozen_file_hashes_ok': files_ok,
+                      'qiaolian_note_present': '侨联说' in str(row['post_text']),
+                  }, ensure_ascii=False, sort_keys=True))
+          print('package.cover_style_counts=' + '|'.join(f'{k}:{v}' for k,v in sorted(style_counts.items())))
+          print(f'package.immutable_content_hash_mismatch={immutable_hash_mismatch}')
+          print(f'package.frozen_file_hash_mismatch={frozen_file_hash_mismatch}')
+          print(f'package.action_contract_mismatch={action_contract_mismatch}')
+          print(f'package.published_style_policy_mismatch={style_policy_mismatch}')
+
+          sale_published = db.execute(
+              '''SELECT COUNT(*) FROM publication_instances pi
+                 JOIN listing_offers o ON o.offer_id=pi.offer_id
+                 WHERE o.offer_type='sale' AND pi.publish_status='published' '''
+          ).fetchone()[0]
+          duplicate_delivery = db.execute(
+              '''SELECT COUNT(*) FROM (
+                   SELECT offer_id,COUNT(*) n FROM publication_instances
+                   WHERE publish_status='published' GROUP BY offer_id HAVING n>1
+                 )'''
+          ).fetchone()[0]
+          print(f'publication.sale_published={sale_published}')
+          print(f'publication.offers_with_duplicate_published_instances={duplicate_delivery}')
+
+          print('=== SERVER COVER RUNTIME ===')
+          regular = Path('/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc')
+          bold = Path('/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc')
+          print(f'font.NotoSansCJK-Regular.exists={regular.is_file()}')
+          print(f'font.NotoSansCJK-Bold.exists={bold.is_file()}')
+          renderer = (release / 'v3_core/media/cover_renderer.py').read_text(errors='ignore')
+          print(f'renderer.enforces_Noto_Sans_CJK_SC={"Noto Sans CJK SC" in renderer and "cover_noto_font_not_applied" in renderer}')
+
+          db.close()
+          PY
+          REMOTE
+
+      - name: Remove temporary SSH material
+        if: always()
+        run: rm -f "$HOME/.ssh/qiaolian-production"
