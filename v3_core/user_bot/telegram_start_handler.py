@@ -265,17 +265,7 @@ async def _handle_broadcast_shortcut(
             )
         return TelegramStartOutcome(True, "broadcast_latest", payload)
 
-    # Broadcast advisor entry is intentionally direct when a configured advisor
-    # exists. With no advisor URL, keep the existing lead/admin fallback.
-    if str(advisor_url or "").strip():
-        await message.reply_text(
-            "💬 <b>联系中文顾问</b>\n\n点击下方直接打开顾问对话。",
-            parse_mode=ParseMode.HTML,
-            reply_markup=InlineKeyboardMarkup(
-                [[InlineKeyboardButton("💬 联系中文顾问", url=advisor_handoff_url(advisor_url))]]
-            ),
-        )
-        return TelegramStartOutcome(True, "broadcast_advisor", payload)
+    # Keep attribution/lead side effects even when a direct advisor URL exists.
     if contact_effects is not None:
         await contact_effects.execute_general(
             bot=getattr(context, "bot", None),
