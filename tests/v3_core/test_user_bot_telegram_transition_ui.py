@@ -45,3 +45,24 @@ def test_renderer_reuses_listing_details_public_callback():
     keyboard = build_transition_keyboard(view)
 
     assert keyboard.inline_keyboard[0][0].callback_data == "v3u:listing:details:QL-RF-A2B3"
+
+
+def test_renderer_maps_success_follow_up_actions_to_existing_home_callbacks():
+    view = TransitionView(
+        kind="appointment_success",
+        text="✅ 预约申请已提交",
+        rows=(
+            (
+                TransitionChoice("📅 我的预约", "home", "appointments"),
+                TransitionChoice("🏠 继续看房", "home", "search"),
+            ),
+            (TransitionChoice("💬 联系中文顾问", "home", "contact"),),
+        ),
+    )
+
+    keyboard = build_transition_keyboard(view)
+
+    assert [[button.callback_data for button in row] for row in keyboard.inline_keyboard] == [
+        ["v3u:home:appointments", "v3u:home:search"],
+        ["v3u:home:contact"],
+    ]
