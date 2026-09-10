@@ -146,7 +146,7 @@ def build_v3_user_bot_dependencies(config: V3UserBotConfig) -> V3UserBotDependen
 async def _render_home_callback(update: Any, config: V3UserBotConfig) -> None:
     query = update.callback_query
     await query.answer()
-    home = build_home_view(channel_url=config.channel_url)
+    home = build_home_view(channel_url=config.channel_url, advisor_url=config.advisor_url)
     message = getattr(query, "message", None)
     markup = build_home_keyboard(home)
     if getattr(message, "photo", None):
@@ -178,11 +178,9 @@ def build_v3_user_bot_application(
     runtime_state = RuntimeStateRepository(config.db_path)
 
     async def configure_command_menu(application: Application) -> None:
-        # Keep the public menu simple. Telegram's per-chat scope makes the
-        # administrator console visible only to configured administrators.
-        await application.bot.set_my_commands([BotCommand("start", "打开侨联小管家")])
+        await application.bot.set_my_commands([BotCommand("start", "打开侨联地产")])
         admin_commands = [
-            BotCommand("start", "打开侨联小管家"),
+            BotCommand("start", "打开侨联地产"),
             BotCommand("admin", "咨询后台"),
         ]
         for admin_id in sorted(set(admin_command_ids or config.admin_ids)):
@@ -212,7 +210,7 @@ def build_v3_user_bot_application(
         if admin_home_handler is not None:
             await admin_home_handler(update, context)
         else:
-            await show_admin_home(update.effective_message)
+            await show_admin_home(update.effective_message, admin_appointments)
 
     async def admin_callbacks(update, context):
         runtime_state.heartbeat("user", state="running", event=True)
@@ -223,13 +221,29 @@ def build_v3_user_bot_application(
             await query.answer("无管理员权限", show_alert=True)
             return
         raw = str(query.data or "")
-        if raw == "adminq:appointments" or raw.startswith("adminq:appointment:"):
-            await handle_admin_callback(update, admin_appointments)
+        if raw in {"adminq:home", "adminq:appointments", "adminq:pending"} or raw.startswith("adminq:appointment:"):
+            await handle_admin_callback(
+                update,
+                admin_appointments,
+                context=context,
+                availability=deps.appointment_effects.availability,
+                channel_sync=deps.appointment_effects.channel,
+                advisor_url=config.advisor_url,
+                channel_url=config.channel_url,
+            )
             return
         if admin_query_handler is not None:
             await admin_query_handler(update, context)
         else:
-            await handle_admin_callback(update, admin_appointments)
+            await handle_admin_callback(
+                update,
+                admin_appointments,
+                context=context,
+                availability=deps.appointment_effects.availability,
+                channel_sync=deps.appointment_effects.channel,
+                advisor_url=config.advisor_url,
+                channel_url=config.channel_url,
+            )
 
     async def start(update, context):
         runtime_state.heartbeat("user", state="running", event=True)
@@ -261,6 +275,7 @@ def build_v3_user_bot_application(
                 search_executor=deps.transition.searches,
                 lead_effects=deps.transition.lead_effects,
                 appointment_runtime_effects=deps.appointment_effects,
+                channel_url=config.channel_url,
             )
             return
         if raw.startswith("v3u:home:"):
@@ -279,6 +294,7 @@ def build_v3_user_bot_application(
                 context,
                 service=deps.transition.tenant_service,
                 effects=deps.service_effects,
+                advisor_url=config.advisor_url,
             )
             return
         if raw.startswith("v3u:assure:"):
@@ -296,6 +312,7 @@ def build_v3_user_bot_application(
             transition_views=deps.transition.views,
             contact_effects=deps.listing_contact_effects,
             advisor_url=config.advisor_url,
+            channel_url=config.channel_url,
         )
 
     async def text(update, context):
@@ -309,6 +326,7 @@ def build_v3_user_bot_application(
             search_executor=deps.transition.searches,
             lead_effects=deps.transition.lead_effects,
             appointment_runtime_effects=deps.appointment_effects,
+            channel_url=config.channel_url,
         )
         if outcome.handled:
             return
