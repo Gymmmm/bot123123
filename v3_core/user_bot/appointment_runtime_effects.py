@@ -4,6 +4,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
 from .admin_notification_plans import appointment_notification
 from .admin_notifications import AdminNotificationResult, TelegramAdminNotifier
 from .appointment_availability import (
@@ -23,6 +25,24 @@ class AppointmentRuntimeEffectResult:
     channel: ChannelStatusSyncResult | None
     admin: AdminNotificationResult | None
     availability_error: str = ""
+
+
+def _admin_appointment_keyboard(appointment_id: int, user_id: int) -> InlineKeyboardMarkup:
+    aid = int(appointment_id)
+    uid = int(user_id)
+    rows = [
+        [
+            InlineKeyboardButton("✅ 确认预约", callback_data=f"adminq:appointment:confirm:{aid}"),
+            InlineKeyboardButton("☎️ 标记已联系", callback_data=f"adminq:appointment:contacted:{aid}"),
+        ],
+        [
+            InlineKeyboardButton("❌ 无法安排", callback_data=f"adminq:appointment:cancel:{aid}"),
+            InlineKeyboardButton("📋 查看预约", callback_data=f"adminq:appointment:{aid}"),
+        ],
+    ]
+    if uid > 0:
+        rows.append([InlineKeyboardButton("👤 联系用户", url=f"tg://user?id={uid}")])
+    return InlineKeyboardMarkup(rows)
 
 
 class AppointmentRuntimeEffectExecutor:
@@ -68,8 +88,6 @@ class AppointmentRuntimeEffectExecutor:
             try:
                 availability_result = self.availability.recompute(execution.listing_id)
             except Exception as exc:
-                # Appointment persistence has already committed. Match production's
-                # non-rollback outer-effect boundary and continue to channel/admin.
                 availability_error = str(exc)
 
         channel_result = None
@@ -85,6 +103,10 @@ class AppointmentRuntimeEffectExecutor:
                     execution,
                     draft,
                     subject=self._subject(execution.public_listing_id),
+                    reply_markup=_admin_appointment_keyboard(
+                        execution.submission.appointment_id,
+                        user.user_id,
+                    ),
                 ),
             )
 
@@ -96,4 +118,8 @@ class AppointmentRuntimeEffectExecutor:
         )
 
 
-__all__ = ["AppointmentRuntimeEffectExecutor", "AppointmentRuntimeEffectResult"]
+__all__ = [
+    "AppointmentRuntimeEffectExecutor",
+    "AppointmentRuntimeEffectResult",
+    "_admin_appointment_keyboard",
+]
