@@ -137,6 +137,21 @@ async def _render_invalid_link(message: Any) -> None:
     )
 
 
+async def _render_unbookable(message: Any, result: PublicListingFlowResult) -> None:
+    await message.reply_text(
+        "这套房暂时不能预约，可以看相近房源或联系中文顾问。",
+        parse_mode=ParseMode.HTML,
+    )
+    if getattr(result, "details", None) is not None:
+        await _render_details(message, result)
+        return
+    await _render_invalid_link(message)
+
+
+def _failure_reason(result: object) -> str:
+    return str(getattr(result, "reason", "") or "").strip()
+
+
 async def _handle_broadcast_shortcut(
     update: Any,
     context: Any,
@@ -247,6 +262,14 @@ async def handle_v3_start(
 
     result = listings.resolve(payload)
     if not result.ok:
+        if _failure_reason(result) == "listing_not_bookable":
+            await _render_unbookable(message, result)
+            return TelegramStartOutcome(
+                handled=True,
+                kind="unbookable",
+                payload=payload,
+                result=result,
+            )
         await _render_invalid_link(message)
         return TelegramStartOutcome(
             handled=True,
