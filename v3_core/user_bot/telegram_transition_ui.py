@@ -8,9 +8,16 @@ from __future__ import annotations
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
+from .home_callbacks import encode_home_callback
 from .telegram_ui import TELEGRAM_CALLBACK_MAX_BYTES
 from .transition_callbacks import encode_transition_choice
 from .transition_views import TransitionView
+
+
+def _callback_data(choice) -> str:
+    if choice.kind == "home" and str(choice.value or "").strip():
+        return encode_home_callback(str(choice.value).strip())
+    return encode_transition_choice(choice)
 
 
 def build_transition_keyboard(view: TransitionView) -> InlineKeyboardMarkup:
@@ -21,12 +28,10 @@ def build_transition_keyboard(view: TransitionView) -> InlineKeyboardMarkup:
             label = str(choice.label or "").strip()
             if not label:
                 raise ValueError("telegram_transition_button_label_missing")
-            callback_data = encode_transition_choice(choice)
+            callback_data = _callback_data(choice)
             if len(callback_data.encode("utf-8")) > TELEGRAM_CALLBACK_MAX_BYTES:
                 raise ValueError("telegram_transition_callback_data_too_long")
-            buttons.append(
-                InlineKeyboardButton(label, callback_data=callback_data)
-            )
+            buttons.append(InlineKeyboardButton(label, callback_data=callback_data))
         if buttons:
             rows.append(buttons)
     if not rows:
