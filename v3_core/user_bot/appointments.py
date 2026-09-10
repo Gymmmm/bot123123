@@ -2,7 +2,7 @@
 
 The public flow is intentionally small: a concrete bookable listing enters a
 mode (offline by default, video optional), then date, then time, then immediate
-submission.  Historical focus/confirm callbacks are compatibility concerns and
+submission. Historical focus/confirm callbacks are compatibility concerns and
 must not enlarge the new V3 state machine.
 """
 from __future__ import annotations
@@ -113,6 +113,26 @@ def normalize_custom_date(value: object) -> str:
     return ""
 
 
+def display_date(value: object) -> str:
+    """Render stored date variants as an explicit month/day whenever possible."""
+    raw = str(value or "").strip()
+    if not raw:
+        return "待安排"
+    compact = raw.replace("/", "-")
+    match = re.fullmatch(r"(?:\d{4}-)?(\d{1,2})-(\d{1,2})", compact)
+    if match:
+        month, day = int(match.group(1)), int(match.group(2))
+        try:
+            datetime(2024, month, day)
+        except ValueError:
+            return raw
+        return f"{month:02d}月{day:02d}日"
+    match = re.fullmatch(r"(\d{1,2})月(\d{1,2})日", raw)
+    if match:
+        return f"{int(match.group(1)):02d}月{int(match.group(2)):02d}日"
+    return raw
+
+
 def valid_custom_time(value: object) -> bool:
     clean = str(value or "").strip()[:40]
     return bool(
@@ -125,7 +145,7 @@ def valid_custom_time(value: object) -> bool:
 
 def display_time(value: object) -> str:
     clean = str(value or "").strip()
-    return APPOINTMENT_TIME_LABELS.get(clean, clean)
+    return APPOINTMENT_TIME_LABELS.get(clean, clean or "待安排")
 
 
 def duplicate_identity(
@@ -157,6 +177,7 @@ __all__ = [
     "AppointmentDraft",
     "TERMINAL_APPOINTMENT_STATUSES",
     "appointment_date_matches",
+    "display_date",
     "display_time",
     "duplicate_identity",
     "editable_status",
