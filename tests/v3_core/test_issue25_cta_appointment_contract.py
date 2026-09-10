@@ -32,7 +32,7 @@ class Inventory:
         if public_listing_id != PUBLIC_ID:
             return None
         return SimpleNamespace(
-            snapshot={"schema": "v3_publication_snapshot.v1"},
+            snapshot={"schema": "v3_publication_snapshot.v1", "canonical_facts": {}},
             frozen_listing={
                 "project_name": "富力城",
                 "property_type": "公寓",
