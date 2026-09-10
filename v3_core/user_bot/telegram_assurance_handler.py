@@ -76,7 +76,6 @@ async def send_assurance_bundle(
         [
             [InlineKeyboardButton("💬 联系我们", callback_data="v3u:home:contact")],
             [InlineKeyboardButton("⬅️ 返回侨联保障", callback_data="v3u:home:rental")],
-            [InlineKeyboardButton("🏠 返回首页", callback_data="v3u:t:home")],
         ]
     )
     await context.bot.send_message(
