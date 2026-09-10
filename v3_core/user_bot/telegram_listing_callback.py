@@ -1,8 +1,8 @@
 """Outer Telegram orchestration for V3 listing/card callbacks.
 
 The generic callback adapter renders details/photos/cards/book/search transitions.
-This wrapper completes the one intentionally deferred transition: listing
-consultation, whose success copy is shown only after lead/admin effects run.
+This wrapper completes the deferred consultation transition only when no direct
+advisor URL was available at the keyboard boundary.
 """
 from __future__ import annotations
 
@@ -25,6 +25,7 @@ from .telegram_callback_handler import (
     TelegramCallbackHandlerOutcome,
     handle_v3_callback,
 )
+from .telegram_navigation import advisor_handoff_url
 from .transition_views import TransitionViewService
 
 
@@ -56,24 +57,44 @@ def _lead_user(update: Any) -> LeadUser:
     )
 
 
-async def _render_contact(query: Any, *, text: str, public_listing_id: str, advisor_url: str) -> None:
+async def _render_contact(
+    query: Any,
+    *,
+    text: str,
+    public_listing_id: str,
+    advisor_url: str,
+    channel_url: str = "",
+) -> None:
+    clean_advisor = str(advisor_url or "").strip()
     contact_button = (
-        InlineKeyboardButton("💬 联系我们", url=advisor_url)
-        if str(advisor_url or "").strip()
-        else InlineKeyboardButton("💬 联系我们", callback_data="v3u:home:contact")
+        InlineKeyboardButton(
+            "💬 联系中文顾问",
+            url=advisor_handoff_url(clean_advisor, public_listing_id=public_listing_id),
+        )
+        if clean_advisor
+        else InlineKeyboardButton("💬 联系中文顾问", callback_data="v3u:home:contact")
     )
-    markup = InlineKeyboardMarkup(
+    rows = [
+        [contact_button],
         [
-            [contact_button],
-            [
-                InlineKeyboardButton(
-                    "📅 预约看房",
-                    callback_data=encode_listing_callback("book", public_listing_id),
-                ),
-                InlineKeyboardButton("🔍 继续找房", callback_data="v3u:home:search"),
-            ],
-        ]
-    )
+            InlineKeyboardButton(
+                "📅 预约看房",
+                callback_data=encode_listing_callback("book", public_listing_id),
+            ),
+            InlineKeyboardButton("🔍 继续找房", callback_data="v3u:home:search"),
+        ],
+        [
+            InlineKeyboardButton(
+                "⬅️ 返回租赁详情",
+                callback_data=encode_listing_callback("details", public_listing_id),
+            )
+        ],
+    ]
+    clean_channel = str(channel_url or "").strip()
+    if clean_channel:
+        rows.append([InlineKeyboardButton("📣 返回房源频道", url=clean_channel)])
+    rows.append([InlineKeyboardButton("🏠 返回首页", callback_data="v3u:t:home")])
+    markup = InlineKeyboardMarkup(rows)
     message = getattr(query, "message", None)
     if getattr(message, "photo", None):
         await query.edit_message_caption(
@@ -98,12 +119,15 @@ async def handle_v3_listing_callback(
     transition_views: TransitionViewService,
     contact_effects: ListingContactEffectExecutor,
     advisor_url: str = "",
+    channel_url: str = "",
 ) -> TelegramListingCallbackOutcome:
     outcome = await handle_v3_callback(
         update,
         context,
         router=router,
         transition_views=transition_views,
+        advisor_url=advisor_url,
+        channel_url=channel_url,
     )
     if not outcome.handled:
         return TelegramListingCallbackOutcome(handled=False, callback=outcome)
@@ -132,6 +156,7 @@ async def handle_v3_listing_callback(
         text=view.text,
         public_listing_id=view.public_listing_id,
         advisor_url=view.advisor_url,
+        channel_url=channel_url,
     )
     return TelegramListingCallbackOutcome(
         handled=True,
