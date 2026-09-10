@@ -1,15 +1,11 @@
-"""Telegram-neutral V3 home/contact/appointment views.
-
-Full home copy and button order follow the locked production User Bot. The view
-can be built before every action is wired, but the Telegram entrypoint must not
-render it until all five actions are live.
-"""
+"""Telegram-neutral V3 home/contact/appointment views."""
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Literal
 
 from .appointment_history import AppointmentHistoryView
+from .telegram_navigation import advisor_handoff_url
 
 
 HomeChoiceKind = Literal["root", "search", "appointments", "rental", "service", "contact"]
@@ -38,17 +34,25 @@ WELCOME_TEXT = (
 )
 
 CONTACT_TEXT = (
-    "💬 <b>有什么需要，直接告诉我们。</b>\n\n"
-    "找房的话，可以直接发送：\n"
-    "区域 + 预算 + 户型\n\n"
+    "💬 <b>联系中文顾问</b>\n\n"
+    "找房可以直接发送：区域 + 预算 + 户型。\n\n"
     "例如：\n"
     "「BKK1 两房，$900以内」\n"
     "「富力城一房，要能做饭」\n\n"
-    "不方便打字，也可以直接联系中文顾问。"
+    "也可以点击下方直接打开顾问对话。"
 )
 
 
-def build_home_view(*, channel_url: str = "") -> HomeView:
+def _contact_choice(advisor_url: str = "") -> HomeChoice:
+    clean = str(advisor_url or "").strip()
+    return HomeChoice(
+        "💬 联系中文顾问",
+        "contact",
+        url=advisor_handoff_url(clean) if clean else "",
+    )
+
+
+def build_home_view(*, channel_url: str = "", advisor_url: str = "") -> HomeView:
     rows: list[tuple[HomeChoice, ...]] = [
         (
             HomeChoice("🔍 帮我找房", "search"),
@@ -60,21 +64,22 @@ def build_home_view(*, channel_url: str = "") -> HomeView:
         ),
     ]
     clean_channel = str(channel_url or "").strip()
+    contact = _contact_choice(advisor_url)
     if clean_channel:
         rows.append(
             (
                 HomeChoice("🏠 最新房源", "root", url=clean_channel),
-                HomeChoice("💬 联系中文顾问", "contact"),
+                contact,
             )
         )
     else:
-        rows.append((HomeChoice("💬 联系中文顾问", "contact"),))
+        rows.append((contact,))
     return HomeView(kind="home", text=WELCOME_TEXT, rows=tuple(rows))
 
 
 def build_contact_view(*, advisor_url: str = "") -> HomeView:
     clean_advisor = str(advisor_url or "").strip()
-    first = HomeChoice("💬 联系中文顾问", "contact", url=clean_advisor) if clean_advisor else HomeChoice("💬 联系中文顾问", "contact")
+    first = _contact_choice(clean_advisor)
     return HomeView(
         kind="contact",
         text=CONTACT_TEXT,
