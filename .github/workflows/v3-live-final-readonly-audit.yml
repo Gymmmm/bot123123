@@ -50,7 +50,12 @@ jobs:
           echo '=== DEPLOYMENT ==='
           printf 'current_target=%s\n' "$CURRENT"
           printf 'release_git_head='; head -n1 < "$CURRENT/.git/HEAD" | sed -E 's/[^A-Za-z0-9_./: -]//g'
-          printf 'release_exact_sha='; git -c safe.directory="$CURRENT" -C "$CURRENT" rev-parse HEAD
+          head_value="$(head -n1 < "$CURRENT/.git/HEAD")"
+          if [[ "$head_value" == ref:\ * ]]; then
+            printf 'release_exact_sha='; tr -cd '0-9a-fA-F\n' < "$CURRENT/.git/${head_value#ref: }" | head -n1
+          else
+            printf 'release_exact_sha=%s\n' "$head_value"
+          fi
           printf 'deployed_sha='; tr -cd '0-9a-fA-F\n' < "$APP/.deployed_sha" | head -n1
 
           echo '=== SYSTEMD ==='
