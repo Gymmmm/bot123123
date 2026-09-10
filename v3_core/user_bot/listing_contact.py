@@ -49,13 +49,14 @@ class ListingContactEffectExecutor:
         admin = await self.admins.send(
             bot,
             AdminNotification(
-                title="用户联系我们",
+                title="💬 新房源咨询",
                 lines=(
-                    f"用户：{user_mention_html(user)}",
-                    f"联系方式：{he(user_contact_text(user))}",
-                    f"入口：{he(source_display_label(intent.source or 'listing_callback'))}",
-                    f"咨询房源：{he(intent.public_listing_id)}",
+                    f"👤 {user_mention_html(user)}",
+                    f"📱 {he(user_contact_text(user))}",
+                    f"🏠 房源｜{he(intent.public_listing_id)}",
+                    f"📍 来源｜{he(source_display_label(intent.source or 'listing_callback'))}",
                 ),
+                show_bell=False,
             ),
         )
         return ListingContactEffectResult(lead=lead, admin=admin)
@@ -77,15 +78,23 @@ def build_listing_contact_view(
         if details.monthly_rent_usd is not None and int(details.monthly_rent_usd) > 0
         else ""
     )
-    price_line = f"\n💰 <b>{he(price)}</b>" if price else ""
+    lines = [
+        "💬 <b>联系中文顾问</b>",
+        "",
+        f"🏠 <b>{he(subject)}</b>",
+        f"🆔 {he(intent.public_listing_id)}",
+    ]
+    if price:
+        lines.append(f"💵 <b>{he(price)}</b>")
+    lines.extend(
+        [
+            "",
+            "房源信息已经带上，不用重新说明。",
+            "点击下方可直接打开顾问对话。",
+        ]
+    )
     return ListingContactView(
-        text=(
-            "💬 <b>已记录您咨询的房源</b>\n\n"
-            f"🏠 <b>{he(subject)}</b>{price_line}\n"
-            f"🆔 {he(intent.public_listing_id)}\n\n"
-            "点击下方即可联系我们。\n"
-            "这套房的信息已经带上，不用重新说明。"
-        ),
+        text="\n".join(lines),
         advisor_url=str(advisor_url or "").strip(),
         public_listing_id=intent.public_listing_id,
     )
