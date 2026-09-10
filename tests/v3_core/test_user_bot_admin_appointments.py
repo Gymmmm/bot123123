@@ -46,7 +46,7 @@ class FakeQuery:
 
 @pytest.mark.asyncio
 async def test_admin_today_appointment_list_detail_and_returns_stay_on_adminq():
-    assert _callbacks(admin_home_keyboard()) == ["adminq:appointments"]
+    assert _callbacks(admin_home_keyboard()) == ["adminq:pending", "adminq:appointments"]
     query = FakeQuery("adminq:appointments")
     await handle_admin_callback(SimpleNamespace(callback_query=query), FakeReader())
     assert _callbacks(query.edits[-1][1]["reply_markup"]) == ["adminq:appointment:7", "adminq:home"]
