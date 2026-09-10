@@ -1,62 +1,96 @@
-# Window D handoff — Issue #25 appointment flow
+# Window D HANDOFF — Issue #25 appointment date-first flow
 
-Baseline: `90180b834c5b13cb5e96aa51b24a081956bb18d2`
-Branch: `agent/c07c08c09-appointment-flow-D`
+- Window: D (`agent/c07c08c09-appointment-flow-D`)
+- Baseline: `90180b834c5b13cb5e96aa51b24a081956bb18d2`
+- Deployed: no
+- Official channel / official bot messages: none
+- Production DB: untouched
+- Did not cherry-pick PR #51 / `codex/product-copy-lock-90180b83-20260910`
 
-## Completed in D
+## Done in allowed files
 
-- `appointment_success_view.py`
-  - Normal created/video submissions now use the locked heading `✅ 预约申请已提交` (no `预约成功`).
-  - Keeps `预约时间已修改` only for an actual update operation.
-  - Adds the post-submit actions required by Issue #25: `📅 我的预约`, `🏠 继续看房`, `💬 联系中文顾问`.
-  - Video submission adds the non-blocking note that the adviser sends the video-call entry before the appointment.
-- `telegram_transition_ui.py`
-  - Reuses the existing `v3u:home:*` callback protocol for success-view home actions (`appointments`, `search`, `contact`) without adding a new callback namespace.
-- `tests/v3_core/test_user_bot_telegram_transition_ui.py`
-  - Adds route-level callback assertions for the three success actions.
+Book entry is date-first (offline default). Video is an optional same-screen control (`🎥 实时视频看房`), not a required mode/focus page.
 
-## Important baseline evidence
+Flow owned by this window:
 
-The fixed baseline is already date-first at the listing booking transition boundary:
+```
+book → date → time → confirm → submit → ✅ 预约申请已提交
+video date → time → confirm → submit
+```
 
-- `build_transition_plan(... transition == "book")` creates `PublicAppointmentDraft(... mode="offline")` and returns `next_step="appointment_date"` with `render_appointment_date`.
-- The existing date view already offers today/tomorrow/day-after/other-date and a video-mode choice.
+Confirm is now a real step. Time no longer persists.
 
-So there is no mode/focus gate before the date page in the extracted transition plan itself.
+Success copy is locked to `✅ 预约申请已提交` (never `预约成功`). Buttons:
 
-## Remaining Issue #25 gap that requires E wiring
+- `📅 我的预约` → `v3u:home:appointments`
+- `🏠 继续看房` → `v3u:t:home`
+- `💬 联系中文顾问` → `v3u:home:contact`
 
-The baseline currently performs **time -> appointment_submit directly** in `transition_actions.py`. Issue #25 requires **time -> confirmation -> submit**.
+## Tests run
 
-A clean implementation needs a distinct submit transition (recommended `appointment_submit`) or equivalent handler-visible state. The transport codec in `transition_callbacks.py` currently supports appointment values only for `appointment_date`, `appointment_mode`, and `appointment_time`, while `telegram_transition_action_handler.py` executes persistence when the action result says `appointment_submit`.
+```
+python -m compileall <allowed production files>
+PYTHONPATH=. pytest -q \
+  tests/v3_core/test_user_bot_public_appointment.py \
+  tests/v3_core/test_user_bot_transition_views.py \
+  tests/v3_core/test_user_bot_transition_plan.py \
+  tests/v3_core/test_user_bot_telegram_transition_ui.py \
+  tests/v3_core/test_user_bot_transition_actions.py \
+  tests/v3_core/test_appointment_submit_executor_v3.py \
+  tests/v3_core/test_user_bot_telegram_appointment_submit.py
+```
 
-Those two files were explicitly outside Window D's allowed modification set. D did not modify them.
+Result: **46 passed**.
 
-### Expected E patch
+## Out-of-boundary wiring for Window E
 
-1. Add/accept one explicit confirmation-submit callback, e.g. `v3u:t:appointment_submit`.
-2. Change the first `appointment_time` selection to persist the chosen time in public session state but return/render an `appointment_confirm` view instead of executing persistence.
-3. Confirmation view must contain:
-   - property summary
-   - date
-   - time
-   - `实地看房` / `视频看房`
-   - `[✅ 提交预约]`
-   - `[⬅️ 修改时间]`
-4. `✅ 提交预约` is the only action that crosses into `AppointmentSubmitExecutor`.
-5. `⬅️ 修改时间` returns to the time view with date/mode/property preserved.
-6. Video confirmation must remain video; it must not route back through mode selection.
-7. Add/adjust handler tests so a first `appointment_time:*` callback does **not** call the executor, while the explicit submit callback does.
+Do **not** merge this branch into `chief/issue25-cta-appt-10commits` from D.
 
-## Verification status
+`transition_callbacks.parse_transition_callback` still does not accept:
 
-The GitHub connector available in this window can read/write repository contents but cannot execute the repository's local `compileall` / `pytest` commands. Therefore D does **not** claim the mandated test command has passed. E/integration must run the exact command from the task before production acceptance.
+- `v3u:t:appointment_submit`
+- `v3u:t:appointment_back_time`
 
-## Safety / production
+`telegram_transition_action_handler._view_for_result` still does not render `appointment_confirm`.
 
-- No deployment performed.
-- No production service restarted.
-- No production Telegram channel/group/Bot user message sent.
-- No production database modified.
-- No forbidden deploy/schema/collector/ingest/canonical files modified.
-- No merge/cherry-pick into `chief/issue25-cta-appt-10commits`.
+Until those two files are patched, a live time click answers but does not persist (correct: confirm is next). A live confirm submit click is unclaimed by the v3 transition parser.
+
+### Expected patch 1 — `v3_core/user_bot/transition_callbacks.py`
+
+Add to `_FLAG_KINDS`:
+
+```python
+"appointment_submit",
+"appointment_back_time",
+```
+
+No value. Encoder can stay as-is; D renderer already emits those strings via `encode_appointment_flow_choice`.
+
+### Expected patch 2 — `v3_core/user_bot/telegram_transition_action_handler.py`
+
+In `_view_for_result`:
+
+```python
+if result.next_step == "appointment_confirm":
+    if result.appointment is None:
+        raise ValueError("appointment_confirm_action_missing_draft")
+    return views.appointment_confirm(result.appointment)
+```
+
+Keep `result.next_step == "appointment_submit"` as the only persist boundary.
+
+`ViewsStub` in out-of-window handler tests must grow `appointment_confirm`.
+
+### Expected patch 3 — text custom-time path (optional same knife)
+
+`transition_text_actions.py` still sets custom time `next_step="appointment_submit"`.
+E should change that to `appointment_confirm`, then render confirm in `telegram_transition_text_handler.py`.
+
+Out-of-window tests that still assert time → `appointment_submit`:
+
+- `tests/v3_core/test_user_bot_telegram_transition_action_handler.py`
+- `tests/v3_core/test_user_bot_transition_text_actions.py`
+
+## Conflicts
+
+None on D files vs baseline `90180b83`. Integration with A/B/C CTA labels is E’s merge job. D did not adopt PR #51 `租赁详情` lock.

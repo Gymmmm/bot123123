@@ -1,10 +1,12 @@
 """Public-ID appointment draft boundary for the V3 User Bot.
 
 Telegram/user-session state must not carry internal listing identifiers.  The
-public draft therefore keeps only the QL public listing id while the user chooses
-mode/date/time.  Immediately before persistence, ``PublicAppointmentResolver``
-re-validates the durably published listing and converts to the existing internal
-``AppointmentDraft`` required by the appointment transaction service.
+public draft therefore keeps only the QL public listing id while the user
+chooses date/time (mode defaults to offline; video is an optional same-screen
+entry, not a required gate).  Immediately before persistence,
+``PublicAppointmentResolver`` re-validates the durably published listing and
+converts to the existing internal ``AppointmentDraft`` required by the
+appointment transaction service.
 """
 from __future__ import annotations
 
