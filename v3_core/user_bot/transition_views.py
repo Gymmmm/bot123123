@@ -9,9 +9,10 @@ succeeds.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from html import escape as he
 from typing import Literal
+from zoneinfo import ZoneInfo
 
 from .listing_presenter import build_public_listing_details
 from .public_appointment import PublicAppointmentDraft
@@ -19,6 +20,8 @@ from .public_inventory import PublicInventoryReader
 from .search_navigation import AREA_OPTIONS, LAYOUT_OPTIONS
 from .transition_plan import TransitionPlan
 
+
+_PHNOM_PENH_TZ = ZoneInfo("Asia/Phnom_Penh")
 
 TransitionChoiceKind = Literal[
     "appointment_date",
@@ -69,6 +72,10 @@ def _date_display(value: object) -> str:
     if len(bits) >= 2 and all(part.isdigit() for part in bits[-2:]):
         return f"{int(bits[-2])}月{int(bits[-1])}日"
     return raw or "待安排"
+
+
+def _phnom_penh_today() -> date:
+    return datetime.now(_PHNOM_PENH_TZ).date()
 
 
 def _resolve_bookable_details(
@@ -306,7 +313,11 @@ class TransitionViewService:
         *,
         today: date | None = None,
     ) -> TransitionView:
-        return _appointment_date_view(draft, self.inventory, today=today or date.today())
+        return _appointment_date_view(
+            draft,
+            self.inventory,
+            today=today or _phnom_penh_today(),
+        )
 
     def appointment_time(self, draft: PublicAppointmentDraft) -> TransitionView:
         return _appointment_time_view(draft, self.inventory)
