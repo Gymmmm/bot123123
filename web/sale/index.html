@@ -8,186 +8,126 @@
 <title>侨联地产 · 金边置业出售</title>
 <style>
 :root{
-  --obsidian-900:#0B0C0E;--obsidian-800:#121418;--obsidian-700:#1A1D24;--obsidian-600:#262A35;
-  --gold-100:#FFF8E7;--gold-300:#EBD096;--gold-400:#DFC278;--gold-500:#C5A059;--gold-600:#9E7C3B;
-  --text:#F2F0EB;--muted:#8B8880;--line:rgba(197,160,89,.16);
-  --safe-top:env(safe-area-inset-top);--safe-bottom:env(safe-area-inset-bottom);
+  --bg:#0B0C0E;--card:#121418;--line:rgba(197,160,89,.16);--gold:#C5A059;--gold2:#DFC278;
+  --text:#F2F0EB;--muted:#8B8880;--safe-top:env(safe-area-inset-top);--safe-bottom:env(safe-area-inset-bottom);
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html{-webkit-text-size-adjust:100%}
-body{min-height:100vh;background:var(--obsidian-900);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans SC","Microsoft YaHei",sans-serif;padding-bottom:var(--safe-bottom)}
-button,input,select{font:inherit;color:inherit}
-a{color:inherit;text-decoration:none}
-.shell{width:min(1180px,92vw);margin:auto}
-.gold-text{background:linear-gradient(135deg,#FFF8E7 0%,#DFC278 52%,#9E7C3B 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
-header{position:sticky;top:0;z-index:40;padding-top:var(--safe-top);background:rgba(11,12,14,.92);backdrop-filter:blur(16px);border-bottom:1px solid var(--line)}
-.header-inner{height:64px;display:flex;align-items:center;justify-content:space-between;gap:12px}
-.brand{display:flex;align-items:center;gap:10px;cursor:pointer}
-.mark{width:36px;height:36px;border-radius:10px;padding:1px;background:linear-gradient(135deg,var(--gold-400),var(--gold-600))}
-.mark span{display:grid;place-items:center;width:100%;height:100%;border-radius:9px;background:var(--obsidian-900);color:var(--gold-400);font-weight:700}
-.brand h1{font-size:16px;font-weight:600}
-.brand h1 em{font-style:normal;font-weight:400}
-.brand p{font-size:11px;color:var(--muted);margin-top:2px}
-.tag{font-size:11px;background:var(--gold-500);color:#171208;padding:4px 8px;border-radius:999px;font-weight:700}
-.tg{padding:8px 12px;border:1px solid rgba(197,160,89,.35);border-radius:10px;color:var(--gold-400);font-size:13px}
-.filters{position:sticky;top:calc(64px + var(--safe-top));z-index:30;background:rgba(18,20,24,.96);backdrop-filter:blur(16px);border-bottom:1px solid var(--line);padding:12px 0}
-.filter-grid{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr 1fr auto auto;gap:8px;align-items:end}
-.field{display:flex;flex-direction:column;gap:5px}
-.field label{font-size:10px;color:var(--muted);letter-spacing:.06em}
-.field input,.field select{height:40px;padding:0 11px;background:var(--obsidian-900);border:1px solid var(--obsidian-600);border-radius:10px;outline:none}
-.field input:focus,.field select:focus{border-color:var(--gold-500)}
-.btn{height:40px;padding:0 14px;border-radius:10px;border:1px solid var(--obsidian-600);background:transparent;color:var(--text);cursor:pointer}
-.btn.gold{background:linear-gradient(135deg,var(--gold-400),var(--gold-600));border-color:var(--gold-500);color:#191408;font-weight:700}
-.btn:disabled{opacity:.4;cursor:not-allowed}
-.catalog{padding:24px 0 56px}
-.section-head{display:flex;justify-content:space-between;align-items:end;gap:12px;margin-bottom:18px}
-.section-head h2{font-size:clamp(26px,4vw,38px);font-weight:500}
-.count{font-size:12px;color:var(--muted)}
-.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
-.card{background:var(--obsidian-800);border:1px solid rgba(38,42,53,.9);border-radius:18px;overflow:hidden;cursor:pointer;display:flex;flex-direction:column;transition:.2s border-color,.2s transform}
-.card:hover{border-color:rgba(197,160,89,.45);transform:translateY(-2px)}
-.photo{position:relative;height:220px;background:#101217;overflow:hidden}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans SC","Microsoft YaHei",sans-serif}
+a{color:inherit;text-decoration:none}button,input,select{font:inherit;color:inherit}
+.top{position:sticky;top:0;z-index:40;padding-top:var(--safe-top);background:rgba(11,12,14,.94);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+.nav{height:46px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;gap:8px}
+.brand{display:flex;align-items:center;gap:7px;min-width:0}
+.mark{width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,var(--gold2),var(--gold));color:#1a1408;display:grid;place-items:center;font-size:12px;font-weight:800;flex-shrink:0}
+.brand b{font-size:14px;font-weight:650;white-space:nowrap}
+.tag{font-size:10px;background:var(--gold);color:#171208;padding:2px 6px;border-radius:999px;font-weight:700}
+.tg{font-size:12px;color:var(--gold2);border:1px solid rgba(197,160,89,.35);border-radius:8px;padding:5px 8px;white-space:nowrap}
+.filters{display:flex;gap:6px;overflow-x:auto;padding:0 12px 8px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.filters::-webkit-scrollbar{display:none}
+.filters input,.filters select,.filters button{height:32px;border:1px solid #262A35;background:#121418;border-radius:8px;padding:0 8px;font-size:12px;flex:0 0 auto}
+.filters input{width:118px}
+.filters select{max-width:108px}
+.filters .gold{background:var(--gold);border-color:var(--gold);color:#191408;font-weight:700}
+.bar{display:flex;justify-content:space-between;align-items:center;padding:8px 12px 6px;color:var(--muted);font-size:12px}
+.bar h2{font-size:12px;font-weight:500;color:var(--muted)}
+.bar h2 span{color:var(--gold2)}
+.grid{display:flex;flex-direction:column;gap:10px;padding:0 10px 24px}
+.card{background:var(--card);border:1px solid #1c2028;border-radius:14px;overflow:hidden;cursor:pointer}
+.photo{position:relative;height:58vw;max-height:360px;min-height:220px;background:#101217}
 .photo img{width:100%;height:100%;object-fit:cover;display:block}
-.photo-fallback{width:100%;height:100%;display:grid;place-items:center;color:rgba(223,194,120,.28);font-size:13px;letter-spacing:.12em}
-.photo::after{content:"";position:absolute;inset:0;background:linear-gradient(to top,rgba(11,12,14,.92),transparent 48%,rgba(0,0,0,.25))}
-.public-id,.status-pill{position:absolute;top:12px;z-index:2;font-size:11px;padding:5px 8px;border-radius:8px;backdrop-filter:blur(10px)}
-.public-id{left:12px;color:var(--gold-300);background:rgba(11,12,14,.78);border:1px solid var(--line);font-variant-numeric:tabular-nums}
-.status-pill{right:12px;color:var(--gold-400);background:rgba(197,160,89,.12);border:1px solid rgba(197,160,89,.3)}
-.status-pill.hold{color:#b0ada5;background:rgba(110,107,100,.16);border-color:rgba(140,140,140,.3)}
-.cover-price{position:absolute;left:14px;right:14px;bottom:12px;z-index:2}
-.cover-price small{display:block;font-size:10px;color:#cfc9bb;letter-spacing:.14em}
-.cover-price b{display:block;font-size:28px;line-height:1.1;margin-top:2px}
-.card-body{padding:14px 16px 16px;display:flex;flex-direction:column;gap:10px;flex:1}
-.title{font-size:16px;font-weight:700;line-height:1.35}
-.place{font-size:12px;color:var(--muted)}
-.chips{display:flex;flex-wrap:wrap;gap:6px}
-.chip{font-size:11px;padding:4px 8px;border-radius:999px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);color:#d8d2c4}
-.card-foot{display:grid;grid-template-columns:2fr 3fr;gap:8px;margin-top:auto;padding-top:10px;border-top:1px solid rgba(38,42,53,.8)}
-.card-foot .btn{width:100%;height:36px;font-size:12px}
-.state{grid-column:1/-1;padding:48px 20px;border:1px dashed var(--line);border-radius:16px;text-align:center;color:var(--muted)}
+.photo-fallback{width:100%;height:100%;display:grid;place-items:center;color:rgba(223,194,120,.3);font-size:12px}
+.photo::after{content:"";position:absolute;inset:0;background:linear-gradient(to top,rgba(11,12,14,.88) 0%,transparent 46%)}
+.public-id,.status-pill{position:absolute;top:10px;z-index:2;font-size:11px;padding:4px 7px;border-radius:7px;backdrop-filter:blur(8px)}
+.public-id{left:10px;color:var(--gold2);background:rgba(11,12,14,.72);border:1px solid var(--line)}
+.status-pill{right:10px;color:var(--gold2);background:rgba(197,160,89,.14);border:1px solid rgba(197,160,89,.3)}
+.status-pill.hold{color:#b0ada5;border-color:#555}
+.cover-price{position:absolute;left:12px;right:12px;bottom:10px;z-index:2}
+.cover-price small{display:block;font-size:10px;color:#cfc9bb}
+.cover-price b{display:block;font-size:26px;line-height:1.1;color:var(--gold2)}
+.card-body{padding:10px 12px 12px}
+.title{font-size:15px;font-weight:700;line-height:1.3}
+.meta{margin-top:5px;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.state{margin:20px 12px;padding:28px 12px;border:1px dashed var(--line);border-radius:12px;text-align:center;color:var(--muted)}
 .state.error{color:#eaa59d}
-.pager{display:flex;justify-content:center;align-items:center;gap:10px;margin-top:24px}
-.page-label{font-size:12px;color:var(--muted);min-width:90px;text-align:center}
-footer{border-top:1px solid var(--line);padding:18px 0 calc(18px + var(--safe-bottom));font-size:12px;color:var(--muted)}
-.footer-inner{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
-.modal-wrap{display:none;position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.78);align-items:end;justify-content:center;padding:0}
+.pager{display:flex;justify-content:center;align-items:center;gap:8px;padding:4px 12px 20px}
+.pager .btn,.btn{height:32px;padding:0 12px;border-radius:8px;border:1px solid #262A35;background:transparent;color:var(--text)}
+.page-label{font-size:12px;color:var(--muted)}
+.btn:disabled{opacity:.35}
+.modal-wrap{display:none;position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.8);align-items:end}
 .modal-wrap.open{display:flex}
-.modal{width:min(720px,100%);max-height:94vh;overflow:auto;background:var(--obsidian-800);border:1px solid var(--obsidian-600);border-radius:24px 24px 0 0}
-.modal-bar{position:sticky;top:0;z-index:3;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;background:rgba(11,12,14,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
-.modal-bar-left{display:flex;align-items:center;gap:8px}
-.modal-close{width:32px;height:32px;border:0;border-radius:999px;background:var(--obsidian-700);color:var(--text);cursor:pointer}
+.modal{width:100%;max-height:94vh;overflow:auto;background:#121418;border-radius:18px 18px 0 0}
+.modal-bar{position:sticky;top:0;z-index:3;display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:rgba(11,12,14,.94)}
+.modal-close{width:30px;height:30px;border:0;border-radius:999px;background:#1A1D24;color:#fff}
 .gallery{position:relative;background:#101217}
-.gallery-main{height:min(360px,46vh);display:grid;place-items:center;overflow:hidden}
+.gallery-main{height:62vw;max-height:420px;min-height:240px;display:grid;place-items:center}
 .gallery-main img{width:100%;height:100%;object-fit:cover}
-.gallery-nav{position:absolute;top:50%;transform:translateY(-50%);width:36px;height:36px;border:0;border-radius:50%;background:rgba(11,12,14,.7);color:white;cursor:pointer}
-.gallery-nav.prev{left:10px}.gallery-nav.next{right:10px}
-.gallery-count{position:absolute;right:12px;bottom:12px;font-size:11px;padding:4px 8px;border-radius:999px;background:rgba(11,12,14,.8);border:1px solid var(--line)}
-.thumbs{display:flex;gap:7px;overflow:auto;padding:9px 12px 0}
-.thumbs img{width:60px;height:46px;border-radius:6px;object-fit:cover;opacity:.5;border:1px solid transparent;cursor:pointer}
-.thumbs img.on{opacity:1;border-color:var(--gold-500)}
-.modal-body{padding:18px 18px 8px}
-.price-label{font-size:12px;color:var(--gold-400);letter-spacing:.08em}
-.modal-price{font-size:34px;font-weight:800;line-height:1.1;margin:4px 0 8px}
-.modal-title{font-size:20px;font-weight:700;line-height:1.35}
-.detail-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:16px 0}
-.detail-row{background:rgba(255,255,255,.03);padding:10px 12px;border-radius:10px;border:1px solid rgba(38,42,53,.8)}
-.detail-key{font-size:10px;color:var(--muted);margin-bottom:3px}
-.detail-value{font-size:13px}
-.modal-cta{position:sticky;bottom:0;padding:12px 16px calc(12px + var(--safe-bottom));background:var(--obsidian-900);border-top:1px solid var(--line)}
-.modal-cta a{display:flex;align-items:center;justify-content:center;height:46px;border-radius:12px}
-@media(max-width:980px){.filter-grid{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:repeat(2,1fr)}.detail-grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:650px){
-  .shell{width:94vw}
-  .tag{display:none}
-  .filters{position:relative;top:auto}
-  .filter-grid,.grid,.detail-grid{grid-template-columns:1fr}
-  .filter-grid .btn{width:100%}
-  .section-head{flex-direction:column;align-items:start}
-  .photo{height:210px}
-  .gallery-main{height:250px}
+.gallery-nav{position:absolute;top:50%;transform:translateY(-50%);width:32px;height:32px;border:0;border-radius:50%;background:rgba(11,12,14,.7);color:#fff}
+.gallery-nav.prev{left:8px}.gallery-nav.next{right:8px}
+.gallery-count{position:absolute;right:10px;bottom:10px;font-size:11px;padding:3px 7px;border-radius:999px;background:rgba(11,12,14,.8)}
+.thumbs{display:flex;gap:6px;overflow:auto;padding:8px 12px 0}
+.thumbs img{width:52px;height:40px;border-radius:5px;object-fit:cover;opacity:.5}
+.thumbs img.on{opacity:1;outline:1px solid var(--gold)}
+.modal-body{padding:12px}
+.modal-price{font-size:28px;font-weight:800;color:var(--gold2);margin:2px 0 6px}
+.modal-title{font-size:17px;font-weight:700}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:12px}
+.detail-row{background:#1A1D24;padding:8px 10px;border-radius:8px}
+.detail-key{font-size:10px;color:var(--muted)}.detail-value{font-size:13px}
+.modal-cta{position:sticky;bottom:0;padding:10px 12px calc(10px + var(--safe-bottom));background:#0B0C0E}
+.modal-cta a{display:flex;align-items:center;justify-content:center;height:42px;border-radius:10px;background:var(--gold);color:#191408;font-weight:700}
+@media(min-width:760px){
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;padding:0 16px 32px}
+  .photo{height:240px}
+  .nav,.filters,.bar{padding-left:16px;padding-right:16px}
+}
+@media(min-width:1100px){
+  .grid{grid-template-columns:repeat(3,1fr);max-width:1180px;margin:0 auto}
 }
 </style>
 </head>
 <body>
-<header>
-  <div class="shell header-inner">
-    <div class="brand" id="home">
-      <div class="mark"><span>侨</span></div>
-      <div>
-        <h1>侨联地产 · <em class="gold-text">金边置业</em></h1>
-        <p>本页只放出售库存</p>
-      </div>
-    </div>
-    <div style="display:flex;align-items:center;gap:8px">
-      <span class="tag">仅出售</span>
-      <a class="tg" href="https://t.me/pengqingw" target="_blank" rel="noopener">Telegram 咨询</a>
-    </div>
+<div class="top">
+  <div class="nav">
+    <div class="brand" id="home"><div class="mark">侨</div><b>侨联 · 金边置业</b><span class="tag">仅出售</span></div>
+    <a class="tg" href="https://t.me/pengqingw" target="_blank" rel="noopener">咨询</a>
   </div>
-</header>
-<section class="filters">
-  <div class="shell filter-grid">
-    <div class="field">
-      <label for="q">编号 / 项目 / 区域 / 户型</label>
-      <input id="q" placeholder="例如 QL-XXXX、炳发城、2房">
-    </div>
-    <div class="field">
-      <label for="area">项目 / 区域</label>
-      <select id="area"><option value="">全部区域</option></select>
-    </div>
-    <div class="field">
-      <label for="type">房屋类型</label>
-      <select id="type"><option value="">全部类型</option></select>
-    </div>
-    <div class="field">
-      <label for="max-price">最高总价</label>
-      <select id="max-price">
-        <option value="">不限</option>
-        <option value="100000">$100,000</option>
-        <option value="200000">$200,000</option>
-        <option value="500000">$500,000</option>
-        <option value="1000000">$1,000,000</option>
-      </select>
-    </div>
-    <div class="field">
-      <label for="sort">排序</label>
-      <select id="sort">
-        <option value="newest">最近更新</option>
-        <option value="price_asc">总价从低到高</option>
-        <option value="price_desc">总价从高到低</option>
-      </select>
-    </div>
-    <button class="btn gold" id="search" type="button">筛选</button>
-    <button class="btn" id="reset" type="button">清空筛选</button>
+  <div class="filters">
+    <input id="q" placeholder="QL / 项目 / 区域">
+    <select id="area"><option value="">全部区域</option></select>
+    <select id="type"><option value="">全部类型</option></select>
+    <select id="max-price">
+      <option value="">总价不限</option>
+      <option value="100000">$10万内</option>
+      <option value="200000">$20万内</option>
+      <option value="500000">$50万内</option>
+      <option value="1000000">$100万内</option>
+    </select>
+    <select id="sort">
+      <option value="newest">最新</option>
+      <option value="price_asc">低价</option>
+      <option value="price_desc">高价</option>
+    </select>
+    <button class="gold" id="search" type="button">筛选</button>
+    <button id="reset" type="button">清空</button>
   </div>
-</section>
-<section class="catalog" id="listings">
-  <div class="shell">
-    <div class="section-head">
-      <h2>正式 <span>出售房源</span></h2>
-      <div class="count" id="count">正在读取出售库存…</div>
-    </div>
-    <div class="grid" id="grid"><div class="state">正在加载出售房源…</div></div>
-    <div class="pager">
-      <button class="btn" id="prev" type="button">上一页</button>
-      <div class="page-label" id="page-label">第 1 页</div>
-      <button class="btn" id="next" type="button">下一页</button>
-    </div>
-  </div>
-</section>
-<footer>
-  <div class="shell footer-inner">
-    <span>© 侨联地产 · 金边置业出售</span>
-    <span>只展示出售房源 · 使用公开 QL 编号</span>
-  </div>
-</footer>
+</div>
+<div class="bar">
+  <h2>正式 <span>出售房源</span></h2>
+  <div id="count">正在读取出售库存…</div>
+</div>
+<div class="grid" id="grid"><div class="state">正在加载出售房源…</div></div>
+<div class="pager">
+  <button class="btn" id="prev" type="button">上一页</button>
+  <div class="page-label" id="page-label">第 1 页</div>
+  <button class="btn" id="next" type="button">下一页</button>
+</div>
 <div class="modal-wrap" id="modal" aria-hidden="true">
   <div class="modal">
     <div class="modal-bar">
-      <div class="modal-bar-left">
-        <span class="status-pill" id="modal-status">可咨询</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="status-pill" id="modal-status" style="position:static">可咨询</span>
         <span class="public-id" id="modal-id" style="position:static">QL</span>
       </div>
-      <button class="modal-close" id="close" type="button" aria-label="关闭">×</button>
+      <button class="modal-close" id="close" type="button">×</button>
     </div>
     <div class="gallery">
       <div class="gallery-main" id="gallery-main"><span class="photo-fallback">暂无实拍</span></div>
@@ -197,13 +137,12 @@ footer{border-top:1px solid var(--line);padding:18px 0 calc(18px + var(--safe-bo
       <div class="thumbs" id="thumbs"></div>
     </div>
     <div class="modal-body">
-      <div class="price-label">出售总价 (USD)</div>
-      <div class="modal-price gold-text" id="modal-price">$0</div>
+      <div class="modal-price" id="modal-price">$0</div>
       <div class="modal-title" id="modal-title"></div>
       <div class="detail-grid" id="details"></div>
     </div>
     <div class="modal-cta">
-      <a class="btn gold" id="consult" href="https://t.me/pengqingw" target="_blank" rel="noopener">Telegram 咨询这套出售房源</a>
+      <a id="consult" href="https://t.me/pengqingw" target="_blank" rel="noopener">Telegram 咨询这套出售房源</a>
     </div>
   </div>
 </div>
@@ -214,184 +153,95 @@ const $=id=>document.getElementById(id);
 const txt=v=>v===null||v===undefined?'':String(v).trim();
 const money=n=>'$'+Number(n||0).toLocaleString('en-US');
 const visibleType=v=>{const t=txt(v);return t && t!=='未知' ? t : ''};
-function consultLink(item){
-  return ADVISOR+'?text='+encodeURIComponent('你好，想咨询金边出售房源 '+(item && item.public_id ? item.public_id : ''));
-}
-function addChip(wrap,value){
-  if(!txt(value)) return;
-  const e=document.createElement('span');e.className='chip';e.textContent=value;wrap.appendChild(e);
-}
+function consultLink(item){return ADVISOR+'?text='+encodeURIComponent('你好，想咨询金边出售房源 '+(item&&item.public_id?item.public_id:''))}
 function photoBox(item){
   const wrap=document.createElement('div');wrap.className='photo';
   if(item.cover_url){
-    const img=document.createElement('img');
-    img.src=item.cover_url;img.alt=txt(item.title)||'出售房源';img.loading='lazy';
+    const img=document.createElement('img');img.src=item.cover_url;img.alt=txt(item.title)||'出售房源';img.loading='lazy';
     img.onerror=()=>{wrap.querySelector('img')?.remove();const f=document.createElement('div');f.className='photo-fallback';f.textContent='实拍读取中';wrap.prepend(f)};
     wrap.appendChild(img);
-  }else{
-    wrap.innerHTML='<div class="photo-fallback">暂无实拍</div>';
-  }
+  }else wrap.innerHTML='<div class="photo-fallback">暂无实拍</div>';
   const id=document.createElement('div');id.className='public-id';id.textContent=item.public_id;wrap.appendChild(id);
   const st=document.createElement('div');st.className='status-pill'+(item.status==='已预留'?' hold':'');st.textContent=item.status||'可咨询';wrap.appendChild(st);
   const price=document.createElement('div');price.className='cover-price';
-  price.innerHTML='<small>出售总价</small><b class="gold-text">'+money(item.sale_price_usd)+'</b>';
-  wrap.appendChild(price);
+  price.innerHTML='<small>出售总价</small><b>'+money(item.sale_price_usd)+'</b>';wrap.appendChild(price);
   return wrap;
 }
 function render(items){
   const grid=$('grid');grid.textContent='';
-  $('count').textContent=total?('共 '+total+' 套出售房源'):'暂无出售房源';
+  $('count').textContent=total?total+' 套':'暂无';
   if(!items.length){grid.innerHTML='<div class="state">当前筛选条件下暂无出售房源</div>';return}
   items.forEach(item=>{
     const card=document.createElement('article');card.className='card';card.onclick=()=>openDetail(item.public_id);
     card.appendChild(photoBox(item));
     const body=document.createElement('div');body.className='card-body';
     const title=document.createElement('div');title.className='title';title.textContent=txt(item.title)||txt(item.project)||'金边置业房源';body.appendChild(title);
-    const place=[txt(item.project),txt(item.location)].filter(Boolean).join(' · ');
-    if(place){const p=document.createElement('div');p.className='place';p.textContent=place;body.appendChild(p)}
-    const chips=document.createElement('div');chips.className='chips';
-    addChip(chips,item.layout);
-    const typeLine=[visibleType(item.property_type),txt(item.property_subtype)].filter(Boolean).join(' / ');
-    addChip(chips,typeLine);
-    if(item.size_sqm) addChip(chips,Number(item.size_sqm).toLocaleString()+'m²');
-    if(txt(item.floor)) addChip(chips,item.floor+'楼');
-    body.appendChild(chips);
-    const foot=document.createElement('div');foot.className='card-foot';
-    const detail=document.createElement('button');detail.className='btn';detail.type='button';detail.textContent='查看详情';foot.appendChild(detail);
-    const consult=document.createElement('a');consult.className='btn gold';consult.href=consultLink(item);consult.target='_blank';consult.rel='noopener';
-    consult.textContent='Telegram 咨询';consult.onclick=e=>e.stopPropagation();foot.appendChild(consult);
-    body.appendChild(foot);card.appendChild(body);grid.appendChild(card);
+    const bits=[txt(item.project),txt(item.location),item.layout,visibleType(item.property_type),txt(item.property_subtype),item.size_sqm?Number(item.size_sqm).toLocaleString()+'㎡':'',txt(item.floor)?item.floor+'楼':''].filter(Boolean);
+    if(bits.length){const m=document.createElement('div');m.className='meta';m.textContent=bits.join(' · ');body.appendChild(m)}
+    card.appendChild(body);grid.appendChild(card);
   });
 }
 function params(){
   const q=new URLSearchParams();
   const query=txt($('q').value),area=txt($('area').value),type=txt($('type').value),max=txt($('max-price').value),sort=txt($('sort').value);
-  if(query) q.set('q',query);
-  if(area) q.set('area',area);
-  if(type) q.set('property_type',type);
-  if(max) q.set('max_price',max);
-  if(sort) q.set('sort',sort);
-  q.set('limit',PAGE_SIZE);q.set('offset',offset);
-  return q;
+  if(query)q.set('q',query);if(area)q.set('area',area);if(type)q.set('property_type',type);if(max)q.set('max_price',max);if(sort)q.set('sort',sort);
+  q.set('limit',PAGE_SIZE);q.set('offset',offset);return q;
 }
 function updatePager(){
   const page=Math.floor(offset/PAGE_SIZE)+1,max=Math.max(1,Math.ceil(total/PAGE_SIZE));
-  $('page-label').textContent='第 '+page+' / '+max+' 页';
+  $('page-label').textContent=page+' / '+max;
   $('prev').disabled=offset<=0;$('next').disabled=offset+PAGE_SIZE>=total;
 }
 async function load(reset=false){
-  if(reset) offset=0;
-  $('grid').innerHTML='<div class="state">正在加载出售房源…</div>';
+  if(reset)offset=0;$('grid').innerHTML='<div class="state">正在加载出售房源…</div>';
   try{
-    const res=await fetch(API+'?'+params());
-    if(!res.ok) throw new Error();
-    const data=await res.json();
-    total=Number(data.total||0);
-    render(data.items||[]);
-    updatePager();
-    const openId=requestedPublicId();
-    if(openId) openDetail(openId);
-  }catch(e){
-    $('grid').innerHTML='<div class="state error">出售房源暂时无法读取，请稍后刷新。</div>';
-    $('count').textContent='读取失败';total=0;updatePager();
-  }
+    const res=await fetch(API+'?'+params());if(!res.ok)throw new Error();
+    const data=await res.json();total=Number(data.total||0);render(data.items||[]);updatePager();
+    const openId=requestedPublicId();if(openId)openDetail(openId);
+  }catch(e){$('grid').innerHTML='<div class="state error">出售房源暂时无法读取，请稍后刷新。</div>';$('count').textContent='读取失败';total=0;updatePager()}
 }
 function fillSelect(id,values){
-  const select=$(id);
-  const current=select.value;
+  const select=$(id),current=select.value;
   [...select.querySelectorAll('option')].slice(1).forEach(o=>o.remove());
-  (values||[]).forEach(v=>{
-    if(!txt(v) || v==='未知') return;
-    const o=document.createElement('option');o.value=v;o.textContent=v;select.appendChild(o);
-  });
-  if(current) select.value=current;
+  (values||[]).forEach(v=>{if(!txt(v)||v==='未知')return;const o=document.createElement('option');o.value=v;o.textContent=v;select.appendChild(o)});
+  if(current)select.value=current;
 }
-async function loadMeta(){
-  try{
-    const res=await fetch(META);
-    if(!res.ok) throw new Error();
-    const m=await res.json();
-    fillSelect('area',m.areas||[]);
-    fillSelect('type',m.property_types||[]);
-  }catch(e){}
-}
-function requestedPublicId(){
-  const p=new URLSearchParams(location.search);
-  const v=txt(p.get('id')||p.get('ql'));
-  const h=txt(location.hash.replace(/^#/,''));
-  return v||(h.toUpperCase().startsWith('QL-')?h:'');
-}
-function rememberId(id){
-  const u=new URL(location.href);
-  if(id){u.searchParams.set('id',id);u.hash=''}else{u.searchParams.delete('id');u.searchParams.delete('ql')}
-  history.replaceState(null,'',u);
-}
-function detailRow(k,v){
-  if(!txt(v)) return null;
-  const e=document.createElement('div');e.className='detail-row';
-  const a=document.createElement('div');a.className='detail-key';a.textContent=k;
-  const b=document.createElement('div');b.className='detail-value';b.textContent=v;
-  e.append(a,b);return e;
-}
+async function loadMeta(){try{const res=await fetch(META);if(!res.ok)throw new Error();const m=await res.json();fillSelect('area',m.areas||[]);fillSelect('type',m.property_types||[])}catch(e){}}
+function requestedPublicId(){const p=new URLSearchParams(location.search);const v=txt(p.get('id')||p.get('ql'));const h=txt(location.hash.replace(/^#/,''));return v||(h.toUpperCase().startsWith('QL-')?h:'')}
+function rememberId(id){const u=new URL(location.href);if(id){u.searchParams.set('id',id);u.hash=''}else{u.searchParams.delete('id');u.searchParams.delete('ql')}history.replaceState(null,'',u)}
+function detailRow(k,v){if(!txt(v))return null;const e=document.createElement('div');e.className='detail-row';e.innerHTML='<div class="detail-key"></div><div class="detail-value"></div>';e.children[0].textContent=k;e.children[1].textContent=v;return e}
 function paintGallery(){
-  const main=$('gallery-main'),thumbs=$('thumbs');
-  main.innerHTML='';thumbs.textContent='';
-  if(!currentGallery.length){
-    main.innerHTML='<span class="photo-fallback">暂无实拍</span>';
-    $('gprev').hidden=$('gnext').hidden=true;
-    $('gallery-count').textContent='0 / 0';
-    return;
-  }
+  const main=$('gallery-main'),thumbs=$('thumbs');main.innerHTML='';thumbs.textContent='';
+  if(!currentGallery.length){main.innerHTML='<span class="photo-fallback">暂无实拍</span>';$('gprev').hidden=$('gnext').hidden=true;$('gallery-count').textContent='0 / 0';return}
   const img=document.createElement('img');img.src=currentGallery[galleryIndex];img.alt='房源实拍';main.appendChild(img);
-  currentGallery.forEach((u,i)=>{
-    const t=document.createElement('img');t.src=u;t.alt='实拍';t.className=i===galleryIndex?'on':'';
-    t.onclick=()=>{galleryIndex=i;paintGallery()};thumbs.appendChild(t);
-  });
-  $('gprev').hidden=$('gnext').hidden=currentGallery.length<2;
-  $('gallery-count').textContent=(galleryIndex+1)+' / '+currentGallery.length;
+  currentGallery.forEach((u,i)=>{const t=document.createElement('img');t.src=u;t.className=i===galleryIndex?'on':'';t.onclick=()=>{galleryIndex=i;paintGallery()};thumbs.appendChild(t)});
+  $('gprev').hidden=$('gnext').hidden=currentGallery.length<2;$('gallery-count').textContent=(galleryIndex+1)+' / '+currentGallery.length;
 }
 async function openDetail(id){
   try{
-    const res=await fetch(API+'/'+encodeURIComponent(id));
-    if(!res.ok) throw new Error();
-    const data=await res.json(),item=data.item;
+    const res=await fetch(API+'/'+encodeURIComponent(id));if(!res.ok)throw new Error();
+    const item=(await res.json()).item;
     $('modal-title').textContent=txt(item.title)||txt(item.project)||'金边置业房源';
-    $('modal-id').textContent=item.public_id;
-    $('modal-price').textContent=money(item.sale_price_usd);
-    $('modal-status').textContent=item.status||'可咨询';
-    $('modal-status').className='status-pill'+(item.status==='已预留'?' hold':'');
+    $('modal-id').textContent=item.public_id;$('modal-price').textContent=money(item.sale_price_usd);
+    $('modal-status').textContent=item.status||'可咨询';$('modal-status').className='status-pill'+(item.status==='已预留'?' hold':'');
     $('consult').href=consultLink(item);
     const d=$('details');d.textContent='';
     const typeLine=[visibleType(item.property_type),txt(item.property_subtype)].filter(Boolean).join(' / ');
-    [['项目',item.project],['位置',item.location],['类型',typeLine],['户型',item.layout],['卧室',item.bedrooms?item.bedrooms+' 间':''],['卫浴',item.bathrooms?item.bathrooms+' 间':''],['面积',item.size_sqm?Number(item.size_sqm).toLocaleString()+'m²':''],['楼层',txt(item.floor)?item.floor+'楼':'']].forEach(([k,v])=>{
-      const r=detailRow(k,v);if(r) d.appendChild(r);
-    });
-    currentGallery=[...(item.gallery_urls||[])].filter(Boolean);
-    if(item.cover_url && !currentGallery.includes(item.cover_url)) currentGallery.unshift(item.cover_url);
-    galleryIndex=0;paintGallery();
-    $('modal').classList.add('open');$('modal').setAttribute('aria-hidden','false');
-    rememberId(item.public_id);
-  }catch(e){
-    alert('这套出售房源当前无法读取，可能已下架或资料已更新。');
-  }
+    [['项目',item.project],['位置',item.location],['类型',typeLine],['户型',item.layout],['卧室',item.bedrooms?item.bedrooms+' 间':''],['卫浴',item.bathrooms?item.bathrooms+' 间':''],['面积',item.size_sqm?Number(item.size_sqm).toLocaleString()+'㎡':''],['楼层',txt(item.floor)?item.floor+'楼':'']].forEach(([k,v])=>{const r=detailRow(k,v);if(r)d.appendChild(r)});
+    currentGallery=[...(item.gallery_urls||[])].filter(Boolean);if(item.cover_url&&!currentGallery.includes(item.cover_url))currentGallery.unshift(item.cover_url);
+    galleryIndex=0;paintGallery();$('modal').classList.add('open');$('modal').setAttribute('aria-hidden','false');rememberId(item.public_id);
+  }catch(e){alert('这套出售房源当前无法读取，可能已下架或资料已更新。')}
 }
-function closeModal(){
-  $('modal').classList.remove('open');$('modal').setAttribute('aria-hidden','true');rememberId('');
-}
-function resetFilters(){
-  $('q').value='';$('area').value='';$('type').value='';$('max-price').value='';$('sort').value='newest';load(true);
-}
-$('search').onclick=()=>load(true);
-$('reset').onclick=resetFilters;
-$('home').onclick=resetFilters;
-$('q').addEventListener('keydown',e=>{if(e.key==='Enter') load(true)});
-$('prev').onclick=()=>{offset=Math.max(0,offset-PAGE_SIZE);load(false);scrollTo({top:$('listings').offsetTop-80,behavior:'smooth'})};
-$('next').onclick=()=>{if(offset+PAGE_SIZE<total){offset+=PAGE_SIZE;load(false);scrollTo({top:$('listings').offsetTop-80,behavior:'smooth'})}};
-$('close').onclick=closeModal;
-$('modal').onclick=e=>{if(e.target===$('modal')) closeModal()};
+function closeModal(){$('modal').classList.remove('open');$('modal').setAttribute('aria-hidden','true');rememberId('')}
+function resetFilters(){$('q').value='';$('area').value='';$('type').value='';$('max-price').value='';$('sort').value='newest';load(true)}
+$('search').onclick=()=>load(true);$('reset').onclick=resetFilters;$('home').onclick=resetFilters;
+$('q').addEventListener('keydown',e=>{if(e.key==='Enter')load(true)});
+$('prev').onclick=()=>{offset=Math.max(0,offset-PAGE_SIZE);load(false)};
+$('next').onclick=()=>{if(offset+PAGE_SIZE<total){offset+=PAGE_SIZE;load(false)}};
+$('close').onclick=closeModal;$('modal').onclick=e=>{if(e.target===$('modal'))closeModal()};
 $('gprev').onclick=()=>{if(currentGallery.length){galleryIndex=(galleryIndex-1+currentGallery.length)%currentGallery.length;paintGallery()}};
 $('gnext').onclick=()=>{if(currentGallery.length){galleryIndex=(galleryIndex+1)%currentGallery.length;paintGallery()}};
-document.addEventListener('keydown',e=>{if(e.key==='Escape' && $('modal').classList.contains('open')) closeModal()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('modal').classList.contains('open'))closeModal()});
 loadMeta();load(false);
 </script>
 </body>
