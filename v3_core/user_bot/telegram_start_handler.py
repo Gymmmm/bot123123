@@ -147,7 +147,7 @@ async def _render_unbookable(message: Any, result: PublicListingFlowResult) -> N
         parse_mode=ParseMode.HTML,
         reply_markup=_support_keyboard(),
     )
-    if result.details is not None:
+    if getattr(result, "details", None) is not None:
         await _render_details(message, result)
 
 
@@ -261,20 +261,20 @@ async def handle_v3_start(
 
     result = listings.resolve(payload)
     if not result.ok:
-        if result.reason == "listing_not_bookable":
+        if getattr(result, "reason", "") == "listing_not_bookable":
             await _render_unbookable(message, result)
             return TelegramStartOutcome(
                 handled=True,
                 kind="unbookable",
                 payload=payload,
-                result=result,
+                result=result if isinstance(result, PublicListingFlowResult) else None,
             )
         await _render_invalid_link(message)
         return TelegramStartOutcome(
             handled=True,
             kind="invalid_link",
             payload=payload,
-            result=result,
+            result=result if isinstance(result, PublicListingFlowResult) else None,
         )
 
     if result.action == "details":
