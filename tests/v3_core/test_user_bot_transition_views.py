@@ -101,7 +101,7 @@ def test_book_view_matches_fixed_sha_date_entry_and_uses_public_identity_only():
         "后天",
         "📅 其他日期",
         "🎥 改为视频看房",
-        "⬅️ 返回房源",
+        "⬅️ 返回租赁详情",
         "🏠 返回首页",
     ]
     assert view.rows[0][0].value == "09-08"
