@@ -1,0 +1,221 @@
+name: v3-live-readonly-audit
+
+on:
+  push:
+    branches: [audit/v3-live-20260910]
+    paths: [.github/workflows/v3-live-readonly-audit.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PROD_HOST: 50.114.74.120
+      PROD_PORT: '22'
+      PROD_SSH_USER: root
+      PROD_SSH_KNOWN_HOSTS: '50.114.74.120 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILuFtkSn5SJKY7mZ52Lc/QydPRTvHFpsj87M/HcIkb/L'
+      PROD_SSH_HOST_FINGERPRINT: 'SHA256:sgqLYOUAZ482j3y5jREQ6q2BVvNFPXYiOg4ruyFVnsA'
+    steps:
+      - name: Verify production SSH host key
+        run: |
+          set -Eeuo pipefail
+          ssh-keyscan -T 10 -p "$PROD_PORT" -t ed25519 "$PROD_HOST" 2>/dev/null | grep -v '^#' > "$RUNNER_TEMP/known_hosts_observed"
+          ssh-keygen -lf "$RUNNER_TEMP/known_hosts_observed" | grep -F "$PROD_SSH_HOST_FINGERPRINT"
+
+      - name: Configure production SSH
+        env:
+          PROD_SSH_PRIVATE_KEY: '${{ secrets.PROD_SSH_PRIVATE_KEY }}'
+        run: |
+          set -Eeuo pipefail
+          test -n "$PROD_SSH_PRIVATE_KEY"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
+          printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
+
+      - name: Read-only production audit
+        run: |
+          set -Eeuo pipefail
+          ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 "$PROD_SSH_USER@$PROD_HOST" 'bash -s' <<'REMOTE'
+          set -Eeuo pipefail
+          APP=/opt/qiaolian_v3
+          CURRENT=$(readlink -f "$APP/current")
+          UNITS=(qiaolian-v3@collector.service qiaolian-v3@canonical.service qiaolian-v3@publisher.service qiaolian-v3@user.service)
+
+          echo '=== DEPLOYMENT ==='
+          printf 'current=%s\n' "$CURRENT"
+          printf 'deployed_sha='; tr -cd '0-9a-fA-F\n' < "$APP/.deployed_sha" | head -n1
+          printf 'git_head='; cat "$CURRENT/.git/HEAD" 2>/dev/null || true
+          if [[ -f "$CURRENT/.git/refs/heads/actions-production" ]]; then printf 'git_ref='; cat "$CURRENT/.git/refs/heads/actions-production"; fi
+
+          echo '=== SERVICES ==='
+          for u in "${UNITS[@]}"; do
+            echo "[$u]"
+            systemctl show "$u" -p ExecStart -p WorkingDirectory -p MainPID -p ActiveState -p SubState -p NRestarts -p ActiveEnterTimestamp --no-pager
+            pid=$(systemctl show "$u" -p MainPID --value)
+            printf 'cwd='; readlink -f "/proc/$pid/cwd" || true
+            printf 'cmd='; tr '\0' ' ' < "/proc/$pid/cmdline" | sed -E 's/[0-9]{6,}:[A-Za-z0-9_-]{20,}/[REDACTED_BOT_TOKEN]/g'; echo
+          done
+
+          echo '=== TOKEN_COLLISION_CHECK ==='
+          python3 - <<'PY'
+          import os,re,subprocess
+          units=['qiaolian-v3@collector.service','qiaolian-v3@canonical.service','qiaolian-v3@publisher.service','qiaolian-v3@user.service']
+          pids=[]
+          for u in units:
+              try: pids.append(int(subprocess.check_output(['systemctl','show',u,'-p','MainPID','--value'],text=True).strip()))
+              except Exception: pass
+          def env(pid):
+              try:
+                  raw=open(f'/proc/{pid}/environ','rb').read().split(b'\0')
+              except Exception: return {}
+              out={}
+              for item in raw:
+                  if b'=' not in item: continue
+                  k,v=item.split(b'=',1)
+                  ks=k.decode(errors='ignore')
+                  if 'TOKEN' in ks.upper() and v: out[ks]=v
+              return out
+          refs=[]
+          for p in pids:
+              for k,v in env(p).items(): refs.append((p,k,v))
+          collisions=[]
+          for name in os.listdir('/proc'):
+              if not name.isdigit(): continue
+              p=int(name)
+              if p in pids: continue
+              e=env(p)
+              if not e: continue
+              for k,v in e.items():
+                  for rp,rk,rv in refs:
+                      if v==rv:
+                          try: cmd=open(f'/proc/{p}/cmdline','rb').read().replace(b'\0',b' ').decode(errors='ignore')[:240]
+                          except Exception: cmd=''
+                          cmd=re.sub(r'\d{6,}:[A-Za-z0-9_-]{20,}','[REDACTED_BOT_TOKEN]',cmd)
+                          collisions.append((p,cmd,rp,k,rk))
+          if collisions:
+              for c in collisions: print(f'COLLISION other_pid={c[0]} cmd={c[1]} v3_pid={c[2]} vars={c[3]}/{c[4]}')
+          else:
+              print('NO_DUPLICATE_TELEGRAM_TOKEN_PROCESS_FOUND')
+          PY
+
+          echo '=== DB PATH ==='
+          set -a
+          # Runtime env is sourced but never printed.
+          source "$APP/runtime.env"
+          set +a
+          DB="${DB_PATH:-${SQLITE_PATH:-$CURRENT/data/qiaolian_dual_bot.db}}"
+          printf 'db_path=%s\n' "$DB"
+          test -f "$DB"
+          stat -c 'db_status=file size=%s mtime=%y owner=%U:%G mode=%A' "$DB"
+
+          echo '=== DATABASE READ ONLY ==='
+          APP_DB="$DB" python3 - <<'PY'
+          import os,sqlite3,re,json
+          path=os.environ['APP_DB']
+          db=sqlite3.connect(f'file:{path}?mode=ro',uri=True)
+          db.execute('PRAGMA query_only=ON')
+          print('integrity_check='+str(db.execute('PRAGMA integrity_check').fetchone()[0]))
+          tables=[r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")]
+          print('tables='+'|'.join(tables))
+          def count(t): return db.execute(f'SELECT COUNT(*) FROM "{t}"').fetchone()[0]
+          wanted=['source_posts','listings_v3','review_items','media_assets','publication_packages','publication_delivery_attempts','posts','publish_logs','appointments_v3','bot_settings']
+          for t in wanted:
+              if t in tables: print(f'count.{t}={count(t)}')
+              else: print(f'count.{t}=MISSING')
+          for t in tables:
+              low=t.lower()
+              if any(x in low for x in ('canonical','service','repair','work_order','lease','tenant','rental_contract')) and t not in wanted:
+                  try: print(f'count.{t}={count(t)}')
+                  except Exception as e: print(f'count.{t}=ERROR:{type(e).__name__}')
+          def cols(t):
+              return [r[1] for r in db.execute(f'PRAGMA table_info("{t}")')]
+          # Safe bot settings only.
+          if 'bot_settings' in tables:
+              cs=cols('bot_settings')
+              key=next((c for c in cs if c.lower() in ('key','name','setting_key')),None)
+              val=next((c for c in cs if c.lower() in ('value','setting_value')),None)
+              if key and val:
+                  rows=db.execute(f'SELECT "{key}","{val}" FROM bot_settings').fetchall()
+                  for k,v in rows:
+                      ks=str(k or '')
+                      kl=ks.lower()
+                      if any(bad in kl for bad in ('token','secret','password','api','hash','session','key_id')): continue
+                      if any(ok in kl for ok in ('publish','auto','schedule','time','hour','window','broadcast')):
+                          print(f'setting.{ks}={v}')
+          # Status distributions for publication/review/delivery tables.
+          for t in tables:
+              if not any(x in t.lower() for x in ('publication','publish','review')): continue
+              cs=cols(t)
+              for c in cs:
+                  if c.lower().endswith('status') or c.lower()=='status':
+                      try:
+                          rows=db.execute(f'SELECT COALESCE(CAST("{c}" AS TEXT),"<NULL>"),COUNT(*) FROM "{t}" GROUP BY "{c}" ORDER BY 1').fetchall()
+                          print('status.%s.%s='% (t,c) + '|'.join(f'{a}:{b}' for a,b in rows))
+                      except Exception: pass
+          # Recent source activity by source identifiers without message contents.
+          if 'source_posts' in tables:
+              cs=cols('source_posts')
+              source_col=next((c for c in cs if c in ('source_channel','source_channel_id','channel_id','source_chat_id')),None)
+              id_col=next((c for c in cs if c in ('source_post_id','message_id','post_id')),None)
+              time_col=next((c for c in cs if c in ('updated_at','collected_at','created_at')),None)
+              if source_col:
+                  q=f'SELECT CAST("{source_col}" AS TEXT),COUNT(*)'
+                  if time_col: q+=f',MAX("{time_col}")'
+                  q+=f' FROM source_posts GROUP BY "{source_col}" ORDER BY 2 DESC'
+                  for r in db.execute(q).fetchall(): print('source_activity='+json.dumps(r,ensure_ascii=False))
+          # Inventory status and offer-type distributions.
+          for t in ('listings_v3','listing_offers'):
+              if t not in tables: continue
+              cs=cols(t)
+              for c in ('inventory_status','offer_status','offer_type','publication_policy'):
+                  if c in cs:
+                      rows=db.execute(f'SELECT COALESCE(CAST("{c}" AS TEXT),"<NULL>"),COUNT(*) FROM "{t}" GROUP BY "{c}" ORDER BY 1').fetchall()
+                      print('dist.%s.%s='% (t,c)+'|'.join(f'{a}:{b}' for a,b in rows))
+          db.close()
+          PY
+
+          echo '=== JOURNAL EXCEPTIONS SINCE CURRENT START ==='
+          for u in "${UNITS[@]}"; do
+            echo "--- $u ---"
+            since=$(systemctl show "$u" -p ActiveEnterTimestamp --value)
+            journalctl -u "$u" --since "$since" --no-pager -o short-iso 2>/dev/null | python3 -c '
+          import sys,re
+          lines=sys.stdin.readlines()
+          pat=re.compile(r"Traceback|ERROR|CRITICAL|getUpdates|Conflict|Query is too old|NetworkError|ReadError|database is locked|sqlite.*locked|no such table|callback.*handler|AttributeError|duplicate|publication.*unknown|Main process exited|restart loop|exception",re.I)
+          hits=[]
+          for i,l in enumerate(lines):
+              if pat.search(l): hits.extend(range(max(0,i-3),min(len(lines),i+12)))
+          if not hits:
+              print("NO_MATCHING_EXCEPTIONS")
+          else:
+              for i in sorted(set(hits)):
+                  l=lines[i]
+                  l=re.sub(r"\d{6,}:[A-Za-z0-9_-]{20,}","[REDACTED_BOT_TOKEN]",l)
+                  l=re.sub(r"(?i)(api[_ -]?hash|api[_ -]?id|session|secret|password)=\S+",r"\1=[REDACTED]",l)
+                  print(l,end="")
+          '
+          done
+
+          echo '=== HANDLER / UI STATIC RUNTIME SNAPSHOT ==='
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('/opt/qiaolian_v3/current/v3_core')
+          terms=['广播中心','我的租约','绑定租约','侨联保障','入住服务','今日预约','待跟进','已联系','已完成','已取消','新建房源','运行状态','每日广播','今日统计','房源状态','发帖时段','采集源','预约申请已提交','实时视频看房','租赁详情','更多实拍','帮我找房','联系中文顾问']
+          files=list(root.rglob('*.py'))
+          for term in terms:
+              found=[]
+              for f in files:
+                  try: txt=f.read_text(errors='ignore')
+                  except Exception: continue
+                  if term in txt: found.append(str(f.relative_to(root.parent)))
+              print(f'term.{term}=' + ('|'.join(found[:12]) if found else 'MISSING'))
+          PY
+          REMOTE
+
+      - name: Remove temporary SSH material
+        if: always()
+        run: rm -f "$HOME/.ssh/qiaolian_production"
