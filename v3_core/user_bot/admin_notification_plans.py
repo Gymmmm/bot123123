@@ -5,7 +5,7 @@ from html import escape as he
 
 from .admin_notifications import AdminNotification
 from .appointment_submit_executor import AppointmentSubmitExecution
-from .appointments import APPOINTMENT_MODE_LABELS, display_time
+from .appointments import APPOINTMENT_MODE_LABELS, display_date, display_time
 from .lead_service import LeadUser
 from .public_appointment import PublicAppointmentDraft
 from .source_display import source_display_label
@@ -31,12 +31,13 @@ def general_contact_notification(
     source: str,
 ) -> AdminNotification:
     return AdminNotification(
-        title="用户联系我们",
+        title="💬 新用户咨询",
         lines=(
-            f"用户：{user_mention_html(user)}",
-            f"联系方式：{he(user_contact_text(user))}",
-            f"入口：{he(source_display_label(source))}",
+            f"👤 {user_mention_html(user)}",
+            f"📱 {he(user_contact_text(user))}",
+            f"📍 来源｜{he(source_display_label(source))}",
         ),
+        show_bell=False,
     )
 
 
@@ -49,18 +50,21 @@ def appointment_notification(
     reply_markup=None,
 ) -> AdminNotification:
     updated = execution.submission.kind == "updated"
-    title = f"📅 {'预约时间已修改' if updated else '新预约'} #{execution.submission.appointment_id}"
+    title = "📅 预约时间已修改" if updated else "📅 新看房预约"
     mode_label = APPOINTMENT_MODE_LABELS.get(draft.mode, "实地看房")
     display_subject = str(subject or draft.public_listing_id).strip()
     return AdminNotification(
         title=title,
         lines=(
             f"🏠 <b>{he(display_subject)}</b>",
-            f"🕐 {he(draft.date)} · {he(display_time(draft.time))}",
+            f"🆔 {he(draft.public_listing_id)}",
+            "",
+            f"👤 {user_mention_html(user)}",
+            f"📱 {he(user_contact_text(user))}",
+            f"🗓 {he(display_date(draft.date))} · {he(display_time(draft.time))}",
             f"📍 {he(mode_label)}",
-            f"👤 客户｜{user_mention_html(user)}",
-            f"💬 Telegram｜{he(user_contact_text(user))}",
-            "<b>当前状态｜🟡 待确认</b>",
+            "",
+            "🟡 <b>待确认</b>",
         ),
         show_bell=False,
         reply_markup=reply_markup,
