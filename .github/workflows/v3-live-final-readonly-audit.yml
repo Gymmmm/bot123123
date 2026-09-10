@@ -1,0 +1,477 @@
+name: v3-live-final-readonly-audit
+
+on:
+  push:
+    branches: [audit/v3-live-final-20260910]
+    paths: [.github/workflows/v3-live-final-readonly-audit.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Configure production SSH
+        env:
+          PROD_SSH_PRIVATE_KEY: '${{ secrets.PROD_SSH_PRIVATE_KEY }}'
+        run: |
+          set -Eeuo pipefail
+          test -n "$PROD_SSH_PRIVATE_KEY"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian-production"
+          printf '%s\n' '50.114.74.120 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILuFtkSn5SJKY7mZ52Lc/QydPRTvHFpsj87M/HcIkb/L' > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/qiaolian-production" "$HOME/.ssh/known_hosts"
+
+      - name: Audit live V3 without writes
+        run: |
+          set -Eeuo pipefail
+          ssh -i "$HOME/.ssh/qiaolian-production" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=20 root@50.114.74.120 'bash -s' <<'REMOTE'
+          set -Eeuo pipefail
+          readonly APP=/opt/qiaolian_v3
+          readonly CURRENT="$(readlink -f "$APP/current")"
+          readonly ENV_FILE="$APP/runtime.env"
+          readonly -a UNITS=(
+            qiaolian-v3@collector.service
+            qiaolian-v3@canonical.service
+            qiaolian-v3@publisher.service
+            qiaolian-v3@user.service
+          )
+
+          redact() {
+            sed -E \
+              -e 's/[0-9]{6,}:[A-Za-z0-9_-]{20,}/[REDACTED_BOT_TOKEN]/g' \
+              -e 's/((api[_ -]?hash|api[_ -]?id|session|secret|password)[=:])[[:graph:]]+/\1[REDACTED]/Ig'
+          }
+
+          echo '=== DEPLOYMENT ==='
+          printf 'current_target=%s\n' "$CURRENT"
+          printf 'release_git_head='; tr -cd 'A-Za-z0-9_./:-\n ' < "$CURRENT/.git/HEAD" | head -n1
+          printf 'release_exact_sha='; git -c safe.directory="$CURRENT" -C "$CURRENT" rev-parse HEAD
+          printf 'deployed_sha='; tr -cd '0-9a-fA-F\n' < "$APP/.deployed_sha" | head -n1
+
+          echo '=== SYSTEMD ==='
+          for unit in "${UNITS[@]}"; do
+            echo "[$unit]"
+            systemctl show "$unit" \
+              -p ExecStart -p WorkingDirectory -p MainPID -p ActiveState -p SubState \
+              -p NRestarts -p ActiveEnterTimestamp -p InvocationID -p EnvironmentFiles \
+              --no-pager | redact
+            pid="$(systemctl show "$unit" -p MainPID --value)"
+            printf 'ProcessCWD=%s\n' "$(readlink -f "/proc/$pid/cwd" 2>/dev/null || true)"
+            printf 'ProcessCmd='; tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | redact; echo
+          done
+
+          echo '=== OTHER QIAOLIAN PROCESSES AND TOKEN COLLISIONS ==='
+          python3 - <<'PY'
+          import os, re, subprocess
+
+          units = [
+              'qiaolian-v3@collector.service',
+              'qiaolian-v3@canonical.service',
+              'qiaolian-v3@publisher.service',
+              'qiaolian-v3@user.service',
+          ]
+          service_pids = {}
+          for unit in units:
+              try:
+                  service_pids[unit] = int(subprocess.check_output(
+                      ['systemctl', 'show', unit, '-p', 'MainPID', '--value'], text=True
+                  ).strip())
+              except Exception:
+                  pass
+
+          def proc_env(pid):
+              try:
+                  chunks = open(f'/proc/{pid}/environ', 'rb').read().split(b'\0')
+              except Exception:
+                  return {}
+              result = {}
+              for item in chunks:
+                  if b'=' not in item:
+                      continue
+                  key, value = item.split(b'=', 1)
+                  name = key.decode(errors='ignore')
+                  if 'TOKEN' in name.upper() and value:
+                      result[name] = value
+              return result
+
+          official = []
+          for unit, pid in service_pids.items():
+              for name, value in proc_env(pid).items():
+                  official.append((unit, pid, name, value))
+
+          collisions = []
+          related = []
+          for name in os.listdir('/proc'):
+              if not name.isdigit():
+                  continue
+              pid = int(name)
+              try:
+                  cmd = open(f'/proc/{pid}/cmdline', 'rb').read().replace(b'\0', b' ').decode(errors='ignore').strip()
+              except Exception:
+                  cmd = ''
+              safe_cmd = re.sub(r'\d{6,}:[A-Za-z0-9_-]{20,}', '[REDACTED_BOT_TOKEN]', cmd)[:260]
+              if pid not in service_pids.values() and 'qiaolian' in safe_cmd.lower():
+                  related.append((pid, safe_cmd))
+              if pid in service_pids.values():
+                  continue
+              for other_name, other_value in proc_env(pid).items():
+                  for unit, official_pid, official_name, official_value in official:
+                      if other_value == official_value:
+                          collisions.append((pid, safe_cmd, unit, official_pid, other_name, official_name))
+
+          if related:
+              for pid, cmd in related:
+                  print(f'other_qiaolian_process pid={pid} cmd={cmd}')
+          else:
+              print('other_qiaolian_processes=NONE')
+          if collisions:
+              for row in collisions:
+                  print('TOKEN_COLLISION other_pid=%s cmd=%s unit=%s official_pid=%s vars=%s/%s' % row)
+          else:
+              print('token_collisions=NONE')
+          PY
+
+          echo '=== RUNTIME PATHS AND READ-ONLY TELEGRAM IDENTITY ==='
+          APP_ENV="$ENV_FILE" python3 - <<'PY'
+          import json, os, shlex, urllib.request
+          from pathlib import Path
+
+          def load_env(path):
+              values = {}
+              for raw in Path(path).read_text(errors='ignore').splitlines():
+                  line = raw.strip()
+                  if not line or line.startswith('#') or '=' not in line:
+                      continue
+                  key, value = line.split('=', 1)
+                  key = key.strip()
+                  try:
+                      parts = shlex.split(value, comments=False, posix=True)
+                      values[key] = parts[0] if parts else ''
+                  except ValueError:
+                      values[key] = value.strip().strip('"').strip("'")
+              return values
+
+          env = load_env(os.environ['APP_ENV'])
+          db_path = env.get('DB_PATH') or env.get('SQLITE_PATH')
+          print('environment_file=' + os.environ['APP_ENV'])
+          print('db_path=' + str(db_path or 'MISSING'))
+          print('media_root=' + str(env.get('MEDIA_ROOT') or 'MISSING'))
+          print('collector_sources_path=' + str(env.get('COLLECTOR_SOURCES_JSON') or 'MISSING'))
+          print('timezone=' + str(env.get('AUTOPILOT_TIMEZONE') or env.get('V3_AUTO_PUBLISH_TIMEZONE') or 'MISSING'))
+
+          for role, key in (('publisher', 'PUBLISHER_BOT_TOKEN'), ('user', 'USER_BOT_TOKEN')):
+              token = env.get(key, '').strip()
+              if not token:
+                  print(f'telegram.{role}=MISSING_TOKEN')
+                  continue
+              try:
+                  with urllib.request.urlopen(f'https://api.telegram.org/bot{token}/getMe', timeout=15) as response:
+                      payload = json.load(response)
+                  result = payload.get('result') or {}
+                  print('telegram.%s.ok=%s username=%s' % (
+                      role, bool(payload.get('ok')), result.get('username') or 'MISSING'))
+                  with urllib.request.urlopen(f'https://api.telegram.org/bot{token}/getWebhookInfo', timeout=15) as response:
+                      hook = (json.load(response).get('result') or {})
+                  print('telegram.%s.webhook_set=%s pending_updates=%s' % (
+                      role, bool(hook.get('url')), int(hook.get('pending_update_count') or 0)))
+              except Exception as exc:
+                  print(f'telegram.{role}.read_error={type(exc).__name__}')
+          PY
+
+          DB="$(APP_ENV="$ENV_FILE" python3 - <<'PY'
+          import os, shlex
+          from pathlib import Path
+          values={}
+          for raw in Path(os.environ['APP_ENV']).read_text(errors='ignore').splitlines():
+              line=raw.strip()
+              if not line or line.startswith('#') or '=' not in line: continue
+              key,value=line.split('=',1)
+              try: parsed=shlex.split(value,comments=False,posix=True); values[key.strip()]=parsed[0] if parsed else ''
+              except ValueError: values[key.strip()]=value.strip().strip('"').strip("'")
+          print(values.get('DB_PATH') or values.get('SQLITE_PATH') or '')
+          PY
+          )"
+          test -n "$DB" -a -f "$DB"
+          stat -c 'db_status=file size=%s mtime=%y owner=%U:%G mode=%A' "$DB"
+
+          echo '=== DATABASE INTEGRITY, TABLES, COUNTS, SETTINGS, STATES ==='
+          APP_DB="$DB" python3 - <<'PY'
+          import datetime as dt
+          import json
+          import os
+          import sqlite3
+          from collections import Counter, defaultdict
+          from pathlib import Path
+
+          path = os.environ['APP_DB']
+          db = sqlite3.connect(f'file:{path}?mode=ro', uri=True)
+          db.row_factory = sqlite3.Row
+          db.execute('PRAGMA query_only=ON')
+          print('integrity_check=' + str(db.execute('PRAGMA integrity_check').fetchone()[0]))
+          tables = [r[0] for r in db.execute(
+              "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+          )]
+          print('tables=' + '|'.join(tables))
+
+          def qident(value):
+              return '"' + str(value).replace('"', '""') + '"'
+
+          def columns(table):
+              return [r[1] for r in db.execute(f'PRAGMA table_info({qident(table)})')]
+
+          def count(table):
+              return int(db.execute(f'SELECT COUNT(*) FROM {qident(table)}').fetchone()[0])
+
+          requested = [
+              'source_posts', 'canonical_records', 'canonical_overrides', 'listings_v3',
+              'review_items', 'media_assets', 'publication_packages', 'publication_packages_v3',
+              'publication_delivery_attempts', 'publication_delivery_attempts_v3',
+              'publication_instances', 'posts', 'publish_logs', 'appointments_v3',
+              'repair_tickets', 'repair_tickets_v3', 'tenant_bindings', 'tenant_bindings_v3',
+              'bot_settings', 'publisher_review_exceptions_v3', 'publisher_auto_items_v3',
+              'publisher_autopilot_settings_v3', 'publisher_post_windows_v3',
+              'publisher_settings_v3', 'publisher_broadcast_log_v3', 'listing_offers',
+          ]
+          for table in requested:
+              print(f'count.{table}={count(table)}' if table in tables else f'count.{table}=MISSING')
+
+          for table in requested:
+              if table not in tables:
+                  continue
+              cols = columns(table)
+              for col in cols:
+                  if col.lower() == 'status' or col.lower().endswith('_status') or col.lower() in ('state', 'review_status', 'publish_status'):
+                      rows = db.execute(
+                          f'SELECT COALESCE(CAST({qident(col)} AS TEXT),"<NULL>"),COUNT(*) '
+                          f'FROM {qident(table)} GROUP BY {qident(col)} ORDER BY 1'
+                      ).fetchall()
+                      print(f'dist.{table}.{col}=' + '|'.join(f'{r[0]}:{r[1]}' for r in rows))
+
+          safe_setting_tables = ['bot_settings', 'publisher_autopilot_settings_v3', 'publisher_settings_v3']
+          for table in safe_setting_tables:
+              if table not in tables:
+                  continue
+              cols = columns(table)
+              key = next((c for c in cols if c.lower() in ('key', 'name', 'setting_key')), None)
+              value = next((c for c in cols if c.lower() in ('value', 'setting_value')), None)
+              if not key or not value:
+                  continue
+              for row in db.execute(f'SELECT {qident(key)},{qident(value)} FROM {qident(table)} ORDER BY {qident(key)}'):
+                  setting_key = str(row[0] or '')
+                  low = setting_key.lower()
+                  if any(bad in low for bad in ('token', 'secret', 'password', 'api', 'hash', 'session', 'credential')):
+                      continue
+                  print(f'setting.{table}.{setting_key}={row[1]}')
+
+          if 'publisher_post_windows_v3' in tables:
+              for row in db.execute('SELECT start_time,end_time,enabled FROM publisher_post_windows_v3 ORDER BY start_time,end_time'):
+                  print(f'post_window={row[0]}-{row[1]} enabled={row[2]}')
+
+          if 'collector_source_state_v3' in tables:
+              for row in db.execute(
+                  'SELECT source_name,enabled,last_collected_at,today_count,today_duplicates,last_error,updated_at '
+                  'FROM collector_source_state_v3 ORDER BY source_name'
+              ):
+                  print('collector_source=' + json.dumps({
+                      'name': row['source_name'], 'enabled': row['enabled'],
+                      'last_collected_at': row['last_collected_at'], 'today_count': row['today_count'],
+                      'today_duplicates': row['today_duplicates'],
+                      'last_error_type': (str(row['last_error']).split(':', 1)[0] if row['last_error'] else ''),
+                      'updated_at': row['updated_at'],
+                  }, ensure_ascii=False, sort_keys=True))
+
+          if 'source_posts' in tables:
+              source_cols = columns('source_posts')
+              duplicate_source_tuples = db.execute(
+                  '''SELECT COUNT(*) FROM (
+                       SELECT source_type,source_name,source_post_id,COUNT(*) n
+                       FROM source_posts GROUP BY source_type,source_name,source_post_id HAVING n>1
+                     )'''
+              ).fetchone()[0]
+              print(f'source.duplicate_identity_tuples={duplicate_source_tuples}')
+              changed = db.execute(
+                  "SELECT COUNT(*) FROM source_posts WHERE COALESCE(updated_at,'')<>COALESCE(created_at,'')"
+              ).fetchone()[0] if {'updated_at','created_at'} <= set(source_cols) else 'UNAVAILABLE'
+              print(f'source.updated_in_place_rows={changed}')
+              for row in db.execute(
+                  '''SELECT id,source_name,source_post_id,source_url,parse_status,
+                            json_array_length(COALESCE(raw_images_json,'[]')) image_count,
+                            fetched_at,created_at,updated_at
+                     FROM source_posts ORDER BY id DESC LIMIT 12'''
+              ):
+                  print('recent_source=' + json.dumps(dict(row), ensure_ascii=False, sort_keys=True))
+
+          if 'media_assets' in tables:
+              cols = columns('media_assets')
+              path_col = next((c for c in ('local_path','path','file_path') if c in cols), None)
+              if path_col:
+                  found = missing = nonempty = 0
+                  for row in db.execute(f'SELECT {qident(path_col)} FROM media_assets'):
+                      value = str(row[0] or '')
+                      if not value:
+                          missing += 1
+                          continue
+                      p = Path(value)
+                      if p.is_file():
+                          found += 1
+                          if p.stat().st_size > 0:
+                              nonempty += 1
+                      else:
+                          missing += 1
+                  print(f'media.files_found={found} nonempty={nonempty} missing={missing}')
+              print('schema.media_assets=' + '|'.join(cols))
+
+          if 'canonical_records' in tables:
+              current_rows = db.execute(
+                  '''SELECT c.* FROM canonical_records c
+                     JOIN (SELECT source_post_id,MAX(rowid) max_rowid FROM canonical_records GROUP BY source_post_id) x
+                       ON x.max_rowid=c.rowid'''
+              ).fetchall()
+              print(f'canonical.current_unique_sources={len(current_rows)}')
+              multi = db.execute(
+                  '''SELECT COUNT(*) FROM (
+                       SELECT source_post_id,COUNT(*) n FROM canonical_records
+                       GROUP BY source_post_id HAVING n>1
+                     )'''
+              ).fetchone()[0]
+              print(f'canonical.sources_with_revisions={multi}')
+              fields = [
+                  'project_name','public_location_display','property_type_display','layout',
+                  'monthly_rent_usd','sale_price_usd','size_sqm','floor',
+                  'deposit_payment_terms','contract_term_display','management_fee','water_rate',
+                  'electric_rate','internet_fee','parking_fee','furniture','appliances','amenities',
+                  'highlights','media_summary','deal_type','source_identity',
+              ]
+              coverage = Counter()
+              evidence_missing = Counter()
+              deal_types = Counter()
+              source_identity_mismatch = 0
+              source_by_id = {str(r['id']): r for r in db.execute(
+                  'SELECT id,source_type,source_name,source_post_id FROM source_posts'
+              )} if 'source_posts' in tables else {}
+              for row in current_rows:
+                  try: facts = json.loads(row['facts_json'] or '{}')
+                  except Exception: facts = {}
+                  deal_types[str(facts.get('deal_type') or row['deal_type'] or '<missing>')] += 1
+                  for field in fields:
+                      value = facts.get(field)
+                      if value not in (None, '', [], {}):
+                          coverage[field] += 1
+                  evidence = facts.get('evidence') or {}
+                  for field in ('project_name','public_location_display','property_type_display','layout','monthly_rent_usd','sale_price_usd','size_sqm','floor','deposit_payment_terms','contract_term_display','management_fee','water_rate','electric_rate','internet_fee','parking_fee'):
+                      if facts.get(field) not in (None, '', [], {}) and not evidence.get(field) and field not in ('project_name','public_location_display','property_type_display'):
+                          evidence_missing[field] += 1
+                  src = source_by_id.get(str(row['source_post_id']))
+                  ident = facts.get('source_identity') or {}
+                  if src and any(str(ident.get(k) or '') != str(src[k] or '') for k in ('source_type','source_name','source_post_id')):
+                      source_identity_mismatch += 1
+              print('canonical.deal_types=' + '|'.join(f'{k}:{v}' for k,v in sorted(deal_types.items())))
+              for field in fields:
+                  print(f'canonical.coverage.{field}={coverage[field]}/{len(current_rows)}')
+              print('canonical.nonempty_without_direct_evidence=' + '|'.join(f'{k}:{v}' for k,v in sorted(evidence_missing.items())))
+              print(f'canonical.source_identity_mismatch={source_identity_mismatch}')
+
+          if {'canonical_records','review_items'} <= set(tables):
+              unstable = db.execute(
+                  '''SELECT COUNT(*) FROM (
+                       SELECT c.source_post_id,
+                              COUNT(DISTINCT r.listing_id) listing_ids,
+                              COUNT(DISTINCT r.offer_id) offer_ids
+                       FROM canonical_records c JOIN review_items r
+                         ON r.canonical_record_id=c.canonical_record_id
+                       GROUP BY c.source_post_id
+                       HAVING listing_ids>1 OR offer_ids>2
+                     )'''
+              ).fetchone()[0]
+              print(f'identity.sources_with_unstable_listing_or_offer={unstable}')
+
+          if 'publisher_review_exceptions_v3' in tables:
+              cols = columns('publisher_review_exceptions_v3')
+              print('schema.publisher_review_exceptions_v3=' + '|'.join(cols))
+              for col in ('reason_code','status','state'):
+                  if col in cols:
+                      rows = db.execute(f'SELECT COALESCE(CAST({qident(col)} AS TEXT),"<NULL>"),COUNT(*) FROM publisher_review_exceptions_v3 GROUP BY {qident(col)} ORDER BY 1').fetchall()
+                      print(f'dist.publisher_review_exceptions_v3.{col}=' + '|'.join(f'{r[0]}:{r[1]}' for r in rows))
+
+          if 'publication_instances' in tables:
+              rows = db.execute(
+                  '''SELECT p.channel_message_id,p.publish_status,p.published_at,l.public_listing_id,p.post_text
+                     FROM publication_instances p
+                     LEFT JOIN listing_public_ids l ON l.listing_id=p.listing_id
+                     ORDER BY p.published_at DESC LIMIT 20'''
+              ).fetchall()
+              invalid_text = 0
+              missing_message_id = 0
+              for row in rows:
+                  text = str(row['post_text'] or '')
+                  low = text.lower()
+                  if any(x in low for x in ('none','null','unknown','listing_id')) or '｜｜' in text or '｜\n' in text:
+                      invalid_text += 1
+                  if not str(row['channel_message_id'] or '').strip():
+                      missing_message_id += 1
+                  print('recent_publication=' + json.dumps({
+                      'message_id': row['channel_message_id'], 'status': row['publish_status'],
+                      'published_at': row['published_at'], 'public_listing_id': row['public_listing_id'],
+                      'caption_lines': text.splitlines(),
+                  }, ensure_ascii=False, sort_keys=True))
+              print(f'publication.recent_invalid_placeholder_or_separator={invalid_text}')
+              print(f'publication.recent_missing_message_id={missing_message_id}')
+
+          if 'appointments_v3' in tables:
+              print('appointments.distinct_users=' + str(db.execute('SELECT COUNT(DISTINCT user_id) FROM appointments_v3').fetchone()[0]))
+              print('appointments.distinct_listings=' + str(db.execute('SELECT COUNT(DISTINCT listing_id) FROM appointments_v3').fetchone()[0]))
+              print('appointments.users_with_multiple_listings=' + str(db.execute(
+                  '''SELECT COUNT(*) FROM (
+                       SELECT user_id FROM appointments_v3
+                       GROUP BY user_id HAVING COUNT(DISTINCT listing_id)>1
+                     )'''
+              ).fetchone()[0]))
+              print('appointments.duplicate_request_rows=' + str(db.execute(
+                  '''SELECT COUNT(*) FROM (
+                       SELECT user_id,listing_id,viewing_mode,appointment_date,appointment_time,COUNT(*) n
+                       FROM appointments_v3 GROUP BY user_id,listing_id,viewing_mode,appointment_date,appointment_time
+                       HAVING n>1
+                     )'''
+              ).fetchone()[0]))
+
+          db.close()
+          PY
+
+          echo '=== JOURNAL SCAN FROM EACH CURRENT ACTIVATION ==='
+          for unit in "${UNITS[@]}"; do
+            echo "--- $unit ---"
+            since="$(systemctl show "$unit" -p ActiveEnterTimestamp --value)"
+            journalctl -u "$unit" --since "$since" --no-pager -o short-iso 2>/dev/null \
+              | python3 -c '
+          import re, sys
+          lines=sys.stdin.readlines()
+          print("journal_lines="+str(len(lines)))
+          if lines:
+              print("journal_first="+lines[0].split(" ",1)[0])
+              print("journal_last="+lines[-1].split(" ",1)[0])
+          pattern=re.compile(r"Traceback|ERROR|CRITICAL|getUpdates|Conflict|Query is too old|NetworkError|ReadError|ReadTimeout|TimedOut|database is locked|sqlite.*locked|no such table|callback.*handler|AttributeError|duplicate send|publication.*unknown|Main process exited|restart loop|Message is not modified",re.I)
+          indexes=[]
+          for index,line in enumerate(lines):
+              if pattern.search(line): indexes.extend(range(max(0,index-2),min(len(lines),index+24)))
+          if not indexes:
+              print("matching_anomalies=NONE")
+          else:
+              for index in sorted(set(indexes)):
+                  line=lines[index]
+                  line=re.sub(r"\d{6,}:[A-Za-z0-9_-]{20,}","[REDACTED_BOT_TOKEN]",line)
+                  line=re.sub(r"(?i)((?:api[_ -]?hash|api[_ -]?id|session|secret|password)[=:])\S+",r"\1[REDACTED]",line)
+                  print(line,end="")
+          '
+          done
+
+          echo '=== END READ-ONLY AUDIT ==='
+          REMOTE
+
+      - name: Remove temporary SSH material
+        if: always()
+        run: rm -f "$HOME/.ssh/qiaolian-production"
