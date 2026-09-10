@@ -16,6 +16,7 @@ from .search_no_match_view import build_search_no_match_view
 from .search_query import SearchCriteria
 from .search_submit_executor import SearchSubmitExecutor
 from .telegram_home_ui import build_home_keyboard
+from .telegram_navigation import advisor_handoff_url, polish_listing_keyboard
 from .telegram_search_results import present_search_flow_result
 from .telegram_transition_ui import build_transition_keyboard
 from .telegram_ui import build_action_keyboard
@@ -40,7 +41,7 @@ def _chat_id(update: Any) -> int | str:
     chat = getattr(update, "effective_chat", None)
     value = getattr(chat, "id", None)
     if value is None:
-        raise ValueError("telegram_effective_chat_missing_for_start")
+        raise ValueError("telegram_effective_chat_missing")
     return value
 
 
@@ -94,17 +95,44 @@ def _search_entry_plan() -> TransitionPlan:
     )
 
 
-async def _render_details(message: Any, result: PublicListingFlowResult) -> None:
+def _listing_keyboard(result, *, advisor_url: str = "", channel_url: str = ""):
+    return polish_listing_keyboard(
+        build_action_keyboard(result.action_rows),
+        advisor_url=advisor_url,
+        channel_url=channel_url,
+        add_home=True,
+        add_channel=True,
+    )
+
+
+async def _render_details(
+    message: Any,
+    result: PublicListingFlowResult,
+    *,
+    advisor_url: str = "",
+    channel_url: str = "",
+) -> None:
     if result.details is None:
         raise ValueError("start_details_result_missing_response")
     await message.reply_text(
         result.details.text,
         parse_mode=ParseMode.HTML,
-        reply_markup=build_action_keyboard(result.details.action_rows),
+        reply_markup=_listing_keyboard(
+            result.details,
+            advisor_url=advisor_url,
+            channel_url=channel_url,
+        ),
     )
 
 
-async def _render_photos(update: Any, context: Any, result: PublicListingFlowResult) -> None:
+async def _render_photos(
+    update: Any,
+    context: Any,
+    result: PublicListingFlowResult,
+    *,
+    advisor_url: str = "",
+    channel_url: str = "",
+) -> None:
     if result.photos is None:
         raise ValueError("start_photos_result_missing_response")
     chat_id = _chat_id(update)
@@ -119,36 +147,71 @@ async def _render_photos(update: Any, context: Any, result: PublicListingFlowRes
         chat_id=chat_id,
         text=result.photos.text,
         parse_mode=ParseMode.HTML,
-        reply_markup=build_action_keyboard(result.photos.action_rows),
+        reply_markup=_listing_keyboard(
+            result.photos,
+            advisor_url=advisor_url,
+            channel_url=channel_url,
+        ),
     )
 
 
-def _support_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        [
-            [InlineKeyboardButton("🔍 帮我找房", callback_data="v3u:home:search")],
-            [InlineKeyboardButton("💬 联系中文顾问", callback_data="v3u:home:contact")],
-            [InlineKeyboardButton("🏠 返回首页", callback_data="v3u:t:home")],
-        ]
-    )
+def _support_keyboard(*, advisor_url: str = "", channel_url: str = "") -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = [
+        [InlineKeyboardButton("🔍 帮我找房", callback_data="v3u:home:search")],
+    ]
+    clean_advisor = str(advisor_url or "").strip()
+    if clean_advisor:
+        rows.append([InlineKeyboardButton("💬 联系中文顾问", url=advisor_handoff_url(clean_advisor))])
+    else:
+        rows.append([InlineKeyboardButton("💬 联系中文顾问", callback_data="v3u:home:contact")])
+    clean_channel = str(channel_url or "").strip()
+    if clean_channel:
+        rows.append([InlineKeyboardButton("📣 返回房源频道", url=clean_channel)])
+    rows.append([InlineKeyboardButton("🏠 返回首页", callback_data="v3u:t:home")])
+    return InlineKeyboardMarkup(rows)
 
 
-async def _render_invalid_link(message: Any) -> None:
+async def _render_invalid_link(
+    message: Any,
+    *,
+    advisor_url: str = "",
+    channel_url: str = "",
+) -> None:
     await message.reply_text(
         "这个链接已经失效或房源信息已更新。\n\n您可以重新找房，或直接联系中文顾问。",
         parse_mode=ParseMode.HTML,
-        reply_markup=_support_keyboard(),
+        reply_markup=_support_keyboard(advisor_url=advisor_url, channel_url=channel_url),
     )
 
 
-async def _render_unbookable(message: Any, result: PublicListingFlowResult) -> None:
+async def _render_unbookable(
+    message: Any,
+    result: PublicListingFlowResult,
+    *,
+    advisor_url: str = "",
+    channel_url: str = "",
+) -> None:
     await message.reply_text(
         "这套房暂时不能预约，可以看相近房源或联系中文顾问。",
         parse_mode=ParseMode.HTML,
-        reply_markup=_support_keyboard(),
+        reply_markup=_support_keyboard(advisor_url=advisor_url, channel_url=channel_url),
     )
     if getattr(result, "details", None) is not None:
-        await _render_details(message, result)
+        await _render_details(
+            message,
+            result,
+            advisor_url=advisor_url,
+            channel_url=channel_url,
+        )
+
+
+def _appointment_keyboard(view, *, channel_url: str = ""):
+    markup = build_transition_keyboard(view)
+    rows = [list(row) for row in markup.inline_keyboard]
+    clean_channel = str(channel_url or "").strip()
+    if clean_channel:
+        rows.append([InlineKeyboardButton("📣 返回房源频道", url=clean_channel)])
+    return InlineKeyboardMarkup(rows)
 
 
 async def _handle_broadcast_shortcut(
@@ -181,7 +244,7 @@ async def _handle_broadcast_shortcut(
 
     if payload == "latest":
         if search_executor is None:
-            await _render_invalid_link(message)
+            await _render_invalid_link(message, advisor_url=advisor_url)
             return TelegramStartOutcome(True, "broadcast_latest_unavailable", payload)
         intent = SearchSubmitIntent(
             criteria=SearchCriteria(raw_text=""),
@@ -202,6 +265,17 @@ async def _handle_broadcast_shortcut(
             )
         return TelegramStartOutcome(True, "broadcast_latest", payload)
 
+    # Broadcast advisor entry is intentionally direct when a configured advisor
+    # exists. With no advisor URL, keep the existing lead/admin fallback.
+    if str(advisor_url or "").strip():
+        await message.reply_text(
+            "💬 <b>联系中文顾问</b>\n\n点击下方直接打开顾问对话。",
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("💬 联系中文顾问", url=advisor_handoff_url(advisor_url))]]
+            ),
+        )
+        return TelegramStartOutcome(True, "broadcast_advisor", payload)
     if contact_effects is not None:
         await contact_effects.execute_general(
             bot=getattr(context, "bot", None),
@@ -238,7 +312,7 @@ async def handle_v3_start(
     args = tuple(getattr(context, "args", None) or ())
     user_data.clear()
     if not args:
-        home = build_home_view(channel_url=channel_url)
+        home = build_home_view(channel_url=channel_url, advisor_url=advisor_url)
         await message.reply_text(
             home.text,
             parse_mode=ParseMode.HTML,
@@ -262,14 +336,23 @@ async def handle_v3_start(
     result = listings.resolve(payload)
     if not result.ok:
         if getattr(result, "reason", "") == "listing_not_bookable":
-            await _render_unbookable(message, result)
+            await _render_unbookable(
+                message,
+                result,
+                advisor_url=advisor_url,
+                channel_url=channel_url,
+            )
             return TelegramStartOutcome(
                 handled=True,
                 kind="unbookable",
                 payload=payload,
                 result=result if isinstance(result, PublicListingFlowResult) else None,
             )
-        await _render_invalid_link(message)
+        await _render_invalid_link(
+            message,
+            advisor_url=advisor_url,
+            channel_url=channel_url,
+        )
         return TelegramStartOutcome(
             handled=True,
             kind="invalid_link",
@@ -278,10 +361,21 @@ async def handle_v3_start(
         )
 
     if result.action == "details":
-        await _render_details(message, result)
+        await _render_details(
+            message,
+            result,
+            advisor_url=advisor_url,
+            channel_url=channel_url,
+        )
         return TelegramStartOutcome(True, "details", payload, result)
     if result.action == "photos":
-        await _render_photos(update, context, result)
+        await _render_photos(
+            update,
+            context,
+            result,
+            advisor_url=advisor_url,
+            channel_url=channel_url,
+        )
         return TelegramStartOutcome(True, "photos", payload, result)
     if result.action == "book":
         plan = _book_plan(result)
@@ -290,7 +384,7 @@ async def handle_v3_start(
         await message.reply_text(
             view.text,
             parse_mode=ParseMode.HTML,
-            reply_markup=build_transition_keyboard(view),
+            reply_markup=_appointment_keyboard(view, channel_url=channel_url),
         )
         apply_session_mutation(user_data, mutation)
         return TelegramStartOutcome(True, "book", payload, result)
