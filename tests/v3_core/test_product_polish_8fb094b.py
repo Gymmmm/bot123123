@@ -51,7 +51,7 @@ def _button_labels(markup):
 def test_channel_keyboard_booking_follows_inventory_status(status, has_book):
     labels = _button_labels(build_channel_keyboard(dict(ACTIONS), inventory_status=status))
     assert ("📅 预约看房" in labels) is has_book
-    assert "🏠 房源详情" in labels
+    assert "📋 租赁详情" in labels
     assert "📸 更多实拍" in labels
 
 
@@ -158,7 +158,7 @@ def test_no_match_page_has_existing_contact_flow_action():
     )
     view = build_search_no_match_view(intent)
     choices = [choice for row in view.rows for choice in row]
-    contact = next(choice for choice in choices if choice.label == "💬 联系我们")
+    contact = next(choice for choice in choices if choice.label == "💬 联系中文顾问")
     assert contact.kind == "home"
     assert contact.value == "contact"
 
@@ -213,7 +213,7 @@ def test_missing_channel_url_does_not_create_latest_listing_url_button():
     view = build_home_view(channel_url="")
     choices = [choice for row in view.rows for choice in row]
     assert all(choice.label != "🏠 最新房源" for choice in choices)
-    assert any(choice.label == "💬 联系我们" for choice in choices)
+    assert any(choice.label == "💬 联系中文顾问" for choice in choices)
 
 
 def test_missing_advisor_url_uses_internal_contact_callback_not_dead_url():
