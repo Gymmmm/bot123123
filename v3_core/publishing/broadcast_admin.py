@@ -50,19 +50,38 @@ class BroadcastAdminController:
         enabled = self.service.config().enabled
         return InlineKeyboardMarkup(
             [
-                [InlineKeyboardButton("查看今日广播", callback_data="v3bc|today")],
-                [InlineKeyboardButton("立即预览", callback_data="v3bc|preview")],
-                [InlineKeyboardButton("发布今日广播", callback_data="v3bc|send")],
+                [
+                    InlineKeyboardButton("🧩 选择模板", callback_data="v3bc|tpl_menu"),
+                    InlineKeyboardButton("✏️ 编辑文案", callback_data="v3bc|custom"),
+                ],
+                [
+                    InlineKeyboardButton("💱 调整汇率", callback_data="v3bc|fx"),
+                    InlineKeyboardButton("🔘 底部按钮", callback_data="v3bc|buttons"),
+                ],
+                [
+                    InlineKeyboardButton("👁 预览", callback_data="v3bc|preview"),
+                    InlineKeyboardButton("📤 立即发送", callback_data="v3bc|send"),
+                ],
+                [InlineKeyboardButton("🕒 广播时间", callback_data="v3bc|time_menu")],
                 [
                     InlineKeyboardButton(
-                        "暂停自动广播" if enabled else "开启自动广播",
+                        "⏸ 关闭定时" if enabled else "▶️ 开启定时",
                         callback_data="v3bc|off" if enabled else "v3bc|on",
                     )
                 ],
-                [InlineKeyboardButton("选择广播时间", callback_data="v3bc|time_menu")],
-                [InlineKeyboardButton("🏠 返回首页", callback_data="v3h")],
+                [InlineKeyboardButton("📄 查看今日广播", callback_data="v3bc|today")],
+                [InlineKeyboardButton("⬅️ 返回发布后台", callback_data="v3h")],
             ]
         )
+
+    def _template_keyboard(self) -> InlineKeyboardMarkup:
+        config = self.service.config()
+        # Keep template keys owned by BroadcastService; this page only exposes the
+        # already-supported callbacks instead of introducing a second settings path.
+        keys = tuple(self.service.template_keys())
+        rows = [[InlineKeyboardButton(("✅ " if key == config.template_key else "") + self.service.template_label(key), callback_data=f"v3bc|tpl|{key}")] for key in keys]
+        rows.append([InlineKeyboardButton("⬅️ 返回广播中心", callback_data="v3bc")])
+        return InlineKeyboardMarkup(rows)
 
     @staticmethod
     def _time_keyboard() -> InlineKeyboardMarkup:
@@ -74,7 +93,7 @@ class BroadcastAdminController:
                     InlineKeyboardButton("18:30", callback_data="v3bc|time|1830"),
                 ],
                 [InlineKeyboardButton("其他时间", callback_data="v3bc|time|custom")],
-                [InlineKeyboardButton("⬅️ 返回每日广播", callback_data="v3bc")],
+                [InlineKeyboardButton("⬅️ 返回广播中心", callback_data="v3bc")],
                 [InlineKeyboardButton("🏠 返回首页", callback_data="v3h")],
             ]
         )
@@ -95,7 +114,7 @@ class BroadcastAdminController:
                     InlineKeyboardButton("+0.10", callback_data="v3bc|fxset|10"),
                     InlineKeyboardButton("+0.20", callback_data="v3bc|fxset|20"),
                 ],
-                [InlineKeyboardButton("⬅️ 返回每日广播", callback_data="v3bc")],
+                [InlineKeyboardButton("⬅️ 返回广播中心", callback_data="v3bc")],
             ]
         )
 
@@ -105,14 +124,14 @@ class BroadcastAdminController:
             [
                 [InlineKeyboardButton("不带按钮", callback_data="v3bc|btn|none")],
                 [
-                    InlineKeyboardButton("🔍 租房找房", callback_data="v3bc|btn|find"),
+                    InlineKeyboardButton("🔍 帮我找房", callback_data="v3bc|btn|find"),
                     InlineKeyboardButton("🏠 最新房源", callback_data="v3bc|btn|latest"),
                 ],
                 [
-                    InlineKeyboardButton("💬 租房置业咨询", callback_data="v3bc|btn|contact"),
+                    InlineKeyboardButton("💬 联系我们", callback_data="v3bc|btn|contact"),
                     InlineKeyboardButton("组合按钮", callback_data="v3bc|btn|combo"),
                 ],
-                [InlineKeyboardButton("⬅️ 返回每日广播", callback_data="v3bc")],
+                [InlineKeyboardButton("⬅️ 返回广播中心", callback_data="v3bc")],
             ]
         )
 
@@ -121,9 +140,11 @@ class BroadcastAdminController:
         prefix = f"✅ {escape(notice)}\n\n" if notice else ""
         await message.reply_text(
             prefix
-            + "<b>📣 每日广播</b>\n\n"
-            f"自动广播：<b>{'已开启' if config.enabled else '已暂停'}</b>\n"
-            f"广播时间：<b>{escape(config.send_time)}</b>（{escape(self.timezone_name)}）\n\n"
+            + "<b>📣 广播中心</b>\n\n"
+            f"当前模板：<b>{escape(self.service.template_label(config.template_key))}</b>\n"
+            f"汇率偏移：<b>{config.fx_offset:+.2f}</b>\n"
+            f"定时广播：<b>{'已开启' if config.enabled else '已关闭'}</b>\n"
+            f"发送时间：<b>{escape(config.send_time)}</b>（{escape(self.timezone_name)}）\n\n"
             "每日广播和房源自动发布相互独立。",
             parse_mode=ParseMode.HTML,
             reply_markup=self._center_keyboard(),
@@ -219,6 +240,9 @@ class BroadcastAdminController:
 
         if action in {"center", "open"}:
             await self.show_center(query.message)
+            return True
+        if action == "tpl_menu":
+            await query.message.reply_text("选择广播模板：", reply_markup=self._template_keyboard())
             return True
         if action == "today":
             await self._render_today(query.message, title="今日广播")
