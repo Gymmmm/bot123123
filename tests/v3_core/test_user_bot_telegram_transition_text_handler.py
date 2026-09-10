@@ -55,13 +55,29 @@ class FakeBot:
         raise AssertionError("test cards do not use photo files")
 
 
-class EmptyInventory:
+class PublicInventory:
     def resolve(self, public_listing_id):
-        return None
+        if str(public_listing_id) != PUBLIC_ID:
+            return None
+        return SimpleNamespace(
+            snapshot={"schema": "v3_publication_snapshot.v1"},
+            frozen_listing={
+                "project_name": "富力城",
+                "property_type": "公寓",
+                "layout": "一房",
+                "public_location_display": "富力城",
+            },
+            frozen_offer={"monthly_rent_usd": 680},
+            listing={"inventory_status": "active"},
+            listing_id="LST_INTERNAL_1",
+            public_listing_id=PUBLIC_ID,
+            bookable=True,
+            gallery=(),
+        )
 
 
 class ViewsStub:
-    inventory = EmptyInventory()
+    inventory = PublicInventory()
 
     def appointment_time(self, draft):
         return TransitionView(
@@ -231,7 +247,7 @@ async def test_invalid_custom_date_keeps_waiting_state_and_returns_fixed_copy():
 
 
 @pytest.mark.asyncio
-async def test_custom_time_persists_then_replies_success_and_clears_appointment_session():
+async def test_custom_time_renders_confirmation_without_persisting():
     message = FakeMessage("20:00")
     user_data = _appt(awaiting_time=True, date="9月5日")
     executor = FakeAppointmentExecutor()
@@ -244,32 +260,41 @@ async def test_custom_time_persists_then_replies_success_and_clears_appointment_
         appointment_executor=executor,
     )
 
-    assert outcome.appointment_execution is not None
-    assert APPOINTMENT_SESSION_KEY not in user_data
+    assert outcome.appointment_execution is None
+    assert APPOINTMENT_SESSION_KEY in user_data
     assert APPOINTMENT_AWAITING_TIME_KEY not in user_data
+    assert user_data[APPOINTMENT_SESSION_KEY]["time"] == "20:00"
+    assert executor.calls == []
     rendered = message.calls[-1][1][0]
-    assert "预约申请已提交" in rendered
-    assert PUBLIC_ID in rendered
+    assert "确认看房预约" in rendered
+    assert "9月5日" in rendered
+    assert "20:00" in rendered
     assert "LST_INTERNAL_1" not in rendered
+    markup = message.calls[-1][2]["reply_markup"]
+    assert markup.inline_keyboard[0][0].callback_data == "v3u:t:appointment_submit"
 
 
 @pytest.mark.asyncio
-async def test_custom_time_executor_failure_preserves_retry_state():
+async def test_custom_time_does_not_invoke_failing_executor_before_confirmation():
     message = FakeMessage("20:00")
     user_data = _appt(awaiting_time=True, date="9月5日")
+    executor = FakeAppointmentExecutor(fail=True)
 
-    with pytest.raises(ValueError, match="listing_not_bookable"):
-        await handle_v3_transition_text(
-            _update(message),
-            _context(user_data),
-            actions=TransitionTextActionService(),
-            views=ViewsStub(),
-            appointment_executor=FakeAppointmentExecutor(fail=True),
-        )
+    outcome = await handle_v3_transition_text(
+        _update(message),
+        _context(user_data),
+        actions=TransitionTextActionService(),
+        views=ViewsStub(),
+        appointment_executor=executor,
+    )
 
+    assert outcome.handled
+    assert outcome.appointment_execution is None
+    assert executor.calls == []
     assert APPOINTMENT_SESSION_KEY in user_data
-    assert APPOINTMENT_AWAITING_TIME_KEY in user_data
-    assert message.calls == []
+    assert user_data[APPOINTMENT_SESSION_KEY]["time"] == "20:00"
+    assert APPOINTMENT_AWAITING_TIME_KEY not in user_data
+    assert "确认看房预约" in message.calls[-1][1][0]
 
 
 @pytest.mark.asyncio
