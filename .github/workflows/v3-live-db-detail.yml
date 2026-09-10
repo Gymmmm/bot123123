@@ -1,0 +1,80 @@
+name: v3-live-db-detail
+on:
+  push:
+    branches: [audit/v3-live-20260910]
+    paths: [.github/workflows/v3-live-db-detail.yml]
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Configure SSH
+        env:
+          KEY: '${{ secrets.PROD_SSH_PRIVATE_KEY }}'
+        run: |
+          set -euo pipefail; test -n "$KEY"; mkdir -p ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/q; chmod 600 ~/.ssh/q
+          printf '%s\n' '50.114.74.120 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILuFtkSn5SJKY7mZ52Lc/QydPRTvHFpsj87M/HcIkb/L' > ~/.ssh/known_hosts
+      - name: Database detail read only
+        run: |
+          ssh -i ~/.ssh/q -o BatchMode=yes -o IdentitiesOnly=yes root@50.114.74.120 'bash -s' <<'REMOTE'
+          set -euo pipefail; APP=/opt/qiaolian_v3; CUR=$(readlink -f "$APP/current"); set -a; source "$APP/runtime.env"; set +a; DB="${DB_PATH:-${SQLITE_PATH:-$CUR/data/qiaolian_dual_bot.db}}"
+          APP_DB="$DB" python3 - <<'PY'
+          import os,sqlite3,json
+          db=sqlite3.connect('file:'+os.environ['APP_DB']+'?mode=ro',uri=True); db.row_factory=sqlite3.Row; db.execute('PRAGMA query_only=ON')
+          def tables(): return {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+          tabs=tables()
+          def cols(t): return [r[1] for r in db.execute(f'PRAGMA table_info("{t}")')]
+          for t in ['collect_sources','collector_source_state_v3','source_posts','canonical_records','review_items','publisher_autopilot_settings_v3','publisher_post_windows_v3','publisher_auto_items_v3','publication_delivery_attempts_v3','publication_instances','appointments_v3','publisher_settings_v3','publisher_broadcast_log_v3','repair_tickets_v3','tenant_bindings_v3']:
+              if t in tabs: print('schema.'+t+'='+'|'.join(cols(t)))
+          def dist(t,c):
+              if t in tabs and c in cols(t):
+                  rr=db.execute(f'SELECT COALESCE(CAST("{c}" AS TEXT),"<NULL>"),COUNT(*) FROM "{t}" GROUP BY "{c}" ORDER BY 1').fetchall(); print(f'dist.{t}.{c}='+'|'.join(f'{r[0]}:{r[1]}' for r in rr))
+          for t,c in [('publisher_auto_items_v3','status'),('publication_delivery_attempts_v3','status'),('appointments_v3','status'),('appointments_v3','viewing_mode'),('review_items','review_status'),('source_posts','status')]: dist(t,c)
+          # Autopilot settings and post windows: only operational non-secret fields.
+          if 'publisher_autopilot_settings_v3' in tabs:
+              cs=cols('publisher_autopilot_settings_v3'); safe=[c for c in cs if not any(x in c.lower() for x in ('token','secret','password','key','session','api'))]
+              for r in db.execute('SELECT * FROM publisher_autopilot_settings_v3'):
+                  d={c:r[c] for c in safe}; print('autopilot='+json.dumps(d,ensure_ascii=False,default=str))
+          if 'publisher_post_windows_v3' in tabs:
+              cs=cols('publisher_post_windows_v3'); safe=[c for c in cs if not any(x in c.lower() for x in ('token','secret','password','key','session','api'))]
+              for r in db.execute('SELECT * FROM publisher_post_windows_v3 ORDER BY 1'):
+                  print('post_window='+json.dumps({c:r[c] for c in safe},ensure_ascii=False,default=str))
+          if 'publisher_settings_v3' in tabs:
+              cs=cols('publisher_settings_v3'); safe=[c for c in cs if not any(x in c.lower() for x in ('token','secret','password','key','session','api'))]
+              for r in db.execute('SELECT * FROM publisher_settings_v3'):
+                  print('publisher_settings='+json.dumps({c:r[c] for c in safe},ensure_ascii=False,default=str))
+          # Collector sources/state without credentials or message body.
+          if 'collect_sources' in tabs:
+              cs=cols('collect_sources'); safe=[c for c in cs if not any(x in c.lower() for x in ('token','secret','password','hash','session','api')) and c.lower() not in ('raw_text','text','content')]
+              for r in db.execute('SELECT * FROM collect_sources'):
+                  print('collect_source='+json.dumps({c:r[c] for c in safe},ensure_ascii=False,default=str))
+          if 'collector_source_state_v3' in tabs:
+              cs=cols('collector_source_state_v3'); safe=[c for c in cs if not any(x in c.lower() for x in ('token','secret','password','hash','session','api'))]
+              for r in db.execute('SELECT * FROM collector_source_state_v3'):
+                  print('collector_state='+json.dumps({c:r[c] for c in safe},ensure_ascii=False,default=str))
+          # Source activity. Detect likely columns.
+          if 'source_posts' in tabs:
+              cs=cols('source_posts'); sc=next((c for c in cs if 'channel' in c.lower() or c in ('source_id','chat_id')),None); mid=next((c for c in cs if c in ('source_post_id','message_id','post_id','source_message_id')),None); tc=next((c for c in cs if c in ('updated_at','collected_at','created_at','last_seen_at')),None)
+              print(f'source_columns source={sc} post={mid} time={tc}')
+              if sc:
+                  q=f'SELECT CAST("{sc}" AS TEXT),COUNT(*)'+(f',MAX("{mid}")' if mid else '')+(f',MAX("{tc}")' if tc else '')+f' FROM source_posts GROUP BY "{sc}" ORDER BY 2 DESC'
+                  for r in db.execute(q): print('source_summary='+json.dumps(tuple(r),ensure_ascii=False,default=str))
+          # Publication instances recent safe metadata.
+          if 'publication_instances' in tabs:
+              cs=cols('publication_instances'); wanted=[c for c in ('instance_id','listing_id','offer_id','channel_chat_id','channel_message_id','publish_status','published_at','updated_at') if c in cs]
+              q='SELECT '+','.join(wanted)+' FROM publication_instances ORDER BY COALESCE(published_at,updated_at) DESC LIMIT 20'
+              for r in db.execute(q): print('publication='+json.dumps({c:r[c] for c in wanted},ensure_ascii=False,default=str))
+          # Appointment aggregate only, no PII.
+          if 'appointments_v3' in tabs:
+              cs=cols('appointments_v3'); print('appointments.distinct_users='+str(db.execute('SELECT COUNT(DISTINCT user_id) FROM appointments_v3').fetchone()[0] if 'user_id' in cs else 'NA')); print('appointments.distinct_listings='+str(db.execute('SELECT COUNT(DISTINCT listing_id) FROM appointments_v3').fetchone()[0] if 'listing_id' in cs else 'NA'))
+          # Canonical/listing coverage: only counts, never original text.
+          if 'canonical_records' in tabs:
+              cs=cols('canonical_records'); print('canonical.total='+str(db.execute('SELECT COUNT(*) FROM canonical_records').fetchone()[0])); print('canonical.columns='+'|'.join(cs))
+          db.close()
+          PY
+          REMOTE
+      - if: always()
+        run: rm -f ~/.ssh/q
