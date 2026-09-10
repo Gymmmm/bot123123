@@ -1,7 +1,7 @@
 """Final V3 Publisher application composition.
 
 The application presents a seven-entry administrator console while retaining the
-existing review/package/delivery machinery underneath.  Automatic listings use
+existing review/package/delivery machinery underneath. Automatic listings use
 the same frozen-package and durable Telegram delivery path as manual listings.
 """
 from __future__ import annotations
@@ -18,6 +18,7 @@ from .admin_bot import PublisherAdminBot, PublisherAdminSettings, REPO_ROOT, loa
 from .autopilot_anomalies import FinalAutoPublishRepository, FinalAutoPublishService
 from .broadcast import BroadcastService, BroadcastSettingsRepository
 from .broadcast_admin import BROADCAST_EDIT_STATE_KEY, BroadcastAdminController
+from .manual_status_sync import PublisherManualStatusSynchronizer
 from .simple_admin import NEW_LISTING_STATE_KEY, SIMPLE_EDIT_STATE_KEY
 from .simple_admin_production import ProductionSimplePublisherAdminController
 
@@ -59,6 +60,10 @@ class V3PublisherApplication(PublisherAdminBot):
             channel_chat_id=settings.channel_chat_id,
             cover_output_dir=settings.cover_output_dir,
         )
+        self.manual_status_sync = PublisherManualStatusSynchronizer(
+            settings.db_path,
+            user_bot_username=settings.user_bot_username,
+        )
 
     @staticmethod
     def _home_button() -> list[InlineKeyboardButton]:
@@ -87,7 +92,20 @@ class V3PublisherApplication(PublisherAdminBot):
                 return
             await query.answer()
             try:
-                await self.simple.handle_callback(update, context)
+                handled = await self.simple.handle_callback(update, context)
+                parts = raw.split("|")
+                if handled and len(parts) == 4 and parts[1] == "status":
+                    status, listing_id = parts[2], parts[3]
+                    result = await self.manual_status_sync.sync(
+                        context.bot,
+                        listing_id=listing_id,
+                        status=status,
+                    )
+                    if result.attempted and not result.synced:
+                        await query.message.reply_text(
+                            "⚠️ 房源状态已更新，但频道帖子同步失败，请稍后重试。",
+                            reply_markup=InlineKeyboardMarkup([self._home_button()]),
+                        )
             except Exception as exc:
                 await query.message.reply_text(
                     "操作失败，房源没有被强行发布：\n" + escape(type(exc).__name__ + ": " + str(exc)),
