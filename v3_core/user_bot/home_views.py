@@ -34,12 +34,13 @@ WELCOME_TEXT = (
 )
 
 CONTACT_TEXT = (
-    "💬 <b>联系中文顾问</b>\n\n"
-    "找房可以直接发送：区域 + 预算 + 户型。\n\n"
+    "💬 <b>有什么需要，直接告诉我们。</b>\n\n"
+    "找房的话，可以直接发送：\n"
+    "区域 + 预算 + 户型\n\n"
     "例如：\n"
     "「BKK1 两房，$900以内」\n"
     "「富力城一房，要能做饭」\n\n"
-    "也可以点击下方直接打开顾问对话。"
+    "不方便打字，也可以直接联系中文顾问。"
 )
 
 
@@ -78,8 +79,7 @@ def build_home_view(*, channel_url: str = "", advisor_url: str = "") -> HomeView
 
 
 def build_contact_view(*, advisor_url: str = "") -> HomeView:
-    clean_advisor = str(advisor_url or "").strip()
-    first = _contact_choice(clean_advisor)
+    first = _contact_choice(advisor_url)
     return HomeView(
         kind="contact",
         text=CONTACT_TEXT,
