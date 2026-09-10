@@ -7,7 +7,8 @@ starting appointment persistence.
 
 The plans preserve fixed-SHA entry semantics while keeping Telegram/session
 identity public:
-- book -> public-ID offline appointment draft, next step date;
+- book -> public-ID offline appointment draft, next step date
+  (no mode/focus gate; video is optional on the date screen);
 - consult -> contact handoff, with lead/admin effects declared but not run;
 - similar -> keep only the frozen public area, goal any, next step budget;
 - change search -> reset to the normal search entry.
