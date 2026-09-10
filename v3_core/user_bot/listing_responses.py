@@ -76,14 +76,14 @@ def _details_actions(
     if bookable:
         return (
             (
-                SemanticAction("📍 预约看房", "book", target),
-                SemanticAction("🕹️ 更多实拍", "photos", target),
+                SemanticAction("📅 预约看房", "book", target),
+                SemanticAction("📸 更多实拍", "photos", target),
             ),
             (SemanticAction("💬 联系中文顾问", "consult", target),),
         )
     return (
         (
-            SemanticAction("🕹️ 更多实拍", "photos", target),
+            SemanticAction("📸 更多实拍", "photos", target),
             SemanticAction("💬 联系中文顾问", "consult", target),
         ),
         (SemanticAction("🏘 看相近房源", "similar", target),),
@@ -98,7 +98,7 @@ def _photo_actions(
     target = str(public_listing_id or "").strip()
     first = [SemanticAction("📋 租赁详情", "details", target)]
     if bookable:
-        first.append(SemanticAction("📍 预约看房", "book", target))
+        first.append(SemanticAction("📅 预约看房", "book", target))
     return (
         tuple(first),
         (SemanticAction("💬 联系中文顾问", "consult", target),),
