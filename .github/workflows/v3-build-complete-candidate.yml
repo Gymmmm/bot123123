@@ -1,0 +1,38 @@
+name: v3-build-complete-candidate
+on:
+  push:
+    branches: [audit/v3-live-20260910]
+    paths: [.github/workflows/v3-build-complete-candidate.yml]
+permissions:
+  contents: write
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Integrate Issue 25 onto exact production base
+        run: |
+          set -euo pipefail
+          git config user.name 'qiaolian-integration-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git fetch origin codex/v3-production-complete-ui-20260910 chief/issue25-cta-appt-10commits
+          git checkout -B codex/v3-production-complete-ui-20260910 origin/codex/v3-production-complete-ui-20260910
+          test "$(git rev-parse HEAD)" = '5b834f65140ad890b83dacee08e8e8e71836f2bc'
+          test "$(git merge-base HEAD 5b834f65140ad890b83dacee08e8e8e71836f2bc)" = '5b834f65140ad890b83dacee08e8e8e71836f2bc'
+          COMMITS=$(git rev-list --reverse 90180b834c5b13cb5e96aa51b24a081956bb18d2..21371ec5b383af7b0ff8415381a449d83d16ae3a)
+          git cherry-pick -n -X theirs $COMMITS
+          # New acceptance supersedes the Issue #25 integration branch's interim channel label:
+          # channel uses 房源详情; Bot detail title remains 租赁详情.
+          if test -f v3_core/publishing/channel_contract.py; then
+            sed -i 's/"details": "📋 租赁详情"/"details": "🏠 房源详情"/' v3_core/publishing/channel_contract.py
+          fi
+          grep -RIl '🏠 租赁详情' tests/v3_core v3_core/publishing v3_core/user_bot 2>/dev/null | xargs -r sed -i 's/🏠 租赁详情/🏠 房源详情/g'
+          # Preserve the user-facing Bot page heading as 租赁详情 wherever it is a title.
+          # Do not touch parser/collector/storage code except files actually changed by the issue25 range.
+          git diff --check
+          git commit -m 'integrate Issue #25 channel and appointment flow' -m 'Base: production 5b834f65140ad890b83dacee08e8e8e71836f2bc. Source: chief/issue25-cta-appt-10commits at 21371ec5b383af7b0ff8415381a449d83d16ae3a. Reconciles channel CTA to current acceptance: 🏠 房源详情.'
+          git push origin HEAD:codex/v3-production-complete-ui-20260910
