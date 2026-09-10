@@ -58,12 +58,27 @@ class PublicListingFlowService:
         route = decision.route
         action = route.action if route is not None else None
         public_id = route.public_listing_id if route is not None else ""
-        if not decision.ok or route is None or decision.view is None:
+        if not decision.ok or route is None:
+            details = None
+            if (
+                decision.status == "blocked"
+                and str(decision.reason or "") == "listing_not_bookable"
+                and decision.view is not None
+            ):
+                details = build_details_response(decision.view)
             return PublicListingFlowResult(
                 status=decision.status,
                 action=action,  # type: ignore[arg-type]
                 public_listing_id=public_id,
-                reason=decision.reason,
+                reason=str(decision.reason or ""),
+                details=details,
+            )
+        if decision.view is None:
+            return PublicListingFlowResult(
+                status=decision.status,
+                action=action,  # type: ignore[arg-type]
+                public_listing_id=public_id,
+                reason=str(decision.reason or ""),
             )
 
         view = decision.view
