@@ -42,7 +42,7 @@ def test_full_home_preserves_fixed_sha_labels_and_never_emits_legacy_callbacks()
         "🛡 侨联保障",
         "🛠 入住服务",
         "🏠 最新房源",
-        "💬 联系我们",
+        "💬 联系中文顾问",
     ]
     callbacks = _callbacks(markup)
     assert callbacks == [
@@ -61,6 +61,7 @@ def test_contact_and_appointment_views_return_only_v3_navigation():
     contact = build_contact_view(advisor_url="https://t.me/advisor")
     contact_markup = build_home_keyboard(contact)
     assert contact_markup is not None
+    assert contact.rows[0][0].label == "💬 联系中文顾问"
     assert _callbacks(contact_markup) == ["v3u:home:search", "v3u:t:home"]
     assert contact_markup.inline_keyboard[0][0].url == "https://t.me/advisor"
 
