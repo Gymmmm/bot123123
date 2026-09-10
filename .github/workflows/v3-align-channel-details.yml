@@ -1,0 +1,47 @@
+name: v3-align-channel-details
+on:
+  push:
+    branches: [audit/v3-live-20260910]
+    paths: [.github/workflows/v3-align-channel-details.yml]
+permissions:
+  contents: write
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/v3-production-complete-ui-20260910
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Align current acceptance copy
+        run: |
+          set -euo pipefail
+          git config user.name 'qiaolian-integration-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('v3_core/publishing/channel_contract.py')
+          s=p.read_text().replace('"details": "📋 租赁详情"','"details": "🏠 房源详情"')
+          p.write_text(s)
+          p=Path('v3_core/user_bot/listing_responses.py')
+          s=p.read_text().replace('lines = ["📋 <b>租赁详情</b>", ""]','lines = ["🏠 <b>租赁详情</b>", ""]')
+          p.write_text(s)
+          p=Path('v3_core/user_bot/telegram_start_handler.py')
+          s=p.read_text().replace('这个链接已经失效或房源信息已更新。\\n\\n您可以重新找房，或直接联系中文顾问。','这个链接已经失效或房源信息已更新。\\n\\n您可以重新找房，或直接联系我们。')
+          p.write_text(s)
+          p=Path('tests/v3_core/test_product_copy_lock_90180b83.py')
+          s=p.read_text().replace('assert publish == ["🏠 租赁详情", "📸 更多实拍", "📅 预约看房"]','assert publish == ["🏠 房源详情", "📸 更多实拍", "📅 预约看房"]')
+          s=s.replace('assert sync == ["🏠 租赁详情", "📸 更多实拍", "📅 预约看房"]','assert sync == ["🏠 房源详情", "📸 更多实拍", "📅 预约看房"]')
+          s=s.replace('assert "🏠 房源详情" not in publish + sync','assert "🏠 租赁详情" not in publish + sync')
+          p.write_text(s)
+          PY
+          python -m pip install -q -r requirements.txt pytest pytest-asyncio
+          PYTHONPATH=. python -m pytest -q tests/v3_core/test_issue25_cta_appointment_contract.py tests/v3_core/test_product_copy_lock_90180b83.py tests/v3_core/test_product_polish_8fb094b.py tests/v3_core/test_telegram_adapter.py tests/v3_core/test_user_bot_channel_status_sync.py
+          git diff --check
+          git add v3_core/publishing/channel_contract.py v3_core/user_bot/listing_responses.py v3_core/user_bot/telegram_start_handler.py tests/v3_core/test_product_copy_lock_90180b83.py
+          git commit -m 'align channel post and factual qiaolian note' -m 'Aligns current acceptance contract: channel CTA uses 🏠 房源详情, Bot page remains 🏠 租赁详情, expired-link body uses 联系我们. Adviser notes remain frozen-fact derived.'
+          git push origin HEAD:codex/v3-production-complete-ui-20260910
