@@ -1,0 +1,79 @@
+name: v3-integrate-broadcast-center
+on:
+  push:
+    branches: [audit/v3-live-20260910]
+    paths: [.github/workflows/v3-integrate-broadcast-center.yml]
+permissions:
+  contents: write
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/v3-production-complete-ui-20260910
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Restore center using existing V3 callbacks/storage
+        run: |
+          set -euo pipefail
+          git config user.name 'qiaolian-integration-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('v3_core/publishing/broadcast_admin.py')
+          s=p.read_text()
+          old='''    def _center_keyboard(self) -> InlineKeyboardMarkup:\n        enabled = self.service.config().enabled\n        return InlineKeyboardMarkup(\n            [\n                [InlineKeyboardButton("查看今日广播", callback_data="v3bc|today")],\n                [InlineKeyboardButton("立即预览", callback_data="v3bc|preview")],\n                [InlineKeyboardButton("发布今日广播", callback_data="v3bc|send")],\n                [\n                    InlineKeyboardButton(\n                        "暂停自动广播" if enabled else "开启自动广播",\n                        callback_data="v3bc|off" if enabled else "v3bc|on",\n                    )\n                ],\n                [InlineKeyboardButton("选择广播时间", callback_data="v3bc|time_menu")],\n                [InlineKeyboardButton("🏠 返回首页", callback_data="v3h")],\n            ]\n        )\n'''
+          new='''    def _center_keyboard(self) -> InlineKeyboardMarkup:\n        enabled = self.service.config().enabled\n        return InlineKeyboardMarkup(\n            [\n                [\n                    InlineKeyboardButton("🧩 选择模板", callback_data="v3bc|tpl_menu"),\n                    InlineKeyboardButton("✏️ 编辑文案", callback_data="v3bc|custom"),\n                ],\n                [\n                    InlineKeyboardButton("💱 调整汇率", callback_data="v3bc|fx"),\n                    InlineKeyboardButton("🔘 底部按钮", callback_data="v3bc|buttons"),\n                ],\n                [\n                    InlineKeyboardButton("👁 预览", callback_data="v3bc|preview"),\n                    InlineKeyboardButton("📤 立即发送", callback_data="v3bc|send"),\n                ],\n                [InlineKeyboardButton("🕒 广播时间", callback_data="v3bc|time_menu")],\n                [\n                    InlineKeyboardButton(\n                        "⏸ 关闭定时" if enabled else "▶️ 开启定时",\n                        callback_data="v3bc|off" if enabled else "v3bc|on",\n                    )\n                ],\n                [InlineKeyboardButton("📄 查看今日广播", callback_data="v3bc|today")],\n                [InlineKeyboardButton("⬅️ 返回发布后台", callback_data="v3h")],\n            ]\n        )\n\n    def _template_keyboard(self) -> InlineKeyboardMarkup:\n        config = self.service.config()\n        # Keep template keys owned by BroadcastService; this page only exposes the\n        # already-supported callbacks instead of introducing a second settings path.\n        keys = tuple(self.service.template_keys())\n        rows = [[InlineKeyboardButton(("✅ " if key == config.template_key else "") + self.service.template_label(key), callback_data=f"v3bc|tpl|{key}")] for key in keys]\n        rows.append([InlineKeyboardButton("⬅️ 返回广播中心", callback_data="v3bc")])\n        return InlineKeyboardMarkup(rows)\n'''
+          if old not in s: raise SystemExit('center snippet not found')
+          s=s.replace(old,new)
+          s=s.replace('InlineKeyboardButton("🔍 租房找房", callback_data="v3bc|btn|find")','InlineKeyboardButton("🔍 帮我找房", callback_data="v3bc|btn|find")')
+          s=s.replace('InlineKeyboardButton("💬 租房置业咨询", callback_data="v3bc|btn|contact")','InlineKeyboardButton("💬 联系我们", callback_data="v3bc|btn|contact")')
+          s=s.replace('InlineKeyboardButton("⬅️ 返回每日广播", callback_data="v3bc")','InlineKeyboardButton("⬅️ 返回广播中心", callback_data="v3bc")')
+          oldcenter='''            + "<b>📣 每日广播</b>\\n\\n"\n            f"自动广播：<b>{'已开启' if config.enabled else '已暂停'}</b>\\n"\n            f"广播时间：<b>{escape(config.send_time)}</b>（{escape(self.timezone_name)}）\\n\\n"\n            "每日广播和房源自动发布相互独立。",'''
+          newcenter='''            + "<b>📣 广播中心</b>\\n\\n"\n            f"当前模板：<b>{escape(self.service.template_label(config.template_key))}</b>\\n"\n            f"汇率偏移：<b>{config.fx_offset:+.2f}</b>\\n"\n            f"定时广播：<b>{'已开启' if config.enabled else '已关闭'}</b>\\n"\n            f"发送时间：<b>{escape(config.send_time)}</b>（{escape(self.timezone_name)}）\\n\\n"\n            "每日广播和房源自动发布相互独立。",'''
+          if oldcenter not in s: raise SystemExit('center text snippet not found')
+          s=s.replace(oldcenter,newcenter)
+          needle='''        if action == "today":\n            await self._render_today(query.message, title="今日广播")\n            return True\n'''
+          insert='''        if action == "tpl_menu":\n            await query.message.reply_text("选择广播模板：", reply_markup=self._template_keyboard())\n            return True\n        if action == "today":\n            await self._render_today(query.message, title="今日广播")\n            return True\n'''
+          if needle not in s: raise SystemExit('today branch not found')
+          s=s.replace(needle,insert)
+          p.write_text(s)
+          PY
+          cat > tests/v3_core/test_broadcast_center_complete_ui.py <<'PY'
+          from types import SimpleNamespace
+          from v3_core.publishing.broadcast_admin import BroadcastAdminController
+
+          class Service:
+              def ensure_defaults(self): pass
+              def config(self): return SimpleNamespace(enabled=True, template_key='market', fx_offset=0.1, send_time='09:30')
+              def template_keys(self): return ('market','weekend')
+              def template_label(self,key): return {'market':'行情早报','weekend':'周末找房'}[key]
+
+          def labels(markup):
+              return [b.text for row in markup.inline_keyboard for b in row]
+
+          def test_complete_broadcast_center_exposes_existing_controls():
+              c=BroadcastAdminController(service=Service(), channel_chat_id='-1001', timezone_name='Asia/Phnom_Penh')
+              got=labels(c._center_keyboard())
+              for expected in ('🧩 选择模板','✏️ 编辑文案','💱 调整汇率','🔘 底部按钮','👁 预览','📤 立即发送','🕒 广播时间','⏸ 关闭定时','⬅️ 返回发布后台'):
+                  assert expected in got
+              times=labels(c._time_keyboard())
+              assert all(x in times for x in ('09:30','12:30','18:30','其他时间','⬅️ 返回广播中心'))
+
+          def test_broadcast_footer_copy_uses_current_product_labels():
+              got=labels(BroadcastAdminController._button_keyboard())
+              assert '🔍 帮我找房' in got
+              assert '💬 联系我们' in got
+              assert '🔍 租房找房' not in got
+              assert '💬 租房置业咨询' not in got
+          PY
+          python -m pip install -q -r requirements.txt pytest pytest-asyncio
+          PYTHONPATH=. python -m pytest -q tests/v3_core/test_broadcast_center_complete_ui.py tests/v3_core/test_broadcast*.py 2>/dev/null || PYTHONPATH=. python -m pytest -q tests/v3_core/test_broadcast_center_complete_ui.py
+          git diff --check
+          git add v3_core/publishing/broadcast_admin.py tests/v3_core/test_broadcast_center_complete_ui.py
+          git commit -m 'restore complete 14:37 broadcast center' -m 'Source: existing V3 hidden compatibility callbacks/storage plus 2026-09-09 14:37 acceptance requirements. No second broadcast persistence path introduced.'
+          git push origin HEAD:codex/v3-production-complete-ui-20260910
