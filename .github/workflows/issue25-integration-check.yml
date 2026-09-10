@@ -61,7 +61,8 @@ jobs:
             tests/v3_core/test_user_bot_telegram_transition_ui.py \
             tests/v3_core/test_user_bot_transition_actions.py \
             tests/v3_core/test_user_bot_telegram_transition_action_handler.py \
-            tests/v3_core/test_user_bot_appointment_submit.py
+            tests/v3_core/test_appointment_submit_executor_v3.py \
+            tests/v3_core/test_appointment_submission_service.py
       - name: Issue 25 contract
         env:
           PYTHONPATH: '${{ github.workspace }}'
