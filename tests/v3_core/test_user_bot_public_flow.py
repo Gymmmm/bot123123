@@ -75,7 +75,7 @@ def test_details_payload_resolves_all_the_way_to_frozen_public_response():
     assert result.action == "details"
     assert result.public_listing_id == "QL-RF-A2B3"
     assert result.details is not None
-    assert "🏠 <b>租赁详情</b>" in result.details.text
+    assert "📋 <b>租赁详情</b>" in result.details.text
     assert "富力城｜2房1厅" in result.details.text
     assert result.photos is None
     assert result.book is None
@@ -158,8 +158,8 @@ def test_rented_book_is_blocked_before_appointment_flow_is_created():
         actions = [action for row in result.details.action_rows for action in row]
         labels = [action.label for action in actions]
         assert "📅 预约看房" not in labels
-        assert "🏘 看相近房源" in labels
-        similar = next(action for action in actions if action.label == "🏘 看相近房源")
+        assert "🊘 看相近房源" in labels
+        similar = next(action for action in actions if action.label == "🊘 看相近房源")
         assert similar.action == "similar"
         assert similar.target_public_listing_id == "QL-RF-A2B3"
 
