@@ -20,11 +20,15 @@ from .callbacks import encode_listing_callback
 from .telegram_navigation import advisor_handoff_url
 
 
-_ADMIN_MUTABLE_STATUSES = frozenset({"pending", "assigned", "contacted", "confirmed"})
 _ADMIN_ACTION_STATUS = {
     "confirm": "confirmed",
     "contacted": "contacted",
     "cancel": "cancelled",
+}
+_ALLOWED_PREVIOUS_BY_TARGET = {
+    "confirmed": frozenset({"pending", "assigned", "contacted"}),
+    "contacted": frozenset({"pending", "assigned"}),
+    "cancelled": frozenset({"pending", "assigned", "contacted", "confirmed"}),
 }
 
 
@@ -43,36 +47,59 @@ class AdminAppointmentReader:
         return conn
 
     @staticmethod
-    def _public_row(row: sqlite3.Row) -> dict[str, Any]:
+    def _table_exists(conn: sqlite3.Connection, name: str) -> bool:
+        row = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name=? LIMIT 1",
+            (str(name),),
+        ).fetchone()
+        return row is not None
+
+    @classmethod
+    def _published_public_id(cls, conn: sqlite3.Connection, listing_id: object) -> str:
+        clean_listing_id = str(listing_id or "").strip()
+        if not clean_listing_id:
+            return ""
+        if not cls._table_exists(conn, "publication_instances") or not cls._table_exists(
+            conn, "publication_packages_v3"
+        ):
+            return ""
+        try:
+            row = conn.execute(
+                """SELECT pp.snapshot_json
+                   FROM publication_instances pi
+                   JOIN publication_packages_v3 pp ON pp.package_id=pi.package_id
+                   WHERE pi.listing_id=?
+                     AND pi.platform='telegram'
+                     AND pi.publish_status='published'
+                   ORDER BY pi.updated_at DESC,pi.id DESC
+                   LIMIT 1""",
+                (clean_listing_id,),
+            ).fetchone()
+        except sqlite3.OperationalError:
+            return ""
+        if row is None:
+            return ""
+        try:
+            snapshot = json.loads(str(row["snapshot_json"] or "{}"))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return ""
+        if not isinstance(snapshot, dict):
+            return ""
+        return normalize_public_id(snapshot.get("public_listing_id")) or ""
+
+    @classmethod
+    def _public_row(cls, conn: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
         value = dict(row)
         direct = normalize_public_id(value.get("public_listing_id"))
-        raw = value.pop("published_snapshot_json", "")
         if direct:
             value["public_listing_id"] = direct
             return value
-        try:
-            snapshot = json.loads(str(raw or "{}"))
-        except (TypeError, ValueError, json.JSONDecodeError):
-            snapshot = {}
-        if isinstance(snapshot, dict):
-            resolved = normalize_public_id(snapshot.get("public_listing_id"))
-            if resolved:
-                value["public_listing_id"] = resolved
-            else:
-                value["public_listing_id"] = ""
+        value["public_listing_id"] = cls._published_public_id(conn, value.get("listing_id"))
         return value
 
     @staticmethod
     def _select_sql(where_clause: str) -> str:
-        return f"""SELECT a.*,l.public_listing_id,l.display_title,l.project_name,
-                          (SELECT pp.snapshot_json
-                           FROM publication_instances pi
-                           JOIN publication_packages_v3 pp ON pp.package_id=pi.package_id
-                           WHERE pi.listing_id=a.listing_id
-                             AND pi.platform='telegram'
-                             AND pi.publish_status='published'
-                           ORDER BY pi.updated_at DESC,pi.id DESC
-                           LIMIT 1) AS published_snapshot_json
+        return f"""SELECT a.*,l.public_listing_id,l.display_title,l.project_name
                    FROM appointments_v3 a
                    LEFT JOIN listings_v3 l ON l.listing_id=a.listing_id
                    WHERE {where_clause}"""
@@ -84,11 +111,11 @@ class AdminAppointmentReader:
             rows = conn.execute(
                 self._select_sql("1=1") + " ORDER BY a.appointment_time,a.id"
             ).fetchall()
-        return tuple(
-            self._public_row(row)
-            for row in rows
-            if appointment_date_matches(row["appointment_date"], target)
-        )
+            return tuple(
+                self._public_row(conn, row)
+                for row in rows
+                if appointment_date_matches(row["appointment_date"], target)
+            )
 
     def list_pending(self, *, limit: int = 30) -> tuple[dict[str, Any], ...]:
         cap = max(1, min(int(limit or 30), 100))
@@ -98,7 +125,7 @@ class AdminAppointmentReader:
                 + " ORDER BY a.created_at ASC,a.id ASC LIMIT ?",
                 (cap,),
             ).fetchall()
-        return tuple(self._public_row(row) for row in rows)
+            return tuple(self._public_row(conn, row) for row in rows)
 
     def get(self, appointment_id: int) -> dict[str, Any] | None:
         with self._connect() as conn:
@@ -106,11 +133,12 @@ class AdminAppointmentReader:
                 self._select_sql("a.id=?") + " LIMIT 1",
                 (int(appointment_id),),
             ).fetchone()
-        return self._public_row(row) if row is not None else None
+            return self._public_row(conn, row) if row is not None else None
 
     def update_status(self, appointment_id: int, status: str) -> tuple[dict[str, Any] | None, bool]:
         clean_status = str(status or "").strip().lower()
-        if clean_status not in {"confirmed", "contacted", "cancelled"}:
+        allowed_previous = _ALLOWED_PREVIOUS_BY_TARGET.get(clean_status)
+        if allowed_previous is None:
             raise ValueError("unsupported_admin_appointment_status")
         current = self.get(int(appointment_id))
         if current is None:
@@ -118,7 +146,7 @@ class AdminAppointmentReader:
         previous = str(current.get("status") or "pending").strip().lower()
         if previous == clean_status:
             return current, False
-        if previous not in _ADMIN_MUTABLE_STATUSES:
+        if previous not in allowed_previous:
             return current, False
         with self._connect(readonly=False) as conn:
             conn.execute("BEGIN IMMEDIATE")
@@ -164,12 +192,16 @@ def _appointment_action_rows(row: dict[str, Any]) -> list[list[InlineKeyboardBut
     appointment_id = int(row.get("id") or 0)
     status = str(row.get("status") or "pending").strip().lower()
     rows: list[list[InlineKeyboardButton]] = []
-    if status in _ADMIN_MUTABLE_STATUSES:
-        if status != "confirmed":
+    if appointment_id > 0:
+        if status in {"pending", "assigned"}:
             rows.append([InlineKeyboardButton("✅ 确认预约", callback_data=f"adminq:appointment:confirm:{appointment_id}")])
-        if status != "contacted":
             rows.append([InlineKeyboardButton("☎️ 标记已联系", callback_data=f"adminq:appointment:contacted:{appointment_id}")])
-        rows.append([InlineKeyboardButton("❌ 无法安排", callback_data=f"adminq:appointment:cancel:{appointment_id}")])
+            rows.append([InlineKeyboardButton("❌ 无法安排", callback_data=f"adminq:appointment:cancel:{appointment_id}")])
+        elif status == "contacted":
+            rows.append([InlineKeyboardButton("✅ 确认预约", callback_data=f"adminq:appointment:confirm:{appointment_id}")])
+            rows.append([InlineKeyboardButton("❌ 无法安排", callback_data=f"adminq:appointment:cancel:{appointment_id}")])
+        elif status == "confirmed":
+            rows.append([InlineKeyboardButton("❌ 无法安排", callback_data=f"adminq:appointment:cancel:{appointment_id}")])
     user_url = _contact_user_url(row)
     if user_url:
         rows.append([InlineKeyboardButton("👤 联系用户", url=user_url)])
@@ -185,25 +217,14 @@ def build_admin_appointment_detail_text(row: dict[str, Any]) -> str:
     mode_key = str(row.get("viewing_mode") or "offline").strip().lower()
     mode_label = APPOINTMENT_MODE_LABELS.get(mode_key, APPOINTMENT_MODE_LABELS["offline"])
     public_id = str(row.get("public_listing_id") or "待生成")
-    subject = str(row.get("display_title") or row.get("project_name") or "").strip()
-    lines = [
-        "📅 <b>预约详情</b>",
-        "",
-        f"{icon} <b>{escape(label)}</b>",
-    ]
-    if subject:
-        lines.append(f"🏠 {escape(subject)}")
-    lines.extend(
-        [
-            f"🆔 {escape(public_id)}",
-            "",
-            f"👤 {escape(str(row.get('display_name') or row.get('username') or '未填写'))}",
-            f"📱 {escape(str(row.get('contact_value') or '未填写'))}",
-            f"🗓 {escape(display_date(row.get('appointment_date')))} · {escape(display_time(row.get('appointment_time')))}",
-            f"📍 {escape(mode_label)}",
-        ]
+    return (
+        f"📅 <b>预约详情</b>\n\n{icon} {escape(label)}\n"
+        f"客户：{escape(str(row.get('display_name') or row.get('username') or '未填写'))}\n"
+        f"房源：{escape(public_id)}\n"
+        f"时间：{escape(display_date(row.get('appointment_date')))} · {escape(display_time(row.get('appointment_time')))}\n"
+        f"方式：{escape(mode_label)}\n"
+        f"联系：{escape(str(row.get('contact_value') or '未填写'))}"
     )
-    return "\n".join(lines)
 
 
 async def show_admin_home(message: Any, reader: AdminAppointmentReader | None = None) -> None:
