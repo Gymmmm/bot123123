@@ -4,9 +4,6 @@ Transition views never emit fixed-SHA callback namespaces such as ``apdate:``
 or ``findbudget:``. Choices that already have a canonical V3 callback reuse it
 (listing details and change-search); the remaining guided-flow choices live
 under the compact ``v3u:t:`` namespace.
-
-This module is transport-only: it does not read session state, query inventory,
-or execute appointment/search/lead effects.
 """
 from __future__ import annotations
 
@@ -102,8 +99,12 @@ def encode_transition_choice(choice: TransitionChoice) -> str:
         return encode_listing_callback("details", choice.public_listing_id)
     if kind == "change_search":
         return encode_change_search_callback()
-    if kind == "home" and str(choice.value or "").strip() == "contact":
-        return encode_home_callback("contact")
+    if kind == "home":
+        home_target = str(choice.value or "").strip()
+        if home_target in {"contact", "appointments", "search", "rental", "service"}:
+            return encode_home_callback(home_target)
+        if home_target:
+            raise ValueError("unsupported_home_transition_target")
     if kind in _VALUE_KINDS:
         value = _validate_value(kind, choice.value)
         return f"{TRANSITION_PREFIX}:{kind}:{value}"
