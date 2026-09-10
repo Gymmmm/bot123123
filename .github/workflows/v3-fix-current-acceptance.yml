@@ -1,0 +1,54 @@
+name: v3-fix-current-acceptance
+on:
+  push:
+    branches: [audit/v3-live-20260910]
+    paths: [.github/workflows/v3-fix-current-acceptance.yml]
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/v3-production-complete-ui-20260910
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Apply current acceptance contract and verify
+        run: |
+          set -euo pipefail
+          git config user.name qiaolian-integration-bot
+          git config user.email actions@users.noreply.github.com
+          python - <<'PY'
+          from pathlib import Path
+          # Runtime: exact invalid-link copy, support actions on unbookable notice, Bot detail title.
+          p=Path('v3_core/user_bot/telegram_start_handler.py'); s=p.read_text()
+          s=s.replace('"这个链接已经失效或房源信息已更新。\\n\\n您可以重新找房，或直接联系中文顾问。"','"这个链接已经失效或房源信息已更新。\\n\\n您可以重新找房，或直接联系我们。"')
+          s=s.replace('''    await message.reply_text(\n        "这套房暂时不能预约，可以看相近房源或联系中文顾问。",\n        parse_mode=ParseMode.HTML,\n    )''','''    await message.reply_text(\n        "这套房暂时不能预约，可以看相近房源或联系中文顾问。",\n        parse_mode=ParseMode.HTML,\n        reply_markup=_support_keyboard(),\n    )''')
+          p.write_text(s)
+          p=Path('v3_core/user_bot/listing_responses.py'); s=p.read_text().replace('lines = ["📋 <b>租赁详情</b>", ""]','lines = ["🏠 <b>租赁详情</b>", ""]'); p.write_text(s)
+          p=Path('v3_core/publishing/channel_contract.py'); s=p.read_text().replace('"details": "📋 租赁详情"','"details": "🏠 房源详情"'); p.write_text(s)
+          # Stale contract expectations superseded by the user's explicit current acceptance contract.
+          replacements={
+            'tests/v3_core/test_issue25_cta_appointment_contract.py': [('"details": "📋 租赁详情"','"details": "🏠 房源详情"')],
+            'tests/v3_core/test_product_polish_8fb094b.py': [('assert "📋 租赁详情" in labels','assert "🏠 房源详情" in labels')],
+            'tests/v3_core/test_telegram_adapter.py': [('["📋 租赁详情", "📸 更多实拍"]','["🏠 房源详情", "📸 更多实拍"]')],
+            'tests/v3_core/test_user_bot_channel_status_sync.py': [('["📋 租赁详情", "📸 更多实拍"]','["🏠 房源详情", "📸 更多实拍"]')],
+            'tests/v3_core/test_product_copy_lock_90180b83.py': [('["🏠 租赁详情", "📸 更多实拍", "📅 预约看房"]','["🏠 房源详情", "📸 更多实拍", "📅 预约看房"]'), ('assert "🏠 房源详情" not in publish + sync','assert "🏠 租赁详情" not in publish + sync')],
+          }
+          for fn,repls in replacements.items():
+              p=Path(fn)
+              if not p.exists(): continue
+              s=p.read_text()
+              for a,b in repls: s=s.replace(a,b)
+              p.write_text(s)
+          PY
+          python -m pip install -q -r requirements.txt pytest pytest-asyncio
+          PYTHONPATH=. python -m pytest -q tests/v3_core/test_issue25_cta_appointment_contract.py tests/v3_core/test_product_copy_lock_90180b83.py tests/v3_core/test_product_polish_8fb094b.py tests/v3_core/test_telegram_adapter.py tests/v3_core/test_user_bot_channel_status_sync.py
+          git diff --check
+          git add v3_core/publishing/channel_contract.py v3_core/user_bot/listing_responses.py v3_core/user_bot/telegram_start_handler.py tests/v3_core/test_issue25_cta_appointment_contract.py tests/v3_core/test_product_polish_8fb094b.py tests/v3_core/test_telegram_adapter.py tests/v3_core/test_user_bot_channel_status_sync.py tests/v3_core/test_product_copy_lock_90180b83.py
+          git commit -m 'align channel post and factual qiaolian note' -m 'Current acceptance supersedes interim Issue #25 CTA wording. Channel uses 房源详情; Bot detail title uses 租赁详情; invalid/unbookable routes expose valid support callbacks.'
+          git push origin HEAD:codex/v3-production-complete-ui-20260910
