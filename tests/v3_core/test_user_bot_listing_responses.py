@@ -69,7 +69,7 @@ def test_details_response_preserves_layout_and_frozen_adviser_notes():
     response = build_details_response(view)
 
     assert response.text == (
-        "🏠 <b>租赁详情</b>\n"
+        "📋 <b>租赁详情</b>\n"
         "\n"
         "🏠 <b>富力城｜2房1厅</b>\n"
         "<b>区域：</b> BKK1\n"
@@ -128,7 +128,7 @@ def test_photos_response_chunks_existing_frozen_gallery_by_ten(tmp_path):
     assert "BKK1" not in response.text
     assert _actions(response.action_rows) == [["details", "book"], ["consult"]]
     assert _labels(response.action_rows) == [
-        ["🏠 租赁详情", "📅 预约看房"],
+        ["📋 租赁详情", "📅 预约看房"],
         ["💬 联系中文顾问"],
     ]
 
@@ -141,7 +141,7 @@ def test_photos_response_drops_missing_files_and_uses_locked_fallback_text(tmp_p
     assert response.media_groups == ()
     assert response.text == "📸 <b>这套房源目前的实拍已经全部显示。</b>"
     assert _labels(response.action_rows) == [
-        ["🏠 租赁详情", "📅 预约看房"],
+        ["📋 租赁详情", "📅 预约看房"],
         ["💬 联系中文顾问"],
     ]
 
@@ -155,6 +155,6 @@ def test_rented_photos_response_keeps_details_and_contact_but_removes_book(tmp_p
 
     assert _actions(response.action_rows) == [["details"], ["consult"]]
     assert _labels(response.action_rows) == [
-        ["🏠 租赁详情"],
+        ["📋 租赁详情"],
         ["💬 联系中文顾问"],
     ]
