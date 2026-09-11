@@ -318,7 +318,7 @@ async def test_custom_budget_telegram_failure_preserves_pref_and_waiting_state()
 
 
 @pytest.mark.asyncio
-async def test_custom_budget_no_match_uses_contact_followup_callback():
+async def test_custom_budget_no_match_offers_current_inventory_and_contact_followup():
     message = FakeMessage("600-900")
     user_data = _budget_session()
 
@@ -333,6 +333,11 @@ async def test_custom_budget_no_match_uses_contact_followup_callback():
     assert outcome.search_presentation is not None and not outcome.search_presentation.matched
     markup = message.calls[-1][2]["reply_markup"]
     callbacks = [button.callback_data for row in markup.inline_keyboard for button in row]
-    assert callbacks == ["v3u:change_search", "v3u:home:contact", "v3u:t:home"]
+    assert callbacks == [
+        "v3u:t:search_available",
+        "v3u:change_search",
+        "v3u:home:contact",
+        "v3u:t:home",
+    ]
     assert SEARCH_PREF_SESSION_KEY not in user_data
     assert SEARCH_AWAITING_BUDGET_KEY not in user_data
