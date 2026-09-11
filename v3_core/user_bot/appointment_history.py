@@ -162,7 +162,7 @@ def _lines(item: AppointmentHistoryItem) -> list[str]:
     mode = APPOINTMENT_MODE_LABELS.get(item.viewing_mode, item.viewing_mode or "待确认")
     mode_icon = "🎥" if item.viewing_mode == "video" else "🚶"
     return [
-        f"{status_icon} {he(status_label)}",
+        f"{status_icon} <b>{he(status_label)}</b>",
         f"🏠 <b>{he(item.subject)}</b>",
         f"📅 {he(_date_compact(item.appointment_date))} · {he(_time_compact(item.appointment_time))}",
         f"{mode_icon} {he(mode)}",
