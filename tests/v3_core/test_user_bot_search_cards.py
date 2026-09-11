@@ -97,7 +97,7 @@ def test_search_card_preserves_fixed_sha_copy_and_uses_frozen_cover(tmp_path):
         "📍 BKK1\n"
         "📐 95㎡ · 19楼\n"
         "\n"
-        "🟢 <b>当前可预约</b>\n"
+        "🟢 当前可预约\n"
         "第 1/2 套"
     )
     assert card.photo_path == str(cover)
@@ -203,7 +203,7 @@ def test_live_reserved_status_changes_badge_without_changing_frozen_facts():
 
     assert "富力城｜2房1厅" in card.text
     assert "$800/月" in card.text
-    assert "🟡 <b>已有预约 · 仍可预约</b>" in card.text
+    assert "🟡 已有预约 · 仍可预约" in card.text
     assert _actions(card)[1 if len(card.action_rows) > 4 else 1] == ["book"]
 
 
