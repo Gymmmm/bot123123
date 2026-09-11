@@ -76,8 +76,9 @@ class BroadcastAdminController:
             + f"状态：{'🟢 每日自动发送' if c.enabled else '⏸ 已暂停'}\n时间：{escape(c.send_time)}\n\n每日天气汇率与营销广播相互独立。",
             parse_mode=ParseMode.HTML,
             reply_markup=self._markup([
-                [InlineKeyboardButton("👀 查看今日内容", callback_data="v3bc|today"), InlineKeyboardButton("📤 立即发送", callback_data="v3bc|send")],
-                [InlineKeyboardButton("⏰ 修改时间", callback_data="v3bc|time_menu"), InlineKeyboardButton("⏸ 暂停" if c.enabled else "▶️ 开启", callback_data="v3bc|off" if c.enabled else "v3bc|on")],
+                [InlineKeyboardButton("👀 查看今日内容", callback_data="v3bc|today"), InlineKeyboardButton("💱 汇率设置", callback_data="v3bc|fx")],
+                [InlineKeyboardButton("📤 立即发送", callback_data="v3bc|send"), InlineKeyboardButton("⏰ 修改时间", callback_data="v3bc|time_menu")],
+                [InlineKeyboardButton("⏸ 暂停" if c.enabled else "▶️ 开启", callback_data="v3bc|off" if c.enabled else "v3bc|on")],
                 [InlineKeyboardButton("⬅️ 返回广播中心", callback_data="v3bc")],
             ]),
         )
@@ -218,6 +219,16 @@ class BroadcastAdminController:
             )
             context.user_data[BROADCAST_EDIT_STATE_KEY] = {"kind": "custom_ready", "text": text}
             return True
+        if kind == "fx":
+            try:
+                value = float(text.replace("+", ""))
+            except ValueError:
+                await update.effective_message.reply_text("格式不正确，请发送例如：+0.02、-0.05 或 0。")
+                return True
+            self.service.set_fx_offset(value)
+            context.user_data.pop(BROADCAST_EDIT_STATE_KEY, None)
+            await self.show_weather(update.effective_message, notice=f"汇率人工调整已设为 {value:+.2f} CNY")
+            return True
         if kind in {"time", "m_time"}:
             try:
                 normalized = self.service.set_time(text) if kind == "time" else self.marketing.set_time(text)
@@ -247,6 +258,34 @@ class BroadcastAdminController:
             await self.show_weather(q.message); return True
         if a in {"today", "preview"}:
             await self._render_today(q.message, title="🌤 今日天气汇率"); return True
+        if a == "fx":
+            c = self.service.config()
+            sign = "+" if c.fx_offset >= 0 else ""
+            await q.message.reply_text(
+                "<b>💱 汇率设置</b>\n\n"
+                "🇺🇸 美元 / 🇨🇳 人民币\n\n"
+                f"人工调整：{sign}{c.fx_offset:.2f} CNY\n"
+                "广播汇率 = 自动实时汇率 + 人工调整",
+                parse_mode=ParseMode.HTML,
+                reply_markup=self._markup([
+                    [InlineKeyboardButton("-0.10", callback_data="v3bc|fx_add|-0.10"), InlineKeyboardButton("-0.01", callback_data="v3bc|fx_add|-0.01"), InlineKeyboardButton("+0.01", callback_data="v3bc|fx_add|0.01"), InlineKeyboardButton("+0.10", callback_data="v3bc|fx_add|0.10")],
+                    [InlineKeyboardButton("✏️ 直接输入", callback_data="v3bc|fx_input"), InlineKeyboardButton("↩️ 恢复自动汇率", callback_data="v3bc|fx_reset")],
+                    [InlineKeyboardButton("⬅️ 返回天气汇率", callback_data="v3bc|weather")],
+                ]),
+            ); return True
+        if a == "fx_add" and len(p) == 3:
+            current = self.service.config().fx_offset
+            self.service.set_fx_offset(current + float(p[2]))
+            q.data = "v3bc|fx"
+            return await self.handle_callback(update, context)
+        if a == "fx_reset":
+            self.service.set_fx_offset(0.0)
+            q.data = "v3bc|fx"
+            return await self.handle_callback(update, context)
+        if a == "fx_input":
+            context.user_data[BROADCAST_EDIT_STATE_KEY] = {"kind": "fx"}
+            await q.message.reply_text("请输入人工调整值，例如：+0.02、-0.05 或 0。")
+            return True
         if a == "send":
             body = await asyncio.to_thread(self.service.body, "live")
             await self._send_channel(context, body, trigger_type="manual_weather", template_key="live")

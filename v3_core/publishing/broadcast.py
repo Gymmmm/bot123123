@@ -53,7 +53,7 @@ DEFAULTS: Mapping[str, str] = {
     KEY_TIME: "09:30",
     KEY_TEMPLATE: "live",
     KEY_CUSTOM_HTML: "",
-    KEY_FX_OFFSET: "-0.20",
+    KEY_FX_OFFSET: "0.00",
     KEY_BUTTON: "none",
     KEY_LAST_ATTEMPT_DATE: "",
     KEY_LAST_SENT_DATE: "",
@@ -61,9 +61,9 @@ DEFAULTS: Mapping[str, str] = {
 
 BUTTON_LABELS = {
     "none": "不带按钮",
-    "find": "租房找房",
+    "find": "帮我找房",
     "latest": "最新房源",
-    "contact": "租房置业咨询",
+    "contact": "联系中文顾问",
     "combo": "组合按钮",
 }
 BUTTON_KEYS = frozenset(BUTTON_LABELS)
@@ -150,7 +150,7 @@ def _clamp_fx(value: object) -> float:
     try:
         parsed = float(value)
     except (TypeError, ValueError):
-        parsed = -0.20
+        parsed = 0.0
     return max(-2.0, min(2.0, parsed))
 
 
@@ -329,7 +329,7 @@ class LiveDailyInfoBuilder:
                 return texts[key]
         return texts["stable"]
 
-    def build(self, *, fx_offset: float = -0.20, now: datetime | None = None) -> str:
+    def build(self, *, fx_offset: float = 0.0, now: datetime | None = None) -> str:
         current = now.astimezone(self.timezone) if now is not None else datetime.now(self.timezone)
         weekday = "一二三四五六日"[current.weekday()]
         weather_line = "🌤 天气：暂时无法获取"
@@ -366,13 +366,25 @@ class LiveDailyInfoBuilder:
         except Exception:
             pass
 
+        weather_display = weather_line.replace("🌤 天气：", "")
+        fx_display = fx_line.replace("💵 美元/人民币：", "")
+        hundred_line = ""
+        if "1 USD ≈" in fx_display:
+            try:
+                rate = float(fx_display.split("≈", 1)[1].split("CNY", 1)[0].strip())
+                hundred_line = f"\n100 USD ≈ {rate * 100:.0f} CNY"
+            except (ValueError, IndexError):
+                pass
         return (
             "<b>☀️ 侨联地产｜早安金边</b>\n"
             f"📅 {current:%Y.%m.%d}｜星期{weekday}\n\n"
-            f"{weather_line}\n"
-            f"{fx_line}\n\n"
-            f"{weather_note}\n"
-            "<i>天气与汇率仅供参考，以实时信息/实际牌价为准。</i>"
+            "<b>🌦 今日天气</b>\n"
+            f"{weather_display}\n\n"
+            "<b>💱 今日汇率</b>\n"
+            f"{fx_display}{hundred_line}\n\n"
+            "<b>📌 今日提醒</b>\n"
+            f"{weather_note}\n\n"
+            "<i>天气与汇率仅供参考，以实时信息及实际牌价为准。</i>"
         )
 
 
@@ -486,9 +498,9 @@ class BroadcastService:
             raise ValueError("broadcast_unknown_button")
         base = f"https://t.me/{self.user_bot_username}?start="
         buttons = {
-            "find": BroadcastButton("🔍 租房找房", base + "find_home"),
-            "latest": BroadcastButton("🏠 查看最新房源", base + "latest"),
-            "contact": BroadcastButton("💬 租房置业咨询", base + "advisor"),
+            "find": BroadcastButton("🔍 帮我找房", base + "find_home"),
+            "latest": BroadcastButton("🏠 最新房源", base + "latest"),
+            "contact": BroadcastButton("💬 联系中文顾问", base + "advisor"),
         }
         if selected == "combo":
             return ((buttons["find"], buttons["latest"]), (buttons["contact"],))
