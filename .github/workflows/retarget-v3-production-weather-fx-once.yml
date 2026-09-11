@@ -1,0 +1,37 @@
+name: retarget-v3-production-weather-fx-once
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - .github/workflows/retarget-v3-production-weather-fx-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  retarget:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+      - name: Retarget production deploy workflow
+        run: |
+          set -Eeuo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('.github/workflows/qiaolian-v3-production-deploy.yml')
+          s = p.read_text()
+          import re
+          s = re.sub(r'(?m)^  CANDIDATE_REF: .*$', '  CANDIDATE_REF: codex/publisher-operator-flow-20260911', s)
+          s = re.sub(r'(?m)^  CANDIDATE_SHA: .*$', '  CANDIDATE_SHA: b8e5c0b2b50a738d4ff8a6760f56878efd336480', s)
+          s = re.sub(r'(?m)^  PREVIOUS_V3_SHA: .*$', '  PREVIOUS_V3_SHA: 113d899313c30fba7925caf698d1f5f26579fadb', s)
+          p.write_text(s)
+          PY
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add .github/workflows/qiaolian-v3-production-deploy.yml
+          git commit -m 'ops: deploy weather fx candidate'
+          git push origin HEAD:master
