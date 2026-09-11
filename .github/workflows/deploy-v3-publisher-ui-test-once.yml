@@ -16,7 +16,7 @@ concurrency:
 
 env:
   DEPLOY_BRANCH: codex/v3-product-polish-round2-5b834f6-20260911
-  EXPECTED_SHA: 5044effbd67f3f37740315048ebaa99230f70c8f
+  EXPECTED_SHA: ddc921ea762313976334a7ccf8db1e585d64f19e
   PROD_HOST: 50.114.74.120
   PROD_PORT: '22'
   PROD_SSH_USER: root
