@@ -118,9 +118,9 @@ def render_channel_caption(
     deposit_contract = "｜".join(value for value in (deposit, contract) if value)
 
     effective_status = str(status if status is not None else listing.get("inventory_status") or "active")
-    blocks: list[str] = [f"🏡 <b>{html.escape(heading_line)}</b>"]
+    blocks: list[str] = [f"🏡 {html.escape(heading_line)}"]
     if price_text:
-        blocks.append(f"💵 <b>{html.escape(price_text)}</b>")
+        blocks.append(f"💵 {html.escape(price_text)}")
     property_display = _property_line(property_type)
     if property_display:
         blocks.append(html.escape(property_display))
