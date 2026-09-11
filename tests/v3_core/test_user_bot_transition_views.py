@@ -232,7 +232,7 @@ def test_change_search_view_matches_locked_entry_copy_and_button_order():
         "💰 按预算",
         "🏠 按户型",
         "🏘 当前可约",
-        "⬅️ 返回首页",
+        "🏠 返回首页",
     ]
 
 
