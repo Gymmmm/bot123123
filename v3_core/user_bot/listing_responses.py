@@ -112,7 +112,7 @@ def build_details_response(view: PublishedListingView) -> PublicDetailsResponse:
     floor = display_floor(details.floor)
     subject = details.subject or details.location or "租赁房源"
 
-    lines = [f"🏠 <b>{he(subject)}</b>"]
+    lines = ["🏠 <b>租赁详情</b>", "", f"🏠 {he(subject)}"]
     if price:
         lines.append(f"💰 <b>{he(price)}</b>")
     if details.location and details.location not in {details.project_name, subject}:
