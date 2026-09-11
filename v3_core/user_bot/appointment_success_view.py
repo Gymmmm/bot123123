@@ -42,7 +42,7 @@ def build_appointment_success_view(
             f"🗓 {he(display_date(draft.date))} · {he(display_time(draft.time))}",
             f"📍 {he(mode_label)}",
             "",
-            "🟡 <b>待顾问确认</b>",
+            "🟡 待顾问确认",
             "顾问确认后会通过 Telegram 通知您。",
         ]
     )
