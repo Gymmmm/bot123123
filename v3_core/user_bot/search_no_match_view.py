@@ -24,10 +24,11 @@ def build_search_no_match_view(intent: SearchSubmitIntent) -> TransitionView:
         text=(
             "🔎 <b>暂时没有完全符合条件的房源</b>"
             f"{summary_block}\n\n"
-            "您可以调整一个条件继续找，\n"
-            "也可以让中文顾问按这个需求继续留意。"
+            "可以先看看当前可预约房源，\n"
+            "也可以调整条件或让中文顾问继续留意。"
         ),
         rows=(
+            (TransitionChoice("🏘 查看当前可约", "search_available"),),
             (TransitionChoice("✏️ 调整条件", "change_search"),),
             (TransitionChoice("💬 联系中文顾问", "home", value="contact"),),
             (TransitionChoice("🏠 返回首页", "home"),),
