@@ -222,9 +222,13 @@ async def handle_v3_transition_action(
         raise ValueError("telegram_user_data_missing_for_transition_action")
 
     result = actions.apply(callback, user_data)
-    await query.answer()
     if not result.ok:
+        if result.status == "expired":
+            await query.answer("操作已过期，请重新选择。", show_alert=True)
+        else:
+            await query.answer("这个操作暂时无法继续，请返回首页重试。", show_alert=True)
         return TelegramTransitionActionOutcome(handled=True, result=result)
+    await query.answer()
 
     view = _view_for_result(views, result)
     if view is not None:
