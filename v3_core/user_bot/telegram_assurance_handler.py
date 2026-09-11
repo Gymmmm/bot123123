@@ -74,7 +74,7 @@ async def send_assurance_bundle(
     chat_id = int(chat.id)
     markup = InlineKeyboardMarkup(
         [
-            [InlineKeyboardButton("💬 联系我们", callback_data="v3u:home:contact")],
+            [InlineKeyboardButton("💬 联系中文顾问", callback_data="v3u:home:contact")],
             [InlineKeyboardButton("⬅️ 返回侨联保障", callback_data="v3u:home:rental")],
         ]
     )
