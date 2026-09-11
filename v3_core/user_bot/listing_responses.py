@@ -122,9 +122,9 @@ def build_details_response(view: PublishedListingView) -> PublicDetailsResponse:
         lines.append(f"📐 {he(' · '.join(house_bits))}")
     if details.lease_summary:
         lines.append(f"🔑 {he(details.lease_summary)}")
-    lines.append(f"{details.status_icon} {he(details.status_label)}")
+    lines.append(f"{details.status_icon} 房态：{he(details.status_label)}")
     if details.public_listing_id:
-        lines.append(f"🆔 {he(details.public_listing_id)}")
+        lines.append(f"🆔 房源编号：{he(details.public_listing_id)}")
 
     notes = adviser_notes_for_view(view, max_points=2, allow_empty=True).strip()
     if notes:
