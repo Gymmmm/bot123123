@@ -69,19 +69,15 @@ def test_details_response_preserves_layout_and_frozen_adviser_notes():
     response = build_details_response(view)
 
     assert response.text == (
-        "🏠 <b>租赁详情</b>\n"
-        "\n"
         "🏠 <b>富力城｜2房1厅</b>\n"
-        "<b>区域：</b> BKK1\n"
-        "<b>租金：</b> <b>$800/月</b>\n"
-        "📐 面积：95㎡\n"
-        "🏢 楼层：19楼\n"
-        "🔑 租约：押1付1 · 1年\n"
-        "🟢 房态：当前可预约\n"
-        "🆔 房源编号：QL-RF-A2B3\n"
+        "💰 <b>$800/月</b>\n"
+        "📍 BKK1\n"
+        "📐 95㎡ · 19楼\n"
+        "🔑 押1付1 · 1年\n"
+        "🟢 当前可预约\n"
+        "🆔 QL-RF-A2B3\n"
         "\n"
-        "💬 <b>侨联说</b>\n"
-        "\n"
+        "💬 侨联说\n"
         "这套标注在BKK1，项目是富力城，可以按实际通勤路线再判断。\n"
         "资料明确标注：采光好、钥匙已备；具体状态可以结合实拍确认。"
     )
@@ -96,8 +92,9 @@ def test_details_response_uses_live_rented_state_but_keeps_frozen_public_facts()
     view = _view(status="rented", offer_status="inactive")
     response = build_details_response(view)
 
-    assert "<b>租金：</b> <b>$800/月</b>" in response.text
-    assert "🔴 房态：已租出" in response.text
+    assert "💰 <b>$800/月</b>" in response.text
+    assert "🔴 已租出" in response.text
+    assert "房态：" not in response.text
     assert _actions(response.action_rows) == [["photos", "consult"], ["similar"]]
     assert _labels(response.action_rows) == [
         ["📸 更多实拍", "💬 联系中文顾问"],
@@ -122,7 +119,8 @@ def test_photos_response_chunks_existing_frozen_gallery_by_ten(tmp_path):
     flattened = [item for group in response.media_groups for item in group]
     assert flattened == files
     assert response.text == (
-        "📸 <b>以上是这套房目前保存的现场实拍。</b>\n\n"
+        "📸 <b>更多实拍</b>\n\n"
+        "以上是这套房目前保存的现场实拍。\n"
         "想进一步了解，可以继续看详情，或直接预约。"
     )
     assert _actions(response.action_rows) == [["details", "book"], ["consult"]]
@@ -139,7 +137,8 @@ def test_photos_response_drops_missing_files_and_uses_locked_fallback_text(tmp_p
     assert not response.has_media
     assert response.media_groups == ()
     assert response.text == (
-        "📸 <b>更多实拍｜QL-RF-A2B3</b>\n\n"
+        "📸 <b>更多实拍</b>\n\n"
+        "房源：QL-RF-A2B3\n"
         "这套房的实拍暂时没有加载出来。\n\n"
         "可以稍后再试，或直接联系中文顾问。"
     )
