@@ -31,10 +31,12 @@ def test_home_callback_codec_is_v3_only_and_closed_set():
     assert parse_home_callback("v3u:home:unknown") is None
 
 
-def test_full_home_preserves_fixed_sha_labels_and_never_emits_legacy_callbacks():
+def test_full_home_preserves_v3_labels_and_exposes_direct_search_copy():
     view = build_home_view(channel_url="https://t.me/qiaolian")
     markup = build_home_keyboard(view)
     assert markup is not None
+    assert "也可以直接发送找房需求" in view.text
+    assert "BKK1，预算 $800以内" in view.text
     labels = [button.text for row in markup.inline_keyboard for button in row]
     assert labels == [
         "🔍 帮我找房",
@@ -70,7 +72,13 @@ def test_contact_and_appointment_views_return_only_v3_navigation():
         items=(),
         history_count=0,
     )
-    appointments = build_appointment_history_home_view(history)
+    appointments = build_appointment_history_home_view(
+        history,
+        advisor_url="https://t.me/advisor",
+    )
     appointment_markup = build_home_keyboard(appointments)
     assert appointment_markup is not None
     assert _callbacks(appointment_markup) == ["v3u:home:search", "v3u:t:home"]
+    labels = [button.text for row in appointment_markup.inline_keyboard for button in row]
+    assert labels == ["🔍 继续找房", "💬 联系中文顾问", "🏠 返回首页"]
+    assert appointment_markup.inline_keyboard[1][0].url == "https://t.me/advisor"
