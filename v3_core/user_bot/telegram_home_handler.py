@@ -133,7 +133,10 @@ async def handle_v3_home_callback(
     if action == "appointments":
         user = _lead_user(update)
         history = appointment_history.build(user.user_id)
-        await _edit_home_view(query, build_appointment_history_home_view(history))
+        await _edit_home_view(
+            query,
+            build_appointment_history_home_view(history, advisor_url=advisor_url),
+        )
         return TelegramHomeOutcome(
             handled=True,
             action=action,
