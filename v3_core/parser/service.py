@@ -12,6 +12,7 @@ from typing import Any
 
 from v3_core.ingest.source_repository import SourceRepository
 from v3_core.inventory.canonical_facts import canonicalize_source
+from v3_core.inventory.qiaolian_say import enrich_qiaolian_facts
 from v3_core.parser.authoritative_enrichment import enrich_authoritative_facts
 from v3_core.storage.inventory_repository import InventoryRepository
 
@@ -92,6 +93,11 @@ class CanonicalParseService:
                 media_summary=media_summary,
             )
             facts = enrich_authoritative_facts(sanitized_text, facts)
+            # ``侨联说`` is a presentation enrichment only.  It reads the same
+            # sanitized source evidence, writes structured tags/manual copy into
+            # canonical facts, and deliberately does not change quality or
+            # publishability decisions.
+            facts = enrich_qiaolian_facts(sanitized_text, facts)
             canonical = self.inventory.store_canonical(
                 source_post_id=int(row["id"]), facts=facts
             )
