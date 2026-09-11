@@ -69,7 +69,9 @@ def test_details_response_preserves_layout_and_frozen_adviser_notes():
     response = build_details_response(view)
 
     assert response.text == (
-        "🏠 <b>富力城｜2房1厅</b>\n"
+        "🏠 <b>租赁详情</b>\n"
+        "\n"
+        "🏠 富力城｜2房1厅\n"
         "💰 <b>$800/月</b>\n"
         "📍 BKK1\n"
         "📐 95㎡ · 19楼\n"
