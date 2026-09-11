@@ -79,9 +79,8 @@ def test_details_response_preserves_layout_and_frozen_adviser_notes():
         "🟢 房态：当前可预约\n"
         "🆔 房源编号：QL-RF-A2B3\n"
         "\n"
-        "💬 侨联说\n"
-        "这套标注在BKK1，项目是富力城，可以按实际通勤路线再判断。\n"
-        "资料明确标注：采光好、钥匙已备；具体状态可以结合实拍确认。"
+        "💬 侨联判断\n"
+        "资料写了采光好、钥匙已备，实拍再确认就行。"
     )
     assert _actions(response.action_rows) == [["book", "photos"], ["consult"]]
     assert _labels(response.action_rows) == [
