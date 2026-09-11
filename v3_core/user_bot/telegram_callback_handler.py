@@ -21,7 +21,7 @@ from telegram import InputMediaPhoto
 from telegram.constants import ParseMode
 
 from .callback_router import CallbackRouter
-from .callbacks import PREFIX
+from .callbacks import PREFIX, encode_card_callback
 from .telegram_callback_response import (
     TelegramCallbackResponse,
     adapt_callback_response,
@@ -184,6 +184,16 @@ async def render_search_card_response(
                 }
 
 
+def _error_alert(response: TelegramCallbackResponse) -> str:
+    if response.status == "expired":
+        return "搜索结果已更新，请重新查找。"
+    if response.status == "blocked":
+        return "这套房当前状态已变化，请查看最新房态。"
+    if response.status == "not_found":
+        return "房源信息已更新，请重新打开。"
+    return "这个操作已失效，请重新进入。"
+
+
 async def handle_v3_callback(
     update: Any,
     context: Any,
@@ -202,22 +212,37 @@ async def handle_v3_callback(
     if parse_transition_callback(raw) is not None:
         return TelegramCallbackHandlerOutcome(handled=False)
 
+    session_ids = _session_ids(context)
     dispatched = router.dispatch(
         raw,
-        session_public_listing_ids=_session_ids(context),
+        session_public_listing_ids=session_ids,
     )
     response = adapt_callback_response(dispatched)
+
+    if response.kind == "error":
+        await query.answer(_error_alert(response), show_alert=True)
+        return TelegramCallbackHandlerOutcome(handled=True, response=response)
 
     # Product polish happens only at the Telegram transport boundary. A configured
     # advisor becomes a one-tap public-username handoff with the listing ID already
     # drafted. Details/photos also receive real exits back to channel/home.
     if response.kind in {"details", "photos", "card"}:
+        back_to_search_callback = ""
+        callback = dispatched.callback
+        if response.kind == "details" and callback is not None:
+            public_id = str(getattr(callback, "public_listing_id", "") or "").strip()
+            if public_id and public_id in session_ids:
+                back_to_search_callback = encode_card_callback(
+                    session_ids.index(public_id),
+                    public_id,
+                )
         response = replace(
             response,
             keyboard=polish_listing_keyboard(
                 response.keyboard,
                 advisor_url=advisor_url,
                 channel_url=channel_url,
+                back_to_search_callback=back_to_search_callback,
                 add_home=response.kind in {"details", "photos"},
                 add_channel=response.kind in {"details", "photos"},
             ),
