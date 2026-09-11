@@ -73,9 +73,9 @@ def property_view() -> ServiceView:
         kind="property",
         text=(
             "🏢 <b>物业协调</b>\n\n"
-            "噪音、停车、门禁、公共区域或垃圾处理等问题，可以直接说明情况。\n\n"
-            "建议写清：发生了什么、大概从什么时候开始，以及是否已和物业沟通过。\n\n"
-            "侨联会协助整理沟通重点，并根据实际情况对接物业。"
+            "噪音、停车、门禁、公共区域或垃圾处理等问题，都可以找侨联协助。\n\n"
+            "建议先准备：发生了什么、大概从什么时候开始，以及是否已和物业沟通过。\n\n"
+            "点击下方「联系中文顾问」把情况发过去，侨联会协助整理沟通重点，并根据实际情况对接物业。"
         ),
         rows=(
             (ServiceChoice("💬 联系中文顾问", "v3u:home:contact"),),
@@ -91,7 +91,7 @@ def issue_prompt_view(draft: ServiceRequestDraft) -> ServiceView:
         kind="repair_issue",
         text=(
             f"🔧 <b>{he(draft.issue_label)}</b>\n\n"
-            "请发送问题照片或短视频，并简单说明异常情况。\n"
+            "请直接发送一段文字，简单说明异常情况。\n"
             f"例如：<code>空调可以启动，但一直不制冷。</code>{note}"
         ),
         rows=(
