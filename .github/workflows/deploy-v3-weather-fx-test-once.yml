@@ -50,10 +50,12 @@ jobs:
 
       - name: Load production transport config
         run: |
-          python - <<'PY'
+          set -Eeuo pipefail
+          git show origin/master:.github/workflows/qiaolian-v3-production-deploy.yml > "$RUNNER_TEMP/prod-deploy.yml"
+          PROD_DEPLOY_FILE="$RUNNER_TEMP/prod-deploy.yml" python - <<'PY'
           import re, os
           from pathlib import Path
-          text = Path('.github/workflows/qiaolian-v3-production-deploy.yml').read_text()
+          text = Path(os.environ['PROD_DEPLOY_FILE']).read_text()
           keys = ['PROD_HOST','PROD_PORT','PROD_SSH_USER','PROD_SSH_KNOWN_HOSTS','PROD_SSH_HOST_FINGERPRINT']
           with open(os.environ['GITHUB_ENV'], 'a') as f:
               for key in keys:
