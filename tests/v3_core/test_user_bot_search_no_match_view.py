@@ -25,7 +25,7 @@ def test_no_match_offers_current_inventory_before_restart_or_advisor():
     view = build_search_no_match_view(intent)
 
     assert view.kind == "search_no_match"
-    assert "BKK1｜<= 800 USD/月" in view.text
+    assert "BKK1｜&lt;= 800 USD/月" in view.text
     assert [choice.label for row in view.rows for choice in row] == [
         "🏘 查看当前可约",
         "✏️ 调整条件",
