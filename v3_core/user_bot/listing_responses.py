@@ -110,30 +110,26 @@ def build_details_response(view: PublishedListingView) -> PublicDetailsResponse:
     price = _format_price(details.monthly_rent_usd)
     size = _format_size(details.size_sqm)
     floor = display_floor(details.floor)
+    subject = details.subject or details.location or "租赁房源"
 
-    lines = ["🏠 <b>租赁详情</b>", ""]
-    if details.subject:
-        lines.append(f"🏠 <b>{he(details.subject)}</b>")
-    elif details.location:
-        lines.append(f"🏠 <b>{he(details.location)}</b>")
-    if details.location and details.location != details.project_name:
-        lines.append(f"<b>区域：</b> {he(details.location)}")
+    lines = [f"🏠 <b>{he(subject)}</b>"]
     if price:
-        lines.append(f"<b>租金：</b> <b>{he(price)}</b>")
-    if size:
-        lines.append(f"📐 面积：{he(size)}")
-    if floor:
-        lines.append(f"🏢 楼层：{he(floor)}")
+        lines.append(f"💰 <b>{he(price)}</b>")
+    if details.location and details.location not in {details.project_name, subject}:
+        lines.append(f"📍 {he(details.location)}")
+    house_bits = [value for value in (size, floor) if value]
+    if house_bits:
+        lines.append(f"📐 {he(' · '.join(house_bits))}")
     if details.lease_summary:
-        lines.append(f"🔑 租约：{he(details.lease_summary)}")
-    lines.append(f"{details.status_icon} 房态：{he(details.status_label)}")
+        lines.append(f"🔑 {he(details.lease_summary)}")
+    lines.append(f"{details.status_icon} {he(details.status_label)}")
     if details.public_listing_id:
-        lines.append(f"🆔 房源编号：{he(details.public_listing_id)}")
+        lines.append(f"🆔 {he(details.public_listing_id)}")
 
     notes = adviser_notes_for_view(view, max_points=2, allow_empty=True).strip()
     if notes:
         safe_notes = "\n".join(he(line) for line in notes.splitlines() if line.strip())
-        lines.extend(["", "💬 <b>侨联说</b>", "", safe_notes])
+        lines.extend(["", "💬 侨联说", safe_notes])
 
     return PublicDetailsResponse(
         text="\n".join(lines),
@@ -166,12 +162,14 @@ def build_photos_response(view: PublishedListingView) -> PublicPhotosResponse:
     groups = tuple(tuple(photos[offset : offset + 10]) for offset in range(0, len(photos), 10))
     if groups:
         text = (
-            "📸 <b>以上是这套房目前保存的现场实拍。</b>\n\n"
+            "📸 <b>更多实拍</b>\n\n"
+            "以上是这套房目前保存的现场实拍。\n"
             "想进一步了解，可以继续看详情，或直接预约。"
         )
     else:
         text = (
-            f"📸 <b>更多实拍｜{he(details.public_listing_id)}</b>\n\n"
+            "📸 <b>更多实拍</b>\n\n"
+            f"房源：{he(details.public_listing_id)}\n"
             "这套房的实拍暂时没有加载出来。\n\n"
             "可以稍后再试，或直接联系中文顾问。"
         )
