@@ -151,5 +151,6 @@ def test_publisher_dashboard_exposes_broadcast_center(tmp_path):
         cover_output_dir=str(tmp_path / "covers"),
     )
     bot = V3PublisherApplication(settings)
-    labels = [button.text for row in bot._dashboard_keyboard().inline_keyboard for button in row]
-    assert "📣 每日广播" in labels
+    buttons = [button for row in bot._dashboard_keyboard().inline_keyboard for button in row]
+    broadcast = next(button for button in buttons if button.text == "📢 广播中心")
+    assert broadcast.callback_data == "v3bc"
