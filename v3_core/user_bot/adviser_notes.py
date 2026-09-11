@@ -1,8 +1,8 @@
 """Evidence-only adviser notes for V3 public listing details.
 
-The note generator is extracted from the locked production ``talk_engine``.
-V3 adds only a projection from the frozen publication snapshot into the same
-fact vocabulary. No live canonical/draft lookup is allowed here.
+New V3 publication packages freeze the exact ``侨联说`` wording alongside the
+canonical facts.  User Bot reads that frozen copy so channel and detail views
+cannot drift.  Older packages keep the previous evidence projection behavior.
 """
 from __future__ import annotations
 
@@ -103,7 +103,7 @@ def generate_adviser_notes(
     max_points: int = 2,
     allow_empty: bool = True,
 ) -> str:
-    """Generate only location/building/value factual lines."""
+    """Legacy evidence-note generator retained for older frozen packages."""
     has_location = bool(
         _fact(listing, "area", "district") and _fact(listing, "project", "building")
     )
@@ -122,7 +122,7 @@ def generate_adviser_notes(
 
 
 def frozen_adviser_evidence(view: PublishedListingView) -> dict[str, Any]:
-    """Project frozen V3 facts into the locked adviser-note vocabulary."""
+    """Project frozen V3 facts into the legacy adviser-note vocabulary."""
     snapshot = view.snapshot
     if str(snapshot.get("schema") or "") != "v3_publication_snapshot.v1":
         raise ValueError("frozen_public_snapshot_missing")
@@ -146,9 +146,6 @@ def frozen_adviser_evidence(view: PublishedListingView) -> dict[str, Any]:
     if highlights not in (None, "", []):
         evidence["highlights"] = highlights
 
-    # V2 SAFE represents explicit inclusion as a normalized list. Project only
-    # those explicit facts into the legacy note vocabulary; never infer inclusion
-    # from an amenity/service merely being present.
     raw_included = canonical.get("included")
     included = (
         {str(item).strip().lower() for item in raw_included if str(item).strip()}
@@ -169,6 +166,20 @@ def adviser_notes_for_view(
     max_points: int = 2,
     allow_empty: bool = True,
 ) -> str:
+    snapshot = view.snapshot
+    if str(snapshot.get("schema") or "") != "v3_publication_snapshot.v1":
+        raise ValueError("frozen_public_snapshot_missing")
+    canonical = snapshot.get("canonical_facts")
+    if not isinstance(canonical, dict):
+        raise ValueError("frozen_canonical_facts_missing")
+
+    frozen_copy = str(snapshot.get("adviser_copy") or "").strip()
+    if frozen_copy:
+        lines = [line.strip() for line in frozen_copy.splitlines() if line.strip()]
+        return "\n".join(lines[: max(0, max_points)])
+
+    # Existing already-published packages predate frozen adviser copy. Preserve
+    # their historical detail wording instead of silently changing old posts.
     return generate_adviser_notes(
         frozen_adviser_evidence(view),
         max_points=max_points,
