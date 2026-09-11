@@ -28,19 +28,19 @@ class HomeView:
 WELCOME_TEXT = (
     "💎 <b>侨联地产｜您在金边的自己人</b>\n\n"
     "找房、约看房、入住服务，都可以从这里开始。\n\n"
-    "如果已经在频道看到具体房源，直接点房源下方按钮进入，房源信息会自动带上。\n\n"
-    "点「帮我找房」后，也可以直接发送：<code>区域 + 预算 + 户型</code>\n\n"
+    "频道看到具体房源，直接点房源下方按钮即可。\n\n"
+    "也可以直接发送找房需求，例如：\n"
+    "<code>BKK1，预算 $800以内</code>\n\n"
     "请选择您现在需要的服务："
 )
 
 CONTACT_TEXT = (
     "💬 <b>联系中文顾问</b>\n\n"
-    "有什么需要，可以直接发给我们。\n\n"
-    "找房可以直接发送：<code>区域 + 预算 + 户型</code>\n\n"
-    "例如：\n"
-    "<code>BKK1 两房，$900以内</code>\n"
-    "<code>富力城一房，要能做饭</code>\n\n"
-    "也可以直接点击下方按钮联系中文顾问。"
+    "找房、看房、签约或入住后的事情，都可以直接咨询。\n\n"
+    "如果是找房，也可以直接发送需求，例如：\n"
+    "<code>BKK1，预算 $900以内</code>\n"
+    "<code>富力城公寓，预算 $600–800</code>\n\n"
+    "点击下方按钮可直接打开中文顾问对话。"
 )
 
 
@@ -91,14 +91,22 @@ def build_contact_view(*, advisor_url: str = "") -> HomeView:
     )
 
 
-def build_appointment_history_home_view(history: AppointmentHistoryView) -> HomeView:
+def build_appointment_history_home_view(
+    history: AppointmentHistoryView,
+    *,
+    advisor_url: str = "",
+) -> HomeView:
+    rows: list[tuple[HomeChoice, ...]] = [
+        (HomeChoice("🔍 继续找房", "search"),),
+    ]
+    clean_advisor = str(advisor_url or "").strip()
+    if clean_advisor:
+        rows.append((_contact_choice(clean_advisor),))
+    rows.append((HomeChoice("🏠 返回首页", "root"),))
     return HomeView(
         kind="appointments",
         text=history.text,
-        rows=(
-            (HomeChoice("🔍 继续找房", "search"),),
-            (HomeChoice("🏠 返回首页", "root"),),
-        ),
+        rows=tuple(rows),
     )
 
 
