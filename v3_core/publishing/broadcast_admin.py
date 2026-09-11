@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timezone
 from html import escape
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
@@ -57,6 +59,31 @@ class BroadcastAdminController:
             [InlineKeyboardButton("🏠 返回首页", callback_data="v3h")],
         ])
 
+    def _last_sent_row(self, template_key: str):
+        local_date = self.service.local_now().date().isoformat()
+        with self.service.repository._connect() as conn:
+            return conn.execute(
+                """SELECT id,template_key,trigger_type,local_date,created_at
+                   FROM publisher_broadcast_log_v3
+                   WHERE local_date=? AND template_key=? AND status='sent'
+                   ORDER BY id DESC LIMIT 1""",
+                (local_date, str(template_key)),
+            ).fetchone()
+
+    def _local_log_time(self, row: Any) -> str:
+        if row is None:
+            return ""
+        raw = str(row["created_at"] or "").strip()
+        if not raw:
+            return ""
+        try:
+            value = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            if value.tzinfo is None:
+                value = value.replace(tzinfo=timezone.utc)
+            return value.astimezone(ZoneInfo(self.timezone_name)).strftime("%H:%M")
+        except (TypeError, ValueError, ZoneInfo.KeyError):
+            return raw[11:16] if len(raw) >= 16 else raw
+
     async def show_center(self, message: Any, *, notice: str = ""):
         prefix = f"✅ {escape(notice)}\n\n" if notice else ""
         await message.reply_text(
@@ -70,10 +97,14 @@ class BroadcastAdminController:
 
     async def show_weather(self, message: Any, *, notice: str = ""):
         c = self.service.config()
+        sent = self._last_sent_row("live")
         prefix = f"✅ {escape(notice)}\n\n" if notice else ""
+        today_state = f"✅ 已发送 · {self._local_log_time(sent)}" if sent is not None else "⏳ 待发送"
         await message.reply_text(
             prefix + "<b>🌤 每日天气汇率</b>\n\n"
-            + f"状态：{'🟢 每日自动发送' if c.enabled else '⏸ 已暂停'}\n时间：{escape(c.send_time)}\n\n每日天气汇率与营销广播相互独立。",
+            + f"状态：{'🟢 每日自动发送' if c.enabled else '⏸ 已暂停'}\n"
+            + f"时间：{escape(c.send_time)}\n"
+            + f"今日状态：{escape(today_state)}",
             parse_mode=ParseMode.HTML,
             reply_markup=self._markup([
                 [InlineKeyboardButton("👀 查看今日内容", callback_data="v3bc|today"), InlineKeyboardButton("💱 汇率设置", callback_data="v3bc|fx")],
@@ -85,36 +116,42 @@ class BroadcastAdminController:
 
     async def show_marketing(self, message: Any, *, notice: str = ""):
         prefix = f"✅ {escape(notice)}\n\n" if notice else ""
+        today = self.marketing.template()
+        sent = self._last_sent_row("marketing_" + today.key)
         lines = [
             "<b>🗓 本周营销计划</b>", "",
             "周一  🏠 本周找房", "周二  📋 看房准备", "周三  💰 租房预算",
             "周四  🔍 房源怎么选", "周五  📝 签约提醒", "周六  🏠 周末看房", "周日  🛡 侨联保障", "",
             f"自动营销：{'🟢 已开启' if self.marketing.enabled else '⏸ 已暂停'}",
             f"发送时间：{escape(self.marketing.send_time)}",
+            f"今日状态：{'✅ 已发送 · ' + self._local_log_time(sent) if sent is not None else '⏳ 待发送'}",
         ]
         await message.reply_text(
             prefix + "\n".join(lines),
             parse_mode=ParseMode.HTML,
             reply_markup=self._markup([
                 [InlineKeyboardButton("👀 查看今天", callback_data="v3bc|m_today"), InlineKeyboardButton("📅 查看整周", callback_data="v3bc|m_week")],
-                [InlineKeyboardButton("⏰ 修改时间", callback_data="v3bc|m_time_menu"), InlineKeyboardButton("⏸ 暂停营销" if self.marketing.enabled else "▶️ 开启营销", callback_data="v3bc|m_off" if self.marketing.enabled else "v3bc|m_on")],
+                [InlineKeyboardButton("📤 立即发送", callback_data="v3bc|m_send"), InlineKeyboardButton("⏰ 修改时间", callback_data="v3bc|m_time_menu")],
+                [InlineKeyboardButton("⏸ 暂停营销" if self.marketing.enabled else "▶️ 开启营销", callback_data="v3bc|m_off" if self.marketing.enabled else "v3bc|m_on")],
                 [InlineKeyboardButton("⬅️ 返回广播中心", callback_data="v3bc")],
             ]),
         )
 
     async def render_marketing(self, message: Any, weekday: int | None = None):
+        """Preview exactly the same body and customer buttons the channel receives."""
         t = self.marketing.template(weekday)
         await message.reply_text(
-            f"<b>{escape(t.title)}</b>\n\n" + t.body,
+            t.body,
             parse_mode=ParseMode.HTML,
             disable_web_page_preview=True,
             reply_markup=self._footer_markup(self.marketing.footer_rows(t)),
         )
 
-    async def _render_today(self, message: Any, *, title: str):
+    async def _render_today(self, message: Any, *, title: str = ""):
+        """Preview exactly the same body and customer buttons the channel receives."""
         body = await asyncio.to_thread(self.service.body, "live")
         await message.reply_text(
-            f"<b>{escape(title)}</b>\n\n" + body,
+            body,
             parse_mode=ParseMode.HTML,
             disable_web_page_preview=True,
             reply_markup=self._footer_markup(),
@@ -149,6 +186,20 @@ class BroadcastAdminController:
             channel_message_id=getattr(result, "message_id", None),
         )
         return result
+
+    async def _send_weather_now(self, context: Any):
+        body = await asyncio.to_thread(self.service.body, "live")
+        return await self._send_channel(context, body, trigger_type="manual_weather", template_key="live")
+
+    async def _send_marketing_now(self, context: Any):
+        t = self.marketing.template()
+        return await self._send_channel(
+            context,
+            t.body,
+            trigger_type="manual_marketing",
+            template_key="marketing_" + t.key,
+            footer=self.marketing.footer_rows(t),
+        )
 
     async def scheduled_tick(self, context: Any):
         claimed, local_date = self.service.claim_scheduled_due()
@@ -185,7 +236,9 @@ class BroadcastAdminController:
         for row in rows:
             icon = "✅" if str(row["status"]) == "sent" else "⚠️"
             kind = "🌤 天气汇率" if str(row["template_key"]) == "live" else ("🗓 营销" if str(row["template_key"]).startswith("marketing_") else "✏️ 临时广播")
-            lines.append(f"{icon} {escape(str(row['local_date']))} · {kind}")
+            tm = self._local_log_time(row)
+            when = f"{escape(str(row['local_date']))} {escape(tm)}" if tm else escape(str(row["local_date"]))
+            lines.append(f"{icon} {when} · {kind}")
         await message.reply_text(
             "\n".join(lines),
             parse_mode=ParseMode.HTML,
@@ -257,7 +310,7 @@ class BroadcastAdminController:
         if a == "weather":
             await self.show_weather(q.message); return True
         if a in {"today", "preview"}:
-            await self._render_today(q.message, title="🌤 今日天气汇率"); return True
+            await self._render_today(q.message); return True
         if a == "fx":
             c = self.service.config()
             sign = "+" if c.fx_offset >= 0 else ""
@@ -287,9 +340,24 @@ class BroadcastAdminController:
             await q.message.reply_text("请输入人工调整值，例如：+0.02、-0.05 或 0。")
             return True
         if a == "send":
-            body = await asyncio.to_thread(self.service.body, "live")
-            await self._send_channel(context, body, trigger_type="manual_weather", template_key="live")
+            sent = self._last_sent_row("live")
+            if sent is not None:
+                await q.message.reply_text(
+                    "⚠️ <b>今日天气汇率已经发送过。</b>\n\n"
+                    f"上次发送：{escape(self._local_log_time(sent) or '今天')}\n\n"
+                    "是否仍然再发送一次？",
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=self._markup([
+                        [InlineKeyboardButton("仍然发送一次", callback_data="v3bc|send_force")],
+                        [InlineKeyboardButton("取消", callback_data="v3bc|weather")],
+                    ]),
+                )
+                return True
+            await self._send_weather_now(context)
             await self.show_weather(q.message, notice="今日天气汇率已发送"); return True
+        if a == "send_force":
+            await self._send_weather_now(context)
+            await self.show_weather(q.message, notice="今日天气汇率已再次发送"); return True
         if a == "marketing":
             await self.show_marketing(q.message); return True
         if a == "m_today":
@@ -308,6 +376,26 @@ class BroadcastAdminController:
             ); return True
         if a == "m_day" and len(p) == 3:
             await self.render_marketing(q.message, int(p[2])); return True
+        if a == "m_send":
+            t = self.marketing.template()
+            sent = self._last_sent_row("marketing_" + t.key)
+            if sent is not None:
+                await q.message.reply_text(
+                    "⚠️ <b>今天的营销广播已经发送过。</b>\n\n"
+                    f"上次发送：{escape(self._local_log_time(sent) or '今天')}\n\n"
+                    "是否仍然再发送一次？",
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=self._markup([
+                        [InlineKeyboardButton("仍然发送一次", callback_data="v3bc|m_send_force")],
+                        [InlineKeyboardButton("取消", callback_data="v3bc|marketing")],
+                    ]),
+                )
+                return True
+            await self._send_marketing_now(context)
+            await self.show_marketing(q.message, notice="今日营销广播已发送"); return True
+        if a == "m_send_force":
+            await self._send_marketing_now(context)
+            await self.show_marketing(q.message, notice="今日营销广播已再次发送"); return True
         if a == "m_on":
             self.marketing.set_enabled(True); await self.show_marketing(q.message, notice="自动营销已开启"); return True
         if a == "m_off":
