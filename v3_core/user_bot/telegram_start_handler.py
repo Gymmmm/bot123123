@@ -8,16 +8,20 @@ from typing import Any
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 from telegram.constants import ParseMode
 
+from .appointment_history import AppointmentHistoryService
+from .assurance_views import build_assurance_home_view
 from .contact_effects import ContactEffectExecutor
-from .home_views import build_contact_view, build_home_view
+from .home_views import build_appointment_history_home_view, build_contact_view, build_home_view
 from .lead_service import LeadUser
 from .public_flow import PublicListingFlowResult, PublicListingFlowService
 from .search_no_match_view import build_search_no_match_view
 from .search_query import SearchCriteria
 from .search_submit_executor import SearchSubmitExecutor
+from .telegram_assurance_handler import build_assurance_keyboard
 from .telegram_home_ui import build_home_keyboard
 from .telegram_navigation import advisor_handoff_url, polish_listing_keyboard
 from .telegram_search_results import present_search_flow_result
+from .telegram_service_handler import _service_home_with_tenant_entry, build_service_keyboard
 from .telegram_transition_ui import build_transition_keyboard
 from .telegram_ui import build_action_keyboard
 from .transition_actions import SearchSubmitIntent
@@ -26,7 +30,9 @@ from .transition_session import apply_session_mutation, build_transition_session
 from .transition_views import TransitionViewService
 
 
-BROADCAST_START_SHORTCUTS = frozenset({"find_home", "latest", "advisor"})
+BROADCAST_START_SHORTCUTS = frozenset(
+    {"find_home", "latest", "advisor", "budget", "appointments", "assurance", "service"}
+)
 
 
 @dataclass(frozen=True)
@@ -221,6 +227,7 @@ async def _handle_broadcast_shortcut(
     payload: str,
     transition_views: TransitionViewService,
     search_executor: SearchSubmitExecutor | None,
+    appointment_history: AppointmentHistoryService | None,
     contact_effects: ContactEffectExecutor | None,
     advisor_url: str,
 ) -> TelegramStartOutcome | None:
@@ -231,16 +238,16 @@ async def _handle_broadcast_shortcut(
     if message is None or not isinstance(user_data, dict):
         raise ValueError("broadcast_shortcut_missing_telegram_context")
 
-    if payload == "find_home":
+    if payload in {"find_home", "budget"}:
         plan = _search_entry_plan()
-        view = transition_views.build(plan)
+        view = transition_views.search_budget() if payload == "budget" else transition_views.build(plan)
         await message.reply_text(
             view.text,
             parse_mode=ParseMode.HTML,
             reply_markup=build_transition_keyboard(view),
         )
         apply_session_mutation(user_data, build_transition_session(plan))
-        return TelegramStartOutcome(True, "broadcast_find_home", payload)
+        return TelegramStartOutcome(True, f"broadcast_{payload}", payload)
 
     if payload == "latest":
         if search_executor is None:
@@ -264,6 +271,37 @@ async def _handle_broadcast_shortcut(
                 reply_markup=build_transition_keyboard(view),
             )
         return TelegramStartOutcome(True, "broadcast_latest", payload)
+
+    if payload == "appointments":
+        if appointment_history is None:
+            await _render_invalid_link(message, advisor_url=advisor_url)
+            return TelegramStartOutcome(True, "broadcast_appointments_unavailable", payload)
+        user = _lead_user(update)
+        view = build_appointment_history_home_view(appointment_history.build(user.user_id))
+        await message.reply_text(
+            view.text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=build_home_keyboard(view),
+        )
+        return TelegramStartOutcome(True, "broadcast_appointments", payload)
+
+    if payload == "assurance":
+        view = build_assurance_home_view()
+        await message.reply_text(
+            view.text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=build_assurance_keyboard(view),
+        )
+        return TelegramStartOutcome(True, "broadcast_assurance", payload)
+
+    if payload == "service":
+        view = _service_home_with_tenant_entry()
+        await message.reply_text(
+            view.text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=build_service_keyboard(view, advisor_url=advisor_url),
+        )
+        return TelegramStartOutcome(True, "broadcast_service", payload)
 
     # Keep attribution/lead side effects even when a direct advisor URL exists.
     if contact_effects is not None:
@@ -289,6 +327,7 @@ async def handle_v3_start(
     transition_views: TransitionViewService,
     channel_url: str = "",
     search_executor: SearchSubmitExecutor | None = None,
+    appointment_history: AppointmentHistoryService | None = None,
     contact_effects: ContactEffectExecutor | None = None,
     advisor_url: str = "",
 ) -> TelegramStartOutcome:
@@ -317,6 +356,7 @@ async def handle_v3_start(
         payload=payload,
         transition_views=transition_views,
         search_executor=search_executor,
+        appointment_history=appointment_history,
         contact_effects=contact_effects,
         advisor_url=advisor_url,
     )
