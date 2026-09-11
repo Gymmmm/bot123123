@@ -1,219 +1,99 @@
-"""Final V3 Publisher application composition.
-
-The Telegram-facing operator workflow stays deliberately small: publish rental
-material, send broadcasts, manage listing status and manage source identities.
-All existing frozen-package, delivery and automatic collector policy remains
-underneath that operator surface.
-"""
+"""Final V3 Publisher application composition."""
 from __future__ import annotations
-
 from html import escape
 import os
-
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 from telegram.ext import CommandHandler, ContextTypes, MessageHandler, filters
-
 from v3_core.ops.runtime_state import RuntimeStateRepository
 from .admin_bot import PublisherAdminBot, PublisherAdminSettings, REPO_ROOT, load_settings
 from .autopilot_anomalies import FinalAutoPublishRepository, FinalAutoPublishService
 from .broadcast import BroadcastService, BroadcastSettingsRepository
 from .broadcast_admin import BROADCAST_EDIT_STATE_KEY, BroadcastAdminController
+from .marketing_broadcast import MarketingBroadcastService
 from .manual_status_sync import PublisherManualStatusSynchronizer
 from .operator_flow import OperatorPublisherAdminController
 from .simple_admin import NEW_LISTING_STATE_KEY, SIMPLE_EDIT_STATE_KEY
 
-
 class V3PublisherApplication(PublisherAdminBot):
     def __init__(self, settings: PublisherAdminSettings):
         super().__init__(settings)
-        timezone_name = (
-            str(os.getenv("V3_AUTO_PUBLISH_TIMEZONE") or os.getenv("AUTOPILOT_TIMEZONE") or "Asia/Phnom_Penh").strip()
-            or "Asia/Phnom_Penh"
-        )
-        broadcast_service = BroadcastService(
-            repository=BroadcastSettingsRepository(settings.db_path),
-            repo_root=REPO_ROOT,
-            user_bot_username=settings.user_bot_username,
-            timezone_name=timezone_name,
-        )
-        self.broadcast = BroadcastAdminController(
-            service=broadcast_service,
-            channel_chat_id=settings.channel_chat_id,
-            timezone_name=timezone_name,
-        )
-        self.auto_repository = FinalAutoPublishRepository(settings.db_path)
-        self.auto_repository.ensure_defaults()
+        timezone_name = str(os.getenv("V3_AUTO_PUBLISH_TIMEZONE") or os.getenv("AUTOPILOT_TIMEZONE") or "Asia/Phnom_Penh").strip() or "Asia/Phnom_Penh"
+        broadcast_service = BroadcastService(repository=BroadcastSettingsRepository(settings.db_path), repo_root=REPO_ROOT, user_bot_username=settings.user_bot_username, timezone_name=timezone_name)
+        marketing_service = MarketingBroadcastService(settings.db_path, user_bot_username=settings.user_bot_username, timezone_name=timezone_name)
+        self.broadcast = BroadcastAdminController(service=broadcast_service, marketing=marketing_service, channel_chat_id=settings.channel_chat_id, timezone_name=timezone_name)
+        self.auto_repository = FinalAutoPublishRepository(settings.db_path); self.auto_repository.ensure_defaults()
         self.runtime = RuntimeStateRepository(settings.db_path)
-        self.autopilot = FinalAutoPublishService(
-            workflow=self.workflow,
-            repository=self.auto_repository,
-            channel_chat_id=settings.channel_chat_id,
-        )
-        self.simple = OperatorPublisherAdminController(
-            db_path=settings.db_path,
-            repo_root=REPO_ROOT,
-            workflow=self.workflow,
-            autopilot=self.autopilot,
-            repository=self.auto_repository,
-            runtime=self.runtime,
-            user_bot_username=settings.user_bot_username,
-            channel_chat_id=settings.channel_chat_id,
-            cover_output_dir=settings.cover_output_dir,
-        )
-        self.manual_status_sync = PublisherManualStatusSynchronizer(
-            settings.db_path,
-            user_bot_username=settings.user_bot_username,
-        )
+        self.autopilot = FinalAutoPublishService(workflow=self.workflow, repository=self.auto_repository, channel_chat_id=settings.channel_chat_id)
+        self.simple = OperatorPublisherAdminController(db_path=settings.db_path, repo_root=REPO_ROOT, workflow=self.workflow, autopilot=self.autopilot, repository=self.auto_repository, runtime=self.runtime, user_bot_username=settings.user_bot_username, channel_chat_id=settings.channel_chat_id, cover_output_dir=settings.cover_output_dir)
+        self.manual_status_sync = PublisherManualStatusSynchronizer(settings.db_path, user_bot_username=settings.user_bot_username)
 
     @staticmethod
-    def _home_button() -> list[InlineKeyboardButton]:
-        return [InlineKeyboardButton("🏠 返回首页", callback_data="v3h")]
+    def _home_button(): return [InlineKeyboardButton("🏠 返回首页", callback_data="v3h")]
+    def _dashboard_keyboard(self): return self.simple.home_keyboard()
+    async def _send_dashboard(self, message): await self.simple.show_home(message)
 
-    def _dashboard_keyboard(self) -> InlineKeyboardMarkup:
-        return self.simple.home_keyboard()
+    async def daily(self, update, context: ContextTypes.DEFAULT_TYPE):
+        if not await self._require_admin(update): return
+        context.user_data.pop(BROADCAST_EDIT_STATE_KEY, None); await self.broadcast.show_center(update.effective_message)
 
-    async def _send_dashboard(self, message) -> None:
-        await self.simple.show_home(message)
-
-    async def daily(self, update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        if not await self._require_admin(update):
-            return
-        context.user_data.pop(BROADCAST_EDIT_STATE_KEY, None)
-        await self.broadcast.show_center(update.effective_message)
-
-    async def on_callback(self, update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        query = getattr(update, "callback_query", None)
-        raw = str(getattr(query, "data", "") or "") if query is not None else ""
+    async def on_callback(self, update, context: ContextTypes.DEFAULT_TYPE):
+        query=getattr(update,"callback_query",None); raw=str(getattr(query,"data","") or "") if query else ""
         if raw.startswith("v3smp|"):
-            if query is None:
-                return
-            if not await self._require_admin(update):
-                await query.answer()
-                return
+            if query is None: return
+            if not await self._require_admin(update): await query.answer(); return
             await query.answer()
             try:
-                handled = await self.simple.handle_callback(update, context)
-                parts = raw.split("|")
-                if handled and len(parts) == 4 and parts[1] == "status":
-                    status, listing_id = parts[2], parts[3]
-                    result = await self.manual_status_sync.sync(
-                        context.bot,
-                        listing_id=listing_id,
-                        status=status,
-                    )
-                    if result.attempted and not result.synced:
-                        await query.message.reply_text(
-                            "⚠️ 房源状态已更新，但频道帖子同步失败，请稍后重试。",
-                            reply_markup=InlineKeyboardMarkup([self._home_button()]),
-                        )
+                handled=await self.simple.handle_callback(update,context); parts=raw.split("|")
+                if handled and len(parts)==4 and parts[1]=="status":
+                    status,listing_id=parts[2],parts[3]; result=await self.manual_status_sync.sync(context.bot,listing_id=listing_id,status=status)
+                    if result.attempted and not result.synced: await query.message.reply_text("⚠️ 房源状态已更新，但频道帖子同步失败，请稍后重试。",reply_markup=InlineKeyboardMarkup([self._home_button()]))
             except Exception as exc:
-                await query.message.reply_text(
-                    "操作失败，房源没有被强行发布：\n" + escape(type(exc).__name__ + ": " + str(exc)),
-                    parse_mode=ParseMode.HTML,
-                    reply_markup=InlineKeyboardMarkup([self._home_button()]),
-                )
+                await query.message.reply_text("操作失败，房源没有被强行发布：\n"+escape(type(exc).__name__+": "+str(exc)),parse_mode=ParseMode.HTML,reply_markup=InlineKeyboardMarkup([self._home_button()]))
             return
-        if raw == "v3bc" or raw.startswith("v3bc|"):
-            if query is None:
-                return
-            if not await self._require_admin(update):
-                await query.answer()
-                return
+        if raw=="v3bc" or raw.startswith("v3bc|"):
+            if query is None: return
+            if not await self._require_admin(update): await query.answer(); return
             await query.answer()
-            try:
-                await self.broadcast.handle_callback(update, context)
-            except Exception as exc:
-                await query.message.reply_text(
-                    "广播操作失败：\n" + escape(type(exc).__name__ + ": " + str(exc)),
-                    parse_mode=ParseMode.HTML,
-                    reply_markup=InlineKeyboardMarkup([self._home_button()]),
-                )
+            try: await self.broadcast.handle_callback(update,context)
+            except Exception as exc: await query.message.reply_text("广播操作失败：\n"+escape(type(exc).__name__+": "+str(exc)),parse_mode=ParseMode.HTML,reply_markup=InlineKeyboardMarkup([self._home_button()]))
             return
-        await super().on_callback(update, context)
+        await super().on_callback(update,context)
 
-    async def on_text(self, update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        if not await self._require_admin(update):
-            return
+    async def on_text(self, update, context: ContextTypes.DEFAULT_TYPE):
+        if not await self._require_admin(update): return
         try:
-            # Field/source edits must consume their expected text before the
-            # active manual listing session treats it as free-form supplement.
-            if isinstance(context.user_data.get(SIMPLE_EDIT_STATE_KEY), dict):
-                if await self.simple.handle_text(update, context):
-                    return
-            if isinstance(context.user_data.get(NEW_LISTING_STATE_KEY), dict):
-                if await self.simple.consume_new_listing_message(update, context):
-                    return
-            if isinstance(context.user_data.get(BROADCAST_EDIT_STATE_KEY), dict):
-                if await self.broadcast.handle_text(update, context):
-                    return
+            if isinstance(context.user_data.get(SIMPLE_EDIT_STATE_KEY),dict) and await self.simple.handle_text(update,context): return
+            if isinstance(context.user_data.get(NEW_LISTING_STATE_KEY),dict) and await self.simple.consume_new_listing_message(update,context): return
+            if isinstance(context.user_data.get(BROADCAST_EDIT_STATE_KEY),dict) and await self.broadcast.handle_text(update,context): return
         except Exception as exc:
-            await update.effective_message.reply_text(
-                "处理失败，未发布到频道：\n" + escape(type(exc).__name__ + ": " + str(exc)),
-                parse_mode=ParseMode.HTML,
-                reply_markup=InlineKeyboardMarkup([self._home_button()]),
-            )
-            return
-        await super().on_text(update, context)
+            await update.effective_message.reply_text("处理失败，未发布到频道：\n"+escape(type(exc).__name__+": "+str(exc)),parse_mode=ParseMode.HTML,reply_markup=InlineKeyboardMarkup([self._home_button()])); return
+        await super().on_text(update,context)
 
-    async def on_media(self, update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        if not await self._require_admin(update):
-            return
-        if not isinstance(context.user_data.get(NEW_LISTING_STATE_KEY), dict):
-            await update.effective_message.reply_text(
-                "请先从首页点击“➕ 发布房源”，再发送图片、相册或视频。",
-                reply_markup=InlineKeyboardMarkup([self._home_button()]),
-            )
-            return
-        try:
-            await self.simple.consume_new_listing_message(update, context)
-        except Exception as exc:
-            await update.effective_message.reply_text(
-                "素材处理失败，未发布到频道：\n" + escape(type(exc).__name__ + ": " + str(exc)),
-                parse_mode=ParseMode.HTML,
-                reply_markup=InlineKeyboardMarkup([self._home_button()]),
-            )
+    async def on_media(self, update, context: ContextTypes.DEFAULT_TYPE):
+        if not await self._require_admin(update): return
+        if not isinstance(context.user_data.get(NEW_LISTING_STATE_KEY),dict):
+            await update.effective_message.reply_text("请先从首页点击“➕ 发布房源”，再发送图片、相册或视频。",reply_markup=InlineKeyboardMarkup([self._home_button()])); return
+        try: await self.simple.consume_new_listing_message(update,context)
+        except Exception as exc: await update.effective_message.reply_text("素材处理失败，未发布到频道：\n"+escape(type(exc).__name__+": "+str(exc)),parse_mode=ParseMode.HTML,reply_markup=InlineKeyboardMarkup([self._home_button()]))
 
-    async def cancel(self, update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        if not await self._require_admin(update):
-            return
-        state = context.user_data.pop(NEW_LISTING_STATE_KEY, None)
-        if isinstance(state, dict):
-            task = state.get("_album_task")
-            if task and not task.done():
-                task.cancel()
-        context.user_data.pop("v3_publisher_edit", None)
-        context.user_data.pop(BROADCAST_EDIT_STATE_KEY, None)
-        context.user_data.pop(SIMPLE_EDIT_STATE_KEY, None)
-        await update.effective_message.reply_text(
-            "已取消当前操作。",
-            reply_markup=InlineKeyboardMarkup([self._home_button()]),
-        )
+    async def cancel(self, update, context: ContextTypes.DEFAULT_TYPE):
+        if not await self._require_admin(update): return
+        state=context.user_data.pop(NEW_LISTING_STATE_KEY,None)
+        if isinstance(state,dict):
+            task=state.get("_album_task")
+            if task and not task.done(): task.cancel()
+        context.user_data.pop("v3_publisher_edit",None); context.user_data.pop(BROADCAST_EDIT_STATE_KEY,None); context.user_data.pop(SIMPLE_EDIT_STATE_KEY,None)
+        await update.effective_message.reply_text("已取消当前操作。",reply_markup=InlineKeyboardMarkup([self._home_button()]))
 
     def build_application(self):
-        app = super().build_application()
-        app.add_handler(CommandHandler("daily", self.daily), group=0)
-        app.add_handler(MessageHandler(filters.PHOTO | filters.VIDEO, self.on_media), group=0)
-        if app.job_queue is None:
-            raise RuntimeError("python-telegram-bot JobQueue support is required for V3 Publisher")
-        app.job_queue.run_repeating(
-            self.autopilot.scheduled_tick,
-            interval=20,
-            first=3,
-            name="v3_auto_publish_tick",
-        )
-        app.job_queue.run_repeating(
-            self.broadcast.scheduled_tick,
-            interval=20,
-            first=5,
-            name="v3_daily_broadcast_tick",
-        )
+        app=super().build_application(); app.add_handler(CommandHandler("daily",self.daily),group=0); app.add_handler(MessageHandler(filters.PHOTO|filters.VIDEO,self.on_media),group=0)
+        if app.job_queue is None: raise RuntimeError("python-telegram-bot JobQueue support is required for V3 Publisher")
+        app.job_queue.run_repeating(self.autopilot.scheduled_tick,interval=20,first=3,name="v3_auto_publish_tick")
+        app.job_queue.run_repeating(self.broadcast.scheduled_tick,interval=20,first=5,name="v3_broadcast_tick")
         return app
 
+def run():
+    settings=load_settings(); V3PublisherApplication(settings).build_application().run_polling(drop_pending_updates=False)
 
-def run() -> None:
-    settings = load_settings()
-    V3PublisherApplication(settings).build_application().run_polling(drop_pending_updates=False)
-
-
-__all__ = ["V3PublisherApplication", "run"]
+__all__=["V3PublisherApplication","run"]
