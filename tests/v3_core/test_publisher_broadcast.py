@@ -19,7 +19,7 @@ from v3_core.storage.bootstrap import initialize_v3_storage
 
 
 class _FakeLiveBuilder:
-    def build(self, *, fx_offset=-0.20, now=None):
+    def build(self, *, fx_offset=0.0, now=None):
         return f"live:{fx_offset:+.2f}"
 
 
@@ -58,9 +58,9 @@ def test_defaults_are_safe_and_disabled(tmp_path):
     assert config.enabled is False
     assert config.send_time == "09:30"
     assert config.template_key == "live"
-    assert config.fx_offset == -0.20
+    assert config.fx_offset == 0.0
     assert config.button_key == "none"
-    assert service.body() == "live:-0.20"
+    assert service.body() == "live:+0.00"
 
 
 def test_footer_buttons_use_live_v3_start_shortcuts(tmp_path):
@@ -68,8 +68,8 @@ def test_footer_buttons_use_live_v3_start_shortcuts(tmp_path):
     service.set_button("combo")
     rows = service.footer_rows()
     assert [[button.label for button in row] for row in rows] == [
-        ["🔍 租房找房", "🏠 查看最新房源"],
-        ["💬 租房置业咨询"],
+        ["🔍 帮我找房", "🏠 最新房源"],
+        ["💬 联系中文顾问"],
     ]
     urls = [button.url for row in rows for button in row]
     assert urls == [
@@ -98,8 +98,6 @@ def test_schedule_claims_before_network_and_never_auto_retries_same_day(tmp_path
     assert local_date == "2026-09-09"
     claimed_again, _ = service.claim_scheduled_due(now)
     assert claimed_again is False
-    # Even without mark_scheduled_sent(), the attempt claim blocks another
-    # automatic send after an ambiguous Telegram result.
     assert service.config().last_scheduled_attempt_date == "2026-09-09"
     assert service.config().last_scheduled_sent_date == ""
 
@@ -134,8 +132,12 @@ def test_live_builder_preserves_weather_and_fx_contract(tmp_path):
     )
     assert "侨联地产｜早安金边" in body
     assert "2026.09.09" in body
+    assert "🌦 今日天气" in body
     assert "小雨 25–32℃｜降雨 45%" in body
+    assert "💱 今日汇率" in body
     assert "1 USD ≈ 7.00 CNY" in body
+    assert "100 USD ≈ 700 CNY" in body
+    assert "📌 今日提醒" in body
     assert "今天有阵雨，出门记得带伞。" in body
 
 
