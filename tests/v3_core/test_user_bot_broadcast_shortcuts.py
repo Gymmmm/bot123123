@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from v3_core.user_bot.admin_notifications import AdminNotificationResult
+from v3_core.user_bot.appointment_history import AppointmentHistoryView
 from v3_core.user_bot.contact_effects import ContactEffectResult
 from v3_core.user_bot.lead_effects import LeadEffectResult
 from v3_core.user_bot.search_flow import SearchFlowResult
@@ -69,6 +70,19 @@ class FakeContactEffects:
         )
 
 
+class FakeAppointmentHistory:
+    def __init__(self):
+        self.calls = []
+
+    def build(self, user_id):
+        self.calls.append(user_id)
+        return AppointmentHistoryView(
+            text="📅 <b>目前还没有看房预约</b>",
+            items=(),
+            history_count=0,
+        )
+
+
 def _update(message):
     return SimpleNamespace(
         effective_message=message,
@@ -94,7 +108,9 @@ def _views():
 
 @pytest.mark.asyncio
 async def test_find_home_shortcut_enters_guided_search_without_property_resolution():
-    assert BROADCAST_START_SHORTCUTS == frozenset({"find_home", "latest", "advisor"})
+    assert BROADCAST_START_SHORTCUTS == frozenset(
+        {"find_home", "latest", "advisor", "budget", "appointments", "assurance", "service"}
+    )
     message = FakeMessage()
     listings = FakeListings()
     context = _context("find_home")
@@ -112,6 +128,25 @@ async def test_find_home_shortcut_enters_guided_search_without_property_resoluti
     assert context.user_data[AWAITING_KEYWORD_SESSION_KEY] == {"source": "daily_broadcast"}
     assert context.user_data[SEARCH_PREF_SESSION_KEY]["source"] == "daily_broadcast"
     assert "stale" not in context.user_data
+
+
+@pytest.mark.asyncio
+async def test_budget_shortcut_opens_budget_filter_directly():
+    message = FakeMessage()
+    listings = FakeListings()
+    context = _context("budget")
+
+    outcome = await handle_v3_start(
+        _update(message),
+        context,
+        listings=listings,
+        transition_views=_views(),
+    )
+
+    assert outcome.handled and outcome.kind == "broadcast_budget"
+    assert listings.calls == []
+    assert "每月预算大概多少" in message.calls[-1][0][0]
+    assert context.user_data[SEARCH_PREF_SESSION_KEY]["source"] == "daily_broadcast"
 
 
 @pytest.mark.asyncio
@@ -137,6 +172,52 @@ async def test_latest_shortcut_uses_published_search_executor_not_property_resol
     assert intent.source == "daily_broadcast_latest"
     assert intent.touch_payload == {"daily_broadcast": True, "latest": True}
     assert "暂时没有完全符合条件的房源" in message.calls[-1][0][0]
+
+
+@pytest.mark.asyncio
+async def test_appointments_shortcut_uses_real_appointment_history():
+    message = FakeMessage()
+    listings = FakeListings()
+    history = FakeAppointmentHistory()
+    context = _context("appointments")
+
+    outcome = await handle_v3_start(
+        _update(message),
+        context,
+        listings=listings,
+        transition_views=_views(),
+        appointment_history=history,
+    )
+
+    assert outcome.handled and outcome.kind == "broadcast_appointments"
+    assert listings.calls == []
+    assert history.calls == [123]
+    assert "目前还没有看房预约" in message.calls[-1][0][0]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("payload", "expected_kind", "expected_text"),
+    [
+        ("assurance", "broadcast_assurance", "侨联保障"),
+        ("service", "broadcast_service", "入住服务"),
+    ],
+)
+async def test_service_shortcuts_land_on_real_user_surfaces(payload, expected_kind, expected_text):
+    message = FakeMessage()
+    listings = FakeListings()
+    context = _context(payload)
+
+    outcome = await handle_v3_start(
+        _update(message),
+        context,
+        listings=listings,
+        transition_views=_views(),
+    )
+
+    assert outcome.handled and outcome.kind == expected_kind
+    assert listings.calls == []
+    assert expected_text in message.calls[-1][0][0]
 
 
 @pytest.mark.asyncio
