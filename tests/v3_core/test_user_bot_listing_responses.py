@@ -76,8 +76,8 @@ def test_details_response_preserves_layout_and_frozen_adviser_notes():
         "📍 BKK1\n"
         "📐 95㎡ · 19楼\n"
         "🔑 押1付1 · 1年\n"
-        "🟢 当前可预约\n"
-        "🆔 QL-RF-A2B3\n"
+        "🟢 房态：当前可预约\n"
+        "🆔 房源编号：QL-RF-A2B3\n"
         "\n"
         "💬 侨联说\n"
         "这套标注在BKK1，项目是富力城，可以按实际通勤路线再判断。\n"
@@ -95,8 +95,8 @@ def test_details_response_uses_live_rented_state_but_keeps_frozen_public_facts()
     response = build_details_response(view)
 
     assert "💰 <b>$800/月</b>" in response.text
-    assert "🔴 已租出" in response.text
-    assert "房态：" not in response.text
+    assert "🔴 房态：已租出" in response.text
+    assert "🆔 房源编号：QL-RF-A2B3" in response.text
     assert _actions(response.action_rows) == [["photos", "consult"], ["similar"]]
     assert _labels(response.action_rows) == [
         ["📸 更多实拍", "💬 联系中文顾问"],
