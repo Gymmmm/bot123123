@@ -91,7 +91,7 @@ def _appointment_date_view(
     details = _resolve_bookable_details(inventory, public_id)
     subject = details.subject or details.location or "这套房"
     price = _format_price(details.monthly_rent_usd)
-    price_line = f"\n💰 <b>{he(price)}</b>" if price else ""
+    price_line = f"\n💰 {he(price)}" if price else ""
     if draft.mode == "video":
         heading = f"🎥 <b>视频看房｜{he(public_id)}</b>"
         question = "哪天方便视频看房？"
@@ -268,12 +268,10 @@ def _similar_view(plan: TransitionPlan) -> TransitionView:
 
 _SEARCH_ENTRY_TEXT = (
     "🔍 <b>想找什么样的房子？</b>\n\n"
-    "直接发一句话就可以：\n\n"
-    "「BKK1 一房，预算 $600」\n"
-    "「富力城两房，要能做饭」\n"
-    "「想找高层、安静一点的」\n\n"
-    "我们会根据您的需求，优先筛选 2–3 套更值得看的房源。\n\n"
-    "还没想好？也可以按条件找 👇"
+    "直接发送需求，例如：\n"
+    "<code>BKK1 一房，预算 $600</code>\n"
+    "<code>富力城两房，要能做饭</code>\n\n"
+    "也可以按条件找："
 )
 
 
@@ -289,7 +287,7 @@ def _change_search_view(plan: TransitionPlan) -> TransitionView:
             TransitionChoice("🏠 按户型", "search_layout"),
             TransitionChoice("🏘 当前可约", "search_available"),
         ),
-        (TransitionChoice("⬅️ 返回首页", "home"),),
+        (TransitionChoice("🏠 返回首页", "home"),),
     )
     return TransitionView(kind="search_entry", text=_SEARCH_ENTRY_TEXT, rows=rows)
 
