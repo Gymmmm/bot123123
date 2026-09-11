@@ -36,27 +36,48 @@ def _feature_present(text: str, aliases: tuple[str, ...]) -> bool:
 
 def _weekly_cleaning(text: str) -> int | None:
     patterns = (
+        # 每周两次保洁 / 一周2次打扫
         r"(?:每周|一周)\s*([一二两三123])\s*(?:次|回|趟)?\s*(?:保洁|清洁|打扫)",
+        # 每周保洁两次 / 每周保洁2次 / 一周安排保洁两次
+        r"(?:每周|一周)[^\n，,；;]{0,8}(?:保洁|清洁|打扫)\s*([一二两三123])\s*(?:次|回|趟)",
+        # 保洁每周两次 / 清洁一周2次
         r"(?:保洁|清洁|打扫)[^\n，,；;]{0,10}(?:每周|一周)\s*([一二两三123])\s*(?:次|回|趟)?",
-        r"(?:保洁|清洁|打扫)[^\n，,；;]{0,8}(?:每周|一周)\s*(一次|两次|二次|三次)",
+        # 保洁一周来两次 / 打扫每周上门3次
+        r"(?:保洁|清洁|打扫)[^\n，,；;]{0,8}(?:每周|一周)[^\n，,；;]{0,6}([一二两三123])\s*(?:次|回|趟)",
     )
     for pattern in patterns:
         match = re.search(pattern, text, re.I)
         if not match:
             continue
-        raw = match.group(1).replace("次", "")
+        raw = match.group(1)
         if raw in _CN_COUNT:
             return _CN_COUNT[raw]
     return None
 
 
 def _fee_included(text: str, nouns: str) -> bool:
-    patterns = (
-        rf"(?:租金|房租|月租)[^\n，,；;]{{0,14}}(?:包|包含|含)[^\n，,；;]{{0,8}}(?:{nouns})",
-        rf"(?:包|包含|含|已含|免)[^\n，,；;]{{0,6}}(?:{nouns})",
-        rf"(?:{nouns})[^\n，,；;]{{0,10}}(?:已?包含|已?含|包了|房东包|不用(?:另外|额外|单独)?(?:交|付)|免收|免费)",
-    )
-    return any(re.search(pattern, text, re.I) for pattern in patterns)
+    """Return true only for an explicit positive included-fee statement.
+
+    Evaluate one punctuation-delimited clause at a time so text like
+    ``不包物业费，不包网络费`` can never satisfy a generic ``包`` matcher.
+    """
+    for clause in re.split(r"[\n，,；;。.!！？]+", text):
+        if not clause or not re.search(rf"(?:{nouns})", clause, re.I):
+            continue
+        negative = (
+            rf"(?:不|未|没|无)\s*(?:包|包含|含|免)[^\n，,；;。.!！？]{{0,8}}(?:{nouns})",
+            rf"(?:{nouns})[^\n，,；;。.!！？]{{0,10}}(?:不包|不含|未含|未包含|另付|另算|另外付|额外付|单独付|自付|自理)",
+        )
+        if any(re.search(pattern, clause, re.I) for pattern in negative):
+            continue
+        positive = (
+            rf"(?:租金|房租|月租)[^\n，,；;。.!！？]{{0,14}}(?:包|包含|含)[^\n，,；;。.!！？]{{0,8}}(?:{nouns})",
+            rf"(?:包|包含|含|已含|免)[^\n，,；;。.!！？]{{0,6}}(?:{nouns})",
+            rf"(?:{nouns})[^\n，,；;。.!！？]{{0,10}}(?:已?包含|已?含|包了|房东包|不用(?:另外|额外|单独)?(?:交|付)|免收|免费)",
+        )
+        if any(re.search(pattern, clause, re.I) for pattern in positive):
+            return True
+    return False
 
 
 def extract_adviser_signals(raw_text: str, facts: dict[str, Any] | None = None) -> list[str]:
