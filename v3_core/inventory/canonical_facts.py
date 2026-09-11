@@ -408,6 +408,31 @@ def _stable_hash(payload: dict[str, Any]) -> str:
     return hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
 
 
+
+def _weak_apartment_fallback(text: str, *, layout: str | None, floor: str | None, size_sqm: object, property_type: str) -> tuple[str, str | None, str, list[dict[str, Any]], list[str]] | None:
+    """Infer 公寓 when the post has structure cues but no explicit type word.
+
+    Conservative: require a layout plus floor or indoor size, and refuse when
+    villa/townhouse/shop/office/land cues are present. Does not invent location.
+    """
+    if property_type not in (None, "", "未知"):
+        return None
+    if not layout:
+        return None
+    if floor in (None, "") and size_sqm in (None, ""):
+        return None
+    raw = str(text or "")
+    lowered = raw.lower()
+    cn_refuse = ("别墅", "双拼", "独栋", "排屋", "联排", "办公室", "写字楼", "商铺", "店面", "土地出售", "地皮出售")
+    if any(token in raw for token in cn_refuse):
+        return None
+    for tok in ("townhouse", "villa", "shophouse", "shop house", "land for sale", "office"):
+        if re.search(rf"(?<![a-z0-9]){re.escape(tok)}(?![a-z0-9])", lowered):
+            return None
+    evidence = [_evidence("公寓", "weak_apartment_structure_fallback", "medium", layout)]
+    return "公寓", None, "公寓", evidence, ["weak_apartment_inferred"]
+
+
 def canonicalize_source(raw_text: str, sanitized_text: str | None = None, source_identity: dict[str, Any] | None = None, media_summary: dict[str, Any] | None = None, manual_overrides: dict[str, Any] | None = None) -> dict[str, Any]:
     raw = str(raw_text or "")
     sanitized = str(sanitized_text or raw)
@@ -426,10 +451,22 @@ def canonicalize_source(raw_text: str, sanitized_text: str | None = None, source
     sizes, sizes_evidence = _extract_sizes(parse_text)
     market_keys, market_displays = list(taxonomy.market_location_keys), list(taxonomy.market_location_displays)
     deal_type, deal_evidence = _extract_deal_type(parse_text)
+    weak_flags: list[str] = []
+    weak = _weak_apartment_fallback(
+        parse_text,
+        layout=layout,
+        floor=floor,
+        size_sqm=sizes.get("size_sqm"),
+        property_type=property_type,
+    )
+    if weak is not None:
+        property_type, property_subtype, property_type_display, weak_evidence, weak_flags = weak
+        property_status = "inferred"
+        taxonomy.evidence.setdefault("property_type", []).extend(weak_evidence)
     facts: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION, "parser_revision": PARSER_REVISION, "source_identity": dict(source_identity or {}), "raw_text_sha256": _source_hash(raw), "sanitized_text_sha256": _source_hash(sanitized), "city_key": CITY_KEY, "city_display": CITY_DISPLAY, "deal_type": deal_type, "canonical_area_key": area_key, "canonical_area_display": area_display, "area_status": taxonomy.area_status, "canonical_area_level": taxonomy.canonical_area_level, "market_location_keys": market_keys, "market_location_displays": market_displays, "project_name": project, "project_alias": project_alias, "project_key": project_key, "project_brand": project_brand, "project_brand_key": taxonomy.project_brand_key, "community_name": project, "property_type": property_type, "property_subtype": property_subtype, "property_type_display": property_type_display, "property_type_status": property_status, "layout": layout, **layout_fields, "monthly_rent_usd": rent, "original_monthly_rent_usd": original_rent, "price_status": price_status, "sale_price_usd": sale_price, "sale_price_status": sale_price_status, **sizes, "floor": floor, **terms, **details, "highlights": _extract_highlights(parse_text), "special_tags": _special_tags(parse_text), "media_summary": dict(media_summary or {}),
         "evidence": {"deal_type": deal_evidence, "canonical_area_key": list(taxonomy.evidence.get("canonical_area_key") or []), "market_location_keys": list(taxonomy.evidence.get("market_location_keys") or []), "project": list(taxonomy.evidence.get("project") or []), "project_alias": list(taxonomy.evidence.get("project_alias") or []), "property_type": list(taxonomy.evidence.get("property_type") or []), "layout": layout_evidence, "floor": floor_evidence, "monthly_rent_usd": price_evidence, "original_monthly_rent_usd": original_price_evidence, "sale_price_usd": sale_price_evidence, **terms_evidence, **details_evidence, **sizes_evidence},
-        "candidate_flags": list(dict.fromkeys(list(taxonomy.flags) + price_flags + sale_price_flags)), "manual_overrides": [], "_source_text": parse_text,
+        "candidate_flags": list(dict.fromkeys(list(taxonomy.flags) + price_flags + sale_price_flags + weak_flags)), "manual_overrides": [], "_source_text": parse_text,
     }
     for key, value in (manual_overrides or {}).items():
         if key not in facts or value in (None, ""): continue
