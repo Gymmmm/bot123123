@@ -35,6 +35,7 @@ WELCOME_TEXT = (
 
 CONTACT_TEXT = (
     "💬 <b>联系中文顾问</b>\n\n"
+    "有什么需要，可以直接发给我们。\n\n"
     "找房可以直接发送：<code>区域 + 预算 + 户型</code>\n\n"
     "例如：\n"
     "<code>BKK1 两房，$900以内</code>\n"
