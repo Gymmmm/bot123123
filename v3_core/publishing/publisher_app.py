@@ -1,8 +1,9 @@
 """Final V3 Publisher application composition.
 
-The application presents a seven-entry administrator console while retaining the
-existing review/package/delivery machinery underneath. Automatic listings use
-the same frozen-package and durable Telegram delivery path as manual listings.
+The Telegram-facing operator workflow stays deliberately small: publish rental
+material, send broadcasts, manage listing status and manage source identities.
+All existing frozen-package, delivery and automatic collector policy remains
+underneath that operator surface.
 """
 from __future__ import annotations
 
@@ -19,8 +20,8 @@ from .autopilot_anomalies import FinalAutoPublishRepository, FinalAutoPublishSer
 from .broadcast import BroadcastService, BroadcastSettingsRepository
 from .broadcast_admin import BROADCAST_EDIT_STATE_KEY, BroadcastAdminController
 from .manual_status_sync import PublisherManualStatusSynchronizer
+from .operator_flow import OperatorPublisherAdminController
 from .simple_admin import NEW_LISTING_STATE_KEY, SIMPLE_EDIT_STATE_KEY
-from .simple_admin_production import ProductionSimplePublisherAdminController
 
 
 class V3PublisherApplication(PublisherAdminBot):
@@ -49,7 +50,7 @@ class V3PublisherApplication(PublisherAdminBot):
             repository=self.auto_repository,
             channel_chat_id=settings.channel_chat_id,
         )
-        self.simple = ProductionSimplePublisherAdminController(
+        self.simple = OperatorPublisherAdminController(
             db_path=settings.db_path,
             repo_root=REPO_ROOT,
             workflow=self.workflow,
@@ -135,11 +136,13 @@ class V3PublisherApplication(PublisherAdminBot):
         if not await self._require_admin(update):
             return
         try:
-            if isinstance(context.user_data.get(NEW_LISTING_STATE_KEY), dict):
-                if await self.simple.consume_new_listing_message(update, context):
-                    return
+            # Field/source edits must consume their expected text before the
+            # active manual listing session treats it as free-form supplement.
             if isinstance(context.user_data.get(SIMPLE_EDIT_STATE_KEY), dict):
                 if await self.simple.handle_text(update, context):
+                    return
+            if isinstance(context.user_data.get(NEW_LISTING_STATE_KEY), dict):
+                if await self.simple.consume_new_listing_message(update, context):
                     return
             if isinstance(context.user_data.get(BROADCAST_EDIT_STATE_KEY), dict):
                 if await self.broadcast.handle_text(update, context):
@@ -153,12 +156,12 @@ class V3PublisherApplication(PublisherAdminBot):
             return
         await super().on_text(update, context)
 
-    async def on_photo(self, update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    async def on_media(self, update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not await self._require_admin(update):
             return
         if not isinstance(context.user_data.get(NEW_LISTING_STATE_KEY), dict):
             await update.effective_message.reply_text(
-                "请先从首页点击“➕ 新建房源”，再发送房源图片。",
+                "请先从首页点击“➕ 发布房源”，再发送图片、相册或视频。",
                 reply_markup=InlineKeyboardMarkup([self._home_button()]),
             )
             return
@@ -166,7 +169,7 @@ class V3PublisherApplication(PublisherAdminBot):
             await self.simple.consume_new_listing_message(update, context)
         except Exception as exc:
             await update.effective_message.reply_text(
-                "图片处理失败，未发布到频道：\n" + escape(type(exc).__name__ + ": " + str(exc)),
+                "素材处理失败，未发布到频道：\n" + escape(type(exc).__name__ + ": " + str(exc)),
                 parse_mode=ParseMode.HTML,
                 reply_markup=InlineKeyboardMarkup([self._home_button()]),
             )
@@ -174,10 +177,14 @@ class V3PublisherApplication(PublisherAdminBot):
     async def cancel(self, update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not await self._require_admin(update):
             return
+        state = context.user_data.pop(NEW_LISTING_STATE_KEY, None)
+        if isinstance(state, dict):
+            task = state.get("_album_task")
+            if task and not task.done():
+                task.cancel()
         context.user_data.pop("v3_publisher_edit", None)
         context.user_data.pop(BROADCAST_EDIT_STATE_KEY, None)
         context.user_data.pop(SIMPLE_EDIT_STATE_KEY, None)
-        context.user_data.pop(NEW_LISTING_STATE_KEY, None)
         await update.effective_message.reply_text(
             "已取消当前操作。",
             reply_markup=InlineKeyboardMarkup([self._home_button()]),
@@ -186,7 +193,7 @@ class V3PublisherApplication(PublisherAdminBot):
     def build_application(self):
         app = super().build_application()
         app.add_handler(CommandHandler("daily", self.daily), group=0)
-        app.add_handler(MessageHandler(filters.PHOTO, self.on_photo), group=0)
+        app.add_handler(MessageHandler(filters.PHOTO | filters.VIDEO, self.on_media), group=0)
         if app.job_queue is None:
             raise RuntimeError("python-telegram-bot JobQueue support is required for V3 Publisher")
         app.job_queue.run_repeating(
