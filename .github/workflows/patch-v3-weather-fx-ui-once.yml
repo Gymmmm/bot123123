@@ -1,0 +1,65 @@
+name: patch-v3-weather-fx-ui-once
+
+on:
+  push:
+    branches: [master]
+    paths: [.github/workflows/patch-v3-weather-fx-ui-once.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/publisher-operator-flow-20260911
+          fetch-depth: 0
+      - name: Patch weather and FX UI
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('v3_core/publishing/broadcast.py')
+          s = p.read_text()
+          s = s.replace('KEY_FX_OFFSET: "-0.20",', 'KEY_FX_OFFSET: "0.00",')
+          s = s.replace('parsed = -0.20', 'parsed = 0.0')
+          s = s.replace('def build(self, *, fx_offset: float = -0.20, now: datetime | None = None) -> str:', 'def build(self, *, fx_offset: float = 0.0, now: datetime | None = None) -> str:')
+          old = '''        return (\n            "<b>☀️ 侨联地产｜早安金边</b>\\n"\n            f"📅 {current:%Y.%m.%d}｜星期{weekday}\\n\\n"\n            f"{weather_line}\\n"\n            f"{fx_line}\\n\\n"\n            f"{weather_note}\\n"\n            "<i>天气与汇率仅供参考，以实时信息/实际牌价为准。</i>"\n        )'''
+          new = '''        weather_display = weather_line.replace("🌤 天气：", "")\n        fx_display = fx_line.replace("💵 美元/人民币：", "")\n        hundred_line = ""\n        if "1 USD ≈" in fx_display:\n            try:\n                rate = float(fx_display.split("≈", 1)[1].split("CNY", 1)[0].strip())\n                hundred_line = f"\\n100 USD ≈ {rate * 100:.0f} CNY"\n            except (ValueError, IndexError):\n                pass\n        return (\n            "<b>☀️ 侨联地产｜早安金边</b>\\n"\n            f"📅 {current:%Y.%m.%d}｜星期{weekday}\\n\\n"\n            "<b>🌦 今日天气</b>\\n"\n            f"{weather_display}\\n\\n"\n            "<b>💱 今日汇率</b>\\n"\n            f"{fx_display}{hundred_line}\\n\\n"\n            "<b>📌 今日提醒</b>\\n"\n            f"{weather_note}\\n\\n"\n            "<i>天气与汇率仅供参考，以实时信息及实际牌价为准。</i>"\n        )'''
+          if old not in s:
+              raise SystemExit('broadcast body anchor not found')
+          s = s.replace(old, new)
+          s = s.replace('"find": "租房找房",', '"find": "帮我找房",')
+          s = s.replace('"contact": "租房置业咨询",', '"contact": "联系中文顾问",')
+          s = s.replace('BroadcastButton("🔍 租房找房", base + "find_home")', 'BroadcastButton("🔍 帮我找房", base + "find_home")')
+          s = s.replace('BroadcastButton("🏠 查看最新房源", base + "latest")', 'BroadcastButton("🏠 最新房源", base + "latest")')
+          s = s.replace('BroadcastButton("💬 租房置业咨询", base + "advisor")', 'BroadcastButton("💬 联系中文顾问", base + "advisor")')
+          p.write_text(s)
+
+          p = Path('v3_core/publishing/broadcast_admin.py')
+          s = p.read_text()
+          old = '''                [InlineKeyboardButton("👀 查看今日内容", callback_data="v3bc|today"), InlineKeyboardButton("📤 立即发送", callback_data="v3bc|send")],\n                [InlineKeyboardButton("⏰ 修改时间", callback_data="v3bc|time_menu"), InlineKeyboardButton("⏸ 暂停" if c.enabled else "▶️ 开启", callback_data="v3bc|off" if c.enabled else "v3bc|on")],'''
+          new = '''                [InlineKeyboardButton("👀 查看今日内容", callback_data="v3bc|today"), InlineKeyboardButton("💱 汇率设置", callback_data="v3bc|fx")],\n                [InlineKeyboardButton("📤 立即发送", callback_data="v3bc|send"), InlineKeyboardButton("⏰ 修改时间", callback_data="v3bc|time_menu")],\n                [InlineKeyboardButton("⏸ 暂停" if c.enabled else "▶️ 开启", callback_data="v3bc|off" if c.enabled else "v3bc|on")],'''
+          if old not in s:
+              raise SystemExit('weather keyboard anchor not found')
+          s = s.replace(old, new)
+          marker = '''        if a in {"today", "preview"}:\n            await self._render_today(q.message, title="🌤 今日天气汇率"); return True\n'''
+          insert = marker + '''        if a == "fx":\n            c = self.service.config()\n            sign = "+" if c.fx_offset >= 0 else ""\n            await q.message.reply_text(\n                "<b>💱 汇率设置</b>\\n\\n"\n                "🇺🇸 美元 / 🇨🇳 人民币\\n\\n"\n                f"人工调整：{sign}{c.fx_offset:.2f} CNY\\n"\n                "广播汇率 = 自动实时汇率 + 人工调整",\n                parse_mode=ParseMode.HTML,\n                reply_markup=self._markup([\n                    [InlineKeyboardButton("-0.10", callback_data="v3bc|fx_add|-0.10"), InlineKeyboardButton("-0.01", callback_data="v3bc|fx_add|-0.01"), InlineKeyboardButton("+0.01", callback_data="v3bc|fx_add|0.01"), InlineKeyboardButton("+0.10", callback_data="v3bc|fx_add|0.10")],\n                    [InlineKeyboardButton("✏️ 直接输入", callback_data="v3bc|fx_input"), InlineKeyboardButton("↩️ 恢复自动汇率", callback_data="v3bc|fx_reset")],\n                    [InlineKeyboardButton("⬅️ 返回天气汇率", callback_data="v3bc|weather")],\n                ]),\n            ); return True\n        if a == "fx_add" and len(p) == 3:\n            current = self.service.config().fx_offset\n            self.service.set_fx_offset(current + float(p[2]))\n            q.data = "v3bc|fx"\n            return await self.handle_callback(update, context)\n        if a == "fx_reset":\n            self.service.set_fx_offset(0.0)\n            q.data = "v3bc|fx"\n            return await self.handle_callback(update, context)\n        if a == "fx_input":\n            context.user_data[BROADCAST_EDIT_STATE_KEY] = {"kind": "fx"}\n            await q.message.reply_text("请输入人工调整值，例如：+0.02、-0.05 或 0。")\n            return True\n'''
+          if marker not in s:
+              raise SystemExit('callback anchor not found')
+          s = s.replace(marker, insert)
+          marker2 = '''        if kind in {"time", "m_time"}:\n'''
+          insert2 = '''        if kind == "fx":\n            try:\n                value = float(text.replace("+", ""))\n            except ValueError:\n                await update.effective_message.reply_text("格式不正确，请发送例如：+0.02、-0.05 或 0。")\n                return True\n            self.service.set_fx_offset(value)\n            context.user_data.pop(BROADCAST_EDIT_STATE_KEY, None)\n            await self.show_weather(update.effective_message, notice=f"汇率人工调整已设为 {value:+.2f} CNY")\n            return True\n        if kind in {"time", "m_time"}:\n'''
+          if marker2 not in s:
+              raise SystemExit('text anchor not found')
+          s = s.replace(marker2, insert2)
+          p.write_text(s)
+          PY
+          python -m compileall -q v3_core
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add v3_core/publishing/broadcast.py v3_core/publishing/broadcast_admin.py
+          git commit -m 'feat: refine weather broadcast and FX controls'
+          git push origin HEAD:codex/publisher-operator-flow-20260911
