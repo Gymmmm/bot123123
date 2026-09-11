@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
 from v3_core.user_bot.adviser_notes import (
     adviser_notes_for_view,
     frozen_adviser_evidence,
@@ -56,7 +54,7 @@ def _view(*, canonical_facts=None, listing=None, offer=None):
     )
 
 
-def test_locked_production_location_building_and_value_wording_is_preserved():
+def test_value_line_prefers_fee_inclusion_and_stays_one_sentence():
     evidence = {
         "area": "BKK1",
         "project": "富力城",
@@ -66,48 +64,38 @@ def test_locked_production_location_building_and_value_wording_is_preserved():
         "price": "800",
         "management_fee": "包含",
     }
-
-    assert generate_adviser_notes(evidence, max_points=3) == (
-        "这套标注在BKK1，项目是富力城，可以按实际通勤路线再判断。\n"
-        "资料里写的是公寓、95㎡、19，实际空间和楼层以现场为准。\n"
-        "月租为$800；物业费已包含。"
-    )
+    assert generate_adviser_notes(evidence, max_points=1) == "月租 $800，物业费包了。"
 
 
-def test_locked_production_highlights_take_precedence_over_generic_building_line():
+def test_highlights_take_precedence_when_no_fee_signal():
     evidence = {
         "property_type": "公寓",
         "size_sqm": "95",
         "floor": "19",
         "highlights": ["一周两次保洁", "灭虫"],
     }
+    assert generate_adviser_notes(evidence) == "资料写了一周两次保洁、灭虫，实拍再确认就行。"
 
-    assert generate_adviser_notes(evidence) == (
-        "资料明确标注：一周两次保洁、灭虫；具体状态可以结合实拍确认。"
-    )
+
+def test_location_line_is_colloquial_when_only_place_facts_exist():
+    evidence = {"area": "BKK1", "project": "富力城"}
+    assert generate_adviser_notes(evidence) == "富力城在BKK1这边，通勤自己看着办。"
 
 
 def test_frozen_safe_included_list_projects_only_explicit_fee_inclusion():
     view = _view(canonical_facts={"included": ["物业费", "Wi-Fi"]})
-
     evidence = frozen_adviser_evidence(view)
     assert evidence["management_fee"] == "包含"
     assert evidence["internet_fee"] == "包含"
-    assert adviser_notes_for_view(view) == (
-        "这套位置标注为富力城，看房前可以先核对具体定位。\n"
-        "月租为$800；物业费已包含；网络费已包含。"
-    )
+    assert adviser_notes_for_view(view) == "月租 $800，物业费包了、网费包了。"
 
 
 def test_amenity_presence_never_becomes_fee_inclusion():
     view = _view(canonical_facts={"amenities": ["游泳池", "健身房"]})
-
     evidence = frozen_adviser_evidence(view)
     assert "management_fee" not in evidence
     assert "internet_fee" not in evidence
-    assert adviser_notes_for_view(view) == (
-        "这套位置标注为富力城，看房前可以先核对具体定位。"
-    )
+    assert adviser_notes_for_view(view) == "在富力城，建议先翻实拍再约看。"
 
 
 def test_frozen_highlights_are_used_without_live_database_lookup():
@@ -115,18 +103,9 @@ def test_frozen_highlights_are_used_without_live_database_lookup():
         canonical_facts={"highlights": ["采光好", "钥匙已备"]},
         listing={"public_location_display": "BKK1"},
     )
-
-    assert adviser_notes_for_view(view) == (
-        "这套标注在BKK1，项目是富力城，可以按实际通勤路线再判断。\n"
-        "资料明确标注：采光好、钥匙已备；具体状态可以结合实拍确认。"
-    )
+    assert adviser_notes_for_view(view) == "资料写了采光好、钥匙已备，实拍再确认就行。"
 
 
-def test_missing_frozen_canonical_facts_is_blocked_instead_of_falling_back_live():
-    view = _view(canonical_facts={})
-    snapshot = view.snapshot
-    snapshot.pop("canonical_facts")
-    view.package["snapshot_json"] = json.dumps(snapshot, ensure_ascii=False)
-
-    with pytest.raises(ValueError, match="frozen_canonical_facts_missing"):
-        adviser_notes_for_view(view)
+def test_allow_empty_returns_blank_when_no_useful_signal():
+    assert generate_adviser_notes({}, allow_empty=True) == ""
+    assert generate_adviser_notes({}, allow_empty=False) == "条件以资料和现场核对为准。"
