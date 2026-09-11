@@ -93,24 +93,19 @@ def test_frozen_safe_included_list_projects_only_explicit_fee_inclusion():
     evidence = frozen_adviser_evidence(view)
     assert evidence["management_fee"] == "包含"
     assert evidence["internet_fee"] == "包含"
-    assert adviser_notes_for_view(view) == (
-        "这套位置标注为富力城，看房前可以先核对具体定位。\n"
-        "月租为$800；物业费已包含；网络费已包含。"
-    )
+    assert adviser_notes_for_view(view) == "管理费跟网费一起含在租金里。"
 
 
-def test_amenity_presence_never_becomes_fee_inclusion():
+def test_frozen_amenities_can_drive_new_style_copy_without_live_lookup():
     view = _view(canonical_facts={"amenities": ["游泳池", "健身房"]})
 
     evidence = frozen_adviser_evidence(view)
     assert "management_fee" not in evidence
     assert "internet_fee" not in evidence
-    assert adviser_notes_for_view(view) == (
-        "这套位置标注为富力城，看房前可以先核对具体定位。"
-    )
+    assert adviser_notes_for_view(view) == "泳池健身房都在楼里，不用另外跑。"
 
 
-def test_frozen_highlights_are_used_without_live_database_lookup():
+def test_frozen_unknown_highlights_still_use_legacy_factual_copy():
     view = _view(
         canonical_facts={"highlights": ["采光好", "钥匙已备"]},
         listing={"public_location_display": "BKK1"},
@@ -120,6 +115,30 @@ def test_frozen_highlights_are_used_without_live_database_lookup():
         "这套标注在BKK1，项目是富力城，可以按实际通勤路线再判断。\n"
         "资料明确标注：采光好、钥匙已备；具体状态可以结合实拍确认。"
     )
+
+
+def test_new_qiaolian_tags_use_controlled_copy_and_manual_lines_win():
+    automatic = _view(canonical_facts={"qiaolian_tags": ["cleaning_2x", "management_included"]})
+    auto_notes = adviser_notes_for_view(automatic).splitlines()
+    assert len(auto_notes) == 2
+    assert any("一周" in line and "两" in line for line in auto_notes)
+
+    manual = _view(
+        canonical_facts={
+            "qiaolian_tags": ["pool_gym"],
+            "qiaolian_say": ["一周两次保洁，日常维护挺省心。", "物业费已经包含。"],
+        }
+    )
+    assert adviser_notes_for_view(manual) == (
+        "一周两次保洁，日常维护挺省心。\n物业费已经包含。"
+    )
+
+
+def test_new_scanned_listing_with_no_tags_gets_one_controlled_fallback():
+    view = _view(canonical_facts={"qiaolian_tags": []})
+    notes = adviser_notes_for_view(view).splitlines()
+    assert len(notes) == 1
+    assert notes[0]
 
 
 def test_missing_frozen_canonical_facts_is_blocked_instead_of_falling_back_live():
