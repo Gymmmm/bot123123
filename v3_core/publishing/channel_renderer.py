@@ -73,12 +73,21 @@ def _status_line(status: str, public_id: str) -> str:
     return f"{icon} {label}　{public_id}"
 
 
+def _adviser_block(value: str) -> str:
+    lines = [re.sub(r"\s+", " ", line).strip() for line in str(value or "").splitlines()]
+    lines = [line for line in lines if line][:2]
+    if not lines:
+        return ""
+    return "💬 侨联说\n" + "\n".join(html.escape(line) for line in lines)
+
+
 def render_channel_caption(
     *,
     listing: dict[str, Any],
     offer: dict[str, Any],
     public_listing_id: object,
     status: str | None = None,
+    adviser_note: str = "",
 ) -> str:
     public_id = normalize_public_id(public_listing_id)
     if not public_id:
@@ -129,6 +138,9 @@ def render_channel_caption(
     if offer_type == "rent" and deposit_contract:
         blocks.append(f"🗝️ {html.escape(deposit_contract)}")
     blocks.append(html.escape(_status_line(effective_status, public_id)))
+    adviser = _adviser_block(adviser_note)
+    if adviser:
+        blocks.append(adviser)
     return "\n\n".join(blocks).strip()[:1024]
 
 
