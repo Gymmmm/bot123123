@@ -52,6 +52,7 @@ def polish_listing_keyboard(
     *,
     advisor_url: str = "",
     channel_url: str = "",
+    back_to_search_callback: str = "",
     add_home: bool = False,
     add_channel: bool = False,
 ) -> InlineKeyboardMarkup | None:
@@ -87,6 +88,10 @@ def polish_listing_keyboard(
                 rows.append(upgraded)
 
     existing_labels = {str(button.text or "") for row in rows for button in row}
+    back_search = str(back_to_search_callback or "").strip()
+    if back_search and "⬅️ 返回搜索结果" not in existing_labels:
+        rows.append([InlineKeyboardButton("⬅️ 返回搜索结果", callback_data=back_search)])
+        existing_labels.add("⬅️ 返回搜索结果")
     clean_channel = str(channel_url or "").strip()
     if add_channel and clean_channel and "📣 返回房源频道" not in existing_labels:
         rows.append([InlineKeyboardButton("📣 返回房源频道", url=clean_channel)])
