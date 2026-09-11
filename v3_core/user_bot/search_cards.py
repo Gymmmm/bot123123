@@ -142,7 +142,7 @@ def build_search_card(
     lines.extend(
         [
             "",
-            f"{details.status_icon} <b>{he(details.status_label)}</b>",
+            f"{details.status_icon} {he(details.status_label)}",
             f"第 {position + 1}/{len(items)} 套",
         ]
     )
