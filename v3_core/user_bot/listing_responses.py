@@ -126,10 +126,10 @@ def build_details_response(view: PublishedListingView) -> PublicDetailsResponse:
     if details.public_listing_id:
         lines.append(f"🆔 房源编号：{he(details.public_listing_id)}")
 
-    notes = adviser_notes_for_view(view, max_points=2, allow_empty=True).strip()
+    notes = adviser_notes_for_view(view, max_points=1, allow_empty=True).strip()
     if notes:
         safe_notes = "\n".join(he(line) for line in notes.splitlines() if line.strip())
-        lines.extend(["", "💬 侨联说", safe_notes])
+        lines.extend(["", "💬 侨联判断", safe_notes])
 
     return PublicDetailsResponse(
         text="\n".join(lines),
