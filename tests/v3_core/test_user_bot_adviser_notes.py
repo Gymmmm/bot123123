@@ -4,6 +4,7 @@ import json
 
 import pytest
 
+from v3_core.inventory.qiaolian_say import PHRASES
 from v3_core.user_bot.adviser_notes import (
     adviser_notes_for_view,
     frozen_adviser_evidence,
@@ -102,7 +103,7 @@ def test_frozen_amenities_can_drive_new_style_copy_without_live_lookup():
     evidence = frozen_adviser_evidence(view)
     assert "management_fee" not in evidence
     assert "internet_fee" not in evidence
-    assert adviser_notes_for_view(view) == "泳池健身房都在楼里，不用另外跑。"
+    assert adviser_notes_for_view(view) in PHRASES["pool_gym"]
 
 
 def test_frozen_unknown_highlights_still_use_legacy_factual_copy():
