@@ -1,2 +1,2 @@
 inspect
-bootstrap-2026-09-04T00:00:00Z
+publisher-20260912-0540
