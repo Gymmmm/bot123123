@@ -125,6 +125,42 @@ def _context(user_data, bot):
 
 
 @pytest.mark.asyncio
+async def test_clear_direct_text_search_works_from_normal_home_state():
+    message = FakeMessage("BKK1 一房 800以内")
+    user_data = {}
+    bot = FakeBot()
+    effects = FakeLeadEffects()
+    executor = FakeSearchExecutor(matched=True)
+
+    outcome = await handle_v3_keyword_search_text(
+        _update(message),
+        _context(user_data, bot),
+        actions=KeywordSearchActionService(),
+        search_executor=executor,
+        lead_effects=effects,
+    )
+
+    assert outcome.handled and outcome.presentation is not None and outcome.presentation.matched
+    assert executor.calls[0].source == "direct_text"
+    assert user_data[SEARCH_SESSION_KEY] == [PUBLIC_ID]
+    assert user_data[LAST_SEARCH_PREF_KEY]["budget_max"] == 800
+    assert len(effects.calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_unrelated_home_text_is_not_swallowed_by_search_handler():
+    message = FakeMessage("你好")
+    outcome = await handle_v3_keyword_search_text(
+        _update(message),
+        _context({}, FakeBot()),
+        actions=KeywordSearchActionService(),
+        search_executor=FakeSearchExecutor(matched=True),
+    )
+    assert not outcome.handled
+    assert message.calls == []
+
+
+@pytest.mark.asyncio
 async def test_keyword_search_presents_public_card_then_records_keyword_lead_and_consumes_waiting():
     message = FakeMessage("BKK1 一房 800以内")
     user_data = _session()
@@ -174,7 +210,7 @@ async def test_keyword_search_telegram_failure_preserves_waiting_and_skips_lead(
 
 
 @pytest.mark.asyncio
-async def test_keyword_no_match_renders_contact_then_records_no_match_lead():
+async def test_keyword_no_match_renders_current_available_and_recovery_actions_then_records_lead():
     message = FakeMessage("BKK1 一房 800以内")
     user_data = _session()
     effects = FakeLeadEffects()
@@ -191,7 +227,12 @@ async def test_keyword_no_match_renders_contact_then_records_no_match_lead():
     assert "暂时没有完全符合条件" in message.calls[-1][1][0]
     markup = message.calls[-1][2]["reply_markup"]
     callbacks = [button.callback_data for row in markup.inline_keyboard for button in row]
-    assert callbacks == ["v3u:change_search", "v3u:home:contact", "v3u:t:home"]
+    assert callbacks == [
+        "v3u:t:search_available",
+        "v3u:change_search",
+        "v3u:home:contact",
+        "v3u:t:home",
+    ]
     assert effects.calls[0][2] == "no_match"
     assert AWAITING_KEYWORD_SESSION_KEY not in user_data
 
