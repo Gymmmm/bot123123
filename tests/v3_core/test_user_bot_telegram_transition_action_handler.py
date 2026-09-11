@@ -198,7 +198,7 @@ async def test_budget_choice_stops_at_search_executor_boundary_without_popping_p
 
 
 @pytest.mark.asyncio
-async def test_stale_transition_is_owned_but_does_not_mutate_or_render():
+async def test_stale_transition_is_owned_and_shows_expired_feedback_without_mutation():
     query = FakeQuery("v3u:t:appointment_date:09-10")
     user_data = {}
 
@@ -212,4 +212,6 @@ async def test_stale_transition_is_owned_but_does_not_mutate_or_render():
     assert outcome.handled and outcome.result is not None
     assert outcome.result.status == "expired"
     assert [call[0] for call in query.calls] == ["answer"]
+    assert query.calls[0][1] == ("操作已过期，请重新选择。",)
+    assert query.calls[0][2] == {"show_alert": True}
     assert user_data == {}
