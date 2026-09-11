@@ -16,7 +16,7 @@ concurrency:
 
 env:
   DEPLOY_BRANCH: codex/publisher-operator-flow-20260911
-  EXPECTED_SHA: b8e5c0b2b50a738d4ff8a6760f56878efd336480
+  EXPECTED_SHA: 8210df23cc0b6000b1b7ae4ca4e6f4fec0665213
 
 jobs:
   verify-and-deploy:
