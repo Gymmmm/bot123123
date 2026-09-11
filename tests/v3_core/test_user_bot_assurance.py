@@ -74,7 +74,7 @@ def test_assurance_home_uses_only_v3_callbacks():
     assert labels == [
         "📋 入住怎么交",
         "🔐 押金怎么退",
-        "💬 联系我们",
+        "💬 联系中文顾问",
         "🏠 返回首页",
     ]
     assert "搬家" not in view.text
