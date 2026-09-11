@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from v3_core.user_bot.callback_router import CallbackDispatchResult
+from v3_core.user_bot.callbacks import parse_callback
 from v3_core.user_bot.consult import ConsultIntent, ConsultResult
 from v3_core.user_bot.listing_responses import PublicDetailsResponse, PublicPhotosResponse, SemanticAction
 from v3_core.user_bot.public_flow import PublicListingFlowResult
@@ -81,6 +82,7 @@ def _context(*, session_ids=()):
 def _details_dispatch():
     return CallbackDispatchResult(
         status="ok",
+        callback=parse_callback("v3u:listing:details:QL-RF-A2B3"),
         action="details",
         listing=PublicListingFlowResult(
             status="ok",
@@ -141,6 +143,20 @@ async def test_details_on_text_message_edits_text():
     await handle_v3_callback(_update(query), context, router=router)
 
     assert [call[0] for call in query.calls] == ["answer", "edit_text"]
+
+
+@pytest.mark.asyncio
+async def test_details_from_search_session_offer_one_tap_return_to_same_card():
+    query = FakeQuery("v3u:listing:details:QL-RF-A2B3", has_photo=True)
+    router = RouterStub(_details_dispatch())
+    context = _context(session_ids=("QL-BK-C4D5", "QL-RF-A2B3"))
+
+    await handle_v3_callback(_update(query), context, router=router)
+
+    markup = query.calls[-1][2]["reply_markup"]
+    buttons = [button for row in markup.inline_keyboard for button in row]
+    back = next(button for button in buttons if button.text == "⬅️ 返回搜索结果")
+    assert back.callback_data == "v3u:card:1:QL-RF-A2B3"
 
 
 @pytest.mark.asyncio
@@ -280,7 +296,7 @@ async def test_text_card_with_cover_sends_new_photo_and_records_anchor(tmp_path)
 
 
 @pytest.mark.asyncio
-async def test_transition_and_error_are_answered_but_not_executed():
+async def test_transition_is_answered_but_not_executed_without_transition_runtime():
     consult = CallbackDispatchResult(
         status="ok",
         action="consult",
@@ -297,24 +313,34 @@ async def test_transition_and_error_are_answered_but_not_executed():
             ),
         ),
     )
-    for result, expected_kind in (
-        (consult, "transition"),
-        (
-            CallbackDispatchResult(
-                status="expired",
-                action="show_card",
-                reason="search_session_expired",
-            ),
-            "error",
-        ),
-    ):
-        query = FakeQuery("v3u:listing:consult:QL-RF-A2B3")
-        router = RouterStub(result)
-        context = _context()
+    query = FakeQuery("v3u:listing:consult:QL-RF-A2B3")
+    router = RouterStub(consult)
+    context = _context()
 
-        outcome = await handle_v3_callback(_update(query), context, router=router)
+    outcome = await handle_v3_callback(_update(query), context, router=router)
 
-        assert outcome.handled and outcome.response is not None
-        assert outcome.response.kind == expected_kind
-        assert [call[0] for call in query.calls] == ["answer"]
-        assert context.bot.calls == []
+    assert outcome.handled and outcome.response is not None
+    assert outcome.response.kind == "transition"
+    assert [call[0] for call in query.calls] == ["answer"]
+    assert context.bot.calls == []
+
+
+@pytest.mark.asyncio
+async def test_expired_listing_or_card_action_shows_visible_alert():
+    result = CallbackDispatchResult(
+        status="expired",
+        action="show_card",
+        reason="search_session_expired",
+    )
+    query = FakeQuery("v3u:card:0:QL-RF-A2B3")
+    router = RouterStub(result)
+    context = _context()
+
+    outcome = await handle_v3_callback(_update(query), context, router=router)
+
+    assert outcome.handled and outcome.response is not None
+    assert outcome.response.kind == "error"
+    assert [call[0] for call in query.calls] == ["answer"]
+    assert query.calls[0][1] == ("搜索结果已更新，请重新查找。",)
+    assert query.calls[0][2] == {"show_alert": True}
+    assert context.bot.calls == []
