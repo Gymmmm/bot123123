@@ -1,4 +1,9 @@
-"""Pure V3 free-text search transition from an explicit keyword-awaiting state."""
+"""Pure V3 free-text renter search action.
+
+Explicit search-entry sessions keep the existing behavior. Outside that state,
+plain text is claimed only when it clearly contains enough real searchable
+rental criteria; unrelated chat remains untouched.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -60,6 +65,28 @@ def _last_pref(criteria: SearchCriteria) -> dict[str, object]:
     }
 
 
+def _looks_like_direct_search(criteria: SearchCriteria) -> bool:
+    """Claim only text with enough currently-enforced rental filters.
+
+    Room type is intentionally not used as the deciding filter here because the
+    current published-inventory query does not strictly filter by room type.
+    This prevents messages such as just "两房" from being presented as a precise
+    room-type search when they are not.
+    """
+    has_location = bool(criteria.location_keys)
+    has_budget = criteria.budget_min is not None or criteria.budget_max is not None
+    has_property_type = bool(str(criteria.property_type or "").strip())
+
+    # A location is a strong real-estate intent when accompanied by another
+    # housing cue, including room type. Budget/property combinations are also
+    # sufficiently specific. A lone number or casual room-type mention is not.
+    if has_location and (has_budget or has_property_type or bool(criteria.room_type)):
+        return True
+    if has_budget and has_property_type:
+        return True
+    return False
+
+
 class KeywordSearchActionService:
     def apply(
         self,
@@ -67,18 +94,26 @@ class KeywordSearchActionService:
         session: Mapping[str, object],
     ) -> KeywordSearchActionResult:
         waiting = session.get(AWAITING_KEYWORD_SESSION_KEY)
-        if not isinstance(waiting, Mapping):
-            return KeywordSearchActionResult(status="not_applicable")
+        explicit_waiting = isinstance(waiting, Mapping)
 
         raw = str(text or "").strip()
         if not raw:
+            if not explicit_waiting:
+                return KeywordSearchActionResult(status="not_applicable")
             return KeywordSearchActionResult(
                 status="invalid",
                 prompt="发一句需求就可以，例如：<code>BKK1 预算800内 一房 安静</code>。",
             )
 
         criteria = parse_search_criteria(raw)
-        source = str(waiting.get("source") or "smart_find_play").strip()
+        if not explicit_waiting and not _looks_like_direct_search(criteria):
+            return KeywordSearchActionResult(status="not_applicable")
+
+        source = (
+            str(waiting.get("source") or "smart_find_play").strip()
+            if explicit_waiting
+            else "direct_text"
+        )
         intent = SearchSubmitIntent(
             criteria=criteria,
             source=source,
