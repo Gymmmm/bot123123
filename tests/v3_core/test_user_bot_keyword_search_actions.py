@@ -18,8 +18,31 @@ def _session(source="user_search"):
     }
 
 
-def test_plain_text_is_not_claimed_without_keyword_waiting_state():
+def test_clear_rental_text_is_claimed_without_keyword_waiting_state():
     result = KeywordSearchActionService().apply("BKK1 一房 800以内", {})
+
+    assert result.ok and result.intent is not None
+    assert result.intent.source == "direct_text"
+    assert result.intent.criteria.location_keys == ("BKK1",)
+    assert result.intent.criteria.room_type == "1房"
+    assert result.intent.criteria.budget_max == 800
+    assert result.mutation is not None
+    assert result.mutation.set_values[LAST_SEARCH_PREF_KEY] == {
+        "property_type": "",
+        "location_keys": ["BKK1"],
+        "budget_min": None,
+        "budget_max": 800,
+    }
+
+
+def test_unrelated_plain_text_is_not_claimed_as_search():
+    result = KeywordSearchActionService().apply("你好", {})
+    assert result.status == "not_applicable"
+    assert result.intent is None
+
+
+def test_room_type_alone_is_not_claimed_because_it_is_not_a_strict_search_filter():
+    result = KeywordSearchActionService().apply("一房", {})
     assert result.status == "not_applicable"
     assert result.intent is None
 
