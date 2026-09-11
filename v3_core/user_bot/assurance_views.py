@@ -37,7 +37,7 @@ MOVING_TEXT = (
     "• 协调搬家时间\n"
     "• 对接车辆和人手\n"
     "• 提供必要的现场支持\n\n"
-    "需要时直接联系我们，说清时间和地点就可以。"
+    "需要时联系中文顾问，说清时间和地点就可以。"
 )
 
 HANDOVER_TEXT = (
@@ -64,7 +64,7 @@ def build_assurance_home_view() -> AssuranceView:
                 AssuranceChoice("🔐 押金怎么退", callback_data="v3u:assure:deposit"),
             ),
             (
-                AssuranceChoice("💬 联系我们", callback_data="v3u:home:contact"),
+                AssuranceChoice("💬 联系中文顾问", callback_data="v3u:home:contact"),
                 AssuranceChoice("🏠 返回首页", callback_data="v3u:t:home"),
             ),
         ),
@@ -76,7 +76,7 @@ def build_moving_view() -> AssuranceView:
         kind="moving",
         text=MOVING_TEXT,
         rows=(
-            (AssuranceChoice("💬 联系我们", callback_data="v3u:home:contact"),),
+            (AssuranceChoice("💬 联系中文顾问", callback_data="v3u:home:contact"),),
             (AssuranceChoice("⬅️ 返回入住服务", callback_data="v3u:home:service"),),
         ),
     )
