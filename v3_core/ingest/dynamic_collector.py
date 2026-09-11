@@ -81,15 +81,16 @@ class DynamicTelegramCollectorApp(TelegramCollectorApp):
                 current = {str(row["source_name"]): row for row in registry.rows()}
 
                 # Removed sources are stopped immediately through the existing
-                # runtime enabled flag.  Their old Telethon handler can remain
-                # registered safely because it checks this flag before intake.
+                # runtime enabled flag. Their registered handler remains safe
+                # because it checks this flag before every intake.
                 for name in registered - set(current):
                     self.runtime.set_source_enabled(name, False)
 
                 for name, cfg in current.items():
                     if name in registered:
                         continue
-                    self.runtime.set_source_enabled(name, True)
+                    # ensure_source inside _register_source intentionally does
+                    # not overwrite an operator's existing pause state.
                     if await self._register_source(client, cfg):
                         registered.add(name)
 
@@ -102,9 +103,10 @@ class DynamicTelegramCollectorApp(TelegramCollectorApp):
                     meta={"configured_sources": len(current), "registered_sources": len(registered)},
                 )
 
-                # Wait for either disconnect or the next source-registry poll.
+                # Shield Telethon's disconnect future: wait_for must not cancel
+                # it on each registry polling timeout.
                 try:
-                    await asyncio.wait_for(client.disconnected, timeout=10)
+                    await asyncio.wait_for(asyncio.shield(client.disconnected), timeout=10)
                     break
                 except asyncio.TimeoutError:
                     continue
