@@ -108,7 +108,7 @@ def _card_actions(
             ),
         )
     )
-    rows.append((SemanticAction("✏️ 换个条件", "change_search"),))
+    rows.append((SemanticAction("✏️ 调整条件", "change_search"),))
     return tuple(rows)
 
 
@@ -142,7 +142,7 @@ def build_search_card(
     lines.extend(
         [
             "",
-            f"{details.status_icon} <b>{he(details.status_label)}</b>",
+            f"{details.status_icon} {he(details.status_label)}",
             f"第 {position + 1}/{len(items)} 套",
         ]
     )
