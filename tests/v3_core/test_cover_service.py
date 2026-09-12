@@ -107,7 +107,7 @@ def test_cover_service_passes_only_resolved_v3_identity_and_facts(tmp_path):
     assert call["data"].layout == "2房1厅"
     assert call["data"].area == "富力城"
     assert call["data"].size == "95.0" or call["data"].size == "95"
-    assert call["data"].floor == "19"
+    assert call["data"].floor == "19楼"
     assert call["data"].price in {"800", "800.0"}
     assert (call["data"].highlight_1, call["data"].highlight_2, call["data"].highlight_3) == (
         "",
