@@ -1,0 +1,36 @@
+name: tmp-v3-db-counts
+on:
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/tmp-v3-db-counts.yml'
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify production host fingerprint
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          expected=$(tr -d '\r\n' < deploy/v3/production_host_fingerprint.txt)
+          ssh-keyscan -T 15 -p 22 -t ed25519 50.114.74.120 2>/dev/null | grep -v '^#' > "$RUNNER_TEMP/known_hosts"
+          ssh-keygen -lf "$RUNNER_TEMP/known_hosts" | grep -F "$expected"
+      - name: Configure SSH
+        shell: bash
+        env:
+          PROD_SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+        run: |
+          set -Eeuo pipefail
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
+          cp "$RUNNER_TEMP/known_hosts" "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
+      - name: Run read-only DB counts
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          scp -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes deploy/v3/read_only_db_counts.py root@50.114.74.120:/tmp/qiaolian_read_only_db_counts.py
+          ssh -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes root@50.114.74.120 'python3 /tmp/qiaolian_read_only_db_counts.py; rm -f /tmp/qiaolian_read_only_db_counts.py'
