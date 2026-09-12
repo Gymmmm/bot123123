@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from v3_core.publishing.formatting import display_layout, display_property_type
+from v3_core.publishing.formatting import display_floor, display_layout, display_property_type
 from v3_core.storage.inventory_reader import InventoryReader
 from .cover_renderer import CoverRenderData, render_cover
 from .cover_styles import normalize_cover_style, recommended_cover_style
@@ -87,6 +87,7 @@ class CoverRenderService:
 
         property_type = display_property_type(listing.get("property_type") or "")
         layout = display_layout(listing.get("layout") or "", property_type)
+        floor = display_floor(listing.get("floor") or "", property_type)
         data = CoverRenderData(
             public_listing_id=public_id,
             project=str(listing.get("project_name") or ""),
@@ -100,7 +101,7 @@ class CoverRenderService:
                 or ""
             ),
             size=str(listing.get("size_sqm") or ""),
-            floor=str(listing.get("floor") or ""),
+            floor=floor,
             price=self._price(offer),
             # Channel covers stay factual and minimal. Marketing/adviser copy
             # belongs in the rental-detail view, never on the cover itself.
