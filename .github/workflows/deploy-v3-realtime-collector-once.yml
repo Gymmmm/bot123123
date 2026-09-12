@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DEPLOY_BRANCH: codex/adviser-copy-sync-20260912
-      EXPECTED_SHA: d87b6a740411d74a1799bce2af26cf7ade5c429f
+      EXPECTED_SHA: aaf7b3d8365641557d866aef798447191308d6dc
       PROD_HOST: 50.114.74.120
       PROD_PORT: '22'
       PROD_SSH_USER: root
