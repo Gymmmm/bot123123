@@ -64,7 +64,7 @@ jobs:
           BACKFILL_SOURCE_NAME=zufang555 \
           BACKFILL_TARGET_GROUPS=50 \
           BACKFILL_FETCH_LIMIT=1200 \
-          python3 /tmp/backfill_zufang555_latest.py
+          /opt/qiaolian_v3/.venv/bin/python /tmp/backfill_zufang555_latest.py
 
           if [ "$was_active" = 1 ]; then
             systemctl start qiaolian-v3@collector.service
