@@ -7,14 +7,16 @@ on:
 permissions:
   contents: read
 jobs:
-  edit-existing:
+  smoke-edit:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 10
     env:
       PROD_HOST: 50.114.74.120
       PROD_PORT: '22'
       PROD_SSH_USER: root
       EXPECTED_PROD_SHA: aaf7b3d8365641557d866aef798447191308d6dc
+      CANDIDATE_SHA: 0b25789e53df37e6fc14f995335cb8e2e1e6cd51
+      TARGET_MESSAGE_ID: '3208'
     steps:
       - uses: actions/checkout@v4
       - name: Verify production host fingerprint
@@ -34,92 +36,72 @@ jobs:
           printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
           cp "$RUNNER_TEMP/known_hosts" "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
-      - name: Re-edit using normal frozen package output at two per minute
+      - name: Re-edit one durable publication through candidate adapter
         shell: bash
         run: |
           set -Eeuo pipefail
-          cat <<'PY' | ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes "$PROD_SSH_USER@$PROD_HOST" "EXPECTED_PROD_SHA='$EXPECTED_PROD_SHA' bash -lc 'set -a; source /opt/qiaolian_v3/runtime.env; set +a; /opt/qiaolian_v3/.venv/bin/python -'"
-          import asyncio, json, os, sqlite3, sys, time
+          cat <<'PY' | ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes "$PROD_SSH_USER@$PROD_HOST" "EXPECTED_PROD_SHA='$EXPECTED_PROD_SHA' CANDIDATE_SHA='$CANDIDATE_SHA' TARGET_MESSAGE_ID='$TARGET_MESSAGE_ID' bash -lc 'set -a; source /opt/qiaolian_v3/runtime.env; set +a; /opt/qiaolian_v3/.venv/bin/python -'"
+          import asyncio, json, os, shutil, sqlite3, subprocess, sys
           from pathlib import Path
-          from telegram import Bot, InputMediaPhoto
-          from telegram.constants import ParseMode
 
-          ROOT=Path('/opt/qiaolian_v3/current').resolve()
-          if Path('/opt/qiaolian_v3/.deployed_sha').read_text().strip()!=os.environ['EXPECTED_PROD_SHA']:
-              raise SystemExit('EDIT_FATAL deployed_sha_mismatch')
-          sys.path.insert(0,str(ROOT)); os.chdir(ROOT)
-          from v3_core.publishing.telegram_adapter import build_channel_keyboard
+          deployed=Path('/opt/qiaolian_v3/.deployed_sha').read_text().strip()
+          if deployed!=os.environ['EXPECTED_PROD_SHA']:
+              raise SystemExit('SMOKE_FATAL deployed_sha_mismatch:'+deployed)
 
-          DB=Path(os.environ.get('DB_PATH','/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db')).resolve()
-          TOKEN=os.environ['PUBLISHER_BOT_TOKEN']; CHAT=os.environ['CHANNEL_ID']
-          START_TARGET=3208; LOW,HIGH=7448,7734; INTERVAL_SECONDS=30
+          root=Path('/tmp/qiaolian_unified_edit_candidate')
+          if root.exists(): shutil.rmtree(root)
+          subprocess.run(['git','clone','--quiet','https://github.com/Gymmmm/bot123123.git',str(root)],check=True)
+          subprocess.run(['git','-C',str(root),'checkout','--quiet',os.environ['CANDIDATE_SHA']],check=True)
+          sys.path.insert(0,str(root)); os.chdir(root)
 
-          def anchor(row):
-              try: return int(json.loads(row['raw_meta_json'] or '{}').get('anchor_message_id') or 0)
-              except Exception: return 0
+          db=Path(os.environ.get('DB_PATH','/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db')).resolve()
+          conn=sqlite3.connect(str(db)); conn.row_factory=sqlite3.Row
+          cols={r['name'] for r in conn.execute('PRAGMA table_info(publication_instances)')}
+          required={'instance_id','package_id','listing_id','offer_id','platform','channel_chat_id','channel_message_id','publish_status'}
+          if not required.issubset(cols):
+              raise SystemExit('SMOKE_FATAL incompatible_publication_instances_schema:'+','.join(sorted(cols)))
+
+          target=os.environ['TARGET_MESSAGE_ID']
+          row=conn.execute("SELECT * FROM publication_instances WHERE platform='telegram' AND channel_message_id=? ORDER BY updated_at DESC LIMIT 1",(target,)).fetchone()
+          if row is None:
+              raise SystemExit('SMOKE_FATAL publication_instance_not_found:'+target)
+          pub=dict(row)
+          print('SMOKE_TARGET',json.dumps({k:pub.get(k) for k in ('instance_id','package_id','listing_id','offer_id','channel_chat_id','channel_message_id','publish_status')},ensure_ascii=False,sort_keys=True),flush=True)
+
+          from telegram import Bot
+          from v3_core.storage.inventory_reader import InventoryReader
+          from v3_core.publishing.package_store import FrozenPackageStore
+          from v3_core.publishing.publication_instances import PublicationInstanceRepository
+          from v3_core.publishing.delivery_state import PublicationDeliveryStateRepository
+          from v3_core.publishing.delivery_coordinator import PublicationDeliveryCoordinator
+          from v3_core.publishing.channel_renderer import render_channel_caption
+          from v3_core.publishing.telegram_adapter import TelegramChannelAdapter, edit_existing_publication, build_channel_keyboard
+
+          reader=InventoryReader(db); packages=FrozenPackageStore(db)
+          publications=PublicationInstanceRepository(db); deliveries=PublicationDeliveryStateRepository(db)
+          coordinator=PublicationDeliveryCoordinator(reader=reader,packages=packages,deliveries=deliveries,publications=publications)
+          package=packages.verify_frozen(pub['package_id'])
+          listing=reader.listing(package.listing_id); offer=reader.offer(package.offer_id)
+          fresh=render_channel_caption(listing=listing,offer=offer,public_listing_id=str(listing.get('public_listing_id') or ''),status=str(listing.get('inventory_status') or 'pending'),adviser_note='')
+          if fresh!=package.post_text:
+              print('SMOKE_BLOCK stale_frozen_caption',flush=True)
+              print('PACKAGE_HEAD',package.post_text[:220].replace('\n',' | '),flush=True)
+              print('FRESH_HEAD',fresh[:220].replace('\n',' | '),flush=True)
+              raise SystemExit(22)
+
+          status=str(listing.get('inventory_status') or 'pending')
+          keyboard=build_channel_keyboard(package.actions,inventory_status=status)
+          print('SMOKE_PRECHECK',json.dumps({'public_listing_id':listing.get('public_listing_id'),'inventory_status':status,'keyboard_rows':len(keyboard.inline_keyboard),'caption_matches_live_renderer':True},ensure_ascii=False,sort_keys=True),flush=True)
+          token=os.environ.get('PUBLISHER_BOT_TOKEN','').strip()
+          if not token: raise SystemExit('SMOKE_FATAL missing_publisher_bot_token')
 
           async def main():
-              conn=sqlite3.connect(str(DB),timeout=30); conn.row_factory=sqlite3.Row
-              conn.execute('PRAGMA busy_timeout=30000')
-              rows=conn.execute("SELECT id,raw_meta_json FROM source_posts WHERE source_name='zufang555'").fetchall()
-              selected=[r for r in rows if LOW<=anchor(r)<=HIGH]
-              selected.sort(key=lambda r:(anchor(r),int(r['id'])),reverse=True)
-              bot=Bot(TOKEN)
-              ok=missing_package=no_offer=failed=0
-              last=0.0
-              print(f'NORMAL_EDIT_BEGIN selected={len(selected)} target_start={START_TARGET}',flush=True)
-              for idx,s in enumerate(selected):
-                  msg_id=START_TARGET-idx; a=anchor(s); source_pk=int(s['id'])
-                  cr=conn.execute('SELECT * FROM canonical_records WHERE source_post_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1',(str(source_pk),)).fetchone()
-                  if not cr:
-                      print('MAP',a,msg_id,'skip:no_canonical',flush=True); continue
-                  listing=conn.execute('SELECT * FROM listings_v3 WHERE canonical_record_id=? ORDER BY updated_at DESC LIMIT 1',(cr['canonical_record_id'],)).fetchone()
-                  if not listing:
-                      print('MAP',a,msg_id,'skip:no_listing',flush=True); continue
-                  offer=conn.execute("SELECT * FROM listing_offers WHERE listing_id=? AND offer_type='rent' AND offer_status='active' ORDER BY updated_at DESC LIMIT 1",(listing['listing_id'],)).fetchone()
-                  if not offer:
-                      no_offer+=1; print('MAP',a,msg_id,'skip:no_offer',flush=True); continue
-                  pkg=conn.execute("SELECT * FROM publication_packages_v3 WHERE offer_id=? AND canonical_record_id=? ORDER BY package_version DESC,id DESC LIMIT 1",(offer['offer_id'],cr['canonical_record_id'])).fetchone()
-                  if not pkg:
-                      missing_package+=1; print('MAP',a,msg_id,'skip:no_current_package',flush=True); continue
-                  wait=max(0.0,INTERVAL_SECONDS-(time.monotonic()-last)) if last else 0.0
-                  if wait: await asyncio.sleep(wait)
-                  actions=json.loads(pkg['actions_json'] or '{}')
-                  keyboard=build_channel_keyboard(actions,inventory_status='pending')
-                  text=str(pkg['post_text'] or '')
-                  cover=Path(str(pkg['cover_path'] or '')).expanduser().resolve()
-                  try:
-                      if cover.is_file():
-                          try:
-                              with cover.open('rb') as fh:
-                                  media=InputMediaPhoto(media=fh,caption=text,parse_mode=ParseMode.HTML)
-                                  await bot.edit_message_media(chat_id=CHAT,message_id=msg_id,media=media,reply_markup=keyboard)
-                              mode='media+caption+buttons'
-                          except Exception as exc:
-                              desc=str(exc).lower()
-                              if 'message can\'t be edited' in desc or 'there is no media' in desc or 'message to edit not found' in desc:
-                                  await bot.edit_message_text(chat_id=CHAT,message_id=msg_id,text=text,parse_mode=ParseMode.HTML,reply_markup=keyboard)
-                                  mode='text+buttons'
-                              elif 'message is not modified' in desc:
-                                  await bot.edit_message_reply_markup(chat_id=CHAT,message_id=msg_id,reply_markup=keyboard)
-                                  mode='buttons'
-                              else:
-                                  raise
-                      else:
-                          await bot.edit_message_reply_markup(chat_id=CHAT,message_id=msg_id,reply_markup=keyboard)
-                          try:
-                              await bot.edit_message_caption(chat_id=CHAT,message_id=msg_id,caption=text,parse_mode=ParseMode.HTML,reply_markup=keyboard)
-                              mode='caption+buttons'
-                          except Exception:
-                              await bot.edit_message_text(chat_id=CHAT,message_id=msg_id,text=text,parse_mode=ParseMode.HTML,reply_markup=keyboard)
-                              mode='text+buttons'
-                      ok+=1; last=time.monotonic()
-                      print('MAP',a,msg_id,'ok:'+mode+':'+str(pkg['package_id']),flush=True)
-                  except Exception as exc:
-                      failed+=1; last=time.monotonic(); print('MAP',a,msg_id,'fail:'+str(exc)[:180],flush=True)
-                  conn.commit()
-              print(f'NORMAL_EDIT_RESULT selected={len(selected)} ok={ok} no_offer={no_offer} missing_package={missing_package} failed={failed}',flush=True)
-              await bot.shutdown()
-              if failed: raise SystemExit(2)
+              bot=Bot(token=token)
+              adapter=TelegramChannelAdapter(bot)
+              try:
+                  result=await edit_existing_publication(coordinator=coordinator,adapter=adapter,channel_chat_id=str(pub['channel_chat_id']),channel_message_id=str(pub['channel_message_id']))
+                  print('SMOKE_EDIT_OK',json.dumps(result,ensure_ascii=False,sort_keys=True),flush=True)
+              finally:
+                  await bot.shutdown()
           asyncio.run(main())
           PY
