@@ -127,7 +127,7 @@ class InventoryRepository:
                     canonical_area_key,canonical_area_display,publication_location_level,
                     layout,bedrooms,bathrooms,size_sqm,floor,display_title,
                     canonical_facts_hash,canonical_facts_schema,inventory_status,data_status)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'active','current')
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending','current')
                    ON CONFLICT(listing_id) DO UPDATE SET
                     public_listing_id=excluded.public_listing_id,
                     canonical_record_id=excluded.canonical_record_id,
