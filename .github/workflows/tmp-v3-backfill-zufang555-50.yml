@@ -1,0 +1,74 @@
+name: tmp-v3-backfill-zufang555-50
+on:
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/tmp-v3-backfill-zufang555-50.yml'
+permissions:
+  contents: read
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify production host fingerprint
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          expected=$(tr -d '\r\n' < deploy/v3/production_host_fingerprint.txt)
+          ssh-keyscan -T 15 -p 22 -t ed25519 50.114.74.120 2>/dev/null | grep -v '^#' > "$RUNNER_TEMP/known_hosts"
+          ssh-keygen -lf "$RUNNER_TEMP/known_hosts" | grep -F "$expected"
+      - name: Configure SSH
+        shell: bash
+        env:
+          PROD_SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+        run: |
+          set -Eeuo pipefail
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
+          cp "$RUNNER_TEMP/known_hosts" "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
+      - name: Copy backfill helper
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          scp -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes \
+            deploy/v3/backfill_zufang555_latest.py \
+            root@50.114.74.120:/tmp/backfill_zufang555_latest.py
+      - name: Back up DB and import latest 50 groups
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          ssh -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes root@50.114.74.120 'bash -se' <<'REMOTE'
+          set -Eeuo pipefail
+          db=/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db
+          stamp=$(date +%Y%m%d_%H%M%S)
+          backup="/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db.before_zufang555_backfill_${stamp}"
+          cp -a "$db" "$backup"
+          echo "DB_BACKUP_OK path=$backup"
+
+          was_active=0
+          if systemctl is-active --quiet qiaolian-v3@collector.service; then
+            was_active=1
+            systemctl stop qiaolian-v3@collector.service
+          fi
+          cleanup() {
+            rm -f /tmp/backfill_zufang555_latest.py
+            if [ "$was_active" = 1 ]; then
+              systemctl start qiaolian-v3@collector.service || true
+            fi
+          }
+          trap cleanup EXIT
+
+          cd /opt/qiaolian_v3/current
+          BACKFILL_SOURCE_NAME=zufang555 \
+          BACKFILL_TARGET_GROUPS=50 \
+          BACKFILL_FETCH_LIMIT=1200 \
+          python3 /tmp/backfill_zufang555_latest.py
+
+          if [ "$was_active" = 1 ]; then
+            systemctl start qiaolian-v3@collector.service
+            was_active=0
+          fi
+          systemctl is-active qiaolian-v3@collector.service || true
+          REMOTE
