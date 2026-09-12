@@ -34,6 +34,31 @@ def _feature_present(text: str, aliases: tuple[str, ...]) -> bool:
     return False
 
 
+def _pet_allowed(text: str) -> bool:
+    """Return true only when a clause explicitly allows pets.
+
+    Pet wording needs clause-aware handling because ``不可养宠物`` contains the
+    positive substring ``可养宠物``.  A generic prefix check therefore cannot
+    safely distinguish it from an affirmative statement.
+    """
+    for clause in re.split(r"[\n，,；;。.!！？]+", text):
+        if not clause or not re.search(r"宠物", clause, re.I):
+            continue
+        negative = (
+            r"(?:不允许|不可以|不可|不能|禁止|不准)\s*(?:养|带)?\s*宠物",
+            r"宠物[^\n，,；;。.!！？]{0,8}(?:不允许|不可以|不可|不能|禁止|不准)",
+        )
+        if any(re.search(pattern, clause, re.I) for pattern in negative):
+            continue
+        positive = (
+            r"(?:允许|可以|可)\s*(?:养|带)?\s*宠物",
+            r"宠物友好",
+        )
+        if any(re.search(pattern, clause, re.I) for pattern in positive):
+            return True
+    return False
+
+
 def _weekly_cleaning(text: str) -> int | None:
     patterns = (
         # 每周两次保洁 / 一周2次打扫
@@ -127,12 +152,13 @@ def extract_adviser_signals(raw_text: str, facts: dict[str, Any] | None = None) 
         ("coworking", ("共享办公", "coworking")),
         ("concierge", ("管家服务", "礼宾服务", "前台管家", "礼宾")),
         ("parking", ("停车位", "停车场", "车位")),
-        ("pet_allowed", ("可养宠物", "允许养宠物", "宠物友好", "可以养宠物", "可带宠物入住")),
         ("large_layout", ("大户型", "大平层", "超大户型")),
     )
     for tag, aliases in feature_rules:
         if _feature_present(text, aliases):
             signals.append(tag)
+    if _pet_allowed(text):
+        signals.append("pet_allowed")
 
     facts = dict(facts or {})
     property_type = str(facts.get("property_type") or "").lower()
