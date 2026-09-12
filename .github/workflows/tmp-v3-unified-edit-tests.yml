@@ -21,5 +21,7 @@ jobs:
         run: |
           pytest -q \
             tests/test_telegram_publication_edit.py \
-            tests/test_v3_delivery.py \
-            tests/test_v3_package_service.py
+            tests/v3_core/test_telegram_adapter.py \
+            tests/v3_core/test_delivery_coordinator.py \
+            tests/v3_core/test_delivery_state_and_instances.py \
+            tests/v3_core/test_frozen_package_service.py
