@@ -64,7 +64,7 @@ class PackageBuildService:
             listing=listing,
             offer=offer,
             public_listing_id=public_id,
-            status=str(listing.get("inventory_status") or "active"),
+            status=str(listing.get("inventory_status") or "pending"),
             adviser_note=adviser_copy,
         )
         actions = {
@@ -85,13 +85,7 @@ class PackageBuildService:
             "offer_id": str(offer_id),
             "canonical_record_id": str(canonical["canonical_record_id"]),
             "canonical_facts_hash": str(canonical["facts_hash"]),
-            # Freeze the complete canonical evidence used to build this public
-            # product. User Bot detail/adviser copy must never reach back into a
-            # later canonical row and silently change what an existing channel
-            # publication means.
             "canonical_facts": facts,
-            # Freeze the exact public wording as well.  The User Bot reads this
-            # copy from the package so channel, preview and detail stay identical.
             "adviser_copy": adviser_copy,
             "listing": {
                 key: listing.get(key)
