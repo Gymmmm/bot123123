@@ -221,7 +221,7 @@ def test_channel_caption_missing_fields_leave_no_empty_separators():
         public_listing_id="QL-PP-A2B3",
     )
     assert "🏡 BKK1｜3房" in text
-    assert "🏢 排屋｜12楼" in text
+    assert "🏢 排屋｜12层楼" in text
     assert "🗝️ 一年起租" in text
     assert "｜｜" not in text
     assert "｜\n" not in text
