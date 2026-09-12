@@ -57,6 +57,7 @@ class PackageBuildService:
             offer=offer,
             public_listing_id=public_id,
             status=str(listing.get("inventory_status") or "active"),
+            canonical_facts=facts,
         )
         actions = {
             action: channel_action_url(
