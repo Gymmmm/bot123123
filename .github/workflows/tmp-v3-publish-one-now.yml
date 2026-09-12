@@ -33,7 +33,7 @@ jobs:
           printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
           cp "$RUNNER_TEMP/known_hosts" "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
-      - name: Publish exactly one ready V3 listing
+      - name: Publish exactly one valid V3 rental
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -46,7 +46,7 @@ jobs:
           source "$ROOT/runtime.env"
           set +a
           "$ROOT/.venv/bin/python" - <<'PY'
-          import asyncio
+          import asyncio, os, sqlite3
           from telegram import Bot
           from v3_core.publishing.admin_bot import load_settings
           from v3_core.publishing.publisher_app import V3PublisherApplication
@@ -54,15 +54,46 @@ jobs:
           async def main():
               settings = load_settings()
               app = V3PublisherApplication(settings)
-              checked = await app.autopilot.validate_pending(limit=50)
+              app.autopilot.repository.sync_candidates()
+              conn = sqlite3.connect(settings.db_path)
+              conn.row_factory = sqlite3.Row
+              rows = conn.execute('''
+                  SELECT a.offer_id,a.listing_id,a.state,l.public_listing_id
+                  FROM publisher_auto_items_v3 a
+                  JOIN listing_offers o ON o.offer_id=a.offer_id
+                  JOIN listings_v3 l ON l.listing_id=a.listing_id
+                  LEFT JOIN publication_instances p
+                    ON p.offer_id=a.offer_id AND p.platform='telegram' AND p.channel_chat_id=?
+                  WHERE o.offer_type='rent'
+                    AND o.offer_status='active'
+                    AND COALESCE(o.publication_policy,'')='telegram_rent'
+                    AND p.instance_id IS NULL
+                  ORDER BY CASE a.state WHEN 'queued' THEN 0 ELSE 1 END,
+                           a.updated_at DESC,a.offer_id ASC
+                  LIMIT 30
+              ''',(settings.channel_chat_id,)).fetchall()
+              conn.close()
+              print('PUBLISH_ONE_CANDIDATES', len(rows))
+              if not rows:
+                  raise SystemExit('PUBLISH_ONE_NO_CANDIDATE')
+
               bot = Bot(token=settings.token)
               await bot.initialize()
               try:
-                  result = await app.autopilot.process_one(bot=bot, origin='manual_oneoff')
-                  print('PUBLISH_ONE_RESULT', result)
-                  status = str(getattr(result, 'status', '') or '')
-                  if status not in {'published', 'already_published'}:
-                      raise SystemExit('PUBLISH_ONE_NO_SEND status=' + status)
+                  for row in rows:
+                      offer_id = str(row['offer_id'])
+                      print('PUBLISH_ONE_TRY', offer_id, row['listing_id'], row['public_listing_id'], row['state'])
+                      result = await app.autopilot.process_one(
+                          bot=bot,
+                          force_offer_id=offer_id,
+                          origin='manual_oneoff',
+                      )
+                      print('PUBLISH_ONE_RESULT', result)
+                      status = str(getattr(result, 'status', '') or '')
+                      if status == 'published':
+                          print('PUBLISH_ONE_DONE', getattr(result,'listing_id',''), getattr(result,'offer_id',''), getattr(result,'channel_message_id',''))
+                          return
+                  raise SystemExit('PUBLISH_ONE_NONE_PUBLISHED')
               finally:
                   await bot.shutdown()
 
