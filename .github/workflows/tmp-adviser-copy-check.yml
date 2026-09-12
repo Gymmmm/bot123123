@@ -31,3 +31,5 @@ jobs:
         run: |
           python -m compileall -q v3_core tests/v3_core run_v3_collector.py run_v3_canonical_worker.py run_v3_publisher_bot.py run_v3_user_bot.py run_v3_preflight.py
           python -m pytest -q tests/v3_core
+
+# rerun latest adviser-copy candidate
