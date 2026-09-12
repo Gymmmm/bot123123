@@ -9,6 +9,7 @@ permissions:
 jobs:
   edit-existing:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     env:
       PROD_HOST: 50.114.74.120
       PROD_PORT: '22'
@@ -33,7 +34,7 @@ jobs:
           printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
           cp "$RUNNER_TEMP/known_hosts" "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
-      - name: Edit 3207 backward from zufang555 7734..7448
+      - name: Redo from latest message at two per minute
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -49,8 +50,10 @@ jobs:
 
           DB=Path(os.environ.get('DB_PATH','/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db')).resolve()
           TOKEN=os.environ['PUBLISHER_BOT_TOKEN']; CHAT=os.environ['CHANNEL_ID']
-          START_TARGET=3207; LOW,HIGH=7448,7734
-          BATCH='edit_existing_3207_backward_20260912'
+          START_TARGET=3208
+          LOW,HIGH=7448,7734
+          INTERVAL_SECONDS=30
+          BATCH='redo_existing_from_3208_two_per_minute_20260912'
 
           def anchor(row):
               try: return int(json.loads(row['raw_meta_json'] or '{}').get('anchor_message_id') or 0)
@@ -70,7 +73,7 @@ jobs:
                           except Exception: obj=None
                       if obj and obj.get('error_code')==429:
                           retry=int((obj.get('parameters') or {}).get('retry_after') or 5)
-                          print(f'RATE_LIMIT method={method} sleep={retry+2}')
+                          print(f'RATE_LIMIT method={method} sleep={retry+2}', flush=True)
                           time.sleep(retry+2)
                           continue
                       if obj: return obj
@@ -93,32 +96,47 @@ jobs:
           rows=conn.execute("SELECT id,source_post_id,source_url,raw_meta_json,parse_status FROM source_posts WHERE source_name='zufang555'").fetchall()
           selected=[r for r in rows if LOW<=anchor(r)<=HIGH]
           selected.sort(key=lambda r:(anchor(r),int(r['id'])),reverse=True)
-          print(f'EDIT_BEGIN selected={len(selected)} source={HIGH}..{LOW} target_start={START_TARGET}')
+          print(f'REDO_BEGIN selected={len(selected)} source={HIGH}..{LOW} target_start={START_TARGET} interval={INTERVAL_SECONDS}s', flush=True)
+
+          backup=Path('/opt/qiaolian_v3/runtime/deploy_backups/pre-redo-existing-from-3208-two-per-minute-20260912.sqlite3')
+          with sqlite3.connect(str(DB)) as src, sqlite3.connect(str(backup)) as dst: src.backup(dst)
 
           edited=unchanged=skipped=no_offer=no_listing=failed=0; mappings=[]
+          last_attempt_at=0.0
           for idx,s in enumerate(selected):
               msg_id=START_TARGET-idx; a=anchor(s); source_pk=int(s['id'])
               cr=conn.execute('SELECT * FROM canonical_records WHERE source_post_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1',(str(source_pk),)).fetchone()
-              if not cr: skipped+=1; mappings.append((a,msg_id,'skip:no_canonical')); continue
+              if not cr:
+                  skipped+=1; mappings.append((a,msg_id,'skip:no_canonical')); print('MAP',a,msg_id,'skip:no_canonical',flush=True); continue
               listing=conn.execute('SELECT * FROM listings_v3 WHERE canonical_record_id=? ORDER BY updated_at DESC LIMIT 1',(cr['canonical_record_id'],)).fetchone()
-              if not listing: no_listing+=1; mappings.append((a,msg_id,'skip:no_listing')); continue
+              if not listing:
+                  no_listing+=1; mappings.append((a,msg_id,'skip:no_listing')); print('MAP',a,msg_id,'skip:no_listing',flush=True); continue
               offer=conn.execute("SELECT * FROM listing_offers WHERE listing_id=? AND offer_type='rent' AND offer_status='active' ORDER BY updated_at DESC LIMIT 1",(listing['listing_id'],)).fetchone()
-              if not offer: no_offer+=1; mappings.append((a,msg_id,'skip:no_offer')); continue
+              if not offer:
+                  no_offer+=1; mappings.append((a,msg_id,'skip:no_offer')); print('MAP',a,msg_id,'skip:no_offer',flush=True); continue
+
+              wait=max(0.0, INTERVAL_SECONDS-(time.monotonic()-last_attempt_at)) if last_attempt_at else 0.0
+              if wait:
+                  print(f'PACE target={msg_id} sleep={wait:.1f}',flush=True)
+                  time.sleep(wait)
+
               conn.execute("UPDATE listings_v3 SET inventory_status='pending',updated_at=CURRENT_TIMESTAMP WHERE listing_id=?",(listing['listing_id'],))
               conn.execute("UPDATE publisher_auto_items_v3 SET state='ignored',ignored=1,reason_code='existing_post_edit',reason_text=?,updated_at=CURRENT_TIMESTAMP WHERE offer_id=? AND state!='published'",(BATCH,offer['offer_id']))
               listing_dict=dict(listing); listing_dict['inventory_status']='pending'
               text=render_channel_caption(listing=listing_dict,offer=dict(offer),public_listing_id=listing['public_listing_id'],status='pending')
               res,mode=edit_existing(msg_id,text)
+              last_attempt_at=time.monotonic()
               if res.get('ok'):
                   if mode=='unchanged': unchanged+=1
                   else: edited+=1
-                  mappings.append((a,msg_id,f"ok:{mode}:{listing['public_listing_id']}"))
+                  status=f"ok:{mode}:{listing['public_listing_id']}"
+                  mappings.append((a,msg_id,status)); print('MAP',a,msg_id,status,flush=True)
                   conn.execute("UPDATE publication_instances SET post_text=?,updated_at=CURRENT_TIMESTAMP WHERE platform='telegram' AND channel_message_id=?",(text,str(msg_id)))
               else:
-                  failed+=1; mappings.append((a,msg_id,'fail:'+str(res.get('description',''))[:140]))
-              time.sleep(1.2)
-          conn.commit()
-          for x in mappings: print('MAP',*x)
-          print(f'EDIT_RESULT selected={len(selected)} edited={edited} unchanged={unchanged} skipped={skipped} no_listing={no_listing} no_offer={no_offer} failed={failed} target_end={START_TARGET-len(selected)+1 if selected else START_TARGET}')
+                  failed+=1; status='fail:'+str(res.get('description',''))[:140]
+                  mappings.append((a,msg_id,status)); print('MAP',a,msg_id,status,flush=True)
+              conn.commit()
+
+          print(f'REDO_RESULT selected={len(selected)} edited={edited} unchanged={unchanged} skipped={skipped} no_listing={no_listing} no_offer={no_offer} failed={failed} target_end={START_TARGET-len(selected)+1 if selected else START_TARGET}',flush=True)
           if failed: raise SystemExit(2)
           PY
