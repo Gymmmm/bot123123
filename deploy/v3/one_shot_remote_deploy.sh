@@ -92,7 +92,7 @@ done
 
 # One-time scoped rebuild hook. It is guarded by both the deployed SHA and a durable marker.
 REBUILD_MARKER="$ROOT/.rebuild_zufang555_20260912_done"
-if [ "$EXPECTED_SHA" = "523577c39824de4c39024e1b592bbbdbe2f2c45e" ] && [ ! -f "$REBUILD_MARKER" ]; then
+if [ "$EXPECTED_SHA" = "67c742f840728a47b94daab8ce972fd17e1ef1eb" ] && [ ! -f "$REBUILD_MARKER" ]; then
   echo "REBUILD_HOOK_BEGIN source=zufang555 target=50"
   rebuild_backup="$BACKUP_DIR/pre-rebuild-zufang555-20260912.sqlite3"
   "$VENV/bin/python" - "$DB" "$rebuild_backup" <<'PY'
