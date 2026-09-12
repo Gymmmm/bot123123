@@ -7,16 +7,18 @@ on:
 permissions:
   contents: read
 jobs:
-  smoke-edit:
+  smoke-edit-10:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     env:
       PROD_HOST: 50.114.74.120
       PROD_PORT: '22'
       PROD_SSH_USER: root
       EXPECTED_PROD_SHA: aaf7b3d8365641557d866aef798447191308d6dc
       CANDIDATE_SHA: 0b25789e53df37e6fc14f995335cb8e2e1e6cd51
-      TARGET_MESSAGE_ID: '3208'
+      MAX_MESSAGE_ID: '3208'
+      LIMIT_COUNT: '10'
+      INTERVAL_SECONDS: '30'
     steps:
       - uses: actions/checkout@v4
       - name: Verify production host fingerprint
@@ -36,12 +38,12 @@ jobs:
           printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
           cp "$RUNNER_TEMP/known_hosts" "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
-      - name: Re-edit one durable publication through candidate adapter
+      - name: Rebuild and re-edit ten durable publications
         shell: bash
         run: |
           set -Eeuo pipefail
-          cat <<'PY' | ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes "$PROD_SSH_USER@$PROD_HOST" "EXPECTED_PROD_SHA='$EXPECTED_PROD_SHA' CANDIDATE_SHA='$CANDIDATE_SHA' TARGET_MESSAGE_ID='$TARGET_MESSAGE_ID' bash -lc 'set -a; source /opt/qiaolian_v3/runtime.env; set +a; /opt/qiaolian_v3/.venv/bin/python -'"
-          import asyncio, json, os, shutil, sqlite3, subprocess, sys
+          cat <<'PY' | ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes "$PROD_SSH_USER@$PROD_HOST" "EXPECTED_PROD_SHA='$EXPECTED_PROD_SHA' CANDIDATE_SHA='$CANDIDATE_SHA' MAX_MESSAGE_ID='$MAX_MESSAGE_ID' LIMIT_COUNT='$LIMIT_COUNT' INTERVAL_SECONDS='$INTERVAL_SECONDS' bash -lc 'set -a; source /opt/qiaolian_v3/runtime.env; set +a; /opt/qiaolian_v3/.venv/bin/python -'"
+          import asyncio, json, os, shutil, sqlite3, subprocess, sys, time
           from pathlib import Path
 
           deployed=Path('/opt/qiaolian_v3/.deployed_sha').read_text().strip()
@@ -55,53 +57,103 @@ jobs:
           sys.path.insert(0,str(root)); os.chdir(root)
 
           db=Path(os.environ.get('DB_PATH','/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db')).resolve()
-          conn=sqlite3.connect(str(db)); conn.row_factory=sqlite3.Row
-          cols={r['name'] for r in conn.execute('PRAGMA table_info(publication_instances)')}
-          required={'instance_id','package_id','listing_id','offer_id','platform','channel_chat_id','channel_message_id','publish_status'}
-          if not required.issubset(cols):
-              raise SystemExit('SMOKE_FATAL incompatible_publication_instances_schema:'+','.join(sorted(cols)))
-
-          target=os.environ['TARGET_MESSAGE_ID']
-          row=conn.execute("SELECT * FROM publication_instances WHERE platform='telegram' AND channel_message_id=? ORDER BY updated_at DESC LIMIT 1",(target,)).fetchone()
-          if row is None:
-              raise SystemExit('SMOKE_FATAL publication_instance_not_found:'+target)
-          pub=dict(row)
-          print('SMOKE_TARGET',json.dumps({k:pub.get(k) for k in ('instance_id','package_id','listing_id','offer_id','channel_chat_id','channel_message_id','publish_status')},ensure_ascii=False,sort_keys=True),flush=True)
+          backup=Path('/opt/qiaolian_v3/runtime/deploy_backups/pre-smoke-reedit-10-20260913.sqlite3')
+          backup.parent.mkdir(parents=True,exist_ok=True)
+          shutil.copy2(db,backup)
 
           from telegram import Bot
           from v3_core.storage.inventory_reader import InventoryReader
           from v3_core.publishing.package_store import FrozenPackageStore
+          from v3_core.publishing.package_service import PackageBuildService
           from v3_core.publishing.publication_instances import PublicationInstanceRepository
           from v3_core.publishing.delivery_state import PublicationDeliveryStateRepository
           from v3_core.publishing.delivery_coordinator import PublicationDeliveryCoordinator
-          from v3_core.publishing.channel_renderer import render_channel_caption
-          from v3_core.publishing.telegram_adapter import TelegramChannelAdapter, edit_existing_publication, build_channel_keyboard
+          from v3_core.publishing.telegram_adapter import TelegramChannelAdapter
+
+          conn=sqlite3.connect(str(db),timeout=30); conn.row_factory=sqlite3.Row
+          conn.execute('PRAGMA busy_timeout=30000')
+          chat=str(os.environ['CHANNEL_ID'])
+          rows=conn.execute("""
+              SELECT * FROM publication_instances
+              WHERE platform='telegram' AND channel_chat_id=?
+                AND publish_status='published'
+                AND CAST(channel_message_id AS INTEGER)<=?
+              ORDER BY CAST(channel_message_id AS INTEGER) DESC
+              LIMIT ?
+          """,(chat,int(os.environ['MAX_MESSAGE_ID']),int(os.environ['LIMIT_COUNT']))).fetchall()
+          if len(rows)!=int(os.environ['LIMIT_COUNT']):
+              raise SystemExit(f'SMOKE_FATAL expected_10_publications_got_{len(rows)}')
 
           reader=InventoryReader(db); packages=FrozenPackageStore(db)
           publications=PublicationInstanceRepository(db); deliveries=PublicationDeliveryStateRepository(db)
           coordinator=PublicationDeliveryCoordinator(reader=reader,packages=packages,deliveries=deliveries,publications=publications)
-          package=packages.verify_frozen(pub['package_id'])
-          listing=reader.listing(package.listing_id); offer=reader.offer(package.offer_id)
-          fresh=render_channel_caption(listing=listing,offer=offer,public_listing_id=str(listing.get('public_listing_id') or ''),status=str(listing.get('inventory_status') or 'pending'),adviser_note='')
-          if fresh!=package.post_text:
-              print('SMOKE_BLOCK stale_frozen_caption',flush=True)
-              print('PACKAGE_HEAD',package.post_text[:220].replace('\n',' | '),flush=True)
-              print('FRESH_HEAD',fresh[:220].replace('\n',' | '),flush=True)
-              raise SystemExit(22)
+          builder=PackageBuildService(reader=reader,store=packages,user_bot_username=os.environ['USER_BOT_USERNAME'])
+          token=os.environ['PUBLISHER_BOT_TOKEN']
+          interval=float(os.environ['INTERVAL_SECONDS'])
 
-          status=str(listing.get('inventory_status') or 'pending')
-          keyboard=build_channel_keyboard(package.actions,inventory_status=status)
-          print('SMOKE_PRECHECK',json.dumps({'public_listing_id':listing.get('public_listing_id'),'inventory_status':status,'keyboard_rows':len(keyboard.inline_keyboard),'caption_matches_live_renderer':True},ensure_ascii=False,sort_keys=True),flush=True)
-          token=os.environ.get('PUBLISHER_BOT_TOKEN','').strip()
-          if not token: raise SystemExit('SMOKE_FATAL missing_publisher_bot_token')
+          def restore_old(package_id,status):
+              with sqlite3.connect(str(db),timeout=30) as c:
+                  c.execute("UPDATE publication_packages_v3 SET status=?,updated_at=CURRENT_TIMESTAMP WHERE package_id=? AND status='rebuild_hold'",(status,package_id))
+                  c.commit()
+
+          def build_replacement(pub):
+              old=packages.verify_frozen(pub['package_id'])
+              old_status=old.status
+              if old_status not in {'approved','published'}:
+                  raise RuntimeError('old_package_not_frozen:'+old_status)
+              with sqlite3.connect(str(db),timeout=30) as c:
+                  c.execute('BEGIN IMMEDIATE')
+                  cur=c.execute("UPDATE publication_packages_v3 SET status='rebuild_hold',updated_at=CURRENT_TIMESTAMP WHERE package_id=? AND status=?",(old.package_id,old_status))
+                  if cur.rowcount!=1: raise RuntimeError('failed_to_hold_old_package')
+                  c.commit()
+              try:
+                  new=builder.build(
+                      listing_id=old.listing_id,
+                      offer_id=old.offer_id,
+                      cover_style=old.cover_style,
+                      cover_path=old.cover_path,
+                      gallery=list(old.gallery),
+                      source_identity=old.source_identity,
+                  )
+              finally:
+                  restore_old(old.package_id,old_status)
+              return old,new
+
+          def finalize(pub,old,new,caption):
+              with sqlite3.connect(str(db),timeout=30) as c:
+                  c.execute('BEGIN IMMEDIATE')
+                  c.execute("UPDATE publication_packages_v3 SET status='superseded',updated_at=CURRENT_TIMESTAMP WHERE package_id=?",(old.package_id,))
+                  c.execute("UPDATE publication_packages_v3 SET status='published',published_at=COALESCE(published_at,CURRENT_TIMESTAMP),updated_at=CURRENT_TIMESTAMP WHERE package_id=? AND status='package_ready'",(new.package_id,))
+                  c.execute("UPDATE publication_instances SET package_id=?,listing_id=?,offer_id=?,post_text=?,updated_at=CURRENT_TIMESTAMP WHERE instance_id=?",(new.package_id,new.listing_id,new.offer_id,caption,pub['instance_id']))
+                  c.commit()
 
           async def main():
-              bot=Bot(token=token)
-              adapter=TelegramChannelAdapter(bot)
+              bot=Bot(token=token); adapter=TelegramChannelAdapter(bot)
+              ok=0; failed=0; last=0.0
+              print('SMOKE10_BEGIN', [r['channel_message_id'] for r in rows], flush=True)
               try:
-                  result=await edit_existing_publication(coordinator=coordinator,adapter=adapter,channel_chat_id=str(pub['channel_chat_id']),channel_message_id=str(pub['channel_message_id']))
-                  print('SMOKE_EDIT_OK',json.dumps(result,ensure_ascii=False,sort_keys=True),flush=True)
+                  for row in rows:
+                      pub=dict(row)
+                      if last:
+                          wait=max(0.0,interval-(time.monotonic()-last))
+                          if wait: await asyncio.sleep(wait)
+                      try:
+                          old,new=build_replacement(pub)
+                          command=coordinator._command_for_package(
+                              package_id=new.package_id,
+                              channel_chat_id=pub['channel_chat_id'],
+                              attempt_id='edit:'+pub['instance_id'],
+                          )
+                          result=await adapter.edit(command,message_id=pub['channel_message_id'])
+                          finalize(pub,old,new,str(result.get('caption') or command.caption))
+                          ok+=1; last=time.monotonic()
+                          print('SMOKE10_OK',pub['channel_message_id'],new.package_id,result.get('edit_mode'),command.inventory_status,flush=True)
+                      except Exception as exc:
+                          failed+=1; last=time.monotonic()
+                          print('SMOKE10_FAIL',pub['channel_message_id'],type(exc).__name__,str(exc)[:220],flush=True)
+                  print(f'SMOKE10_RESULT selected={len(rows)} ok={ok} failed={failed} backup={backup}',flush=True)
               finally:
                   await bot.shutdown()
+              if failed: raise SystemExit(2)
           asyncio.run(main())
           PY
