@@ -56,16 +56,16 @@ def _normalize_contract(value: Any) -> str:
     return re.sub(r"^(?:租期|合同)\s*[:：]?\s*", "", text)
 
 
-def _property_line(value: Any) -> str:
+def _property_name(value: Any) -> str:
     raw = _clean(value, 24)
     identity = raw.lower()
     if any(token in identity for token in ("villa", "别墅")):
-        return "🏛️ 别墅"
+        return "别墅"
     if any(token in identity for token in ("排屋", "townhouse", "town house", "row house", "shophouse")):
-        return "🏘️ 排屋"
+        return "排屋"
     if any(token in identity for token in ("公寓", "apartment", "condo", "condominium")):
-        return "🏢 公寓"
-    return f"🏠 {raw}" if raw else ""
+        return "公寓"
+    return raw
 
 
 def _status_line(status: str, public_id: str) -> str:
@@ -79,6 +79,33 @@ def _adviser_block(value: str) -> str:
     if not lines:
         return ""
     return "💬 侨联说\n" + "\n".join(html.escape(line) for line in lines)
+
+
+def _hashtag(value: str) -> str:
+    text = re.sub(r"[^0-9A-Za-z\u4e00-\u9fff]+", "", str(value or "").strip())
+    return f"#{text}" if text else ""
+
+
+def _layout_tag(value: Any) -> str:
+    raw = _clean(value, 20)
+    match = re.search(r"\d+房", raw)
+    return match.group(0) if match else raw
+
+
+def _price_tag(amount: int) -> str:
+    if amount <= 0:
+        return ""
+    if amount <= 400:
+        return "400以下"
+    if amount <= 600:
+        return "400至600"
+    if amount <= 800:
+        return "600至800"
+    if amount <= 1200:
+        return "800至1200"
+    if amount <= 1500:
+        return "1200至1500"
+    return "1500以上"
 
 
 def render_channel_caption(
@@ -99,10 +126,8 @@ def render_channel_caption(
     if not heading:
         heading = "金边房源"
     property_type = _clean(listing.get("property_type"), 24)
-    layout = _clean(
-        display_layout(listing.get("layout") or "", property_type),
-        20,
-    )
+    raw_layout = listing.get("layout") or ""
+    layout = _clean(display_layout(raw_layout, property_type), 20)
     heading_line = "｜".join(value for value in (heading, layout) if value)
 
     offer_type = str(offer.get("offer_type") or "rent").strip().lower()
@@ -120,28 +145,43 @@ def render_channel_caption(
 
     size = _display_size(listing.get("size_sqm") or listing.get("size"))
     floor = _clean(display_floor(_clean(listing.get("floor"), 16)), 18)
-    size_floor = "｜".join(value for value in (size, floor) if value)
+    property_bits = [value for value in (_property_name(property_type), size, floor) if value]
 
     deposit = _clean(offer.get("payment_terms") or offer.get("deposit_terms"), 20)
     contract = _normalize_contract(offer.get("contract_term"))
     deposit_contract = "｜".join(value for value in (deposit, contract) if value)
 
     effective_status = str(status if status is not None else listing.get("inventory_status") or "active")
-    blocks: list[str] = [f"🏡 {html.escape(heading_line)}"]
+
+    sections: list[str] = []
+    top_lines = [f"🏡 {html.escape(heading_line)}"]
     if price_text:
-        blocks.append(f"💵 {html.escape(price_text)}")
-    property_display = _property_line(property_type)
-    if property_display:
-        blocks.append(html.escape(property_display))
-    if size_floor:
-        blocks.append(f"📐 {html.escape(size_floor)}")
+        top_lines.append(f"💵 {html.escape(price_text)}")
+    sections.append("\n".join(top_lines))
+
+    fact_lines: list[str] = []
+    if property_bits:
+        fact_lines.append(f"🏢 {html.escape('｜'.join(property_bits))}")
     if offer_type == "rent" and deposit_contract:
-        blocks.append(f"🗝️ {html.escape(deposit_contract)}")
-    blocks.append(html.escape(_status_line(effective_status, public_id)))
+        fact_lines.append(f"🗝️ {html.escape(deposit_contract)}")
+    if fact_lines:
+        sections.append("\n".join(fact_lines))
+
+    sections.append(html.escape(_status_line(effective_status, public_id)))
+
+    tags = [
+        _hashtag(area),
+        _hashtag(_layout_tag(raw_layout)),
+        _hashtag(_price_tag(amount)),
+    ]
+    tags = [tag for tag in tags if tag]
+    if tags:
+        sections.append(" ".join(tags))
+
     adviser = _adviser_block(adviser_note)
     if adviser:
-        blocks.append(adviser)
-    return "\n\n".join(blocks).strip()[:1024]
+        sections.append(adviser)
+    return "\n\n".join(sections).strip()[:1024]
 
 
 __all__ = ["render_channel_caption"]
