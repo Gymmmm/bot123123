@@ -1,8 +1,8 @@
-"""Coordinate one approved frozen package across the Telegram send boundary.
+"""Coordinate frozen V3 publications across the Telegram boundary.
 
-No Telegram client is imported here.  The adapter asks for a send command,
-performs the external API call, then records the durable receipt.  Recovery can
-resume from a saved ``sent`` attempt without sending again.
+New sends and existing-post edits both produce ``TelegramSendCommand`` objects.
+The external message identity for edits always comes from ``publication_instances``;
+message-id arithmetic is never part of the publication contract.
 """
 from __future__ import annotations
 
@@ -53,6 +53,27 @@ class PublicationDeliveryCoordinator:
         self.deliveries = deliveries
         self.publications = publications
 
+    def _command_for_package(
+        self,
+        *,
+        package_id: str,
+        channel_chat_id: str,
+        attempt_id: str,
+    ) -> TelegramSendCommand:
+        package = self.packages.verify_frozen(package_id)
+        listing = self.reader.listing(package.listing_id)
+        return TelegramSendCommand(
+            attempt_id=str(attempt_id),
+            package_id=package.package_id,
+            channel_chat_id=str(channel_chat_id),
+            cover_path=package.cover_path,
+            caption=package.post_text,
+            actions=dict(package.actions),
+            inventory_status=str(
+                listing.get("inventory_status") or "pending"
+            ).strip().lower(),
+        )
+
     def prepare_send(
         self, *, package_id: str, channel_chat_id: str
     ) -> TelegramSendCommand:
@@ -85,19 +106,45 @@ class PublicationDeliveryCoordinator:
         if attempt.state not in {"prepared", "failed_before_send"}:
             raise DeliveryBlocked(f"delivery attempt is not sendable: {attempt.state}")
 
-        # Caption/facts remain frozen in the approved package.  Only the live
-        # inventory status is read here so Telegram booking UI cannot expose a
-        # stale appointment action after the listing status changes.
-        listing = self.reader.listing(package.listing_id)
-        return TelegramSendCommand(
-            attempt_id=attempt.attempt_id,
+        return self._command_for_package(
             package_id=package.package_id,
             channel_chat_id=str(channel_chat_id),
-            cover_path=package.cover_path,
-            caption=package.post_text,
-            actions=dict(package.actions),
-            inventory_status=str(listing.get("inventory_status") or "pending").strip().lower(),
+            attempt_id=attempt.attempt_id,
         )
+
+    def prepare_edit(
+        self,
+        *,
+        channel_chat_id: str,
+        channel_message_id: str | int,
+    ) -> tuple[PublicationInstance, TelegramSendCommand]:
+        """Resolve one existing Telegram post and prepare the normal frozen output.
+
+        The package may already be published or archived/superseded: the durable
+        publication instance is the authority for which frozen product belongs to
+        the external Telegram message. Only inventory status is live at edit time.
+        """
+        publication = self.publications.get_for_channel_message(
+            channel_chat_id=str(channel_chat_id),
+            channel_message_id=str(channel_message_id),
+            platform="telegram",
+        )
+        if publication is None:
+            raise DeliveryBlocked("telegram publication instance not found")
+        package = self.packages.verify_frozen(publication.package_id)
+        if package.listing_id != publication.listing_id:
+            raise DeliveryBlocked("publication listing does not match frozen package")
+        if publication.offer_id and package.offer_id != publication.offer_id:
+            raise DeliveryBlocked("publication offer does not match frozen package")
+        command = self._command_for_package(
+            package_id=package.package_id,
+            channel_chat_id=publication.channel_chat_id,
+            attempt_id=f"edit:{publication.instance_id}",
+        )
+        return publication, command
+
+    def record_edit(self, instance_id: str, *, post_text: str) -> PublicationInstance:
+        return self.publications.record_edit(instance_id, post_text=post_text)
 
     def mark_sending(self, attempt_id: str) -> None:
         self.deliveries.mark_sending(attempt_id)
