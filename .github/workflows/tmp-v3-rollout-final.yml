@@ -1,0 +1,33 @@
+name: tmp-v3-rollout-final
+on:
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/tmp-v3-rollout-final.yml'
+permissions:
+  contents: write
+jobs:
+  stage-rollout:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Pin tested candidate and rebuild hook
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          OLD='d87b6a740411d74a1799bce2af26cf7ade5c429f'
+          NEW='aaf7b3d8365641557d866aef798447191308d6dc'
+          sed -i "s/$OLD/$NEW/g" .github/workflows/deploy-v3-realtime-collector-once.yml deploy/v3/one_shot_remote_deploy.sh
+          grep -F "EXPECTED_SHA: $NEW" .github/workflows/deploy-v3-realtime-collector-once.yml
+          grep -F "if [ \"\$EXPECTED_SHA\" = \"$NEW\" ]" deploy/v3/one_shot_remote_deploy.sh
+          git config user.name 'qiaolian-ci'
+          git config user.email 'qiaolian-ci@users.noreply.github.com'
+          git add .github/workflows/deploy-v3-realtime-collector-once.yml deploy/v3/one_shot_remote_deploy.sh
+          git commit -m 'deploy(v3): roll out tested pending-status contract'
+          git push origin HEAD:master
+          echo "MASTER_SHA=$(git rev-parse HEAD)"
