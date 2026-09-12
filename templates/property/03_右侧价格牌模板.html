@@ -5,6 +5,20 @@
 <meta name="viewport" content="width=1600">
 <title>侨联封面 · 全 Noto Sans SC 锁定版</title>
 <style>
+  /* 字体：全 Noto Sans SC（不要 Manrope） */
+  @font-face {
+    font-family: "Noto Sans SC";
+    src: local("Noto Sans SC"), local("Noto Sans CJK SC");
+    font-weight: 700;
+    font-display: block;
+  }
+  @font-face {
+    font-family: "Noto Sans SC";
+    src: local("Noto Sans SC"), local("Noto Sans CJK SC");
+    font-weight: 400;
+    font-display: block;
+  }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
     width: 1600px;
@@ -18,7 +32,7 @@
     width: 1600px;
     height: 1200px;
     overflow: hidden;
-    font-family: "Noto Sans CJK SC", "Noto Sans SC", sans-serif;
+    font-family: "Noto Sans SC", "Noto Sans CJK SC", sans-serif;
   }
 
   .bg {
@@ -32,9 +46,7 @@
 
   .leftShade {
     position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
+    left: 0; top: 0; bottom: 0;
     width: 50%;
     background: linear-gradient(
       90deg,
@@ -44,6 +56,7 @@
     );
   }
 
+  /* 品牌区 */
   .brand {
     position: absolute;
     left: 48px;
@@ -63,6 +76,7 @@
     letter-spacing: 0.16em;
   }
 
+  /* 左侧主信息：原位 top=300，不上移 */
   .main {
     position: absolute;
     left: 48px;
@@ -95,6 +109,7 @@
   }
   .info b { font-weight: 700; }
 
+  /* 右下价签：上移 bottom=100；米白卡；租金 + $金额/月 同行 */
   .pricebox {
     position: absolute;
     right: 48px;
@@ -134,18 +149,18 @@
     </div>
 
     <div class="main">
-      <div class="title" id="project" data-autofit="54">{{PROJECT}}</div>
-      <div class="sub" id="layout" data-field="layout" data-autofit="34">{{LAYOUT}}</div>
+      <div class="title" id="project">{{PROJECT}}</div>
+      <div class="sub" id="layout">{{LAYOUT}}</div>
       <div class="info">
         <div data-field="area">📍 <b id="area">{{AREA}}</b></div>
         <div data-fields="size,floor"><span data-field="size">📐 <b id="size">{{SIZE}}</b></span><span data-field="floor"> ｜ 🏢 <b id="floor">{{FLOOR}}</b></span></div>
-        <div data-fields="h1,h2,h3">✨ <span data-field="h1" id="h1">{{H1}}</span><span data-field="h2"> · <span id="h2">{{H2}}</span></span><span data-field="h3"> · <span id="h3">{{H3}}</span></span></div>
+        <div data-fields="h1,h2,h3">✨ <span id="highlights">{{HIGHLIGHTS}}</span></div>
       </div>
     </div>
 
     <div class="pricebox">
       <div class="label">租金</div>
-      <div class="price" id="price_line" data-autofit="58">{{PRICE_LINE}}</div>
+      <div class="price" id="price_line">{{PRICE_LINE}}</div>
     </div>
   </div>
 </body>
