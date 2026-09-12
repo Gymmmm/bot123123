@@ -20,6 +20,7 @@ from v3_core.parser.worker import CanonicalWorker  # noqa: E402
 DB = Path(os.getenv('DB_PATH', '/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db')).resolve()
 SOURCE_NAME = os.getenv('REBUILD_SOURCE_NAME', 'zufang555').strip()
 TARGET = max(1, int(os.getenv('REBUILD_TARGET_GROUPS', '50') or 50))
+SKIP = max(0, int(os.getenv('REBUILD_SKIP_GROUPS', '0') or 0))
 BATCH = os.getenv('REBUILD_BATCH_ID', 'zufang555_20260912_v2').strip()
 
 
@@ -52,10 +53,10 @@ def main() -> None:
         (SOURCE_NAME,),
     ).fetchall()
     ordered = sorted(rows, key=lambda row: (meta_anchor(row), int(row['id'])), reverse=True)
-    selected = ordered[:TARGET]
+    selected = ordered[SKIP:SKIP + TARGET]
     selected_ids = [int(r['id']) for r in selected]
     if not selected_ids:
-        raise SystemExit('REBUILD_FATAL no_source_rows')
+        raise SystemExit(f'REBUILD_FATAL no_source_rows skip={SKIP} target={TARGET}')
 
     worker = CanonicalWorker(str(DB))
     processed = failed = blocked_media = 0
@@ -83,7 +84,7 @@ def main() -> None:
 
     if not materialized_listing_ids:
         print(
-            f'REBUILD_RESULT source={SOURCE_NAME} selected={len(selected_ids)} processed={processed} '
+            f'REBUILD_RESULT source={SOURCE_NAME} skip={SKIP} selected={len(selected_ids)} processed={processed} '
             f'blocked_media={blocked_media} failed={failed} queued=0 archived_publications=0 superseded_packages=0'
         )
         return
@@ -106,8 +107,6 @@ def main() -> None:
         offer_id = str(row['offer_id'])
         listing_id = str(row['listing_id'])
 
-        # Every rebuilt post starts with an unverified room status. The admin
-        # explicitly changes it later to available/reserved/rented as appropriate.
         cur = conn.execute(
             """UPDATE listings_v3 SET inventory_status='pending',updated_at=CURRENT_TIMESTAMP
                WHERE listing_id=?""",
@@ -115,9 +114,6 @@ def main() -> None:
         )
         status_pending += int(cur.rowcount or 0)
 
-        # Rebuild is intentionally routed back through AutoPublishService. New rent
-        # offers start publishable=0/review_required by design; package approval
-        # flips publishable only after the normal strict eligibility checks pass.
         cur = conn.execute(
             """UPDATE publication_instances
                SET publish_status=?,updated_at=CURRENT_TIMESTAMP
@@ -162,7 +158,7 @@ def main() -> None:
     ).fetchone()[0])
     anchors = [meta_anchor(r) for r in selected]
     print(
-        f'REBUILD_RESULT source={SOURCE_NAME} selected={len(selected_ids)} processed={processed} '
+        f'REBUILD_RESULT source={SOURCE_NAME} skip={SKIP} selected={len(selected_ids)} processed={processed} '
         f'blocked_media={blocked_media} failed={failed} listings={len(materialized_listing_ids)} '
         f'offers={len(offer_rows)} queued={queued} queue_total={qcount} status_pending={status_pending} '
         f'archived_publications={archived_publications} superseded_packages={superseded_packages} '
