@@ -38,7 +38,7 @@ jobs:
           printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
           cp "$RUNNER_TEMP/known_hosts" "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
-      - name: Rebuild and re-edit ten durable publications
+      - name: Rebuild and re-edit ten durable publications as pending
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -57,7 +57,7 @@ jobs:
           sys.path.insert(0,str(root)); os.chdir(root)
 
           db=Path(os.environ.get('DB_PATH','/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db')).resolve()
-          backup=Path('/opt/qiaolian_v3/runtime/deploy_backups/pre-smoke-reedit-10-20260913.sqlite3')
+          backup=Path('/opt/qiaolian_v3/runtime/deploy_backups/pre-smoke-reedit-10-pending-20260913.sqlite3')
           backup.parent.mkdir(parents=True,exist_ok=True)
           shutil.copy2(db,backup)
 
@@ -85,6 +85,13 @@ jobs:
                   c.execute('BEGIN IMMEDIATE')
                   cur=c.execute('UPDATE publication_packages_v3 SET status=?,updated_at=CURRENT_TIMESTAMP WHERE package_id=? AND status=?',(new_status,package_id,old_status))
                   if cur.rowcount!=1: raise RuntimeError('package_status_transition_failed')
+                  c.commit()
+
+          def set_inventory_status(listing_id, status):
+              with sqlite3.connect(str(db),timeout=30) as c:
+                  c.execute('BEGIN IMMEDIATE')
+                  cur=c.execute('UPDATE listings_v3 SET inventory_status=?,updated_at=CURRENT_TIMESTAMP WHERE listing_id=?',(status,listing_id))
+                  if cur.rowcount!=1: raise RuntimeError('inventory_status_update_failed')
                   c.commit()
 
           def build_replacement(pub):
@@ -143,21 +150,31 @@ jobs:
                       if last:
                           wait=max(0.0,interval-(time.monotonic()-last))
                           if wait: await asyncio.sleep(wait)
+                      original_inventory=None
                       try:
                           offer=reader.offer(pub['offer_id'])
                           if str(offer.get('offer_type') or '')!='rent' or str(offer.get('offer_status') or '')!='active' or str(offer.get('publication_policy') or '')!='telegram_rent':
                               raise RuntimeError('target_offer_not_currently_publishable')
+                          listing=reader.listing(pub['listing_id'])
+                          original_inventory=str(listing.get('inventory_status') or 'pending')
+                          if original_inventory!='pending':
+                              set_inventory_status(pub['listing_id'],'pending')
                           old,new=build_replacement(pub)
                           command=coordinator._command_for_package(
                               package_id=new.package_id,
                               channel_chat_id=pub['channel_chat_id'],
                               attempt_id='edit:'+pub['instance_id'],
                           )
+                          if command.inventory_status!='pending':
+                              raise RuntimeError('pending_invariant_failed:'+str(command.inventory_status))
                           result=await adapter.edit(command,message_id=pub['channel_message_id'])
                           finalize(pub,old,new,str(result.get('caption') or command.caption))
                           ok+=1; last=time.monotonic()
-                          print('SMOKE10_OK',pub['channel_message_id'],new.package_id,result.get('edit_mode'),command.inventory_status,flush=True)
+                          print('SMOKE10_OK',pub['channel_message_id'],new.package_id,result.get('edit_mode'),command.inventory_status,'from',original_inventory,flush=True)
                       except Exception as exc:
+                          if original_inventory and original_inventory!='pending':
+                              try: set_inventory_status(pub['listing_id'],original_inventory)
+                              except Exception as restore_exc: print('SMOKE10_RESTORE_FAIL',pub['channel_message_id'],type(restore_exc).__name__,str(restore_exc)[:160],flush=True)
                           failed+=1; last=time.monotonic()
                           print('SMOKE10_FAIL',pub['channel_message_id'],type(exc).__name__,str(exc)[:220],flush=True)
                   print(f'SMOKE10_RESULT selected={len(rows)} ok={ok} failed={failed} backup={backup}',flush=True)
