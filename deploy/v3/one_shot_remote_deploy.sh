@@ -90,7 +90,7 @@ done
 [ "$HEALTH_FAILED" -eq 0 ]
 ! journalctl -u qiaolian-v3@collector.service -u qiaolian-v3@canonical.service -u qiaolian-v3@publisher.service -u qiaolian-v3@user.service --since "$ACTIVATED_AT" --no-pager | grep -Eq 'Traceback|ModuleNotFoundError|ImportError|database is locked|no such table|Conflict: terminated by other getUpdates request|Main process exited|Failed with result'
 
-# Pin the corrected helper commit so this one-shot cannot receive a cached master copy.
+# Historical v3 hook retained for idempotency on the original rollout.
 REBUILD_MARKER="$ROOT/.rebuild_zufang555_20260912_v3_done"
 if [ "$EXPECTED_SHA" = "67c742f840728a47b94daab8ce972fd17e1ef1eb" ] && [ ! -f "$REBUILD_MARKER" ]; then
   echo "REBUILD_HOOK_BEGIN source=zufang555 target=50 batch=v3"
@@ -115,6 +115,35 @@ PY
   sleep 8
   systemctl is-active --quiet qiaolian-v3@publisher.service
   echo "REBUILD_HOOK_DONE marker=$REBUILD_MARKER"
+fi
+
+# Current rebuild: rerun the selected 50 groups under the final copy/cover rules.
+# Every selected listing is reset to inventory_status=pending before it re-enters
+# the publisher queue. Admin explicitly changes room status later.
+REBUILD_PENDING_MARKER="$ROOT/.rebuild_zufang555_20260912_pending_v4_done"
+if [ "$EXPECTED_SHA" = "d87b6a740411d74a1799bce2af26cf7ade5c429f" ] && [ ! -f "$REBUILD_PENDING_MARKER" ]; then
+  echo "REBUILD_PENDING_HOOK_BEGIN source=zufang555 target=50 batch=pending_v4"
+  rebuild_backup="$BACKUP_DIR/pre-rebuild-zufang555-20260912-pending-v4.sqlite3"
+  "$VENV/bin/python" - "$DB" "$rebuild_backup" <<'PY'
+import sqlite3, sys
+src, dst = sys.argv[1:3]
+with sqlite3.connect(src) as source, sqlite3.connect(dst) as target:
+    source.backup(target)
+PY
+  chmod 0640 "$rebuild_backup"
+  chown qiaolianbot:qiaolianbot "$rebuild_backup"
+  curl -fsSL https://raw.githubusercontent.com/Gymmmm/bot123123/9f1b101f2b81d81b489eeb340681cdf2a55e9c97/deploy/v3/open_rebuild_batch_zufang555.py -o /tmp/open_rebuild_batch_zufang555_pending.py
+  set -a
+  source "$RUNTIME_ENV"
+  set +a
+  REBUILD_SOURCE_NAME=zufang555 REBUILD_TARGET_GROUPS=50 REBUILD_BATCH_ID=zufang555_20260912_pending_v4 \
+    "$VENV/bin/python" /tmp/open_rebuild_batch_zufang555_pending.py
+  rm -f /tmp/open_rebuild_batch_zufang555_pending.py
+  touch "$REBUILD_PENDING_MARKER"
+  systemctl restart qiaolian-v3@publisher.service
+  sleep 8
+  systemctl is-active --quiet qiaolian-v3@publisher.service
+  echo "REBUILD_PENDING_HOOK_DONE marker=$REBUILD_PENDING_MARKER"
 fi
 
 printf '%s\n' "$EXPECTED_SHA" > "$ROOT/.deployed_sha"
