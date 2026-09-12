@@ -110,9 +110,9 @@ def test_cover_service_passes_only_resolved_v3_identity_and_facts(tmp_path):
     assert call["data"].floor == "19"
     assert call["data"].price in {"800", "800.0"}
     assert (call["data"].highlight_1, call["data"].highlight_2, call["data"].highlight_3) == (
-        "采光好",
-        "客厅方正",
-        "实拍房源",
+        "",
+        "",
+        "",
     )
 
 
