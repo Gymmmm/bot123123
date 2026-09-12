@@ -20,7 +20,7 @@ from v3_core.parser.worker import CanonicalWorker  # noqa: E402
 DB = Path(os.getenv('DB_PATH', '/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db')).resolve()
 SOURCE_NAME = os.getenv('REBUILD_SOURCE_NAME', 'zufang555').strip()
 TARGET = max(1, int(os.getenv('REBUILD_TARGET_GROUPS', '50') or 50))
-BATCH = os.getenv('REBUILD_BATCH_ID', 'zufang555_20260912').strip()
+BATCH = os.getenv('REBUILD_BATCH_ID', 'zufang555_20260912_v2').strip()
 
 
 def meta_anchor(row: sqlite3.Row) -> int:
@@ -96,17 +96,18 @@ def main() -> None:
              FROM listing_offers o
              LEFT JOIN review_items r ON r.offer_id=o.offer_id
              WHERE o.listing_id IN ({placeholders})
-               AND o.offer_type='rent' AND o.offer_status='active'""",
+               AND o.offer_type='rent' AND o.offer_status='active'
+               AND o.publication_policy='telegram_rent'""",
         listing_ids,
     ).fetchall()
 
-    queued = archived_publications = superseded_packages = skipped_unpublishable = 0
+    queued = archived_publications = superseded_packages = 0
     for row in offer_rows:
         offer_id = str(row['offer_id'])
-        if str(row['publication_policy'] or '') != 'telegram_rent' or int(row['publishable'] or 0) != 1:
-            skipped_unpublishable += 1
-            continue
 
+        # Rebuild is intentionally routed back through AutoPublishService. New rent
+        # offers start publishable=0/review_required by design; package approval
+        # flips publishable only after the normal strict eligibility checks pass.
         cur = conn.execute(
             """UPDATE publication_instances
                SET publish_status=?,updated_at=CURRENT_TIMESTAMP
@@ -124,13 +125,14 @@ def main() -> None:
         superseded_packages += int(cur.rowcount or 0)
 
         review_id = str(row['review_id'] or '')
-        if review_id:
-            conn.execute(
-                """UPDATE review_items SET review_status='pending',operator_user_id='',approved_at=NULL,
-                   review_note=CASE WHEN review_note='' THEN ? ELSE review_note || ' | ' || ? END,
-                   updated_at=CURRENT_TIMESTAMP WHERE review_id=?""",
-                (f'rebuild:{BATCH}', f'rebuild:{BATCH}', review_id),
-            )
+        if not review_id:
+            continue
+        conn.execute(
+            """UPDATE review_items SET review_status='pending',operator_user_id='',approved_at=NULL,
+               review_note=CASE WHEN review_note='' THEN ? ELSE review_note || ' | ' || ? END,
+               updated_at=CURRENT_TIMESTAMP WHERE review_id=?""",
+            (f'rebuild:{BATCH}', f'rebuild:{BATCH}', review_id),
+        )
 
         conn.execute(
             """INSERT INTO publisher_auto_items_v3
@@ -154,7 +156,6 @@ def main() -> None:
         f'blocked_media={blocked_media} failed={failed} listings={len(materialized_listing_ids)} '
         f'offers={len(offer_rows)} queued={queued} queue_total={qcount} '
         f'archived_publications={archived_publications} superseded_packages={superseded_packages} '
-        f'skipped_unpublishable={skipped_unpublishable} '
         f'oldest_anchor={min(anchors)} newest_anchor={max(anchors)}'
     )
 
