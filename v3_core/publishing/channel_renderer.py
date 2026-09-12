@@ -9,6 +9,7 @@ import html
 import re
 from typing import Any
 
+from v3_core.inventory.qiaolian_say import qiaolian_notes_from_facts
 from v3_core.status_labels import inventory_status_presentation
 
 from .formatting import display_floor, display_layout
@@ -79,6 +80,7 @@ def render_channel_caption(
     offer: dict[str, Any],
     public_listing_id: object,
     status: str | None = None,
+    canonical_facts: dict[str, Any] | None = None,
 ) -> str:
     public_id = normalize_public_id(public_listing_id)
     if not public_id:
@@ -129,6 +131,17 @@ def render_channel_caption(
     if offer_type == "rent" and deposit_contract:
         blocks.append(f"🗝️ {html.escape(deposit_contract)}")
     blocks.append(html.escape(_status_line(effective_status, public_id)))
+
+    notes = qiaolian_notes_from_facts(
+        canonical_facts,
+        seed=public_id,
+        limit=2,
+        allow_fallback=canonical_facts is not None,
+    )
+    if notes:
+        note_lines = "\n".join(html.escape(note) for note in notes[:2])
+        blocks.append(f"💬 侨联说\n{note_lines}")
+
     return "\n\n".join(blocks).strip()[:1024]
 
 
