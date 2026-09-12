@@ -1,0 +1,37 @@
+name: tmp-bump-adviser-deploy-sha
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/tmp-bump-adviser-deploy-sha.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+      - name: Pin approved candidate
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('.github/workflows/deploy-v3-adviser-cover-once.yml')
+          text = p.read_text()
+          old = 'EXPECTED_SHA: b929ae236d7a616f569cb85d85dceed0e71affbb'
+          new = 'EXPECTED_SHA: f63db4d8187736db7967c68cac09567d1157fe6d'
+          if old not in text:
+              raise SystemExit('old expected SHA not found')
+          p.write_text(text.replace(old, new, 1))
+          PY
+      - name: Commit pin
+        run: |
+          git config user.name Gymmmm
+          git config user.email 73370798+Gymmmm@users.noreply.github.com
+          git add .github/workflows/deploy-v3-adviser-cover-once.yml
+          git commit -m 'ops: rerun adviser cover deploy after copy test sync'
+          git push origin HEAD:master
