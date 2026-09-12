@@ -6,6 +6,7 @@ import os
 import sqlite3
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 
@@ -28,7 +29,15 @@ def meta_anchor(row: sqlite3.Row) -> int:
     except Exception:
         meta = {}
     try:
-        return int(meta.get('anchor_message_id') or 0)
+        anchor = int(meta.get('anchor_message_id') or 0)
+    except Exception:
+        anchor = 0
+    if anchor > 0:
+        return anchor
+    try:
+        path = urlparse(str(row['source_url'] or '')).path.rstrip('/')
+        tail = path.rsplit('/', 1)[-1]
+        return int(tail) if tail.isdigit() else 0
     except Exception:
         return 0
 
@@ -39,10 +48,10 @@ def main() -> None:
     conn.execute('PRAGMA busy_timeout=30000')
 
     rows = conn.execute(
-        "SELECT id,source_post_id,parse_status,raw_meta_json FROM source_posts WHERE source_name=?",
+        "SELECT id,source_post_id,source_url,parse_status,raw_meta_json FROM source_posts WHERE source_name=?",
         (SOURCE_NAME,),
     ).fetchall()
-    ordered = sorted(rows, key=meta_anchor, reverse=True)
+    ordered = sorted(rows, key=lambda row: (meta_anchor(row), int(row['id'])), reverse=True)
     selected = ordered[:TARGET]
     selected_ids = [int(r['id']) for r in selected]
     if not selected_ids:
@@ -139,13 +148,14 @@ def main() -> None:
     qcount = int(conn.execute(
         "SELECT COUNT(*) FROM publisher_auto_items_v3 WHERE state='queued' AND ignored=0"
     ).fetchone()[0])
+    anchors = [meta_anchor(r) for r in selected]
     print(
         f'REBUILD_RESULT source={SOURCE_NAME} selected={len(selected_ids)} processed={processed} '
         f'blocked_media={blocked_media} failed={failed} listings={len(materialized_listing_ids)} '
         f'offers={len(offer_rows)} queued={queued} queue_total={qcount} '
         f'archived_publications={archived_publications} superseded_packages={superseded_packages} '
         f'skipped_unpublishable={skipped_unpublishable} '
-        f'oldest_anchor={min(meta_anchor(r) for r in selected)} newest_anchor={max(meta_anchor(r) for r in selected)}'
+        f'oldest_anchor={min(anchors)} newest_anchor={max(anchors)}'
     )
 
 
