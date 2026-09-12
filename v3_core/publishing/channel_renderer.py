@@ -1,7 +1,7 @@
 """Final V3 public channel caption renderer.
 
 The renderer consumes already materialized listing/offer facts and emits only
-public information.  It performs no DB lookup and never exposes internal ids.
+public information. It performs no DB lookup and never exposes internal ids.
 """
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from typing import Any
 
 from v3_core.status_labels import inventory_status_presentation
 
-from .formatting import display_floor, display_layout
+from .formatting import display_floor, display_layout, display_property_type
 from .public_ids import normalize_public_id
 
 _EMPTY_FACTS = {
@@ -56,29 +56,9 @@ def _normalize_contract(value: Any) -> str:
     return re.sub(r"^(?:租期|合同)\s*[:：]?\s*", "", text)
 
 
-def _property_name(value: Any) -> str:
-    raw = _clean(value, 24)
-    identity = raw.lower()
-    if any(token in identity for token in ("villa", "别墅")):
-        return "别墅"
-    if any(token in identity for token in ("排屋", "townhouse", "town house", "row house", "shophouse")):
-        return "排屋"
-    if any(token in identity for token in ("公寓", "apartment", "condo", "condominium")):
-        return "公寓"
-    return raw
-
-
 def _status_line(status: str, public_id: str) -> str:
     icon, label = inventory_status_presentation(status)
-    return f"{icon} {label}　{public_id}"
-
-
-def _adviser_block(value: str) -> str:
-    lines = [re.sub(r"\s+", " ", line).strip() for line in str(value or "").splitlines()]
-    lines = [line for line in lines if line][:2]
-    if not lines:
-        return ""
-    return "💬 侨联说\n" + "\n".join(html.escape(line) for line in lines)
+    return f"{icon} <b>{html.escape(label)}</b>　{html.escape(public_id)}"
 
 
 def _hashtag(value: str) -> str:
@@ -86,8 +66,10 @@ def _hashtag(value: str) -> str:
     return f"#{text}" if text else ""
 
 
-def _layout_tag(value: Any) -> str:
-    raw = _clean(value, 20)
+def _layout_tag(value: Any, property_type: Any = "") -> str:
+    raw = _clean(display_layout(value, property_type), 20)
+    if raw == "单间":
+        return "单间"
     match = re.search(r"\d+房", raw)
     return match.group(0) if match else raw
 
@@ -116,6 +98,12 @@ def render_channel_caption(
     status: str | None = None,
     adviser_note: str = "",
 ) -> str:
+    """Render the short public channel post.
+
+    ``adviser_note`` is intentionally accepted for backward compatibility but
+    is not rendered here. 侨联说 belongs to the rental-detail experience, not
+    the channel feed.
+    """
     public_id = normalize_public_id(public_listing_id)
     if not public_id:
         raise ValueError("valid public_listing_id is required")
@@ -125,7 +113,9 @@ def render_channel_caption(
     heading = project if project and project not in _GENERIC_HEADINGS else area
     if not heading:
         heading = "金边房源"
-    property_type = _clean(listing.get("property_type"), 24)
+
+    property_type_raw = _clean(listing.get("property_type"), 24)
+    property_type = _clean(display_property_type(property_type_raw), 24)
     raw_layout = listing.get("layout") or ""
     layout = _clean(display_layout(raw_layout, property_type), 20)
     heading_line = "｜".join(value for value in (heading, layout) if value)
@@ -145,42 +135,39 @@ def render_channel_caption(
 
     size = _display_size(listing.get("size_sqm") or listing.get("size"))
     floor = _clean(display_floor(_clean(listing.get("floor"), 16)), 18)
-    property_bits = [value for value in (_property_name(property_type), size, floor) if value]
+    property_bits = [value for value in (property_type, size, floor) if value]
 
     deposit = _clean(offer.get("payment_terms") or offer.get("deposit_terms"), 20)
     contract = _normalize_contract(offer.get("contract_term"))
-    deposit_contract = "｜".join(value for value in (deposit, contract) if value)
+    deposit_contract = " ｜ ".join(value for value in (deposit, contract) if value)
 
     effective_status = str(status if status is not None else listing.get("inventory_status") or "active")
 
     sections: list[str] = []
-    top_lines = [f"🏡 {html.escape(heading_line)}"]
+    top_lines = [f"🏡 <b>{html.escape(heading_line)}</b>"]
     if price_text:
-        top_lines.append(f"💵 {html.escape(price_text)}")
+        top_lines.append(f"💵 <b>{html.escape(price_text)}</b>")
     sections.append("\n".join(top_lines))
 
     fact_lines: list[str] = []
     if property_bits:
-        fact_lines.append(f"🏢 {html.escape('｜'.join(property_bits))}")
+        fact_lines.append(f"🏢 {html.escape(' ｜ '.join(property_bits))}")
     if offer_type == "rent" and deposit_contract:
         fact_lines.append(f"🗝️ {html.escape(deposit_contract)}")
     if fact_lines:
         sections.append("\n".join(fact_lines))
 
-    sections.append(html.escape(_status_line(effective_status, public_id)))
+    sections.append(_status_line(effective_status, public_id))
 
     tags = [
         _hashtag(area),
-        _hashtag(_layout_tag(raw_layout)),
+        _hashtag(_layout_tag(raw_layout, property_type)),
         _hashtag(_price_tag(amount)),
     ]
     tags = [tag for tag in tags if tag]
     if tags:
         sections.append(" ".join(tags))
 
-    adviser = _adviser_block(adviser_note)
-    if adviser:
-        sections.append(adviser)
     return "\n\n".join(sections).strip()[:1024]
 
 
