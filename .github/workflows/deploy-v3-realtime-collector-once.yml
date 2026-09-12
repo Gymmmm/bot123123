@@ -23,7 +23,7 @@ jobs:
       - name: Stage deployment controls
         shell: bash
         run: |
-          # deploy final Chinese copy, locked cover, and pending room-status rebuild
+          # retry tested final contract after release ownership handoff fix
           cp deploy/v3/production_host_fingerprint.txt "$RUNNER_TEMP/production_host_fingerprint.txt"
           cp deploy/v3/one_shot_remote_deploy.sh "$RUNNER_TEMP/one_shot_remote_deploy.sh"
       - name: Checkout exact candidate
