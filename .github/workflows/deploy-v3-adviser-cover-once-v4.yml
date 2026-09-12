@@ -1,0 +1,85 @@
+name: qiaolian-v3-adviser-cover-once-v4
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/deploy-v3-adviser-cover-once-v4.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qiaolian-v3-production
+  cancel-in-progress: false
+
+env:
+  DEPLOY_BRANCH: codex/adviser-copy-sync-20260912
+  EXPECTED_SHA: f63db4d8187736db7967c68cac09567d1157fe6d
+  PROD_HOST: 50.114.74.120
+  PROD_PORT: '22'
+  PROD_SSH_USER: root
+
+jobs:
+  verify-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout deployment controls
+        uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - name: Stage deployment controls
+        run: |
+          cp deploy/v3/production_host_fingerprint.txt "$RUNNER_TEMP/production_host_fingerprint.txt"
+          cp deploy/v3/one_shot_remote_deploy.sh "$RUNNER_TEMP/one_shot_remote_deploy.sh"
+
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_BRANCH }}
+          path: candidate
+          fetch-depth: 0
+
+      - name: Verify immutable candidate SHA
+        working-directory: candidate
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run complete V3 regression gate
+        working-directory: candidate
+        env:
+          PYTHONPATH: '${{ github.workspace }}/candidate'
+        run: |
+          set -Eeuo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pytest pytest-asyncio
+          python -m compileall -q v3_core tests/v3_core run_v3_collector.py run_v3_canonical_worker.py run_v3_publisher_bot.py run_v3_user_bot.py run_v3_preflight.py
+          python -m pytest -q tests/v3_core
+
+      - name: Verify production host fingerprint
+        run: |
+          set -Eeuo pipefail
+          EXPECTED_FINGERPRINT=$(tr -d '\r\n' < "$RUNNER_TEMP/production_host_fingerprint.txt")
+          ssh-keyscan -T 15 -p "$PROD_PORT" -t ed25519 "$PROD_HOST" 2>/dev/null | grep -v '^#' > "$RUNNER_TEMP/known_hosts"
+          ssh-keygen -lf "$RUNNER_TEMP/known_hosts" | grep -F "$EXPECTED_FINGERPRINT"
+
+      - name: Configure production SSH
+        env:
+          PROD_SSH_PRIVATE_KEY: '${{ secrets.PROD_SSH_PRIVATE_KEY }}'
+        run: |
+          set -Eeuo pipefail
+          test -n "$PROD_SSH_PRIVATE_KEY"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
+          cp "$RUNNER_TEMP/known_hosts" "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
+
+      - name: Deploy candidate with rollback guard
+        run: |
+          set -Eeuo pipefail
+          ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 "$PROD_SSH_USER@$PROD_HOST" "bash -s -- '$DEPLOY_BRANCH' '$EXPECTED_SHA'" < "$RUNNER_TEMP/one_shot_remote_deploy.sh"
