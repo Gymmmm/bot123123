@@ -12,7 +12,7 @@ import sqlite3
 sys.path.insert(0, "/opt/qiaolian_dual_bots")
 os.chdir("/opt/qiaolian_dual_bots")
 
-from cover_generator import choose_best_cover_image, _score_image
+from renderers.cover import choose_best_cover_image, _score_image
 
 DB_PATH = os.getenv("DB_PATH", "data/qiaolian_dual_bot.db")
 

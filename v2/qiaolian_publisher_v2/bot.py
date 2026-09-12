@@ -52,7 +52,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 from discussion_map_store import load_discuss_map, save_discuss_map
-from meihua_publisher import add_detail_logo_watermark, resolve_discussion_id
+from publishers.meihua import add_detail_logo_watermark, resolve_discussion_id
 
 for _cover_module_dir in (
     _REPO_ROOT / "v2_admin",
