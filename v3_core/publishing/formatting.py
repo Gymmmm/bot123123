@@ -14,7 +14,7 @@ def display_layout(layout: object, property_type: object = "") -> str:
         return ""
 
     lowered = raw.lower()
-    # Public channel/cover terminology is Chinese-first.  Keep parser/database
+    # Public channel/cover terminology is Chinese-first. Keep parser/database
     # aliases flexible, but never expose Studio/开间 variants to customers.
     if lowered in {"studio", "studio公寓", "开间", "开间公寓", "单间", "单间公寓"}:
         return "单间"
@@ -62,15 +62,18 @@ def display_property_type(value: object) -> str:
     return raw.replace("|", "｜")
 
 
-def display_floor(floor: object) -> str:
+def display_floor(floor: object, property_type: object = "") -> str:
     raw = str(floor or "").strip()
     if not raw or raw in {"未知", "待确认", "暂无", "[暂无]", "-", "--"}:
         return ""
     compact = re.sub(r"\s+", "", raw)
-    if re.fullmatch(r"\d+", compact):
-        return f"{int(compact)}楼"
-    if re.fullmatch(r"\d+楼", compact):
-        return compact
+    kind = display_property_type(property_type)
+    is_house = any(token in kind for token in ("别墅", "排屋"))
+
+    numeric = re.fullmatch(r"(\d+)(?:楼|层|层楼)?", compact)
+    if numeric:
+        value = int(numeric.group(1))
+        return f"{value}层楼" if is_house else f"{value}楼"
     return raw.replace("|", "｜")
 
 
