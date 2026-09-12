@@ -101,9 +101,19 @@ def main() -> None:
         listing_ids,
     ).fetchall()
 
-    queued = archived_publications = superseded_packages = 0
+    queued = archived_publications = superseded_packages = status_pending = 0
     for row in offer_rows:
         offer_id = str(row['offer_id'])
+        listing_id = str(row['listing_id'])
+
+        # Every rebuilt post starts with an unverified room status. The admin
+        # explicitly changes it later to available/reserved/rented as appropriate.
+        cur = conn.execute(
+            """UPDATE listings_v3 SET inventory_status='pending',updated_at=CURRENT_TIMESTAMP
+               WHERE listing_id=?""",
+            (listing_id,),
+        )
+        status_pending += int(cur.rowcount or 0)
 
         # Rebuild is intentionally routed back through AutoPublishService. New rent
         # offers start publishable=0/review_required by design; package approval
@@ -142,7 +152,7 @@ def main() -> None:
                  listing_id=excluded.listing_id,review_id=excluded.review_id,state='queued',
                  reason_code='',reason_text='',package_id='',channel_message_id='',origin='rebuild',ignored=0,
                  published_at=NULL,updated_at=CURRENT_TIMESTAMP""",
-            (offer_id, str(row['listing_id']), review_id),
+            (offer_id, listing_id, review_id),
         )
         queued += 1
 
@@ -154,7 +164,7 @@ def main() -> None:
     print(
         f'REBUILD_RESULT source={SOURCE_NAME} selected={len(selected_ids)} processed={processed} '
         f'blocked_media={blocked_media} failed={failed} listings={len(materialized_listing_ids)} '
-        f'offers={len(offer_rows)} queued={queued} queue_total={qcount} '
+        f'offers={len(offer_rows)} queued={queued} queue_total={qcount} status_pending={status_pending} '
         f'archived_publications={archived_publications} superseded_packages={superseded_packages} '
         f'oldest_anchor={min(anchors)} newest_anchor={max(anchors)}'
     )
