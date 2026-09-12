@@ -108,12 +108,7 @@ class TelegramChannelAdapter:
         }
 
     async def edit(self, command: TelegramSendCommand, *, message_id: str | int) -> dict[str, Any]:
-        """Replace one existing Telegram publication using the normal send contract.
-
-        Media posts are updated atomically with cover + caption + keyboard. Text-only
-        legacy posts fall back to text + keyboard. A no-op content edit still refreshes
-        reply markup so live booking visibility stays correct.
-        """
+        """Replace one existing Telegram publication using the normal send contract."""
         cover, keyboard = self._validated(command)
         target = int(message_id)
         mode = "media"
@@ -178,12 +173,7 @@ async def deliver_approved_package(
     package_id: str,
     channel_chat_id: str,
 ) -> Any:
-    """Execute one safe delivery attempt.
-
-    Any exception after ``mark_sending`` is treated as unknown because Telegram
-    may have accepted the request before the client observed the failure. This
-    intentionally blocks automatic retry until reconciliation.
-    """
+    """Execute one safe delivery attempt."""
     command = coordinator.prepare_send(
         package_id=str(package_id),
         channel_chat_id=str(channel_chat_id),
@@ -200,8 +190,32 @@ async def deliver_approved_package(
     )
 
 
+async def edit_existing_publication(
+    *,
+    coordinator: Any,
+    adapter: TelegramChannelAdapter,
+    channel_chat_id: str,
+    channel_message_id: str | int,
+) -> Any:
+    """Edit one durable Telegram publication without inventing a message mapping."""
+    publication, command = coordinator.prepare_edit(
+        channel_chat_id=str(channel_chat_id),
+        channel_message_id=str(channel_message_id),
+    )
+    receipt = await adapter.edit(
+        command,
+        message_id=publication.channel_message_id,
+    )
+    coordinator.record_edit(
+        publication.instance_id,
+        post_text=str(receipt.get("caption") or command.caption),
+    )
+    return receipt
+
+
 __all__ = [
     "TelegramChannelAdapter",
     "build_channel_keyboard",
     "deliver_approved_package",
+    "edit_existing_publication",
 ]
