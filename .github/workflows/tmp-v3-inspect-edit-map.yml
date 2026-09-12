@@ -1,0 +1,53 @@
+name: tmp-v3-inspect-edit-map
+on:
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/tmp-v3-inspect-edit-map.yml'
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    env:
+      PROD_HOST: 50.114.74.120
+      PROD_PORT: '22'
+      PROD_SSH_USER: root
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify production host fingerprint
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          expected=$(tr -d '\r\n' < deploy/v3/production_host_fingerprint.txt)
+          ssh-keyscan -T 15 -p "$PROD_PORT" -t ed25519 "$PROD_HOST" 2>/dev/null | grep -v '^#' > "$RUNNER_TEMP/known_hosts"
+          ssh-keygen -lf "$RUNNER_TEMP/known_hosts" | grep -F "$expected"
+      - name: Configure production SSH
+        shell: bash
+        env:
+          PROD_SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+        run: |
+          set -Eeuo pipefail
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
+          cp "$RUNNER_TEMP/known_hosts" "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
+      - name: Inspect mapping
+        shell: bash
+        run: |
+          ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes "$PROD_SSH_USER@$PROD_HOST" 'python3 - <<'"'"'PY'"'"'
+          import sqlite3, json
+          db='/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db'
+          c=sqlite3.connect(db); c.row_factory=sqlite3.Row
+          for t in ['source_posts','canonical_records','listings_v3','listing_offers','publication_instances','publication_packages_v3']:
+              print('TABLE',t)
+              for r in c.execute(f'pragma table_info({t})'):
+                  print(r['name'], r['type'])
+          print('SOURCE_SAMPLE')
+          rows=c.execute("select * from source_posts where source_name='zufang555' order by id desc limit 3").fetchall()
+          for r in rows:
+              print(dict(r))
+          print('CANON_SAMPLE')
+          for r in c.execute('select * from canonical_records order by rowid desc limit 3'):
+              print(dict(r))
+          PY'
