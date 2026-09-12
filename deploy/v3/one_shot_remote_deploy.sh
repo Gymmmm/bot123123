@@ -90,6 +90,33 @@ done
 [ "$HEALTH_FAILED" -eq 0 ]
 ! journalctl -u qiaolian-v3@collector.service -u qiaolian-v3@canonical.service -u qiaolian-v3@publisher.service -u qiaolian-v3@user.service --since "$ACTIVATED_AT" --no-pager | grep -Eq 'Traceback|ModuleNotFoundError|ImportError|database is locked|no such table|Conflict: terminated by other getUpdates request|Main process exited|Failed with result'
 
+# One-time scoped rebuild hook. It is guarded by both the deployed SHA and a durable marker.
+REBUILD_MARKER="$ROOT/.rebuild_zufang555_20260912_done"
+if [ "$EXPECTED_SHA" = "523577c39824de4c39024e1b592bbbdbe2f2c45e" ] && [ ! -f "$REBUILD_MARKER" ]; then
+  echo "REBUILD_HOOK_BEGIN source=zufang555 target=50"
+  rebuild_backup="$BACKUP_DIR/pre-rebuild-zufang555-20260912.sqlite3"
+  "$VENV/bin/python" - "$DB" "$rebuild_backup" <<'PY'
+import sqlite3, sys
+src, dst = sys.argv[1:3]
+with sqlite3.connect(src) as source, sqlite3.connect(dst) as target:
+    source.backup(target)
+PY
+  chmod 0640 "$rebuild_backup"
+  chown qiaolianbot:qiaolianbot "$rebuild_backup"
+  curl -fsSL https://raw.githubusercontent.com/Gymmmm/bot123123/master/deploy/v3/open_rebuild_batch_zufang555.py -o /tmp/open_rebuild_batch_zufang555.py
+  set -a
+  source "$RUNTIME_ENV"
+  set +a
+  REBUILD_SOURCE_NAME=zufang555 REBUILD_TARGET_GROUPS=50 REBUILD_BATCH_ID=zufang555_20260912 \
+    "$VENV/bin/python" /tmp/open_rebuild_batch_zufang555.py
+  rm -f /tmp/open_rebuild_batch_zufang555.py
+  touch "$REBUILD_MARKER"
+  systemctl restart qiaolian-v3@publisher.service
+  sleep 8
+  systemctl is-active --quiet qiaolian-v3@publisher.service
+  echo "REBUILD_HOOK_DONE marker=$REBUILD_MARKER"
+fi
+
 printf '%s\n' "$EXPECTED_SHA" > "$ROOT/.deployed_sha"
 chmod 0644 "$ROOT/.deployed_sha"
 echo "V3_DEPLOY_OK sha=$EXPECTED_SHA previous=$OLD_SHA"
