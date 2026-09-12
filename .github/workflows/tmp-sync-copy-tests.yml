@@ -1,0 +1,75 @@
+name: tmp-sync-copy-tests
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/tmp-sync-copy-tests.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  sync-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/adviser-copy-sync-20260912
+          fetch-depth: 0
+      - name: Update stale copy locks
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new, count=None):
+              p = Path(path)
+              text = p.read_text()
+              if old not in text:
+                  raise SystemExit(f'missing expected text in {path}: {old!r}')
+              text = text.replace(old, new, -1 if count is None else count)
+              p.write_text(text)
+
+          p = 'tests/v3_core/test_autopublish_simplified_contract.py'
+          replace(p,
+              '            "project_name": "炳发城",\n            "property_type": "公寓",',
+              '            "project_name": "炳发城",\n            "public_location_display": "炳发城",\n            "property_type": "公寓",',
+              1,
+          )
+          replace(p,
+              '    assert text == (\n        "🏡 炳发城｜2房2卫\\n\\n"\n        "💵 $800/月\\n\\n"\n        "🏢 公寓\\n\\n"\n        "📐 95㎡｜19楼\\n\\n"\n        "🗝️ 押一付一｜一年起租\\n\\n"\n        "🟢 当前可预约　QL-PP-A2B3"\n    )\n    assert "l_999" not in text\n    assert "OFF_SECRET" not in text\n    assert "#" not in text',
+              '    assert text == (\n        "🏡 炳发城｜2房2卫\\n"\n        "💵 $800/月\\n\\n"\n        "🏢 公寓｜95㎡｜19楼\\n"\n        "🗝️ 押一付一｜一年起租\\n\\n"\n        "🟢 当前可预约　QL-PP-A2B3\\n\\n"\n        "#炳发城 #2房 #600至800"\n    )\n    assert "l_999" not in text\n    assert "OFF_SECRET" not in text\n    assert "#炳发城 #2房 #600至800" in text',
+              1,
+          )
+          replace(p,
+              '    assert "🏘️ 排屋" in text\n    assert "📐 12楼" in text',
+              '    assert "🏢 排屋｜12楼" in text',
+              1,
+          )
+
+          p = 'tests/v3_core/test_product_copy_lock_90180b83.py'
+          replace(p, 'assert "🏠 <b>租赁详情</b>" in result.details.text', 'assert "🏠 <b>区域：</b>" in result.details.text')
+          replace(p, 'assert result.details.action_rows[0][1].label == "💬 联系中文顾问"', 'assert result.details.action_rows[0][1].label == "💬 联系侨联"', 1)
+          replace(p, 'assert "🏠 <b>租赁详情</b>" in message.texts[1]', 'assert "🏠 <b>区域：</b>" in message.texts[1]', 1)
+
+          p = 'tests/v3_core/test_product_polish_8fb094b.py'
+          replace(p,
+              'def test_details_labels_public_id_as_listing_number_not_photo_field():\n    text = build_details_response(_published_view()).text\n    assert "🏠 <b>租赁详情</b>" in text\n    assert "🆔 房源编号：QL-RF-A2B3" in text\n    assert "📸 实拍：QL-RF-A2B3" not in text',
+              'def test_details_labels_public_id_as_real_photo_reference():\n    text = build_details_response(_published_view()).text\n    assert "🏠 <b>区域：</b>" in text\n    assert "📸 <b>实拍：</b> QL-RF-A2B3" in text\n    assert "🆔 房源编号：QL-RF-A2B3" not in text',
+              1,
+          )
+
+          p = 'tests/v3_core/test_user_bot_public_flow.py'
+          replace(p, 'assert "🏠 <b>租赁详情</b>" in result.details.text', 'assert "🏠 <b>区域：</b>" in result.details.text')
+          replace(p, 'assert "富力城｜2房1厅" in result.details.text', 'assert "🛏 <b>户型：</b> 2房1厅" in result.details.text', 1)
+          replace(p, 'assert "🔴 房态：已租出" in result.details.text', 'assert "🔴 <b>房态：</b> 已租出" in result.details.text', 1)
+          PY
+      - name: Commit synced tests
+        run: |
+          set -Eeuo pipefail
+          git config user.name Gymmmm
+          git config user.email 73370798+Gymmmm@users.noreply.github.com
+          git add tests/v3_core/test_autopublish_simplified_contract.py tests/v3_core/test_product_copy_lock_90180b83.py tests/v3_core/test_product_polish_8fb094b.py tests/v3_core/test_user_bot_public_flow.py
+          git diff --cached --check
+          git commit -m 'test: sync copy locks with approved listing templates'
+          git push origin HEAD:codex/adviser-copy-sync-20260912
