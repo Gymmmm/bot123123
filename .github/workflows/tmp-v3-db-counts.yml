@@ -31,6 +31,7 @@ jobs:
       - name: Run read-only DB counts
         shell: bash
         run: |
+          # Rebuild activation verification: read-only only.
           set -Eeuo pipefail
           scp -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes deploy/v3/read_only_db_counts.py root@50.114.74.120:/tmp/qiaolian_read_only_db_counts.py
           ssh -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes root@50.114.74.120 'python3 /tmp/qiaolian_read_only_db_counts.py; rm -f /tmp/qiaolian_read_only_db_counts.py'
