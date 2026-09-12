@@ -1,0 +1,71 @@
+name: tmp-v3-publish-one-now
+on:
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/tmp-v3-publish-one-now.yml'
+permissions:
+  contents: read
+jobs:
+  publish-one:
+    runs-on: ubuntu-latest
+    env:
+      PROD_HOST: 50.114.74.120
+      PROD_PORT: '22'
+      PROD_SSH_USER: root
+      EXPECTED_PROD_SHA: aaf7b3d8365641557d866aef798447191308d6dc
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify production host fingerprint
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          expected=$(tr -d '\r\n' < deploy/v3/production_host_fingerprint.txt)
+          ssh-keyscan -T 15 -p "$PROD_PORT" -t ed25519 "$PROD_HOST" 2>/dev/null | grep -v '^#' > "$RUNNER_TEMP/known_hosts"
+          ssh-keygen -lf "$RUNNER_TEMP/known_hosts" | grep -F "$expected"
+      - name: Configure production SSH
+        shell: bash
+        env:
+          PROD_SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+        run: |
+          set -Eeuo pipefail
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
+          cp "$RUNNER_TEMP/known_hosts" "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
+      - name: Publish exactly one ready V3 listing
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes "$PROD_SSH_USER@$PROD_HOST" "EXPECTED_PROD_SHA='$EXPECTED_PROD_SHA' bash -s" <<'REMOTE'
+          set -Eeuo pipefail
+          ROOT=/opt/qiaolian_v3
+          test "$(cat "$ROOT/.deployed_sha")" = "$EXPECTED_PROD_SHA"
+          cd "$ROOT/current"
+          set -a
+          source "$ROOT/runtime.env"
+          set +a
+          "$ROOT/.venv/bin/python" - <<'PY'
+          import asyncio
+          from telegram import Bot
+          from v3_core.publishing.admin_bot import load_settings
+          from v3_core.publishing.publisher_app import V3PublisherApplication
+
+          async def main():
+              settings = load_settings()
+              app = V3PublisherApplication(settings)
+              checked = await app.autopilot.validate_pending(limit=50)
+              bot = Bot(token=settings.token)
+              await bot.initialize()
+              try:
+                  result = await app.autopilot.process_one(bot=bot, origin='manual_oneoff')
+                  print('PUBLISH_ONE_RESULT', result)
+                  status = str(getattr(result, 'status', '') or '')
+                  if status not in {'published', 'already_published'}:
+                      raise SystemExit('PUBLISH_ONE_NO_SEND status=' + status)
+              finally:
+                  await bot.shutdown()
+
+          asyncio.run(main())
+          PY
+          REMOTE
