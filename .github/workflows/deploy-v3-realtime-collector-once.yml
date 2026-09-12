@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DEPLOY_BRANCH: codex/adviser-copy-sync-20260912
-      EXPECTED_SHA: 1294993720ea6c52b1dc53bff7a205e7b8aa4029
+      EXPECTED_SHA: 73ac1de68e0c42a28e24a17bcea0b2d8335d1e7f
       PROD_HOST: 50.114.74.120
       PROD_PORT: '22'
       PROD_SSH_USER: root
@@ -23,7 +23,7 @@ jobs:
       - name: Stage deployment controls
         shell: bash
         run: |
-          # deploy simplified Chinese channel copy and minimal covers
+          # deploy locked right-price cover template
           cp deploy/v3/production_host_fingerprint.txt "$RUNNER_TEMP/production_host_fingerprint.txt"
           cp deploy/v3/one_shot_remote_deploy.sh "$RUNNER_TEMP/one_shot_remote_deploy.sh"
       - name: Checkout exact candidate
