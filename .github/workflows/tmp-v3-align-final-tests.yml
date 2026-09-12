@@ -1,0 +1,69 @@
+name: tmp-v3-align-final-tests
+on:
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/tmp-v3-align-final-tests.yml'
+permissions:
+  contents: write
+jobs:
+  patch-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout candidate branch
+        uses: actions/checkout@v4
+        with:
+          ref: codex/adviser-copy-sync-20260912
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Align stale assertions with locked public contract
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          replacements = {
+              Path('tests/v3_core/test_autopublish_simplified_contract.py'): [
+                  ('assert "🏢 排屋｜12楼" in text', 'assert "🏢 排屋｜12层楼" in text'),
+              ],
+              Path('tests/v3_core/test_cover_service.py'): [
+                  ('assert call["data"].floor == "19"', 'assert call["data"].floor == "19楼"'),
+              ],
+              Path('tests/v3_core/test_user_bot_channel_status_sync.py'): [
+                  ('assert "🔵 房态确认中" in call["caption"]', 'assert "🔵 房态待确认" in call["caption"]'),
+                  ('assert "🔵 房态确认中" in newest', 'assert "🔵 房态待确认" in newest'),
+                  ('assert "🔵 房态确认中" not in old', 'assert "🔵 房态待确认" not in old'),
+              ],
+          }
+          for path, pairs in replacements.items():
+              text = path.read_text(encoding='utf-8')
+              for old, new in pairs:
+                  if old in text:
+                      text = text.replace(old, new)
+              path.write_text(text, encoding='utf-8')
+          PY
+      - name: Run complete V3 regression gate
+        shell: bash
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          set -Eeuo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pytest pytest-asyncio
+          python -m compileall -q v3_core tests/v3_core run_v3_collector.py run_v3_canonical_worker.py run_v3_publisher_bot.py run_v3_user_bot.py run_v3_preflight.py
+          python -m pytest -q tests/v3_core
+      - name: Commit aligned tests
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if git diff --quiet; then
+            echo 'NO_CHANGES'
+            exit 0
+          fi
+          git config user.name 'qiaolian-ci'
+          git config user.email 'qiaolian-ci@users.noreply.github.com'
+          git add tests/v3_core/test_autopublish_simplified_contract.py tests/v3_core/test_cover_service.py tests/v3_core/test_user_bot_channel_status_sync.py
+          git commit -m 'test(v3): align final public publishing contract'
+          git push origin HEAD:codex/adviser-copy-sync-20260912
+          echo "CANDIDATE_SHA=$(git rev-parse HEAD)"
