@@ -121,7 +121,7 @@ fi
 # Every selected listing is reset to inventory_status=pending before it re-enters
 # the publisher queue. Admin explicitly changes room status later.
 REBUILD_PENDING_MARKER="$ROOT/.rebuild_zufang555_20260912_pending_v4_done"
-if [ "$EXPECTED_SHA" = "d87b6a740411d74a1799bce2af26cf7ade5c429f" ] && [ ! -f "$REBUILD_PENDING_MARKER" ]; then
+if [ "$EXPECTED_SHA" = "aaf7b3d8365641557d866aef798447191308d6dc" ] && [ ! -f "$REBUILD_PENDING_MARKER" ]; then
   echo "REBUILD_PENDING_HOOK_BEGIN source=zufang555 target=50 batch=pending_v4"
   rebuild_backup="$BACKUP_DIR/pre-rebuild-zufang555-20260912-pending-v4.sqlite3"
   "$VENV/bin/python" - "$DB" "$rebuild_backup" <<'PY'
