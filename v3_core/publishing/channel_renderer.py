@@ -134,7 +134,7 @@ def render_channel_caption(
     price_text = f"${amount:,}" + ("/月" if offer_type == "rent" else "") if amount > 0 else ""
 
     size = _display_size(listing.get("size_sqm") or listing.get("size"))
-    floor = _clean(display_floor(_clean(listing.get("floor"), 16)), 18)
+    floor = _clean(display_floor(_clean(listing.get("floor"), 16), property_type), 18)
     property_bits = [value for value in (property_type, size, floor) if value]
 
     deposit = _clean(offer.get("payment_terms") or offer.get("deposit_terms"), 20)
