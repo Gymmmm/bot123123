@@ -1,7 +1,7 @@
 """Resolve V3 inventory facts into one final rendered cover.
 
 The service owns cover output naming and the inventory -> renderer contract.
-It does not read drafts or mutate publication packages.  ``renderer`` is
+It does not read drafts or mutate publication packages. ``renderer`` is
 injectable so contracts can be tested without launching Chromium.
 """
 from __future__ import annotations
@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
+from v3_core.publishing.formatting import display_layout, display_property_type
 from v3_core.storage.inventory_reader import InventoryReader
 from .cover_renderer import CoverRenderData, render_cover
 from .cover_styles import normalize_cover_style, recommended_cover_style
@@ -55,14 +56,6 @@ class CoverRenderService:
             return str(value)
         return str(int(numeric)) if numeric.is_integer() else str(numeric)
 
-    @staticmethod
-    def _highlights(facts: dict) -> tuple[str, str, str]:
-        raw = facts.get("highlights")
-        values = [str(value).strip() for value in raw] if isinstance(raw, list) else []
-        values = [value for value in values if value][:3]
-        values.extend([""] * (3 - len(values)))
-        return values[0], values[1], values[2]
-
     def render(
         self,
         *,
@@ -92,14 +85,15 @@ class CoverRenderService:
         if not Path(media.cover_source_path).is_file():
             raise FileNotFoundError(f"cover_source_not_found:{media.cover_source_path}")
 
-        h1, h2, h3 = self._highlights(facts)
+        property_type = display_property_type(listing.get("property_type") or "")
+        layout = display_layout(listing.get("layout") or "", property_type)
         data = CoverRenderData(
             public_listing_id=public_id,
             project=str(listing.get("project_name") or ""),
             project_alias=str(listing.get("project_alias") or ""),
-            property_type=str(listing.get("property_type") or ""),
+            property_type=property_type,
             deal_type=str(offer.get("offer_type") or facts.get("deal_type") or "rent"),
-            layout=str(listing.get("layout") or ""),
+            layout=layout,
             area=str(
                 listing.get("public_location_display")
                 or listing.get("canonical_area_display")
@@ -108,9 +102,11 @@ class CoverRenderService:
             size=str(listing.get("size_sqm") or ""),
             floor=str(listing.get("floor") or ""),
             price=self._price(offer),
-            highlight_1=h1,
-            highlight_2=h2,
-            highlight_3=h3,
+            # Channel covers stay factual and minimal. Marketing/adviser copy
+            # belongs in the rental-detail view, never on the cover itself.
+            highlight_1="",
+            highlight_2="",
+            highlight_3="",
         )
         target = (
             Path(output_path).expanduser().resolve()
