@@ -1,15 +1,16 @@
 """Thin Telegram adapter for one frozen V3 publication command.
 
-The adapter owns only python-telegram-bot API shapes.  It does not read the DB,
-rebuild captions, choose media, or touch discussion threads.  The durable state
-machine remains in ``delivery_coordinator`` / ``delivery_state``.
+The adapter owns only python-telegram-bot API shapes. It does not read the DB,
+rebuild captions, choose media, or touch discussion threads. Both new sends and
+existing-post edits consume the same frozen command so caption, actions and live
+inventory status cannot drift into separate Telegram implementations.
 """
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Protocol
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 from telegram.constants import ParseMode
 
 from v3_core.status_labels import inventory_status_bookable
@@ -20,6 +21,10 @@ from .package_store import CHANNEL_ACTION_ORDER
 
 class TelegramBotLike(Protocol):
     async def send_photo(self, **kwargs: Any) -> Any: ...
+    async def edit_message_media(self, **kwargs: Any) -> Any: ...
+    async def edit_message_caption(self, **kwargs: Any) -> Any: ...
+    async def edit_message_text(self, **kwargs: Any) -> Any: ...
+    async def edit_message_reply_markup(self, **kwargs: Any) -> Any: ...
 
 
 def build_channel_keyboard(
@@ -40,11 +45,34 @@ def build_channel_keyboard(
     return InlineKeyboardMarkup(rows)
 
 
+def _telegram_error_text(exc: Exception) -> str:
+    return str(exc or "").strip().lower()
+
+
+def _message_not_modified(exc: Exception) -> bool:
+    return "message is not modified" in _telegram_error_text(exc)
+
+
+def _media_edit_requires_text_fallback(exc: Exception) -> bool:
+    text = _telegram_error_text(exc)
+    return any(
+        token in text
+        for token in (
+            "there is no media",
+            "message can't be edited",
+            "message can\u2019t be edited",
+            "message to edit not found",
+            "message is not a media message",
+        )
+    )
+
+
 class TelegramChannelAdapter:
     def __init__(self, bot: TelegramBotLike):
         self.bot = bot
 
-    async def send(self, command: TelegramSendCommand) -> dict[str, Any]:
+    @staticmethod
+    def _validated(command: TelegramSendCommand) -> tuple[Path, InlineKeyboardMarkup]:
         cover = Path(str(command.cover_path)).expanduser().resolve()
         if not cover.is_file():
             raise FileNotFoundError(f"frozen_cover_missing:{cover}")
@@ -54,7 +82,10 @@ class TelegramChannelAdapter:
             command.actions,
             inventory_status=command.inventory_status,
         )
+        return cover, keyboard
 
+    async def send(self, command: TelegramSendCommand) -> dict[str, Any]:
+        cover, keyboard = self._validated(command)
         with cover.open("rb") as handle:
             message = await self.bot.send_photo(
                 chat_id=command.channel_chat_id,
@@ -76,6 +107,69 @@ class TelegramChannelAdapter:
             "discussion_published": False,
         }
 
+    async def edit(self, command: TelegramSendCommand, *, message_id: str | int) -> dict[str, Any]:
+        """Replace one existing Telegram publication using the normal send contract.
+
+        Media posts are updated atomically with cover + caption + keyboard. Text-only
+        legacy posts fall back to text + keyboard. A no-op content edit still refreshes
+        reply markup so live booking visibility stays correct.
+        """
+        cover, keyboard = self._validated(command)
+        target = int(message_id)
+        mode = "media"
+        try:
+            with cover.open("rb") as handle:
+                media = InputMediaPhoto(
+                    media=handle,
+                    caption=command.caption,
+                    parse_mode=ParseMode.HTML,
+                )
+                await self.bot.edit_message_media(
+                    chat_id=command.channel_chat_id,
+                    message_id=target,
+                    media=media,
+                    reply_markup=keyboard,
+                )
+        except Exception as exc:
+            if _message_not_modified(exc):
+                await self.bot.edit_message_reply_markup(
+                    chat_id=command.channel_chat_id,
+                    message_id=target,
+                    reply_markup=keyboard,
+                )
+                mode = "reply_markup"
+            elif _media_edit_requires_text_fallback(exc):
+                try:
+                    await self.bot.edit_message_text(
+                        chat_id=command.channel_chat_id,
+                        message_id=target,
+                        text=command.caption,
+                        parse_mode=ParseMode.HTML,
+                        reply_markup=keyboard,
+                    )
+                    mode = "text"
+                except Exception as text_exc:
+                    if not _message_not_modified(text_exc):
+                        raise
+                    await self.bot.edit_message_reply_markup(
+                        chat_id=command.channel_chat_id,
+                        message_id=target,
+                        reply_markup=keyboard,
+                    )
+                    mode = "reply_markup"
+            else:
+                raise
+
+        return {
+            "media_message_ids": [str(target)],
+            "caption_message_id": str(target),
+            "button_message_id": str(target),
+            "caption": command.caption,
+            "single_cover": True,
+            "discussion_published": False,
+            "edit_mode": mode,
+        }
+
 
 async def deliver_approved_package(
     *,
@@ -87,7 +181,7 @@ async def deliver_approved_package(
     """Execute one safe delivery attempt.
 
     Any exception after ``mark_sending`` is treated as unknown because Telegram
-    may have accepted the request before the client observed the failure.  This
+    may have accepted the request before the client observed the failure. This
     intentionally blocks automatic retry until reconciliation.
     """
     command = coordinator.prepare_send(
