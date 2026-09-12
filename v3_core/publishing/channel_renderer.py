@@ -5,7 +5,6 @@ public information. It performs no DB lookup and never exposes internal ids.
 """
 from __future__ import annotations
 
-import html
 import re
 from typing import Any
 
@@ -58,7 +57,7 @@ def _normalize_contract(value: Any) -> str:
 
 def _status_line(status: str, public_id: str) -> str:
     icon, label = inventory_status_presentation(status)
-    return f"{icon} <b>{html.escape(label)}</b>　{html.escape(public_id)}"
+    return f"{icon} {label}　{public_id}"
 
 
 def _hashtag(value: str) -> str:
@@ -139,21 +138,21 @@ def render_channel_caption(
 
     deposit = _clean(offer.get("payment_terms") or offer.get("deposit_terms"), 20)
     contract = _normalize_contract(offer.get("contract_term"))
-    deposit_contract = " ｜ ".join(value for value in (deposit, contract) if value)
+    deposit_contract = "｜".join(value for value in (deposit, contract) if value)
 
-    effective_status = str(status if status is not None else listing.get("inventory_status") or "active")
+    effective_status = str(status if status is not None else listing.get("inventory_status") or "pending")
 
     sections: list[str] = []
-    top_lines = [f"🏡 <b>{html.escape(heading_line)}</b>"]
+    top_lines = [f"🏡 {heading_line}"]
     if price_text:
-        top_lines.append(f"💵 <b>{html.escape(price_text)}</b>")
+        top_lines.append(f"💵 {price_text}")
     sections.append("\n".join(top_lines))
 
     fact_lines: list[str] = []
     if property_bits:
-        fact_lines.append(f"🏢 {html.escape(' ｜ '.join(property_bits))}")
+        fact_lines.append(f"🏢 {'｜'.join(property_bits)}")
     if offer_type == "rent" and deposit_contract:
-        fact_lines.append(f"🗝️ {html.escape(deposit_contract)}")
+        fact_lines.append(f"🗝️ {deposit_contract}")
     if fact_lines:
         sections.append("\n".join(fact_lines))
 
