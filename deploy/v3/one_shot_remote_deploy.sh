@@ -61,9 +61,9 @@ if [ ! -d "$RELEASE/.git" ]; then
   rm -rf -- "$RELEASE"
   git clone -q --single-branch --branch "$DEPLOY_BRANCH" https://github.com/Gymmmm/bot123123.git "$RELEASE"
 fi
+chown -R qiaolianbot:qiaolianbot "$RELEASE"
 test "$(runuser -u qiaolianbot -- git -C "$RELEASE" rev-parse HEAD)" = "$EXPECTED_SHA"
 "$VENV/bin/python" -m pip install --disable-pip-version-check -q -r "$RELEASE/requirements.txt"
-chown -R qiaolianbot:qiaolianbot "$RELEASE"
 
 ln -sfn "$RELEASE" "$ROOT/current.next"
 mv -Tf "$ROOT/current.next" "$CURRENT"
