@@ -33,7 +33,7 @@ jobs:
           printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
           cp "$RUNNER_TEMP/known_hosts" "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
-      - name: Inspect live publication mapping
+      - name: Inspect candidate ten publication identities
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -44,27 +44,15 @@ jobs:
               raise SystemExit('INSPECT_FATAL deployed_sha_mismatch')
           db='/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db'
           c=sqlite3.connect(db); c.row_factory=sqlite3.Row
-          print('PUBLICATION_SCHEMA',','.join(r['name'] for r in c.execute('pragma table_info(publication_instances)')))
-          print('LIVE_PUBLICATIONS_3208_3176')
-          rows=c.execute("""
-              SELECT p.channel_chat_id,p.channel_message_id,p.package_id,p.offer_id,p.publish_status,
-                     l.listing_id,l.public_listing_id,l.inventory_status,
-                     pk.status AS pkg_status,pk.package_version,pk.canonical_record_id,
-                     substr(pk.post_text,1,100) AS post_head
-              FROM publication_instances p
-              LEFT JOIN listing_offers o ON o.offer_id=p.offer_id
-              LEFT JOIN listings_v3 l ON l.listing_id=o.listing_id
-              LEFT JOIN publication_packages_v3 pk ON pk.package_id=p.package_id
-              WHERE p.platform='telegram' AND CAST(p.channel_message_id AS INTEGER) BETWEEN 3176 AND 3208
-              ORDER BY CAST(p.channel_message_id AS INTEGER) DESC
-          """).fetchall()
-          for r in rows: print('PUB',json.dumps(dict(r),ensure_ascii=False,sort_keys=True))
-          print('PUB_COUNT',len(rows))
-          print('ALL_TELEGRAM_PUBLICATIONS_TOP20')
-          rows2=c.execute("""
-              SELECT channel_chat_id,channel_message_id,package_id,offer_id,publish_status
-              FROM publication_instances WHERE platform='telegram'
-              ORDER BY CAST(channel_message_id AS INTEGER) DESC LIMIT 20
-          """).fetchall()
-          for r in rows2: print('TOP',json.dumps(dict(r),ensure_ascii=False,sort_keys=True))
+          ids=(3210,3209,3208,3207,3206,3203,3202,3201,3200,3199)
+          for mid in ids:
+              p=c.execute("SELECT * FROM publication_instances WHERE platform='telegram' AND channel_message_id=? ORDER BY updated_at DESC LIMIT 1",(str(mid),)).fetchone()
+              if not p:
+                  print('MISS',mid); continue
+              offer=str(p['offer_id'] or '')
+              listing=c.execute('SELECT * FROM listings_v3 WHERE listing_id=?',(p['listing_id'],)).fetchone()
+              off=c.execute('SELECT * FROM listing_offers WHERE offer_id=?',(offer,)).fetchone()
+              packs=c.execute("SELECT package_id,status,package_version,cover_style,cover_path,created_at,updated_at FROM publication_packages_v3 WHERE offer_id=? ORDER BY package_version DESC,id DESC",(offer,)).fetchall()
+              print('TARGET',mid,json.dumps({'instance_id':p['instance_id'],'pub_status':p['publish_status'],'bound_package':p['package_id'],'listing_id':p['listing_id'],'public_id':listing['public_listing_id'] if listing else None,'inventory_status':listing['inventory_status'] if listing else None,'offer_status':off['offer_status'] if off else None,'publication_policy':off['publication_policy'] if off else None},ensure_ascii=False,sort_keys=True))
+              print('PACKAGES',mid,json.dumps([dict(x) for x in packs],ensure_ascii=False,sort_keys=True))
           PY
