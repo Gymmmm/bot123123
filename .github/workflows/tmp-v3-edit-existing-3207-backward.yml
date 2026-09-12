@@ -1,0 +1,113 @@
+name: tmp-v3-edit-existing-3207-backward
+on:
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/tmp-v3-edit-existing-3207-backward.yml'
+permissions:
+  contents: read
+jobs:
+  edit-existing:
+    runs-on: ubuntu-latest
+    env:
+      PROD_HOST: 50.114.74.120
+      PROD_PORT: '22'
+      PROD_SSH_USER: root
+      EXPECTED_PROD_SHA: aaf7b3d8365641557d866aef798447191308d6dc
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify production host fingerprint
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          expected=$(tr -d '\r\n' < deploy/v3/production_host_fingerprint.txt)
+          ssh-keyscan -T 15 -p "$PROD_PORT" -t ed25519 "$PROD_HOST" 2>/dev/null | grep -v '^#' > "$RUNNER_TEMP/known_hosts"
+          ssh-keygen -lf "$RUNNER_TEMP/known_hosts" | grep -F "$expected"
+      - name: Configure production SSH
+        shell: bash
+        env:
+          PROD_SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+        run: |
+          set -Eeuo pipefail
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
+          cp "$RUNNER_TEMP/known_hosts" "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
+      - name: Edit 3207 backward from zufang555 7734..7448
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          cat <<'PY' | ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes "$PROD_SSH_USER@$PROD_HOST" "EXPECTED_PROD_SHA='$EXPECTED_PROD_SHA' bash -lc 'set -a; source /opt/qiaolian_v3/runtime.env; set +a; /opt/qiaolian_v3/.venv/bin/python -'"
+          import json, os, sqlite3, sys, urllib.parse, urllib.request
+          from pathlib import Path
+
+          ROOT=Path('/opt/qiaolian_v3/current').resolve()
+          if Path('/opt/qiaolian_v3/.deployed_sha').read_text().strip()!=os.environ['EXPECTED_PROD_SHA']:
+              raise SystemExit('EDIT_FATAL deployed_sha_mismatch')
+          sys.path.insert(0,str(ROOT))
+          os.chdir(ROOT)
+          from v3_core.publishing.channel_renderer import render_channel_caption
+
+          DB=Path(os.environ.get('DB_PATH','/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db')).resolve()
+          TOKEN=os.environ['PUBLISHER_BOT_TOKEN']
+          CHAT=os.environ['CHANNEL_ID']
+          START_TARGET=3207
+          LOW,HIGH=7448,7734
+          BATCH='edit_existing_3207_backward_20260912'
+
+          def anchor(row):
+              try: return int(json.loads(row['raw_meta_json'] or '{}').get('anchor_message_id') or 0)
+              except Exception: return 0
+
+          def api(method,payload):
+              data=urllib.parse.urlencode(payload).encode()
+              req=urllib.request.Request(f'https://api.telegram.org/bot{TOKEN}/{method}',data=data)
+              try:
+                  with urllib.request.urlopen(req,timeout=30) as r:
+                      return json.loads(r.read().decode())
+              except Exception as e:
+                  if hasattr(e,'read'):
+                      try: return json.loads(e.read().decode())
+                      except Exception: pass
+                  return {'ok':False,'description':str(e)}
+
+          conn=sqlite3.connect(str(DB),timeout=30); conn.row_factory=sqlite3.Row
+          conn.execute('PRAGMA busy_timeout=30000')
+          rows=conn.execute("SELECT id,source_post_id,source_url,raw_meta_json,parse_status FROM source_posts WHERE source_name='zufang555'").fetchall()
+          selected=[r for r in rows if LOW<=anchor(r)<=HIGH]
+          selected.sort(key=lambda r:(anchor(r),int(r['id'])),reverse=True)
+          print(f'EDIT_BEGIN selected={len(selected)} source={HIGH}..{LOW} target_start={START_TARGET}')
+
+          backup=Path('/opt/qiaolian_v3/runtime/deploy_backups/pre-edit-existing-3207-backward-20260912.sqlite3')
+          with sqlite3.connect(str(DB)) as src, sqlite3.connect(str(backup)) as dst: src.backup(dst)
+
+          edited=skipped=no_offer=no_listing=failed=0
+          mappings=[]
+          for idx,s in enumerate(selected):
+              msg_id=START_TARGET-idx
+              a=anchor(s); source_pk=int(s['id'])
+              cr=conn.execute('SELECT * FROM canonical_records WHERE source_post_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1',(str(source_pk),)).fetchone()
+              if not cr:
+                  skipped+=1; mappings.append((a,msg_id,'skip:no_canonical')); continue
+              listing=conn.execute('SELECT * FROM listings_v3 WHERE canonical_record_id=? ORDER BY updated_at DESC LIMIT 1',(cr['canonical_record_id'],)).fetchone()
+              if not listing:
+                  no_listing+=1; mappings.append((a,msg_id,'skip:no_listing')); continue
+              offer=conn.execute("SELECT * FROM listing_offers WHERE listing_id=? AND offer_type='rent' AND offer_status='active' ORDER BY updated_at DESC LIMIT 1",(listing['listing_id'],)).fetchone()
+              if not offer:
+                  no_offer+=1; mappings.append((a,msg_id,'skip:no_offer')); continue
+              conn.execute("UPDATE listings_v3 SET inventory_status='pending',updated_at=CURRENT_TIMESTAMP WHERE listing_id=?",(listing['listing_id'],))
+              conn.execute("UPDATE publisher_auto_items_v3 SET state='ignored',ignored=1,reason_code='existing_post_edit',reason_text=?,updated_at=CURRENT_TIMESTAMP WHERE offer_id=? AND state!='published'",(BATCH,offer['offer_id']))
+              listing_dict=dict(listing); listing_dict['inventory_status']='pending'
+              caption=render_channel_caption(listing=listing_dict,offer=dict(offer),public_listing_id=listing['public_listing_id'],status='pending')
+              res=api('editMessageCaption',{'chat_id':CHAT,'message_id':msg_id,'caption':caption})
+              if res.get('ok'):
+                  edited+=1; mappings.append((a,msg_id,f"ok:{listing['public_listing_id']}"))
+                  conn.execute("UPDATE publication_instances SET post_text=?,updated_at=CURRENT_TIMESTAMP WHERE platform='telegram' AND channel_message_id=?",(caption,str(msg_id)))
+              else:
+                  failed+=1; mappings.append((a,msg_id,'fail:'+str(res.get('description',''))[:120]))
+          conn.commit()
+          for x in mappings: print('MAP',*x)
+          print(f'EDIT_RESULT selected={len(selected)} edited={edited} skipped={skipped} no_listing={no_listing} no_offer={no_offer} failed={failed} target_end={START_TARGET-len(selected)+1 if selected else START_TARGET}')
+          if failed:
+              raise SystemExit(2)
+          PY
