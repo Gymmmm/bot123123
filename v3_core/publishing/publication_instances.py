@@ -104,6 +104,41 @@ class PublicationInstanceRepository:
             ).fetchone()
         return self._model(row) if row else None
 
+    def get_for_channel_message(
+        self,
+        *,
+        channel_chat_id: str,
+        channel_message_id: str | int,
+        platform: str = "telegram",
+    ) -> PublicationInstance | None:
+        """Resolve the durable publication identity for an external message id."""
+        with self._connect() as conn:
+            row = conn.execute(
+                """SELECT * FROM publication_instances
+                   WHERE platform=? AND channel_chat_id=? AND channel_message_id=?""",
+                (str(platform), str(channel_chat_id), str(channel_message_id)),
+            ).fetchone()
+        return self._model(row) if row else None
+
+    def record_edit(self, instance_id: str, *, post_text: str) -> PublicationInstance:
+        """Record a successful external edit without changing publication identity."""
+        with self._connect() as conn:
+            cur = conn.execute(
+                """UPDATE publication_instances
+                   SET post_text=?,updated_at=CURRENT_TIMESTAMP
+                   WHERE instance_id=?""",
+                (str(post_text or ""), str(instance_id)),
+            )
+            if cur.rowcount != 1:
+                raise KeyError(instance_id)
+            row = conn.execute(
+                "SELECT * FROM publication_instances WHERE instance_id=?",
+                (str(instance_id),),
+            ).fetchone()
+            conn.commit()
+        assert row is not None
+        return self._model(row)
+
     def record_telegram_publication(
         self,
         *,
