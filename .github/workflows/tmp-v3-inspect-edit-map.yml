@@ -35,19 +35,18 @@ jobs:
       - name: Inspect mapping
         shell: bash
         run: |
-          ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes "$PROD_SSH_USER@$PROD_HOST" 'python3 - <<'"'"'PY'"'"'
-          import sqlite3, json
+          set -Eeuo pipefail
+          cat <<'PY' | ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes "$PROD_SSH_USER@$PROD_HOST" python3 -
+          import sqlite3
           db='/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db'
           c=sqlite3.connect(db); c.row_factory=sqlite3.Row
           for t in ['source_posts','canonical_records','listings_v3','listing_offers','publication_instances','publication_packages_v3']:
               print('TABLE',t)
-              for r in c.execute(f'pragma table_info({t})'):
-                  print(r['name'], r['type'])
+              print(','.join(r['name'] for r in c.execute(f'pragma table_info({t})')))
           print('SOURCE_SAMPLE')
-          rows=c.execute("select * from source_posts where source_name='zufang555' order by id desc limit 3").fetchall()
-          for r in rows:
+          for r in c.execute("select id,source_post_id,source_url,parse_status,raw_meta_json from source_posts where source_name='zufang555' order by id desc limit 3"):
               print(dict(r))
           print('CANON_SAMPLE')
           for r in c.execute('select * from canonical_records order by rowid desc limit 3'):
               print(dict(r))
-          PY'
+          PY
