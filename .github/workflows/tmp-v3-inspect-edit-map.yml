@@ -48,14 +48,14 @@ jobs:
           print('PACKAGE_SCHEMA',','.join(r['name'] for r in c.execute('pragma table_info(publication_packages_v3)')))
           print('LIVE_PUBLICATIONS_3208_3176')
           rows=c.execute("""
-              SELECT p.channel_message_id,p.publication_package_id,p.offer_id,p.publication_state,
+              SELECT p.channel_message_id,p.package_id,p.offer_id,p.publish_status,
                      l.listing_id,l.public_listing_id,l.inventory_status,
-                     pk.package_id AS pkg_id,pk.status AS pkg_status,pk.package_version,pk.canonical_record_id,
+                     pk.status AS pkg_status,pk.package_version,pk.canonical_record_id,
                      substr(pk.post_text,1,80) AS post_head
               FROM publication_instances p
               LEFT JOIN listing_offers o ON o.offer_id=p.offer_id
               LEFT JOIN listings_v3 l ON l.listing_id=o.listing_id
-              LEFT JOIN publication_packages_v3 pk ON pk.package_id=p.publication_package_id
+              LEFT JOIN publication_packages_v3 pk ON pk.package_id=p.package_id
               WHERE p.platform='telegram' AND CAST(p.channel_message_id AS INTEGER) BETWEEN 3176 AND 3208
               ORDER BY CAST(p.channel_message_id AS INTEGER) DESC
           """).fetchall()
