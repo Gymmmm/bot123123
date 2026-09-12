@@ -1,0 +1,83 @@
+name: tmp-v3-backward-rebuild-v5
+on:
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/tmp-v3-backward-rebuild-v5.yml'
+permissions:
+  contents: read
+jobs:
+  rebuild-older:
+    runs-on: ubuntu-latest
+    env:
+      PROD_HOST: 50.114.74.120
+      PROD_PORT: '22'
+      PROD_SSH_USER: root
+      EXPECTED_PROD_SHA: aaf7b3d8365641557d866aef798447191308d6dc
+      HELPER_COMMIT: cdaa4909816f7c01197e56d46422c4110d710a5e
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+      - name: Verify production host fingerprint
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          expected=$(tr -d '\r\n' < deploy/v3/production_host_fingerprint.txt)
+          ssh-keyscan -T 15 -p "$PROD_PORT" -t ed25519 "$PROD_HOST" 2>/dev/null | grep -v '^#' > "$RUNNER_TEMP/known_hosts"
+          ssh-keygen -lf "$RUNNER_TEMP/known_hosts" | grep -F "$expected"
+      - name: Configure production SSH
+        shell: bash
+        env:
+          PROD_SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+        run: |
+          set -Eeuo pipefail
+          test -n "$PROD_SSH_PRIVATE_KEY"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
+          cp "$RUNNER_TEMP/known_hosts" "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
+      - name: Rebuild next 50 older groups
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 "$PROD_SSH_USER@$PROD_HOST" "bash -s -- '$EXPECTED_PROD_SHA' '$HELPER_COMMIT'" <<'REMOTE'
+          set -Eeuo pipefail
+          EXPECTED_PROD_SHA="$1"
+          HELPER_COMMIT="$2"
+          ROOT=/opt/qiaolian_v3
+          DB=/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db
+          VENV="$ROOT/.venv"
+          RUNTIME_ENV="$ROOT/runtime.env"
+          CURRENT_SHA=$(cat "$ROOT/.deployed_sha")
+          test "$CURRENT_SHA" = "$EXPECTED_PROD_SHA"
+          MARKER="$ROOT/.rebuild_zufang555_20260912_backward_v5_done"
+          if [ -f "$MARKER" ]; then
+            echo "BACKWARD_REBUILD_ALREADY_DONE marker=$MARKER"
+            exit 0
+          fi
+          BACKUP="$ROOT/runtime/deploy_backups/pre-rebuild-zufang555-20260912-backward-v5.sqlite3"
+          "$VENV/bin/python" - "$DB" "$BACKUP" <<'PY'
+          import sqlite3, sys
+          src, dst = sys.argv[1:3]
+          with sqlite3.connect(src) as source, sqlite3.connect(dst) as target:
+              source.backup(target)
+          PY
+          chmod 0640 "$BACKUP"
+          chown qiaolianbot:qiaolianbot "$BACKUP"
+          curl -fsSL "https://raw.githubusercontent.com/Gymmmm/bot123123/$HELPER_COMMIT/deploy/v3/open_rebuild_batch_zufang555.py" -o /tmp/open_rebuild_batch_zufang555_backward.py
+          set -a
+          source "$RUNTIME_ENV"
+          set +a
+          REBUILD_SOURCE_NAME=zufang555 \
+          REBUILD_TARGET_GROUPS=50 \
+          REBUILD_SKIP_GROUPS=50 \
+          REBUILD_BATCH_ID=zufang555_20260912_backward_v5 \
+            "$VENV/bin/python" /tmp/open_rebuild_batch_zufang555_backward.py
+          rm -f /tmp/open_rebuild_batch_zufang555_backward.py
+          touch "$MARKER"
+          systemctl restart qiaolian-v3@publisher.service
+          sleep 8
+          systemctl is-active --quiet qiaolian-v3@publisher.service
+          echo "BACKWARD_REBUILD_DONE marker=$MARKER skip=50 target=50"
+          REMOTE
