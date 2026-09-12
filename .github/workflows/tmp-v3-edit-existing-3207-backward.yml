@@ -80,21 +80,20 @@ jobs:
           limit=int(os.environ['LIMIT_COUNT'])
           max_id=int(os.environ['MAX_MESSAGE_ID'])
 
-          def restore_old(package_id,status):
+          def set_package_status(package_id, old_status, new_status):
               with sqlite3.connect(str(db),timeout=30) as c:
-                  c.execute("UPDATE publication_packages_v3 SET status=?,updated_at=CURRENT_TIMESTAMP WHERE package_id=? AND status='rebuild_hold'",(status,package_id))
+                  c.execute('BEGIN IMMEDIATE')
+                  cur=c.execute('UPDATE publication_packages_v3 SET status=?,updated_at=CURRENT_TIMESTAMP WHERE package_id=? AND status=?',(new_status,package_id,old_status))
+                  if cur.rowcount!=1: raise RuntimeError('package_status_transition_failed')
                   c.commit()
 
           def build_replacement(pub):
               old=packages.verify_frozen(pub['package_id'])
               old_status=old.status
-              if old_status not in {'approved','published'}:
-                  raise RuntimeError('old_package_not_frozen:'+old_status)
-              with sqlite3.connect(str(db),timeout=30) as c:
-                  c.execute('BEGIN IMMEDIATE')
-                  cur=c.execute("UPDATE publication_packages_v3 SET status='rebuild_hold',updated_at=CURRENT_TIMESTAMP WHERE package_id=? AND status=?",(old.package_id,old_status))
-                  if cur.rowcount!=1: raise RuntimeError('failed_to_hold_old_package')
-                  c.commit()
+              held=False
+              if old_status in {'approved','published'}:
+                  set_package_status(old.package_id,old_status,'rebuild_hold')
+                  held=True
               try:
                   new=builder.build(
                       listing_id=old.listing_id,
@@ -105,15 +104,18 @@ jobs:
                       source_identity=old.source_identity,
                   )
               finally:
-                  restore_old(old.package_id,old_status)
+                  if held:
+                      set_package_status(old.package_id,'rebuild_hold',old_status)
               return old,new
 
           def finalize(pub,old,new,caption):
               with sqlite3.connect(str(db),timeout=30) as c:
                   c.execute('BEGIN IMMEDIATE')
                   c.execute("UPDATE publication_packages_v3 SET status='superseded',updated_at=CURRENT_TIMESTAMP WHERE package_id=?",(old.package_id,))
-                  c.execute("UPDATE publication_packages_v3 SET status='published',published_at=COALESCE(published_at,CURRENT_TIMESTAMP),updated_at=CURRENT_TIMESTAMP WHERE package_id=? AND status='package_ready'",(new.package_id,))
-                  c.execute("UPDATE publication_instances SET package_id=?,listing_id=?,offer_id=?,post_text=?,updated_at=CURRENT_TIMESTAMP WHERE instance_id=?",(new.package_id,new.listing_id,new.offer_id,caption,pub['instance_id']))
+                  cur=c.execute("UPDATE publication_packages_v3 SET status='published',published_at=COALESCE(published_at,CURRENT_TIMESTAMP),updated_at=CURRENT_TIMESTAMP WHERE package_id=? AND status='package_ready'",(new.package_id,))
+                  if cur.rowcount!=1: raise RuntimeError('new_package_publish_transition_failed')
+                  cur=c.execute("UPDATE publication_instances SET package_id=?,listing_id=?,offer_id=?,post_text=?,publish_status='published',updated_at=CURRENT_TIMESTAMP WHERE instance_id=?",(new.package_id,new.listing_id,new.offer_id,caption,pub['instance_id']))
+                  if cur.rowcount!=1: raise RuntimeError('publication_rebind_failed')
                   c.commit()
 
           async def main():
@@ -127,22 +129,24 @@ jobs:
                           SELECT * FROM publication_instances
                           WHERE platform='telegram'
                             AND channel_chat_id IN (?,?)
-                            AND publish_status='published'
                             AND CAST(channel_message_id AS INTEGER)<=?
                           ORDER BY CAST(channel_message_id AS INTEGER) DESC
                           LIMIT ?
                       """,(aliases[0],aliases[1],max_id,limit)).fetchall()
                   print('SMOKE10_ALIASES',aliases,'COUNT',len(rows),flush=True)
+                  print('SMOKE10_BEGIN',[(r['channel_message_id'],r['publish_status']) for r in rows],flush=True)
                   if len(rows)<limit:
                       raise RuntimeError(f'only_{len(rows)}_durable_publications_available')
                   ok=0; failed=0; last=0.0
-                  print('SMOKE10_BEGIN',[r['channel_message_id'] for r in rows],flush=True)
                   for row in rows:
                       pub=dict(row)
                       if last:
                           wait=max(0.0,interval-(time.monotonic()-last))
                           if wait: await asyncio.sleep(wait)
                       try:
+                          offer=reader.offer(pub['offer_id'])
+                          if str(offer.get('offer_type') or '')!='rent' or str(offer.get('offer_status') or '')!='active' or str(offer.get('publication_policy') or '')!='telegram_rent':
+                              raise RuntimeError('target_offer_not_currently_publishable')
                           old,new=build_replacement(pub)
                           command=coordinator._command_for_package(
                               package_id=new.package_id,
