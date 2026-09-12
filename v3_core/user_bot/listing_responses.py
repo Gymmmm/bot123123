@@ -79,12 +79,12 @@ def _details_actions(
                 SemanticAction("📅 预约看房", "book", target),
                 SemanticAction("📸 更多实拍", "photos", target),
             ),
-            (SemanticAction("💬 联系中文顾问", "consult", target),),
+            (SemanticAction("💬 联系侨联", "consult", target),),
         )
     return (
         (
             SemanticAction("📸 更多实拍", "photos", target),
-            SemanticAction("💬 联系中文顾问", "consult", target),
+            SemanticAction("💬 联系侨联", "consult", target),
         ),
         (SemanticAction("🏘 看相近房源", "similar", target),),
     )
@@ -96,12 +96,12 @@ def _photo_actions(
     public_listing_id: str,
 ) -> tuple[tuple[SemanticAction, ...], ...]:
     target = str(public_listing_id or "").strip()
-    first = [SemanticAction("🏠 租赁详情", "details", target)]
+    first = [SemanticAction("📋 租赁详情", "details", target)]
     if bookable:
         first.append(SemanticAction("📅 预约看房", "book", target))
     return (
         tuple(first),
-        (SemanticAction("💬 联系中文顾问", "consult", target),),
+        (SemanticAction("💬 联系侨联", "consult", target),),
     )
 
 
@@ -110,26 +110,28 @@ def build_details_response(view: PublishedListingView) -> PublicDetailsResponse:
     price = _format_price(details.monthly_rent_usd)
     size = _format_size(details.size_sqm)
     floor = display_floor(details.floor)
-    subject = details.subject or details.location or "租赁房源"
 
-    lines = ["🏠 <b>租赁详情</b>", "", f"🏠 {he(subject)}"]
+    lines: list[str] = []
+    if details.location:
+        lines.append(f"🏠 <b>区域：</b> {he(details.location)}")
+    if details.layout:
+        lines.append(f"🛏 <b>户型：</b> {he(details.layout)}")
     if price:
-        lines.append(f"💰 <b>{he(price)}</b>")
-    if details.location and details.location not in {details.project_name, subject}:
-        lines.append(f"📍 {he(details.location)}")
-    house_bits = [value for value in (size, floor) if value]
-    if house_bits:
-        lines.append(f"📐 {he(' · '.join(house_bits))}")
+        lines.append(f"💰 <b>租金：</b> {he(price)}")
+    if size:
+        lines.append(f"📐 <b>面积：</b> {he(size)}")
+    if floor:
+        lines.append(f"🏢 <b>楼层：</b> {he(floor)}")
     if details.lease_summary:
-        lines.append(f"🔑 {he(details.lease_summary)}")
-    lines.append(f"{details.status_icon} 房态：{he(details.status_label)}")
+        lines.append(f"🔑 <b>租约：</b> {he(details.lease_summary)}")
+    lines.append(f"{details.status_icon} <b>房态：</b> {he(details.status_label)}")
     if details.public_listing_id:
-        lines.append(f"🆔 房源编号：{he(details.public_listing_id)}")
+        lines.append(f"📸 <b>实拍：</b> {he(details.public_listing_id)}")
 
     notes = adviser_notes_for_view(view, max_points=2, allow_empty=True).strip()
     if notes:
         safe_notes = "\n".join(he(line) for line in notes.splitlines() if line.strip())
-        lines.extend(["", "💬 侨联说", safe_notes])
+        lines.extend(["", "💬 <b>侨联说</b>", safe_notes])
 
     return PublicDetailsResponse(
         text="\n".join(lines),
@@ -171,7 +173,7 @@ def build_photos_response(view: PublishedListingView) -> PublicPhotosResponse:
             "📸 <b>更多实拍</b>\n\n"
             f"房源：{he(details.public_listing_id)}\n"
             "这套房的实拍暂时没有加载出来。\n\n"
-            "可以稍后再试，或直接联系中文顾问。"
+            "可以稍后再试，或直接联系侨联。"
         )
     return PublicPhotosResponse(
         media_groups=groups,
