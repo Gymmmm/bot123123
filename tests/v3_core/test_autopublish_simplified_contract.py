@@ -171,6 +171,7 @@ def test_channel_caption_matches_final_format_and_hides_internal_ids():
     text = render_channel_caption(
         listing={
             "project_name": "炳发城",
+            "public_location_display": "炳发城",
             "property_type": "公寓",
             "layout": "2房2卫",
             "size_sqm": 95,
@@ -188,16 +189,16 @@ def test_channel_caption_matches_final_format_and_hides_internal_ids():
         public_listing_id="QL-PP-A2B3",
     )
     assert text == (
-        "🏡 炳发城｜2房2卫\n\n"
+        "🏡 炳发城｜2房2卫\n"
         "💵 $800/月\n\n"
-        "🏢 公寓\n\n"
-        "📐 95㎡｜19楼\n\n"
+        "🏢 公寓｜95㎡｜19楼\n"
         "🗝️ 押一付一｜一年起租\n\n"
-        "🟢 当前可预约　QL-PP-A2B3"
+        "🟢 当前可预约　QL-PP-A2B3\n\n"
+        "#炳发城 #2房 #600至800"
     )
     assert "l_999" not in text
     assert "OFF_SECRET" not in text
-    assert "#" not in text
+    assert "#炳发城 #2房 #600至800" in text
 
 
 def test_channel_caption_missing_fields_leave_no_empty_separators():
@@ -220,8 +221,7 @@ def test_channel_caption_missing_fields_leave_no_empty_separators():
         public_listing_id="QL-PP-A2B3",
     )
     assert "🏡 BKK1｜3房" in text
-    assert "🏘️ 排屋" in text
-    assert "📐 12楼" in text
+    assert "🏢 排屋｜12楼" in text
     assert "🗝️ 一年起租" in text
     assert "｜｜" not in text
     assert "｜\n" not in text

@@ -197,11 +197,11 @@ def _published_view() -> PublishedListingView:
     )
 
 
-def test_details_labels_public_id_as_listing_number_not_photo_field():
+def test_details_labels_public_id_as_real_photo_reference():
     text = build_details_response(_published_view()).text
-    assert "🏠 <b>租赁详情</b>" in text
-    assert "🆔 房源编号：QL-RF-A2B3" in text
-    assert "📸 实拍：QL-RF-A2B3" not in text
+    assert "🏠 <b>区域：</b>" in text
+    assert "📸 <b>实拍：</b> QL-RF-A2B3" in text
+    assert "🆔 房源编号：QL-RF-A2B3" not in text
 
 
 def test_rfcity_category_returns_to_rfcity_navigation():
