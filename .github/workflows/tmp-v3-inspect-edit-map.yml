@@ -13,6 +13,7 @@ jobs:
       PROD_HOST: 50.114.74.120
       PROD_PORT: '22'
       PROD_SSH_USER: root
+      EXPECTED_PROD_SHA: aaf7b3d8365641557d866aef798447191308d6dc
     steps:
       - uses: actions/checkout@v4
       - name: Verify production host fingerprint
@@ -32,21 +33,37 @@ jobs:
           printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
           cp "$RUNNER_TEMP/known_hosts" "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
-      - name: Inspect mapping
+      - name: Inspect live publication mapping
         shell: bash
         run: |
           set -Eeuo pipefail
-          cat <<'PY' | ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes "$PROD_SSH_USER@$PROD_HOST" python3 -
-          import sqlite3
+          cat <<'PY' | ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes "$PROD_SSH_USER@$PROD_HOST" "EXPECTED_PROD_SHA='$EXPECTED_PROD_SHA' python3 -"
+          import json, os, sqlite3
+          from pathlib import Path
+          if Path('/opt/qiaolian_v3/.deployed_sha').read_text().strip()!=os.environ['EXPECTED_PROD_SHA']:
+              raise SystemExit('INSPECT_FATAL deployed_sha_mismatch')
           db='/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db'
           c=sqlite3.connect(db); c.row_factory=sqlite3.Row
-          for t in ['source_posts','canonical_records','listings_v3','listing_offers','publication_instances','publication_packages_v3']:
-              print('TABLE',t)
-              print(','.join(r['name'] for r in c.execute(f'pragma table_info({t})')))
-          print('SOURCE_SAMPLE')
-          for r in c.execute("select id,source_post_id,source_url,parse_status,raw_meta_json from source_posts where source_name='zufang555' order by id desc limit 3"):
-              print(dict(r))
-          print('CANON_SAMPLE')
-          for r in c.execute('select * from canonical_records order by rowid desc limit 3'):
-              print(dict(r))
+          print('PUBLICATION_SCHEMA',','.join(r['name'] for r in c.execute('pragma table_info(publication_instances)')))
+          print('PACKAGE_SCHEMA',','.join(r['name'] for r in c.execute('pragma table_info(publication_packages_v3)')))
+          print('LIVE_PUBLICATIONS_3208_3176')
+          rows=c.execute("""
+              SELECT p.channel_message_id,p.publication_package_id,p.offer_id,p.publication_state,
+                     l.listing_id,l.public_listing_id,l.inventory_status,
+                     pk.package_id AS pkg_id,pk.status AS pkg_status,pk.package_version,pk.canonical_record_id,
+                     substr(pk.post_text,1,80) AS post_head
+              FROM publication_instances p
+              LEFT JOIN listing_offers o ON o.offer_id=p.offer_id
+              LEFT JOIN listings_v3 l ON l.listing_id=o.listing_id
+              LEFT JOIN publication_packages_v3 pk ON pk.package_id=p.publication_package_id
+              WHERE p.platform='telegram' AND CAST(p.channel_message_id AS INTEGER) BETWEEN 3176 AND 3208
+              ORDER BY CAST(p.channel_message_id AS INTEGER) DESC
+          """).fetchall()
+          for r in rows: print('PUB',json.dumps(dict(r),ensure_ascii=False,sort_keys=True))
+          print('PUB_COUNT',len(rows))
+          print('PACKAGES_FOR_MAPPED_OFFERS')
+          offers=sorted({str(r['offer_id']) for r in rows if r['offer_id']})
+          for offer in offers:
+              rs=c.execute("SELECT package_id,status,package_version,canonical_record_id,created_at,updated_at FROM publication_packages_v3 WHERE offer_id=? ORDER BY package_version DESC,id DESC",(offer,)).fetchall()
+              print('OFFER_PACKAGES',offer,json.dumps([dict(x) for x in rs],ensure_ascii=False,sort_keys=True))
           PY
