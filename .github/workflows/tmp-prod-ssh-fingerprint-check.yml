@@ -1,0 +1,28 @@
+name: tmp-prod-ssh-fingerprint-check
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/tmp-prod-ssh-fingerprint-check.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scan production ed25519 host key
+        run: |
+          set +e
+          ssh-keyscan -vv -T 15 -p 22 -t ed25519 50.114.74.120 > "$RUNNER_TEMP/hostkey" 2> "$RUNNER_TEMP/scanerr"
+          rc=$?
+          echo "KEYSCAN_RC=$rc"
+          echo '--- stderr ---'
+          cat "$RUNNER_TEMP/scanerr"
+          echo '--- key ---'
+          cat "$RUNNER_TEMP/hostkey"
+          echo '--- fingerprint ---'
+          if [ -s "$RUNNER_TEMP/hostkey" ]; then ssh-keygen -lf "$RUNNER_TEMP/hostkey"; fi
+          exit 0
