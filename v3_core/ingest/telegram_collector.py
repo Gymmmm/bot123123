@@ -167,14 +167,14 @@ class TelegramCollectorApp:
         message: Any,
         raw_images: list[dict[str, Any]],
     ) -> str:
-        """Production policy: collect images only; videos are admin-import only."""
+        """Download supported images while still identifying non-image source posts."""
         if getattr(message, "photo", None):
             item = await self.download_media(client, message)
             if item:
                 raw_images.append(item)
             return "image"
         if getattr(message, "video", None):
-            return "skip_video"
+            return "video"
         media = getattr(message, "media", None)
         if isinstance(media, MessageMediaDocument):
             document = media.document
@@ -222,25 +222,31 @@ class TelegramCollectorApp:
 
     async def handle_single(self, event: Any, source_cfg: dict[str, Any]) -> IntakeResult | None:
         message = event.message
-        if not getattr(message, "text", None) and not getattr(message, "media", None):
+        raw_text = str(message.message or "")
+        if not raw_text and not getattr(message, "media", None):
             return None
         raw_images: list[dict[str, Any]] = []
+        mode = "text"
         if getattr(message, "media", None):
             mode = await self.append_supported_media(event.client, message, raw_images)
-            if mode == "skip_video":
-                return None
-        if not raw_images:
+        if mode == "unsupported" and not raw_text:
             return None
+        ingest_kind = {
+            "text": "single_text",
+            "video": "single_video",
+            "image": "single",
+            "unsupported": "single_text_media",
+        }.get(mode, "single")
         return self.persist(
             source_cfg=source_cfg,
             chat_id=int(event.chat_id),
             source_post_id=str(message.id),
             anchor_message_id=int(message.id),
-            raw_text=str(message.message or ""),
+            raw_text=raw_text,
             raw_images=raw_images,
             grouped_id=getattr(message, "grouped_id", None),
             source_author=sender_label(message),
-            ingest_kind="single",
+            ingest_kind=ingest_kind,
             message_count=1,
         )
 
@@ -251,10 +257,14 @@ class TelegramCollectorApp:
         messages.sort(key=lambda item: item.id)
         anchor = messages[0]
         raw_images: list[dict[str, Any]] = []
+        has_video = False
         for message in messages:
+            if getattr(message, "video", None):
+                has_video = True
             if getattr(message, "media", None):
                 await self.append_supported_media(event.client, message, raw_images)
-        if not raw_images:
+        raw_text = str((event.text or event.raw_text or "").strip())
+        if not raw_images and not raw_text and not has_video:
             return None
         grouped_id = getattr(anchor, "grouped_id", None)
         source_post_id = f"album_{grouped_id}" if grouped_id is not None else f"album_{anchor.id}"
@@ -263,7 +273,7 @@ class TelegramCollectorApp:
             chat_id=int(event.chat_id),
             source_post_id=source_post_id,
             anchor_message_id=int(anchor.id),
-            raw_text=str((event.text or event.raw_text or "").strip()),
+            raw_text=raw_text,
             raw_images=raw_images,
             grouped_id=grouped_id,
             source_author=sender_label(anchor),
