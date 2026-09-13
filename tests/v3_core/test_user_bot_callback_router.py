@@ -189,10 +189,54 @@ def test_similar_callback_returns_guided_budget_intent_without_searching():
     assert dispatched.similar.intent.area_display == "BKK1"
     assert dispatched.similar.intent.next_step == "budget"
     assert similar is not None
-    assert similar.calls == [("QL-RF-A2B3", "similar_listing")]
+    assert similar.calls == [("QL-RF-A2B3", "listing_callback")]
     assert consult is not None and consult.calls == []
     assert listing.calls == []
     assert session.calls == []
+
+
+def test_listing_callbacks_preserve_explicit_channel_source_across_actions():
+    router, listing, _, consult, similar = _router()
+
+    router.dispatch(
+        "v3u:listing:details:QL-RF-A2B3",
+        source="channel_listing",
+    )
+    router.dispatch(
+        "v3u:listing:consult:QL-RF-A2B3",
+        source="channel_listing",
+    )
+    router.dispatch(
+        "v3u:listing:similar:QL-RF-A2B3",
+        source="channel_listing",
+    )
+
+    assert listing.calls == [("QL-RF-A2B3", "details", "channel_listing")]
+    assert consult is not None and consult.calls == [("QL-RF-A2B3", "channel_listing")]
+    assert similar is not None and similar.calls == [("QL-RF-A2B3", "channel_listing")]
+
+
+def test_listing_book_callback_passes_search_result_source_to_flow():
+    result = PublicListingFlowResult(
+        status="ok",
+        action="book",
+        public_listing_id="QL-RF-A2B3",
+        book=PublicBookIntent(
+            listing_id="LST_1",
+            public_listing_id="QL-RF-A2B3",
+            source="search_result",
+            start_payload="",
+        ),
+    )
+    router, listing, _, _, _ = _router(listing_result=result)
+
+    dispatched = router.dispatch(
+        "v3u:listing:book:QL-RF-A2B3",
+        source="search_result",
+    )
+
+    assert dispatched.ok
+    assert listing.calls == [("QL-RF-A2B3", "book", "search_result")]
 
 
 def test_missing_consult_or_similar_listing_preserves_not_found():
