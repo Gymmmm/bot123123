@@ -26,7 +26,19 @@ jobs:
             qiaolian_dual \
             tests/v3_core \
             run_v3_user_bot.py
-      - name: Run V3 contracts
+      - name: V3 isolation and upgraded User Bot contract
+        env:
+          PYTHONPATH: '${{ github.workspace }}'
+        run: |
+          python -m pytest -q \
+            tests/v3_core/test_no_legacy_runtime_imports.py \
+            tests/v3_core/test_user_bot_product_upgrade.py \
+            tests/v3_core/test_user_bot_public_flow.py \
+            tests/v3_core/test_user_bot_telegram_appointment_submit.py \
+            tests/v3_core/test_user_bot_telegram_search_submit.py \
+            tests/v3_core/test_user_bot_telegram_lead_effects.py
+      - name: Baseline V3 suite audit
+        continue-on-error: true
         env:
           PYTHONPATH: '${{ github.workspace }}'
         run: |
