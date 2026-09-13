@@ -21,10 +21,7 @@ from .listing_contact import (
     build_listing_contact_view,
 )
 from .public_inventory import PublicInventoryReader
-from .telegram_callback_handler import (
-    TelegramCallbackHandlerOutcome,
-    handle_v3_callback,
-)
+from .telegram_callback_handler import TelegramCallbackHandlerOutcome, handle_v3_callback
 from .transition_views import TransitionViewService
 
 
@@ -58,9 +55,9 @@ def _lead_user(update: Any) -> LeadUser:
 
 async def _render_contact(query: Any, *, text: str, public_listing_id: str, advisor_url: str) -> None:
     contact_button = (
-        InlineKeyboardButton("💬 联系我们", url=advisor_url)
+        InlineKeyboardButton("💬 打开顾问对话", url=advisor_url)
         if str(advisor_url or "").strip()
-        else InlineKeyboardButton("💬 联系我们", callback_data="v3u:home:contact")
+        else InlineKeyboardButton("💬 联系顾问", callback_data="v3u:home:contact")
     )
     markup = InlineKeyboardMarkup(
         [
@@ -70,23 +67,25 @@ async def _render_contact(query: Any, *, text: str, public_listing_id: str, advi
                     "📅 预约看房",
                     callback_data=encode_listing_callback("book", public_listing_id),
                 ),
+                InlineKeyboardButton(
+                    "📸 更多实拍",
+                    callback_data=encode_listing_callback("photos", public_listing_id),
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    "⬅️ 返回这套房",
+                    callback_data=encode_listing_callback("details", public_listing_id),
+                ),
                 InlineKeyboardButton("🔍 继续找房", callback_data="v3u:home:search"),
             ],
         ]
     )
     message = getattr(query, "message", None)
     if getattr(message, "photo", None):
-        await query.edit_message_caption(
-            caption=text,
-            parse_mode=ParseMode.HTML,
-            reply_markup=markup,
-        )
+        await query.edit_message_caption(caption=text, parse_mode=ParseMode.HTML, reply_markup=markup)
         return
-    await query.edit_message_text(
-        text,
-        parse_mode=ParseMode.HTML,
-        reply_markup=markup,
-    )
+    await query.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=markup)
 
 
 async def handle_v3_listing_callback(
