@@ -171,6 +171,10 @@ def build_v3_user_bot_application(
     admin_authorizer: Callable[[int], bool] | None = None,
     admin_home_handler: Callable[[Any, Any], Awaitable[None]] | None = None,
     admin_query_handler: Callable[[Any, Any], Awaitable[None]] | None = None,
+    admin_contract_command_handler: Callable[[Any, Any], Awaitable[Any]] | None = None,
+    admin_contract_callback_handler: Callable[[Any, Any, Any, str, Any], Awaitable[Any]] | None = None,
+    admin_contract_text_handler: Callable[[Any, Any], Awaitable[Any]] | None = None,
+    admin_workflow_callback_handler: Callable[[Any, Any, Any, str, Any], Awaitable[Any]] | None = None,
 ) -> Application:
     config.validate()
     deps = dependencies or build_v3_user_bot_dependencies(config)
@@ -178,12 +182,11 @@ def build_v3_user_bot_application(
     runtime_state = RuntimeStateRepository(config.db_path)
 
     async def configure_command_menu(application: Application) -> None:
-        # Keep the public menu simple. Telegram's per-chat scope makes the
-        # administrator console visible only to configured administrators.
         await application.bot.set_my_commands([BotCommand("start", "打开侨联小管家")])
         admin_commands = [
             BotCommand("start", "打开侨联小管家"),
-            BotCommand("admin", "咨询后台"),
+            BotCommand("admin", "管理后台"),
+            BotCommand("contracts", "租客与合同"),
         ]
         for admin_id in sorted(set(admin_command_ids or config.admin_ids)):
             await application.bot.set_my_commands(
@@ -214,6 +217,13 @@ def build_v3_user_bot_application(
         else:
             await show_admin_home(update.effective_message)
 
+    async def contracts(update, context):
+        runtime_state.heartbeat("user", state="running", event=True)
+        if not is_admin(update):
+            return
+        if admin_contract_command_handler is not None:
+            await admin_contract_command_handler(update, context)
+
     async def admin_callbacks(update, context):
         runtime_state.heartbeat("user", state="running", event=True)
         query = getattr(update, "callback_query", None)
@@ -230,6 +240,22 @@ def build_v3_user_bot_application(
             await admin_query_handler(update, context)
         else:
             await handle_admin_callback(update, admin_appointments)
+
+    async def legacy_admin_callbacks(update, context):
+        runtime_state.heartbeat("user", state="running", event=True)
+        query = getattr(update, "callback_query", None)
+        user = getattr(update, "effective_user", None)
+        if query is None or user is None:
+            return
+        if not is_admin(update):
+            await query.answer("无管理员权限", show_alert=True)
+            return
+        raw = str(query.data or "")
+        if raw.startswith("admincontract:") and admin_contract_callback_handler is not None:
+            await admin_contract_callback_handler(update, context, query, raw, user)
+            return
+        if raw.startswith(("adminlead:", "adminrepair:")) and admin_workflow_callback_handler is not None:
+            await admin_workflow_callback_handler(update, context, query, raw, user)
 
     async def start(update, context):
         runtime_state.heartbeat("user", state="running", event=True)
@@ -300,6 +326,10 @@ def build_v3_user_bot_application(
 
     async def text(update, context):
         runtime_state.heartbeat("user", state="running", event=True)
+        if is_admin(update) and admin_contract_text_handler is not None:
+            admin_result = await admin_contract_text_handler(update, context)
+            if admin_result is not None:
+                return
         outcome = await handle_v3_transition_text(
             update,
             context,
@@ -337,7 +367,15 @@ def build_v3_user_bot_application(
 
     app.add_handler(CommandHandler("start", start), group=0)
     app.add_handler(CommandHandler("admin", admin), group=0)
+    app.add_handler(CommandHandler("contracts", contracts), group=0)
     app.add_handler(CallbackQueryHandler(admin_callbacks, pattern=r"^adminq:"), group=0)
+    app.add_handler(
+        CallbackQueryHandler(
+            legacy_admin_callbacks,
+            pattern=r"^(?:admincontract|adminlead|adminrepair):",
+        ),
+        group=0,
+    )
     app.add_handler(CallbackQueryHandler(callbacks, pattern=r"^v3u:"), group=0)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text), group=0)
     app.add_error_handler(errors)
