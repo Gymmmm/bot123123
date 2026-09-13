@@ -1,15 +1,18 @@
 """Prepare immutable derived media for V3 publication packaging.
 
-Raw source evidence is never modified. Publication media is first copied through
-our conservative source-mark scrubber, then the existing production dedupe /
-quality ranking / cover selection contract runs on those derived files. Cover
-rendering remains owned by ``CoverRenderService`` and is intentionally unchanged.
+Raw source evidence is never modified. Publication media first goes through the
+conservative source-mark scrubber, then the existing production dedupe / quality
+ranking / cover selection contract runs on derived files. If a scrub would edit
+more than the safety budget, an untouched derived copy is used instead of
+blocking the listing or damaging the photo. Cover rendering remains owned by
+``CoverRenderService`` and is intentionally unchanged.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
 from pathlib import Path
+import shutil
 from typing import Any
 
 from v3_core.ingest.source_reader import SourceReader
@@ -51,6 +54,17 @@ class MediaPreparationService:
                 digest.update(chunk)
         return digest.hexdigest()
 
+    @staticmethod
+    def _safe_suffix(path: Path) -> str:
+        suffix = path.suffix.lower()
+        return suffix if suffix in {".jpg", ".jpeg", ".png", ".webp"} else ".img"
+
+    def _original_derivative(self, src: Path, target_dir: Path, digest: str) -> Path:
+        fallback = target_dir / f"{digest[:24]}_source{self._safe_suffix(src)}"
+        if not fallback.is_file():
+            shutil.copy2(src, fallback)
+        return fallback
+
     def _scrubbed_paths(
         self,
         *,
@@ -68,22 +82,31 @@ class MediaPreparationService:
             if not src.is_file():
                 rejected.append(str(src))
                 continue
-            dst = target_dir / f"{self._digest(src)[:24]}_clean.jpg"
+            digest = self._digest(src)
+            dst = target_dir / f"{digest[:24]}_clean.jpg"
+            chosen: Path | None = None
             try:
-                if not dst.is_file():
+                if dst.is_file():
+                    chosen = dst
+                else:
                     info = scrub_file(src, dst, prefer_crop=False)
                     actual = info.get("inpaint_coverage")
                     coverage = float(actual if actual is not None else info.get("coverage") or 0.0)
-                    if coverage > MAX_SCRUB_COVERAGE:
+                    if coverage <= MAX_SCRUB_COVERAGE:
+                        chosen = dst
+                    else:
                         dst.unlink(missing_ok=True)
-                        rejected.append(str(src))
-                        continue
-                clean = str(dst.resolve())
-                accepted.append(clean)
-                raw_to_clean[str(src)] = clean
-            except Exception as exc:
+                        chosen = self._original_derivative(src, target_dir, digest)
+            except Exception:
                 dst.unlink(missing_ok=True)
-                raise RuntimeError(f"source_scrub_failed:{src}:{type(exc).__name__}:{exc}") from exc
+                # Scrubbing is an enhancement stage, not permission to corrupt
+                # or drop otherwise valid source evidence. Fail safely to an
+                # immutable derived copy and let production quality gates decide.
+                chosen = self._original_derivative(src, target_dir, digest)
+
+            clean = str(chosen.resolve())
+            accepted.append(clean)
+            raw_to_clean[str(src)] = clean
 
         return accepted, raw_to_clean, rejected
 
