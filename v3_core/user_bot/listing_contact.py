@@ -29,27 +29,16 @@ class ListingContactView:
 
 
 class ListingContactEffectExecutor:
-    def __init__(
-        self,
-        *,
-        leads: LeadEffectExecutor,
-        admins: TelegramAdminNotifier,
-    ):
+    def __init__(self, *, leads: LeadEffectExecutor, admins: TelegramAdminNotifier):
         self.leads = leads
         self.admins = admins
 
-    async def execute(
-        self,
-        *,
-        bot: Any,
-        user: LeadUser,
-        intent: ConsultIntent,
-    ) -> ListingContactEffectResult:
+    async def execute(self, *, bot: Any, user: LeadUser, intent: ConsultIntent) -> ListingContactEffectResult:
         lead = self.leads.record_listing_contact(user=user, intent=intent)
         admin = await self.admins.send(
             bot,
             AdminNotification(
-                title="用户联系我们",
+                title="用户咨询房源",
                 lines=(
                     f"用户：{user_mention_html(user)}",
                     f"联系方式：{he(user_contact_text(user))}",
@@ -77,15 +66,23 @@ def build_listing_contact_view(
         if details.monthly_rent_usd is not None and int(details.monthly_rent_usd) > 0
         else ""
     )
-    price_line = f"\n💰 <b>{he(price)}</b>" if price else ""
+    lines = [
+        "💬 <b>咨询这套房</b>",
+        "",
+        f"🏠 <b>{he(subject)}</b>",
+    ]
+    if price:
+        lines.append(f"💵 <b>{he(price)}</b>")
+    lines.extend(
+        [
+            f"🆔 {he(intent.public_listing_id)}",
+            "",
+            "这套房的信息已经带上，不用重新说明。",
+            "可以直接问价格、费用、房态或看房时间。",
+        ]
+    )
     return ListingContactView(
-        text=(
-            "💬 <b>已记录您咨询的房源</b>\n\n"
-            f"🏠 <b>{he(subject)}</b>{price_line}\n"
-            f"🆔 {he(intent.public_listing_id)}\n\n"
-            "点击下方即可联系我们。\n"
-            "这套房的信息已经带上，不用重新说明。"
-        ),
+        text="\n".join(lines),
         advisor_url=str(advisor_url or "").strip(),
         public_listing_id=intent.public_listing_id,
     )
