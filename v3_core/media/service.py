@@ -74,7 +74,12 @@ class MediaPreparationService:
                 # bytes + scrub revision; raw evidence is never overwritten.
                 if not dst.is_file():
                     info = scrub_file(src, dst, prefer_crop=False)
-                    coverage = float(info.get("coverage") or 0.0)
+                    # ``coverage`` is the detector's broad candidate mask and can
+                    # intentionally over-detect. Safety is based on the area that
+                    # was actually inpainted; fall back to detector coverage only
+                    # when the scrubber reports no actual-edit metric.
+                    actual = info.get("inpaint_coverage")
+                    coverage = float(actual if actual is not None else info.get("coverage") or 0.0)
                     if coverage > MAX_SCRUB_COVERAGE:
                         dst.unlink(missing_ok=True)
                         rejected.append(str(src))
