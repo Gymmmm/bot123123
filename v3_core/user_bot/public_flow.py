@@ -112,9 +112,15 @@ class PublicListingFlowService:
 
     def resolve(self, payload: object) -> PublicListingFlowResult:
         clean_payload = str(payload or "").strip()
+        decision = self.routes.resolve(clean_payload)
+        route_source = (
+            str(getattr(decision.route, "source", "") or "").strip()
+            if decision.route is not None
+            else ""
+        )
         return self._render(
-            self.routes.resolve(clean_payload),
-            source="channel_deeplink",
+            decision,
+            source=route_source or "channel_deeplink",
             start_payload=clean_payload,
         )
 
