@@ -15,6 +15,7 @@ jobs:
       PROD_SSH_USER: root
       EXPECTED_PROD_SHA: aaf7b3d8365641557d866aef798447191308d6dc
       MEDIA_BRANCH: feat/listing-media-pipeline-v1
+      PREVIEW_STYLE_REV: glass-v2
     steps:
       - uses: actions/checkout@v4
       - name: Verify production host fingerprint
