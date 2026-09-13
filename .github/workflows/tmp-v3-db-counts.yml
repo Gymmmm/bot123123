@@ -31,6 +31,7 @@ jobs:
       - name: Inspect production runtime
         shell: bash
         run: |
+          # Verify media-preparation production activation; read-only.
           set -Eeuo pipefail
           ssh -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes root@50.114.74.120 '
             set -Eeuo pipefail
@@ -42,5 +43,6 @@ jobs:
               pid=$(systemctl show "$unit" -p MainPID --value || true)
               if [ -n "$pid" ] && [ "$pid" != "0" ] && [ -e "/proc/$pid/cwd" ]; then echo "CWD ${svc}=$(readlink -f /proc/$pid/cwd)"; fi
             done
+            test -f /opt/qiaolian_v3/current/v3_core/media/source_scrub.py
             python3 -m compileall -q /opt/qiaolian_v3/current/v3_core
           '
