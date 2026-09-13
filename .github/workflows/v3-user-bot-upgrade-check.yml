@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - feat/v3-user-bot-product-upgrade
+      - feat/v3-user-bot-retention-pass1
+  pull_request:
+    branches:
+      - feat/v3-user-bot-product-upgrade
   workflow_dispatch:
 
 jobs:
