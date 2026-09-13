@@ -139,7 +139,7 @@ def build_details_response(view: PublishedListingView) -> PublicDetailsResponse:
         lines.append(f"📐 {'｜'.join(he(item) for item in detail_parts)}")
     if details.lease_summary:
         lines.append(f"🔑 {he(details.lease_summary)}")
-    lines.append(f"{details.status_icon} {he(details.status_label)}")
+    lines.append(f"{details.status_icon} 房态：{he(details.status_label)}")
     if details.public_listing_id:
         lines.append(f"🆔 {he(details.public_listing_id)}")
 
