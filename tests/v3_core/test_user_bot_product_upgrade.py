@@ -1,13 +1,19 @@
 from pathlib import Path
 
 from v3_core.user_bot.admin_console_bridge import admin_home_keyboard
+from v3_core.user_bot.assurance_views import build_assurance_home_view, build_moving_view
 from v3_core.user_bot.home_callbacks import encode_home_callback, parse_home_callback
-from v3_core.user_bot.home_views import build_about_view, build_booking_view, build_home_view
+from v3_core.user_bot.home_views import build_about_view, build_booking_view, build_contact_view, build_home_view
 from v3_core.user_bot.service_product_views import service_home_view
+from v3_core.user_bot.service_views import local_life_view, nearby_view, property_view, repair_home_view, rfcity_home_view
 
 
 def _labels(view):
     return [choice.label for row in view.rows for choice in row]
+
+
+def _callbacks(view):
+    return [choice.callback_data for row in view.rows for choice in row if getattr(choice, "callback_data", "")]
 
 
 def _button_labels(markup):
@@ -17,13 +23,7 @@ def _button_labels(markup):
 def test_v3_home_uses_product_upgrade_navigation():
     view = build_home_view(channel_url="https://t.me/qiaolian")
     labels = _labels(view)
-    assert labels[:5] == [
-        "🔍 智能找房",
-        "📖 关于侨联",
-        "📅 预约看房",
-        "💬 联系顾问",
-        "🛡 入住服务",
-    ]
+    assert labels[:5] == ["🔍 智能找房", "📖 关于侨联", "📅 预约看房", "💬 联系顾问", "🛡 入住服务"]
     assert "📢 房源频道" in labels
     assert "🧭 周边服务" not in labels
     assert "📅 我的预约" not in labels
@@ -34,7 +34,7 @@ def test_about_and_booking_are_first_class_home_actions():
     assert parse_home_callback(encode_home_callback("about")).action == "about"
     assert parse_home_callback(encode_home_callback("book")).action == "book"
     assert "关于侨联地产" in build_about_view().text
-    assert "从房源详情直接点「预约看房」" in build_booking_view().text
+    assert "从房源详情点「预约看房」" in build_booking_view().text
 
 
 def test_service_hub_covers_full_rental_lifecycle_without_new_backend_flow():
@@ -44,15 +44,41 @@ def test_service_hub_covers_full_rental_lifecycle_without_new_backend_flow():
     assert "🔧 报修与维护" in labels
     assert "🏢 物业沟通" in labels
     assert "🔄 续租 / 换房" in labels
-    assert "🔐 退租与押金" in labels
+    assert "📄 押金与退租说明" in labels
     assert "🧭 周边服务" in labels
-
-    callbacks = [choice.callback_data for row in view.rows for choice in row]
+    callbacks = _callbacks(view)
     assert "v3u:service:repair" in callbacks
     assert "v3u:service:property" in callbacks
     assert "v3u:home:rental" in callbacks
     assert "v3u:assure:deposit" in callbacks
     assert "v3u:service:local" in callbacks
+
+
+def test_rental_guide_is_one_parent_document_with_supporting_assets():
+    view = build_assurance_home_view()
+    assert "租赁服务指南" in view.text
+    assert "签约前确认" in view.text
+    assert "入住交接" in view.text
+    assert "退租核对" in view.text
+    assert _callbacks(view) == ["v3u:assure:handover", "v3u:assure:deposit", "v3u:home:contact", "v3u:home:service"]
+
+
+def test_repair_page_exposes_every_supported_core_issue():
+    callbacks = set(_callbacks(repair_home_view()))
+    for issue in ("repair_ac", "repair_water", "repair_power", "repair_door", "repair_washer", "repair_fridge", "repair_network", "repair_furniture", "repair_other"):
+        assert f"v3u:service:issue:{issue}" in callbacks
+
+
+def test_public_static_page_callbacks_use_registered_v3_namespaces():
+    views = [
+        build_about_view(), build_booking_view(), build_contact_view(), service_home_view(),
+        build_assurance_home_view(), build_moving_view(), repair_home_view(), property_view(),
+        local_life_view(), nearby_view(), rfcity_home_view(),
+    ]
+    allowed = ("v3u:home:", "v3u:service:", "v3u:assure:", "v3u:t:")
+    for view in views:
+        for callback in _callbacks(view):
+            assert callback.startswith(allowed), (view.kind, callback)
 
 
 def test_admin_home_exposes_consult_contract_renewal_and_service_work():
