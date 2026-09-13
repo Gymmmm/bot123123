@@ -1,6 +1,8 @@
 from pathlib import Path
+import hashlib
 
 from PIL import Image, ImageDraw
+import pytest
 
 from v3_core.ingest.source_reader import SourceReader
 from v3_core.ingest.source_repository import SourceRepository
@@ -24,11 +26,15 @@ def _image(path: Path, value: int):
     return str(path)
 
 
-def test_media_preparation_reads_source_order_and_selects_one_cover(tmp_path):
-    db = tmp_path / "media.sqlite3"
+def _sha(path: str | Path) -> str:
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def _source(tmp_path: Path, name: str = "media"):
+    db = tmp_path / f"{name}.sqlite3"
     initialize_v3_storage(db)
     repo = SourceRepository(str(db))
-    paths = [_image(tmp_path / f"{i}.jpg", 30 + i * 20) for i in range(4)]
+    paths = [_image(tmp_path / f"{name}-{i}.jpg", 30 + i * 20) for i in range(4)]
     source_id = repo.save_source_post(
         source_id=None,
         source_type="telegram_channel",
@@ -41,15 +47,23 @@ def test_media_preparation_reads_source_order_and_selects_one_cover(tmp_path):
         raw_videos=[],
         raw_contact="",
         raw_meta={"sanitized_text": "富力城 2房1厅 月租 $800/月"},
-        dedupe_hash="hash-100",
+        dedupe_hash=f"hash-{name}",
     )
     repo.save_source_images(
         source_id,
-        [{"local_path": path, "file_hash": f"hash-{i}"} for i, path in enumerate(paths)],
+        [{"local_path": path, "file_hash": f"hash-{name}-{i}"} for i, path in enumerate(paths)],
     )
+    return db, source_id, paths
 
-    reader = SourceReader(str(db))
-    prepared = MediaPreparationService(reader).prepare(source_post_id=source_id)
+
+def test_media_preparation_scrubs_to_derived_files_before_selection(tmp_path):
+    db, source_id, paths = _source(tmp_path)
+    before = [_sha(path) for path in paths]
+    prepared_dir = tmp_path / "prepared"
+
+    prepared = MediaPreparationService(
+        SourceReader(str(db)), prepared_dir=prepared_dir
+    ).prepare(source_post_id=source_id)
 
     assert prepared.source_post_id == source_id
     assert prepared.cover_source_path in prepared.gallery_paths
@@ -57,35 +71,38 @@ def test_media_preparation_reads_source_order_and_selects_one_cover(tmp_path):
     assert prepared.source_identity["source_post_db_id"] == source_id
     assert prepared.source_identity["source_post_id"] == "100"
     assert all(Path(path).is_file() for path in prepared.gallery_paths)
+    assert all(prepared_dir in Path(path).parents for path in prepared.gallery_paths)
+    assert all(str(Path(path).resolve()) not in prepared.gallery_paths for path in paths)
+    assert [_sha(path) for path in paths] == before
 
 
-def test_manual_cover_is_honoured_only_when_it_is_usable_source_media(tmp_path):
-    db = tmp_path / "media-manual.sqlite3"
-    initialize_v3_storage(db)
-    repo = SourceRepository(str(db))
-    paths = [_image(tmp_path / f"m{i}.jpg", 50 + i * 25) for i in range(4)]
-    source_id = repo.save_source_post(
-        source_id=None,
-        source_type="manual",
-        source_name="admin_import",
-        source_post_id="manual-1",
-        source_url="",
-        source_author="admin",
-        raw_text="BKK1 公寓 1房 月租 $600/月",
-        raw_images=[{"local_path": path} for path in paths],
-        raw_videos=[],
-        raw_contact="",
-        raw_meta={},
-        dedupe_hash="manual-hash",
-    )
-    repo.save_source_images(
-        source_id,
-        [{"local_path": path, "file_hash": f"mhash-{i}"} for i, path in enumerate(paths)],
-    )
+def test_manual_raw_cover_maps_to_its_clean_derivative(tmp_path):
+    db, source_id, paths = _source(tmp_path, "manual")
+    prepared_dir = tmp_path / "prepared-manual"
+    prepared = MediaPreparationService(
+        SourceReader(str(db)), prepared_dir=prepared_dir
+    ).prepare(source_post_id=source_id, manual_cover_path=paths[2])
 
-    prepared = MediaPreparationService(SourceReader(str(db))).prepare(
-        source_post_id=source_id,
-        manual_cover_path=paths[2],
+    # Manual selection is preserved after replacing raw evidence with a cleaned
+    # derivative; production never publishes the raw source file directly.
+    assert prepared.cover_source_path in prepared.gallery_paths
+    assert prepared.cover_source_path != str(Path(paths[2]).resolve())
+    expected_service = MediaPreparationService(
+        SourceReader(str(db)), prepared_dir=prepared_dir
     )
-    if paths[2] in prepared.gallery_paths:
-        assert prepared.cover_source_path == paths[2]
+    expected = expected_service._scrubbed_paths(source_post_id=source_id, paths=paths)[1]
+    assert prepared.cover_source_path == expected[str(Path(paths[2]).resolve())]
+
+
+def test_scrub_over_eight_percent_is_rejected_before_ranking(tmp_path, monkeypatch):
+    db, source_id, paths = _source(tmp_path, "reject")
+
+    def fake_scrub(src, dst, *, prefer_crop=False):
+        Path(dst).write_bytes(Path(src).read_bytes())
+        return {"coverage": 0.081, "methods": ["inpaint_telea"]}
+
+    monkeypatch.setattr("v3_core.media.service.scrub_file", fake_scrub)
+    service = MediaPreparationService(SourceReader(str(db)), prepared_dir=tmp_path / "rejected")
+    with pytest.raises(ValueError, match="missing_usable_images_after_source_scrub"):
+        service.prepare(source_post_id=source_id)
+    assert all(Path(path).is_file() for path in paths)
