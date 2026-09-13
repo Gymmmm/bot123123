@@ -17,7 +17,8 @@ from .home_views import (
     build_contact_view,
 )
 from .lead_service import LeadUser
-from .service_views import local_life_view, service_home_view
+from .service_product_views import service_home_view
+from .service_views import local_life_view
 from .telegram_assurance_handler import render_assurance_view
 from .telegram_home_ui import build_home_keyboard
 from .telegram_service_handler import render_service_view
