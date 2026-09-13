@@ -2,7 +2,6 @@ from pathlib import Path
 import hashlib
 
 from PIL import Image, ImageDraw
-import pytest
 
 from v3_core.ingest.source_reader import SourceReader
 from v3_core.ingest.source_repository import SourceRepository
@@ -76,15 +75,13 @@ def test_media_preparation_scrubs_to_derived_files_before_selection(tmp_path):
     assert [_sha(path) for path in paths] == before
 
 
-def test_manual_raw_cover_maps_to_its_clean_derivative(tmp_path):
+def test_manual_raw_cover_maps_to_its_derived_media(tmp_path):
     db, source_id, paths = _source(tmp_path, "manual")
     prepared_dir = tmp_path / "prepared-manual"
     prepared = MediaPreparationService(
         SourceReader(str(db)), prepared_dir=prepared_dir
     ).prepare(source_post_id=source_id, manual_cover_path=paths[2])
 
-    # Manual selection is preserved after replacing raw evidence with a cleaned
-    # derivative; production never publishes the raw source file directly.
     assert prepared.cover_source_path in prepared.gallery_paths
     assert prepared.cover_source_path != str(Path(paths[2]).resolve())
     expected_service = MediaPreparationService(
@@ -94,15 +91,21 @@ def test_manual_raw_cover_maps_to_its_clean_derivative(tmp_path):
     assert prepared.cover_source_path == expected[str(Path(paths[2]).resolve())]
 
 
-def test_scrub_over_eight_percent_is_rejected_before_ranking(tmp_path, monkeypatch):
+def test_scrub_over_eight_percent_falls_back_to_untouched_derived_copy(tmp_path, monkeypatch):
     db, source_id, paths = _source(tmp_path, "reject")
+    before = [_sha(path) for path in paths]
 
     def fake_scrub(src, dst, *, prefer_crop=False):
         Path(dst).write_bytes(Path(src).read_bytes())
         return {"coverage": 0.081, "methods": ["inpaint_telea"]}
 
     monkeypatch.setattr("v3_core.media.service.scrub_file", fake_scrub)
-    service = MediaPreparationService(SourceReader(str(db)), prepared_dir=tmp_path / "rejected")
-    with pytest.raises(ValueError, match="missing_usable_images_after_source_scrub"):
-        service.prepare(source_post_id=source_id)
-    assert all(Path(path).is_file() for path in paths)
+    prepared_dir = tmp_path / "risky"
+    prepared = MediaPreparationService(
+        SourceReader(str(db)), prepared_dir=prepared_dir
+    ).prepare(source_post_id=source_id)
+
+    assert prepared.gallery_paths
+    assert all("_source" in Path(path).stem for path in prepared.gallery_paths)
+    assert all(prepared_dir in Path(path).parents for path in prepared.gallery_paths)
+    assert [_sha(path) for path in paths] == before
