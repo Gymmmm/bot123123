@@ -101,18 +101,18 @@ async def _render_photos(update: Any, context: Any, result: PublicListingFlowRes
 
 def _support_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔍 帮我找房", callback_data="v3u:home:search")],
-        [InlineKeyboardButton("💬 联系中文顾问", callback_data="v3u:home:contact")],
+        [InlineKeyboardButton("🔍 智能找房", callback_data="v3u:home:search")],
+        [InlineKeyboardButton("💬 顾问帮我找", callback_data="v3u:home:contact")],
         [InlineKeyboardButton("🏠 返回首页", callback_data="v3u:t:home")],
     ])
 
 
 async def _render_invalid_link(message: Any) -> None:
-    await message.reply_text("这个链接已经失效或房源信息已更新。\n\n您可以重新找房，或直接联系中文顾问。", parse_mode=ParseMode.HTML, reply_markup=_support_keyboard())
+    await message.reply_text("这个链接已经失效或房源信息已更新。\n\n可以重新找房，或让顾问继续帮您找。", parse_mode=ParseMode.HTML, reply_markup=_support_keyboard())
 
 
 async def _render_unbookable(message: Any, result: PublicListingFlowResult) -> None:
-    await message.reply_text("这套房暂时不能预约，可以看相近房源或联系中文顾问。", parse_mode=ParseMode.HTML)
+    await message.reply_text("这套房暂时不能预约。可以继续看相近房源，或让顾问帮您确认其他选择。", parse_mode=ParseMode.HTML)
     if getattr(result, "details", None) is not None:
         await _render_details(message, result)
         return
