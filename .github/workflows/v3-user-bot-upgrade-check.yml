@@ -38,6 +38,8 @@ jobs:
             tests/v3_core/test_no_legacy_runtime_imports.py \
             tests/v3_core/test_user_bot_product_upgrade.py \
             tests/v3_core/test_user_bot_public_flow.py \
+            tests/v3_core/test_user_bot_callback_router.py \
+            tests/v3_core/test_user_bot_deeplink_attribution.py \
             tests/v3_core/test_user_bot_telegram_appointment_submit.py \
             tests/v3_core/test_user_bot_telegram_search_submit.py \
             tests/v3_core/test_user_bot_telegram_lead_effects.py
