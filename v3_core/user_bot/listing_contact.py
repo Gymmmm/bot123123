@@ -35,16 +35,19 @@ class ListingContactEffectExecutor:
 
     async def execute(self, *, bot: Any, user: LeadUser, intent: ConsultIntent) -> ListingContactEffectResult:
         lead = self.leads.record_listing_contact(user=user, intent=intent)
+        lines = [
+            f"用户：{user_mention_html(user)}",
+            f"联系方式：{he(user_contact_text(user))}",
+            f"来源：{he(source_display_label(intent.source or 'listing_callback'))}",
+        ]
+        if str(intent.touchpoint or "").strip():
+            lines.append(f"转化页：{he(source_display_label(intent.touchpoint))}")
+        lines.append(f"咨询房源：{he(intent.public_listing_id)}")
         admin = await self.admins.send(
             bot,
             AdminNotification(
                 title="用户咨询房源",
-                lines=(
-                    f"用户：{user_mention_html(user)}",
-                    f"联系方式：{he(user_contact_text(user))}",
-                    f"入口：{he(source_display_label(intent.source or 'listing_callback'))}",
-                    f"咨询房源：{he(intent.public_listing_id)}",
-                ),
+                lines=tuple(lines),
             ),
         )
         return ListingContactEffectResult(lead=lead, admin=admin)
