@@ -15,6 +15,7 @@ from .public_flow import PublicListingFlowResult, PublicListingFlowService
 from .search_no_match_view import build_search_no_match_view
 from .search_query import SearchCriteria
 from .search_submit_executor import SearchSubmitExecutor
+from .telegram_callback_handler import LISTING_SOURCE_KEY
 from .telegram_home_ui import build_home_keyboard
 from .telegram_search_results import present_search_flow_result
 from .telegram_transition_ui import build_transition_keyboard
@@ -156,6 +157,12 @@ def _failure_reason(result: object) -> str:
     return str(getattr(result, "reason", "") or "").strip()
 
 
+def _remember_listing_source(user_data: dict[str, Any], result: PublicListingFlowResult) -> None:
+    source = str(getattr(result, "source", "") or "").strip()
+    if source:
+        user_data[LISTING_SOURCE_KEY] = source
+
+
 async def _handle_broadcast_shortcut(
     update: Any,
     context: Any,
@@ -265,6 +272,7 @@ async def handle_v3_start(
         return broadcast
 
     result = listings.resolve(payload)
+    _remember_listing_source(user_data, result)
     if not result.ok:
         if _failure_reason(result) == "listing_not_bookable":
             await _render_unbookable(message, result)
