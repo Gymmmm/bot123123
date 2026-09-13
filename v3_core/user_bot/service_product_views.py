@@ -13,23 +13,20 @@ def service_home_view() -> ServiceView:
         kind="service_home",
         text=(
             "🛡 <b>入住服务</b>\n\n"
-            "入住才是侨联服务的开始。\n\n"
-            "通过侨联租房后，报修、物业、续租、换房、退租等住房问题，都可以从这里继续处理。\n\n"
-            "已绑定租约的客户会自动关联房屋信息，不用重复说明。"
+            "签约不是服务的结束。\n\n"
+            "通过侨联租房后，租期内遇到住房问题，都可以从这里继续处理。\n\n"
+            "找房中的客户也可以先了解侨联签约后的服务范围。"
         ),
         rows=(
             (
-                ServiceChoice("📄 租赁服务指南", "v3u:home:rental"),
                 ServiceChoice("🔧 报修与维护", "v3u:service:repair"),
-            ),
-            (
                 ServiceChoice("🏢 物业沟通", "v3u:service:property"),
-                ServiceChoice("🔄 续租 / 换房", "v3u:home:contact"),
             ),
             (
-                ServiceChoice("📄 押金与退租说明", "v3u:assure:deposit"),
+                ServiceChoice("🔄 续租 / 退租", "v3u:home:contact"),
                 ServiceChoice("🧭 周边服务", "v3u:service:local"),
             ),
+            (ServiceChoice("📄 租赁服务指南", "v3u:home:rental"),),
             (
                 ServiceChoice("💬 联系顾问", "v3u:home:contact"),
                 ServiceChoice("🏠 返回首页", "v3u:t:home"),
