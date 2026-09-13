@@ -70,14 +70,8 @@ class MediaPreparationService:
                 continue
             dst = target_dir / f"{self._digest(src)[:24]}_clean.jpg"
             try:
-                # Reuse an existing immutable derivative for the same source
-                # bytes + scrub revision; raw evidence is never overwritten.
                 if not dst.is_file():
                     info = scrub_file(src, dst, prefer_crop=False)
-                    # ``coverage`` is the detector's broad candidate mask and can
-                    # intentionally over-detect. Safety is based on the area that
-                    # was actually inpainted; fall back to detector coverage only
-                    # when the scrubber reports no actual-edit metric.
                     actual = info.get("inpaint_coverage")
                     coverage = float(actual if actual is not None else info.get("coverage") or 0.0)
                     if coverage > MAX_SCRUB_COVERAGE:
@@ -87,9 +81,9 @@ class MediaPreparationService:
                 clean = str(dst.resolve())
                 accepted.append(clean)
                 raw_to_clean[str(src)] = clean
-            except Exception:
+            except Exception as exc:
                 dst.unlink(missing_ok=True)
-                rejected.append(str(src))
+                raise RuntimeError(f"source_scrub_failed:{src}:{type(exc).__name__}:{exc}") from exc
 
         return accepted, raw_to_clean, rejected
 
