@@ -7,8 +7,8 @@ from qiaolian_dual.admin_contract_ui import (
     handle_callback as handle_admin_contract_callback,
     handle_message as handle_admin_contract_text,
 )
+from qiaolian_dual.v3_admin_workflow_bridge import handle_v3_admin_workflow
 from v3_core.user_bot.admin_console_bridge import show_unified_admin_home
-from v3_core.user_bot.admin_workflow_bridge import handle_v3_admin_workflow
 from v3_core.user_bot.app import run_v3_user_bot
 
 
