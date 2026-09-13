@@ -64,7 +64,7 @@ def build_home_view(*, channel_url: str = "") -> HomeView:
     rows: list[tuple[HomeChoice, ...]] = [
         (HomeChoice("🔍 智能找房", "search"), HomeChoice("📖 关于侨联", "about")),
         (HomeChoice("📅 预约看房", "book"), HomeChoice("💬 联系顾问", "contact")),
-        (HomeChoice("🛡 入住服务", "service"), HomeChoice("🧭 周边服务", "local")),
+        (HomeChoice("🛡 入住服务", "service"),),
     ]
     clean_channel = str(channel_url or "").strip()
     if clean_channel:
