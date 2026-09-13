@@ -50,7 +50,7 @@ jobs:
           source "$ROOT/runtime.env"
           set +a
           "$ROOT/.venv/bin/python" - "$TMP/repo" "$TMP" <<'PY'
-          import asyncio, json, os, sqlite3, sys
+          import asyncio, json, sqlite3, sys
           from pathlib import Path
           from telegram import Bot
           from v3_core.publishing.admin_bot import load_settings
@@ -64,11 +64,11 @@ jobs:
           conn = sqlite3.connect(settings.db_path)
           conn.row_factory = sqlite3.Row
           row = conn.execute('''
-              SELECT p.channel_message_id,p.package_id,p.listing_id,p.offer_id,
-                     k.cover_path,k.gallery_json,
-                     l.public_listing_id,l.project_name,l.location_text,l.property_type,
-                     l.bedrooms,l.bathrooms,l.area_sqm,l.floor,l.inventory_status,
-                     o.monthly_rent_usd
+              SELECT p.channel_message_id AS _channel_message_id,
+                     p.package_id AS _package_id,p.listing_id AS _listing_id,p.offer_id AS _offer_id,
+                     k.cover_path AS _cover_path,k.gallery_json AS _gallery_json,
+                     o.monthly_rent_usd AS _monthly_rent_usd,
+                     l.*
               FROM publication_instances p
               JOIN publication_packages_v3 k ON k.package_id=p.package_id
               JOIN listings_v3 l ON l.listing_id=p.listing_id
@@ -81,11 +81,19 @@ jobs:
           conn.close()
           if not row:
               raise SystemExit('PREVIEW_NO_PUBLISHED_LISTING')
+          data=dict(row)
+          print('PREVIEW_LISTING_COLUMNS', ','.join(sorted(data.keys())))
+
+          def pick(*names, default=None):
+              for n in names:
+                  v=data.get(n)
+                  if v not in (None,''):
+                      return v
+              return default
 
           def collect_paths(obj):
               out=[]
-              if isinstance(obj,str):
-                  out.append(obj)
+              if isinstance(obj,str): out.append(obj)
               elif isinstance(obj,list):
                   for x in obj: out.extend(collect_paths(x))
               elif isinstance(obj,dict):
@@ -93,12 +101,10 @@ jobs:
               return out
 
           candidates=[]
-          try:
-              candidates += collect_paths(json.loads(row['gallery_json'] or '[]'))
-          except Exception:
-              pass
-          if row['cover_path']:
-              candidates.append(str(row['cover_path']))
+          try: candidates += collect_paths(json.loads(pick('_gallery_json', default='[]') or '[]'))
+          except Exception: pass
+          cover_path=pick('_cover_path')
+          if cover_path: candidates.append(str(cover_path))
           bg=None
           for raw in candidates:
               p=Path(str(raw))
@@ -107,34 +113,37 @@ jobs:
           if bg is None:
               raise SystemExit('PREVIEW_NO_EXISTING_IMAGE_PATH')
 
+          bedrooms=pick('bedrooms','bedroom_count')
+          bathrooms=pick('bathrooms','bathroom_count')
+          ptype=pick('property_type','property_type_display', default='房源')
           layout=''
-          if row['bedrooms']:
-              layout=f"{row['bedrooms']}房"
-              if row['bathrooms']:
-                  layout += f"{row['bathrooms']}卫"
-          layout = layout or (row['property_type'] or '房源')
-          title = row['project_name'] or row['location_text'] or '金边房源'
-          location = row['location_text'] or '金边'
-          size = f"{int(row['area_sqm'])}㎡" if row['area_sqm'] else '—'
-          floor = str(row['floor'] or '—')
-          if floor not in {'—',''} and '楼' not in floor and '层' not in floor:
-              floor += '楼'
-          rent = int(row['monthly_rent_usd']) if row['monthly_rent_usd'] else '面议'
+          if bedrooms:
+              layout=f"{bedrooms}房"
+              if bathrooms: layout += f"{bathrooms}卫"
+          layout = layout or str(ptype)
+          title = str(pick('project_name','community_name','building_name','title', default='金边房源'))
+          location = str(pick('canonical_area_display','area_name','district_name','location','address', default='金边'))
+          area=pick('area_sqm','size_sqm')
+          size = f"{int(float(area))}㎡" if area else '—'
+          floor_raw=pick('floor','floor_text')
+          floor = str(floor_raw or '—')
+          if floor not in {'—',''} and '楼' not in floor and '层' not in floor: floor += '楼'
+          rent_raw=pick('_monthly_rent_usd')
+          rent = int(float(rent_raw)) if rent_raw else '面议'
+          public_id=str(pick('public_listing_id','public_id', default=pick('_listing_id')))
           out = tmp / 'channel_preview.jpg'
           logo = repo / 'media_pipeline/assets/qiaolian_logo_mark_gold.png'
           generate_cover(str(bg), str(out), title=title, rent=rent,
                          property_type=layout, location=location,
                          area=size, floor=floor, tags=[], logo_path=str(logo))
           print('PREVIEW_RENDERED', out, out.stat().st_size, 'source=', bg)
-          print('PREVIEW_LISTING', row['listing_id'], row['public_listing_id'], row['offer_id'], 'from_msg=', row['channel_message_id'])
+          print('PREVIEW_LISTING', pick('_listing_id'), public_id, pick('_offer_id'), 'from_msg=', pick('_channel_message_id'))
 
           async def send():
               bot=Bot(token=settings.token)
               await bot.initialize()
               try:
-                  caption=(f"封面效果测试｜{row['public_listing_id']}\n"
-                           f"{title}｜{layout}\n"
-                           f"${rent}/月")
+                  caption=(f"封面效果测试｜{public_id}\n{title}｜{layout}\n${rent}/月")
                   with out.open('rb') as f:
                       msg=await bot.send_photo(chat_id=settings.channel_chat_id, photo=f, caption=caption)
                   print('PREVIEW_SENT', msg.message_id)
