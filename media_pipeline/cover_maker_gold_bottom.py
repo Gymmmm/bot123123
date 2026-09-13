@@ -7,7 +7,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageFilter
 W, H = 1600, 1200
 GOLD = "#E8D5A8"
 WHITE = "#FFFFFF"
-MUTED_WHITE = "#E9EDF2"
+MUTED = "#E7E8EA"
 
 FONT_CANDIDATES_BOLD = [
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
@@ -25,7 +25,7 @@ def find_font(candidates):
     for p in candidates:
         if Path(p).exists():
             return p
-    raise RuntimeError("未找到中文字体。Debian/Ubuntu 可执行：apt install -y fonts-noto-cjk")
+    raise RuntimeError("未找到中文字体")
 
 
 FONT_BOLD = find_font(FONT_CANDIDATES_BOLD)
@@ -47,11 +47,12 @@ def cover_crop(image: Image.Image, width: int, height: int):
     scale = max(width / iw, height / ih)
     nw, nh = int(iw * scale), int(ih * scale)
     image = image.resize((nw, nh), Image.Resampling.LANCZOS)
-    left, top = (nw - width) // 2, (nh - height) // 2
+    left = (nw - width) // 2
+    top = (nh - height) // 2
     return image.crop((left, top, left + width, top + height))
 
 
-def fit_font(text, max_width, start_size, min_size=30, bold=True):
+def fit_font(text, max_width, start_size, min_size=28, bold=True):
     dummy = Image.new("RGB", (10, 10))
     draw = ImageDraw.Draw(dummy)
     for size in range(start_size, min_size - 1, -2):
@@ -62,140 +63,114 @@ def fit_font(text, max_width, start_size, min_size=30, bold=True):
     return font_bold(min_size) if bold else font_regular(min_size)
 
 
-def overlay_vertical_gradient(base, y0, y1, start_alpha, end_alpha=0, reverse=False):
-    layer = Image.new("RGBA", base.size, (0, 0, 0, 0))
-    d = ImageDraw.Draw(layer)
-    span = max(1, y1 - y0)
-    for y in range(y0, y1):
-        t = (y - y0) / span
-        if reverse:
-            a = int(end_alpha + (start_alpha - end_alpha) * t)
-        else:
-            a = int(start_alpha + (end_alpha - start_alpha) * t)
-        d.line((0, y, W, y), fill=(0, 0, 0, max(0, min(255, a))))
-    return Image.alpha_composite(base, layer)
-
-
-def glass_panel(base, box, radius, fill=(15, 17, 23, 128), blur=14,
-                outline=(232, 213, 168, 46), width=2, shadow=True):
+def glass_panel(base, box, radius=24, fill=(11, 14, 20, 120), blur=16, outline=(232, 213, 168, 85), width=1):
     x1, y1, x2, y2 = map(int, box)
-    result = base.copy()
-    crop = base.crop((x1, y1, x2, y2)).filter(ImageFilter.GaussianBlur(blur))
+    region = base.crop((x1, y1, x2, y2)).filter(ImageFilter.GaussianBlur(blur))
     mask = Image.new("L", (x2 - x1, y2 - y1), 0)
     md = ImageDraw.Draw(mask)
     md.rounded_rectangle((0, 0, x2 - x1 - 1, y2 - y1 - 1), radius=radius, fill=255)
-    if shadow:
-        shadow_layer = Image.new("RGBA", base.size, (0, 0, 0, 0))
-        sd = ImageDraw.Draw(shadow_layer)
-        sd.rounded_rectangle((x1, y1 + 10, x2, y2 + 10), radius=radius, fill=(0, 0, 0, 55))
-        result = Image.alpha_composite(result, shadow_layer)
-    result.paste(crop, (x1, y1), mask)
-    tint = Image.new("RGBA", base.size, (0, 0, 0, 0))
-    td = ImageDraw.Draw(tint)
-    td.rounded_rectangle((x1, y1, x2, y2), radius=radius, fill=fill, outline=outline, width=width)
-    return Image.alpha_composite(result, tint)
+    base.paste(region, (x1, y1), mask)
+    layer = Image.new("RGBA", base.size, (0, 0, 0, 0))
+    d = ImageDraw.Draw(layer)
+    d.rounded_rectangle(box, radius=radius, fill=fill, outline=outline, width=width)
+    return Image.alpha_composite(base, layer)
 
 
-def generate_cover(image_path: str, output_path: str, *, title: str, rent,
-                   property_type: str, location: str, area: str = "", floor: str = "",
-                   tags=None, logo_path: str | None = None):
+def generate_cover(image_path: str, output_path: str, *, title: str, rent, property_type: str,
+                   location: str, area: str = "", floor: str = "", tags=None, logo_path: str | None = None):
     tags = tags or []
     bg = cover_crop(Image.open(image_path), W, H).convert("RGBA")
 
-    # CSS-equivalent softened fades: top 280px, bottom 320px.
-    bg = overlay_vertical_gradient(bg, 0, 280, 115, 0)
-    bg = overlay_vertical_gradient(bg, H - 320, H, 0, 153, reverse=True)
+    # 只做很轻的整体压暗，保留实拍本身。
+    bg = Image.alpha_composite(bg, Image.new("RGBA", (W, H), (4, 8, 14, 24)))
+
+    # 顶部轻渐变，仅服务 logo / 租金可读性。
+    top = Image.new("RGBA", (W, 230), (0, 0, 0, 0))
+    td = ImageDraw.Draw(top)
+    for y in range(230):
+        a = int(82 * (1 - y / 230))
+        td.line((0, y, W, y), fill=(0, 0, 0, a))
+    bg.alpha_composite(top, (0, 0))
+
+    # 底部只留一层很短的渐变，不再铺整条黑带。
+    bottom = Image.new("RGBA", (W, 360), (0, 0, 0, 0))
+    bd = ImageDraw.Draw(bottom)
+    for y in range(360):
+        t = y / 359
+        a = int(12 + 125 * (t ** 1.9))
+        bd.line((0, y, W, y), fill=(0, 0, 0, a))
+    bg.alpha_composite(bottom, (0, H - 360))
 
     draw = ImageDraw.Draw(bg)
-    draw.line((48, 42, 1552, 42), fill=(232, 213, 168, 170), width=2)
+    draw.line((48, 42, 1552, 42), fill=(232, 213, 168, 130), width=2)
 
-    # Brand block.
-    logo_x, logo_y = 48, 40
+    # Logo 缩小，减少与标题抢视觉。
     if logo_path and Path(logo_path).exists():
         logo = Image.open(logo_path).convert("RGBA")
-        ratio = min(420 / logo.width, 112 / logo.height)
+        ratio = min(315 / logo.width, 92 / logo.height)
         logo = logo.resize((int(logo.width * ratio), int(logo.height * ratio)), Image.Resampling.LANCZOS)
-        bg.alpha_composite(logo, (logo_x, logo_y + 24))
-    else:
-        draw.text((48, 72), "侨联地产", font=font_bold(52), fill=GOLD)
-        draw.text((50, 137), "QIAO LIAN PROPERTY", font=font_regular(18), fill=MUTED_WHITE)
+        bg.alpha_composite(logo, (48, 66))
 
-    # Price glass card, right 48/top 48, ~48% opacity.
-    rent_box = (1080, 110, 1552, 295)
-    bg = glass_panel(bg, rent_box, 26, fill=(18, 20, 26, 122), blur=12,
-                     outline=(232, 213, 168, 51), width=2)
+    # 右上价格：更窄、更轻、信息层级更清楚。
+    price_box = (1110, 72, 1552, 224)
+    bg = glass_panel(bg, price_box, radius=28, fill=(10, 14, 18, 112), blur=18, outline=(232, 213, 168, 95))
     draw = ImageDraw.Draw(bg)
-    rent_label = "Monthly Rent"
-    lf = font_regular(30)
-    b = draw.textbbox((0, 0), rent_label, font=lf)
-    draw.text((rent_box[0] + (rent_box[2] - rent_box[0] - (b[2]-b[0]))/2, 137), rent_label, font=lf, fill=(255,255,255,230))
-    rent_text = f"${rent}/月"
-    rf = fit_font(rent_text, 410, 72, 56, True)
-    b = draw.textbbox((0,0), rent_text, font=rf)
-    draw.text((rent_box[0] + (rent_box[2]-rent_box[0]-(b[2]-b[0]))/2, 184), rent_text, font=rf, fill=GOLD)
+    lab = "月租"
+    lf = font_regular(24)
+    lw = draw.textbbox((0, 0), lab, font=lf)[2]
+    draw.text((price_box[0] + (price_box[2]-price_box[0]-lw)/2, 92), lab, font=lf, fill=(255,255,255,220))
+    price = f"${rent}/月"
+    pf = fit_font(price, 390, 66, 48, True)
+    pw = draw.textbbox((0, 0), price, font=pf)[2]
+    draw.text((price_box[0] + (price_box[2]-price_box[0]-pw)/2, 126), price, font=pf, fill=GOLD)
 
-    # Main title / property pill.
-    title_font = fit_font(title, 930, 78, 54, True)
-    draw.text((48, 280), str(title), font=title_font, fill=WHITE,
-              stroke_width=2, stroke_fill=(0,0,0,115))
+    # 主标题下移到画面下半部，让主体照片完整展示。
+    title_y = 770
+    title_font = fit_font(title, 1010, 76, 48, True)
+    draw.text((52, title_y), title, font=title_font, fill=WHITE, stroke_width=2, stroke_fill=(0,0,0,110))
 
-    pf = font_bold(34)
-    pb = draw.textbbox((0,0), str(property_type), font=pf)
+    # 户型 pill 改成真正的小标签，不再是大块。
+    pill_font = font_bold(30)
+    pb = draw.textbbox((0, 0), property_type, font=pill_font)
     pw = pb[2] - pb[0]
-    pill = (48, 432, 48 + pw + 52, 500)
-    bg = glass_panel(bg, pill, 34, fill=(20,22,28,133), blur=8,
-                     outline=(255,255,255,31), width=1, shadow=False)
+    pill = (54, title_y + 102, 54 + pw + 46, title_y + 158)
+    bg = glass_panel(bg, pill, radius=28, fill=(15, 17, 22, 105), blur=10, outline=(255,255,255,55))
     draw = ImageDraw.Draw(bg)
-    draw.text((74, 444), str(property_type), font=pf, fill=WHITE)
+    draw.text((77, title_y + 112), property_type, font=pill_font, fill=WHITE)
 
-    # Bottom cards: 1.4 / .8 / .8 ratios, 18px gap, 48px inset.
-    bottom_y, bottom_h = 997, 155
-    usable = W - 96 - 36
-    unit = usable / 3.0
-    w1, w2, w3 = int(unit * 1.4), int(unit * 0.8), int(unit * 0.8)
-    # normalize exact width to available space
-    total = w1 + w2 + w3
-    scale = usable / total
-    w1, w2 = int(w1*scale), int(w2*scale)
-    w3 = usable - w1 - w2
-    x1 = 48
-    card1 = (x1, bottom_y, x1+w1, bottom_y+bottom_h)
-    x2 = card1[2] + 18
-    card2 = (x2, bottom_y, x2+w2, bottom_y+bottom_h)
-    x3 = card2[2] + 18
-    card3 = (x3, bottom_y, 1552, bottom_y+bottom_h)
-
-    for card in (card1, card2, card3):
-        bg = glass_panel(bg, card, 22, fill=(15,17,23,128), blur=14,
-                         outline=(232,213,168,46), width=2)
+    # 底部信息改成一整条轻量信息栏，中间用竖线分隔，取消三个笨重盒子。
+    bar = (48, 990, 1552, 1140)
+    bg = glass_panel(bg, bar, radius=26, fill=(12, 15, 20, 105), blur=18, outline=(232,213,168,70))
     draw = ImageDraw.Draw(bg)
-    labf, valf = font_regular(22), font_bold(44)
+    xcuts = [590, 1050]
+    for x in xcuts:
+        draw.line((x, 1016, x, 1115), fill=(232,213,168,70), width=1)
 
-    def card_text(card, label, value, maxw=None):
-        x, y = card[0] + 26, card[1] + 18
-        draw.text((x, y), label, font=labf, fill=(255,255,255,190))
-        vf = fit_font(value or "—", maxw or (card[2]-card[0]-52), 44, 28, True)
-        draw.text((x, y+42), value or "—", font=vf, fill=WHITE)
+    label_f = font_regular(20)
+    value_f = font_bold(36)
 
-    card_text(card1, "位置", location, card1[2]-card1[0]-52)
-    card_text(card2, "面积", area or "—")
-    card_text(card3, "楼层", floor or "—")
+    def info(x, label, value, width):
+        draw.text((x, 1014), label, font=label_f, fill=(232,213,168,220))
+        vf = fit_font(value or "—", width, 36, 28, True)
+        draw.text((x, 1052), value or "—", font=vf, fill=WHITE)
 
+    info(76, "位置", location or "—", 470)
+    info(625, "面积", area or "—", 355)
+    info(1085, "楼层", floor or "—", 360)
+
+    # 可选标签紧贴信息栏上方；没有就不占空间。
     if tags:
-        tx, ty = card1[0] + 26, card1[1] + 105
-        tf = font_bold(22)
+        tx, ty = 54, 934
+        tf = font_regular(19)
         for tag in tags[:3]:
-            b = draw.textbbox((0,0), str(tag), font=tf)
-            tw = b[2]-b[0]
-            if tx + tw + 34 > card1[2]-20:
-                break
-            pill = (tx, ty, tx+tw+34, ty+38)
-            bg = glass_panel(bg, pill, 19, fill=(32,36,44,153), blur=5,
-                             outline=(255,255,255,26), width=1, shadow=False)
+            tw = draw.textbbox((0,0), tag, font=tf)[2]
+            box = (tx, ty, tx + tw + 28, ty + 38)
+            bg = glass_panel(bg, box, radius=19, fill=(22,26,32,95), blur=8, outline=(255,255,255,35))
             draw = ImageDraw.Draw(bg)
-            draw.text((tx+17, ty+5), str(tag), font=tf, fill=(240,230,204,255))
-            tx += tw + 44
+            draw.text((tx+14, ty+7), tag, font=tf, fill=(244,236,216,235))
+            tx += tw + 40
 
+    out = bg.convert("RGB")
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-    bg.convert("RGB").save(output_path, "JPEG", quality=94, optimize=True, progressive=True)
+    out.save(output_path, "JPEG", quality=94, optimize=True, progressive=True)
     return output_path
