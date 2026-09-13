@@ -36,6 +36,7 @@ from .transition_views import TransitionView, TransitionViewService
 
 SEARCH_SESSION_KEY = "v3_find_card_public_ids"
 SEARCH_ANCHOR_KEY = "v3_find_card_anchor"
+LISTING_SOURCE_KEY = "v3_listing_source"
 
 
 @dataclass(frozen=True)
@@ -52,6 +53,13 @@ def _session_ids(context: Any) -> tuple[str, ...]:
     if not isinstance(values, (list, tuple)):
         return ()
     return tuple(str(value) for value in values)
+
+
+def _listing_source(context: Any) -> str:
+    data = getattr(context, "user_data", None)
+    if not isinstance(data, dict):
+        return "listing_callback"
+    return str(data.get(LISTING_SOURCE_KEY) or "").strip() or "listing_callback"
 
 
 def _chat_id(update: Any) -> int | str:
@@ -174,6 +182,7 @@ async def render_search_card_response(
     user_data = getattr(context, "user_data", None)
     if isinstance(user_data, dict):
         user_data[SEARCH_SESSION_KEY] = list(response.session_public_listing_ids)
+        user_data[LISTING_SOURCE_KEY] = "search_result"
         if sent is not None:
             sent_chat_id = getattr(sent, "chat_id", _chat_id(update))
             sent_message_id = getattr(sent, "message_id", None)
@@ -197,19 +206,16 @@ async def handle_v3_callback(
     if query is None or not raw.startswith(f"{PREFIX}:"):
         return TelegramCallbackHandlerOutcome(handled=False)
 
-    # ``v3u:t:*`` has its own parser/state machine. Do not let the listing/card
-    # router turn it into a malformed-callback error or consume it first.
     if parse_transition_callback(raw) is not None:
         return TelegramCallbackHandlerOutcome(handled=False)
 
     dispatched = router.dispatch(
         raw,
         session_public_listing_ids=_session_ids(context),
+        source=_listing_source(context),
     )
     response = adapt_callback_response(dispatched)
 
-    # Always stop Telegram's callback spinner for callbacks owned by this
-    # handler. Consult/error copy is intentionally handled elsewhere.
     await query.answer()
 
     if response.kind == "details":
@@ -230,7 +236,6 @@ async def handle_v3_callback(
         user_data = getattr(context, "user_data", None)
         if not isinstance(user_data, dict):
             raise ValueError("telegram_user_data_missing_for_transition")
-        # Telegram edit succeeded: session may now advance to the rendered step.
         apply_session_mutation(user_data, mutation)
 
     return TelegramCallbackHandlerOutcome(
@@ -240,6 +245,7 @@ async def handle_v3_callback(
 
 
 __all__ = [
+    "LISTING_SOURCE_KEY",
     "SEARCH_ANCHOR_KEY",
     "SEARCH_SESSION_KEY",
     "TelegramCallbackHandlerOutcome",
