@@ -66,7 +66,9 @@ class CallbackRouter:
         raw_callback: object,
         *,
         session_public_listing_ids: tuple[str, ...] | list[str] = (),
+        source: str = "listing_callback",
     ) -> CallbackDispatchResult:
+        clean_source = str(source or "").strip() or "listing_callback"
         callback = parse_callback(raw_callback)
         if callback is None:
             return CallbackDispatchResult(
@@ -121,7 +123,7 @@ class CallbackRouter:
                     )
                 consult = self.consults.resolve(
                     callback.public_listing_id,
-                    source="listing_callback",
+                    source=clean_source,
                 )
                 if consult.ok:
                     return CallbackDispatchResult(
@@ -153,7 +155,7 @@ class CallbackRouter:
                     )
                 similar = self.similars.resolve(
                     callback.public_listing_id,
-                    source="similar_listing",
+                    source=clean_source,
                 )
                 if similar.ok:
                     return CallbackDispatchResult(
@@ -186,7 +188,7 @@ class CallbackRouter:
             listing = self.listings.resolve_action(
                 callback.public_listing_id,
                 callback.action,
-                source="listing_callback",
+                source=clean_source,
             )
             if listing.ok:
                 return CallbackDispatchResult(
