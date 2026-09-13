@@ -14,8 +14,8 @@ def service_home_view() -> ServiceView:
         text=(
             "🛡 <b>入住服务</b>\n\n"
             "入住才是侨联服务的开始。\n\n"
-            "通过侨联租房后，整个租期内的住房问题，都可以从这里处理。\n"
-            "已绑定房屋信息的流程会继续沿用现有 V3 档案，不需要重复说明。"
+            "通过侨联租房后，报修、物业、续租、换房、退租等住房问题，都可以从这里继续处理。\n\n"
+            "已绑定租约的客户会自动关联房屋信息，不用重复说明。"
         ),
         rows=(
             (
@@ -27,7 +27,7 @@ def service_home_view() -> ServiceView:
                 ServiceChoice("🔄 续租 / 换房", "v3u:home:contact"),
             ),
             (
-                ServiceChoice("🔐 退租与押金", "v3u:assure:deposit"),
+                ServiceChoice("📄 押金与退租说明", "v3u:assure:deposit"),
                 ServiceChoice("🧭 周边服务", "v3u:service:local"),
             ),
             (
