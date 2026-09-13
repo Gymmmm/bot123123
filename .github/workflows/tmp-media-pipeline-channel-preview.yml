@@ -1,0 +1,145 @@
+name: tmp-media-pipeline-channel-preview
+on:
+  push:
+    branches: [feat/listing-media-pipeline-v1]
+    paths:
+      - '.github/workflows/tmp-media-pipeline-channel-preview.yml'
+permissions:
+  contents: read
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    env:
+      PROD_HOST: 50.114.74.120
+      PROD_PORT: '22'
+      PROD_SSH_USER: root
+      EXPECTED_PROD_SHA: aaf7b3d8365641557d866aef798447191308d6dc
+      MEDIA_BRANCH: feat/listing-media-pipeline-v1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify production host fingerprint
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          expected=$(tr -d '\r\n' < deploy/v3/production_host_fingerprint.txt)
+          ssh-keyscan -T 15 -p "$PROD_PORT" -t ed25519 "$PROD_HOST" 2>/dev/null | grep -v '^#' > "$RUNNER_TEMP/known_hosts"
+          ssh-keygen -lf "$RUNNER_TEMP/known_hosts" | grep -F "$expected"
+      - name: Configure production SSH
+        shell: bash
+        env:
+          PROD_SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+        run: |
+          set -Eeuo pipefail
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
+          cp "$RUNNER_TEMP/known_hosts" "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
+      - name: Render real listing with media branch and send preview to channel
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes "$PROD_SSH_USER@$PROD_HOST" "EXPECTED_PROD_SHA='$EXPECTED_PROD_SHA' MEDIA_BRANCH='$MEDIA_BRANCH' bash -s" <<'REMOTE'
+          set -Eeuo pipefail
+          ROOT=/opt/qiaolian_v3
+          test "$(cat "$ROOT/.deployed_sha")" = "$EXPECTED_PROD_SHA"
+          TMP=$(mktemp -d /tmp/qiaolian-media-preview.XXXXXX)
+          trap 'rm -rf "$TMP"' EXIT
+          git clone -q --depth 1 --branch "$MEDIA_BRANCH" https://github.com/Gymmmm/bot123123.git "$TMP/repo"
+          cd "$ROOT/current"
+          set -a
+          source "$ROOT/runtime.env"
+          set +a
+          "$ROOT/.venv/bin/python" - "$TMP/repo" "$TMP" <<'PY'
+          import asyncio, json, os, sqlite3, sys
+          from pathlib import Path
+          from telegram import Bot
+          from v3_core.publishing.admin_bot import load_settings
+
+          repo = Path(sys.argv[1])
+          tmp = Path(sys.argv[2])
+          sys.path.insert(0, str(repo / 'media_pipeline'))
+          from cover_maker_gold_bottom import generate_cover
+
+          settings = load_settings()
+          conn = sqlite3.connect(settings.db_path)
+          conn.row_factory = sqlite3.Row
+          row = conn.execute('''
+              SELECT p.channel_message_id,p.package_id,p.listing_id,p.offer_id,
+                     k.cover_path,k.gallery_json,
+                     l.public_listing_id,l.project_name,l.location_text,l.property_type,
+                     l.bedrooms,l.bathrooms,l.area_sqm,l.floor,l.inventory_status,
+                     o.monthly_rent_usd
+              FROM publication_instances p
+              JOIN publication_packages_v3 k ON k.package_id=p.package_id
+              JOIN listings_v3 l ON l.listing_id=p.listing_id
+              JOIN listing_offers o ON o.offer_id=p.offer_id
+              WHERE p.platform='telegram' AND p.publish_status='published'
+                AND o.offer_type='rent' AND o.offer_status='active'
+              ORDER BY CAST(p.channel_message_id AS INTEGER) DESC
+              LIMIT 1
+          ''').fetchone()
+          conn.close()
+          if not row:
+              raise SystemExit('PREVIEW_NO_PUBLISHED_LISTING')
+
+          def collect_paths(obj):
+              out=[]
+              if isinstance(obj,str):
+                  out.append(obj)
+              elif isinstance(obj,list):
+                  for x in obj: out.extend(collect_paths(x))
+              elif isinstance(obj,dict):
+                  for x in obj.values(): out.extend(collect_paths(x))
+              return out
+
+          candidates=[]
+          try:
+              candidates += collect_paths(json.loads(row['gallery_json'] or '[]'))
+          except Exception:
+              pass
+          if row['cover_path']:
+              candidates.append(str(row['cover_path']))
+          bg=None
+          for raw in candidates:
+              p=Path(str(raw))
+              if p.exists() and p.is_file() and p.suffix.lower() in {'.jpg','.jpeg','.png','.webp'}:
+                  bg=p; break
+          if bg is None:
+              raise SystemExit('PREVIEW_NO_EXISTING_IMAGE_PATH')
+
+          layout=''
+          if row['bedrooms']:
+              layout=f"{row['bedrooms']}房"
+              if row['bathrooms']:
+                  layout += f"{row['bathrooms']}卫"
+          layout = layout or (row['property_type'] or '房源')
+          title = row['project_name'] or row['location_text'] or '金边房源'
+          location = row['location_text'] or '金边'
+          size = f"{int(row['area_sqm'])}㎡" if row['area_sqm'] else '—'
+          floor = str(row['floor'] or '—')
+          if floor not in {'—',''} and '楼' not in floor and '层' not in floor:
+              floor += '楼'
+          rent = int(row['monthly_rent_usd']) if row['monthly_rent_usd'] else '面议'
+          out = tmp / 'channel_preview.jpg'
+          logo = repo / 'media_pipeline/assets/qiaolian_logo_mark_gold.png'
+          generate_cover(str(bg), str(out), title=title, rent=rent,
+                         property_type=layout, location=location,
+                         area=size, floor=floor, tags=[], logo_path=str(logo))
+          print('PREVIEW_RENDERED', out, out.stat().st_size, 'source=', bg)
+          print('PREVIEW_LISTING', row['listing_id'], row['public_listing_id'], row['offer_id'], 'from_msg=', row['channel_message_id'])
+
+          async def send():
+              bot=Bot(token=settings.token)
+              await bot.initialize()
+              try:
+                  caption=(f"封面效果测试｜{row['public_listing_id']}\n"
+                           f"{title}｜{layout}\n"
+                           f"${rent}/月")
+                  with out.open('rb') as f:
+                      msg=await bot.send_photo(chat_id=settings.channel_chat_id, photo=f, caption=caption)
+                  print('PREVIEW_SENT', msg.message_id)
+              finally:
+                  await bot.shutdown()
+          asyncio.run(send())
+          PY
+          REMOTE
