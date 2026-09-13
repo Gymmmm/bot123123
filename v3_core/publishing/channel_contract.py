@@ -1,6 +1,6 @@
 """Database-free public channel action contract.
 
-The caller supplies the already-assigned public QL listing id.  This keeps URL
+The caller supplies the already-assigned public QL listing id. This keeps URL
 rendering deterministic and prevents channel rendering from reaching into
 legacy listing/draft tables merely to discover an identifier.
 """
@@ -26,31 +26,52 @@ _ACTION_SUFFIX = {
     "book": "book",
 }
 _START_PAYLOAD_RE_PREFIX = "property_"
+_CHANNEL_SOURCE_CODE = "ch"
 
 
-def channel_start_payload(public_listing_id: object, action: str) -> str:
+def channel_start_payload(
+    public_listing_id: object,
+    action: str,
+    *,
+    source_code: str = "",
+) -> str:
     public_id = normalize_public_id(public_listing_id)
     if not public_id:
         raise ValueError(f"invalid_public_listing_id:{public_listing_id}")
     suffix = _ACTION_SUFFIX.get(str(action or "").strip().lower())
     if not suffix:
         raise ValueError(f"unsupported_channel_action:{action}")
-    return f"property_{public_id}_{suffix}"
+    payload = f"property_{public_id}_{suffix}"
+    source = str(source_code or "").strip().lower()
+    if source:
+        if not source.isalnum() or len(source) > 8:
+            raise ValueError(f"invalid_channel_source_code:{source_code}")
+        payload = f"{payload}__{source}"
+    return payload
 
 
 def channel_action_url(
-    username: str, public_listing_id: object, action: str
+    username: str,
+    public_listing_id: object,
+    action: str,
+    *,
+    source_code: str = "",
 ) -> str:
     user = str(username or "").strip().lstrip("@")
     if not user:
         return ""
-    return f"https://t.me/{user}?start={channel_start_payload(public_listing_id, action)}"
+    payload = channel_start_payload(
+        public_listing_id,
+        action,
+        source_code=source_code,
+    )
+    return f"https://t.me/{user}?start={payload}"
 
 
 def channel_actions(public_listing_id: object) -> tuple[str, str, str]:
     """Return the only three public listing actions in stable order."""
     return tuple(
-        channel_start_payload(public_listing_id, action)
+        channel_start_payload(public_listing_id, action, source_code=_CHANNEL_SOURCE_CODE)
         for action in CHANNEL_ACTION_ORDER
     )
 
@@ -58,16 +79,17 @@ def channel_actions(public_listing_id: object) -> tuple[str, str, str]:
 def official_channel_action_urls(
     username: str, public_listing_id: object
 ) -> dict[str, str]:
-    """Build the frozen three-action URL map or raise.
-
-    Missing username or a non-public listing id must not yield a clickable
-    start link.  Internal listing ids such as ``l_1`` are rejected.
-    """
+    """Build the frozen three-action URL map or raise."""
     user = str(username or "").strip().lstrip("@")
     if not user:
         raise ValueError("channel_username_missing")
     urls = {
-        action: channel_action_url(user, public_listing_id, action)
+        action: channel_action_url(
+            user,
+            public_listing_id,
+            action,
+            source_code=_CHANNEL_SOURCE_CODE,
+        )
         for action in CHANNEL_ACTION_ORDER
     }
     return official_channel_action_identity(urls)
@@ -123,10 +145,11 @@ def _public_id_from_action_url(url: str, expected_action: str) -> str:
     payload = (parse_qs(parsed.query).get("start") or [""])[0]
     if not payload.startswith(_START_PAYLOAD_RE_PREFIX):
         raise ValueError(f"invalid_public_listing_id:{payload}")
+    core_payload = payload.split("__", 1)[0]
     suffix = f"_{expected_action}"
-    if not payload.lower().endswith(suffix):
+    if not core_payload.lower().endswith(suffix):
         raise ValueError(f"unsupported_channel_action:{payload}")
-    raw_id = payload[len(_START_PAYLOAD_RE_PREFIX) : -len(suffix)]
+    raw_id = core_payload[len(_START_PAYLOAD_RE_PREFIX) : -len(suffix)]
     public_id = normalize_public_id(raw_id)
     if not public_id:
         raise ValueError(f"invalid_public_listing_id:{raw_id}")
