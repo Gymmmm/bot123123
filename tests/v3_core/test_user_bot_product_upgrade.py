@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from v3_core.user_bot.admin_console_bridge import admin_home_keyboard
 from v3_core.user_bot.home_callbacks import encode_home_callback, parse_home_callback
 from v3_core.user_bot.home_views import build_about_view, build_booking_view, build_home_view
@@ -60,3 +62,22 @@ def test_admin_home_exposes_consult_contract_renewal_and_service_work():
     assert "📄 租客与合同" in labels
     assert "🔄 续租跟进" in labels
     assert "🛠 服务工单" in labels
+
+
+def test_production_entrypoint_wires_complete_admin_adapters():
+    source = Path("run_v3_user_bot.py").read_text(encoding="utf-8")
+    assert "show_unified_admin_home" in source
+    assert "admin_contract_command_handler=cmd_contracts" in source
+    assert "admin_contract_callback_handler=handle_admin_contract_callback" in source
+    assert "admin_contract_text_handler=handle_admin_contract_text" in source
+    assert "admin_workflow_callback_handler=handle_v3_admin_workflow" in source
+    assert "qiaolian_dual.v3_admin_workflow_bridge" in source
+
+
+def test_v3_app_registers_admin_contract_and_workflow_routes():
+    source = Path("v3_core/user_bot/app.py").read_text(encoding="utf-8")
+    assert 'CommandHandler("admin", admin)' in source
+    assert 'CommandHandler("contracts", contracts)' in source
+    assert 'pattern=r"^adminq:"' in source
+    assert 'pattern=r"^admincontract:"' in source
+    assert 'pattern=r"^admin(?:lead|repair):"' in source
