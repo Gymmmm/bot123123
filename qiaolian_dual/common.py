@@ -44,7 +44,7 @@ FIND_AREA_CODE_MAP = {
     'rf': '富力城', 'pp': '炳发城', 'ph': '太子幸福广场',
     'bkk1': 'BKK1', 'bkk23': 'BKK2 / BKK3', 'tk': 'TK/7月区', 'koh': '钻石岛',
     'aeon1': '永旺1', 'russian': '俄罗斯市场', 'chroy': '水净华', 'sen': '森速',
-    'jinjie': '桥牌',
+    'jinjie': '金街附近',
     'a4': 'BKK1', 'a8': '森速', 'a6': 'TK/7月区', 'a7': '洪森大道',
     'a41': 'BKK2', 'a42': 'BKK3', 'a0': '不限',
 }
