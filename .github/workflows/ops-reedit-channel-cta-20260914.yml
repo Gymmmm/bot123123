@@ -25,6 +25,7 @@ env:
   CANDIDATE_SHA: '8c0ad0b66985f4f12b80b09133c87ae17d34db7e'
   INTERVAL_SECONDS: '8'
   LIMIT_COUNT: '0'
+  RUN_STAMP: '20260914-reedit-cta-1'
 
 jobs:
   reedit-all:
