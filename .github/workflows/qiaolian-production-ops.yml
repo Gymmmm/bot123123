@@ -113,6 +113,8 @@ jobs:
             test -f "$V3/scripts/v3/backfill_source_history.py"
             TMP=$(mktemp -d /var/tmp/qiaolian-zufang555-50.XXXXXX)
             trap 'rm -rf "$TMP"' RETURN
+            chown qiaolianbot:qiaolianbot "$TMP"
+            chmod 0750 "$TMP"
             install -d -m 0750 -o qiaolianbot -g qiaolianbot "$TMP/media"
             "$VENV/bin/python" - "$DB" "$TMP/trial.db" <<'PY'
           import sqlite3,sys
