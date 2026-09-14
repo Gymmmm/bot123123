@@ -1,0 +1,202 @@
+name: ops-zufang555-fresh-reedit-pilot
+
+on:
+  push:
+    branches: [codex/qiaolian-ui-cleanup-20260829]
+    paths: [.github/workflows/ops-zufang555-fresh-reedit-pilot.yml]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qiaolian-v3-production
+  cancel-in-progress: false
+
+env:
+  PROD_HOST: 50.114.74.120
+  PROD_PORT: '22'
+  PROD_SSH_USER: root
+  PROD_SSH_HOST_FINGERPRINT: 'SHA256:fuufBlFaqRpQhlkio0vuLsuv8w8x3zUb3VFQsnUny/o'
+  EXPECTED_PROD_SHA: 'cfe49d2624ce83a5a7eed91c17cd599710d37504'
+  SOURCE_PK: '317'
+  EXPECTED_LISTING_ID: 'l_33'
+  TARGET_MESSAGE_ID: '3215'
+
+jobs:
+  pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Verify production SSH host key
+        run: |
+          set -Eeuo pipefail
+          ssh-keyscan -T 10 -p "$PROD_PORT" -t ed25519 "$PROD_HOST" 2>/dev/null | grep -v '^#' > "$RUNNER_TEMP/known_hosts_observed"
+          ssh-keygen -lf "$RUNNER_TEMP/known_hosts_observed" | grep -F "$PROD_SSH_HOST_FINGERPRINT"
+
+      - name: Configure production SSH
+        env:
+          PROD_SSH_PRIVATE_KEY: '${{ secrets.PROD_SSH_PRIVATE_KEY }}'
+        run: |
+          set -Eeuo pipefail
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
+          cp "$RUNNER_TEMP/known_hosts_observed" "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
+
+      - name: Fresh reparse and in-place edit one mapped post
+        run: |
+          set -Eeuo pipefail
+          ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 "$PROD_SSH_USER@$PROD_HOST" \
+            "EXPECTED_PROD_SHA='$EXPECTED_PROD_SHA' SOURCE_PK='$SOURCE_PK' EXPECTED_LISTING_ID='$EXPECTED_LISTING_ID' TARGET_MESSAGE_ID='$TARGET_MESSAGE_ID' bash -s" <<'REMOTE'
+          set -Eeuo pipefail
+          ROOT=/opt/qiaolian_v3
+          V3="$ROOT/current"
+          VENV="$ROOT/.venv"
+          DB=/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db
+          test "$(tr -cd '0-9a-fA-F' < "$ROOT/.deployed_sha")" = "$EXPECTED_PROD_SHA"
+          test "$(basename "$(readlink -f "$V3")")" = "$EXPECTED_PROD_SHA"
+          BACKUP="/opt/qiaolian_backups/fresh-reedit-pilot-$(date -u +%Y%m%d-%H%M%S)"
+          install -d -m 0700 "$BACKUP"
+          sqlite3 "$DB" ".backup '$BACKUP/qiaolian_dual_bot.db'"
+          sqlite3 "$BACKUP/qiaolian_dual_bot.db" 'PRAGMA quick_check;' | grep -Fx ok
+          echo "PILOT_BACKUP_OK path=$BACKUP"
+          set -a; source "$ROOT/runtime.env"; set +a
+
+          runuser -u qiaolianbot -- bash -lc "set -a; source '$ROOT/runtime.env'; set +a; export PYTHONPATH='$V3'; export SOURCE_PK='$SOURCE_PK'; export EXPECTED_LISTING_ID='$EXPECTED_LISTING_ID'; export TARGET_MESSAGE_ID='$TARGET_MESSAGE_ID'; cd '$V3'; exec '$VENV/bin/python' -" <<'PY'
+          import asyncio, os, sqlite3
+          from telegram import Bot
+          from v3_core.parser.worker import CanonicalWorker
+          from v3_core.publishing.admin_bot import load_settings, build_workflow
+          from v3_core.publishing.delivery_coordinator import TelegramSendCommand
+          from v3_core.publishing.package_store import FrozenPackageStore
+          from v3_core.publishing.telegram_adapter import TelegramChannelAdapter
+          from v3_core.storage.inventory_reader import InventoryReader
+
+          source_pk=int(os.environ['SOURCE_PK'])
+          expected_listing=os.environ['EXPECTED_LISTING_ID']
+          target_message=str(os.environ['TARGET_MESSAGE_ID'])
+          settings=load_settings()
+          db=settings.db_path
+          reader=InventoryReader(db)
+          packages=FrozenPackageStore(db)
+          workflow=build_workflow(settings)
+
+          with sqlite3.connect(db,timeout=30) as c:
+              c.row_factory=sqlite3.Row
+              src=c.execute("SELECT source_name,source_post_id,parse_status,raw_meta_json FROM source_posts WHERE id=?",(source_pk,)).fetchone()
+              if not src or src['source_name']!='zufang555': raise RuntimeError('pilot_source_mismatch')
+              pub=c.execute("SELECT * FROM publication_instances WHERE platform='telegram' AND channel_message_id=?",(target_message,)).fetchone()
+              if not pub: raise RuntimeError('pilot_publication_missing')
+              if str(pub['listing_id'])!=expected_listing: raise RuntimeError(f"pilot_listing_mismatch:{pub['listing_id']}")
+              old_package=packages.get(str(pub['package_id']))
+              if old_package is None: raise RuntimeError('pilot_old_package_missing')
+              old_offer_id=str(pub['offer_id'])
+              old_status=str(old_package.status)
+              print('PILOT_PRECHECK',source_pk,src['source_post_id'],expected_listing,target_message,old_package.package_id,old_status,flush=True)
+
+          parsed=CanonicalWorker(db).process_one(source_pk)
+          if parsed.status!='materialized' or parsed.listing_id!=expected_listing:
+              raise RuntimeError(f"pilot_reparse_failed:{parsed}")
+
+          with sqlite3.connect(db,timeout=30) as c:
+              c.row_factory=sqlite3.Row
+              listing=c.execute("SELECT * FROM listings_v3 WHERE listing_id=?",(expected_listing,)).fetchone()
+              if not listing: raise RuntimeError('pilot_listing_missing_after_reparse')
+              offer=c.execute("SELECT * FROM listing_offers WHERE listing_id=? AND offer_type='rent' AND offer_status='active' ORDER BY created_at DESC LIMIT 1",(expected_listing,)).fetchone()
+              if not offer: raise RuntimeError('pilot_active_rent_offer_missing')
+              offer_id=str(offer['offer_id'])
+              review=c.execute("SELECT * FROM review_items WHERE listing_id=? AND offer_id=? ORDER BY created_at DESC,review_id DESC LIMIT 1",(expected_listing,offer_id)).fetchone()
+              if not review: raise RuntimeError('pilot_review_missing')
+              review_id=str(review['review_id'])
+              inventory_status=str(listing['inventory_status'] or 'pending')
+
+          workflow.inventory.approve_review(review_id=review_id,operator_user_id='ops:fresh50-pilot')
+
+          held=[]
+          with sqlite3.connect(db,timeout=30) as c:
+              c.row_factory=sqlite3.Row
+              c.execute('BEGIN IMMEDIATE')
+              ids={old_offer_id,offer_id}
+              for oid in ids:
+                  for row in c.execute("SELECT package_id,status FROM publication_packages_v3 WHERE offer_id=? AND status IN ('approved','published')",(oid,)).fetchall():
+                      cur=c.execute("UPDATE publication_packages_v3 SET status='rebuild_hold',updated_at=CURRENT_TIMESTAMP WHERE package_id=? AND status=?",(row['package_id'],row['status']))
+                      if cur.rowcount==1: held.append((str(row['package_id']),str(row['status'])))
+              c.commit()
+          print('PILOT_HELD',held,flush=True)
+
+          def restore_held(new_package_id=''):
+              with sqlite3.connect(db,timeout=30) as c:
+                  c.execute('BEGIN IMMEDIATE')
+                  if new_package_id:
+                      c.execute("UPDATE publication_packages_v3 SET status='superseded',updated_at=CURRENT_TIMESTAMP WHERE package_id=?",(new_package_id,))
+                  for pid,status in held:
+                      c.execute("UPDATE publication_packages_v3 SET status=?,updated_at=CURRENT_TIMESTAMP WHERE package_id=? AND status='rebuild_hold'",(status,pid))
+                  c.commit()
+
+          new=None
+          try:
+              old=packages.get(str(pub['package_id']))
+              new=workflow.build_package_for_review(review_id=review_id,cover_style=str(old.cover_style or 'default'))
+              approved=workflow.approve_package(package_id=new.package_id,approved_by='ops:fresh50-pilot')
+              command=TelegramSendCommand(
+                  attempt_id='fresh50-pilot:'+str(pub['instance_id']),
+                  package_id=approved.package_id,
+                  channel_chat_id=str(pub['channel_chat_id']),
+                  cover_path=approved.cover_path,
+                  caption=approved.post_text,
+                  actions=dict(approved.actions),
+                  inventory_status=inventory_status,
+              )
+          except Exception:
+              restore_held(new.package_id if new else '')
+              raise
+
+          async def do_edit():
+              bot=Bot(token=settings.token)
+              adapter=TelegramChannelAdapter(bot)
+              try:
+                  return await adapter.edit(command,message_id=target_message)
+              finally:
+                  await bot.shutdown()
+
+          try:
+              result=asyncio.run(do_edit())
+          except Exception:
+              restore_held(new.package_id)
+              raise
+
+          try:
+              with sqlite3.connect(db,timeout=30) as c:
+                  c.execute('BEGIN IMMEDIATE')
+                  for pid,_status in held:
+                      c.execute("UPDATE publication_packages_v3 SET status='superseded',updated_at=CURRENT_TIMESTAMP WHERE package_id=? AND status='rebuild_hold'",(pid,))
+                  cur=c.execute("UPDATE publication_packages_v3 SET status='published',published_at=COALESCE(published_at,CURRENT_TIMESTAMP),updated_at=CURRENT_TIMESTAMP WHERE package_id=? AND status='approved'",(new.package_id,))
+                  if cur.rowcount!=1: raise RuntimeError('pilot_new_package_publish_transition_failed')
+                  cur=c.execute("UPDATE publication_instances SET package_id=?,listing_id=?,offer_id=?,post_text=?,publish_status='published',updated_at=CURRENT_TIMESTAMP WHERE instance_id=?",(new.package_id,expected_listing,offer_id,str(result.get('caption') or command.caption),str(pub['instance_id'])))
+                  if cur.rowcount!=1: raise RuntimeError('pilot_publication_rebind_failed')
+                  c.commit()
+          except Exception:
+              old=packages.get(str(pub['package_id']))
+              rollback=TelegramSendCommand(attempt_id='fresh50-pilot-rollback',package_id=old.package_id,channel_chat_id=str(pub['channel_chat_id']),cover_path=old.cover_path,caption=old.post_text,actions=dict(old.actions),inventory_status=inventory_status)
+              async def undo():
+                  bot=Bot(token=settings.token); adapter=TelegramChannelAdapter(bot)
+                  try: await adapter.edit(rollback,message_id=target_message)
+                  finally: await bot.shutdown()
+              asyncio.run(undo())
+              restore_held(new.package_id)
+              raise
+
+          with sqlite3.connect(db) as c:
+              assert c.execute('PRAGMA quick_check').fetchone()[0]=='ok'
+              row=c.execute("SELECT package_id,listing_id,offer_id,channel_message_id,publish_status FROM publication_instances WHERE instance_id=?",(str(pub['instance_id']),)).fetchone()
+          print('PILOT_REEDIT_OK',{'source_pk':source_pk,'listing_id':expected_listing,'message_id':target_message,'new_package':new.package_id,'edit_mode':result.get('edit_mode'),'publication':row},flush=True)
+          PY
+
+          sqlite3 "$DB" 'PRAGMA quick_check;' | grep -Fx ok
+          for s in collector canonical publisher user; do systemctl is-active --quiet "qiaolian-v3@$s.service"; done
+          echo PILOT_HEALTH_OK
+          REMOTE
+
+      - name: Remove SSH material
+        if: always()
+        run: rm -f "$HOME/.ssh/qiaolian_production"
