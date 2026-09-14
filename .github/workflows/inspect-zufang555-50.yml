@@ -1,0 +1,30 @@
+name: inspect-zufang555-50
+on:
+  push:
+    branches: [ops/inspect-zufang555-50]
+    paths:
+      - '.github/workflows/inspect-zufang555-50.yml'
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify production SSH identity
+        run: |
+          set -Eeuo pipefail
+          ssh-keyscan -T 10 -p 22 -t ed25519 50.114.74.120 2>/dev/null | grep -v '^#' > "$RUNNER_TEMP/known_hosts"
+          ssh-keygen -lf "$RUNNER_TEMP/known_hosts" | grep -F 'SHA256:fuufBlFaqRpQhlkio0vuLsuv8w8x3zUb3VFQsnUny/o'
+      - name: Configure SSH
+        env:
+          PROD_SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+        run: |
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
+          cp "$RUNNER_TEMP/known_hosts" "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
+      - name: Copy helper
+        run: scp -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes deploy/v3/inspect_zufang555.py root@50.114.74.120:/tmp/inspect_zufang555.py
+      - name: Inspect
+        run: ssh -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes root@50.114.74.120 'python3 /tmp/inspect_zufang555.py; rm -f /tmp/inspect_zufang555.py'
