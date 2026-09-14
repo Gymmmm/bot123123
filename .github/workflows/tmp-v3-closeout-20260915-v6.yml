@@ -1,0 +1,164 @@
+name: tmp-v3-closeout-20260915-v6
+
+on:
+  push:
+    branches:
+      - codex/v3-publisher-admin-adjustments-20260914
+    paths:
+      - .github/workflows/tmp-v3-closeout-20260915-v6.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qiaolian-v3-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: contains(github.event.head_commit.message, '[deploy-closeout-v6]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CANDIDATE_SHA: 7000ab4c4f2060d3253f0695fb89ff244b904c62
+      EXPECTED_OLD_SHA: 5ddaaa357d79967fa76d19cd0e2195202b6d3b89
+      PROD_HOST: 50.114.74.120
+      PROD_PORT: '22'
+      PROD_SSH_USER: root
+      PROD_SSH_HOST_FINGERPRINT: 'SHA256:fuufBlFaqRpQhlkio0vuLsuv8w8x3zUb3VFQsnUny/o'
+
+    steps:
+      - name: Verify production identity and configure SSH
+        env:
+          PROD_SSH_PRIVATE_KEY: '${{ secrets.PROD_SSH_PRIVATE_KEY }}'
+        run: |
+          set -Eeuo pipefail
+          ssh-keyscan -T 10 -p "$PROD_PORT" -t ed25519 "$PROD_HOST" 2>/dev/null | grep -v '^#' > "$RUNNER_TEMP/known_hosts"
+          test "$(ssh-keygen -lf "$RUNNER_TEMP/known_hosts" | awk '{print $2}')" = "$PROD_SSH_HOST_FINGERPRINT"
+          test -n "$PROD_SSH_PRIVATE_KEY"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
+          cp "$RUNNER_TEMP/known_hosts" "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
+
+      - name: Deploy immutable release with runtime inheritance and rollback
+        run: |
+          set -Eeuo pipefail
+          ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes "$PROD_SSH_USER@$PROD_HOST" "bash -s -- '$CANDIDATE_SHA' '$EXPECTED_OLD_SHA'" <<'REMOTE'
+          set -Eeuo pipefail
+          CANDIDATE_SHA=$1
+          EXPECTED_OLD_SHA=$2
+          ROOT=/opt/qiaolian_v3
+          CURRENT=$ROOT/current
+          RUNTIME=$ROOT/runtime
+          ENVFILE=$ROOT/runtime.env
+          VENV=$ROOT/.venv
+          RELEASE=$ROOT/releases/$CANDIDATE_SHA
+          SOURCE_CONFIG=$ROOT/sources.json
+          SERVICES=(qiaolian-v3@collector.service qiaolian-v3@canonical.service qiaolian-v3@publisher.service qiaolian-v3@user.service)
+
+          OLD_SHA=$(cat "$ROOT/.deployed_sha")
+          OLD_RELEASE=$(readlink -f "$CURRENT")
+          test "$OLD_SHA" = "$EXPECTED_OLD_SHA"
+          test -d "$OLD_RELEASE"
+          test -x "$VENV/bin/python"
+          test -f "$ENVFILE"
+          test -f "$RUNTIME/data/qiaolian_dual_bot.db" || test -f /opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db
+          test -f "$SOURCE_CONFIG"
+
+          STAMP=$(date -u '+%Y%m%d-%H%M%S')
+          BACKUP=/opt/qiaolian_backups/actions-v3-closeout-$STAMP
+          install -d -m 0750 -o qiaolianbot -g qiaolianbot "$BACKUP"
+          DB_SOURCE="$RUNTIME/data/qiaolian_dual_bot.db"
+          if [ ! -f "$DB_SOURCE" ]; then DB_SOURCE=/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db; fi
+          runuser -u qiaolianbot -- "$VENV/bin/python" - "$DB_SOURCE" "$BACKUP/qiaolian_dual_bot.db" <<'PY'
+          import sqlite3, sys
+          s=sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True)
+          d=sqlite3.connect(sys.argv[2])
+          with d: s.backup(d)
+          result=d.execute("PRAGMA integrity_check").fetchone()[0]
+          s.close(); d.close()
+          if result != "ok": raise SystemExit(f"backup_integrity_failed:{result}")
+          print("DB_BACKUP_OK")
+          PY
+          chmod 0640 "$BACKUP/qiaolian_dual_bot.db"
+
+          if [ ! -d "$RELEASE/.git" ]; then
+            rm -rf -- "$RELEASE"
+            git clone -q https://github.com/Gymmmm/bot123123.git "$RELEASE"
+            git -C "$RELEASE" checkout -q --detach "$CANDIDATE_SHA"
+            chown -R qiaolianbot:qiaolianbot "$RELEASE"
+          fi
+          test "$(runuser -u qiaolianbot -- git -C "$RELEASE" rev-parse HEAD)" = "$CANDIDATE_SHA"
+
+          install -m 0640 -o qiaolianbot -g qiaolianbot "$SOURCE_CONFIG" "$RELEASE/sources.json"
+          runuser -u qiaolianbot -- "$VENV/bin/python" - "$RELEASE/sources.json" <<'PY'
+          import json, sys
+          with open(sys.argv[1], encoding='utf-8') as f: data=json.load(f)
+          rows=data if isinstance(data,list) else data.get('sources',[]) if isinstance(data,dict) else []
+          enabled=[r for r in rows if isinstance(r,dict) and r.get('enabled',True)]
+          if not enabled: raise SystemExit('collector_source_inheritance_failed')
+          print(f"COLLECTOR_SOURCE_INHERITANCE_OK enabled={len(enabled)}")
+          PY
+
+          runuser -u qiaolianbot -- bash -lc "set -a; source '$ENVFILE'; set +a; exec '$VENV/bin/python' '$RELEASE/run_v3_preflight.py' --component all --db '$DB_SOURCE'"
+
+          rollback() {
+            echo "ROLLBACK_START sha=$OLD_SHA"
+            ln -sfn "$OLD_RELEASE" "$ROOT/current.rollback"
+            mv -Tf "$ROOT/current.rollback" "$CURRENT"
+            systemctl restart "${SERVICES[@]}" || true
+            sleep 8
+            printf '%s\n' "$OLD_SHA" > "$ROOT/.deployed_sha"
+            echo "ROLLBACK_DONE sha=$OLD_SHA"
+          }
+          trap 'rc=$?; if [ "$rc" -ne 0 ]; then rollback; fi; exit "$rc"' EXIT
+
+          ln -sfn "$RELEASE" "$ROOT/current.next"
+          mv -Tf "$ROOT/current.next" "$CURRENT"
+          ACTIVATED_AT=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          systemctl restart "${SERVICES[@]}"
+
+          wait_active() {
+            local service=$1
+            for _ in $(seq 1 12); do
+              local active pid
+              active=$(systemctl is-active "$service" 2>/dev/null || true)
+              pid=$(systemctl show "$service" -p MainPID --value 2>/dev/null || echo 0)
+              if [ "$active" = active ] && [ "${pid:-0}" -gt 0 ] 2>/dev/null; then return 0; fi
+              sleep 5
+            done
+            echo "SERVICE_NOT_ACTIVE unit=$service"
+            journalctl -u "$service" --since "$ACTIVATED_AT" -n 100 --no-pager || true
+            return 1
+          }
+
+          for service in "${SERVICES[@]}"; do wait_active "$service"; done
+          sleep 12
+
+          FAILED=0
+          for service in "${SERVICES[@]}"; do
+            ACTIVE=$(systemctl is-active "$service" 2>/dev/null || true)
+            PID=$(systemctl show "$service" -p MainPID --value 2>/dev/null || echo 0)
+            RESTARTS=$(systemctl show "$service" -p NRestarts --value 2>/dev/null || echo unknown)
+            echo "FINAL_HEALTH unit=$service active=$ACTIVE pid=$PID restarts=$RESTARTS"
+            [ "$ACTIVE" = active ] || FAILED=1
+            [ "${PID:-0}" -gt 0 ] 2>/dev/null || FAILED=1
+            [ "$RESTARTS" = 0 ] || FAILED=1
+          done
+          [ "$FAILED" -eq 0 ] || {
+            journalctl -u qiaolian-v3@collector.service -u qiaolian-v3@canonical.service -u qiaolian-v3@publisher.service -u qiaolian-v3@user.service --since "$ACTIVATED_AT" -n 160 --no-pager || true
+            exit 1
+          }
+
+          if journalctl -u qiaolian-v3@collector.service -u qiaolian-v3@canonical.service -u qiaolian-v3@publisher.service -u qiaolian-v3@user.service --since "$ACTIVATED_AT" --no-pager | grep -Eq 'Traceback|ModuleNotFoundError|Main process exited|Failed with result'; then
+            journalctl -u qiaolian-v3@collector.service -u qiaolian-v3@canonical.service -u qiaolian-v3@publisher.service -u qiaolian-v3@user.service --since "$ACTIVATED_AT" -n 160 --no-pager
+            exit 1
+          fi
+
+          runuser -u qiaolianbot -- bash -lc "set -a; source '$ENVFILE'; set +a; exec '$VENV/bin/python' '$CURRENT/run_v3_preflight.py' --component all --db '$DB_SOURCE'"
+          printf '%s\n' "$CANDIDATE_SHA" > "$ROOT/.deployed_sha"
+          chmod 0644 "$ROOT/.deployed_sha"
+          trap - EXIT
+          echo "V3_CLOSEOUT_DEPLOYMENT_OK sha=$CANDIDATE_SHA backup=$BACKUP"
+          REMOTE
