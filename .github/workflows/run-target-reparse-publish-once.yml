@@ -75,33 +75,68 @@ jobs:
               repository = FinalAutoPublishRepository(settings.db_path)
               repository.ensure_defaults()
               synced = repository.sync_candidates()
+              workflow = build_workflow(settings)
+              service = FinalAutoPublishService(
+                  workflow=workflow,
+                  repository=repository,
+                  channel_chat_id=settings.channel_chat_id,
+              )
               candidate = repository.next_item()
               with sqlite3.connect(f"file:{settings.db_path}?mode=ro", uri=True) as conn:
                   conn.row_factory = sqlite3.Row
                   before = int(conn.execute("SELECT COUNT(*) FROM publication_instances").fetchone()[0])
               print(f"CANDIDATES_SYNCED={synced}")
               print(f"PUBLICATIONS_BEFORE={before}")
+
               if candidate is None:
                   with sqlite3.connect(f"file:{settings.db_path}?mode=ro", uri=True) as conn:
                       conn.row_factory = sqlite3.Row
-                      states = [dict(r) for r in conn.execute("SELECT state,COUNT(*) AS n FROM publisher_auto_items_v3 GROUP BY state ORDER BY n DESC,state")]
-                      reasons = [dict(r) for r in conn.execute("SELECT COALESCE(reason_code,'') AS reason_code,COUNT(*) AS n FROM publisher_auto_items_v3 WHERE state='exception' AND ignored=0 GROUP BY COALESCE(reason_code,'') ORDER BY n DESC,reason_code")]
-                      rows = [dict(r) for r in conn.execute("""SELECT a.offer_id,a.listing_id,a.review_id,a.origin,a.reason_code,a.reason_text,a.updated_at,l.public_listing_id,l.project_name,l.public_location_display,l.layout,l.property_type,l.inventory_status,o.monthly_rent_usd,o.offer_type FROM publisher_auto_items_v3 a JOIN listings_v3 l ON l.listing_id=a.listing_id JOIN listing_offers o ON o.offer_id=a.offer_id WHERE a.state='exception' AND a.ignored=0 AND o.offer_type='rent' ORDER BY a.updated_at DESC LIMIT 12""")]
-                  print('STATES=' + json.dumps(states, ensure_ascii=False, default=str))
-                  print('EXCEPTION_REASONS=' + json.dumps(reasons, ensure_ascii=False, default=str))
-                  print('RENT_EXCEPTIONS=' + json.dumps(rows, ensure_ascii=False, default=str))
-                  print('RESULT=' + json.dumps({'status': 'idle'}, ensure_ascii=False))
+                      rows = [dict(r) for r in conn.execute("""
+                          SELECT a.*,r.review_status,o.offer_type,o.publication_policy,o.offer_status,
+                                 o.monthly_rent_usd,l.inventory_status,l.public_listing_id,l.project_name,
+                                 l.public_location_display,l.layout,l.property_type,l.canonical_record_id
+                          FROM publisher_auto_items_v3 a
+                          JOIN review_items r ON r.review_id=a.review_id
+                          JOIN listing_offers o ON o.offer_id=a.offer_id
+                          JOIN listings_v3 l ON l.listing_id=a.listing_id
+                          WHERE a.state='exception' AND a.ignored=0
+                            AND o.offer_type='rent' AND o.offer_status='active'
+                            AND l.inventory_status IN ('active','reserved')
+                            AND COALESCE(o.monthly_rent_usd,0)>0
+                            AND (TRIM(COALESCE(l.project_name,''))<>'' OR TRIM(COALESCE(l.public_location_display,''))<>'')
+                          ORDER BY a.updated_at DESC,a.offer_id ASC
+                          LIMIT 20
+                      """)]
+                  print(f"RECHECKABLE_EXCEPTIONS={len(rows)}")
+                  for item in rows:
+                      try:
+                          detail = workflow.review_detail(str(item['review_id']))
+                          facts = dict(detail.canonical.get('facts') or {})
+                          media = await asyncio.to_thread(workflow.review_media, review_id=str(item['review_id']))
+                          blockers = service._strict_blockers(item, facts, media)
+                      except Exception as exc:
+                          blockers = ['unreadable_media']
+                          print('RECHECK_ERROR=' + json.dumps({'offer_id':item.get('offer_id'),'error':type(exc).__name__+':'+str(exc)},ensure_ascii=False))
+                      print('RECHECK=' + json.dumps({
+                          'offer_id':item.get('offer_id'),'listing_id':item.get('listing_id'),
+                          'public_listing_id':item.get('public_listing_id'),'project_name':item.get('project_name'),
+                          'location':item.get('public_location_display'),'layout':item.get('layout'),
+                          'rent':item.get('monthly_rent_usd'),'inventory_status':item.get('inventory_status'),
+                          'old_reason':item.get('reason_code'),'blockers':blockers,
+                      },ensure_ascii=False,default=str))
+                      if not blockers:
+                          candidate = item
+                          break
+
+              if candidate is None:
+                  print('RESULT=' + json.dumps({'status':'idle','reason':'no_candidate_passes_current_gates'},ensure_ascii=False))
                   return
+
               safe = {key: candidate.get(key) for key in (
                   'offer_id','listing_id','review_id','origin','review_status','public_listing_id',
                   'project_name','public_location_display','layout','property_type','monthly_rent_usd','inventory_status'
               )}
               print('CANDIDATE=' + json.dumps(safe, ensure_ascii=False, default=str))
-              service = FinalAutoPublishService(
-                  workflow=build_workflow(settings),
-                  repository=repository,
-                  channel_chat_id=settings.channel_chat_id,
-              )
               if not repository.acquire_lock(service.owner, ttl_seconds=300):
                   print('RESULT=' + json.dumps({'status':'blocked','reason':'publish_lock_busy'}, ensure_ascii=False))
                   return
