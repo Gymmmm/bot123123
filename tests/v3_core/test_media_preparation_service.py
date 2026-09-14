@@ -65,12 +65,15 @@ def test_media_preparation_scrubs_to_derived_files_before_selection(tmp_path):
     ).prepare(source_post_id=source_id)
 
     assert prepared.source_post_id == source_id
-    assert prepared.cover_source_path in prepared.gallery_paths
+    assert prepared.cover_source_path not in prepared.gallery_paths
     assert len(prepared.gallery_paths) >= 1
     assert prepared.source_identity["source_post_db_id"] == source_id
     assert prepared.source_identity["source_post_id"] == "100"
     assert all(Path(path).is_file() for path in prepared.gallery_paths)
     assert all(prepared_dir in Path(path).parents for path in prepared.gallery_paths)
+    assert all(Path(path).parent.name == "gallery" for path in prepared.gallery_paths)
+    assert all(Path(path).name.endswith("_gallery.jpg") for path in prepared.gallery_paths)
+    assert prepared.source_identity["gallery_brand_revision"] == "qiaolian_gallery_logo_v1"
     assert all(str(Path(path).resolve()) not in prepared.gallery_paths for path in paths)
     assert [_sha(path) for path in paths] == before
 
@@ -82,7 +85,7 @@ def test_manual_raw_cover_maps_to_its_derived_media(tmp_path):
         SourceReader(str(db)), prepared_dir=prepared_dir
     ).prepare(source_post_id=source_id, manual_cover_path=paths[2])
 
-    assert prepared.cover_source_path in prepared.gallery_paths
+    assert prepared.cover_source_path not in prepared.gallery_paths
     assert prepared.cover_source_path != str(Path(paths[2]).resolve())
     expected_service = MediaPreparationService(
         SourceReader(str(db)), prepared_dir=prepared_dir
@@ -106,6 +109,6 @@ def test_scrub_over_eight_percent_falls_back_to_untouched_derived_copy(tmp_path,
     ).prepare(source_post_id=source_id)
 
     assert prepared.gallery_paths
-    assert all("_source" in Path(path).stem for path in prepared.gallery_paths)
+    assert all(Path(path).name.endswith("_gallery.jpg") for path in prepared.gallery_paths)
     assert all(prepared_dir in Path(path).parents for path in prepared.gallery_paths)
     assert [_sha(path) for path in paths] == before
