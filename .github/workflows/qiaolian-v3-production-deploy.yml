@@ -16,9 +16,9 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  CANDIDATE_REF: release/v3-production-candidate-20260909
-  CANDIDATE_SHA: fc878b5302d1081cc8adbade2af01412dd329506
-  PREVIOUS_V3_SHA: c1c8aa2381412745036ab25976d87ffafd9d5efc
+  CANDIDATE_REF: release/v3-media-userbot-ready-20260914
+  CANDIDATE_SHA: b718d6b5b227d5fd0b2c59c3d3c069344335f540
+  PREVIOUS_V3_SHA: d3639402e90aea6b507e92982bee7e42efd8a6ad
   PROD_HOST: 50.114.74.120
   PROD_PORT: '22'
   PROD_SSH_USER: root
@@ -174,6 +174,9 @@ jobs:
           test -f "$BUNDLE_PATH"
           test -f "$ENV_SOURCE"
           test -s "$DB"
+          test -f "$APP/.deployed_sha"
+          test "$(tr -cd '0-9a-fA-F' < "$APP/.deployed_sha")" = "$PREVIOUS_SHA"
+          test -d "$APP/releases/$PREVIOUS_SHA"
           id qiaolianbot >/dev/null
           command -v git >/dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y git
           command -v sqlite3 >/dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y sqlite3
