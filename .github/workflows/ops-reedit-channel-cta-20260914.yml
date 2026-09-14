@@ -26,7 +26,7 @@ env:
   INTERVAL_SECONDS: '10'
   # First pass left these message_ids failed; empty = all
   ONLY_MESSAGE_IDS: ''
-  RUN_STAMP: '20260914-adviser-handoff-full2'
+  RUN_STAMP: '20260914-adviser-handoff-full3'
 
 jobs:
   reedit-all:
@@ -58,7 +58,7 @@ jobs:
           set -Eeuo pipefail
           ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 \
             "$PROD_SSH_USER@$PROD_HOST" \
-            "EXPECTED_PROD_SHA='$EXPECTED_PROD_SHA' CANDIDATE_SHA='$CANDIDATE_SHA' INTERVAL_SECONDS='$INTERVAL_SECONDS' ONLY_MESSAGE_IDS='$ONLY_MESSAGE_IDS' bash -s" <<'REMOTE'
+            "EXPECTED_PROD_SHA='$EXPECTED_PROD_SHA' CANDIDATE_SHA='$CANDIDATE_SHA' INTERVAL_SECONDS='$INTERVAL_SECONDS' ONLY_MESSAGE_IDS='${ONLY_MESSAGE_IDS:-}' bash -s" <<'REMOTE'
           set -Eeuo pipefail
           ROOT=/opt/qiaolian_v3
           test "$(cat "$ROOT/.deployed_sha")" = "$EXPECTED_PROD_SHA"
