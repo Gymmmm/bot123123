@@ -113,6 +113,41 @@ def test_admin_edit_records_override_rematerializes_and_returns_review_to_pendin
     assert row[2] == "admin"
 
 
+def test_admin_location_correction_clears_only_the_resolved_quality_flag(tmp_path):
+    _, _, reader, ops, materialized = _setup(tmp_path)
+    review_id = materialized.review_ids[0]
+    canonical_id = str(reader.review(review_id)["canonical_record_id"])
+    canonical = reader.canonical(canonical_id)
+    facts = dict(canonical["facts"])
+    facts["public_location_display"] = ""
+    facts["quality"] = {
+        "all_flags": ["missing_public_location", "missing_size"],
+        "blocking_flags": ["missing_public_location"],
+        "hard_flags": ["missing_public_location"],
+        "warning_flags": ["missing_size"],
+    }
+    with ops._connect() as conn:
+        conn.execute(
+            "UPDATE canonical_records SET facts_json=? WHERE canonical_record_id=?",
+            (ops._json(facts), canonical_id),
+        )
+        conn.commit()
+
+    ops.edit_review_field(
+        review_id=review_id,
+        field_name="public_location_display",
+        raw_value="新机场附近",
+        operator_user_id="admin",
+    )
+
+    updated = reader.canonical(canonical_id)["facts"]
+    assert updated["public_location_display"] == "新机场附近"
+    assert "missing_public_location" not in updated["quality"]["all_flags"]
+    assert "missing_public_location" not in updated["quality"]["blocking_flags"]
+    assert "missing_public_location" not in updated["quality"]["hard_flags"]
+    assert updated["quality"]["warning_flags"] == ["missing_size"]
+
+
 def test_hold_reject_and_reopen_are_explicit_non_publishable_states(tmp_path):
     _, inventory, reader, ops, materialized = _setup(tmp_path)
     review_id = materialized.review_ids[0]

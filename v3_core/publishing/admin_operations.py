@@ -38,6 +38,10 @@ EDITABLE_FACT_FIELDS: dict[str, tuple[str, str]] = {
 
 REVIEW_ADMIN_STATUSES = frozenset({"pending", "approved", "hold", "rejected"})
 
+_RESOLVED_QUALITY_FLAGS = {
+    "public_location_display": {"missing_public_location"},
+}
+
 
 @dataclass(frozen=True)
 class QueueCounts:
@@ -135,6 +139,24 @@ class PublisherAdminOperations:
         bathroom = re.search(r"(\d{1,2})\s*卫", layout)
         facts["bedrooms"] = int(bedroom.group(1)) if bedroom else None
         facts["bathrooms"] = int(bathroom.group(1)) if bathroom else None
+
+    @staticmethod
+    def _clear_resolved_quality_flags(facts: dict[str, Any], field_name: str) -> None:
+        resolved = _RESOLVED_QUALITY_FLAGS.get(field_name, set())
+        quality = facts.get("quality")
+        if not resolved or not isinstance(quality, dict):
+            return
+        for key in (
+            "all_flags",
+            "blocking_flags",
+            "hard_flags",
+            "review_flags",
+            "warning_flags",
+            "info_flags",
+        ):
+            values = quality.get(key)
+            if isinstance(values, list):
+                quality[key] = [value for value in values if str(value) not in resolved]
 
     def _assert_not_frozen(self, offer_id: str) -> None:
         with self._connect() as conn:
@@ -241,6 +263,7 @@ class PublisherAdminOperations:
         old_value = facts.get(field_name)
         new_value = self._coerce(field_name, raw_value)
         facts[field_name] = new_value
+        self._clear_resolved_quality_flags(facts, field_name)
         if field_name == "layout":
             self._refresh_layout_counts(facts)
         if field_name in {

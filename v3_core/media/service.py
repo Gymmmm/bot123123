@@ -17,11 +17,13 @@ from typing import Any
 
 from v3_core.ingest.source_reader import SourceReader
 from .media_selection import select_publication_media
+from .photo_formatter import format_gallery_photo
 from .source_scrub import scrub_file
 
 
 MAX_SCRUB_COVERAGE = 0.08
 SCRUB_REVISION = "source_scrub_v1"
+GALLERY_BRAND_REVISION = "qiaolian_gallery_logo_v1"
 
 
 @dataclass(frozen=True)
@@ -64,6 +66,43 @@ class MediaPreparationService:
         if not fallback.is_file():
             shutil.copy2(src, fallback)
         return fallback
+
+    @staticmethod
+    def _gallery_digest(path: Path) -> str:
+        digest = hashlib.sha256()
+        digest.update((GALLERY_BRAND_REVISION + "\0").encode("utf-8"))
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+
+    def _branded_gallery(
+        self, *, source_post_id: int | str, paths: list[str]
+    ) -> list[str]:
+        """Create deterministic logo-bearing gallery copies without touching evidence.
+
+        Cover rendering intentionally keeps using the clean selected source.  The
+        returned files are only for the public ``更多实拍`` gallery, preventing a
+        second brand mark from appearing underneath the cover template.
+        """
+        target_dir = self.prepared_dir / str(int(source_post_id)) / "gallery"
+        target_dir.mkdir(parents=True, exist_ok=True)
+        branded: list[str] = []
+        for raw in paths:
+            source = Path(str(raw)).expanduser().resolve()
+            if not source.is_file():
+                raise FileNotFoundError(f"gallery_source_not_found:{source}")
+            target = target_dir / f"{self._gallery_digest(source)[:24]}_gallery.jpg"
+            if not target.is_file():
+                format_gallery_photo(
+                    source,
+                    target,
+                    logo_position="top_left",
+                    add_logo=True,
+                    enhance=False,
+                )
+            branded.append(str(target.resolve()))
+        return branded
 
     def _scrubbed_paths(
         self,
@@ -133,17 +172,28 @@ class MediaPreparationService:
             cleaned_paths,
             manual_cover_path=manual_clean or None,
         )
+        branded_gallery = self._branded_gallery(
+            source_post_id=source_post_id,
+            paths=[str(path) for path in selected["gallery_paths"]],
+        )
         rejected = [str(path) for path in scrub_rejected]
         rejected.extend(str(path) for path in selected["rejected_paths"])
         return PreparedSourceMedia(
             source_post_id=int(source_post_id),
             cover_source_path=str(selected["cover_path"]),
-            gallery_paths=tuple(str(path) for path in selected["gallery_paths"]),
-            source_identity=self.reader.source_identity(source_post_id),
+            gallery_paths=tuple(branded_gallery),
+            source_identity={
+                **self.reader.source_identity(source_post_id),
+                "gallery_brand_revision": GALLERY_BRAND_REVISION,
+            },
             duplicates=tuple(dict(item) for item in selected["duplicates"]),
             rejected_paths=tuple(rejected),
             ranking=tuple(dict(item) for item in selected["ranking"]),
         )
 
 
-__all__ = ["MediaPreparationService", "PreparedSourceMedia"]
+__all__ = [
+    "GALLERY_BRAND_REVISION",
+    "MediaPreparationService",
+    "PreparedSourceMedia",
+]
