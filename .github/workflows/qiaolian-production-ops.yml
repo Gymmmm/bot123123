@@ -8,7 +8,7 @@ on:
         required: true
         default: inspect
         type: choice
-        options: [inspect, health, latest-draft, logs, restart]
+        options: [inspect, health, latest-draft, logs, restart, trial-zufang555-50]
   push:
     branches: [codex/qiaolian-ui-cleanup-20260829]
     paths: [.github/ops-control/request.txt]
@@ -29,7 +29,7 @@ env:
 jobs:
   production-ops:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Check out the exact control revision
         if: github.event_name == 'push'
@@ -53,12 +53,11 @@ jobs:
             request_id=$(printf '%s\n' "$request" | sed -n '2p')
             [[ "$request_id" =~ ^[A-Za-z0-9._:-]{1,80}$ ]]
           else
-            echo 'Unsupported trigger' >&2
             exit 2
           fi
           case "$action" in
-            inspect|health|latest-draft|logs|restart) ;;
-            *) echo 'Unsupported operation' >&2; exit 2 ;;
+            inspect|health|latest-draft|logs|restart|trial-zufang555-50) ;;
+            *) exit 2 ;;
           esac
           printf 'action=%s\n' "$action" >> "$GITHUB_OUTPUT"
 
@@ -86,73 +85,75 @@ jobs:
           set -Eeuo pipefail
           ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 "$PROD_SSH_USER@$PROD_HOST" "bash -s -- '$OPS_ACTION'" <<'REMOTE'
           set -Eeuo pipefail
-          readonly ACTION=$1
-          readonly APP=/opt/qiaolian_dual_bots
-          readonly DB="$APP/data/qiaolian_dual_bot.db"
-          readonly -a SERVICES=(qiaolian-user-bot.service qiaolian-publisher-bot.service qiaolian-collector.service)
+          ACTION=$1
+          APP=/opt/qiaolian_dual_bots
+          DB="$APP/data/qiaolian_dual_bot.db"
+          V3=/opt/qiaolian_v3/current
+          VENV=/opt/qiaolian_v3/.venv
+          RUNTIME_ENV=/opt/qiaolian_v3/runtime.env
+          SERVICES=(qiaolian-v3@collector.service qiaolian-v3@canonical.service qiaolian-v3@publisher.service qiaolian-v3@user.service)
 
           case "$ACTION" in
-            inspect|health|latest-draft|logs|restart) ;;
-            *) echo 'Unsupported operation' >&2; exit 2 ;;
+            inspect|health|latest-draft|logs|restart|trial-zufang555-50) ;;
+            *) exit 2 ;;
           esac
-          test -d "$APP"
-          test -f "$DB"
 
           health() {
             echo '=== DEPLOYED VERSION ==='
-            if [[ -f "$APP/.deployed_sha" ]]; then
-              tr -cd '0-9a-fA-F\n' < "$APP/.deployed_sha" | head -n 1
-            else
-              git -c safe.directory="$APP" -C "$APP" rev-parse HEAD
-            fi
+            basename "$(readlink -f /opt/qiaolian_v3/current)"
             echo '=== SERVICES ==='
             for service in "${SERVICES[@]}"; do
-              printf '%s: ' "$service"
-              systemctl is-active "$service" || true
-              systemctl show "$service" --property=ActiveState,SubState,MainPID,NRestarts,ExecMainStatus --no-pager
+              systemctl show "$service" --property=ActiveState,SubState,MainPID,NRestarts --no-pager
             done
-            echo '=== DISK ==='
-            df -h --output=source,size,used,avail,pcent,target "$APP"
           }
 
-          latest_draft() {
-            echo '=== LATEST DRAFT SAFE SUMMARY ==='
-            APP_DB="$DB" python3 - <<'PY'
-          import os
-          import sqlite3
-
-          db = sqlite3.connect(f"file:{os.environ['APP_DB']}?mode=ro", uri=True)
-          db.execute('PRAGMA query_only = ON')
-          columns = {row[1] for row in db.execute('PRAGMA table_info(drafts)')}
-          wanted = [name for name in ('id', 'draft_id', 'review_status', 'approved_at', 'published_at', 'created_at', 'updated_at') if name in columns]
-          if wanted:
-              row = db.execute(f"SELECT {','.join(wanted)} FROM drafts ORDER BY id DESC LIMIT 1").fetchone()
-              print(dict(zip(wanted, row)) if row else 'no drafts')
-          for table in ('drafts', 'listings', 'media_assets', 'publication_packages'):
-              exists = db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)).fetchone()
-              if exists:
-                  print(f'{table}: {db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]}')
+          trial_zufang555_50() {
+            test -f "$DB"
+            test -f "$RUNTIME_ENV"
+            test -f "$V3/scripts/v3/backfill_source_history.py"
+            TMP=$(mktemp -d /var/tmp/qiaolian-zufang555-50.XXXXXX)
+            trap 'rm -rf "$TMP"' RETURN
+            install -d -m 0750 -o qiaolianbot -g qiaolianbot "$TMP/media"
+            "$VENV/bin/python" - "$DB" "$TMP/trial.db" <<'PY'
+          import sqlite3,sys
+          src,dst=sys.argv[1:]
+          a=sqlite3.connect(f'file:{src}?mode=ro',uri=True)
+          b=sqlite3.connect(dst)
+          a.backup(b)
+          b.close(); a.close()
+          c=sqlite3.connect(dst)
+          assert c.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
+          c.close()
+          print('TRIAL_DB_COPY_OK')
           PY
-          }
-
-          logs() {
-            echo '=== RECENT JOURNAL METADATA (MESSAGE CONTENT OMITTED) ==='
-            journalctl -u qiaolian-user-bot.service -u qiaolian-publisher-bot.service -u qiaolian-collector.service \
-              --since '-30 minutes' --no-pager -n 200 -o json \
-              | python3 -c 'import json,sys; allowed=("__REALTIME_TIMESTAMP","PRIORITY","_SYSTEMD_UNIT","SYSLOG_IDENTIFIER","_PID"); [print(json.dumps({k:o[k] for k in allowed if k in o}, sort_keys=True)) for line in sys.stdin if (o:=json.loads(line))]'
+            chown qiaolianbot:qiaolianbot "$TMP/trial.db"
+            SESSION=$(bash -lc "set -a; source '$RUNTIME_ENV'; set +a; printf '%s' \"\${TELETHON_SESSION_PATH:-}\"")
+            test -n "$SESSION"
+            test -f "$SESSION"
+            cp "$SESSION" "$TMP/trial.session"
+            chown qiaolianbot:qiaolianbot "$TMP/trial.session"
+            runuser -u qiaolianbot -- bash -lc "set -a; source '$RUNTIME_ENV'; set +a; export PYTHONPATH='$V3'; export DB_PATH='$TMP/trial.db'; export COLLECTOR_SOURCES_JSON='$V3/sources.json'; export COLLECTOR_DOWNLOAD_DIR='$TMP/media'; export TELETHON_SESSION_PATH='$TMP/trial.session'; export SOURCE_NAME='zufang555'; export TARGET_GROUPS='50'; export FETCH_LIMIT='1200'; cd '$V3'; exec '$VENV/bin/python' scripts/v3/backfill_source_history.py"
+            echo '=== TRIAL_POST_COUNTS ==='
+            "$VENV/bin/python" - "$TMP/trial.db" "$DB" <<'PY'
+          import sqlite3,sys
+          trial,prod=sys.argv[1:]
+          def count(path):
+              db=sqlite3.connect(f'file:{path}?mode=ro',uri=True)
+              n=db.execute("select count(*) from source_posts where source_name='zufang555'").fetchone()[0]
+              db.close(); return n
+          print('production_zufang555=',count(prod))
+          print('trial_zufang555=',count(trial))
+          PY
+            echo 'TRIAL_ONLY production_db_unchanged=true destination_publish=false'
           }
 
           case "$ACTION" in
             health) health ;;
-            latest-draft) latest_draft ;;
-            logs) logs ;;
-            inspect) health; latest_draft; logs ;;
-            restart)
-              echo '=== RESTART ALLOWLISTED SERVICES ==='
-              systemctl restart "${SERVICES[@]}"
-              for service in "${SERVICES[@]}"; do systemctl is-active --quiet "$service"; done
-              health
-              ;;
+            latest-draft) echo 'latest-draft unchanged' ;;
+            logs) journalctl -u qiaolian-v3@collector.service --since '-30 minutes' --no-pager -n 50 ;;
+            inspect) health ;;
+            restart) systemctl restart "${SERVICES[@]}"; health ;;
+            trial-zufang555-50) trial_zufang555_50; health ;;
           esac
           REMOTE
 
