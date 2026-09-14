@@ -96,7 +96,7 @@ def _published(*, bookable=True):
 
 def test_channel_ctas_and_sync_contract_share_one_real_listing():
     urls = official_channel_action_urls(
-        "QiaoLianBot", PUBLIC_ID, advisor_url="https://t.me/qiaolian_advisor"
+        "QiaoLianBot", PUBLIC_ID, advisor_url="https://t.me/qiaolian_advisor", listing_summary="桥牌｜2房｜$420/月｜百色河"
     )
     rows = official_channel_button_spec(urls, inventory_status="active")
     assert CHANNEL_CTA_LABELS == {
@@ -111,6 +111,7 @@ def test_channel_ctas_and_sync_contract_share_one_real_listing():
     ]
     assert all(f"property_{PUBLIC_ID}_" in urls[key] for key in ("details", "photos", "book"))
     assert PUBLIC_ID in urls["consult"]
+    assert "%EF%BC%88" in urls["consult"] or "桥牌" in urls["consult"] or "%E6%A1%A5%E7%89%8C" in urls["consult"]
     synced = official_channel_button_spec(urls, inventory_status="reserved")
     assert synced == rows
     unbookable = official_channel_button_spec(urls, inventory_status="pending")

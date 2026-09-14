@@ -43,6 +43,7 @@ class SemanticAction:
 class PublicDetailsResponse:
     text: str
     action_rows: tuple[tuple[SemanticAction, ...], ...]
+    listing_summary: str = ""
 
 
 @dataclass(frozen=True)
@@ -50,6 +51,7 @@ class PublicPhotosResponse:
     media_groups: tuple[tuple[str, ...], ...]
     text: str
     action_rows: tuple[tuple[SemanticAction, ...], ...]
+    listing_summary: str = ""
 
     @property
     def has_media(self) -> bool:
@@ -58,6 +60,26 @@ class PublicPhotosResponse:
 
 def _format_price(value: int | None) -> str:
     return f"${int(value):,}/月" if value is not None and int(value) > 0 else ""
+
+
+def listing_summary_bits(
+    *,
+    project_name: object = "",
+    layout: object = "",
+    monthly_rent_usd: int | None = None,
+    location: object = "",
+) -> str:
+    """Compact identity line for advisor handoff / consult prefill."""
+    return "｜".join(
+        part
+        for part in (
+            str(project_name or "").strip(),
+            str(layout or "").strip(),
+            _format_price(monthly_rent_usd),
+            str(location or "").strip(),
+        )
+        if part
+    )
 
 
 def _format_size(value: float | None) -> str:
@@ -143,13 +165,19 @@ def build_details_response(view: PublishedListingView) -> PublicDetailsResponse:
     if details.public_listing_id:
         lines.append(f"🆔 {he(details.public_listing_id)}")
 
-    notes = adviser_notes_for_view(view, max_points=2, allow_empty=True).strip()
+    notes = adviser_notes_for_view(view, max_points=1, allow_empty=True).strip()
     if notes:
         safe_notes = "\n".join(he(line) for line in notes.splitlines() if line.strip())
-        lines.extend(["", "💬 <b>侨联说</b>", safe_notes])
+        lines.extend(["", "💬 <b>侨联判断</b>", safe_notes])
 
     return PublicDetailsResponse(
         text="\n".join(lines),
+        listing_summary=listing_summary_bits(
+            project_name=details.project_name,
+            layout=details.layout,
+            monthly_rent_usd=details.monthly_rent_usd,
+            location=details.location,
+        ),
         action_rows=_details_actions(
             bookable=details.bookable,
             public_listing_id=details.public_listing_id,
@@ -184,6 +212,12 @@ def build_photos_response(view: PublishedListingView) -> PublicPhotosResponse:
     return PublicPhotosResponse(
         media_groups=groups,
         text=text,
+        listing_summary=listing_summary_bits(
+            project_name=details.project_name,
+            layout=details.layout,
+            monthly_rent_usd=details.monthly_rent_usd,
+            location=details.location,
+        ),
         action_rows=_photo_actions(
             bookable=details.bookable,
             public_listing_id=details.public_listing_id,
@@ -198,4 +232,5 @@ __all__ = [
     "SemanticAction",
     "build_details_response",
     "build_photos_response",
+    "listing_summary_bits",
 ]

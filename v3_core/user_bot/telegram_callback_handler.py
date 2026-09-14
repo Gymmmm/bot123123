@@ -201,6 +201,7 @@ async def handle_v3_callback(
                 advisor_url=advisor_url,
                 channel_url=channel_url,
                 back_to_search_callback=back_to_search_callback,
+                listing_summary=str(getattr(response, "listing_summary", "") or ""),
                 add_home=response.kind in {"details", "photos"},
                 add_channel=response.kind in {"details", "photos"},
             ),
