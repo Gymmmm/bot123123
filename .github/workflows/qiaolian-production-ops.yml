@@ -120,7 +120,7 @@ jobs:
                   FROM canonical_records c
                   LEFT JOIN listing_identity_reservations_v3 r ON r.canonical_record_id=c.canonical_record_id
                   WHERE CAST(c.source_post_id AS INTEGER) IN ({placeholders})
-                  ORDER BY c.id ASC
+                  ORDER BY c.created_at ASC,c.canonical_record_id ASC
               """,source_pks):
                   identities.setdefault(int(r['source_post_id']),dict(r))
 
