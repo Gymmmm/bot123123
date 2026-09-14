@@ -13,7 +13,7 @@ jobs:
       PROD_HOST: 50.114.74.120
       PROD_PORT: '22'
       PROD_SSH_USER: root
-      EXPECTED_PROD_SHA: aaf7b3d8365641557d866aef798447191308d6dc
+      EXPECTED_PROD_SHA: b718d6b5b227d5fd0b2c59c3d3c069344335f540
     steps:
       - uses: actions/checkout@v4
       - name: Verify production host fingerprint
@@ -70,30 +70,29 @@ jobs:
                     AND p.instance_id IS NULL
                   ORDER BY CASE a.state WHEN 'queued' THEN 0 ELSE 1 END,
                            a.updated_at DESC,a.offer_id ASC
-                  LIMIT 30
+                  LIMIT 1
               ''',(settings.channel_chat_id,)).fetchall()
               conn.close()
               print('PUBLISH_ONE_CANDIDATES', len(rows))
               if not rows:
                   raise SystemExit('PUBLISH_ONE_NO_CANDIDATE')
 
+              row = rows[0]
               bot = Bot(token=settings.token)
               await bot.initialize()
               try:
-                  for row in rows:
-                      offer_id = str(row['offer_id'])
-                      print('PUBLISH_ONE_TRY', offer_id, row['listing_id'], row['public_listing_id'], row['state'])
-                      result = await app.autopilot.process_one(
-                          bot=bot,
-                          force_offer_id=offer_id,
-                          origin='manual_oneoff',
-                      )
-                      print('PUBLISH_ONE_RESULT', result)
-                      status = str(getattr(result, 'status', '') or '')
-                      if status == 'published':
-                          print('PUBLISH_ONE_DONE', getattr(result,'listing_id',''), getattr(result,'offer_id',''), getattr(result,'channel_message_id',''))
-                          return
-                  raise SystemExit('PUBLISH_ONE_NONE_PUBLISHED')
+                  offer_id = str(row['offer_id'])
+                  print('PUBLISH_ONE_TRY', offer_id, row['listing_id'], row['public_listing_id'], row['state'])
+                  result = await app.autopilot.process_one(
+                      bot=bot,
+                      force_offer_id=offer_id,
+                      origin='manual_oneoff',
+                  )
+                  print('PUBLISH_ONE_RESULT', result)
+                  status = str(getattr(result, 'status', '') or '')
+                  if status != 'published':
+                      raise SystemExit('PUBLISH_ONE_SELECTED_CANDIDATE_NOT_PUBLISHED')
+                  print('PUBLISH_ONE_DONE', getattr(result,'listing_id',''), getattr(result,'offer_id',''), getattr(result,'channel_message_id',''))
               finally:
                   await bot.shutdown()
 
