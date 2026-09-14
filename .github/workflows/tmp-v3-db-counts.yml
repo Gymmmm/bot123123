@@ -47,3 +47,26 @@ jobs:
             test -f /opt/qiaolian_v3/current/v3_core/media/source_scrub.py
             python3 -m compileall -q /opt/qiaolian_v3/current/v3_core
           '
+      - name: Restore and verify current V3 services
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          ssh -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes root@50.114.74.120 '
+            set -Eeuo pipefail
+            expected=d3639402e90aea6b507e92982bee7e42efd8a6ad
+            test "$(cat /opt/qiaolian_v3/.deployed_sha)" = "$expected"
+            test "$(readlink -f /opt/qiaolian_v3/current)" = "/opt/qiaolian_v3/releases/$expected"
+            units=(qiaolian-v3@canonical.service qiaolian-v3@publisher.service qiaolian-v3@user.service qiaolian-v3@collector.service)
+            systemctl enable --now "${units[@]}"
+            sleep 5
+            for unit in "${units[@]}"; do
+              systemctl is-active --quiet "$unit"
+              pid=$(systemctl show "$unit" -p MainPID --value)
+              test "${pid:-0}" -gt 0
+              echo "RESTORED $unit PID=$pid"
+            done
+            if journalctl -u qiaolian-v3@canonical.service -u qiaolian-v3@publisher.service -u qiaolian-v3@user.service -u qiaolian-v3@collector.service --since "2 minutes ago" --no-pager | grep -Eq "Traceback|ModuleNotFoundError|ImportError|database is locked|Conflict: terminated by other getUpdates request|Main process exited|Failed with result"; then
+              journalctl -u qiaolian-v3@canonical.service -u qiaolian-v3@publisher.service -u qiaolian-v3@user.service -u qiaolian-v3@collector.service --since "2 minutes ago" -n 200 --no-pager
+              exit 1
+            fi
+          '
