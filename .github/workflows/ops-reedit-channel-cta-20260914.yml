@@ -23,14 +23,15 @@ env:
   PROD_SSH_HOST_FINGERPRINT: 'SHA256:fuufBlFaqRpQhlkio0vuLsuv8w8x3zUb3VFQsnUny/o'
   EXPECTED_PROD_SHA: '5ddaaa357d79967fa76d19cd0e2195202b6d3b89'
   CANDIDATE_SHA: '213a2e5d69620c857d2c860a2077996077ceda64'
-  INTERVAL_SECONDS: '8'
+  INTERVAL_SECONDS: '10'
+  # First pass left these message_ids failed; empty = all
   ONLY_MESSAGE_IDS: ''
-  RUN_STAMP: '20260914-adviser-handoff-full'
+  RUN_STAMP: '20260914-adviser-handoff-full2'
 
 jobs:
   reedit-all:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 45
     steps:
       - name: Verify production SSH host key
         shell: bash
@@ -38,6 +39,7 @@ jobs:
           set -Eeuo pipefail
           ssh-keyscan -T 10 -p "$PROD_PORT" -t ed25519 "$PROD_HOST" 2>/dev/null | grep -v '^#' > "$RUNNER_TEMP/known_hosts_observed"
           ssh-keygen -lf "$RUNNER_TEMP/known_hosts_observed" | grep -F "$PROD_SSH_HOST_FINGERPRINT"
+
       - name: Configure production SSH
         shell: bash
         env:
@@ -49,7 +51,8 @@ jobs:
           printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
           printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
-      - name: Rebuild packages with enriched consult + re-edit all channel posts
+
+      - name: Retry failed channel re-edits
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -60,17 +63,26 @@ jobs:
           ROOT=/opt/qiaolian_v3
           test "$(cat "$ROOT/.deployed_sha")" = "$EXPECTED_PROD_SHA"
           test "$(basename "$(readlink -f "$ROOT/current")")" = "$EXPECTED_PROD_SHA"
-          set -a; source "$ROOT/runtime.env"; set +a
+
+          set -a
+          source "$ROOT/runtime.env"
+          set +a
+
           CAND=/tmp/qiaolian-reedit-cta-$CANDIDATE_SHA
-          rm -rf "$CAND"
-          git clone --quiet https://github.com/Gymmmm/bot123123.git "$CAND"
+          if [ ! -d "$CAND/.git" ]; then
+            rm -rf "$CAND"
+            git clone --quiet https://github.com/Gymmmm/bot123123.git "$CAND"
+          fi
+          git -C "$CAND" fetch --quiet origin "$CANDIDATE_SHA"
           git -C "$CAND" checkout --quiet "$CANDIDATE_SHA"
+
           DB="${DB_PATH:-/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db}"
-          BACKUP="/opt/qiaolian_backups/reedit-handoff-$(date -u +%Y%m%d-%H%M%S)"
+          BACKUP="/opt/qiaolian_backups/reedit-cta-retry-$(date -u +%Y%m%d-%H%M%S)"
           install -d -m 0700 "$BACKUP"
           sqlite3 "$DB" ".backup '$BACKUP/qiaolian_dual_bot.db'"
           sqlite3 "$BACKUP/qiaolian_dual_bot.db" 'PRAGMA quick_check;' | grep -Fx ok
           echo "REEDIT_BACKUP_OK path=$BACKUP"
+
           cd "$CAND"
           export PYTHONPATH="$CAND${PYTHONPATH:+:$PYTHONPATH}"
           "$ROOT/.venv/bin/python" - <<'PY'
@@ -86,7 +98,6 @@ jobs:
           from v3_core.publishing.publication_instances import PublicationInstanceRepository
           from v3_core.publishing.telegram_adapter import TelegramChannelAdapter, build_channel_keyboard
           from v3_core.storage.inventory_reader import InventoryReader
-          from urllib.parse import unquote, parse_qs, urlsplit
 
           settings = load_settings()
           db = Path(settings.db_path)
@@ -100,11 +111,12 @@ jobs:
               user_bot_username=settings.user_bot_username,
               advisor_url=settings.advisor_url,
           )
-          interval = float(os.environ.get("INTERVAL_SECONDS") or "8")
+          interval = float(os.environ.get("INTERVAL_SECONDS") or "10")
           only_raw = str(os.environ.get("ONLY_MESSAGE_IDS") or "").strip()
           only_ids = {int(x) for x in only_raw.split(",") if x.strip()} if only_raw else set()
 
-          def hold_offer_packages(offer_id: str):
+          def hold_offer_packages(offer_id: str) -> list[tuple[str, str]]:
+              """Move approved/published packages for offer to rebuild_hold; return [(id, old_status)]."""
               held = []
               with sqlite3.connect(str(db), timeout=30) as c:
                   c.row_factory = sqlite3.Row
@@ -126,7 +138,7 @@ jobs:
                   c.commit()
               return held
 
-          def restore_held(held):
+          def restore_held(held: list[tuple[str, str]]) -> None:
               with sqlite3.connect(str(db), timeout=30) as c:
                   c.execute("BEGIN IMMEDIATE")
                   for package_id, old_status in held:
@@ -139,6 +151,7 @@ jobs:
                   c.commit()
 
           def build_replacement(pub):
+              # Prefer get() over verify_frozen: media bytes may have been reformatted on disk.
               old = packages.get(pub["package_id"])
               if old is None:
                   raise KeyError(pub["package_id"])
@@ -157,7 +170,11 @@ jobs:
               except Exception:
                   restore_held(held)
                   raise
-              return old, new, held
+              else:
+                  # Leave held packages as rebuild_hold until finalize supersedes/publishes.
+                  # Restore any held that are NOT the old package if build created a new one —
+                  # finalize will supersede old; restore others' original status only if still held.
+                  return old, new, held
 
           def command_for(package_id, channel_chat_id, attempt_id, inventory_status):
               package = packages.get(package_id)
@@ -182,6 +199,7 @@ jobs:
                          WHERE package_id=?""",
                       (old.package_id,),
                   )
+                  # Any other held packages for the offer also supersede
                   for package_id, _old_status in held:
                       if package_id != old.package_id:
                           c.execute(
@@ -245,8 +263,9 @@ jobs:
                       ).fetchall()
                   if only_ids:
                       rows = [r for r in rows if int(r["channel_message_id"]) in only_ids]
-                  print("REEDIT_BEGIN", "count=", len(rows), flush=True)
-                  ok = failed = 0
+                  print("REEDIT_BEGIN", "aliases=", aliases, "count=", len(rows), "only=", sorted(only_ids), flush=True)
+                  ok = 0
+                  failed = 0
                   last = 0.0
                   for row in rows:
                       pub = dict(row)
@@ -259,36 +278,53 @@ jobs:
                           listing = reader.listing(pub["listing_id"])
                           inventory_status = str(listing.get("inventory_status") or "pending")
                           old, new, held = build_replacement(pub)
-                          command = command_for(new.package_id, pub["channel_chat_id"], "reedit:"+pub["instance_id"], inventory_status)
-                          consult = str(command.actions.get("consult") or "")
-                          consult_text = ""
-                          if consult:
-                              try:
-                                  consult_text = unquote(parse_qs(urlsplit(consult).query).get("text", [""])[0])
-                              except Exception:
-                                  consult_text = consult
-                          if "QL-" in consult_text and "（" not in consult_text and "(" not in consult_text:
-                              # summary may be missing for sparse listings; warn but allow if no project/layout available
-                              print("REEDIT_WARN_THIN_HANDOFF", pub["channel_message_id"], consult_text, flush=True)
+                          command = command_for(
+                              new.package_id,
+                              pub["channel_chat_id"],
+                              "reedit:" + pub["instance_id"],
+                              inventory_status,
+                          )
+                          kb = build_channel_keyboard(command.actions, inventory_status=inventory_status)
+                          labels = [[b.text for b in r] for r in kb.inline_keyboard]
+                          if not any("📋 租赁详情" in cell for row_labels in labels for cell in row_labels):
+                              raise RuntimeError(f"cta_missing_clipboard_details:{labels}")
                           result = await edit_with_retry(adapter, command, pub["channel_message_id"])
                           finalize(pub, old, new, str(result.get("caption") or command.caption), held)
                           ok += 1
                           last = time.monotonic()
-                          print("REEDIT_OK", pub["channel_message_id"], new.package_id, result.get("edit_mode"), consult_text.replace("\n"," | "), flush=True)
+                          print(
+                              "REEDIT_OK",
+                              pub["channel_message_id"],
+                              new.package_id,
+                              result.get("edit_mode"),
+                              inventory_status,
+                              labels,
+                              flush=True,
+                          )
                       except Exception as exc:
                           if held:
-                              try: restore_held(held)
+                              try:
+                                  restore_held(held)
                               except Exception as restore_exc:
                                   print("REEDIT_RESTORE_FAIL", pub.get("channel_message_id"), restore_exc, flush=True)
                           failed += 1
                           last = time.monotonic()
-                          print("REEDIT_FAIL", pub.get("channel_message_id"), type(exc).__name__, str(exc)[:240], flush=True)
+                          print(
+                              "REEDIT_FAIL",
+                              pub.get("channel_message_id"),
+                              type(exc).__name__,
+                              str(exc)[:240],
+                              flush=True,
+                          )
                   print(f"REEDIT_RESULT selected={len(rows)} ok={ok} failed={failed}", flush=True)
                   if failed:
                       raise SystemExit(2)
+                  if ok < 1 and only_ids:
+                      raise SystemExit("REEDIT_NO_TARGETS")
               finally:
                   await bot.shutdown()
+
           asyncio.run(main())
           PY
-          echo "REEDIT_HANDOFF_OK candidate=$CANDIDATE_SHA"
+          echo "REEDIT_CHANNEL_CTA_RETRY_OK"
           REMOTE
