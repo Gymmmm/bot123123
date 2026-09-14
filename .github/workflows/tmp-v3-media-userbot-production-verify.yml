@@ -1,0 +1,106 @@
+name: tmp-v3-media-userbot-production-verify
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/tmp-v3-media-userbot-production-verify.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-production:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify production host and configure SSH
+        env:
+          PROD_SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+        run: |
+          set -Eeuo pipefail
+          expected=$(tr -d '\r\n' < deploy/v3/production_host_fingerprint.txt)
+          ssh-keyscan -T 15 -p 22 -t ed25519 50.114.74.120 2>/dev/null | grep -v '^#' > "$RUNNER_TEMP/known_hosts"
+          ssh-keygen -lf "$RUNNER_TEMP/known_hosts" | grep -F "$expected"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
+          cp "$RUNNER_TEMP/known_hosts" "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
+      - name: Verify deployed release and production paths
+        run: |
+          set -Eeuo pipefail
+          ssh -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes root@50.114.74.120 'bash -s' <<'REMOTE'
+          set -Eeuo pipefail
+          expected=b718d6b5b227d5fd0b2c59c3d3c069344335f540
+          rollback=d3639402e90aea6b507e92982bee7e42efd8a6ad
+          app=/opt/qiaolian_v3
+          db=/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db
+          current=$(readlink -f "$app/current")
+          test "$(cat "$app/.deployed_sha")" = "$expected"
+          test "$current" = "$app/releases/$expected"
+          test -d "$app/releases/$rollback"
+          test -s "$current/sources.json"
+          echo "RELEASE_OK sha=$expected rollback=$rollback"
+
+          units=(qiaolian-v3@canonical.service qiaolian-v3@publisher.service qiaolian-v3@user.service qiaolian-v3@collector.service)
+          for unit in "${units[@]}"; do
+            active=$(systemctl is-active "$unit")
+            enabled=$(systemctl is-enabled "$unit")
+            pid=$(systemctl show "$unit" -p MainPID --value)
+            restarts=$(systemctl show "$unit" -p NRestarts --value)
+            test "$active" = active
+            test "$enabled" = enabled
+            test "${pid:-0}" -gt 0
+            test "${restarts:-0}" -le 1
+            echo "SERVICE_OK unit=$unit pid=$pid restarts=$restarts"
+          done
+
+          set -a
+          source "$app/runtime.env"
+          set +a
+          export QIAOLIAN_CODE_ROOT="$current"
+          export COLLECTOR_SOURCES_JSON="$current/sources.json"
+          export DB_PATH="$db"
+          export SQLITE_PATH="$db"
+          cd "$current"
+          runuser -u qiaolianbot --preserve-environment -- "$app/.venv/bin/python" run_v3_preflight.py --component all --db "$db" >/tmp/qiaolian-v3-postdeploy-preflight.json
+          grep -q '"ok": true' /tmp/qiaolian-v3-postdeploy-preflight.json
+          rm -f /tmp/qiaolian-v3-postdeploy-preflight.json
+          echo 'PREFLIGHT_OK component=all'
+
+          "$app/.venv/bin/python" - <<'PY'
+          import os, sqlite3, urllib.request, json
+
+          db = os.environ['DB_PATH']
+          conn = sqlite3.connect(f'file:{db}?mode=ro', uri=True)
+          tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+          required = {'appointments_v3', 'publication_instances', 'publication_packages_v3'}
+          missing = sorted(required - tables)
+          if missing:
+              raise SystemExit(f'missing_tables={missing}')
+          appointments = conn.execute('SELECT COUNT(*) FROM appointments_v3').fetchone()[0]
+          publications = conn.execute('SELECT COUNT(*) FROM publication_instances').fetchone()[0]
+          conn.close()
+          print(f'DB_OK appointments_v3={appointments} publication_instances={publications}')
+
+          for label, key in [('user', 'USER_BOT_TOKEN'), ('publisher', 'PUBLISHER_BOT_TOKEN')]:
+              token = os.environ[key]
+              with urllib.request.urlopen(f'https://api.telegram.org/bot{token}/getMe', timeout=15) as response:
+                  payload = json.load(response)
+              if not payload.get('ok') or not payload.get('result', {}).get('id'):
+                  raise SystemExit(f'TELEGRAM_FAIL bot={label}')
+              print(f'TELEGRAM_OK bot={label}')
+
+          from v3_core.media.media_selection import select_publication_media
+          from v3_core.user_bot.channel_status_sync import V3AppointmentChannelSynchronizer
+          from v3_core.user_bot.app import build_v3_user_bot_application
+          print('IMPORT_OK media_selection,user_bot,appointment_channel_sync')
+          PY
+
+          if journalctl -u qiaolian-v3@canonical.service -u qiaolian-v3@publisher.service -u qiaolian-v3@user.service -u qiaolian-v3@collector.service --since '5 minutes ago' --no-pager | grep -Eq 'Traceback|ModuleNotFoundError|ImportError|database is locked|no such table|Conflict: terminated by other getUpdates request|Main process exited|Failed with result'; then
+            journalctl -u qiaolian-v3@canonical.service -u qiaolian-v3@publisher.service -u qiaolian-v3@user.service -u qiaolian-v3@collector.service --since '5 minutes ago' -n 250 --no-pager
+            exit 1
+          fi
+          echo 'LOG_GATE_OK'
+          REMOTE
