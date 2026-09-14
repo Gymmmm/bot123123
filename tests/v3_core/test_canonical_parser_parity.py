@@ -28,6 +28,19 @@ def test_v3_canonical_parser_matches_locked_production_matrix():
         _assert_same(raw)
 
 
+def test_bridge_uses_chinese_customer_facing_project_and_jinjie_location():
+    facts = v3_canonicalize_source(
+        "【公寓出租】桥牌房间（河景）｜租金：$420/月｜房型：1房1卫｜押1付1"
+    )
+    assert facts["project_name"] == "桥牌"
+    assert facts["project_key"] == "the_bridge"
+    assert facts["public_location_key"] == "金街"
+    assert facts["public_location_display"] == "金街附近"
+    assert facts["canonical_area_key"] is None
+    assert facts["quality"]["blocking_flags"] == []
+    _assert_same("【公寓出租】桥牌房间（河景）｜租金：$420/月｜房型：1房1卫｜押1付1")
+
+
 def test_v3_canonical_parser_matches_combinatorial_contract_space():
     projects = ("富力城", "BKK1", "钻石岛")
     layouts = ("1房1厅", "2房1厅2卫", "Studio")

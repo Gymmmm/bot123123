@@ -491,9 +491,16 @@ class SimplePublisherAdminController:
             reason = ERROR_LABELS.get(code, code)
             self.repository.set_item(offer_id, state="exception", reason_code=code, reason_text=reason, origin="manual")
             await message.reply_text(
-                f"当前不能发布：<b>{escape(reason)}</b>\n\n可以继续发送补充资料或图片，系统会自动重新检查。",
+                f"当前不能发布：<b>{escape(reason)}</b>\n\n请先补充或修改资料，完成后再点“检查并发布”。",
                 parse_mode=ParseMode.HTML,
-                reply_markup=InlineKeyboardMarkup([self.home_row()]),
+                reply_markup=InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("➕ 补充资料", callback_data="v3smp|manual_supplement"),
+                        InlineKeyboardButton("✏️ 修改资料", callback_data="v3smp|manual_edit"),
+                    ],
+                    [InlineKeyboardButton("⬅️ 返回房源资料", callback_data="v3smp|manual_back_confirm")],
+                    self.home_row(),
+                ]),
             )
             return
         if str(detail.review.get("review_status") or "") != "approved":
@@ -522,7 +529,7 @@ class SimplePublisherAdminController:
                 parse_mode=ParseMode.HTML,
                 reply_markup=InlineKeyboardMarkup(
                     [
-                        [InlineKeyboardButton("发布到频道", callback_data=f"v3smp|manual_send|{package.package_id}|{offer_id}")],
+                        [InlineKeyboardButton("📤 确认发布到频道", callback_data=f"v3smp|manual_send|{package.package_id}|{offer_id}")],
                         [
                             InlineKeyboardButton("更换封面图片", callback_data=f"v3smp|manual_cover|{review_id}|{offer_id}"),
                             InlineKeyboardButton("更换封面模板", callback_data=f"v3smp|manual_templates|{review_id}|{offer_id}"),

@@ -21,10 +21,10 @@ def _build_location_map() -> dict[str, tuple[str, list[str]]]:
 LOCATION_MAP = _build_location_map()
 
 PRIMARY_LOCATION_KEYS = (
-    "富力城", "炳发城", "太子幸福广场", "百色河", "BKK1", "TK/7月区", "钻石岛",
+    "富力城", "炳发城", "太子幸福广场", "金街", "BKK1", "TK/7月区", "钻石岛",
 )
 SECONDARY_LOCATION_KEYS = (
-    "俄罗斯市场", "永旺商圈", "永旺2", "森速", "洪森大道", "BKK2", "BKK3",
+    "俄罗斯市场", "永旺商圈", "永旺2", "森速", "洪森大道", "百色河", "BKK2", "BKK3",
     "河边", "机场附近",
 )
 

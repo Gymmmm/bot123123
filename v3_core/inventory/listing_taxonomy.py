@@ -91,6 +91,7 @@ _MARKET_LOCATIONS_EXPLICIT: tuple[MarketLocation, ...] = (
     MarketLocation("永旺商圈", "永旺1", "nearby", ("永旺1", "永旺一", "aeon1", "aeon 1")),
     MarketLocation("永旺2", "永旺2", "nearby", ("永旺2", "永旺二", "aeon2", "aeon 2")),
     MarketLocation("河边", "河边", "corridor", ("河边", "河畔", "riverside")),
+    MarketLocation("金街", "金街附近", "nearby", ("金街", "金街附近", "金街中国城", "桥牌", "the bridge")),
     MarketLocation("机场附近", "机场附近", "nearby", ("机场附近", "机场路", "老机场", "旧机场")),
     MarketLocation("中央市场", "中央市场", "nearby", ("中央市场", "新街市", "central market", "phsar thmei")),
     MarketLocation("奥林匹克", "奥林匹克", "nearby", ("奥林匹克", "奥林匹亚", "olympic", "olympia")),
@@ -124,6 +125,7 @@ MANUAL_MARKET_ALIASES: dict[str, tuple[str, ...]] = {
 }
 
 PROJECT_IDENTITIES: tuple[ProjectIdentity, ...] = (
+    ProjectIdentity("the_bridge", "桥牌", "project", ("桥牌", "the bridge"), property_family="公寓"),
     ProjectIdentity("aeon1", "永旺一", "project", ("Aeon1", "永旺一", "永旺1", "aeon 1")),
     ProjectIdentity("vila_town", "Vila Town", "project", ("vila town",)),
     ProjectIdentity("the_pinnacle", "The Pinnacle 幸福广场", "project", ("the pinnacle", "太子幸福广场", "幸福广场", "prince happiness plaza"), property_family="公寓"),

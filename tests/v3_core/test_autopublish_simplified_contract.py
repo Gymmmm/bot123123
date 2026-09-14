@@ -442,7 +442,7 @@ def test_manual_publish_preview_has_one_confirmation_and_optional_cover_controls
     message = Message()
     asyncio.run(controller.send_manual_preview(message, package, review_id="REV_1", offer_id="OFF_1"))
     labels = [button.text for row in message.markup.inline_keyboard for button in row]
-    assert labels == ["发布到频道", "更换封面图片", "更换封面模板", "🏠 返回首页"]
+    assert labels == ["📤 确认发布到频道", "更换封面图片", "更换封面模板", "🏠 返回首页"]
     for forbidden in ("审核事实", "批准发布包", "冻结", "待审核", "待发送"):
         assert forbidden not in labels
 

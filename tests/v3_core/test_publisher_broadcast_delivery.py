@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 import sqlite3
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -142,3 +143,54 @@ async def test_scheduler_never_touches_network_when_disabled_or_wrong_minute(tmp
     service.set_time("09:30")
     await controller.scheduled_tick(context)
     assert bot.calls == []
+
+
+@pytest.mark.asyncio
+async def test_daily_copy_and_button_can_be_changed_from_admin(tmp_path):
+    _, service, controller = _build(tmp_path)
+    message = SimpleNamespace(text="今天的新文案", reply_text=AsyncMock())
+    context = SimpleNamespace(user_data={"v3_publisher_broadcast_edit": {"kind": "daily_copy"}})
+
+    assert await controller.handle_text(SimpleNamespace(effective_message=message), context) is True
+    assert service.config().template_key == "custom"
+    assert service.body() == "今天的新文案"
+
+    query = SimpleNamespace(data="v3bc|daily_btn|combo", message=message)
+    assert await controller.handle_callback(SimpleNamespace(callback_query=query), context) is True
+    assert service.config().button_key == "combo"
+
+    bot = FakeBot()
+    await controller._send_weather_now(SimpleNamespace(bot=bot))
+    assert bot.calls[0]["text"] == "今天的新文案"
+
+
+@pytest.mark.asyncio
+async def test_each_weekday_copy_and_button_can_be_changed(tmp_path):
+    _, _, controller = _build(tmp_path)
+    message = SimpleNamespace(text="周三的新文案", reply_text=AsyncMock())
+    context = SimpleNamespace(user_data={"v3_publisher_broadcast_edit": {"kind": "marketing_copy", "weekday": 2}})
+
+    assert await controller.handle_text(SimpleNamespace(effective_message=message), context) is True
+    assert controller.marketing.template(2).body == "周三的新文案"
+
+    query = SimpleNamespace(data="v3bc|m_btn|2|contact", message=message)
+    assert await controller.handle_callback(SimpleNamespace(callback_query=query), context) is True
+    assert controller.marketing.button_key(2) == "contact"
+    rows = controller.marketing.footer_rows(controller.marketing.template(2))
+    assert rows[0][0].label == "💬 联系中文顾问"
+
+
+@pytest.mark.asyncio
+async def test_temporary_broadcast_uses_its_own_selected_button(tmp_path):
+    _, _, controller = _build(tmp_path)
+    message = SimpleNamespace(reply_text=AsyncMock())
+    bot = FakeBot()
+    context = SimpleNamespace(
+        bot=bot,
+        user_data={"v3_publisher_broadcast_edit": {"kind": "custom_ready", "text": "临时通知", "button_key": "latest"}},
+    )
+    query = SimpleNamespace(data="v3bc|custom_send", message=message)
+
+    assert await controller.handle_callback(SimpleNamespace(callback_query=query), context) is True
+    assert bot.calls[0]["text"] == "临时通知"
+    assert bot.calls[0]["reply_markup"].inline_keyboard[0][0].text == "🏠 最新房源"

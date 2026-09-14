@@ -411,8 +411,12 @@ class OperatorPublisherAdminController(ProductionSimplePublisherAdminController)
             )
         else:
             buttons.append([InlineKeyboardButton("✏️ 修改资料", callback_data="v3smp|manual_edit")])
-        if not blockers:
-            buttons.append([InlineKeyboardButton("👀 生成预览", callback_data="v3smp|manual_preview")])
+        buttons.append([
+            InlineKeyboardButton(
+                "📤 检查并发布" if blockers else "📤 预览并发布",
+                callback_data="v3smp|manual_preview",
+            )
+        ])
         buttons.append([InlineKeyboardButton("❌ 取消", callback_data="v3smp|manual_cancel")])
         await message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(buttons))
 

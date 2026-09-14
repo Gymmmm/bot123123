@@ -51,6 +51,19 @@ class BroadcastAdminController:
             return None
         return InlineKeyboardMarkup([[InlineKeyboardButton(b.label, url=b.url) for b in row] for row in source])
 
+    @staticmethod
+    def _button_keyboard(*, prefix: str, back: str, include_default: bool = False):
+        rows = []
+        if include_default:
+            rows.append([InlineKeyboardButton("按当天默认按钮", callback_data=f"{prefix}|default")])
+        rows.extend([
+            [InlineKeyboardButton("不带按钮", callback_data=f"{prefix}|none")],
+            [InlineKeyboardButton("帮我找房", callback_data=f"{prefix}|find"), InlineKeyboardButton("最新房源", callback_data=f"{prefix}|latest")],
+            [InlineKeyboardButton("联系中文顾问", callback_data=f"{prefix}|contact"), InlineKeyboardButton("组合按钮", callback_data=f"{prefix}|combo")],
+            [InlineKeyboardButton("⬅️ 返回", callback_data=back)],
+        ])
+        return InlineKeyboardMarkup(rows)
+
     def _center_keyboard(self):
         return self._markup([
             [InlineKeyboardButton("🌤 每日天气汇率", callback_data="v3bc|weather"), InlineKeyboardButton("🗓 本周营销计划", callback_data="v3bc|marketing")],
@@ -100,14 +113,19 @@ class BroadcastAdminController:
         sent = self._last_sent_row("live")
         prefix = f"✅ {escape(notice)}\n\n" if notice else ""
         today_state = f"✅ 已发送 · {self._local_log_time(sent)}" if sent is not None else "⏳ 待发送"
+        copy_name = "自动天气汇率" if c.template_key == "live" else "自定义文案"
         await message.reply_text(
             prefix + "<b>🌤 每日天气汇率</b>\n\n"
             + f"状态：{'🟢 每日自动发送' if c.enabled else '⏸ 已暂停'}\n"
             + f"时间：{escape(c.send_time)}\n"
+            + f"文案：{escape(copy_name)}\n"
+            + f"底部按钮：{escape(BUTTON_LABELS[c.button_key])}\n"
             + f"今日状态：{escape(today_state)}",
             parse_mode=ParseMode.HTML,
             reply_markup=self._markup([
                 [InlineKeyboardButton("👀 查看今日内容", callback_data="v3bc|today"), InlineKeyboardButton("💱 汇率设置", callback_data="v3bc|fx")],
+                [InlineKeyboardButton("✏️ 修改文案", callback_data="v3bc|daily_copy"), InlineKeyboardButton("🔘 选择按钮", callback_data="v3bc|daily_button")],
+                [InlineKeyboardButton("↩️ 恢复自动天气文案", callback_data="v3bc|daily_reset")],
                 [InlineKeyboardButton("📤 立即发送", callback_data="v3bc|send"), InlineKeyboardButton("⏰ 修改时间", callback_data="v3bc|time_menu")],
                 [InlineKeyboardButton("⏸ 暂停" if c.enabled else "▶️ 开启", callback_data="v3bc|off" if c.enabled else "v3bc|on")],
                 [InlineKeyboardButton("⬅️ 返回广播中心", callback_data="v3bc")],
@@ -117,6 +135,8 @@ class BroadcastAdminController:
     async def show_marketing(self, message: Any, *, notice: str = ""):
         prefix = f"✅ {escape(notice)}\n\n" if notice else ""
         today = self.marketing.template()
+        today_index = self.marketing.local_now().weekday()
+        marketing_button = self.marketing.button_key(today_index)
         sent = self._last_sent_row("marketing_" + today.key)
         lines = [
             "<b>🗓 本周营销计划</b>", "",
@@ -124,6 +144,8 @@ class BroadcastAdminController:
             "周四  🔍 房源怎么选", "周五  📝 签约提醒", "周六  🏠 周末看房", "周日  🛡 侨联保障", "",
             f"自动营销：{'🟢 已开启' if self.marketing.enabled else '⏸ 已暂停'}",
             f"发送时间：{escape(self.marketing.send_time)}",
+            f"今日文案：{'自定义' if today.body != TEMPLATES[today_index].body else '默认'}",
+            f"今日按钮：{escape('当天默认按钮' if marketing_button == 'default' else BUTTON_LABELS[marketing_button])}",
             f"今日状态：{'✅ 已发送 · ' + self._local_log_time(sent) if sent is not None else '⏳ 待发送'}",
         ]
         await message.reply_text(
@@ -131,6 +153,7 @@ class BroadcastAdminController:
             parse_mode=ParseMode.HTML,
             reply_markup=self._markup([
                 [InlineKeyboardButton("👀 查看今天", callback_data="v3bc|m_today"), InlineKeyboardButton("📅 查看整周", callback_data="v3bc|m_week")],
+                [InlineKeyboardButton("✏️ 修改今日文案", callback_data=f"v3bc|m_edit|{today_index}"), InlineKeyboardButton("🔘 修改今日按钮", callback_data=f"v3bc|m_button|{today_index}")],
                 [InlineKeyboardButton("📤 立即发送", callback_data="v3bc|m_send"), InlineKeyboardButton("⏰ 修改时间", callback_data="v3bc|m_time_menu")],
                 [InlineKeyboardButton("⏸ 暂停营销" if self.marketing.enabled else "▶️ 开启营销", callback_data="v3bc|m_off" if self.marketing.enabled else "v3bc|m_on")],
                 [InlineKeyboardButton("⬅️ 返回广播中心", callback_data="v3bc")],
@@ -149,7 +172,7 @@ class BroadcastAdminController:
 
     async def _render_today(self, message: Any, *, title: str = ""):
         """Preview exactly the same body and customer buttons the channel receives."""
-        body = await asyncio.to_thread(self.service.body, "live")
+        body = await asyncio.to_thread(self.service.body)
         await message.reply_text(
             body,
             parse_mode=ParseMode.HTML,
@@ -188,7 +211,7 @@ class BroadcastAdminController:
         return result
 
     async def _send_weather_now(self, context: Any):
-        body = await asyncio.to_thread(self.service.body, "live")
+        body = await asyncio.to_thread(self.service.body)
         return await self._send_channel(context, body, trigger_type="manual_weather", template_key="live")
 
     async def _send_marketing_now(self, context: Any):
@@ -205,7 +228,7 @@ class BroadcastAdminController:
         claimed, local_date = self.service.claim_scheduled_due()
         if claimed:
             try:
-                body = await asyncio.to_thread(self.service.body, "live")
+                body = await asyncio.to_thread(self.service.body)
                 await self._send_channel(context, body, trigger_type="scheduled", template_key="live")
                 self.service.mark_scheduled_sent(local_date)
             except Exception:
@@ -266,11 +289,27 @@ class BroadcastAdminController:
                 parse_mode=ParseMode.HTML,
                 reply_markup=self._markup([
                     [InlineKeyboardButton("📤 立即发送", callback_data="v3bc|custom_send")],
+                    [InlineKeyboardButton("🔘 选择按钮", callback_data="v3bc|custom_button")],
                     [InlineKeyboardButton("✏️ 重新编辑", callback_data="v3bc|custom")],
                     [InlineKeyboardButton("⬅️ 返回广播中心", callback_data="v3bc")],
                 ]),
             )
-            context.user_data[BROADCAST_EDIT_STATE_KEY] = {"kind": "custom_ready", "text": text}
+            context.user_data[BROADCAST_EDIT_STATE_KEY] = {
+                "kind": "custom_ready",
+                "text": text,
+                "button_key": self.service.config().button_key,
+            }
+            return True
+        if kind == "daily_copy":
+            self.service.set_custom_html(escape(text))
+            context.user_data.pop(BROADCAST_EDIT_STATE_KEY, None)
+            await self.show_weather(update.effective_message, notice="每日文案已更新")
+            return True
+        if kind == "marketing_copy":
+            weekday = int(state.get("weekday") or 0)
+            self.marketing.set_custom_body(weekday, escape(text))
+            context.user_data.pop(BROADCAST_EDIT_STATE_KEY, None)
+            await self.show_marketing(update.effective_message, notice=f"周{'一二三四五六日'[weekday % 7]}文案已更新")
             return True
         if kind == "fx":
             try:
@@ -309,6 +348,21 @@ class BroadcastAdminController:
             await self.show_center(q.message); return True
         if a == "weather":
             await self.show_weather(q.message); return True
+        if a == "daily_copy":
+            context.user_data[BROADCAST_EDIT_STATE_KEY] = {"kind": "daily_copy"}
+            await q.message.reply_text("请直接发送新的每日广播文案。发送后保存为自定义文案，可先预览再发布。")
+            return True
+        if a == "daily_reset":
+            self.service.set_template("live")
+            await self.show_weather(q.message, notice="已恢复自动天气汇率文案")
+            return True
+        if a == "daily_button":
+            await q.message.reply_text("选择每日广播底部按钮：", reply_markup=self._button_keyboard(prefix="v3bc|daily_btn", back="v3bc|weather"))
+            return True
+        if a == "daily_btn" and len(p) == 3:
+            self.service.set_button(p[2])
+            await self.show_weather(q.message, notice=f"按钮已改为：{BUTTON_LABELS[p[2]]}")
+            return True
         if a in {"today", "preview"}:
             await self._render_today(q.message); return True
         if a == "fx":
@@ -375,7 +429,40 @@ class BroadcastAdminController:
                 ]),
             ); return True
         if a == "m_day" and len(p) == 3:
-            await self.render_marketing(q.message, int(p[2])); return True
+            weekday = int(p[2]) % 7
+            await self.render_marketing(q.message, weekday)
+            await q.message.reply_text(
+                f"周{'一二三四五六日'[weekday]}内容设置：",
+                reply_markup=self._markup([
+                    [InlineKeyboardButton("✏️ 修改文案", callback_data=f"v3bc|m_edit|{weekday}"), InlineKeyboardButton("🔘 修改按钮", callback_data=f"v3bc|m_button|{weekday}")],
+                    [InlineKeyboardButton("↩️ 恢复默认文案", callback_data=f"v3bc|m_reset|{weekday}")],
+                    [InlineKeyboardButton("⬅️ 返回整周", callback_data="v3bc|m_week")],
+                ]),
+            )
+            return True
+        if a == "m_edit" and len(p) == 3:
+            weekday = int(p[2]) % 7
+            context.user_data[BROADCAST_EDIT_STATE_KEY] = {"kind": "marketing_copy", "weekday": weekday}
+            await q.message.reply_text(f"请直接发送周{'一二三四五六日'[weekday]}的新文案。保存后可先预览再发布。")
+            return True
+        if a == "m_reset" and len(p) == 3:
+            weekday = int(p[2]) % 7
+            self.marketing.reset_body(weekday)
+            await self.show_marketing(q.message, notice=f"周{'一二三四五六日'[weekday]}已恢复默认文案")
+            return True
+        if a == "m_button" and len(p) == 3:
+            weekday = int(p[2]) % 7
+            await q.message.reply_text(
+                f"选择周{'一二三四五六日'[weekday]}广播底部按钮：",
+                reply_markup=self._button_keyboard(prefix=f"v3bc|m_btn|{weekday}", back="v3bc|m_week", include_default=True),
+            )
+            return True
+        if a == "m_btn" and len(p) == 4:
+            weekday = int(p[2]) % 7
+            self.marketing.set_button(weekday, p[3])
+            label = "当天默认按钮" if p[3] == "default" else BUTTON_LABELS[p[3]]
+            await self.show_marketing(q.message, notice=f"周{'一二三四五六日'[weekday]}按钮已改为：{label}")
+            return True
         if a == "m_send":
             t = self.marketing.template()
             sent = self._last_sent_row("marketing_" + t.key)
@@ -423,11 +510,40 @@ class BroadcastAdminController:
             context.user_data[BROADCAST_EDIT_STATE_KEY] = {"kind": "custom"}
             await q.message.reply_text("<b>✏️ 临时广播</b>\n\n直接发送广播文案，发送后先预览，不会立即发布。", parse_mode=ParseMode.HTML)
             return True
+        if a == "custom_button":
+            await q.message.reply_text(
+                "选择这条临时广播的底部按钮：",
+                reply_markup=self._button_keyboard(prefix="v3bc|custom_btn", back="v3bc|custom"),
+            )
+            return True
+        if a == "custom_btn" and len(p) == 3:
+            st = context.user_data.get(BROADCAST_EDIT_STATE_KEY) or {}
+            if st.get("kind") != "custom_ready":
+                await q.message.reply_text("临时广播预览已失效，请重新输入文案。")
+                return True
+            st["button_key"] = p[2]
+            context.user_data[BROADCAST_EDIT_STATE_KEY] = st
+            await q.message.reply_text(
+                f"✅ 这条广播的按钮已改为：{BUTTON_LABELS[p[2]]}",
+                reply_markup=self._markup([
+                    [InlineKeyboardButton("📤 立即发送", callback_data="v3bc|custom_send")],
+                    [InlineKeyboardButton("✏️ 重新编辑", callback_data="v3bc|custom")],
+                    [InlineKeyboardButton("⬅️ 返回广播中心", callback_data="v3bc")],
+                ]),
+            )
+            return True
         if a == "custom_send":
             st = context.user_data.get(BROADCAST_EDIT_STATE_KEY) or {}
             text = str(st.get("text") or "").strip()
             if text:
-                await self._send_channel(context, escape(text), trigger_type="manual_custom", template_key="custom")
+                button_key = str(st.get("button_key") or "none")
+                await self._send_channel(
+                    context,
+                    escape(text),
+                    trigger_type="manual_custom",
+                    template_key="custom",
+                    footer=self.service.footer_rows(button_key),
+                )
                 context.user_data.pop(BROADCAST_EDIT_STATE_KEY, None)
                 await self.show_center(q.message, notice="临时广播已发送")
             return True

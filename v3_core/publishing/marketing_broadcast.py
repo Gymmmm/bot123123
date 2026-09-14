@@ -12,7 +12,7 @@ from pathlib import Path
 import sqlite3
 from zoneinfo import ZoneInfo
 
-from .broadcast import BroadcastButton, parse_hhmm
+from .broadcast import BUTTON_KEYS, BroadcastButton, parse_hhmm
 
 KEY_ENABLED = "marketing_broadcast_enabled"
 KEY_TIME = "marketing_broadcast_time"
@@ -101,6 +101,11 @@ class MarketingBroadcastService:
             row = conn.execute("SELECT setting_value FROM publisher_settings_v3 WHERE setting_key=?", (key,)).fetchone()
         return str(row[0]) if row else DEFAULTS[key]
 
+    def _get_optional(self, key: str, default: str = "") -> str:
+        with self._connect() as conn:
+            row = conn.execute("SELECT setting_value FROM publisher_settings_v3 WHERE setting_key=?", (key,)).fetchone()
+        return str(row[0]) if row else str(default)
+
     def _set(self, key: str, value: str):
         with self._connect() as conn:
             conn.execute("INSERT INTO publisher_settings_v3(setting_key,setting_value,updated_at) VALUES (?,?,CURRENT_TIMESTAMP) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value,updated_at=CURRENT_TIMESTAMP", (key, value))
@@ -131,10 +136,49 @@ class MarketingBroadcastService:
 
     def template(self, weekday: int | None = None) -> MarketingTemplate:
         index = self.local_now().weekday() if weekday is None else int(weekday)
-        return TEMPLATES[index % 7]
+        base = TEMPLATES[index % 7]
+        custom = self._get_optional(f"marketing_body_{base.key}").strip()
+        return MarketingTemplate(base.key, base.title, custom or base.body, base.buttons)
+
+    def set_custom_body(self, weekday: int, body: str) -> None:
+        clean = str(body or "").strip()
+        if not clean:
+            raise ValueError("marketing_body_required")
+        template = TEMPLATES[int(weekday) % 7]
+        self._set(f"marketing_body_{template.key}", clean[:12000])
+
+    def reset_body(self, weekday: int) -> None:
+        template = TEMPLATES[int(weekday) % 7]
+        self._set(f"marketing_body_{template.key}", "")
+
+    def button_key(self, weekday: int | None = None) -> str:
+        index = self.local_now().weekday() if weekday is None else int(weekday)
+        template = TEMPLATES[index % 7]
+        value = self._get_optional(f"marketing_button_{template.key}", "default").strip().lower()
+        return value if value in {*BUTTON_KEYS, "default"} else "default"
+
+    def set_button(self, weekday: int, key: str) -> None:
+        clean = str(key or "").strip().lower()
+        if clean not in {*BUTTON_KEYS, "default"}:
+            raise ValueError("marketing_unknown_button")
+        template = TEMPLATES[int(weekday) % 7]
+        self._set(f"marketing_button_{template.key}", clean)
 
     def footer_rows(self, template: MarketingTemplate) -> tuple[tuple[BroadcastButton, ...], ...]:
         base = f"https://t.me/{self.user_bot_username}?start="
+        weekday = next((index for index, item in enumerate(TEMPLATES) if item.key == template.key), 0)
+        selected = self.button_key(weekday)
+        if selected == "none":
+            return ()
+        generic = {
+            "find": BroadcastButton("🔍 帮我找房", base + "find_home"),
+            "latest": BroadcastButton("🏠 最新房源", base + "latest"),
+            "contact": BroadcastButton("💬 联系中文顾问", base + "advisor"),
+        }
+        if selected == "combo":
+            return ((generic["find"], generic["latest"]), (generic["contact"],))
+        if selected in generic:
+            return ((generic[selected],),)
         return (tuple(BroadcastButton(label, base + payload) for label, payload in template.buttons),)
 
     def claim_due(self, now: datetime | None = None) -> tuple[bool, str]:
