@@ -127,6 +127,16 @@ async def test_scheduled_uncertain_failure_is_logged_and_never_auto_resent_same_
     assert rows[0]["status"] == "failed_or_unknown"
     assert "telegram_uncertain" in rows[0]["error_text"]
 
+    with sqlite3.connect(db) as conn:
+        conn.row_factory = sqlite3.Row
+        component = conn.execute(
+            "SELECT state,last_error,meta_json FROM v3_component_status WHERE component='publisher_broadcast'"
+        ).fetchone()
+    assert component is not None
+    assert component["state"] == "degraded"
+    assert "telegram_uncertain" in component["last_error"]
+    assert "failed_or_unknown" in component["meta_json"]
+
 
 @pytest.mark.asyncio
 async def test_scheduler_never_touches_network_when_disabled_or_wrong_minute(tmp_path):
@@ -194,3 +204,46 @@ async def test_temporary_broadcast_uses_its_own_selected_button(tmp_path):
     assert await controller.handle_callback(SimpleNamespace(callback_query=query), context) is True
     assert bot.calls[0]["text"] == "临时通知"
     assert bot.calls[0]["reply_markup"].inline_keyboard[0][0].text == "🏠 最新房源"
+
+
+@pytest.mark.asyncio
+async def test_manual_send_after_uncertain_result_requires_explicit_confirmation(tmp_path):
+    _, service, controller = _build(tmp_path)
+    service.set_enabled(True)
+    service.set_time("09:30")
+    fixed = datetime(2026, 9, 9, 9, 30, 5, tzinfo=ZoneInfo("Asia/Phnom_Penh"))
+    service.local_now = lambda: fixed
+
+    await controller.scheduled_tick(SimpleNamespace(bot=FakeBot(fail=True)))
+
+    bot = FakeBot()
+    message = SimpleNamespace(reply_text=AsyncMock())
+    context = SimpleNamespace(bot=bot, user_data={})
+    query = SimpleNamespace(data="v3bc|send", message=message)
+
+    assert await controller.handle_callback(SimpleNamespace(callback_query=query), context) is True
+    assert bot.calls == []
+    text = message.reply_text.await_args.args[0]
+    assert "发送结果待确认" in text
+    assert "先到频道确认" in text
+    markup = message.reply_text.await_args.kwargs["reply_markup"]
+    assert markup.inline_keyboard[0][0].callback_data == "v3bc|send_force"
+
+
+@pytest.mark.asyncio
+async def test_broadcast_status_recovers_to_running_after_confirmed_send(tmp_path):
+    db, _, controller = _build(tmp_path)
+    failing = SimpleNamespace(bot=FakeBot(fail=True))
+    with pytest.raises(RuntimeError):
+        await controller._send_channel(failing, "x", trigger_type="manual", template_key="live")
+
+    await controller._send_channel(SimpleNamespace(bot=FakeBot()), "x", trigger_type="manual", template_key="live")
+
+    with sqlite3.connect(db) as conn:
+        conn.row_factory = sqlite3.Row
+        component = conn.execute(
+            "SELECT state,last_error,meta_json FROM v3_component_status WHERE component='publisher_broadcast'"
+        ).fetchone()
+    assert component["state"] == "running"
+    assert component["last_error"] == ""
+    assert '"delivery": "sent"' in component["meta_json"]
