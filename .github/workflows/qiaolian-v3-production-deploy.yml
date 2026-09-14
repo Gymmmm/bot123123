@@ -152,7 +152,10 @@ jobs:
           OLD_V3_WAS_ACTIVE=0
           if systemctl is-active --quiet qiaolian-v3-user-bot.service 2>/dev/null || \
              systemctl is-active --quiet qiaolian-v3-publisher.service 2>/dev/null || \
-             systemctl is-active --quiet qiaolian-v3-collector.service 2>/dev/null; then
+             systemctl is-active --quiet qiaolian-v3-collector.service 2>/dev/null || \
+             systemctl is-active --quiet qiaolian-v3@user.service 2>/dev/null || \
+             systemctl is-active --quiet qiaolian-v3@publisher.service 2>/dev/null || \
+             systemctl is-active --quiet qiaolian-v3@collector.service 2>/dev/null; then
             OLD_V3_WAS_ACTIVE=1
           fi
 
@@ -163,24 +166,27 @@ jobs:
               systemctl disable --now "${NEW_SERVICES[@]}" 2>/dev/null || true
               if [ "$OLD_V3_WAS_ACTIVE" = 1 ]; then
                 echo 'ROLLBACK: restoring previous V3 services' >&2
-                systemctl enable --now qiaolian-v3-user-bot.service qiaolian-v3-publisher.service qiaolian-v3-collector.service qiaolian-v3-canonical-worker.timer 2>/dev/null || true
+                rm -f "$CURRENT"
+                ln -s "$APP/releases/$PREVIOUS_SHA" "$CURRENT"
+                chown -h qiaolianbot:qiaolianbot "$CURRENT"
+                systemctl daemon-reload
+                systemctl enable --now "${NEW_SERVICES[@]}" 2>/dev/null || true
               fi
             fi
             exit "$rc"
           }
-          trap rollback_on_error EXIT
-
           echo 'CHECK: prerequisites'
-          test -f "$BUNDLE_PATH"
-          test -f "$ENV_SOURCE"
-          test -s "$DB"
-          test -f "$APP/.deployed_sha"
-          test "$(tr -cd '0-9a-fA-F' < "$APP/.deployed_sha")" = "$PREVIOUS_SHA"
-          test -d "$APP/releases/$PREVIOUS_SHA"
-          id qiaolianbot >/dev/null
+          test -f "$BUNDLE_PATH" && echo 'PREREQ bundle=ok'
+          test -f "$ENV_SOURCE" && echo 'PREREQ env=ok'
+          test -s "$DB" && echo 'PREREQ db=ok'
+          test -f "$APP/.deployed_sha" && echo 'PREREQ deployed_marker=ok'
+          test "$(tr -cd '0-9a-fA-F' < "$APP/.deployed_sha")" = "$PREVIOUS_SHA" && echo 'PREREQ deployed_sha=ok'
+          test -d "$APP/releases/$PREVIOUS_SHA" && echo 'PREREQ rollback_release=ok'
+          id qiaolianbot >/dev/null && echo 'PREREQ service_user=ok'
           command -v git >/dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y git
           command -v sqlite3 >/dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y sqlite3
           command -v python3 >/dev/null
+          trap rollback_on_error EXIT
 
           echo 'FREEZE: stop all old writers before backup and cutover'
           systemctl stop "${LEGACY_SERVICES[@]}" 2>/dev/null || true
