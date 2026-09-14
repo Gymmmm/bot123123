@@ -1,6 +1,6 @@
 """Evidence-only adviser notes for V3 public listing details.
 
-New V3 publication packages freeze the exact ``侨联说`` wording alongside the
+New V3 publication packages freeze the exact ``侨联判断`` wording alongside the
 canonical facts.  User Bot reads that frozen copy so channel and detail views
 cannot drift.  Older packages keep the previous evidence projection behavior.
 """

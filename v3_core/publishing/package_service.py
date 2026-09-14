@@ -60,7 +60,7 @@ class PackageBuildService:
         adviser_copy = generate_adviser_text(
             facts,
             seed=adviser_seed,
-            max_points=2,
+            max_points=1,
             allow_fallback=True,
         )
 
@@ -71,10 +71,28 @@ class PackageBuildService:
             status=str(listing.get("inventory_status") or "active"),
             adviser_note=adviser_copy,
         )
+        rent = offer.get("monthly_rent_usd")
+        rent_bit = ""
+        if isinstance(rent, (int, float)) and rent not in (None, ""):
+            rent_bit = f"${int(rent)}/月"
+        elif str(rent or "").strip():
+            raw_rent = str(rent).strip()
+            rent_bit = raw_rent if ("$" in raw_rent or "/月" in raw_rent) else f"${raw_rent}/月"
+        listing_summary = "｜".join(
+            part
+            for part in (
+                str(listing.get("project_name") or "").strip(),
+                str(listing.get("layout") or "").strip(),
+                rent_bit,
+                str(listing.get("public_location_display") or listing.get("area") or "").strip(),
+            )
+            if part
+        )
         actions = official_channel_action_urls(
             self.user_bot_username,
             public_id,
             advisor_url=self.advisor_url,
+            listing_summary=listing_summary,
         )
         public_token = "ql" + hashlib.sha256(
             f"{listing_id}:{offer_id}:{canonical['facts_hash']}".encode("utf-8")

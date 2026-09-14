@@ -6,6 +6,8 @@ listing reference and appends safe return buttons to listing keyboards.
 """
 from __future__ import annotations
 
+import re
+
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -15,7 +17,29 @@ _HOME_CALLBACK = "v3u:t:home"
 _CONSULT_PREFIX = "v3u:listing:consult:"
 
 
-def advisor_handoff_url(advisor_url: object, *, public_listing_id: object = "") -> str:
+def build_advisor_handoff_text(
+    *,
+    public_listing_id: object = "",
+    listing_summary: object = "",
+) -> str:
+    """Compose the prefilled advisor chat text (id + which listing)."""
+    public_id = str(public_listing_id or "").strip()
+    summary = re.sub(r"\s+", " ", str(listing_summary or "").strip())
+    if public_id and summary:
+        return f"你好，我想咨询这套房：{public_id}\n（{summary}）"
+    if public_id:
+        return f"你好，我想咨询这套房：{public_id}"
+    if summary:
+        return f"你好，我想咨询这套房：\n（{summary}）"
+    return "你好，我想咨询租房。"
+
+
+def advisor_handoff_url(
+    advisor_url: object,
+    *,
+    public_listing_id: object = "",
+    listing_summary: object = "",
+) -> str:
     """Return a direct Telegram advisor chat URL with a prepared listing message.
 
     Telegram public-username links support ``?text=<draft_text>``. Unknown/non-
@@ -24,8 +48,10 @@ def advisor_handoff_url(advisor_url: object, *, public_listing_id: object = "") 
     raw = str(advisor_url or "").strip()
     if not raw:
         return ""
-    public_id = str(public_listing_id or "").strip()
-    message = f"你好，我想咨询这套房：{public_id}" if public_id else "你好，我想咨询租房。"
+    message = build_advisor_handoff_text(
+        public_listing_id=public_listing_id,
+        listing_summary=listing_summary,
+    )
     parts = urlsplit(raw)
     host = parts.netloc.lower()
     if parts.scheme in {"http", "https"} and host in {
@@ -51,6 +77,7 @@ def polish_listing_keyboard(
     advisor_url: str = "",
     channel_url: str = "",
     back_to_search_callback: str = "",
+    listing_summary: str = "",
     add_home: bool = False,
     add_channel: bool = False,
 ) -> InlineKeyboardMarkup | None:
@@ -69,7 +96,7 @@ def polish_listing_keyboard(
                     upgraded.append(
                         InlineKeyboardButton(
                             label or "💬 联系中文顾问",
-                            url=advisor_handoff_url(advisor_url, public_listing_id=public_id),
+                            url=advisor_handoff_url(advisor_url, public_listing_id=public_id, listing_summary=listing_summary),
                         )
                     )
                 elif label != str(button.text or ""):
@@ -98,4 +125,4 @@ def polish_listing_keyboard(
     return InlineKeyboardMarkup(rows) if rows else None
 
 
-__all__ = ["advisor_handoff_url", "polish_listing_keyboard"]
+__all__ = ["advisor_handoff_url", "build_advisor_handoff_text", "polish_listing_keyboard"]

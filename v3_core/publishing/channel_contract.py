@@ -79,7 +79,11 @@ def channel_actions(public_listing_id: object) -> tuple[str, str, str]:
 
 
 def official_channel_action_urls(
-    username: str, public_listing_id: object, *, advisor_url: str = ""
+    username: str,
+    public_listing_id: object,
+    *,
+    advisor_url: str = "",
+    listing_summary: object = "",
 ) -> dict[str, str]:
     """Build the frozen listing-action URL map or raise."""
     user = str(username or "").strip().lstrip("@")
@@ -94,7 +98,11 @@ def official_channel_action_urls(
         )
         for action in ("details", "photos", "book")
     }
-    urls["consult"] = advisor_handoff_url(advisor_url, public_listing_id=public_listing_id)
+    urls["consult"] = advisor_handoff_url(
+        advisor_url,
+        public_listing_id=public_listing_id,
+        listing_summary=listing_summary,
+    )
     if not urls["consult"]:
         raise ValueError("advisor_url_missing")
     return official_channel_action_identity(urls)
