@@ -125,7 +125,6 @@ jobs:
           RELEASE="$APP/releases/$EXPECTED_SHA"
           CURRENT="$APP/current"
           RUNTIME_ENV="$APP/runtime.env"
-          SOURCES_SOURCE="$CURRENT/sources.json"
           OLD=/opt/qiaolian_dual_bots
           DB="$OLD/data/qiaolian_dual_bot.db"
           if [ -f "$OLD/.env" ]; then
@@ -133,6 +132,13 @@ jobs:
           else
             ENV_SOURCE="$RUNTIME_ENV"
           fi
+          SOURCES_SOURCE=''
+          for source_candidate in "$CURRENT/sources.json" "$OLD/sources.json" "$APP/sources.json"; do
+            if [ -s "$source_candidate" ]; then
+              SOURCES_SOURCE="$source_candidate"
+              break
+            fi
+          done
           BACKUP_ROOT=/opt/qiaolian_backups
           STAMP=$(date -u +%Y%m%d-%H%M%S)
           BACKUP="$BACKUP_ROOT/actions-v3-$STAMP"
@@ -187,7 +193,7 @@ jobs:
           test -f "$APP/.deployed_sha"; echo 'PREREQ deployed_marker=ok'
           test "$(tr -cd '0-9a-fA-F' < "$APP/.deployed_sha")" = "$PREVIOUS_SHA"; echo 'PREREQ deployed_sha=ok'
           test -d "$APP/releases/$PREVIOUS_SHA"; echo 'PREREQ rollback_release=ok'
-          test -s "$SOURCES_SOURCE"; echo 'PREREQ collector_sources=ok'
+          test -n "$SOURCES_SOURCE"; test -s "$SOURCES_SOURCE"; echo 'PREREQ collector_sources=ok'
           id qiaolianbot >/dev/null; echo 'PREREQ service_user=ok'
           command -v git >/dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y git
           command -v sqlite3 >/dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y sqlite3
