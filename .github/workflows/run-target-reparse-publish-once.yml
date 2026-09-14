@@ -18,8 +18,7 @@ env:
   PROD_HOST: 50.114.74.120
   PROD_PORT: '22'
   PROD_SSH_USER: root
-  PROD_SSH_KNOWN_HOSTS: '50.114.74.120 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILuFtkSn5SJKY7mZ52Lc/QydPRTvHFpsj87M/HcIkb/L'
-  PROD_SSH_HOST_FINGERPRINT: 'SHA256:sgqLYOUAZ482H3y5jREQ6q2BVvNFPXYiOg4ruyFVnsA'
+  PROD_SSH_HOST_FINGERPRINT: 'SHA256:fuufBlFaqRpQhlkio0vuLsuv8w8x3zUb3VFQsnUny/o'
 
 jobs:
   reparse-publish:
@@ -31,6 +30,7 @@ jobs:
           set -Eeuo pipefail
           ssh-keyscan -T 10 -p "$PROD_PORT" -t ed25519 "$PROD_HOST" 2>/dev/null | grep -v '^#' > "$RUNNER_TEMP/known_hosts_observed"
           ssh-keygen -lf "$RUNNER_TEMP/known_hosts_observed" | grep -F "$PROD_SSH_HOST_FINGERPRINT"
+
       - name: Configure production SSH
         env:
           PROD_SSH_PRIVATE_KEY: '${{ secrets.PROD_SSH_PRIVATE_KEY }}'
@@ -39,15 +39,96 @@ jobs:
           test -n "$PROD_SSH_PRIVATE_KEY"
           install -d -m 700 "$HOME/.ssh"
           printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
-          printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          cp "$RUNNER_TEMP/known_hosts_observed" "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
-      - name: Reparse, approve, publish, and verify target through application code
+
+      - name: Publish one V3 collector candidate through application flow
+        run: |
+          set -Eeuo pipefail
+          ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 "$PROD_SSH_USER@$PROD_HOST" 'bash -s' <<'REMOTE'
+          set -Eeuo pipefail
+          V3_ROOT=/opt/qiaolian_v3
+          CURRENT=$(readlink -f "$V3_ROOT/current")
+          DB=/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db
+          test -d "$CURRENT"
+          test -f "$DB"
+          test -f "$V3_ROOT/runtime.env"
+          set -a
+          source "$V3_ROOT/runtime.env"
+          set +a
+          export QIAOLIAN_CODE_ROOT="$CURRENT"
+          export DB_PATH="$DB"
+          export SQLITE_PATH="$DB"
+          export PYTHONPATH="$CURRENT"
+          cd "$CURRENT"
+          runuser -u qiaolianbot --preserve-environment -- "$V3_ROOT/.venv/bin/python" - <<'PY'
+          import asyncio
+          import json
+          import sqlite3
+          from dataclasses import asdict
+          from telegram import Bot
+          from v3_core.publishing.admin_bot import build_workflow, load_settings
+          from v3_core.publishing.autopilot_anomalies import FinalAutoPublishRepository, FinalAutoPublishService
+
+          async def main():
+              settings = load_settings()
+              repository = FinalAutoPublishRepository(settings.db_path)
+              repository.ensure_defaults()
+              synced = repository.sync_candidates()
+              candidate = repository.next_item()
+              with sqlite3.connect(f"file:{settings.db_path}?mode=ro", uri=True) as conn:
+                  before = int(conn.execute("SELECT COUNT(*) FROM publication_instances").fetchone()[0])
+              print(f"CANDIDATES_SYNCED={synced}")
+              print(f"PUBLICATIONS_BEFORE={before}")
+              if candidate is None:
+                  print('RESULT=' + json.dumps({'status': 'idle'}, ensure_ascii=False))
+                  return
+              safe = {key: candidate.get(key) for key in (
+                  'offer_id','listing_id','review_id','origin','review_status','public_listing_id',
+                  'project_name','public_location_display','layout','property_type','monthly_rent_usd','inventory_status'
+              )}
+              print('CANDIDATE=' + json.dumps(safe, ensure_ascii=False, default=str))
+              service = FinalAutoPublishService(
+                  workflow=build_workflow(settings),
+                  repository=repository,
+                  channel_chat_id=settings.channel_chat_id,
+              )
+              if not repository.acquire_lock(service.owner, ttl_seconds=300):
+                  print('RESULT=' + json.dumps({'status':'blocked','reason':'publish_lock_busy'}, ensure_ascii=False))
+                  return
+              try:
+                  async with Bot(settings.token) as bot:
+                      result = await service.process_one(bot=bot, force_offer_id=str(candidate['offer_id']))
+              finally:
+                  repository.release_lock(service.owner)
+              payload = asdict(result)
+              print('RESULT=' + json.dumps(payload, ensure_ascii=False, default=str))
+              with sqlite3.connect(f"file:{settings.db_path}?mode=ro", uri=True) as conn:
+                  after = int(conn.execute("SELECT COUNT(*) FROM publication_instances").fetchone()[0])
+                  row = None
+                  if payload.get('package_id'):
+                      row = conn.execute(
+                          "SELECT instance_id,package_id,listing_id,offer_id,platform,channel_chat_id,channel_message_id,publish_status,published_at FROM publication_instances WHERE package_id=? ORDER BY id DESC LIMIT 1",
+                          (payload['package_id'],),
+                      ).fetchone()
+              print(f"PUBLICATIONS_AFTER={after}")
+              if row:
+                  print('PUBLICATION=' + json.dumps({
+                      'instance_id':row[0],'package_id':row[1],'listing_id':row[2],'offer_id':row[3],
+                      'platform':row[4],'channel_chat_id':row[5],'channel_message_id':row[6],
+                      'publish_status':row[7],'published_at':row[8],
+                  }, ensure_ascii=False, default=str))
+
+          asyncio.run(main())
+          PY
+          REMOTE
+
+      - name: Verify V3 services remain active
         run: |
           set -Eeuo pipefail
           ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 "$PROD_SSH_USER@$PROD_HOST" \
-            "cd /opt/qiaolian_dual_bots && runuser -u qiaolianbot -- env PYTHONPATH=/opt/qiaolian_dual_bots DB_PATH=/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db /opt/qiaolian_dual_bots/.venv/bin/python /opt/qiaolian_dual_bots/tools/reparse_publish_draft.py --db /opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db --draft-id DRF_0cdfabc0-4136-4da4-819c-a50525da19ae --source-post-id 1"
-      - name: Verify services remain active
-        run: |
-          set -Eeuo pipefail
-          ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 "$PROD_SSH_USER@$PROD_HOST" \
-            "systemctl is-active --quiet qiaolian-user-bot.service && systemctl is-active --quiet qiaolian-publisher-bot.service && systemctl is-active --quiet qiaolian-collector.service"
+            "systemctl is-active --quiet qiaolian-v3@canonical.service && systemctl is-active --quiet qiaolian-v3@publisher.service && systemctl is-active --quiet qiaolian-v3@user.service && systemctl is-active --quiet qiaolian-v3@collector.service"
+
+      - name: Remove temporary SSH material
+        if: always()
+        run: rm -f "$HOME/.ssh/qiaolian_production"
