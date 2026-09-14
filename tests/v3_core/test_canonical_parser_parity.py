@@ -83,3 +83,9 @@ def test_v3_canonical_parser_matches_manual_overrides():
         }
     }
     _assert_same(raw, **kwargs)
+
+
+def test_legacy_jinjie_callback_keeps_area_label_not_project_name():
+    from qiaolian_dual.common import FIND_AREA_CODE_MAP
+
+    assert FIND_AREA_CODE_MAP["jinjie"] == "金街附近"

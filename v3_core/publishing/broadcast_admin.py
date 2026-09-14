@@ -10,6 +10,8 @@ from zoneinfo import ZoneInfo
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 
+from v3_core.ops.runtime_state import RuntimeStateRepository
+
 from .broadcast import BUTTON_LABELS, BroadcastService
 from .marketing_broadcast import MarketingBroadcastService, TEMPLATES
 
@@ -24,6 +26,7 @@ class BroadcastAdminController:
         channel_chat_id: str,
         timezone_name: str,
         marketing: MarketingBroadcastService | None = None,
+        runtime: RuntimeStateRepository | None = None,
     ):
         self.service = service
         self.marketing = marketing or MarketingBroadcastService(
@@ -32,6 +35,7 @@ class BroadcastAdminController:
             timezone_name=timezone_name,
         )
         self.channel_chat_id = str(channel_chat_id or "").strip()
+        self.runtime = runtime or RuntimeStateRepository(service.repository.db_path)
         self.timezone_name = str(timezone_name or "Asia/Phnom_Penh").strip()
         if not self.channel_chat_id:
             raise ValueError("broadcast_channel_chat_id_required")
@@ -72,16 +76,30 @@ class BroadcastAdminController:
             [InlineKeyboardButton("🏠 返回首页", callback_data="v3h")],
         ])
 
-    def _last_sent_row(self, template_key: str):
+    def _last_delivery_row(self, template_key: str):
         local_date = self.service.local_now().date().isoformat()
         with self.service.repository._connect() as conn:
             return conn.execute(
-                """SELECT id,template_key,trigger_type,local_date,created_at
+                """SELECT id,template_key,trigger_type,status,error_text,local_date,created_at
                    FROM publisher_broadcast_log_v3
-                   WHERE local_date=? AND template_key=? AND status='sent'
+                   WHERE local_date=? AND template_key=?
                    ORDER BY id DESC LIMIT 1""",
                 (local_date, str(template_key)),
             ).fetchone()
+
+    def _last_sent_row(self, template_key: str):
+        row = self._last_delivery_row(template_key)
+        return row if row is not None and str(row["status"]) == "sent" else None
+
+    def _today_delivery_state(self, template_key: str) -> str:
+        row = self._last_delivery_row(template_key)
+        if row is None:
+            return "⏳ 待发送"
+        tm = self._local_log_time(row)
+        suffix = f" · {tm}" if tm else ""
+        if str(row["status"]) == "sent":
+            return "✅ 已发送" + suffix
+        return "⚠️ 发送结果待确认" + suffix
 
     def _local_log_time(self, row: Any) -> str:
         if row is None:
@@ -110,9 +128,8 @@ class BroadcastAdminController:
 
     async def show_weather(self, message: Any, *, notice: str = ""):
         c = self.service.config()
-        sent = self._last_sent_row("live")
         prefix = f"✅ {escape(notice)}\n\n" if notice else ""
-        today_state = f"✅ 已发送 · {self._local_log_time(sent)}" if sent is not None else "⏳ 待发送"
+        today_state = self._today_delivery_state("live")
         copy_name = "自动天气汇率" if c.template_key == "live" else "自定义文案"
         await message.reply_text(
             prefix + "<b>🌤 每日天气汇率</b>\n\n"
@@ -137,7 +154,7 @@ class BroadcastAdminController:
         today = self.marketing.template()
         today_index = self.marketing.local_now().weekday()
         marketing_button = self.marketing.button_key(today_index)
-        sent = self._last_sent_row("marketing_" + today.key)
+        today_state = self._today_delivery_state("marketing_" + today.key)
         lines = [
             "<b>🗓 本周营销计划</b>", "",
             "周一  🏠 本周找房", "周二  📋 看房准备", "周三  💰 租房预算",
@@ -146,7 +163,7 @@ class BroadcastAdminController:
             f"发送时间：{escape(self.marketing.send_time)}",
             f"今日文案：{'自定义' if today.body != TEMPLATES[today_index].body else '默认'}",
             f"今日按钮：{escape('当天默认按钮' if marketing_button == 'default' else BUTTON_LABELS[marketing_button])}",
-            f"今日状态：{'✅ 已发送 · ' + self._local_log_time(sent) if sent is not None else '⏳ 待发送'}",
+            f"今日状态：{today_state}",
         ]
         await message.reply_text(
             prefix + "\n".join(lines),
@@ -191,22 +208,38 @@ class BroadcastAdminController:
                 reply_markup=self._footer_markup(footer),
             )
         except Exception as exc:
+            error_text = f"{type(exc).__name__}: {exc}"
             self.service.repository.log_delivery(
                 trigger_type=trigger_type,
                 template_key=template_key,
                 channel_chat_id=self.channel_chat_id,
                 local_date=local_date,
                 status="failed_or_unknown",
-                error_text=f"{type(exc).__name__}: {exc}",
+                error_text=error_text,
+            )
+            self.runtime.heartbeat(
+                "publisher_broadcast",
+                state="degraded",
+                event=True,
+                error=error_text,
+                meta={"template_key": template_key, "trigger_type": trigger_type, "delivery": "failed_or_unknown"},
             )
             raise
+        message_id = getattr(result, "message_id", None)
         self.service.repository.log_delivery(
             trigger_type=trigger_type,
             template_key=template_key,
             channel_chat_id=self.channel_chat_id,
             local_date=local_date,
             status="sent",
-            channel_message_id=getattr(result, "message_id", None),
+            channel_message_id=message_id,
+        )
+        self.runtime.heartbeat(
+            "publisher_broadcast",
+            state="running",
+            event=True,
+            error="",
+            meta={"template_key": template_key, "trigger_type": trigger_type, "delivery": "sent", "channel_message_id": message_id},
         )
         return result
 
@@ -231,8 +264,14 @@ class BroadcastAdminController:
                 body = await asyncio.to_thread(self.service.body)
                 await self._send_channel(context, body, trigger_type="scheduled", template_key="live")
                 self.service.mark_scheduled_sent(local_date)
-            except Exception:
-                pass
+            except Exception as exc:
+                self.runtime.heartbeat(
+                    "publisher_broadcast",
+                    state="degraded",
+                    event=True,
+                    error=f"{type(exc).__name__}: {exc}",
+                    meta={"template_key": "live", "trigger_type": "scheduled", "delivery": "failed_or_unknown"},
+                )
         m_claimed, m_date = self.marketing.claim_due()
         if m_claimed:
             t = self.marketing.template()
@@ -245,8 +284,14 @@ class BroadcastAdminController:
                     footer=self.marketing.footer_rows(t),
                 )
                 self.marketing.mark_sent(m_date)
-            except Exception:
-                pass
+            except Exception as exc:
+                self.runtime.heartbeat(
+                    "publisher_broadcast",
+                    state="degraded",
+                    event=True,
+                    error=f"{type(exc).__name__}: {exc}",
+                    meta={"template_key": "marketing", "trigger_type": "scheduled_marketing", "delivery": "failed_or_unknown"},
+                )
 
     async def show_logs(self, message: Any):
         with self.service.repository._connect() as conn:
@@ -394,15 +439,21 @@ class BroadcastAdminController:
             await q.message.reply_text("请输入人工调整值，例如：+0.02、-0.05 或 0。")
             return True
         if a == "send":
-            sent = self._last_sent_row("live")
-            if sent is not None:
+            delivery = self._last_delivery_row("live")
+            if delivery is not None:
+                sent = str(delivery["status"]) == "sent"
+                title = "今日天气汇率已经发送过。" if sent else "上次发送结果待确认。"
+                detail = (
+                    "频道可能已经收到消息。为避免重复，请先到频道确认；确认未发送后再继续。"
+                    if not sent else "是否仍然再发送一次？"
+                )
                 await q.message.reply_text(
-                    "⚠️ <b>今日天气汇率已经发送过。</b>\n\n"
-                    f"上次发送：{escape(self._local_log_time(sent) or '今天')}\n\n"
-                    "是否仍然再发送一次？",
+                    f"⚠️ <b>{title}</b>\n\n"
+                    f"上次尝试：{escape(self._local_log_time(delivery) or '今天')}\n\n"
+                    + detail,
                     parse_mode=ParseMode.HTML,
                     reply_markup=self._markup([
-                        [InlineKeyboardButton("仍然发送一次", callback_data="v3bc|send_force")],
+                        [InlineKeyboardButton("确认后仍然发送一次", callback_data="v3bc|send_force")],
                         [InlineKeyboardButton("取消", callback_data="v3bc|weather")],
                     ]),
                 )
@@ -465,15 +516,21 @@ class BroadcastAdminController:
             return True
         if a == "m_send":
             t = self.marketing.template()
-            sent = self._last_sent_row("marketing_" + t.key)
-            if sent is not None:
+            delivery = self._last_delivery_row("marketing_" + t.key)
+            if delivery is not None:
+                sent = str(delivery["status"]) == "sent"
+                title = "今天的营销广播已经发送过。" if sent else "上次营销发送结果待确认。"
+                detail = (
+                    "频道可能已经收到消息。为避免重复，请先到频道确认；确认未发送后再继续。"
+                    if not sent else "是否仍然再发送一次？"
+                )
                 await q.message.reply_text(
-                    "⚠️ <b>今天的营销广播已经发送过。</b>\n\n"
-                    f"上次发送：{escape(self._local_log_time(sent) or '今天')}\n\n"
-                    "是否仍然再发送一次？",
+                    f"⚠️ <b>{title}</b>\n\n"
+                    f"上次尝试：{escape(self._local_log_time(delivery) or '今天')}\n\n"
+                    + detail,
                     parse_mode=ParseMode.HTML,
                     reply_markup=self._markup([
-                        [InlineKeyboardButton("仍然发送一次", callback_data="v3bc|m_send_force")],
+                        [InlineKeyboardButton("确认后仍然发送一次", callback_data="v3bc|m_send_force")],
                         [InlineKeyboardButton("取消", callback_data="v3bc|marketing")],
                     ]),
                 )
