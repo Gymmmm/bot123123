@@ -4,14 +4,6 @@ on:
   push:
     branches: [codex/qiaolian-ui-cleanup-20260829]
     paths: [.github/ops-control/request.txt]
-  workflow_dispatch:
-    inputs:
-      action:
-        description: Safe production operation
-        required: true
-        default: health
-        type: choice
-        options: [health, plan-zufang555-50]
 
 permissions:
   contents: read
@@ -32,27 +24,19 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Check out control revision
-        if: github.event_name == 'push'
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
 
       - name: Resolve operation
         id: request
-        env:
-          DISPATCH_ACTION: '${{ inputs.action }}'
-          EVENT_NAME: '${{ github.event_name }}'
         run: |
           set -Eeuo pipefail
-          if [[ "$EVENT_NAME" == workflow_dispatch ]]; then
-            action=$DISPATCH_ACTION
-          else
-            request=$(<.github/ops-control/request.txt)
-            test "$(printf '%s\n' "$request" | wc -l | tr -d ' ')" = 2
-            action=$(printf '%s\n' "$request" | sed -n '1p')
-            request_id=$(printf '%s\n' "$request" | sed -n '2p')
-            [[ "$request_id" =~ ^[A-Za-z0-9._:-]{1,80}$ ]]
-          fi
+          request=$(<.github/ops-control/request.txt)
+          test "$(printf '%s\n' "$request" | wc -l | tr -d ' ')" = 2
+          action=$(printf '%s\n' "$request" | sed -n '1p')
+          request_id=$(printf '%s\n' "$request" | sed -n '2p')
+          [[ "$request_id" =~ ^[A-Za-z0-9._:-]{1,80}$ ]]
           case "$action" in health|plan-zufang555-50) ;; *) exit 2 ;; esac
           printf 'action=%s\n' "$action" >> "$GITHUB_OUTPUT"
 
@@ -81,9 +65,10 @@ jobs:
           set -Eeuo pipefail
           ACTION=$1
           ROOT=/opt/qiaolian_v3
-          DB="${DB_PATH:-/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db}"
+          V3="$ROOT/current"
           VENV="$ROOT/.venv"
-          case "$ACTION" in health|plan-zufang555-50) ;; *) exit 2 ;; esac
+          RUNTIME_ENV="$ROOT/runtime.env"
+          DB=/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db
 
           health() {
             echo "DEPLOYED_SHA=$(tr -cd '0-9a-fA-F' < "$ROOT/.deployed_sha")"
@@ -94,70 +79,70 @@ jobs:
           }
 
           plan_latest50() {
-            "$VENV/bin/python" - "$DB" <<'PY'
-          import json, sqlite3, sys
-          db_path=sys.argv[1]
-          c=sqlite3.connect(f'file:{db_path}?mode=ro', uri=True)
-          c.row_factory=sqlite3.Row
-          c.execute('PRAGMA query_only=ON')
+            set -a; source "$RUNTIME_ENV"; set +a
+            SESSION_BASE="${TELETHON_SESSION_PATH:-}"
+            if [ -z "$SESSION_BASE" ]; then SESSION_BASE="$V3/telethon_sessions/${COLLECTOR_SESSION_NAME:-qiaolian_collector}"; fi
+            if [ -f "$SESSION_BASE" ]; then SESSION_FILE="$SESSION_BASE"; elif [ -f "$SESSION_BASE.session" ]; then SESSION_FILE="$SESSION_BASE.session"; else echo SESSION_NOT_FOUND; exit 3; fi
+            TMP=$(mktemp -d /var/tmp/qiaolian-live50-plan.XXXXXX)
+            trap 'rm -rf "$TMP"' RETURN
+            chown qiaolianbot:qiaolianbot "$TMP"; chmod 0750 "$TMP"
+            cp "$SESSION_FILE" "$TMP/read.session"; chown qiaolianbot:qiaolianbot "$TMP/read.session"
+            runuser -u qiaolianbot -- env \
+              PYTHONPATH="$V3" DB_PATH="$DB" COLLECTOR_SOURCES_JSON="$V3/sources.json" \
+              TELETHON_SESSION_PATH="$TMP/read" TG_API_ID="$TG_API_ID" TG_API_HASH="$TG_API_HASH" \
+              "$VENV/bin/python" - <<'PY'
+          import asyncio,json,os,sqlite3
+          from collections import defaultdict
+          from telethon import TelegramClient
+          from v3_core.ingest.telegram_collector import load_sources
 
-          rows=c.execute("SELECT id,source_post_id,source_url,raw_meta_json,parse_status FROM source_posts WHERE source_name='zufang555'").fetchall()
-          source=[]
-          for r in rows:
-              try: meta=json.loads(r['raw_meta_json'] or '{}')
-              except Exception: meta={}
-              anchor=int(meta.get('anchor_message_id') or 0)
-              source.append((anchor,dict(r)))
-          source=sorted(source,key=lambda x:x[0],reverse=True)[:50]
-          source=list(reversed(source))
-          source_pks=[int(x[1]['id']) for x in source]
+          async def main():
+              sources=load_sources(os.environ['COLLECTOR_SOURCES_JSON'])
+              cfg=next(dict(x) for x in sources if str(x.get('source_name'))=='zufang555')
+              client=TelegramClient(os.environ['TELETHON_SESSION_PATH'],int(os.environ['TG_API_ID']),os.environ['TG_API_HASH'])
+              await client.start()
+              try:
+                  entity=await client.get_entity(cfg['entity_id'])
+                  msgs=[]
+                  async for m in client.iter_messages(entity,limit=1200): msgs.append(m)
+              finally:
+                  await client.disconnect()
+              grouped=defaultdict(list); singles=[]
+              for m in msgs:
+                  gid=getattr(m,'grouped_id',None)
+                  (grouped[int(gid)] if gid is not None else singles).append(m)
+              units=[]
+              for gid,parts in grouped.items():
+                  parts=sorted(parts,key=lambda m:int(m.id)); units.append((max(int(m.id) for m in parts),f'album_{gid}',len(parts)))
+              for m in singles: units.append((int(m.id),str(m.id),1))
+              units=sorted(units,key=lambda x:x[0],reverse=True)[:50]
+              units=list(reversed(units))
 
-          placeholders=','.join('?' for _ in source_pks)
-          identities={}
-          if source_pks:
-              for r in c.execute(f"""
-                  SELECT c.source_post_id,r.listing_id,r.public_id,c.canonical_record_id
-                  FROM canonical_records c
-                  LEFT JOIN listing_identity_reservations_v3 r ON r.canonical_record_id=c.canonical_record_id
-                  WHERE CAST(c.source_post_id AS INTEGER) IN ({placeholders})
-                  ORDER BY c.created_at ASC,c.canonical_record_id ASC
-              """,source_pks):
-                  identities.setdefault(int(r['source_post_id']),dict(r))
-
-          pubs={}
-          listing_ids=[str(v.get('listing_id') or '') for v in identities.values() if v.get('listing_id')]
-          if listing_ids:
-              ph=','.join('?' for _ in listing_ids)
-              for r in c.execute(f"""
-                  SELECT instance_id,package_id,listing_id,offer_id,channel_message_id,publish_status
-                  FROM publication_instances
-                  WHERE platform='telegram' AND listing_id IN ({ph})
-                    AND CAST(COALESCE(channel_message_id,'0') AS INTEGER)>0
-                  ORDER BY CAST(channel_message_id AS INTEGER)
-              """,listing_ids):
-                  pubs[str(r['listing_id'])]=dict(r)
-
-          mapped=[]; missing=[]
-          for anchor,r in source:
-              ident=identities.get(int(r['id'])) or {}
-              listing=str(ident.get('listing_id') or '')
-              pub=pubs.get(listing)
-              item={'anchor':anchor,'source_pk':int(r['id']),'source_identity':r['source_post_id'],'parse_status':r['parse_status'],'listing_id':listing,'public_id':ident.get('public_id'),'channel_message_id':int(pub['channel_message_id']) if pub else None,'instance_id':pub.get('instance_id') if pub else None}
-              (mapped if pub else missing).append(item)
-          print('PLAN_SUMMARY',json.dumps({'latest50':len(source),'with_identity':len(identities),'mapped_publications':len(mapped),'missing_publication':len(missing)},ensure_ascii=False))
-          print('PLAN_MAP',json.dumps(mapped,ensure_ascii=False))
-          if missing:
-              print('PLAN_MISSING',json.dumps(missing,ensure_ascii=False))
-          allpub=c.execute("SELECT COUNT(*) FROM publication_instances WHERE platform='telegram' AND CAST(COALESCE(channel_message_id,'0') AS INTEGER)>0").fetchone()[0]
-          print('TOTAL_CHANNEL_PUBLICATIONS',allpub)
-          c.close()
+              db=sqlite3.connect(f"file:{os.environ['DB_PATH']}?mode=ro",uri=True); db.row_factory=sqlite3.Row; db.execute('PRAGMA query_only=ON')
+              out=[]; missing_source=[]; with_identity=0; mapped=0
+              for anchor,key,count in units:
+                  s=db.execute("SELECT id,parse_status FROM source_posts WHERE source_name='zufang555' AND source_post_id=? ORDER BY id DESC LIMIT 1",(key,)).fetchone()
+                  if not s:
+                      missing_source.append({'anchor':anchor,'key':key,'messages':count}); continue
+                  ident=db.execute("""SELECT r.listing_id,r.public_id,c.canonical_record_id FROM canonical_records c JOIN listing_identity_reservations_v3 r ON r.canonical_record_id=c.canonical_record_id WHERE c.source_post_id=? ORDER BY c.created_at DESC,c.canonical_record_id DESC LIMIT 1""",(str(s['id']),)).fetchone()
+                  listing=str(ident['listing_id']) if ident else ''
+                  if ident: with_identity+=1
+                  pub=db.execute("SELECT instance_id,package_id,offer_id,channel_message_id,publish_status FROM publication_instances WHERE platform='telegram' AND listing_id=? AND CAST(COALESCE(channel_message_id,'0') AS INTEGER)>0 ORDER BY updated_at DESC LIMIT 1",(listing,)).fetchone() if listing else None
+                  if pub: mapped+=1
+                  out.append({'anchor':anchor,'key':key,'messages':count,'source_pk':int(s['id']),'parse_status':s['parse_status'],'listing_id':listing,'public_id':ident['public_id'] if ident else None,'channel_message_id':int(pub['channel_message_id']) if pub else None,'instance_id':pub['instance_id'] if pub else None})
+              print('LIVE50_SUMMARY',json.dumps({'logical_groups':len(units),'source_rows':len(out),'missing_source':len(missing_source),'with_identity':with_identity,'mapped_publications':mapped},ensure_ascii=False))
+              print('LIVE50',json.dumps(out,ensure_ascii=False))
+              if missing_source: print('LIVE50_MISSING_SOURCE',json.dumps(missing_source,ensure_ascii=False))
+              targets=[dict(r) for r in db.execute("SELECT instance_id,package_id,listing_id,offer_id,channel_message_id,publish_status FROM publication_instances WHERE platform='telegram' AND CAST(COALESCE(channel_message_id,'0') AS INTEGER)>0 ORDER BY CAST(channel_message_id AS INTEGER) DESC LIMIT 50").fetchall()]
+              targets=list(reversed(targets))
+              print('TARGET50',json.dumps(targets,ensure_ascii=False))
+              print('TARGET50_COUNT',len(targets))
+              db.close()
+          asyncio.run(main())
           PY
           }
 
-          case "$ACTION" in
-            health) health ;;
-            plan-zufang555-50) plan_latest50; health ;;
-          esac
+          case "$ACTION" in health) health ;; plan-zufang555-50) plan_latest50; health ;; *) exit 2 ;; esac
           REMOTE
 
       - name: Remove SSH material
