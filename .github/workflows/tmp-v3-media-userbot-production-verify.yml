@@ -98,6 +98,34 @@ jobs:
           print('IMPORT_OK media_selection,user_bot,appointment_channel_sync')
           PY
 
+          "$app/.venv/bin/python" - <<'PY'
+          import json, os, re, sqlite3
+          db = os.environ['DB_PATH']
+          conn = sqlite3.connect(f'file:{db}?mode=ro', uri=True)
+          conn.row_factory = sqlite3.Row
+          row = conn.execute('''
+              SELECT l.*, o.offer_id, o.monthly_rent_usd, o.publish_block_reason,
+                     c.source_post_id, c.facts_json, s.raw_text
+              FROM listings_v3 l
+              JOIN listing_offers o ON o.listing_id=l.listing_id
+              JOIN canonical_records c ON c.canonical_record_id=l.canonical_record_id
+              LEFT JOIN source_posts s ON CAST(s.id AS TEXT)=CAST(c.source_post_id AS TEXT)
+              WHERE l.public_listing_id='QL-PP-W2H7'
+              ORDER BY c.created_at DESC LIMIT 1
+          ''').fetchone()
+          if row is None:
+              raise SystemExit('TARGET_NOT_FOUND')
+          fields = {k: row[k] for k in ('listing_id','public_listing_id','project_name','project_alias','public_location_display','canonical_area_display','display_title','layout','bedrooms','monthly_rent_usd','publish_block_reason','source_post_id')}
+          print('TARGET_FIELDS', json.dumps(fields, ensure_ascii=False, sort_keys=True))
+          facts = json.loads(row['facts_json'] or '{}')
+          print('TARGET_FACTS', json.dumps(facts, ensure_ascii=False, sort_keys=True))
+          raw = row['raw_text'] or ''
+          raw = re.sub(r'(?<!\d)\+?\d[\d\s-]{6,}\d', '[contact-redacted]', raw)
+          raw = re.sub(r'@[A-Za-z0-9_]{4,}', '[handle-redacted]', raw)
+          print('TARGET_RAW_REDACTED', raw[:1600].replace('\n', ' | '))
+          conn.close()
+          PY
+
           if journalctl -u qiaolian-v3@canonical.service -u qiaolian-v3@publisher.service -u qiaolian-v3@user.service -u qiaolian-v3@collector.service --since '5 minutes ago' --no-pager | grep -Eq 'Traceback|ModuleNotFoundError|ImportError|database is locked|no such table|Conflict: terminated by other getUpdates request|Main process exited|Failed with result'; then
             journalctl -u qiaolian-v3@canonical.service -u qiaolian-v3@publisher.service -u qiaolian-v3@user.service -u qiaolian-v3@collector.service --since '5 minutes ago' -n 250 --no-pager
             exit 1
