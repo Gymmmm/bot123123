@@ -40,6 +40,7 @@ def test_rent_source_reaches_approved_frozen_send_command(tmp_path):
     pipeline = V3CorePipeline(
         db_path=str(db),
         user_bot_username="QiaolianBot",
+        advisor_url="https://t.me/qiaolian_advisor",
     )
     intake = pipeline.ingest_source(
         SourceIntake(
@@ -85,7 +86,7 @@ def test_rent_source_reaches_approved_frozen_send_command(tmp_path):
         channel_chat_id="-100123",
     )
     assert command.cover_path == approved.cover_path
-    assert tuple(command.actions) == ("details", "photos", "book")
+    assert tuple(command.actions) == ("details", "photos", "book", "consult")
     assert "QL-RF-A2B3" in command.caption
 
 
@@ -95,6 +96,7 @@ def test_sale_source_is_saved_but_cannot_build_rental_package(tmp_path):
     pipeline = V3CorePipeline(
         db_path=str(db),
         user_bot_username="QiaolianBot",
+        advisor_url="https://t.me/qiaolian_advisor",
     )
     intake = pipeline.ingest_source(
         SourceIntake(

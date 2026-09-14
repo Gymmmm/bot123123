@@ -52,7 +52,7 @@ ON publication_packages_v3(status, created_at);
 """
 
 
-CHANNEL_ACTION_ORDER = ("details", "photos", "book")
+CHANNEL_ACTION_ORDER = ("details", "photos", "book", "consult")
 
 
 @dataclass(frozen=True)
@@ -91,9 +91,16 @@ def _ordered_actions(value: Any) -> dict[str, str]:
     if not isinstance(decoded, dict):
         raise ValueError("package_actions_invalid")
     keys = set(str(key) for key in decoded)
-    if keys != set(CHANNEL_ACTION_ORDER):
-        raise ValueError("package_actions_must_be_details_photos_book")
-    return {key: str(decoded[key]) for key in CHANNEL_ACTION_ORDER}
+    legacy_order = ("details", "photos", "book")
+    if keys == set(CHANNEL_ACTION_ORDER):
+        order = CHANNEL_ACTION_ORDER
+    elif keys == set(legacy_order):
+        # Published/approved packages created before the contact CTA stay
+        # byte-for-byte readable; all newly built packages use four actions.
+        order = legacy_order
+    else:
+        raise ValueError("package_actions_must_be_details_photos_book_or_consult")
+    return {key: str(decoded[key]) for key in order}
 
 
 def _actions_json(actions: dict[str, str]) -> str:

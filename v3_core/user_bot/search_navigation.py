@@ -10,16 +10,17 @@ from .search_query import detect_location_keys, detect_property_type
 
 
 AREA_OPTIONS: tuple[tuple[str, str], ...] = (
-    ("bkk1", "BKK1"),
-    ("bkk23", "BKK2/3"),
+    ("bkk1", "BKK1（市中心）"),
+    ("bkk23", "BKK2 / BKK3（BKK周边）"),
     ("koh", "钻石岛"),
+    ("jinjie", "金街附近"),
     ("rf", "富力城"),
-    ("aeon1", "永旺1"),
-    ("tk", "TK"),
-    ("russian", "俄市"),
+    ("aeon1", "永旺1附近"),
+    ("tk", "堆谷（TK）"),
+    ("russian", "俄罗斯市场附近"),
     ("pp", "炳发城"),
-    ("chroy", "水净华"),
-    ("sen", "森速"),
+    ("chroy", "水净华半岛"),
+    ("sen", "森速（永旺2一带）"),
 )
 
 LAYOUT_OPTIONS: tuple[tuple[str, str], ...] = (

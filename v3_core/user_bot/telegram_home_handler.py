@@ -134,7 +134,7 @@ async def handle_v3_home_callback(
         return TelegramHomeOutcome(handled=True, action=action, rendered=True)
 
     if action == "book":
-        await _edit_home_view(query, build_booking_view())
+        await _edit_home_view(query, build_booking_view(advisor_url=advisor_url))
         return TelegramHomeOutcome(handled=True, action=action, rendered=True)
 
     if action == "appointments":
@@ -149,19 +149,21 @@ async def handle_v3_home_callback(
         )
 
     if action == "about":
-        await _edit_home_view(query, build_about_view())
+        await _edit_home_view(query, build_about_view(advisor_url=advisor_url))
         return TelegramHomeOutcome(handled=True, action=action, rendered=True)
 
     if action == "rental":
-        await render_assurance_view(query, build_assurance_home_view())
+        await render_assurance_view(
+            query, build_assurance_home_view(), advisor_url=advisor_url
+        )
         return TelegramHomeOutcome(handled=True, action=action, rendered=True)
 
     if action == "service":
-        await render_service_view(query, service_home_view())
+        await render_service_view(query, service_home_view(), advisor_url=advisor_url)
         return TelegramHomeOutcome(handled=True, action=action, rendered=True)
 
     if action == "local":
-        await render_service_view(query, local_life_view())
+        await render_service_view(query, local_life_view(), advisor_url=advisor_url)
         return TelegramHomeOutcome(handled=True, action=action, rendered=True)
 
     if action == "contact":

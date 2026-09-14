@@ -173,7 +173,7 @@ def test_area_navigation_initializes_public_search_pref_then_advances_to_budget(
     assert picked.mutation is not None
     pref = picked.mutation.set_values[SEARCH_PREF_SESSION_KEY]
     assert pref["source"] == "home_area"
-    assert pref["area_display"] == "BKK1"
+    assert pref["area_display"] == "BKK1（市中心）"
     assert pref["location_keys"] == ["BKK1"]
     assert "listing_id" not in repr(pref)
 

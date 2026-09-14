@@ -29,6 +29,7 @@ def test_collector_intake_remains_pending_until_independent_worker_runs(tmp_path
     pipeline = V3CorePipeline(
         db_path=db_path,
         user_bot_username="QiaolianBot",
+        advisor_url="https://t.me/qiaolian_advisor",
     )
     intake = pipeline.ingest_source(
         SourceIntake(
@@ -59,7 +60,11 @@ def test_collector_intake_remains_pending_until_independent_worker_runs(tmp_path
 def test_worker_recovers_legacy_parsed_source_without_canonical_record(tmp_path):
     db_path = str(tmp_path / "legacy-orphan.sqlite3")
     initialize_v3_storage(db_path)
-    pipeline = V3CorePipeline(db_path=db_path, user_bot_username="QiaolianBot")
+    pipeline = V3CorePipeline(
+        db_path=db_path,
+        user_bot_username="QiaolianBot",
+        advisor_url="https://t.me/qiaolian_advisor",
+    )
     intake = pipeline.ingest_source(
         SourceIntake(
             source_type="telegram_channel",

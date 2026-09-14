@@ -172,6 +172,7 @@ def _workflow(tmp_path: Path, *, deal_type="rent"):
         reader=reader,
         store=packages,
         user_bot_username="QiaolianBot",
+        advisor_url="https://t.me/qiaolian_advisor",
     )
     package_approver = PackageApprovalService(
         reader=reader,
@@ -214,7 +215,7 @@ def test_review_must_be_approved_before_package_build(tmp_path):
     )
     assert package.status == "package_ready"
     assert package.cover_style == "black_gold"
-    assert tuple(package.actions) == ("details", "photos", "book")
+    assert tuple(package.actions) == ("details", "photos", "book", "consult")
     assert len(package.gallery) >= 4
 
 

@@ -407,6 +407,17 @@ class AutoPublishRepository:
             )
             conn.commit()
 
+    def mark_listing_pending_for_auto_publish(self, listing_id: str) -> None:
+        """Make the first automatic public state explicitly await confirmation."""
+        with self._connect() as conn:
+            conn.execute(
+                """UPDATE listings_v3
+                   SET inventory_status='pending',updated_at=CURRENT_TIMESTAMP
+                   WHERE listing_id=? AND inventory_status IN ('active','reserved')""",
+                (str(listing_id),),
+            )
+            conn.commit()
+
     def ignore(self, offer_id: str) -> None:
         with self._connect() as conn:
             conn.execute(
@@ -582,7 +593,14 @@ class AutoPublishService:
         quality = facts.get("quality") if isinstance(facts.get("quality"), dict) else {}
         return tuple(str(x) for x in (quality.get("blocking_flags") or []) if str(x).strip())
 
-    def _strict_blockers(self, item: dict[str, Any], facts: dict[str, Any], media: Any) -> list[str]:
+    def _strict_blockers(
+        self,
+        item: dict[str, Any],
+        facts: dict[str, Any],
+        media: Any,
+        *,
+        allow_pending: bool = False,
+    ) -> list[str]:
         cfg = self.repository.config()
         blocking: list[str] = []
         if str(item.get("offer_type") or "") != "rent" or str(facts.get("deal_type") or "") == "sale":
@@ -604,7 +622,10 @@ class AutoPublishService:
         cover = str(getattr(media, "cover_source_path", "") or "")
         if not cover or not Path(cover).is_file():
             blocking.append("unreadable_media")
-        if str(item.get("inventory_status") or "") not in {"active", "reserved"}:
+        allowed_statuses = {"active", "reserved"}
+        if allow_pending:
+            allowed_statuses.add("pending")
+        if str(item.get("inventory_status") or "") not in allowed_statuses:
             blocking.append("listing_not_publishable")
         if self._critical_quality_flags(facts):
             blocking.append("canonical_error")
@@ -651,6 +672,7 @@ class AutoPublishService:
         unsafe = self.repository.unsafe_delivery_state(offer_id, self.channel_chat_id)
         if unsafe in {"sending", "sent", "unknown"}:
             return self._mark_exception(offer_id, "telegram_unknown")
+        approved = self.repository.approved_package(offer_id)
         detail = self.workflow.review_detail(str(item["review_id"]))
         if str(detail.review.get("review_status") or "") in {"hold", "rejected"}:
             return self._mark_exception(offer_id, "admin_hold")
@@ -659,16 +681,18 @@ class AutoPublishService:
             media = await asyncio.to_thread(self.workflow.review_media, review_id=str(item["review_id"]))
         except Exception:
             return self._mark_exception(offer_id, "unreadable_media")
-        blockers = self._strict_blockers(item, facts, media)
+        blockers = self._strict_blockers(item, facts, media, allow_pending=True)
         if blockers:
             return self._mark_exception(offer_id, blockers[0])
+        if approved is None:
+            self.repository.mark_listing_pending_for_auto_publish(listing_id)
+            item["inventory_status"] = "pending"
         if str(detail.review.get("review_status") or "") != "approved":
             await asyncio.to_thread(
                 self.workflow.approve_review,
                 review_id=str(item["review_id"]),
                 operator_user_id="system:auto_publish",
             )
-        approved = self.repository.approved_package(offer_id)
         package: FrozenPackage
         if approved and str(approved.get("status")) == "published":
             existing = self.repository.publication_for_offer(offer_id, self.channel_chat_id)

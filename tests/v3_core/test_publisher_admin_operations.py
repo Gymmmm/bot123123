@@ -212,6 +212,7 @@ def test_any_frozen_package_on_listing_blocks_shared_fact_edits(tmp_path):
             "details": "https://t.me/QiaolianBot?start=property_QL-RF-A2B3_details",
             "photos": "https://t.me/QiaolianBot?start=property_QL-RF-A2B3_photos",
             "book": "https://t.me/QiaolianBot?start=property_QL-RF-A2B3_book",
+            "consult": "https://t.me/advisor?text=你好，我想咨询这套房：QL-RF-A2B3",
         },
         snapshot={},
         source_identity={},

@@ -153,7 +153,7 @@ async def test_area_choice_renders_budget_with_canonical_location_after_edit():
     assert outcome.result.navigation == "search_budget"
     assert "已选：BKK1" in query.calls[-1][1][0]
     assert user_data[SEARCH_PREF_SESSION_KEY]["location_keys"] == ["BKK1"]
-    assert user_data[SEARCH_PREF_SESSION_KEY]["area_display"] == "BKK1"
+    assert user_data[SEARCH_PREF_SESSION_KEY]["area_display"] == "BKK1（市中心）"
     callbacks = _callbacks(query)
     assert "v3u:t:budget_choice:b2" in callbacks
     assert not any(value.startswith("findbudget:") for value in callbacks)

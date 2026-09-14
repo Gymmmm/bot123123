@@ -128,6 +128,7 @@ def build_v3_user_bot_dependencies(config: V3UserBotConfig) -> V3UserBotDependen
             config.db_path,
             publisher_bot_token=config.publisher_bot_token,
             user_bot_username=config.user_bot_username,
+            advisor_url=config.advisor_url,
         ),
         admins=admins,
         inventory=read.inventory,
@@ -146,7 +147,7 @@ def build_v3_user_bot_dependencies(config: V3UserBotConfig) -> V3UserBotDependen
 async def _render_home_callback(update: Any, config: V3UserBotConfig) -> None:
     query = update.callback_query
     await query.answer()
-    home = build_home_view(channel_url=config.channel_url)
+    home = build_home_view(channel_url=config.channel_url, advisor_url=config.advisor_url)
     message = getattr(query, "message", None)
     markup = build_home_keyboard(home)
     if getattr(message, "photo", None):
@@ -316,6 +317,7 @@ def build_v3_user_bot_application(
                 context,
                 service=deps.transition.tenant_service,
                 effects=deps.service_effects,
+                advisor_url=config.advisor_url,
             )
             return
         if raw.startswith("v3u:assure:"):
@@ -323,6 +325,7 @@ def build_v3_user_bot_application(
                 update,
                 context,
                 repo_root=config.repo_root,
+                advisor_url=config.advisor_url,
             )
             return
         await handle_v3_listing_callback(
@@ -359,6 +362,7 @@ def build_v3_user_bot_application(
             context,
             service=deps.transition.tenant_service,
             effects=deps.service_effects,
+            advisor_url=config.advisor_url,
         )
         if service.handled:
             return

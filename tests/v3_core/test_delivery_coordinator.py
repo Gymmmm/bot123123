@@ -87,6 +87,7 @@ def _setup(tmp_path):
         reader=reader,
         store=packages,
         user_bot_username="QiaolianBot",
+        advisor_url="https://t.me/qiaolian_advisor",
     )
     package = builder.build(
         listing_id="l_1",
@@ -131,7 +132,7 @@ def test_prepare_send_returns_only_frozen_single_cover_command(tmp_path):
     assert command.cover_path == package.cover_path
     assert command.caption == package.post_text
     assert command.actions == package.actions
-    assert tuple(command.actions) == ("details", "photos", "book")
+    assert tuple(command.actions) == ("details", "photos", "book", "consult")
 
 
 def test_receipt_commits_delivery_package_and_exact_publication_identity(tmp_path):

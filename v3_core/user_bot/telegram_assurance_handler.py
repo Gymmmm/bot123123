@@ -13,6 +13,7 @@ from .assurance_views import (
     assurance_asset_bundle,
     build_moving_view,
 )
+from .telegram_navigation import advisor_handoff_url
 
 
 @dataclass(frozen=True)
@@ -23,14 +24,17 @@ class TelegramAssuranceOutcome:
     assets_sent: bool = False
 
 
-def build_assurance_keyboard(view: AssuranceView) -> InlineKeyboardMarkup | None:
+def build_assurance_keyboard(view: AssuranceView, *, advisor_url: str = "") -> InlineKeyboardMarkup | None:
     if not view.rows:
         return None
     rows = []
     for row in view.rows:
         buttons = []
         for choice in row:
-            if choice.url:
+            direct_advisor = advisor_handoff_url(advisor_url)
+            if choice.callback_data == "v3u:home:contact" and direct_advisor:
+                buttons.append(InlineKeyboardButton(choice.label, url=direct_advisor))
+            elif choice.url:
                 buttons.append(InlineKeyboardButton(choice.label, url=choice.url))
             else:
                 buttons.append(InlineKeyboardButton(choice.label, callback_data=choice.callback_data))
@@ -38,8 +42,8 @@ def build_assurance_keyboard(view: AssuranceView) -> InlineKeyboardMarkup | None
     return InlineKeyboardMarkup(rows)
 
 
-async def render_assurance_view(query: Any, view: AssuranceView) -> None:
-    markup = build_assurance_keyboard(view)
+async def render_assurance_view(query: Any, view: AssuranceView, *, advisor_url: str = "") -> None:
+    markup = build_assurance_keyboard(view, advisor_url=advisor_url)
     message = getattr(query, "message", None)
     if getattr(message, "photo", None):
         await query.edit_message_caption(
@@ -61,6 +65,7 @@ async def send_assurance_bundle(
     *,
     repo_root: str | Path,
     kind: str,
+    advisor_url: str = "",
 ) -> None:
     bundle = assurance_asset_bundle(repo_root, kind)
     if not bundle.image_path.is_file():
@@ -71,9 +76,15 @@ async def send_assurance_bundle(
     if chat is None or getattr(chat, "id", None) is None:
         raise ValueError("telegram_chat_missing_for_assurance_assets")
     chat_id = int(chat.id)
+    direct_advisor = advisor_handoff_url(advisor_url)
+    contact_button = (
+        InlineKeyboardButton("💬 联系顾问", url=direct_advisor)
+        if direct_advisor
+        else InlineKeyboardButton("💬 联系顾问", callback_data="v3u:home:contact")
+    )
     markup = InlineKeyboardMarkup(
         [
-            [InlineKeyboardButton("💬 联系顾问", callback_data="v3u:home:contact")],
+            [contact_button],
             [InlineKeyboardButton("⬅️ 返回租赁服务指南", callback_data="v3u:home:rental")],
         ]
     )
@@ -97,6 +108,7 @@ async def handle_v3_assurance_callback(
     context: Any,
     *,
     repo_root: str | Path,
+    advisor_url: str = "",
 ) -> TelegramAssuranceOutcome:
     query = getattr(update, "callback_query", None)
     raw = str(getattr(query, "data", "") or "") if query is not None else ""
@@ -112,14 +124,16 @@ async def handle_v3_assurance_callback(
             await query.message.delete()
         except Exception:
             pass
-        await send_assurance_bundle(update, context, repo_root=repo_root, kind=action)
+        await send_assurance_bundle(
+            update, context, repo_root=repo_root, kind=action, advisor_url=advisor_url
+        )
         return TelegramAssuranceOutcome(
             handled=True,
             action=action,
             rendered=True,
             assets_sent=True,
         )
-    await render_assurance_view(query, build_moving_view())
+    await render_assurance_view(query, build_moving_view(), advisor_url=advisor_url)
     return TelegramAssuranceOutcome(handled=True, action=action, rendered=True)
 
 

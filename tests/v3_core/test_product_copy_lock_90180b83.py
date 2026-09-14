@@ -23,6 +23,7 @@ ACTIONS = {
     "details": "https://t.me/TestBot?start=property_QL-RF-A2B3_details",
     "photos": "https://t.me/TestBot?start=property_QL-RF-A2B3_photos",
     "book": "https://t.me/TestBot?start=property_QL-RF-A2B3_book",
+    "consult": "https://t.me/advisor?text=你好，我想咨询这套房：QL-RF-A2B3",
 }
 
 
@@ -81,10 +82,12 @@ def test_channel_and_sync_keyboards_use_locked_details_label():
             username="qiaolian_rent_bot",
             public_listing_id="QL-RF-A2B3",
             status="reserved",
+            advisor_url="https://t.me/advisor",
         )
     )
-    assert publish == ["📋 租赁详情", "📸 更多实拍", "📅 预约看房"]
-    assert sync == ["📋 租赁详情", "📸 更多实拍", "📅 预约看房"]
+    expected = ["📋 租赁详情", "📸 更多实拍", "📅 预约看房", "💬 联系中文顾问"]
+    assert publish == expected
+    assert sync == expected
     assert "🏠 房源详情" not in publish + sync
 
 

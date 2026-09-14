@@ -17,7 +17,7 @@ from telegram.constants import ParseMode
 
 from v3_core.status_labels import inventory_status_presentation
 
-from .channel_contract import channel_action_url
+from .channel_contract import channel_action_url, official_channel_action_urls
 from .telegram_adapter import build_channel_keyboard
 
 
@@ -61,9 +61,10 @@ def caption_with_inventory_status(
 
 
 class PublisherManualStatusSynchronizer:
-    def __init__(self, db_path: str | Path, *, user_bot_username: str):
+    def __init__(self, db_path: str | Path, *, user_bot_username: str, advisor_url: str = ""):
         self.db_path = Path(db_path).expanduser().resolve()
         self.user_bot_username = str(user_bot_username or "").strip().lstrip("@")
+        self.advisor_url = str(advisor_url or "").strip()
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(str(self.db_path), timeout=30)
@@ -109,10 +110,16 @@ class PublisherManualStatusSynchronizer:
                 status=clean_status,
                 public_listing_id=public_id,
             )
-            actions = {
-                action: channel_action_url(self.user_bot_username, public_id, action)
-                for action in ("details", "photos", "book")
-            }
+            actions = (
+                official_channel_action_urls(
+                    self.user_bot_username, public_id, advisor_url=self.advisor_url
+                )
+                if self.advisor_url
+                else {
+                    action: channel_action_url(self.user_bot_username, public_id, action)
+                    for action in ("details", "photos", "book")
+                }
+            )
             await bot.edit_message_caption(
                 chat_id=chat_id,
                 message_id=message_id,

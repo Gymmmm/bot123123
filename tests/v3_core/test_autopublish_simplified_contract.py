@@ -252,6 +252,11 @@ def test_strict_autopublish_blockers_cover_required_failures(tmp_path):
     }
     base_facts = {"deal_type": "rent", "quality": {"blocking_flags": []}}
     assert service._strict_blockers(base_item, base_facts, good_media) == []
+    pending_item = dict(base_item, inventory_status="pending")
+    assert "listing_not_publishable" in service._strict_blockers(pending_item, base_facts, good_media)
+    assert service._strict_blockers(
+        pending_item, base_facts, good_media, allow_pending=True
+    ) == []
 
     item = dict(base_item, monthly_rent_usd=0)
     assert "missing_rent" in service._strict_blockers(item, base_facts, good_media)
@@ -389,6 +394,21 @@ def test_single_instance_publish_lock_is_durable(tmp_path):
     assert repo.acquire_lock("publisher-B", ttl_seconds=180) is False
     repo.release_lock("publisher-A")
     assert repo.acquire_lock("publisher-B", ttl_seconds=180) is True
+
+
+def test_automatic_publish_changes_first_public_status_to_pending(tmp_path):
+    db = tmp_path / "qiaolian.db"
+    initialize_v3_storage(db)
+    listing_id, _offer_id, _review_id = _insert_listing(db, suffix="9")
+    repo = FinalAutoPublishRepository(db)
+
+    repo.mark_listing_pending_for_auto_publish(listing_id)
+
+    with sqlite3.connect(db) as conn:
+        status = conn.execute(
+            "SELECT inventory_status FROM listings_v3 WHERE listing_id=?", (listing_id,)
+        ).fetchone()[0]
+    assert status == "pending"
 
 
 def test_post_windows_and_pause_setting_survive_repository_restart(tmp_path, monkeypatch):

@@ -35,6 +35,7 @@ class V3CorePipeline:
         *,
         db_path: str,
         user_bot_username: str,
+        advisor_url: str,
         min_listing_images: int = 4,
         cover_output_dir: str | None = None,
     ):
@@ -65,6 +66,7 @@ class V3CorePipeline:
             reader=self.inventory_reader,
             store=self.packages,
             user_bot_username=user_bot_username,
+            advisor_url=advisor_url,
         )
         self.package_approver = PackageApprovalService(
             reader=self.inventory_reader,

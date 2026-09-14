@@ -74,6 +74,7 @@ def _inventory(tmp_path, facts, *, listing_id="l_1", public_id="QL-RF-A2B3"):
         reader=reader,
         store=store,
         user_bot_username="QiaolianBot",
+        advisor_url="https://t.me/qiaolian_advisor",
     )
     approver = PackageApprovalService(
         reader=reader,
@@ -101,7 +102,7 @@ def test_rent_package_freezes_caption_actions_and_file_hashes(tmp_path):
     assert package.status == "package_ready"
     assert package.canonical_record_id == canonical["canonical_record_id"]
     assert package.gallery == tuple(gallery)
-    assert tuple(package.actions) == ("details", "photos", "book")
+    assert tuple(package.actions) == ("details", "photos", "book", "consult")
     assert "QL-RF-A2B3" in package.post_text
     assert len(package.post_text) <= 1024
     assert len(package.frozen_file_hashes) == 5

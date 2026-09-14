@@ -30,6 +30,7 @@ ACTIONS = {
     "details": "https://t.me/TestBot?start=property_QL-RF-A2B3_details",
     "photos": "https://t.me/TestBot?start=property_QL-RF-A2B3_photos",
     "book": "https://t.me/TestBot?start=property_QL-RF-A2B3_book",
+    "consult": "https://t.me/advisor?text=你好，我想咨询这套房：QL-RF-A2B3",
 }
 
 

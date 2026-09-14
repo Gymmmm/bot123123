@@ -54,7 +54,9 @@ def test_unknown_valid_source_code_falls_back_without_breaking_link():
 
 
 def test_official_channel_urls_emit_channel_source_code():
-    urls = official_channel_action_urls("qiaolian_rent_bot", "QL-RF-A2B3")
+    urls = official_channel_action_urls(
+        "qiaolian_rent_bot", "QL-RF-A2B3", advisor_url="https://t.me/qiaolian_advisor"
+    )
 
     assert urls["details"].endswith("property_QL-RF-A2B3_details__ch")
     assert urls["photos"].endswith("property_QL-RF-A2B3_photos__ch")

@@ -94,23 +94,28 @@ def _published(*, bookable=True):
     return Inventory(bookable=bookable).resolve(PUBLIC_ID)
 
 
-def test_channel_three_ctas_and_sync_contract_share_one_real_listing():
-    urls = official_channel_action_urls("QiaoLianBot", PUBLIC_ID)
+def test_channel_ctas_and_sync_contract_share_one_real_listing():
+    urls = official_channel_action_urls(
+        "QiaoLianBot", PUBLIC_ID, advisor_url="https://t.me/qiaolian_advisor"
+    )
     rows = official_channel_button_spec(urls, inventory_status="active")
     assert CHANNEL_CTA_LABELS == {
         "details": "📋 租赁详情",
         "photos": "📸 更多实拍",
         "book": "📅 预约看房",
+        "consult": "💬 联系中文顾问",
     }
     assert [[label for label, _ in row] for row in rows] == [
         ["📋 租赁详情", "📸 更多实拍"],
-        ["📅 预约看房"],
+        ["📅 预约看房", "💬 联系中文顾问"],
     ]
-    assert all(f"property_{PUBLIC_ID}_" in url for url in urls.values())
+    assert all(f"property_{PUBLIC_ID}_" in urls[key] for key in ("details", "photos", "book"))
+    assert PUBLIC_ID in urls["consult"]
     synced = official_channel_button_spec(urls, inventory_status="reserved")
     assert synced == rows
     unbookable = official_channel_button_spec(urls, inventory_status="pending")
     assert "📅 预约看房" not in [label for row in unbookable for label, _ in row]
+    assert "💬 联系中文顾问" in [label for row in unbookable for label, _ in row]
 
 
 def test_details_and_photos_contract_has_real_fields_three_entries_and_no_internal_id():

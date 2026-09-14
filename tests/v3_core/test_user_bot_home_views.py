@@ -62,7 +62,7 @@ def test_contact_and_appointment_views_return_only_v3_navigation():
     assert contact_markup is not None
     assert contact.rows[0][0].label == "💬 打开顾问对话"
     assert _callbacks(contact_markup) == ["v3u:home:search", "v3u:t:home"]
-    assert contact_markup.inline_keyboard[0][0].url == "https://t.me/advisor"
+    assert contact_markup.inline_keyboard[0][0].url.startswith("https://t.me/advisor?text=")
 
     history = AppointmentHistoryView(
         text="📅 <b>我的预约</b>",

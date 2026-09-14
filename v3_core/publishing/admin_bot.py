@@ -73,6 +73,7 @@ class PublisherAdminSettings:
     user_bot_username: str
     channel_chat_id: str
     cover_output_dir: str
+    advisor_url: str = ""
 
 
 def _parse_admin_ids(raw: str) -> frozenset[int]:
@@ -92,6 +93,9 @@ def load_settings() -> PublisherAdminSettings:
         str(os.getenv("DEEPLINK_BOT_USERNAME", "")).strip().lstrip("@")
         or str(os.getenv("USER_BOT_USERNAME", "")).strip().lstrip("@")
     )
+    advisor = str(os.getenv("ADVISOR_TG", "") or os.getenv("SUPPORT_USERNAME", "")).strip()
+    if advisor and not advisor.startswith(("https://", "http://", "tg://")):
+        advisor = f"https://t.me/{advisor.lstrip('@')}"
     db = Path(os.getenv("DB_PATH") or os.getenv("SQLITE_PATH") or REPO_ROOT / "data/qiaolian_dual_bot.db")
     if not db.is_absolute():
         db = (REPO_ROOT / db).resolve()
@@ -107,6 +111,8 @@ def load_settings() -> PublisherAdminSettings:
         missing.append("CHANNEL_ID")
     if not user_bot:
         missing.append("DEEPLINK_BOT_USERNAME/USER_BOT_USERNAME")
+    if not advisor:
+        missing.append("ADVISOR_TG/SUPPORT_USERNAME")
     if missing:
         raise RuntimeError("missing_v3_publisher_settings:" + ",".join(missing))
     return PublisherAdminSettings(
@@ -116,6 +122,7 @@ def load_settings() -> PublisherAdminSettings:
         user_bot_username=user_bot,
         channel_chat_id=channel,
         cover_output_dir=str(cover_dir),
+        advisor_url=advisor,
     )
 
 
@@ -130,6 +137,7 @@ def build_workflow(settings: PublisherAdminSettings) -> PublisherWorkflowService
         reader=reader,
         store=packages,
         user_bot_username=settings.user_bot_username,
+        advisor_url=settings.advisor_url,
     )
     package_approver = PackageApprovalService(
         reader=reader,

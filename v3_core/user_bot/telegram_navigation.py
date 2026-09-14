@@ -25,9 +25,7 @@ def advisor_handoff_url(advisor_url: object, *, public_listing_id: object = "") 
     if not raw:
         return ""
     public_id = str(public_listing_id or "").strip()
-    if not public_id:
-        return raw
-    message = f"你好，我想咨询这套房：{public_id}"
+    message = f"你好，我想咨询这套房：{public_id}" if public_id else "你好，我想咨询租房。"
     parts = urlsplit(raw)
     host = parts.netloc.lower()
     if parts.scheme in {"http", "https"} and host in {

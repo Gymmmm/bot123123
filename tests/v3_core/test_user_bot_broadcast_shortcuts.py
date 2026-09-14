@@ -248,7 +248,7 @@ async def test_advisor_shortcut_records_contact_effect_and_renders_advisor_hando
     assert source == "daily_broadcast"
     assert "顾问帮我找" in message.calls[-1][0][0]
     markup = message.calls[-1][1]["reply_markup"]
-    assert markup.inline_keyboard[0][0].url == "https://t.me/advisor"
+    assert markup.inline_keyboard[0][0].url.startswith("https://t.me/advisor?text=")
 
 
 @pytest.mark.asyncio

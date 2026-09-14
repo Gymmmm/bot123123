@@ -189,7 +189,9 @@ async def test_contact_home_action_runs_effects_before_rendering_handoff():
     assert user.user_id == 123 and source == "hub"
     assert [call[0] for call in query.calls] == ["answer", "edit_text"]
     assert "顾问帮我找" in query.calls[-1][1][0]
-    assert query.calls[-1][2]["reply_markup"].inline_keyboard[0][0].url == "https://t.me/advisor"
+    assert query.calls[-1][2]["reply_markup"].inline_keyboard[0][0].url.startswith(
+        "https://t.me/advisor?text="
+    )
 
 
 @pytest.mark.asyncio

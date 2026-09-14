@@ -241,7 +241,16 @@ def _search_budget_view(
 
 def _search_area_view() -> TransitionView:
     choices = tuple(TransitionChoice(label, "area_choice", code) for code, label in AREA_OPTIONS)
-    rows = tuple(tuple(choices[index : index + 2]) for index in range(0, len(choices), 2)) + (
+    # Keep long, explanatory Chinese area names on their own row so Telegram's
+    # two-column keyboard does not squeeze them into unreadable fragments.
+    rows = (
+        (choices[0], choices[1]),
+        (choices[2], choices[3]),
+        (choices[4], choices[5]),
+        (choices[6],),
+        (choices[7],),
+        (choices[8], choices[9]),
+        (choices[10],),
         (TransitionChoice("📍 其他区域", "area_other"),),
         (TransitionChoice("⬅️ 返回找房", "change_search"),),
     )

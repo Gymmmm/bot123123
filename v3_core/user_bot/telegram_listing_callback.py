@@ -22,6 +22,7 @@ from .listing_contact import (
 )
 from .public_inventory import PublicInventoryReader
 from .telegram_callback_handler import TelegramCallbackHandlerOutcome, handle_v3_callback
+from .telegram_navigation import advisor_handoff_url
 from .transition_views import TransitionViewService
 
 
@@ -54,9 +55,12 @@ def _lead_user(update: Any) -> LeadUser:
 
 
 async def _render_contact(query: Any, *, text: str, public_listing_id: str, advisor_url: str) -> None:
+    direct_advisor = advisor_handoff_url(
+        advisor_url, public_listing_id=public_listing_id
+    )
     contact_button = (
-        InlineKeyboardButton("💬 打开顾问对话", url=advisor_url)
-        if str(advisor_url or "").strip()
+        InlineKeyboardButton("💬 打开顾问对话", url=direct_advisor)
+        if direct_advisor
         else InlineKeyboardButton("💬 联系顾问", callback_data="v3u:home:contact")
     )
     markup = InlineKeyboardMarkup(

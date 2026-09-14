@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from .appointment_history import AppointmentHistoryView
+from .telegram_navigation import advisor_handoff_url
 
 
 HomeChoiceKind = Literal[
@@ -60,9 +61,13 @@ BOOK_TEXT = (
 )
 
 
-def build_home_view(*, channel_url: str = "") -> HomeView:
+def build_home_view(*, channel_url: str = "", advisor_url: str = "") -> HomeView:
+    direct_advisor = advisor_handoff_url(advisor_url)
     rows: list[tuple[HomeChoice, ...]] = [
-        (HomeChoice("🔍 智能找房", "search"), HomeChoice("💬 顾问帮我找", "contact")),
+        (
+            HomeChoice("🔍 智能找房", "search"),
+            HomeChoice("💬 顾问帮我找", "contact", url=direct_advisor) if direct_advisor else HomeChoice("💬 顾问帮我找", "contact"),
+        ),
     ]
     clean_channel = str(channel_url or "").strip()
     if clean_channel:
@@ -75,31 +80,36 @@ def build_home_view(*, channel_url: str = "") -> HomeView:
     return HomeView(kind="home", text=WELCOME_TEXT, rows=tuple(rows))
 
 
-def build_about_view() -> HomeView:
+def build_about_view(*, advisor_url: str = "") -> HomeView:
+    direct_advisor = advisor_handoff_url(advisor_url)
     return HomeView(
         kind="about",
         text=ABOUT_TEXT,
         rows=(
-            (HomeChoice("🔍 智能找房", "search"), HomeChoice("💬 顾问帮我找", "contact")),
+            (
+                HomeChoice("🔍 智能找房", "search"),
+                HomeChoice("💬 顾问帮我找", "contact", url=direct_advisor) if direct_advisor else HomeChoice("💬 顾问帮我找", "contact"),
+            ),
             (HomeChoice("🏠 返回首页", "root"),),
         ),
     )
 
 
-def build_booking_view() -> HomeView:
+def build_booking_view(*, advisor_url: str = "") -> HomeView:
+    direct_advisor = advisor_handoff_url(advisor_url)
     return HomeView(
         kind="book",
         text=BOOK_TEXT,
         rows=(
             (HomeChoice("🔍 先找房", "search"), HomeChoice("📅 我的预约", "appointments")),
-            (HomeChoice("💬 顾问帮我找", "contact"),),
+            (HomeChoice("💬 顾问帮我找", "contact", url=direct_advisor) if direct_advisor else HomeChoice("💬 顾问帮我找", "contact"),),
             (HomeChoice("🏠 返回首页", "root"),),
         ),
     )
 
 
 def build_contact_view(*, advisor_url: str = "") -> HomeView:
-    clean_advisor = str(advisor_url or "").strip()
+    clean_advisor = advisor_handoff_url(advisor_url)
     first = HomeChoice("💬 打开顾问对话", "contact", url=clean_advisor) if clean_advisor else HomeChoice("💬 顾问帮我找", "contact")
     return HomeView(
         kind="contact",

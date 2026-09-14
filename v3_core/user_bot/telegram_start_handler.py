@@ -306,7 +306,7 @@ async def handle_v3_start(
     args = tuple(getattr(context, "args", None) or ())
     user_data.clear()
     if not args:
-        home = build_home_view(channel_url=channel_url)
+        home = build_home_view(channel_url=channel_url, advisor_url=advisor_url)
         await message.reply_text(home.text, parse_mode=ParseMode.HTML, reply_markup=build_home_keyboard(home))
         return TelegramStartOutcome(handled=True, kind="home")
 

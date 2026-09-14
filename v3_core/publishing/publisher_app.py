@@ -26,7 +26,11 @@ class V3PublisherApplication(PublisherAdminBot):
         self.runtime = RuntimeStateRepository(settings.db_path)
         self.autopilot = FinalAutoPublishService(workflow=self.workflow, repository=self.auto_repository, channel_chat_id=settings.channel_chat_id)
         self.simple = OperatorPublisherAdminController(db_path=settings.db_path, repo_root=REPO_ROOT, workflow=self.workflow, autopilot=self.autopilot, repository=self.auto_repository, runtime=self.runtime, user_bot_username=settings.user_bot_username, channel_chat_id=settings.channel_chat_id, cover_output_dir=settings.cover_output_dir)
-        self.manual_status_sync = PublisherManualStatusSynchronizer(settings.db_path, user_bot_username=settings.user_bot_username)
+        self.manual_status_sync = PublisherManualStatusSynchronizer(
+            settings.db_path,
+            user_bot_username=settings.user_bot_username,
+            advisor_url=settings.advisor_url,
+        )
 
     @staticmethod
     def _home_button(): return [InlineKeyboardButton("🏠 返回首页", callback_data="v3h")]

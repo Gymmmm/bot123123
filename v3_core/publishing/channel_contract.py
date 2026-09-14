@@ -9,14 +9,16 @@ from __future__ import annotations
 from urllib.parse import parse_qs, urlparse
 
 from v3_core.status_labels import inventory_status_bookable
+from v3_core.user_bot.telegram_navigation import advisor_handoff_url
 
 from .public_ids import normalize_public_id
 
-CHANNEL_ACTION_ORDER = ("details", "photos", "book")
+CHANNEL_ACTION_ORDER = ("details", "photos", "book", "consult")
 CHANNEL_CTA_LABELS = {
     "details": "📋 租赁详情",
     "photos": "📸 更多实拍",
     "book": "📅 预约看房",
+    "consult": "💬 联系中文顾问",
 }
 
 _ACTION_SUFFIX = {
@@ -69,17 +71,17 @@ def channel_action_url(
 
 
 def channel_actions(public_listing_id: object) -> tuple[str, str, str]:
-    """Return the only three public listing actions in stable order."""
+    """Return the three User Bot deep-link actions in stable order."""
     return tuple(
         channel_start_payload(public_listing_id, action, source_code=_CHANNEL_SOURCE_CODE)
-        for action in CHANNEL_ACTION_ORDER
+        for action in ("details", "photos", "book")
     )
 
 
 def official_channel_action_urls(
-    username: str, public_listing_id: object
+    username: str, public_listing_id: object, *, advisor_url: str = ""
 ) -> dict[str, str]:
-    """Build the frozen three-action URL map or raise."""
+    """Build the frozen listing-action URL map or raise."""
     user = str(username or "").strip().lstrip("@")
     if not user:
         raise ValueError("channel_username_missing")
@@ -90,8 +92,11 @@ def official_channel_action_urls(
             action,
             source_code=_CHANNEL_SOURCE_CODE,
         )
-        for action in CHANNEL_ACTION_ORDER
+        for action in ("details", "photos", "book")
     }
+    urls["consult"] = advisor_handoff_url(advisor_url, public_listing_id=public_listing_id)
+    if not urls["consult"]:
+        raise ValueError("advisor_url_missing")
     return official_channel_action_identity(urls)
 
 
@@ -99,7 +104,7 @@ def official_channel_cta_keys(inventory_status: object = "active") -> tuple[str,
     keys = ("details", "photos")
     if inventory_status_bookable(inventory_status):
         keys += ("book",)
-    return keys
+    return keys + ("consult",)
 
 
 def official_channel_button_spec(
@@ -115,25 +120,53 @@ def official_channel_button_spec(
             (CHANNEL_CTA_LABELS["photos"], verified["photos"]),
         )
     ]
+    has_consult = "consult" in verified
     if "book" in official_channel_cta_keys(inventory_status):
-        rows.append(((CHANNEL_CTA_LABELS["book"], verified["book"]),))
+        second_row = [(CHANNEL_CTA_LABELS["book"], verified["book"])]
+        if has_consult:
+            second_row.append((CHANNEL_CTA_LABELS["consult"], verified["consult"]))
+        rows.append(
+            tuple(second_row)
+        )
+    elif has_consult:
+        rows.append(((CHANNEL_CTA_LABELS["consult"], verified["consult"]),))
     return tuple(rows)
 
 
 def official_channel_action_identity(actions: dict[str, str]) -> dict[str, str]:
     """Require details/photos/book URLs that share one public listing id."""
-    if not isinstance(actions, dict) or set(actions) != set(CHANNEL_ACTION_ORDER):
-        raise ValueError("telegram_actions_must_be_details_photos_book")
-    ordered = {key: str(actions.get(key) or "").strip() for key in CHANNEL_ACTION_ORDER}
-    if any(not ordered[key] for key in CHANNEL_ACTION_ORDER):
+    if not isinstance(actions, dict):
+        raise ValueError("telegram_actions_invalid")
+    legacy_order = ("details", "photos", "book")
+    keys = set(actions)
+    if keys == set(CHANNEL_ACTION_ORDER):
+        order = CHANNEL_ACTION_ORDER
+    elif keys == set(legacy_order):
+        order = legacy_order
+    else:
+        raise ValueError("telegram_actions_must_be_details_photos_book_or_consult")
+    ordered = {key: str(actions.get(key) or "").strip() for key in order}
+    if any(not ordered[key] for key in order):
         raise ValueError("telegram_action_url_missing")
     public_ids: list[str] = []
     for action, url in ordered.items():
-        public_id = _public_id_from_action_url(url, action)
+        public_id = _consult_public_id_from_url(url) if action == "consult" else _public_id_from_action_url(url, action)
         public_ids.append(public_id)
     if len(set(public_ids)) != 1:
         raise ValueError("telegram_action_public_listing_id_mismatch")
     return ordered
+
+
+def _consult_public_id_from_url(url: str) -> str:
+    parsed = urlparse(str(url or "").strip())
+    if parsed.scheme not in {"http", "https"} or parsed.netloc.lower() not in {"t.me", "www.t.me"}:
+        raise ValueError("telegram_action_url_invalid")
+    message = (parse_qs(parsed.query).get("text") or [""])[0]
+    for word in message.replace("：", " ").replace(":", " ").split():
+        public_id = normalize_public_id(word.strip("，。,."))
+        if public_id:
+            return public_id
+    raise ValueError(f"invalid_public_listing_id:{message}")
 
 
 def _public_id_from_action_url(url: str, expected_action: str) -> str:

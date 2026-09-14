@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from v3_core.adviser_copy import generate_adviser_text
-from v3_core.publishing.channel_contract import channel_action_url
+from v3_core.publishing.channel_contract import official_channel_action_urls
 from v3_core.publishing.channel_renderer import render_channel_caption
 from v3_core.publishing.eligibility import evaluate_offer_eligibility
 from v3_core.storage.inventory_reader import InventoryReader
@@ -21,12 +21,16 @@ class PackageBuildService:
         reader: InventoryReader,
         store: FrozenPackageStore,
         user_bot_username: str,
+        advisor_url: str = "",
     ):
         self.reader = reader
         self.store = store
         self.user_bot_username = str(user_bot_username or "").strip().lstrip("@")
+        self.advisor_url = str(advisor_url or "").strip()
         if not self.user_bot_username:
             raise ValueError("user_bot_username is required")
+        if not self.advisor_url:
+            raise ValueError("advisor_url is required")
 
     def build(
         self,
@@ -67,14 +71,11 @@ class PackageBuildService:
             status=str(listing.get("inventory_status") or "active"),
             adviser_note=adviser_copy,
         )
-        actions = {
-            action: channel_action_url(
-                self.user_bot_username,
-                public_id,
-                action,
-            )
-            for action in ("details", "photos", "book")
-        }
+        actions = official_channel_action_urls(
+            self.user_bot_username,
+            public_id,
+            advisor_url=self.advisor_url,
+        )
         public_token = "ql" + hashlib.sha256(
             f"{listing_id}:{offer_id}:{canonical['facts_hash']}".encode("utf-8")
         ).hexdigest()[:14]

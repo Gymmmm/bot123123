@@ -90,8 +90,11 @@ def appointment_channel_keyboard(
     username: str,
     public_listing_id: str,
     status: str,
+    advisor_url: str,
 ) -> InlineKeyboardMarkup:
-    actions = official_channel_action_urls(username, public_listing_id)
+    actions = official_channel_action_urls(
+        username, public_listing_id, advisor_url=advisor_url
+    )
     rows = [
         [InlineKeyboardButton(label, url=url) for label, url in row]
         for row in official_channel_button_spec(actions, inventory_status=status)
@@ -119,11 +122,13 @@ class V3AppointmentChannelSynchronizer:
         *,
         publisher_bot_token: str,
         user_bot_username: str,
+        advisor_url: str = "",
         bot_factory: Callable[[str], Any] | None = None,
     ):
         self.db_path = Path(db_path).expanduser().resolve()
         self.publisher_bot_token = str(publisher_bot_token or "").strip()
         self.user_bot_username = str(user_bot_username or "").strip().lstrip("@")
+        self.advisor_url = str(advisor_url or "").strip()
         self.bot_factory = bot_factory or (lambda token: Bot(token=token))
 
     def _connect(self) -> sqlite3.Connection:
@@ -160,7 +165,7 @@ class V3AppointmentChannelSynchronizer:
         clean = str(listing_id or "").strip()
         if not clean:
             return ChannelStatusSyncResult(clean, attempted=False, synced=False, error="listing_id_required")
-        if not self.publisher_bot_token or not self.user_bot_username:
+        if not self.publisher_bot_token or not self.user_bot_username or not self.advisor_url:
             return ChannelStatusSyncResult(clean, attempted=False, synced=False, error="channel_sync_not_configured")
         try:
             row, active_count = self._snapshot(clean)
@@ -187,6 +192,7 @@ class V3AppointmentChannelSynchronizer:
                     username=self.user_bot_username,
                     public_listing_id=public_id,
                     status=target,
+                    advisor_url=self.advisor_url,
                 ),
             )
             with self._connect() as conn:

@@ -151,6 +151,7 @@ def test_publisher_dashboard_exposes_broadcast_center(tmp_path):
         user_bot_username="qiaolian_rent_bot",
         channel_chat_id="-1001234567890",
         cover_output_dir=str(tmp_path / "covers"),
+        advisor_url="https://t.me/qiaolian_advisor",
     )
     bot = V3PublisherApplication(settings)
     buttons = [button for row in bot._dashboard_keyboard().inline_keyboard for button in row]

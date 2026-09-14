@@ -12,6 +12,7 @@ ACTIONS = {
     "details": "https://t.me/TestBot?start=property_QL-RF-A2B3_details",
     "photos": "https://t.me/TestBot?start=property_QL-RF-A2B3_photos",
     "book": "https://t.me/TestBot?start=property_QL-RF-A2B3_book",
+    "consult": "https://t.me/advisor?text=你好，我想咨询这套房：QL-RF-A2B3",
 }
 
 
@@ -65,11 +66,11 @@ def _command(tmp_path):
     )
 
 
-def test_keyboard_contract_is_two_plus_one_and_ordered():
+def test_keyboard_contract_is_two_plus_two_and_ordered():
     keyboard = build_channel_keyboard(dict(ACTIONS))
     rows = keyboard.inline_keyboard
     assert [button.text for button in rows[0]] == ["📋 租赁详情", "📸 更多实拍"]
-    assert [button.text for button in rows[1]] == ["📅 预约看房"]
+    assert [button.text for button in rows[1]] == ["📅 预约看房", "💬 联系中文顾问"]
     assert rows[0][0].url == ACTIONS["details"]
     assert rows[0][1].url == ACTIONS["photos"]
     assert rows[1][0].url == ACTIONS["book"]

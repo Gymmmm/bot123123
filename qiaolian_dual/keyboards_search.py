@@ -26,18 +26,27 @@ def guided_search_keyboard() -> InlineKeyboardMarkup:
 
 def find_area_keyboard() -> InlineKeyboardMarkup:
     options = [
-        ('bkk1', 'BKK1'), ('bkk23', 'BKK2/3'),
-        ('koh', '钻石岛'), ('rf', '富力城'),
-        ('aeon1', '永旺1'), ('tk', 'TK'),
-        ('russian', '俄市'), ('pp', '炳发城'),
-        ('chroy', '水净华'), ('sen', '森速'),
+        ('bkk1', 'BKK1（市中心）'), ('bkk23', 'BKK2 / BKK3（BKK周边）'),
+        ('koh', '钻石岛'), ('jinjie', '金街附近'),
+        ('rf', '富力城'), ('aeon1', '永旺1附近'),
+        ('tk', '堆谷（TK）'), ('russian', '俄罗斯市场附近'),
+        ('pp', '炳发城'), ('chroy', '水净华半岛'),
+        ('sen', '森速（永旺2一带）'),
     ]
-    rows = []
-    for index in range(0, len(options), 2):
-        rows.append([
-            InlineKeyboardButton(options[index][1], callback_data=f'findarea:{options[index][0]}'),
-            InlineKeyboardButton(options[index + 1][1], callback_data=f'findarea:{options[index + 1][0]}'),
-        ])
+    compact_pairs = options[:6]
+    rows = [
+        [InlineKeyboardButton(label, callback_data=f'findarea:{code}') for code, label in compact_pairs[index:index + 2]]
+        for index in range(0, len(compact_pairs), 2)
+    ]
+    rows.extend([
+        [InlineKeyboardButton(label, callback_data=f'findarea:{code}')]
+        for code, label in options[6:8]
+    ])
+    rows.append([
+        InlineKeyboardButton(label, callback_data=f'findarea:{code}')
+        for code, label in options[8:10]
+    ])
+    rows.append([InlineKeyboardButton(options[10][1], callback_data=f'findarea:{options[10][0]}')])
     rows.append([InlineKeyboardButton('📍 其他区域', callback_data='findarea:other')])
     rows.append([InlineKeyboardButton('⬅️ 返回', callback_data='home_smart_search')])
     return InlineKeyboardMarkup(rows)
