@@ -1,0 +1,59 @@
+name: reedit-zufang555-latest50
+on:
+  push:
+    branches: [ops/reedit-zufang555-latest50]
+    paths: [.github/workflows/reedit-zufang555-latest50.yml]
+permissions:
+  contents: read
+concurrency:
+  group: qiaolian-v3-production
+  cancel-in-progress: false
+jobs:
+  reedit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify production host
+        run: |
+          set -Eeuo pipefail
+          ssh-keyscan -T 10 -t ed25519 50.114.74.120 2>/dev/null | grep -v '^#' > "$RUNNER_TEMP/kh"
+          ssh-keygen -lf "$RUNNER_TEMP/kh" | grep -F 'SHA256:fuufBlFaqRpQhlkio0vuLsuv8w8x3zUb3VFQsnUny/o'
+      - name: Configure SSH
+        env:
+          PROD_SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+        run: |
+          set -Eeuo pipefail
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/key"
+          cp "$RUNNER_TEMP/kh" "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/key" "$HOME/.ssh/known_hosts"
+      - name: Copy bounded reedit helper
+        run: scp -i "$HOME/.ssh/key" -o BatchMode=yes deploy/v3/reedit_zufang555_latest50_existing.py root@50.114.74.120:/tmp/reedit_latest50.py
+      - name: Backup and edit existing channel posts
+        run: |
+          ssh -i "$HOME/.ssh/key" -o BatchMode=yes root@50.114.74.120 'bash -se' <<'REMOTE'
+          set -Eeuo pipefail
+          ROOT=/opt/qiaolian_v3
+          DB=/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db
+          test "$(cat "$ROOT/.deployed_sha")" = 'cfe49d2624ce83a5a7eed91c17cd599710d37504'
+          stamp=$(date -u +%Y%m%d-%H%M%S)
+          backup="/opt/qiaolian_backups/reedit-zufang555-latest50-$stamp"
+          install -d -m 0750 -o qiaolianbot -g qiaolianbot "$backup"
+          runuser -u qiaolianbot -- "$ROOT/.venv/bin/python" - "$DB" "$backup/qiaolian_dual_bot.db" <<'PY'
+          import sqlite3,sys
+          src,dst=sys.argv[1:]
+          a=sqlite3.connect(f'file:{src}?mode=ro',uri=True); b=sqlite3.connect(dst); a.backup(b); b.close(); a.close()
+          c=sqlite3.connect(dst); ok=c.execute('pragma integrity_check').fetchone()[0]; c.close(); assert ok=='ok',ok
+          print('REEDIT_BACKUP_OK',dst)
+          PY
+          cd "$ROOT/current"
+          set -a; source "$ROOT/runtime.env"; set +a
+          PYTHONPATH="$ROOT/current" "$ROOT/.venv/bin/python" /tmp/reedit_latest50.py
+          rm -f /tmp/reedit_latest50.py
+          for unit in collector canonical publisher user; do
+            systemctl is-active --quiet "qiaolian-v3@$unit.service"
+            echo "SERVICE_OK $unit"
+          done
+          echo "REEDIT_OPERATION_OK backup=$backup"
+          REMOTE
