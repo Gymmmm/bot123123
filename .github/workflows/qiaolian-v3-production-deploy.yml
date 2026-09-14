@@ -127,7 +127,11 @@ jobs:
           RUNTIME_ENV="$APP/runtime.env"
           OLD=/opt/qiaolian_dual_bots
           DB="$OLD/data/qiaolian_dual_bot.db"
-          ENV_SOURCE="$OLD/.env"
+          if [ -f "$OLD/.env" ]; then
+            ENV_SOURCE="$OLD/.env"
+          else
+            ENV_SOURCE="$RUNTIME_ENV"
+          fi
           BACKUP_ROOT=/opt/qiaolian_backups
           STAMP=$(date -u +%Y%m%d-%H%M%S)
           BACKUP="$BACKUP_ROOT/actions-v3-$STAMP"
@@ -176,13 +180,13 @@ jobs:
             exit "$rc"
           }
           echo 'CHECK: prerequisites'
-          test -f "$BUNDLE_PATH" && echo 'PREREQ bundle=ok'
-          test -f "$ENV_SOURCE" && echo 'PREREQ env=ok'
-          test -s "$DB" && echo 'PREREQ db=ok'
-          test -f "$APP/.deployed_sha" && echo 'PREREQ deployed_marker=ok'
-          test "$(tr -cd '0-9a-fA-F' < "$APP/.deployed_sha")" = "$PREVIOUS_SHA" && echo 'PREREQ deployed_sha=ok'
-          test -d "$APP/releases/$PREVIOUS_SHA" && echo 'PREREQ rollback_release=ok'
-          id qiaolianbot >/dev/null && echo 'PREREQ service_user=ok'
+          test -f "$BUNDLE_PATH"; echo 'PREREQ bundle=ok'
+          test -f "$ENV_SOURCE"; echo 'PREREQ env=ok'
+          test -s "$DB"; echo 'PREREQ db=ok'
+          test -f "$APP/.deployed_sha"; echo 'PREREQ deployed_marker=ok'
+          test "$(tr -cd '0-9a-fA-F' < "$APP/.deployed_sha")" = "$PREVIOUS_SHA"; echo 'PREREQ deployed_sha=ok'
+          test -d "$APP/releases/$PREVIOUS_SHA"; echo 'PREREQ rollback_release=ok'
+          id qiaolianbot >/dev/null; echo 'PREREQ service_user=ok'
           command -v git >/dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y git
           command -v sqlite3 >/dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y sqlite3
           command -v python3 >/dev/null
@@ -233,7 +237,9 @@ jobs:
           chown -R qiaolianbot:qiaolianbot "$APP/.venv" "$RELEASE"
 
           echo 'RUNTIME ENV: preserve existing secrets and pin V3 runtime paths'
-          cp -a "$ENV_SOURCE" "$RUNTIME_ENV"
+          if [ "$ENV_SOURCE" != "$RUNTIME_ENV" ]; then
+            cp -a "$ENV_SOURCE" "$RUNTIME_ENV"
+          fi
           cat >>"$RUNTIME_ENV" <<EOF
           QIAOLIAN_CODE_ROOT=$CURRENT
           QIAOLIAN_VENV=$APP/.venv
