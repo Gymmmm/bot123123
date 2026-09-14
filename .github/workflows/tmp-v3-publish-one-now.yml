@@ -93,40 +93,46 @@ jobs:
                   'canonical_area_key': '百色河',
                   'canonical_area_display': '百色河',
               }
-              facts = canonicalize_source(
-                  str(target['raw_text'] or ''),
-                  source_identity=dict(old_facts.get('source_identity') or {}),
-                  media_summary=dict(old_facts.get('media_summary') or {}),
-                  manual_overrides=overrides,
-              )
-              if facts.get('project_name') != 'The Bridge' or facts.get('public_location_display') != '百色河':
-                  raise SystemExit('TARGET_OVERRIDE_PROJECTION_FAILED')
-              if (facts.get('quality') or {}).get('blocking_flags'):
-                  raise SystemExit(f"TARGET_STILL_BLOCKED {facts['quality']['blocking_flags']}")
-              canonical = inventory.store_canonical(
-                  source_post_id=target['source_post_id'],
-                  facts=facts,
-                  supersedes_id=str(target['canonical_record_id']),
-              )
-              materialized = InventoryMaterializationService(inventory).materialize(
-                  canonical_record_id=str(canonical['canonical_record_id']),
-                  listing_id=str(target['listing_id']),
-                  public_listing_id=str(target['public_listing_id']),
-                  create_review=True,
-              )
-              for field_name, new_value in overrides.items():
-                  inventory.add_override(
-                      canonical_record_id=str(canonical['canonical_record_id']),
-                      field_name=field_name,
-                      old_value=old_facts.get(field_name),
-                      new_value=new_value,
-                      reason='verified_source_bridge_tonle_bassac',
-                      operator_id='codex:normal_publish',
+              if old_facts.get('project_name') == 'The Bridge' and old_facts.get('public_location_display') == '百色河':
+                  offer_id = str(target['offer_id'])
+                  print('CANONICAL_OVERRIDE_ALREADY_APPLIED', target['public_listing_id'], target['canonical_record_id'], offer_id)
+              else:
+                  facts = canonicalize_source(
+                      str(target['raw_text'] or ''),
+                      source_identity=dict(old_facts.get('source_identity') or {}),
+                      media_summary=dict(old_facts.get('media_summary') or {}),
+                      manual_overrides=overrides,
                   )
-              offer_id = materialized.offer_ids[0]
-              print('CANONICAL_OVERRIDE_OK', target['public_listing_id'], canonical['canonical_record_id'], offer_id)
+                  if facts.get('project_name') != 'The Bridge' or facts.get('public_location_display') != '百色河':
+                      raise SystemExit('TARGET_OVERRIDE_PROJECTION_FAILED')
+                  if (facts.get('quality') or {}).get('blocking_flags'):
+                      raise SystemExit(f"TARGET_STILL_BLOCKED {facts['quality']['blocking_flags']}")
+                  canonical = inventory.store_canonical(
+                      source_post_id=target['source_post_id'],
+                      facts=facts,
+                      supersedes_id=str(target['canonical_record_id']),
+                  )
+                  materialized = InventoryMaterializationService(inventory).materialize(
+                      canonical_record_id=str(canonical['canonical_record_id']),
+                      listing_id=str(target['listing_id']),
+                      public_listing_id=str(target['public_listing_id']),
+                      create_review=True,
+                  )
+                  for field_name, new_value in overrides.items():
+                      inventory.add_override(
+                          canonical_record_id=str(canonical['canonical_record_id']),
+                          field_name=field_name,
+                          old_value=old_facts.get(field_name),
+                          new_value=new_value,
+                          reason='verified_source_bridge_tonle_bassac',
+                          operator_id='codex:normal_publish',
+                      )
+                  offer_id = materialized.offer_ids[0]
+                  print('CANONICAL_OVERRIDE_OK', target['public_listing_id'], canonical['canonical_record_id'], offer_id)
 
               app = V3PublisherApplication(settings)
+              app.autopilot.repository.set_listing_status(str(target['listing_id']), 'active')
+              print('LISTING_REVIEW_APPROVED', target['listing_id'], 'active')
               app.autopilot.repository.sync_candidates()
               bot = Bot(token=settings.token)
               await bot.initialize()
