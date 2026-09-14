@@ -83,8 +83,8 @@ def test_channel_and_sync_keyboards_use_locked_details_label():
             status="reserved",
         )
     )
-    assert publish == ["🏠 租赁详情", "📸 更多实拍", "📅 预约看房"]
-    assert sync == ["🏠 租赁详情", "📸 更多实拍", "📅 预约看房"]
+    assert publish == ["📋 租赁详情", "📸 更多实拍", "📅 预约看房"]
+    assert sync == ["📋 租赁详情", "📸 更多实拍", "📅 预约看房"]
     assert "🏠 房源详情" not in publish + sync
 
 
@@ -100,8 +100,8 @@ def test_home_contact_and_no_match_use_advisor_label():
         touch_payload={},
     )
     no_match = [choice.label for row in build_search_no_match_view(intent).rows for choice in row]
-    assert "💬 联系中文顾问" in home
-    assert "💬 联系中文顾问" in contact
+    assert "💬 顾问帮我找" in home
+    assert "💬 顾问帮我找" in contact
     assert "💬 联系中文顾问" in no_match
     assert "💬 联系我们" not in home + contact + no_match
 
@@ -113,9 +113,9 @@ def test_unbookable_book_payload_keeps_details_instead_of_dead_link():
     assert result.reason == "listing_not_bookable"
     assert result.book is None
     assert result.details is not None
-    assert "🏠 <b>区域：</b>" in result.details.text
+    assert "🏠 <b>富力城｜1房</b>" in result.details.text
     assert result.details.action_rows[0][0].label == "📸 更多实拍"
-    assert result.details.action_rows[0][1].label == "💬 联系侨联"
+    assert result.details.action_rows[0][1].label == "💬 问这套房"
 
 
 class _FakeMessage:
@@ -159,7 +159,7 @@ async def test_start_handler_renders_chinese_unbookable_copy_then_details():
     )
     assert outcome.kind == "unbookable"
     assert outcome.handled is True
-    assert message.texts[0] == "这套房暂时不能预约，可以看相近房源或联系中文顾问。"
-    assert "🏠 <b>区域：</b>" in message.texts[1]
-    support = [button.text for row in message.markups[0].inline_keyboard for button in row]
-    assert support == ["🔍 帮我找房", "💬 联系中文顾问", "🏠 返回首页"]
+    assert message.texts[0] == "这套房暂时不能预约。可以继续看相近房源，或让顾问帮您确认其他选择。"
+    assert "🏠 <b>富力城｜1房</b>" in message.texts[1]
+    actions = [button.text for row in message.markups[1].inline_keyboard for button in row]
+    assert actions == ["📸 更多实拍", "💬 问这套房", "🔍 看相近房源", "🏠 返回首页"]

@@ -69,23 +69,26 @@ def test_details_response_preserves_layout_and_frozen_adviser_notes():
     response = build_details_response(view)
 
     assert response.text == (
-        "🏠 <b>区域：</b> BKK1\n"
-        "🛏 <b>户型：</b> 2房1厅\n"
-        "💰 <b>租金：</b> $800/月\n"
-        "📐 <b>面积：</b> 95㎡\n"
-        "🏢 <b>楼层：</b> 19楼\n"
-        "🔑 <b>租约：</b> 押1付1 · 1年\n"
-        "🟢 <b>房态：</b> 当前可预约\n"
-        "📸 <b>实拍：</b> QL-RF-A2B3\n"
+        "📋 <b>租赁详情</b>\n"
+        "\n"
+        "🏠 <b>富力城｜2房1厅</b>\n"
+        "💵 <b>$800/月</b>\n"
+        "\n"
+        "📍 BKK1\n"
+        "📐 95㎡｜19楼\n"
+        "🔑 押1付1 · 1年\n"
+        "🟢 房态：当前可预约\n"
+        "🆔 QL-RF-A2B3\n"
         "\n"
         "💬 <b>侨联说</b>\n"
         "这套标注在BKK1，项目是富力城，可以按实际通勤路线再判断。\n"
         "资料明确标注：采光好、钥匙已备；具体状态可以结合实拍确认。"
     )
-    assert _actions(response.action_rows) == [["book", "photos"], ["consult"]]
+    assert _actions(response.action_rows) == [["book", "consult"], ["photos"], ["similar"]]
     assert _labels(response.action_rows) == [
-        ["📅 预约看房", "📸 更多实拍"],
-        ["💬 联系侨联"],
+        ["📅 预约看房", "💬 问这套房"],
+        ["📸 更多实拍"],
+        ["🔍 看相近房源"],
     ]
 
 
@@ -93,13 +96,12 @@ def test_details_response_uses_live_rented_state_but_keeps_frozen_public_facts()
     view = _view(status="rented", offer_status="inactive")
     response = build_details_response(view)
 
-    assert "💰 <b>租金：</b> $800/月" in response.text
-    assert "🔴 <b>房态：</b> 已租出" in response.text
-    assert "📸 <b>实拍：</b> QL-RF-A2B3" in response.text
+    assert "💵 <b>$800/月</b>" in response.text
+    assert "🔴 房态：已租出" in response.text
     assert _actions(response.action_rows) == [["photos", "consult"], ["similar"]]
     assert _labels(response.action_rows) == [
-        ["📸 更多实拍", "💬 联系侨联"],
-        ["🏘 看相近房源"],
+        ["📸 更多实拍", "💬 问这套房"],
+        ["🔍 看相近房源"],
     ]
 
 
@@ -119,15 +121,16 @@ def test_photos_response_chunks_existing_frozen_gallery_by_ten(tmp_path):
     assert tuple(len(group) for group in response.media_groups) == (10, 2)
     flattened = [item for group in response.media_groups for item in group]
     assert flattened == files
-    assert response.text == (
-        "📸 <b>更多实拍</b>\n\n"
-        "以上是这套房目前保存的现场实拍。\n"
-        "想进一步了解，可以继续看详情，或直接预约。"
-    )
-    assert _actions(response.action_rows) == [["details", "book"], ["consult"]]
+    assert response.text == "📸 <b>以上是这套房目前保存的现场实拍。</b>"
+    assert "QL-RF-A2B3" not in response.text
+    assert "富力城" not in response.text
+    assert "$800" not in response.text
+    assert "BKK1" not in response.text
+    assert _actions(response.action_rows) == [["book", "consult"], ["details"], ["similar"]]
     assert _labels(response.action_rows) == [
-        ["📋 租赁详情", "📅 预约看房"],
-        ["💬 联系侨联"],
+        ["📅 预约看房", "💬 问这套房"],
+        ["📋 租赁详情"],
+        ["🔍 看相近房源"],
     ]
 
 
@@ -137,12 +140,12 @@ def test_photos_response_drops_missing_files_and_uses_locked_fallback_text(tmp_p
 
     assert not response.has_media
     assert response.media_groups == ()
-    assert response.text == (
-        "📸 <b>更多实拍</b>\n\n"
-        "房源：QL-RF-A2B3\n"
-        "这套房的实拍暂时没有加载出来。\n\n"
-        "可以稍后再试，或直接联系侨联。"
-    )
+    assert response.text == "📸 <b>这套房源目前的实拍已经全部显示。</b>"
+    assert _labels(response.action_rows) == [
+        ["📅 预约看房", "💬 问这套房"],
+        ["📋 租赁详情"],
+        ["🔍 看相近房源"],
+    ]
 
 
 def test_rented_photos_response_keeps_details_and_contact_but_removes_book(tmp_path):
@@ -152,8 +155,8 @@ def test_rented_photos_response_keeps_details_and_contact_but_removes_book(tmp_p
         _view(status="rented", offer_status="inactive", gallery=[str(photo)])
     )
 
-    assert _actions(response.action_rows) == [["details"], ["consult"]]
+    assert _actions(response.action_rows) == [["details", "consult"], ["similar"]]
     assert _labels(response.action_rows) == [
-        ["📋 租赁详情"],
-        ["💬 联系侨联"],
+        ["📋 租赁详情", "💬 问这套房"],
+        ["🔍 看相近房源"],
     ]

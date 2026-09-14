@@ -1,8 +1,4 @@
-"""Telegram adapter for V3 home-surface callbacks.
-
-All five fixed-SHA public home actions enter complete V3-owned surfaces.
-Business/storage effects remain in their dedicated adapters.
-"""
+"""Telegram adapter for V3 home-surface callbacks."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -14,11 +10,18 @@ from .appointment_history import AppointmentHistoryService, AppointmentHistoryVi
 from .assurance_views import build_assurance_home_view
 from .contact_effects import ContactEffectExecutor, ContactEffectResult
 from .home_callbacks import HomeAction, parse_home_callback
-from .home_views import build_appointment_history_home_view, build_contact_view
+from .home_views import (
+    build_about_view,
+    build_appointment_history_home_view,
+    build_booking_view,
+    build_contact_view,
+)
 from .lead_service import LeadUser
+from .service_product_views import service_home_view
+from .service_views import local_life_view
 from .telegram_assurance_handler import render_assurance_view
 from .telegram_home_ui import build_home_keyboard
-from .telegram_service_handler import _service_home_with_tenant_entry, render_service_view
+from .telegram_service_handler import render_service_view
 from .telegram_transition_ui import build_transition_keyboard
 from .transition_plan import ChangeSearchTransition, TransitionPlan
 from .transition_session import apply_session_mutation, build_transition_session
@@ -130,13 +133,14 @@ async def handle_v3_home_callback(
         apply_session_mutation(user_data, mutation)
         return TelegramHomeOutcome(handled=True, action=action, rendered=True)
 
+    if action == "book":
+        await _edit_home_view(query, build_booking_view())
+        return TelegramHomeOutcome(handled=True, action=action, rendered=True)
+
     if action == "appointments":
         user = _lead_user(update)
         history = appointment_history.build(user.user_id)
-        await _edit_home_view(
-            query,
-            build_appointment_history_home_view(history, advisor_url=advisor_url),
-        )
+        await _edit_home_view(query, build_appointment_history_home_view(history))
         return TelegramHomeOutcome(
             handled=True,
             action=action,
@@ -144,16 +148,20 @@ async def handle_v3_home_callback(
             appointment_history=history,
         )
 
+    if action == "about":
+        await _edit_home_view(query, build_about_view())
+        return TelegramHomeOutcome(handled=True, action=action, rendered=True)
+
     if action == "rental":
         await render_assurance_view(query, build_assurance_home_view())
         return TelegramHomeOutcome(handled=True, action=action, rendered=True)
 
     if action == "service":
-        await render_service_view(
-            query,
-            _service_home_with_tenant_entry(),
-            advisor_url=advisor_url,
-        )
+        await render_service_view(query, service_home_view())
+        return TelegramHomeOutcome(handled=True, action=action, rendered=True)
+
+    if action == "local":
+        await render_service_view(query, local_life_view())
         return TelegramHomeOutcome(handled=True, action=action, rendered=True)
 
     if action == "contact":

@@ -8,6 +8,7 @@ from v3_core.user_bot.admin_notifications import AdminNotificationResult
 from v3_core.user_bot.appointment_history import AppointmentHistoryView
 from v3_core.user_bot.contact_effects import ContactEffectResult
 from v3_core.user_bot.lead_effects import LeadEffectResult
+from v3_core.user_bot.listing_responses import PublicDetailsResponse, SemanticAction
 from v3_core.user_bot.search_flow import SearchFlowResult
 from v3_core.user_bot.search_query import SearchCriteria
 from v3_core.user_bot.telegram_start_handler import BROADCAST_START_SHORTCUTS, handle_v3_start
@@ -30,12 +31,15 @@ class FakeMessage:
 
 
 class FakeListings:
-    def __init__(self):
+    def __init__(self, result=None):
         self.calls = []
+        self.result = result
 
     def resolve(self, payload):
         self.calls.append(payload)
-        return SimpleNamespace(ok=False, reason="unsupported_public_payload", details=None)
+        if self.result is not None:
+            return self.result
+        return SimpleNamespace(ok=False)
 
 
 class FakeSearchExecutor:
@@ -199,7 +203,7 @@ async def test_appointments_shortcut_uses_real_appointment_history():
 @pytest.mark.parametrize(
     ("payload", "expected_kind", "expected_text"),
     [
-        ("assurance", "broadcast_assurance", "侨联保障"),
+        ("assurance", "broadcast_assurance", "租赁服务指南"),
         ("service", "broadcast_service", "入住服务"),
     ],
 )
@@ -242,13 +246,13 @@ async def test_advisor_shortcut_records_contact_effect_and_renders_advisor_hando
     _, user, source = effects.calls[0]
     assert user.user_id == 123
     assert source == "daily_broadcast"
-    assert "有什么需要" in message.calls[-1][0][0]
+    assert "顾问帮我找" in message.calls[-1][0][0]
     markup = message.calls[-1][1]["reply_markup"]
     assert markup.inline_keyboard[0][0].url == "https://t.me/advisor"
 
 
 @pytest.mark.asyncio
-async def test_unknown_start_payload_still_falls_through_to_public_property_validation():
+async def test_unknown_start_payload_without_reason_still_falls_through_without_attribute_error():
     message = FakeMessage()
     listings = FakeListings()
     context = _context("not_a_real_shortcut")
@@ -264,5 +268,50 @@ async def test_unknown_start_payload_still_falls_through_to_public_property_vali
     assert listings.calls == ["not_a_real_shortcut"]
     assert message.calls[-1][0][0] == (
         "这个链接已经失效或房源信息已更新。\n\n"
-        "您可以重新找房，或直接联系中文顾问。"
+        "可以重新找房，或让顾问继续帮您找。"
     )
+
+
+@pytest.mark.asyncio
+async def test_unbookable_property_book_deeplink_shows_lock_copy_then_contextual_details():
+    public_id = "QL-RF-A2B3"
+    details = PublicDetailsResponse(
+        text="🏠 <b>房源详情</b>\n\n🔴 房态：已租出",
+        action_rows=(
+            (
+                SemanticAction("📸 更多实拍", "photos", public_id),
+                SemanticAction("💬 联系我们", "consult", public_id),
+            ),
+            (SemanticAction("🏘 看相近房源", "similar", public_id),),
+        ),
+    )
+    listings = FakeListings(
+        SimpleNamespace(
+            ok=False,
+            reason="listing_not_bookable",
+            details=details,
+            action="book",
+            public_listing_id=public_id,
+        )
+    )
+    message = FakeMessage()
+    context = _context(f"property_{public_id}_book")
+
+    outcome = await handle_v3_start(
+        _update(message),
+        context,
+        listings=listings,
+        transition_views=_views(),
+    )
+
+    assert outcome.handled and outcome.kind == "unbookable"
+    assert listings.calls == [f"property_{public_id}_book"]
+    assert message.calls[0][0][0] == "这套房暂时不能预约。可以继续看相近房源，或让顾问帮您确认其他选择。"
+    assert "🔴 房态：已租出" in message.calls[1][0][0]
+    markup = message.calls[1][1]["reply_markup"]
+    labels = [button.text for row in markup.inline_keyboard for button in row]
+    callbacks = [button.callback_data for row in markup.inline_keyboard for button in row]
+    assert "📅 预约看房" not in labels
+    assert "🏘 看相近房源" in labels
+    similar_index = labels.index("🏘 看相近房源")
+    assert public_id in callbacks[similar_index]

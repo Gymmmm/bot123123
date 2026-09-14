@@ -161,13 +161,13 @@ async def test_search_records_lead_only_after_successful_telegram_presentation()
 
 @pytest.mark.asyncio
 async def test_appointment_persists_then_records_lead_before_success_render_cleanup():
-    query = FakeQuery("v3u:t:appointment_time:pm")
+    query = FakeQuery("v3u:t:appointment_submit")
     user_data = {
         APPOINTMENT_SESSION_KEY: {
             "public_listing_id": PUBLIC_ID,
             "mode": "offline",
             "date": "09-10",
-            "time": "",
+            "time": "pm",
             "source": "listing_callback",
         }
     }

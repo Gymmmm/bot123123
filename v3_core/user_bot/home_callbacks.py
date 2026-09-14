@@ -7,9 +7,9 @@ from typing import Literal
 from .callbacks import PREFIX
 
 
-HomeAction = Literal["search", "appointments", "rental", "service", "contact"]
+HomeAction = Literal["search", "book", "appointments", "about", "rental", "service", "local", "contact"]
 HOME_PREFIX = f"{PREFIX}:home"
-_ACTIONS = frozenset({"search", "appointments", "rental", "service", "contact"})
+_ACTIONS = frozenset({"search", "book", "appointments", "about", "rental", "service", "local", "contact"})
 
 
 @dataclass(frozen=True)

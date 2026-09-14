@@ -188,7 +188,7 @@ async def test_contact_home_action_runs_effects_before_rendering_handoff():
     _, user, source = effects.calls[0]
     assert user.user_id == 123 and source == "hub"
     assert [call[0] for call in query.calls] == ["answer", "edit_text"]
-    assert "有什么需要" in query.calls[-1][1][0]
+    assert "顾问帮我找" in query.calls[-1][1][0]
     assert query.calls[-1][2]["reply_markup"].inline_keyboard[0][0].url == "https://t.me/advisor"
 
 
@@ -213,23 +213,22 @@ async def test_contact_without_effect_executor_is_deferred_and_never_claims_succ
     [
         (
             "rental",
-            "侨联保障",
+            "租赁服务指南",
             {
                 "v3u:assure:handover",
                 "v3u:assure:deposit",
                 "v3u:home:contact",
-                "v3u:t:home",
+                "v3u:home:service",
             },
         ),
         (
             "service",
             "入住服务",
             {
-                "v3u:service:tenant",
                 "v3u:service:repair",
                 "v3u:service:property",
-                "v3u:assure:moving",
                 "v3u:service:local",
+                "v3u:home:rental",
                 "v3u:home:contact",
                 "v3u:t:home",
             },

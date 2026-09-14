@@ -1,7 +1,7 @@
 """Published-only consultation intent for the side-by-side V3 User Bot.
 
 Consultation is intentionally separated from lead persistence and admin
-notification.  Fixed-SHA allows users to contact us about a previously
+notification. Fixed-SHA allows users to contact us about a previously
 published rent listing even when that listing is pending, rented, or offline.
 The only visibility prerequisite here is the durable public publication
 boundary enforced by ``PublicInventoryReader``.
@@ -27,6 +27,7 @@ class ConsultIntent:
     inventory_status: str
     offer_status: str
     publication_instance_id: str
+    touchpoint: str = ""
 
 
 @dataclass(frozen=True)
@@ -52,6 +53,7 @@ class ConsultService:
         public_listing_id: object,
         *,
         source: str = "listing_callback",
+        touchpoint: str = "",
     ) -> ConsultResult:
         public_id = normalize_public_id(public_listing_id)
         if public_id is None:
@@ -86,6 +88,7 @@ class ConsultService:
                 publication_instance_id=str(
                     view.publication.get("instance_id") or ""
                 ).strip(),
+                touchpoint=str(touchpoint or "").strip(),
             ),
         )
 

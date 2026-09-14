@@ -77,16 +77,17 @@ def _details_actions(
         return (
             (
                 SemanticAction("📅 预约看房", "book", target),
-                SemanticAction("📸 更多实拍", "photos", target),
+                SemanticAction("💬 问这套房", "consult", target),
             ),
-            (SemanticAction("💬 联系侨联", "consult", target),),
+            (SemanticAction("📸 更多实拍", "photos", target),),
+            (SemanticAction("🔍 看相近房源", "similar", target),),
         )
     return (
         (
             SemanticAction("📸 更多实拍", "photos", target),
-            SemanticAction("💬 联系侨联", "consult", target),
+            SemanticAction("💬 问这套房", "consult", target),
         ),
-        (SemanticAction("🏘 看相近房源", "similar", target),),
+        (SemanticAction("🔍 看相近房源", "similar", target),),
     )
 
 
@@ -96,12 +97,21 @@ def _photo_actions(
     public_listing_id: str,
 ) -> tuple[tuple[SemanticAction, ...], ...]:
     target = str(public_listing_id or "").strip()
-    first = [SemanticAction("📋 租赁详情", "details", target)]
     if bookable:
-        first.append(SemanticAction("📅 预约看房", "book", target))
+        return (
+            (
+                SemanticAction("📅 预约看房", "book", target),
+                SemanticAction("💬 问这套房", "consult", target),
+            ),
+            (SemanticAction("📋 租赁详情", "details", target),),
+            (SemanticAction("🔍 看相近房源", "similar", target),),
+        )
     return (
-        tuple(first),
-        (SemanticAction("💬 联系侨联", "consult", target),),
+        (
+            SemanticAction("📋 租赁详情", "details", target),
+            SemanticAction("💬 问这套房", "consult", target),
+        ),
+        (SemanticAction("🔍 看相近房源", "similar", target),),
     )
 
 
@@ -111,22 +121,27 @@ def build_details_response(view: PublishedListingView) -> PublicDetailsResponse:
     size = _format_size(details.size_sqm)
     floor = display_floor(details.floor)
 
-    lines: list[str] = []
-    if details.location:
-        lines.append(f"🏠 <b>区域：</b> {he(details.location)}")
-    if details.layout:
-        lines.append(f"🛏 <b>户型：</b> {he(details.layout)}")
+    lines = ["📋 <b>租赁详情</b>", ""]
+    if details.subject:
+        lines.append(f"🏠 <b>{he(details.subject)}</b>")
+    elif details.location:
+        lines.append(f"🏠 <b>{he(details.location)}</b>")
     if price:
-        lines.append(f"💰 <b>租金：</b> {he(price)}")
+        lines.extend([f"💵 <b>{he(price)}</b>", ""])
+    if details.location and details.location != details.project_name:
+        lines.append(f"📍 {he(details.location)}")
+    detail_parts: list[str] = []
     if size:
-        lines.append(f"📐 <b>面积：</b> {he(size)}")
+        detail_parts.append(size)
     if floor:
-        lines.append(f"🏢 <b>楼层：</b> {he(floor)}")
+        detail_parts.append(floor)
+    if detail_parts:
+        lines.append(f"📐 {'｜'.join(he(item) for item in detail_parts)}")
     if details.lease_summary:
-        lines.append(f"🔑 <b>租约：</b> {he(details.lease_summary)}")
-    lines.append(f"{details.status_icon} <b>房态：</b> {he(details.status_label)}")
+        lines.append(f"🔑 {he(details.lease_summary)}")
+    lines.append(f"{details.status_icon} 房态：{he(details.status_label)}")
     if details.public_listing_id:
-        lines.append(f"📸 <b>实拍：</b> {he(details.public_listing_id)}")
+        lines.append(f"🆔 {he(details.public_listing_id)}")
 
     notes = adviser_notes_for_view(view, max_points=2, allow_empty=True).strip()
     if notes:
@@ -163,18 +178,9 @@ def build_photos_response(view: PublishedListingView) -> PublicPhotosResponse:
     photos = _existing_gallery(details.gallery)
     groups = tuple(tuple(photos[offset : offset + 10]) for offset in range(0, len(photos), 10))
     if groups:
-        text = (
-            "📸 <b>更多实拍</b>\n\n"
-            "以上是这套房目前保存的现场实拍。\n"
-            "想进一步了解，可以继续看详情，或直接预约。"
-        )
+        text = "📸 <b>以上是这套房目前保存的现场实拍。</b>"
     else:
-        text = (
-            "📸 <b>更多实拍</b>\n\n"
-            f"房源：{he(details.public_listing_id)}\n"
-            "这套房的实拍暂时没有加载出来。\n\n"
-            "可以稍后再试，或直接联系侨联。"
-        )
+        text = "📸 <b>这套房源目前的实拍已经全部显示。</b>"
     return PublicPhotosResponse(
         media_groups=groups,
         text=text,

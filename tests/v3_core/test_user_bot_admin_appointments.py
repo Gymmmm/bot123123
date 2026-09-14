@@ -61,11 +61,14 @@ def test_v3_application_registers_admin_command_and_adminq_callbacks():
     source = Path("v3_core/user_bot/app.py").read_text(encoding="utf-8")
     assert 'CommandHandler("admin", admin)' in source
     assert 'pattern=r"^adminq:"' in source
-    assert 'BotCommand("admin", "咨询后台")' in source
+    assert 'BotCommand("admin", "管理后台")' in source
     assert "BotCommandScopeChat(chat_id=admin_id)" in source
     assert ".post_init(configure_command_menu)" in source
+    assert 'raw in {"adminq:appointments", "adminq:pending"}' in source
+    assert "availability=deps.appointment_effects.availability" in source
+    assert "channel_sync=deps.appointment_effects.channel" in source
     entrypoint = Path("run_v3_user_bot.py").read_text(encoding="utf-8")
-    assert "admin_home_handler=cmd_admin_home" in entrypoint
+    assert "admin_home_handler=show_unified_admin_home" in entrypoint
     assert "admin_query_handler=handle_admin_query" in entrypoint
     assert "admin_authorizer=_is_admin_user" in entrypoint
 

@@ -29,34 +29,25 @@ class ListingContactView:
 
 
 class ListingContactEffectExecutor:
-    def __init__(
-        self,
-        *,
-        leads: LeadEffectExecutor,
-        admins: TelegramAdminNotifier,
-    ):
+    def __init__(self, *, leads: LeadEffectExecutor, admins: TelegramAdminNotifier):
         self.leads = leads
         self.admins = admins
 
-    async def execute(
-        self,
-        *,
-        bot: Any,
-        user: LeadUser,
-        intent: ConsultIntent,
-    ) -> ListingContactEffectResult:
+    async def execute(self, *, bot: Any, user: LeadUser, intent: ConsultIntent) -> ListingContactEffectResult:
         lead = self.leads.record_listing_contact(user=user, intent=intent)
+        lines = [
+            f"用户：{user_mention_html(user)}",
+            f"联系方式：{he(user_contact_text(user))}",
+            f"来源：{he(source_display_label(intent.source or 'listing_callback'))}",
+        ]
+        if str(intent.touchpoint or "").strip():
+            lines.append(f"转化页：{he(source_display_label(intent.touchpoint))}")
+        lines.append(f"咨询房源：{he(intent.public_listing_id)}")
         admin = await self.admins.send(
             bot,
             AdminNotification(
-                title="💬 新房源咨询",
-                lines=(
-                    f"👤 {user_mention_html(user)}",
-                    f"📱 {he(user_contact_text(user))}",
-                    f"🏠 房源｜{he(intent.public_listing_id)}",
-                    f"📍 来源｜{he(source_display_label(intent.source or 'listing_callback'))}",
-                ),
-                show_bell=False,
+                title="用户咨询房源",
+                lines=tuple(lines),
             ),
         )
         return ListingContactEffectResult(lead=lead, admin=admin)
@@ -79,18 +70,18 @@ def build_listing_contact_view(
         else ""
     )
     lines = [
-        "💬 <b>联系中文顾问</b>",
+        "💬 <b>咨询这套房</b>",
         "",
         f"🏠 <b>{he(subject)}</b>",
-        f"🆔 {he(intent.public_listing_id)}",
     ]
     if price:
         lines.append(f"💵 <b>{he(price)}</b>")
     lines.extend(
         [
+            f"🆔 {he(intent.public_listing_id)}",
             "",
-            "房源信息已经带上，不用重新说明。",
-            "点击下方可直接打开顾问对话。",
+            "这套房的信息已经带上，不用重新说明。",
+            "可以直接问价格、费用、房态或看房时间。",
         ]
     )
     return ListingContactView(

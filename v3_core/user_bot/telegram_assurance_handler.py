@@ -62,7 +62,6 @@ async def send_assurance_bundle(
     repo_root: str | Path,
     kind: str,
 ) -> None:
-    """One customer click sends the guidance, preview image and full PDF."""
     bundle = assurance_asset_bundle(repo_root, kind)
     if not bundle.image_path.is_file():
         raise FileNotFoundError(str(bundle.image_path))
@@ -74,8 +73,8 @@ async def send_assurance_bundle(
     chat_id = int(chat.id)
     markup = InlineKeyboardMarkup(
         [
-            [InlineKeyboardButton("💬 联系中文顾问", callback_data="v3u:home:contact")],
-            [InlineKeyboardButton("⬅️ 返回侨联保障", callback_data="v3u:home:rental")],
+            [InlineKeyboardButton("💬 联系顾问", callback_data="v3u:home:contact")],
+            [InlineKeyboardButton("⬅️ 返回租赁服务指南", callback_data="v3u:home:rental")],
         ]
     )
     await context.bot.send_message(

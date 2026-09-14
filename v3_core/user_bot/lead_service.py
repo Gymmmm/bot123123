@@ -105,7 +105,6 @@ class LeadService:
 
 
 def build_sqlite_lead_service(db_path: str | Path) -> LeadService:
-    """Build a V3 lead writer without opening or initializing the database."""
     return LeadService(SQLiteLeadRepository(db_path))
 
 
@@ -134,7 +133,6 @@ def keyword_search_lead_request(
     *,
     match_mode: str,
 ) -> LeadRequest:
-    """Preserve fixed-SHA ``awaiting_keyword_find`` lead identity."""
     area = str(intent.area_display or "").strip()
     if area == "不限":
         area = ""
@@ -186,7 +184,10 @@ def listing_contact_lead_request(intent: ConsultIntent) -> LeadRequest:
         action="consult_menu_click",
         source=str(intent.source or "listing_callback"),
         listing_id=str(intent.listing_id or ""),
-        payload={"listing_id": str(intent.listing_id or "")},
+        payload={
+            "listing_id": str(intent.listing_id or ""),
+            "touchpoint": str(intent.touchpoint or "").strip(),
+        },
     )
 
 

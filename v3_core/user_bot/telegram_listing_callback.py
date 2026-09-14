@@ -1,8 +1,8 @@
 """Outer Telegram orchestration for V3 listing/card callbacks.
 
 The generic callback adapter renders details/photos/cards/book/search transitions.
-This wrapper completes the deferred consultation transition only when no direct
-advisor URL was available at the keyboard boundary.
+This wrapper completes the one intentionally deferred transition: listing
+consultation, whose success copy is shown only after lead/admin effects run.
 """
 from __future__ import annotations
 
@@ -21,11 +21,7 @@ from .listing_contact import (
     build_listing_contact_view,
 )
 from .public_inventory import PublicInventoryReader
-from .telegram_callback_handler import (
-    TelegramCallbackHandlerOutcome,
-    handle_v3_callback,
-)
-from .telegram_navigation import advisor_handoff_url
+from .telegram_callback_handler import TelegramCallbackHandlerOutcome, handle_v3_callback
 from .transition_views import TransitionViewService
 
 
@@ -57,57 +53,39 @@ def _lead_user(update: Any) -> LeadUser:
     )
 
 
-async def _render_contact(
-    query: Any,
-    *,
-    text: str,
-    public_listing_id: str,
-    advisor_url: str,
-    channel_url: str = "",
-) -> None:
-    clean_advisor = str(advisor_url or "").strip()
+async def _render_contact(query: Any, *, text: str, public_listing_id: str, advisor_url: str) -> None:
     contact_button = (
-        InlineKeyboardButton(
-            "💬 联系中文顾问",
-            url=advisor_handoff_url(clean_advisor, public_listing_id=public_listing_id),
-        )
-        if clean_advisor
-        else InlineKeyboardButton("💬 联系中文顾问", callback_data="v3u:home:contact")
+        InlineKeyboardButton("💬 打开顾问对话", url=advisor_url)
+        if str(advisor_url or "").strip()
+        else InlineKeyboardButton("💬 联系顾问", callback_data="v3u:home:contact")
     )
-    rows = [
-        [contact_button],
+    markup = InlineKeyboardMarkup(
         [
-            InlineKeyboardButton(
-                "📅 预约看房",
-                callback_data=encode_listing_callback("book", public_listing_id),
-            ),
-            InlineKeyboardButton("🔍 继续找房", callback_data="v3u:home:search"),
-        ],
-        [
-            InlineKeyboardButton(
-                "⬅️ 返回租赁详情",
-                callback_data=encode_listing_callback("details", public_listing_id),
-            )
-        ],
-    ]
-    clean_channel = str(channel_url or "").strip()
-    if clean_channel:
-        rows.append([InlineKeyboardButton("📣 返回房源频道", url=clean_channel)])
-    rows.append([InlineKeyboardButton("🏠 返回首页", callback_data="v3u:t:home")])
-    markup = InlineKeyboardMarkup(rows)
+            [contact_button],
+            [
+                InlineKeyboardButton(
+                    "📅 预约看房",
+                    callback_data=encode_listing_callback("book", public_listing_id),
+                ),
+                InlineKeyboardButton(
+                    "📸 更多实拍",
+                    callback_data=encode_listing_callback("photos", public_listing_id),
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    "⬅️ 返回这套房",
+                    callback_data=encode_listing_callback("details", public_listing_id),
+                ),
+                InlineKeyboardButton("🔍 继续找房", callback_data="v3u:home:search"),
+            ],
+        ]
+    )
     message = getattr(query, "message", None)
     if getattr(message, "photo", None):
-        await query.edit_message_caption(
-            caption=text,
-            parse_mode=ParseMode.HTML,
-            reply_markup=markup,
-        )
+        await query.edit_message_caption(caption=text, parse_mode=ParseMode.HTML, reply_markup=markup)
         return
-    await query.edit_message_text(
-        text,
-        parse_mode=ParseMode.HTML,
-        reply_markup=markup,
-    )
+    await query.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=markup)
 
 
 async def handle_v3_listing_callback(
@@ -156,7 +134,6 @@ async def handle_v3_listing_callback(
         text=view.text,
         public_listing_id=view.public_listing_id,
         advisor_url=view.advisor_url,
-        channel_url=channel_url,
     )
     return TelegramListingCallbackOutcome(
         handled=True,

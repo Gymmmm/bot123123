@@ -21,12 +21,7 @@ from .similar_intent import SimilarIntentResult, SimilarIntentService
 
 
 CallbackDispatchStatus = Literal[
-    "ok",
-    "invalid_callback",
-    "not_found",
-    "blocked",
-    "expired",
-    "unsupported",
+    "ok", "invalid_callback", "not_found", "blocked", "expired", "unsupported"
 ]
 
 
@@ -48,14 +43,7 @@ class CallbackDispatchResult:
 
 
 class CallbackRouter:
-    def __init__(
-        self,
-        *,
-        listings: PublicListingFlowService,
-        search_sessions: SearchSessionService,
-        consults: ConsultService | None = None,
-        similars: SimilarIntentService | None = None,
-    ):
+    def __init__(self, *, listings: PublicListingFlowService, search_sessions: SearchSessionService, consults: ConsultService | None = None, similars: SimilarIntentService | None = None):
         self.listings = listings
         self.search_sessions = search_sessions
         self.consults = consults
@@ -66,148 +54,62 @@ class CallbackRouter:
         raw_callback: object,
         *,
         session_public_listing_ids: tuple[str, ...] | list[str] = (),
+        source: str = "listing_callback",
+        touchpoint: str = "",
     ) -> CallbackDispatchResult:
+        clean_source = str(source or "").strip() or "listing_callback"
+        clean_touchpoint = str(touchpoint or "").strip()
         callback = parse_callback(raw_callback)
         if callback is None:
-            return CallbackDispatchResult(
-                status="invalid_callback",
-                reason="unsupported_or_malformed_callback",
-            )
+            return CallbackDispatchResult(status="invalid_callback", reason="unsupported_or_malformed_callback")
 
         if callback.kind == "change_search":
-            return CallbackDispatchResult(
-                status="ok",
-                callback=callback,
-                action="change_search",
-                change_search=True,
-            )
+            return CallbackDispatchResult(status="ok", callback=callback, action="change_search", change_search=True)
 
         if callback.kind == "card":
-            navigation = self.search_sessions.navigate(
-                callback,
-                session_public_listing_ids,
-            )
+            navigation = self.search_sessions.navigate(callback, session_public_listing_ids)
             if navigation.status == "invalid_callback":
-                return CallbackDispatchResult(
-                    status="invalid_callback",
-                    callback=callback,
-                    action="show_card",
-                    reason="stale_or_tampered_search_callback",
-                    navigation=navigation,
-                )
+                return CallbackDispatchResult(status="invalid_callback", callback=callback, action="show_card", reason="stale_or_tampered_search_callback", navigation=navigation)
             if navigation.status == "expired":
-                return CallbackDispatchResult(
-                    status="expired",
-                    callback=callback,
-                    action="show_card",
-                    reason="search_session_expired",
-                    navigation=navigation,
-                )
-            return CallbackDispatchResult(
-                status="ok",
-                callback=callback,
-                action="show_card",
-                navigation=navigation,
-            )
+                return CallbackDispatchResult(status="expired", callback=callback, action="show_card", reason="search_session_expired", navigation=navigation)
+            return CallbackDispatchResult(status="ok", callback=callback, action="show_card", navigation=navigation)
 
         if callback.kind == "listing":
             if callback.action == "consult":
                 if self.consults is None:
-                    return CallbackDispatchResult(
-                        status="unsupported",
-                        callback=callback,
-                        action="consult",
-                        reason="unsupported_not_wired",
-                    )
+                    return CallbackDispatchResult(status="unsupported", callback=callback, action="consult", reason="unsupported_not_wired")
                 consult = self.consults.resolve(
                     callback.public_listing_id,
-                    source="listing_callback",
+                    source=clean_source,
+                    touchpoint=clean_touchpoint,
                 )
                 if consult.ok:
-                    return CallbackDispatchResult(
-                        status="ok",
-                        callback=callback,
-                        action="consult",
-                        consult=consult,
-                    )
-                status: CallbackDispatchStatus = (
-                    "not_found"
-                    if consult.status == "not_found"
-                    else "invalid_callback"
-                )
-                return CallbackDispatchResult(
-                    status=status,
-                    callback=callback,
-                    action="consult",
-                    reason=consult.reason,
-                    consult=consult,
-                )
+                    return CallbackDispatchResult(status="ok", callback=callback, action="consult", consult=consult)
+                status: CallbackDispatchStatus = "not_found" if consult.status == "not_found" else "invalid_callback"
+                return CallbackDispatchResult(status=status, callback=callback, action="consult", reason=consult.reason, consult=consult)
 
             if callback.action == "similar":
                 if self.similars is None:
-                    return CallbackDispatchResult(
-                        status="unsupported",
-                        callback=callback,
-                        action="similar",
-                        reason="unsupported_not_wired",
-                    )
-                similar = self.similars.resolve(
-                    callback.public_listing_id,
-                    source="similar_listing",
-                )
+                    return CallbackDispatchResult(status="unsupported", callback=callback, action="similar", reason="unsupported_not_wired")
+                similar = self.similars.resolve(callback.public_listing_id, source=clean_source)
                 if similar.ok:
-                    return CallbackDispatchResult(
-                        status="ok",
-                        callback=callback,
-                        action="similar",
-                        similar=similar,
-                    )
-                status = (
-                    "not_found"
-                    if similar.status == "not_found"
-                    else "invalid_callback"
-                )
-                return CallbackDispatchResult(
-                    status=status,
-                    callback=callback,
-                    action="similar",
-                    reason=similar.reason,
-                    similar=similar,
-                )
+                    return CallbackDispatchResult(status="ok", callback=callback, action="similar", similar=similar)
+                status: CallbackDispatchStatus = "not_found" if similar.status == "not_found" else "invalid_callback"
+                return CallbackDispatchResult(status=status, callback=callback, action="similar", reason=similar.reason, similar=similar)
 
             if callback.action not in {"details", "photos", "book"}:
-                return CallbackDispatchResult(
-                    status="unsupported",
-                    callback=callback,
-                    action=callback.action,
-                    reason="unsupported_not_wired",
-                )
+                return CallbackDispatchResult(status="unsupported", callback=callback, action=callback.action, reason="unsupported_not_wired")
 
-            listing = self.listings.resolve_action(
-                callback.public_listing_id,
-                callback.action,
-                source="listing_callback",
-            )
+            listing = self.listings.resolve_action(callback.public_listing_id, callback.action, source=clean_source)
             if listing.ok:
-                return CallbackDispatchResult(
-                    status="ok",
-                    callback=callback,
-                    action=callback.action,
-                    listing=listing,
-                )
+                return CallbackDispatchResult(status="ok", callback=callback, action=callback.action, listing=listing)
             if listing.status == "not_found":
                 status = "not_found"
             elif listing.status == "blocked":
                 status = "blocked"
             else:
                 status = "invalid_callback"
-            return CallbackDispatchResult(
-                status=status,
-                callback=callback,
-                action=callback.action,
-                reason=listing.reason,
-                listing=listing,
-            )
+            return CallbackDispatchResult(status=status, callback=callback, action=callback.action, reason=listing.reason, listing=listing)
 
         raise AssertionError(f"unhandled_v3_callback_kind:{callback.kind}")
 

@@ -1,6 +1,6 @@
 """Human-readable display labels for persisted consultation source slugs.
 
-The raw source value remains unchanged in lead/attribution storage.  This module
+The raw source value remains unchanged in lead/attribution storage. This module
 is presentation-only so administrator notifications never expose internal
 routing slugs.
 """
@@ -8,13 +8,19 @@ from __future__ import annotations
 
 
 SOURCE_DISPLAY_LABELS = {
-    "hub": "首页联系我们",
+    "hub": "首页顾问",
     "listing_callback": "房源咨询",
     "daily_broadcast": "每日广播咨询",
+    "daily_broadcast_latest": "每日广播房源",
     "user_search": "找房咨询",
     "channel": "频道房源",
     "channel_deeplink": "频道房源",
+    "channel_listing": "频道房源",
     "search_result": "找房结果",
+    "listing_details": "租赁详情",
+    "listing_photos": "更多实拍",
+    "similar_listing": "相近房源",
+    "appointment_success": "预约完成",
 }
 
 

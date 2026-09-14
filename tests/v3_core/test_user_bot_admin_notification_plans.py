@@ -54,7 +54,7 @@ def test_general_contact_plan_preserves_title_and_uses_readable_source():
     assert note.show_bell is True
     assert "用户：<a href=\"tg://user?id=123\">Alice &amp; Bob</a>" in note.lines
     assert "联系方式：@alice" in note.lines
-    assert "入口：首页联系我们" in note.lines
+    assert "入口：首页顾问" in note.lines
     assert "入口：hub" not in note.lines
 
 

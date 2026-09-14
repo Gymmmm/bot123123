@@ -3,16 +3,20 @@
 The pure ``TransitionActionService`` owns state decisions. This adapter claims
 callbacks from the transition namespace, renders local steps, and executes the
 V3 appointment/search boundaries when their dependencies are injected.
+
+Issue #25 keeps persistence behind an explicit confirmation callback:
+date -> time -> confirmation -> submit. Durable ordering after submit remains
+appointment -> lead -> availability/channel/admin effects -> user success page.
 """
 from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Mapping
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 
+from .appointment_confirmation_view import build_appointment_confirmation_view
 from .appointment_runtime_effects import (
     AppointmentRuntimeEffectExecutor,
     AppointmentRuntimeEffectResult,
@@ -25,6 +29,7 @@ from .appointment_submit_executor import (
 from .appointment_success_view import build_appointment_success_view
 from .lead_effects import LeadEffectExecutor, LeadEffectResult
 from .lead_service import LeadUser
+from .public_appointment import PublicAppointmentDraft
 from .search_no_match_view import build_search_no_match_view
 from .search_submit_executor import SearchSubmitExecution, SearchSubmitExecutor
 from .telegram_search_results import TelegramSearchPresentation, present_search_flow_result
@@ -72,19 +77,8 @@ class TelegramTransitionActionOutcome:
     lead_effect: LeadEffectResult | None = None
 
 
-def _view_keyboard(view: TransitionView, channel_url: str = ""):
+async def _edit_view(query: Any, view: TransitionView) -> None:
     keyboard = build_transition_keyboard(view) if view.rows else None
-    clean_channel = str(channel_url or "").strip()
-    if not clean_channel or not view.kind.startswith("appointment"):
-        return keyboard
-    rows = [list(row) for row in (keyboard.inline_keyboard if keyboard else ())]
-    if not any(str(button.text or "") == "📣 返回房源频道" for row in rows for button in row):
-        rows.append([InlineKeyboardButton("📣 返回房源频道", url=clean_channel)])
-    return InlineKeyboardMarkup(rows)
-
-
-async def _edit_view(query: Any, view: TransitionView, *, channel_url: str = "") -> None:
-    keyboard = _view_keyboard(view, channel_url)
     message = getattr(query, "message", None)
     if getattr(message, "photo", None):
         await query.edit_message_caption(
@@ -199,6 +193,68 @@ def _appointment_success_cleanup() -> SessionMutationPlan:
     )
 
 
+def _load_confirmation_draft(user_data: Mapping[str, Any]) -> PublicAppointmentDraft | None:
+    raw = user_data.get(APPOINTMENT_SESSION_KEY)
+    if not isinstance(raw, Mapping):
+        return None
+    try:
+        draft = PublicAppointmentDraft(
+            public_listing_id=raw.get("public_listing_id", ""),
+            mode=raw.get("mode", "offline"),
+            date=str(raw.get("date") or ""),
+            time=str(raw.get("time") or ""),
+            source=str(raw.get("source") or "user_bot"),
+        )
+    except (TypeError, ValueError):
+        return None
+    return draft if draft.ready else None
+
+
+async def _submit_confirmed_appointment(
+    update: Any,
+    context: Any,
+    query: Any,
+    *,
+    draft: PublicAppointmentDraft,
+    views: TransitionViewService,
+    user_data: dict[str, Any],
+    appointment_executor: AppointmentSubmitExecutor,
+    lead_effects: LeadEffectExecutor | None,
+    appointment_runtime_effects: AppointmentRuntimeEffectExecutor | None,
+) -> TelegramTransitionActionOutcome:
+    appointment_user = _telegram_appointment_user(update)
+    lead_user = _lead_user(appointment_user)
+    execution = appointment_executor.execute(user=appointment_user, draft=draft)
+    lead_effect = None
+    if lead_effects is not None:
+        lead_effect = lead_effects.record_appointment(
+            user=lead_user,
+            execution=execution,
+            draft=draft,
+        )
+    runtime_effect = None
+    if appointment_runtime_effects is not None:
+        runtime_effect = await appointment_runtime_effects.execute(
+            bot=getattr(context, "bot", None),
+            user=lead_user,
+            execution=execution,
+            draft=draft,
+        )
+    success_view = build_appointment_success_view(
+        draft,
+        views.inventory,
+        submission_kind=execution.submission.kind,
+    )
+    await _edit_view(query, success_view)
+    apply_session_mutation(user_data, _appointment_success_cleanup())
+    return TelegramTransitionActionOutcome(
+        handled=True,
+        appointment_execution=execution,
+        appointment_effects=runtime_effect,
+        lead_effect=lead_effect,
+    )
+
+
 async def handle_v3_transition_action(
     update: Any,
     context: Any,
@@ -209,7 +265,6 @@ async def handle_v3_transition_action(
     search_executor: SearchSubmitExecutor | None = None,
     lead_effects: LeadEffectExecutor | None = None,
     appointment_runtime_effects: AppointmentRuntimeEffectExecutor | None = None,
-    channel_url: str = "",
 ) -> TelegramTransitionActionOutcome:
     query = getattr(update, "callback_query", None)
     raw = str(getattr(query, "data", "") or "") if query is not None else ""
@@ -221,63 +276,59 @@ async def handle_v3_transition_action(
     if not isinstance(user_data, dict):
         raise ValueError("telegram_user_data_missing_for_transition_action")
 
+    # These two callbacks are the explicit confirmation boundary added by
+    # Issue #25. They operate on the same public appointment session and do not
+    # introduce a second controller or persistence path.
+    if callback.kind in {"appointment_submit", "appointment_back_time"}:
+        await query.answer()
+        draft = _load_confirmation_draft(user_data)
+        if draft is None:
+            return TelegramTransitionActionOutcome(handled=True)
+        if callback.kind == "appointment_back_time":
+            await _edit_view(query, views.appointment_time(draft.with_date(draft.date)))
+            return TelegramTransitionActionOutcome(handled=True)
+        if appointment_executor is None:
+            return TelegramTransitionActionOutcome(handled=True)
+        return await _submit_confirmed_appointment(
+            update,
+            context,
+            query,
+            draft=draft,
+            views=views,
+            user_data=user_data,
+            appointment_executor=appointment_executor,
+            lead_effects=lead_effects,
+            appointment_runtime_effects=appointment_runtime_effects,
+        )
+
     result = actions.apply(callback, user_data)
     if not result.ok:
-        if result.status == "expired":
-            await query.answer("操作已过期，请重新选择。", show_alert=True)
-        else:
-            await query.answer("这个操作暂时无法继续，请返回首页重试。", show_alert=True)
+        await query.answer("操作已过期，请重新选择。", show_alert=True)
         return TelegramTransitionActionOutcome(handled=True, result=result)
     await query.answer()
 
     view = _view_for_result(views, result)
     if view is not None:
-        await _edit_view(query, view, channel_url=channel_url)
+        await _edit_view(query, view)
         _apply_success_mutation(user_data, result, callback.kind)
         return TelegramTransitionActionOutcome(handled=True, result=result)
 
     if result.next_step == "navigation":
         navigation_view = _navigation_view(views, result, user_data)
         if navigation_view is not None:
-            await _edit_view(query, navigation_view, channel_url=channel_url)
+            await _edit_view(query, navigation_view)
             _apply_success_mutation(user_data, result, callback.kind)
             return TelegramTransitionActionOutcome(handled=True, result=result)
 
-    if result.next_step == "appointment_submit" and appointment_executor is not None:
+    # Existing action service historically names this boundary appointment_submit.
+    # Under Issue #25 it now means "draft ready for confirmation"; persistence is
+    # performed only by the explicit appointment_submit callback above.
+    if result.next_step == "appointment_submit":
         if result.appointment is None:
             raise ValueError("appointment_submit_action_missing_draft")
-        appointment_user = _telegram_appointment_user(update)
-        lead_user = _lead_user(appointment_user)
-        execution = appointment_executor.execute(user=appointment_user, draft=result.appointment)
-        lead_effect = None
-        if lead_effects is not None:
-            lead_effect = lead_effects.record_appointment(
-                user=lead_user,
-                execution=execution,
-                draft=result.appointment,
-            )
-        runtime_effect = None
-        if appointment_runtime_effects is not None:
-            runtime_effect = await appointment_runtime_effects.execute(
-                bot=getattr(context, "bot", None),
-                user=lead_user,
-                execution=execution,
-                draft=result.appointment,
-            )
-        success_view = build_appointment_success_view(
-            result.appointment,
-            views.inventory,
-            submission_kind=execution.submission.kind,
-        )
-        await _edit_view(query, success_view, channel_url=channel_url)
-        apply_session_mutation(user_data, _appointment_success_cleanup())
-        return TelegramTransitionActionOutcome(
-            handled=True,
-            result=result,
-            appointment_execution=execution,
-            appointment_effects=runtime_effect,
-            lead_effect=lead_effect,
-        )
+        _apply_success_mutation(user_data, result, callback.kind)
+        await _edit_view(query, build_appointment_confirmation_view(result.appointment, views.inventory))
+        return TelegramTransitionActionOutcome(handled=True, result=result)
 
     if result.next_step == "search_submit" and search_executor is not None:
         if result.search is None:
@@ -285,7 +336,7 @@ async def handle_v3_transition_action(
         execution = search_executor.execute(result.search)
         presentation = await present_search_flow_result(update, context, execution.result)
         if not presentation.matched:
-            await _edit_view(query, build_search_no_match_view(result.search), channel_url=channel_url)
+            await _edit_view(query, build_search_no_match_view(result.search))
         lead_effect = None
         if lead_effects is not None:
             lead_effect = lead_effects.record_search(
