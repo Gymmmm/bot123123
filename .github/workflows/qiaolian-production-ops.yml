@@ -127,12 +127,11 @@ jobs:
           print('TRIAL_DB_COPY_OK')
           PY
             chown qiaolianbot:qiaolianbot "$TMP/trial.db"
-            SESSION=$(bash -lc "set -a; source '$RUNTIME_ENV'; set +a; printf '%s' \"\${TELETHON_SESSION_PATH:-}\"")
-            test -n "$SESSION"
-            test -f "$SESSION"
-            cp "$SESSION" "$TMP/trial.session"
+            SESSION_BASE=$(bash -lc "set -a; source '$RUNTIME_ENV'; set +a; if [ -n \"\${TELETHON_SESSION_PATH:-}\" ]; then printf '%s' \"\$TELETHON_SESSION_PATH\"; else printf '%s' '$V3/telethon_sessions/'\"\${COLLECTOR_SESSION_NAME:-qiaolian_collector}\"; fi")
+            if [ -f "$SESSION_BASE" ]; then SESSION_FILE="$SESSION_BASE"; elif [ -f "$SESSION_BASE.session" ]; then SESSION_FILE="$SESSION_BASE.session"; else echo 'TRIAL_SESSION_NOT_FOUND'; return 3; fi
+            cp "$SESSION_FILE" "$TMP/trial.session"
             chown qiaolianbot:qiaolianbot "$TMP/trial.session"
-            runuser -u qiaolianbot -- bash -lc "set -a; source '$RUNTIME_ENV'; set +a; export PYTHONPATH='$V3'; export DB_PATH='$TMP/trial.db'; export COLLECTOR_SOURCES_JSON='$V3/sources.json'; export COLLECTOR_DOWNLOAD_DIR='$TMP/media'; export TELETHON_SESSION_PATH='$TMP/trial.session'; export SOURCE_NAME='zufang555'; export TARGET_GROUPS='50'; export FETCH_LIMIT='1200'; cd '$V3'; exec '$VENV/bin/python' scripts/v3/backfill_source_history.py"
+            runuser -u qiaolianbot -- bash -lc "set -a; source '$RUNTIME_ENV'; set +a; export PYTHONPATH='$V3'; export DB_PATH='$TMP/trial.db'; export COLLECTOR_SOURCES_JSON='$V3/sources.json'; export COLLECTOR_DOWNLOAD_DIR='$TMP/media'; export TELETHON_SESSION_PATH='$TMP/trial'; export SOURCE_NAME='zufang555'; export TARGET_GROUPS='50'; export FETCH_LIMIT='1200'; cd '$V3'; exec '$VENV/bin/python' scripts/v3/backfill_source_history.py"
             echo '=== TRIAL_POST_COUNTS ==='
             "$VENV/bin/python" - "$TMP/trial.db" "$DB" <<'PY'
           import sqlite3,sys
