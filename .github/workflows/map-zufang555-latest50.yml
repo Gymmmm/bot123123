@@ -1,0 +1,28 @@
+name: map-zufang555-latest50
+on:
+  push:
+    branches: [ops/reedit-zufang555-latest50]
+    paths: [.github/workflows/map-zufang555-latest50.yml]
+permissions:
+  contents: read
+jobs:
+  map:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify host
+        run: |
+          ssh-keyscan -T 10 -t ed25519 50.114.74.120 2>/dev/null | grep -v '^#' > "$RUNNER_TEMP/kh"
+          ssh-keygen -lf "$RUNNER_TEMP/kh" | grep -F 'SHA256:fuufBlFaqRpQhlkio0vuLsuv8w8x3zUb3VFQsnUny/o'
+      - name: Configure SSH
+        env:
+          PROD_SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+        run: |
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/key"
+          cp "$RUNNER_TEMP/kh" "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/key" "$HOME/.ssh/known_hosts"
+      - name: Map latest 50
+        run: |
+          scp -i "$HOME/.ssh/key" -o BatchMode=yes deploy/v3/map_zufang555_latest50_publications.py root@50.114.74.120:/tmp/map_latest50.py
+          ssh -i "$HOME/.ssh/key" -o BatchMode=yes root@50.114.74.120 'python3 /tmp/map_latest50.py; rm -f /tmp/map_latest50.py'
