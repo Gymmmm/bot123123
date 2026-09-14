@@ -1,17 +1,17 @@
 name: qiaolian-production-ops
 
 on:
+  push:
+    branches: [codex/qiaolian-ui-cleanup-20260829]
+    paths: [.github/ops-control/request.txt]
   workflow_dispatch:
     inputs:
       action:
         description: Safe production operation
         required: true
-        default: inspect
+        default: health
         type: choice
-        options: [inspect, health, latest-draft, logs, restart, trial-zufang555-50]
-  push:
-    branches: [codex/qiaolian-ui-cleanup-20260829]
-    paths: [.github/ops-control/request.txt]
+        options: [health, plan-zufang555-50]
 
 permissions:
   contents: read
@@ -31,13 +31,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Check out the exact control revision
+      - name: Check out control revision
         if: github.event_name == 'push'
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
 
-      - name: Read and validate requested operation
+      - name: Resolve operation
         id: request
         env:
           DISPATCH_ACTION: '${{ inputs.action }}'
@@ -46,19 +46,14 @@ jobs:
           set -Eeuo pipefail
           if [[ "$EVENT_NAME" == workflow_dispatch ]]; then
             action=$DISPATCH_ACTION
-          elif [[ "$EVENT_NAME" == push ]]; then
+          else
             request=$(<.github/ops-control/request.txt)
             test "$(printf '%s\n' "$request" | wc -l | tr -d ' ')" = 2
             action=$(printf '%s\n' "$request" | sed -n '1p')
             request_id=$(printf '%s\n' "$request" | sed -n '2p')
             [[ "$request_id" =~ ^[A-Za-z0-9._:-]{1,80}$ ]]
-          else
-            exit 2
           fi
-          case "$action" in
-            inspect|health|latest-draft|logs|restart|trial-zufang555-50) ;;
-            *) exit 2 ;;
-          esac
+          case "$action" in health|plan-zufang555-50) ;; *) exit 2 ;; esac
           printf 'action=%s\n' "$action" >> "$GITHUB_OUTPUT"
 
       - name: Verify production SSH host key
@@ -72,13 +67,12 @@ jobs:
           PROD_SSH_PRIVATE_KEY: '${{ secrets.PROD_SSH_PRIVATE_KEY }}'
         run: |
           set -Eeuo pipefail
-          test -n "$PROD_SSH_PRIVATE_KEY"
           install -d -m 700 "$HOME/.ssh"
           printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
           cp "$RUNNER_TEMP/known_hosts_observed" "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
 
-      - name: Run allowlisted production operation
+      - name: Run production preflight
         env:
           OPS_ACTION: '${{ steps.request.outputs.action }}'
         run: |
@@ -86,78 +80,86 @@ jobs:
           ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 "$PROD_SSH_USER@$PROD_HOST" "bash -s -- '$OPS_ACTION'" <<'REMOTE'
           set -Eeuo pipefail
           ACTION=$1
-          APP=/opt/qiaolian_dual_bots
-          DB="$APP/data/qiaolian_dual_bot.db"
-          V3=/opt/qiaolian_v3/current
-          VENV=/opt/qiaolian_v3/.venv
-          RUNTIME_ENV=/opt/qiaolian_v3/runtime.env
-          SERVICES=(qiaolian-v3@collector.service qiaolian-v3@canonical.service qiaolian-v3@publisher.service qiaolian-v3@user.service)
-
-          case "$ACTION" in
-            inspect|health|latest-draft|logs|restart|trial-zufang555-50) ;;
-            *) exit 2 ;;
-          esac
+          ROOT=/opt/qiaolian_v3
+          DB="${DB_PATH:-/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db}"
+          VENV="$ROOT/.venv"
+          case "$ACTION" in health|plan-zufang555-50) ;; *) exit 2 ;; esac
 
           health() {
-            echo '=== DEPLOYED VERSION ==='
-            basename "$(readlink -f /opt/qiaolian_v3/current)"
-            echo '=== SERVICES ==='
-            for service in "${SERVICES[@]}"; do
-              systemctl show "$service" --property=ActiveState,SubState,MainPID,NRestarts --no-pager
+            echo "DEPLOYED_SHA=$(tr -cd '0-9a-fA-F' < "$ROOT/.deployed_sha")"
+            for s in collector canonical publisher user; do
+              systemctl show "qiaolian-v3@$s.service" -p ActiveState -p SubState -p MainPID -p NRestarts --no-pager | tr '\n' ' '
+              echo " service=$s"
             done
           }
 
-          trial_zufang555_50() {
-            test -f "$DB"
-            test -f "$RUNTIME_ENV"
-            test -f "$V3/scripts/v3/backfill_source_history.py"
-            TMP=$(mktemp -d /var/tmp/qiaolian-zufang555-50.XXXXXX)
-            trap 'rm -rf "$TMP"' RETURN
-            chown qiaolianbot:qiaolianbot "$TMP"
-            chmod 0750 "$TMP"
-            install -d -m 0750 -o qiaolianbot -g qiaolianbot "$TMP/media"
-            "$VENV/bin/python" - "$DB" "$TMP/trial.db" <<'PY'
-          import sqlite3,sys
-          src,dst=sys.argv[1:]
-          a=sqlite3.connect(f'file:{src}?mode=ro',uri=True)
-          b=sqlite3.connect(dst)
-          a.backup(b)
-          b.close(); a.close()
-          c=sqlite3.connect(dst)
-          assert c.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
+          plan_latest50() {
+            "$VENV/bin/python" - "$DB" <<'PY'
+          import json, sqlite3, sys
+          db_path=sys.argv[1]
+          c=sqlite3.connect(f'file:{db_path}?mode=ro', uri=True)
+          c.row_factory=sqlite3.Row
+          c.execute('PRAGMA query_only=ON')
+
+          rows=c.execute("SELECT id,source_post_id,source_url,raw_meta_json,parse_status FROM source_posts WHERE source_name='zufang555'").fetchall()
+          source=[]
+          for r in rows:
+              try: meta=json.loads(r['raw_meta_json'] or '{}')
+              except Exception: meta={}
+              anchor=int(meta.get('anchor_message_id') or 0)
+              source.append((anchor,dict(r)))
+          source=sorted(source,key=lambda x:x[0],reverse=True)[:50]
+          source=list(reversed(source))
+          source_pks=[int(x[1]['id']) for x in source]
+
+          placeholders=','.join('?' for _ in source_pks)
+          identities={}
+          if source_pks:
+              for r in c.execute(f"""
+                  SELECT c.source_post_id,r.listing_id,r.public_id,c.canonical_record_id
+                  FROM canonical_records c
+                  LEFT JOIN listing_identity_reservations_v3 r ON r.canonical_record_id=c.canonical_record_id
+                  WHERE CAST(c.source_post_id AS INTEGER) IN ({placeholders})
+                  ORDER BY c.id ASC
+              """,source_pks):
+                  identities.setdefault(int(r['source_post_id']),dict(r))
+
+          pubs={}
+          listing_ids=[str(v.get('listing_id') or '') for v in identities.values() if v.get('listing_id')]
+          if listing_ids:
+              ph=','.join('?' for _ in listing_ids)
+              for r in c.execute(f"""
+                  SELECT instance_id,package_id,listing_id,offer_id,channel_message_id,publish_status
+                  FROM publication_instances
+                  WHERE platform='telegram' AND listing_id IN ({ph})
+                    AND CAST(COALESCE(channel_message_id,'0') AS INTEGER)>0
+                  ORDER BY CAST(channel_message_id AS INTEGER)
+              """,listing_ids):
+                  pubs[str(r['listing_id'])]=dict(r)
+
+          mapped=[]; missing=[]
+          for anchor,r in source:
+              ident=identities.get(int(r['id'])) or {}
+              listing=str(ident.get('listing_id') or '')
+              pub=pubs.get(listing)
+              item={'anchor':anchor,'source_pk':int(r['id']),'source_identity':r['source_post_id'],'parse_status':r['parse_status'],'listing_id':listing,'public_id':ident.get('public_id'),'channel_message_id':int(pub['channel_message_id']) if pub else None,'instance_id':pub.get('instance_id') if pub else None}
+              (mapped if pub else missing).append(item)
+          print('PLAN_SUMMARY',json.dumps({'latest50':len(source),'with_identity':len(identities),'mapped_publications':len(mapped),'missing_publication':len(missing)},ensure_ascii=False))
+          print('PLAN_MAP',json.dumps(mapped,ensure_ascii=False))
+          if missing:
+              print('PLAN_MISSING',json.dumps(missing,ensure_ascii=False))
+          allpub=c.execute("SELECT COUNT(*) FROM publication_instances WHERE platform='telegram' AND CAST(COALESCE(channel_message_id,'0') AS INTEGER)>0").fetchone()[0]
+          print('TOTAL_CHANNEL_PUBLICATIONS',allpub)
           c.close()
-          print('TRIAL_DB_COPY_OK')
           PY
-            chown qiaolianbot:qiaolianbot "$TMP/trial.db"
-            SESSION_BASE=$(bash -lc "set -a; source '$RUNTIME_ENV'; set +a; if [ -n \"\${TELETHON_SESSION_PATH:-}\" ]; then printf '%s' \"\$TELETHON_SESSION_PATH\"; else printf '%s' '$V3/telethon_sessions/'\"\${COLLECTOR_SESSION_NAME:-qiaolian_collector}\"; fi")
-            if [ -f "$SESSION_BASE" ]; then SESSION_FILE="$SESSION_BASE"; elif [ -f "$SESSION_BASE.session" ]; then SESSION_FILE="$SESSION_BASE.session"; else echo 'TRIAL_SESSION_NOT_FOUND'; return 3; fi
-            cp "$SESSION_FILE" "$TMP/trial.session"
-            chown qiaolianbot:qiaolianbot "$TMP/trial.session"
-            runuser -u qiaolianbot -- bash -lc "set -a; source '$RUNTIME_ENV'; set +a; export PYTHONPATH='$V3'; export DB_PATH='$TMP/trial.db'; export COLLECTOR_SOURCES_JSON='$V3/sources.json'; export COLLECTOR_DOWNLOAD_DIR='$TMP/media'; export TELETHON_SESSION_PATH='$TMP/trial'; export SOURCE_NAME='zufang555'; export TARGET_GROUPS='50'; export FETCH_LIMIT='1200'; cd '$V3'; exec '$VENV/bin/python' scripts/v3/backfill_source_history.py"
-            echo '=== TRIAL_POST_COUNTS ==='
-            "$VENV/bin/python" - "$TMP/trial.db" "$DB" <<'PY'
-          import sqlite3,sys
-          trial,prod=sys.argv[1:]
-          def count(path):
-              db=sqlite3.connect(f'file:{path}?mode=ro',uri=True)
-              n=db.execute("select count(*) from source_posts where source_name='zufang555'").fetchone()[0]
-              db.close(); return n
-          print('production_zufang555=',count(prod))
-          print('trial_zufang555=',count(trial))
-          PY
-            echo 'TRIAL_ONLY production_db_unchanged=true destination_publish=false'
           }
 
           case "$ACTION" in
             health) health ;;
-            latest-draft) echo 'latest-draft unchanged' ;;
-            logs) journalctl -u qiaolian-v3@collector.service --since '-30 minutes' --no-pager -n 50 ;;
-            inspect) health ;;
-            restart) systemctl restart "${SERVICES[@]}"; health ;;
-            trial-zufang555-50) trial_zufang555_50; health ;;
+            plan-zufang555-50) plan_latest50; health ;;
           esac
           REMOTE
 
-      - name: Remove temporary SSH material
+      - name: Remove SSH material
         if: always()
         run: rm -f "$HOME/.ssh/qiaolian_production"
