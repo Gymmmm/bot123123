@@ -1,2 +1,2 @@
 latest-draft
-publish-inspect-2026-09-14T21:00:00+07:00
+publish-inspect-2026-09-14T21-00-00-0700
