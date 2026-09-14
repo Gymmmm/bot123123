@@ -123,6 +123,35 @@ jobs:
           raw = re.sub(r'(?<!\d)\+?\d[\d\s-]{6,}\d', '[contact-redacted]', raw)
           raw = re.sub(r'@[A-Za-z0-9_]{4,}', '[handle-redacted]', raw)
           print('TARGET_RAW_REDACTED', raw[:1600].replace('\n', ' | '))
+
+          publication = conn.execute('''
+              SELECT * FROM publication_instances
+              WHERE listing_id=? AND offer_id=? AND platform='telegram'
+              ORDER BY published_at DESC LIMIT 1
+          ''', (row['listing_id'], row['offer_id'])).fetchone()
+          if publication is None:
+              raise SystemExit('TARGET_PUBLICATION_NOT_FOUND')
+          if str(publication['channel_message_id']) != '3245' or publication['publish_status'] != 'published':
+              raise SystemExit('TARGET_PUBLICATION_IDENTITY_MISMATCH')
+          package = conn.execute('''
+              SELECT * FROM publication_packages_v3 WHERE package_id=?
+          ''', (publication['package_id'],)).fetchone()
+          if package is None or package['status'] != 'published':
+              raise SystemExit('TARGET_PACKAGE_NOT_PUBLISHED')
+          gallery = json.loads(package['gallery_json'] or '[]')
+          actions = json.loads(package['actions_json'] or '{}')
+          if list(actions) != ['details', 'photos', 'book']:
+              raise SystemExit(f'TARGET_ACTIONS_INVALID keys={list(actions)}')
+          if 'QL-PP-W2H7' not in package['post_text'] or '$420' not in package['post_text']:
+              raise SystemExit('TARGET_POST_TEXT_MISMATCH')
+          print(
+              'TARGET_PUBLICATION_OK',
+              f"message_id={publication['channel_message_id']}",
+              f"package_id={package['package_id']}",
+              f"package_status={package['status']}",
+              f"gallery_count={len(gallery)}",
+              f"actions={','.join(actions)}",
+          )
           conn.close()
           PY
 
