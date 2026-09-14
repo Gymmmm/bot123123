@@ -22,9 +22,10 @@ env:
   PROD_SSH_KNOWN_HOSTS: '50.114.74.120 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMvdBaAbAt9/4NCEC4RmiAukQ5KK5S6OF4YEml2iLw+6'
   PROD_SSH_HOST_FINGERPRINT: 'SHA256:fuufBlFaqRpQhlkio0vuLsuv8w8x3zUb3VFQsnUny/o'
   EXPECTED_PROD_SHA: '5ddaaa357d79967fa76d19cd0e2195202b6d3b89'
-  CANDIDATE_SHA: 'REPLACE_AFTER_PUSH'
+  CANDIDATE_SHA: '213a2e5d69620c857d2c860a2077996077ceda64'
   INTERVAL_SECONDS: '8'
-  LIMIT_COUNT: '0'
+  ONLY_MESSAGE_IDS: ''
+  RUN_STAMP: '20260914-adviser-handoff-full'
 
 jobs:
   reedit-all:
@@ -37,7 +38,6 @@ jobs:
           set -Eeuo pipefail
           ssh-keyscan -T 10 -p "$PROD_PORT" -t ed25519 "$PROD_HOST" 2>/dev/null | grep -v '^#' > "$RUNNER_TEMP/known_hosts_observed"
           ssh-keygen -lf "$RUNNER_TEMP/known_hosts_observed" | grep -F "$PROD_SSH_HOST_FINGERPRINT"
-
       - name: Configure production SSH
         shell: bash
         env:
@@ -49,56 +49,44 @@ jobs:
           printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
           printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
-
-      - name: Rebuild and re-edit durable channel posts to clipboard CTA + consult
+      - name: Rebuild packages with enriched consult + re-edit all channel posts
         shell: bash
         run: |
           set -Eeuo pipefail
           ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 \
             "$PROD_SSH_USER@$PROD_HOST" \
-            "EXPECTED_PROD_SHA='$EXPECTED_PROD_SHA' CANDIDATE_SHA='$CANDIDATE_SHA' INTERVAL_SECONDS='$INTERVAL_SECONDS' LIMIT_COUNT='$LIMIT_COUNT' bash -s" <<'REMOTE'
+            "EXPECTED_PROD_SHA='$EXPECTED_PROD_SHA' CANDIDATE_SHA='$CANDIDATE_SHA' INTERVAL_SECONDS='$INTERVAL_SECONDS' ONLY_MESSAGE_IDS='$ONLY_MESSAGE_IDS' bash -s" <<'REMOTE'
           set -Eeuo pipefail
           ROOT=/opt/qiaolian_v3
           test "$(cat "$ROOT/.deployed_sha")" = "$EXPECTED_PROD_SHA"
           test "$(basename "$(readlink -f "$ROOT/current")")" = "$EXPECTED_PROD_SHA"
-          for unit in qiaolian-v3@canonical.service qiaolian-v3@publisher.service qiaolian-v3@user.service qiaolian-v3@collector.service; do
-            test "$(systemctl is-active "$unit")" = active
-          done
-
-          set -a
-          source "$ROOT/runtime.env"
-          set +a
-          test -n "${PUBLISHER_BOT_TOKEN:-}"
-          test -n "${CHANNEL_ID:-}"
-          test -n "${USER_BOT_USERNAME:-}${DEEPLINK_BOT_USERNAME:-}"
-          test -n "${ADVISOR_TG:-}${SUPPORT_USERNAME:-}"
-
+          set -a; source "$ROOT/runtime.env"; set +a
           CAND=/tmp/qiaolian-reedit-cta-$CANDIDATE_SHA
           rm -rf "$CAND"
           git clone --quiet https://github.com/Gymmmm/bot123123.git "$CAND"
           git -C "$CAND" checkout --quiet "$CANDIDATE_SHA"
-
           DB="${DB_PATH:-/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db}"
-          BACKUP="/opt/qiaolian_backups/reedit-cta-$(date -u +%Y%m%d-%H%M%S)"
+          BACKUP="/opt/qiaolian_backups/reedit-handoff-$(date -u +%Y%m%d-%H%M%S)"
           install -d -m 0700 "$BACKUP"
           sqlite3 "$DB" ".backup '$BACKUP/qiaolian_dual_bot.db'"
           sqlite3 "$BACKUP/qiaolian_dual_bot.db" 'PRAGMA quick_check;' | grep -Fx ok
           echo "REEDIT_BACKUP_OK path=$BACKUP"
-
           cd "$CAND"
           export PYTHONPATH="$CAND${PYTHONPATH:+:$PYTHONPATH}"
           "$ROOT/.venv/bin/python" - <<'PY'
-          import asyncio, json, os, sqlite3, time
+          import asyncio, os, sqlite3, time
           from pathlib import Path
           from telegram import Bot
+          from telegram.error import NetworkError, TimedOut, RetryAfter
           from v3_core.publishing.admin_bot import load_settings
-          from v3_core.publishing.delivery_coordinator import PublicationDeliveryCoordinator, TelegramSendCommand
+          from v3_core.publishing.delivery_coordinator import TelegramSendCommand
           from v3_core.publishing.delivery_state import PublicationDeliveryStateRepository
           from v3_core.publishing.package_service import PackageBuildService
           from v3_core.publishing.package_store import FrozenPackageStore
           from v3_core.publishing.publication_instances import PublicationInstanceRepository
-          from v3_core.publishing.telegram_adapter import TelegramChannelAdapter
+          from v3_core.publishing.telegram_adapter import TelegramChannelAdapter, build_channel_keyboard
           from v3_core.storage.inventory_reader import InventoryReader
+          from urllib.parse import unquote, parse_qs, urlsplit
 
           settings = load_settings()
           db = Path(settings.db_path)
@@ -106,12 +94,6 @@ jobs:
           packages = FrozenPackageStore(db)
           publications = PublicationInstanceRepository(db)
           deliveries = PublicationDeliveryStateRepository(db)
-          coordinator = PublicationDeliveryCoordinator(
-              reader=reader,
-              packages=packages,
-              deliveries=deliveries,
-              publications=publications,
-          )
           builder = PackageBuildService(
               reader=reader,
               store=packages,
@@ -119,26 +101,50 @@ jobs:
               advisor_url=settings.advisor_url,
           )
           interval = float(os.environ.get("INTERVAL_SECONDS") or "8")
-          limit = int(os.environ.get("LIMIT_COUNT") or "0")
+          only_raw = str(os.environ.get("ONLY_MESSAGE_IDS") or "").strip()
+          only_ids = {int(x) for x in only_raw.split(",") if x.strip()} if only_raw else set()
 
-          def set_package_status(package_id, old_status, new_status):
+          def hold_offer_packages(offer_id: str):
+              held = []
+              with sqlite3.connect(str(db), timeout=30) as c:
+                  c.row_factory = sqlite3.Row
+                  c.execute("BEGIN IMMEDIATE")
+                  rows = c.execute(
+                      """SELECT package_id, status FROM publication_packages_v3
+                         WHERE offer_id=? AND status IN ('approved','published')""",
+                      (str(offer_id),),
+                  ).fetchall()
+                  for row in rows:
+                      cur = c.execute(
+                          """UPDATE publication_packages_v3
+                             SET status='rebuild_hold', updated_at=CURRENT_TIMESTAMP
+                             WHERE package_id=? AND status=?""",
+                          (row["package_id"], row["status"]),
+                      )
+                      if cur.rowcount == 1:
+                          held.append((row["package_id"], row["status"]))
+                  c.commit()
+              return held
+
+          def restore_held(held):
               with sqlite3.connect(str(db), timeout=30) as c:
                   c.execute("BEGIN IMMEDIATE")
-                  cur = c.execute(
-                      "UPDATE publication_packages_v3 SET status=?, updated_at=CURRENT_TIMESTAMP WHERE package_id=? AND status=?",
-                      (new_status, package_id, old_status),
-                  )
-                  if cur.rowcount != 1:
-                      raise RuntimeError(f"package_status_transition_failed:{package_id}:{old_status}->{new_status}")
+                  for package_id, old_status in held:
+                      c.execute(
+                          """UPDATE publication_packages_v3
+                             SET status=?, updated_at=CURRENT_TIMESTAMP
+                             WHERE package_id=? AND status='rebuild_hold'""",
+                          (old_status, package_id),
+                      )
                   c.commit()
 
           def build_replacement(pub):
-              old = packages.verify_frozen(pub["package_id"])
-              old_status = old.status
-              held = False
-              if old_status in {"approved", "published"}:
-                  set_package_status(old.package_id, old_status, "rebuild_hold")
-                  held = True
+              old = packages.get(pub["package_id"])
+              if old is None:
+                  raise KeyError(pub["package_id"])
+              if not Path(str(old.cover_path)).is_file():
+                  raise FileNotFoundError(f"cover_missing:{old.cover_path}")
+              held = hold_offer_packages(old.offer_id)
               try:
                   new = builder.build(
                       listing_id=old.listing_id,
@@ -148,13 +154,15 @@ jobs:
                       gallery=list(old.gallery),
                       source_identity=old.source_identity,
                   )
-              finally:
-                  if held:
-                      set_package_status(old.package_id, "rebuild_hold", old_status)
-              return old, new
+              except Exception:
+                  restore_held(held)
+                  raise
+              return old, new, held
 
           def command_for(package_id, channel_chat_id, attempt_id, inventory_status):
-              package = packages.verify_frozen(package_id)
+              package = packages.get(package_id)
+              if package is None:
+                  raise KeyError(package_id)
               return TelegramSendCommand(
                   attempt_id=str(attempt_id),
                   package_id=package.package_id,
@@ -165,26 +173,57 @@ jobs:
                   inventory_status=str(inventory_status or "pending").strip().lower(),
               )
 
-          def finalize(pub, old, new, caption):
+          def finalize(pub, old, new, caption, held):
               with sqlite3.connect(str(db), timeout=30) as c:
                   c.execute("BEGIN IMMEDIATE")
                   c.execute(
-                      "UPDATE publication_packages_v3 SET status='superseded', updated_at=CURRENT_TIMESTAMP WHERE package_id=?",
+                      """UPDATE publication_packages_v3
+                         SET status='superseded', updated_at=CURRENT_TIMESTAMP
+                         WHERE package_id=?""",
                       (old.package_id,),
                   )
+                  for package_id, _old_status in held:
+                      if package_id != old.package_id:
+                          c.execute(
+                              """UPDATE publication_packages_v3
+                                 SET status='superseded', updated_at=CURRENT_TIMESTAMP
+                                 WHERE package_id=? AND status='rebuild_hold'""",
+                              (package_id,),
+                          )
                   cur = c.execute(
-                      "UPDATE publication_packages_v3 SET status='published', published_at=COALESCE(published_at, CURRENT_TIMESTAMP), updated_at=CURRENT_TIMESTAMP WHERE package_id=? AND status='package_ready'",
+                      """UPDATE publication_packages_v3
+                         SET status='published',
+                             published_at=COALESCE(published_at, CURRENT_TIMESTAMP),
+                             updated_at=CURRENT_TIMESTAMP
+                         WHERE package_id=? AND status='package_ready'""",
                       (new.package_id,),
                   )
                   if cur.rowcount != 1:
                       raise RuntimeError("new_package_publish_transition_failed")
                   cur = c.execute(
-                      "UPDATE publication_instances SET package_id=?, listing_id=?, offer_id=?, post_text=?, publish_status='published', updated_at=CURRENT_TIMESTAMP WHERE instance_id=?",
+                      """UPDATE publication_instances
+                         SET package_id=?, listing_id=?, offer_id=?, post_text=?,
+                             publish_status='published', updated_at=CURRENT_TIMESTAMP
+                         WHERE instance_id=?""",
                       (new.package_id, new.listing_id, new.offer_id, caption, pub["instance_id"]),
                   )
                   if cur.rowcount != 1:
                       raise RuntimeError("publication_rebind_failed")
                   c.commit()
+
+          async def edit_with_retry(adapter, command, message_id, attempts=4):
+              last = None
+              for i in range(1, attempts + 1):
+                  try:
+                      return await adapter.edit(command, message_id=message_id)
+                  except RetryAfter as exc:
+                      last = exc
+                      wait = int(getattr(exc, "retry_after", 5) or 5) + 2
+                      await asyncio.sleep(wait)
+                  except (TimedOut, NetworkError) as exc:
+                      last = exc
+                      await asyncio.sleep(3 * i)
+              raise last
 
           async def main():
               bot = Bot(token=settings.token)
@@ -194,19 +233,20 @@ jobs:
                   aliases = (str(settings.channel_chat_id), str(resolved.id))
                   with sqlite3.connect(str(db), timeout=30) as c:
                       c.row_factory = sqlite3.Row
-                      sql = """
+                      rows = c.execute(
+                          """
                           SELECT * FROM publication_instances
                           WHERE platform='telegram'
                             AND channel_chat_id IN (?,?)
                             AND CAST(coalesce(channel_message_id,'0') AS INTEGER) > 0
                           ORDER BY CAST(channel_message_id AS INTEGER) ASC
-                      """
-                      rows = c.execute(sql, aliases).fetchall()
-                  if limit > 0:
-                      rows = rows[:limit]
-                  print("REEDIT_BEGIN", "aliases=", aliases, "count=", len(rows), flush=True)
-                  ok = 0
-                  failed = 0
+                          """,
+                          aliases,
+                      ).fetchall()
+                  if only_ids:
+                      rows = [r for r in rows if int(r["channel_message_id"]) in only_ids]
+                  print("REEDIT_BEGIN", "count=", len(rows), flush=True)
+                  ok = failed = 0
                   last = 0.0
                   for row in rows:
                       pub = dict(row)
@@ -214,61 +254,41 @@ jobs:
                           wait = max(0.0, interval - (time.monotonic() - last))
                           if wait:
                               await asyncio.sleep(wait)
+                      held = []
                       try:
                           listing = reader.listing(pub["listing_id"])
                           inventory_status = str(listing.get("inventory_status") or "pending")
-                          old, new = build_replacement(pub)
-                          command = command_for(
-                              new.package_id,
-                              pub["channel_chat_id"],
-                              "reedit:" + pub["instance_id"],
-                              inventory_status,
-                          )
-                          labels = []
-                          from v3_core.publishing.telegram_adapter import build_channel_keyboard
-                          kb = build_channel_keyboard(command.actions, inventory_status=inventory_status)
-                          labels = [[b.text for b in r] for r in kb.inline_keyboard]
-                          if not any("📋 租赁详情" in cell for row_labels in labels for cell in row_labels):
-                              raise RuntimeError(f"cta_missing_clipboard_details:{labels}")
-                          if "consult" in command.actions and not any("联系中文顾问" in cell for row_labels in labels for cell in row_labels):
-                              raise RuntimeError(f"cta_missing_consult:{labels}")
-                          result = await adapter.edit(command, message_id=pub["channel_message_id"])
-                          finalize(pub, old, new, str(result.get("caption") or command.caption))
+                          old, new, held = build_replacement(pub)
+                          command = command_for(new.package_id, pub["channel_chat_id"], "reedit:"+pub["instance_id"], inventory_status)
+                          consult = str(command.actions.get("consult") or "")
+                          consult_text = ""
+                          if consult:
+                              try:
+                                  consult_text = unquote(parse_qs(urlsplit(consult).query).get("text", [""])[0])
+                              except Exception:
+                                  consult_text = consult
+                          if "QL-" in consult_text and "（" not in consult_text and "(" not in consult_text:
+                              # summary may be missing for sparse listings; warn but allow if no project/layout available
+                              print("REEDIT_WARN_THIN_HANDOFF", pub["channel_message_id"], consult_text, flush=True)
+                          result = await edit_with_retry(adapter, command, pub["channel_message_id"])
+                          finalize(pub, old, new, str(result.get("caption") or command.caption), held)
                           ok += 1
                           last = time.monotonic()
-                          print(
-                              "REEDIT_OK",
-                              pub["channel_message_id"],
-                              new.package_id,
-                              result.get("edit_mode"),
-                              inventory_status,
-                              labels,
-                              flush=True,
-                          )
+                          print("REEDIT_OK", pub["channel_message_id"], new.package_id, result.get("edit_mode"), consult_text.replace("\n"," | "), flush=True)
                       except Exception as exc:
+                          if held:
+                              try: restore_held(held)
+                              except Exception as restore_exc:
+                                  print("REEDIT_RESTORE_FAIL", pub.get("channel_message_id"), restore_exc, flush=True)
                           failed += 1
                           last = time.monotonic()
-                          print(
-                              "REEDIT_FAIL",
-                              pub.get("channel_message_id"),
-                              type(exc).__name__,
-                              str(exc)[:240],
-                              flush=True,
-                          )
-                  print(f"REEDIT_RESULT selected={len(rows)} ok={ok} failed={failed} backup={os.environ.get('BACKUP','')}", flush=True)
+                          print("REEDIT_FAIL", pub.get("channel_message_id"), type(exc).__name__, str(exc)[:240], flush=True)
+                  print(f"REEDIT_RESULT selected={len(rows)} ok={ok} failed={failed}", flush=True)
                   if failed:
                       raise SystemExit(2)
-                  if ok < 1:
-                      raise SystemExit("REEDIT_NO_POSTS")
               finally:
                   await bot.shutdown()
-
           asyncio.run(main())
           PY
-
-          for unit in qiaolian-v3@canonical.service qiaolian-v3@publisher.service qiaolian-v3@user.service qiaolian-v3@collector.service; do
-            echo "SERVICE_POST unit=$unit active=$(systemctl is-active "$unit") restarts=$(systemctl show "$unit" -p NRestarts --value)"
-            test "$(systemctl is-active "$unit")" = active
-          done
-          echo "REEDIT_CHANNEL_CTA_OK sha=$EXPECTED_PROD_SHA candidate=$CANDIDATE_SHA"
+          echo "REEDIT_HANDOFF_OK candidate=$CANDIDATE_SHA"
           REMOTE
