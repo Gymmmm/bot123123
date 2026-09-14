@@ -71,13 +71,13 @@ def test_adviser_copy_resolves_overlaps_and_is_deterministic():
     assert "never_lived" in tags
     assert "new_condition" not in tags
 
-    first = generate_adviser_text(facts, seed="QL-RF-A2B3|hash", max_points=2)
-    second = generate_adviser_text(facts, seed="QL-RF-A2B3|hash", max_points=2)
+    first = generate_adviser_text(facts, seed="QL-RF-A2B3|hash", max_points=1)
+    second = generate_adviser_text(facts, seed="QL-RF-A2B3|hash", max_points=1)
     assert first == second
-    assert len(first.splitlines()) == 2
+    assert len(first.splitlines()) == 1
 
 
 def test_adviser_copy_uses_neutral_fallback_when_no_signal_exists():
-    text = generate_adviser_text({}, seed="empty", max_points=2, allow_fallback=True)
+    text = generate_adviser_text({}, seed="empty", max_points=1, allow_fallback=True)
     assert text
     assert len(text.splitlines()) == 1

@@ -92,6 +92,7 @@ def _listing_keyboard(result, *, advisor_url: str = "", channel_url: str = ""):
         build_action_keyboard(result.action_rows),
         advisor_url=advisor_url,
         channel_url=channel_url,
+        listing_summary=str(getattr(result, "listing_summary", "") or ""),
         add_home=True,
         add_channel=True,
     )

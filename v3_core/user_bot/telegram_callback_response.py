@@ -45,6 +45,7 @@ class TelegramCallbackResponse:
     similar_intent: SimilarSearchIntent | None = None
     session_public_listing_ids: tuple[str, ...] = ()
     requested_removed: bool = False
+    listing_summary: str = ""
 
     @property
     def ok(self) -> bool:
@@ -96,6 +97,7 @@ def adapt_callback_response(
                 status="ok",
                 text=listing.details.text,
                 keyboard=build_action_keyboard(listing.details.action_rows),
+                listing_summary=str(getattr(listing.details, "listing_summary", "") or ""),
             )
         if dispatched.action == "photos":
             if listing.photos is None:
@@ -106,6 +108,7 @@ def adapt_callback_response(
                 text=listing.photos.text,
                 media_groups=listing.photos.media_groups,
                 keyboard=build_action_keyboard(listing.photos.action_rows),
+                listing_summary=str(getattr(listing.photos, "listing_summary", "") or ""),
             )
         if listing.book is None:
             raise ValueError("successful_book_dispatch_missing_intent")
