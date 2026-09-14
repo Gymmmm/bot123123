@@ -81,8 +81,7 @@ def test_details_response_preserves_layout_and_frozen_adviser_notes():
         "🆔 QL-RF-A2B3\n"
         "\n"
         "💬 <b>侨联判断</b>\n"
-        "这套标注在BKK1，项目是富力城，可以按实际通勤路线再判断。\n"
-        "资料明确标注：采光好、钥匙已备；具体状态可以结合实拍确认。"
+        "这套标注在BKK1，项目是富力城，可以按实际通勤路线再判断。"
     )
     assert _actions(response.action_rows) == [["book", "consult"], ["photos"], ["similar"]]
     assert _labels(response.action_rows) == [
