@@ -45,44 +45,93 @@ jobs:
           set -a
           source "$ROOT/runtime.env"
           set +a
+          BACKUP_DIR="/opt/qiaolian_backups/manual-normal-publish-$(date -u +%Y%m%d-%H%M%S)"
+          install -d -m 0700 "$BACKUP_DIR"
+          sqlite3 "$DB_PATH" ".backup '$BACKUP_DIR/qiaolian_dual_bot.db'"
+          sqlite3 "$BACKUP_DIR/qiaolian_dual_bot.db" 'PRAGMA quick_check;' | grep -Fx ok
+          echo "PUBLISH_BACKUP_OK path=$BACKUP_DIR"
           "$ROOT/.venv/bin/python" - <<'PY'
-          import asyncio, os, sqlite3
+          import asyncio, json, os, sqlite3
           from telegram import Bot
+          from v3_core.inventory.canonical_facts import canonicalize_source
+          from v3_core.inventory.service import InventoryMaterializationService
           from v3_core.publishing.admin_bot import load_settings
           from v3_core.publishing.publisher_app import V3PublisherApplication
+          from v3_core.storage.inventory_repository import InventoryRepository
 
           async def main():
               settings = load_settings()
-              app = V3PublisherApplication(settings)
-              app.autopilot.repository.sync_candidates()
+              inventory = InventoryRepository(settings.db_path)
               conn = sqlite3.connect(settings.db_path)
               conn.row_factory = sqlite3.Row
-              rows = conn.execute('''
-                  SELECT a.offer_id,a.listing_id,a.state,l.public_listing_id
-                  FROM publisher_auto_items_v3 a
-                  JOIN listing_offers o ON o.offer_id=a.offer_id
-                  JOIN listings_v3 l ON l.listing_id=a.listing_id
-                  LEFT JOIN publication_instances p
-                    ON p.offer_id=a.offer_id AND p.platform='telegram' AND p.channel_chat_id=?
-                  WHERE o.offer_type='rent'
-                    AND o.offer_status='active'
-                    AND COALESCE(o.publication_policy,'')='telegram_rent'
-                    AND p.instance_id IS NULL
-                  ORDER BY CASE a.state WHEN 'queued' THEN 0 ELSE 1 END,
-                           a.updated_at DESC,a.offer_id ASC
+              target = conn.execute('''
+                  SELECT l.listing_id,l.public_listing_id,l.canonical_record_id,
+                         o.offer_id,o.monthly_rent_usd,c.source_post_id,c.facts_json,s.raw_text
+                  FROM listings_v3 l
+                  JOIN listing_offers o ON o.listing_id=l.listing_id AND o.offer_type='rent' AND o.offer_status='active'
+                  JOIN canonical_records c ON c.canonical_record_id=l.canonical_record_id
+                  JOIN source_posts s ON CAST(s.id AS TEXT)=CAST(c.source_post_id AS TEXT)
+                  WHERE l.public_listing_id='QL-PP-W2H7'
                   LIMIT 1
-              ''',(settings.channel_chat_id,)).fetchall()
+              ''').fetchone()
+              if target is None:
+                  raise SystemExit('TARGET_NOT_FOUND')
+              if int(target['monthly_rent_usd'] or 0) != 420 or '桥牌' not in str(target['raw_text'] or ''):
+                  raise SystemExit('TARGET_EVIDENCE_MISMATCH')
+              already = conn.execute('''
+                  SELECT channel_message_id FROM publication_instances
+                  WHERE offer_id=? AND platform='telegram' AND channel_chat_id=?
+              ''', (target['offer_id'], settings.channel_chat_id)).fetchone()
               conn.close()
-              print('PUBLISH_ONE_CANDIDATES', len(rows))
-              if not rows:
-                  raise SystemExit('PUBLISH_ONE_NO_CANDIDATE')
+              if already is not None:
+                  raise SystemExit(f"TARGET_ALREADY_PUBLISHED message_id={already['channel_message_id']}")
 
-              row = rows[0]
+              old_facts = json.loads(str(target['facts_json']))
+              overrides = {
+                  'project_name': 'The Bridge',
+                  'project_alias': '桥牌',
+                  'canonical_area_key': '百色河',
+                  'canonical_area_display': '百色河',
+              }
+              facts = canonicalize_source(
+                  str(target['raw_text'] or ''),
+                  source_identity=dict(old_facts.get('source_identity') or {}),
+                  media_summary=dict(old_facts.get('media_summary') or {}),
+                  manual_overrides=overrides,
+              )
+              if facts.get('project_name') != 'The Bridge' or facts.get('public_location_display') != '百色河':
+                  raise SystemExit('TARGET_OVERRIDE_PROJECTION_FAILED')
+              if (facts.get('quality') or {}).get('blocking_flags'):
+                  raise SystemExit(f"TARGET_STILL_BLOCKED {facts['quality']['blocking_flags']}")
+              canonical = inventory.store_canonical(
+                  source_post_id=target['source_post_id'],
+                  facts=facts,
+                  supersedes_id=str(target['canonical_record_id']),
+              )
+              materialized = InventoryMaterializationService(inventory).materialize(
+                  canonical_record_id=str(canonical['canonical_record_id']),
+                  listing_id=str(target['listing_id']),
+                  public_listing_id=str(target['public_listing_id']),
+                  create_review=True,
+              )
+              for field_name, new_value in overrides.items():
+                  inventory.add_override(
+                      canonical_record_id=str(canonical['canonical_record_id']),
+                      field_name=field_name,
+                      old_value=old_facts.get(field_name),
+                      new_value=new_value,
+                      reason='verified_source_bridge_tonle_bassac',
+                      operator_id='codex:normal_publish',
+                  )
+              offer_id = materialized.offer_ids[0]
+              print('CANONICAL_OVERRIDE_OK', target['public_listing_id'], canonical['canonical_record_id'], offer_id)
+
+              app = V3PublisherApplication(settings)
+              app.autopilot.repository.sync_candidates()
               bot = Bot(token=settings.token)
               await bot.initialize()
               try:
-                  offer_id = str(row['offer_id'])
-                  print('PUBLISH_ONE_TRY', offer_id, row['listing_id'], row['public_listing_id'], row['state'])
+                  print('PUBLISH_ONE_TRY', offer_id, target['listing_id'], target['public_listing_id'])
                   result = await app.autopilot.process_one(
                       bot=bot,
                       force_offer_id=offer_id,
