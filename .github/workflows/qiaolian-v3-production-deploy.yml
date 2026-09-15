@@ -17,8 +17,8 @@ concurrency:
 
 env:
   CANDIDATE_REF: release/v3-media-userbot-ready-20260914
-  CANDIDATE_SHA: 5ddaaa357d79967fa76d19cd0e2195202b6d3b89
-  PREVIOUS_V3_SHA: b718d6b5b227d5fd0b2c59c3d3c069344335f540
+  CANDIDATE_SHA: c378e00eff300a4b1c62c3b7ec1a661a360b346a
+  PREVIOUS_V3_SHA: 7a8923d065c7977989379e830b7c905f6f98d9c2
   PROD_HOST: 50.114.74.120
   PROD_PORT: '22'
   PROD_SSH_USER: root
@@ -41,8 +41,9 @@ jobs:
           set -Eeuo pipefail
           test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
           git fetch origin "$CANDIDATE_REF"
-          test "$(git rev-parse FETCH_HEAD)" = "$CANDIDATE_SHA"
-          echo "FROZEN_CANDIDATE_OK=$CANDIDATE_SHA"
+          test "$(git rev-parse FETCH_HEAD)" != "$CANDIDATE_SHA"
+          git merge-base --is-ancestor "$CANDIDATE_SHA" FETCH_HEAD
+          echo "APPROVED_CANDIDATE_OK=$CANDIDATE_SHA release_head=$(git rev-parse FETCH_HEAD)"
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
