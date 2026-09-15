@@ -64,6 +64,13 @@ def validate_environment(
 
     if with_publisher:
         _check_token(values, "PUBLISHER_BOT_TOKEN", errors)
+        if with_user and _value(values, "USER_BOT_TOKEN") == _value(
+            values, "PUBLISHER_BOT_TOKEN"
+        ):
+            errors.append(
+                "USER_BOT_TOKEN 与 PUBLISHER_BOT_TOKEN 相同，不能同时长轮询；"
+                "请配置两个 Bot，或只启动用户 Bot。"
+            )
         admin_ids = [
             item.strip()
             for item in _value(values, "ADMIN_IDS").split(",")

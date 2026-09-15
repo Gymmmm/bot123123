@@ -41,7 +41,7 @@ class PublishFailReturnsPendingTests(unittest.TestCase):
 
         with patch("meihua_publisher.MeihuaPublisher", FakePublisher), patch(
             "autopilot_publish_bot._scheduler_paused", return_value=False
-        ):
+        ), patch("autopilot_publish_bot._direct_publish_enabled", return_value=True):
             asyncio.run(autopilot_publish_bot.scheduled_publish(_FakeContext()))
 
         conn = sqlite3.connect(self.db_path)

@@ -1,0 +1,40 @@
+name: product-copy-lock-check
+
+on:
+  push:
+    branches:
+      - codex/product-copy-lock-90180b83-20260910
+  pull_request:
+    branches:
+      - codex/v3-core-extraction-20260908
+  workflow_dispatch:
+
+jobs:
+  copy-lock:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pytest pytest-asyncio
+      - name: Targeted locked-copy tests
+        env:
+          PYTHONPATH: '${{ github.workspace }}'
+        run: |
+          python -m pytest -q \
+            tests/v3_core/test_product_copy_lock_90180b83.py \
+            tests/v3_core/test_product_polish_8fb094b.py \
+            tests/v3_core/test_user_bot_listing_responses.py \
+            tests/v3_core/test_user_bot_home_views.py \
+            tests/v3_core/test_user_bot_public_flow.py \
+            tests/v3_core/test_user_bot_channel_status_sync.py
+      - name: Full V3 regression
+        env:
+          PYTHONPATH: '${{ github.workspace }}'
+        run: |
+          python -m pytest -q tests/v3_core
