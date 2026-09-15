@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from urllib.parse import parse_qs, urlparse
 
-from v3_core.status_labels import inventory_status_bookable
 from v3_core.user_bot.telegram_navigation import advisor_handoff_url
 
 from .public_ids import normalize_public_id
@@ -18,7 +17,8 @@ CHANNEL_CTA_LABELS = {
     "details": "📋 租赁详情",
     "photos": "📸 更多实拍",
     "book": "📅 预约看房",
-    "consult": "💬 联系中文顾问",
+    "consult": "💬 咨询顾问",
+    "more": "🔍 更多房源",
 }
 
 _ACTION_SUFFIX = {
@@ -109,10 +109,29 @@ def official_channel_action_urls(
 
 
 def official_channel_cta_keys(inventory_status: object = "active") -> tuple[str, ...]:
-    keys = ("details", "photos")
-    if inventory_status_bookable(inventory_status):
-        keys += ("book",)
-    return keys + ("consult",)
+    """Return exactly three channel CTAs for the current inventory state.
+
+    active/reserved: details + photos + booking
+    pending:         details + photos + advisor
+    rented/offline:  details + more listings + advisor
+    """
+    status = str(inventory_status or "").strip().lower()
+    if status in {"active", "reserved"}:
+        return ("details", "photos", "book")
+    if status == "pending":
+        return ("details", "photos", "consult")
+    return ("details", "more", "consult")
+
+
+def _more_listings_url(actions: dict[str, str]) -> str:
+    """Reuse the User Bot host from the listing deep link and open latest listings."""
+    parsed = urlparse(str(actions.get("details") or "").strip())
+    if parsed.scheme not in {"http", "https"} or parsed.netloc.lower() != "t.me":
+        raise ValueError("telegram_action_url_invalid")
+    username = str(parsed.path or "").strip("/")
+    if not username:
+        raise ValueError("telegram_action_url_invalid")
+    return f"https://t.me/{username}?start=latest"
 
 
 def official_channel_button_spec(
@@ -120,25 +139,17 @@ def official_channel_button_spec(
     *,
     inventory_status: object = "active",
 ) -> tuple[tuple[tuple[str, str], ...], ...]:
-    """Return keyboard rows as ``((label, url), ...)`` for publish and sync."""
+    """Return exactly three status-aware channel buttons for publish and sync."""
     verified = official_channel_action_identity(actions)
-    rows: list[tuple[tuple[str, str], ...]] = [
-        (
-            (CHANNEL_CTA_LABELS["details"], verified["details"]),
-            (CHANNEL_CTA_LABELS["photos"], verified["photos"]),
-        )
-    ]
-    has_consult = "consult" in verified
-    if "book" in official_channel_cta_keys(inventory_status):
-        second_row = [(CHANNEL_CTA_LABELS["book"], verified["book"])]
-        if has_consult:
-            second_row.append((CHANNEL_CTA_LABELS["consult"], verified["consult"]))
-        rows.append(
-            tuple(second_row)
-        )
-    elif has_consult:
-        rows.append(((CHANNEL_CTA_LABELS["consult"], verified["consult"]),))
-    return tuple(rows)
+    keys = official_channel_cta_keys(inventory_status)
+    buttons: list[tuple[str, str]] = []
+    for key in keys:
+        if key == "more":
+            url = _more_listings_url(verified)
+        else:
+            url = verified[key]
+        buttons.append((CHANNEL_CTA_LABELS[key], url))
+    return (tuple(buttons),)
 
 
 def official_channel_action_identity(actions: dict[str, str]) -> dict[str, str]:
