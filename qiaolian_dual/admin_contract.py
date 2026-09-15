@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from .common import *
-
 def _user_mention_html(user) -> str:
     from .session_deeplink import user_display_name
     name = he(user_display_name(user) or str(getattr(user, 'id', '')))
@@ -86,7 +85,7 @@ def _lease_reminder_label(user_id: int | None) -> str:
 
 def _binding_contract_text(binding: dict | None, user_id: int | None=None) -> str:
     if not binding:
-        return '📋 <b>我的租约</b>\n\n当前还没有绑定租约档案。\n请点「💬 联系中文顾问」，我们会后台录入房号、交租日和到期日。'
+        return '📋 <b>我的租约</b>\n\n当前还没有绑定租约档案。\n请联系中文顾问，由后台核实并绑定。'
     property_name = str(binding.get('property_name') or '-')
     rent_day = binding.get('rent_day')
     rent_text = f'每月 {int(rent_day)} 号' if isinstance(rent_day, int) else '待确认'
@@ -108,26 +107,22 @@ def _binding_contract_text(binding: dict | None, user_id: int | None=None) -> st
     status_line = _contract_status_text(days_left)
     return (
         f'📋 <b>我的租约</b>\n\n'
-        f'<b>房源与账期</b>\n'
-        f'房源｜{he(property_name)}\n'
-        f'交租日｜{he(rent_text)}\n\n'
-        f'<b>金额与到期</b>\n'
-        f'月租｜{he(rent_line)}\n'
-        f'押金｜{he(deposit_line)}\n'
-        f'到期日｜{he(end_date)}\n'
-        f'还有｜<b>{he(day_line)}</b>\n\n'
-        f'<b>当前状态</b>\n'
-        f'{he(status_line)}\n'
+        f'🏠 房源｜{he(property_name)}\n'
+        f'💰 月租｜{he(rent_line)}\n'
+        f'🔐 押金｜{he(deposit_line)}\n'
+        f'📅 交租日｜{he(rent_text)}\n'
+        f'⏳ 合同到期｜{he(end_date)}\n'
+        f'🧭 当前状态｜{he(status_line)}\n\n'
         f'{he(reminder_line)}'
     )
 
 def _contract_actions_keyboard(user_id: int | None=None) -> InlineKeyboardMarkup:
-    """新租约页不再生成续租/换房入口；旧回调继续兼容历史按钮。"""
     reminder_label = _lease_reminder_label(user_id)
     rows: list[list[InlineKeyboardButton]] = [
-        [InlineKeyboardButton('📅 我的预约', callback_data='appointment_menu:list'), InlineKeyboardButton('🛠 入住后服务', callback_data='service:hub')],
+        [InlineKeyboardButton('🔄 续租', callback_data='contract:renew'), InlineKeyboardButton('🚪 退租', callback_data='contract:terminate')],
+        [InlineKeyboardButton('📄 租赁服务指南', callback_data='hub:rental')],
         [InlineKeyboardButton(reminder_label, callback_data='contract:toggle_reminder')],
-        [InlineKeyboardButton('💬 联系中文顾问', callback_data='appointment_menu:contact')],
+        [InlineKeyboardButton('🛠 返回入住服务', callback_data='service:hub'), InlineKeyboardButton('💬 中文顾问', callback_data='appointment_menu:contact')],
         [InlineKeyboardButton('🏠 返回首页', callback_data='home')],
     ]
     return InlineKeyboardMarkup(rows)
