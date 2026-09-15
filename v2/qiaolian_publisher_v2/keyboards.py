@@ -1,10 +1,10 @@
-
 from __future__ import annotations
 
 import logging
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
+from qiaolian_dual.channel_links import channel_action_url
 from .formatters import AREA_OPTIONS, TYPE_LABELS, deep_link
 
 log = logging.getLogger(__name__)
@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 def main_menu() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         [
-            [InlineKeyboardButton("➕ 新建房源", callback_data="pub:new")],
+            [InlineKeyboardButton("➕ 发布房源", callback_data="pub:new")],
             [InlineKeyboardButton("🧪 检查频道权限", callback_data="pub:test")],
             [InlineKeyboardButton("❌ 取消当前流程", callback_data="pub:cancel")],
         ]
@@ -21,34 +21,19 @@ def main_menu() -> InlineKeyboardMarkup:
 
 
 def admin_menu() -> InlineKeyboardMarkup:
-    """管理员主面板：只保留高频、可执行的动作。"""
+    """Publisher home: direct publishing, status management and broadcasts."""
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("➕ 新建房源", callback_data="pub:new"),
-                InlineKeyboardButton("📋 待审预览", callback_data="cmd:pending"),
+                InlineKeyboardButton("➕ 发布房源", callback_data="cmd:intake"),
+                InlineKeyboardButton("🔵 房态管理", callback_data="cmd:listing_states"),
             ],
             [
-                InlineKeyboardButton("🚀 立即发布", callback_data="cmd:send_help"),
-                InlineKeyboardButton("⚡ 一屏总览", callback_data="cmd:ops"),
+                InlineKeyboardButton("📢 广播中心", callback_data="cmd:daily"),
+                InlineKeyboardButton("📡 采集源", callback_data="cmd:sources"),
             ],
-            [
-                InlineKeyboardButton("📡 运行状态", callback_data="cmd:status"),
-                InlineKeyboardButton("⏱ 发帖时段", callback_data="cmd:slots"),
-            ],
-            [
-                InlineKeyboardButton("⏸ 暂停队列", callback_data="cmd:pause"),
-                InlineKeyboardButton("▶️ 恢复队列", callback_data="cmd:resume"),
-            ],
-            [
-                InlineKeyboardButton("📥 微信导入", callback_data="cmd:intake"),
-                InlineKeyboardButton("📋 导入草稿", callback_data="cmd:intake_pending"),
-            ],
-            [
-                InlineKeyboardButton("🧾 最近日志", callback_data="cmd:logs"),
-                InlineKeyboardButton("🎨 封面测试", callback_data="cmd:cover_test"),
-            ],
-            [InlineKeyboardButton("❓ 命令速查", callback_data="cmd:quick_help")],
+            [InlineKeyboardButton("🧪 查看发布效果", callback_data="cmd:sample_preview")],
+            [InlineKeyboardButton("📚 发布记录", callback_data="cmd:logs")],
         ]
     )
 
@@ -60,9 +45,10 @@ def type_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton("🏡 别墅", callback_data="type:villa"),
         ],
         [
+            InlineKeyboardButton("🏘 排屋", callback_data="type:townhouse"),
             InlineKeyboardButton("🏪 商铺", callback_data="type:shop"),
-            InlineKeyboardButton("💼 办公室", callback_data="type:office"),
         ],
+        [InlineKeyboardButton("💼 办公室", callback_data="type:office")],
         [InlineKeyboardButton("❌ 取消", callback_data="pub:cancel")],
     ]
     return InlineKeyboardMarkup(rows)
@@ -89,14 +75,9 @@ def preview_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("✅ 立即发布", callback_data="preview:publish"),
-                InlineKeyboardButton("✏️ 修改字段", callback_data="preview:edit"),
+                InlineKeyboardButton("📤 发布到频道", callback_data="preview:publish"),
+                InlineKeyboardButton("✏️ 修改内容", callback_data="preview:edit"),
             ],
-            [
-                InlineKeyboardButton("🖼 对比两款封面", callback_data="preview:compare_covers"),
-                InlineKeyboardButton("🎨 切换封面模板", callback_data="preview:style"),
-            ],
-            [InlineKeyboardButton("🧪 多文案对比发布", callback_data="preview:publish_variants")],
             [InlineKeyboardButton("❌ 取消", callback_data="pub:cancel")],
         ]
     )
@@ -115,7 +96,7 @@ def edit_keyboard() -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton("费用", callback_data="edit:fee_note"),
-                InlineKeyboardButton("缺点/提醒", callback_data="edit:advisor_note"),
+                InlineKeyboardButton("提醒", callback_data="edit:advisor_note"),
             ],
             [InlineKeyboardButton("⬅️ 返回预览", callback_data="edit:done")],
         ]
@@ -131,47 +112,38 @@ def publish_post_keyboard(
     channel_username: str = "",
     channel_message_id: int | None = None,
     discussion_group_link: str = "",
+    post_token: str = "",
 ) -> InlineKeyboardMarkup:
-    """频道房源帖按钮，升级为 4 个。
-
-    第一排：📅 预约看房 | 💎 问问顾问
-    第二排：🖼 更多实拍/评论区 | 🔍 找类似房源
-
-    评论区链接优先使用 channel_username + channel_message_id。
-    降级策略：CHANNEL_USERNAME 缺失时使用 discussion_group_link；
-    两者均无时「🖼 更多实拍/评论区」使用「找类似房源」链接兜底，保持 4 按钮布局。
-    """
-    book_url = deep_link(user_bot_username, f"book_{listing_id}")
-    consult_url = deep_link(user_bot_username, f"consult_{listing_id}")
-    similar_url = deep_link(user_bot_username, f"similar_{listing_id}")
-
-    # 评论区链接生成（三级优先）
-    _ch_user = (channel_username or "").strip().lstrip("@")
-    if _ch_user and channel_message_id:
-        comment_url: str = f"https://t.me/{_ch_user}/{channel_message_id}?comment=1"
-    elif discussion_group_link:
-        comment_url = discussion_group_link
-    else:
-        # Degraded state: both 🖼 and 🔍 buttons share the same URL (similar listings).
-        # This keeps the layout intact but 🖼 will NOT lead to media/comments.
-        # Resolve by setting DISCUSSION_GROUP_LINK in .env.
-        log.warning(
-            "[publish_post_keyboard] listing=%s: 无 channel_message_id 且无 DISCUSSION_GROUP_LINK，"
-            "「🖼 更多实拍/评论区」与「🔍 找类似房源」将指向同一链接（降级状态）。"
-            "请在 .env 配置 DISCUSSION_GROUP_LINK 以恢复评论区入口。",
-            listing_id,
-        )
-        comment_url = similar_url
+    """频道房源帖固定三个动作；所有入口统一使用公开 QC Deep Link。"""
+    _ = (
+        area,
+        detail_url,
+        maps_url,
+        channel_username,
+        channel_message_id,
+        discussion_group_link,
+        post_token,
+        deep_link,
+        TYPE_LABELS,
+    )
 
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("📅 预约看房", url=book_url),
-                InlineKeyboardButton("💎 问问顾问", url=consult_url),
+                InlineKeyboardButton(
+                    "🏠 房源详情",
+                    url=channel_action_url(user_bot_username, listing_id, "details"),
+                ),
+                InlineKeyboardButton(
+                    "📸 更多实拍",
+                    url=channel_action_url(user_bot_username, listing_id, "photos"),
+                ),
             ],
             [
-                InlineKeyboardButton("🖼 更多实拍/评论区", url=comment_url),
-                InlineKeyboardButton("🔍 找类似房源", url=similar_url),
+                InlineKeyboardButton(
+                    "📅 预约看房",
+                    url=channel_action_url(user_bot_username, listing_id, "book"),
+                )
             ],
         ]
     )
