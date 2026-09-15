@@ -131,8 +131,9 @@ def official_channel_button_spec(
         return ((
             (CHANNEL_CTA_LABELS["details"], verified["details"]),
             (CHANNEL_CTA_LABELS["photos"], verified["photos"]),
+        ), (
             (CHANNEL_CTA_LABELS["book"], verified["book"]),
-        ),)
+        ))
     if status in {"rented", "inactive", "offline"}:
         details = urlparse(verified["details"])
         more_url = f"https://t.me/{details.path.strip('/')}?start=latest"
@@ -142,7 +143,7 @@ def official_channel_button_spec(
         ]
         if has_consult:
             row.append((CHANNEL_CTA_LABELS["consult"], verified["consult"]))
-        return (tuple(row),)
+        return tuple(tuple(row[i:i + 2]) for i in range(0, len(row), 2))
 
     row = [
         (CHANNEL_CTA_LABELS["details"], verified["details"]),
@@ -150,7 +151,7 @@ def official_channel_button_spec(
     ]
     if has_consult:
         row.append((CHANNEL_CTA_LABELS["consult"], verified["consult"]))
-    return (tuple(row),)
+    return tuple(tuple(row[i:i + 2]) for i in range(0, len(row), 2))
 
 
 def official_channel_action_identity(actions: dict[str, str]) -> dict[str, str]:

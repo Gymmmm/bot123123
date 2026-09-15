@@ -107,7 +107,7 @@ def test_channel_ctas_and_sync_contract_share_one_real_listing():
         "more": "🔍 更多房源",
     }
     assert [[label for label, _ in row] for row in rows] == [
-        ["📋 租赁详情", "📸 更多实拍", "📅 预约看房"],
+        ["📋 租赁详情", "📸 更多实拍"], ["📅 预约看房"],
     ]
     assert all(f"property_{PUBLIC_ID}_" in urls[key] for key in ("details", "photos", "book"))
     assert PUBLIC_ID in urls["consult"]
@@ -116,11 +116,11 @@ def test_channel_ctas_and_sync_contract_share_one_real_listing():
     assert synced == rows
     unbookable = official_channel_button_spec(urls, inventory_status="pending")
     assert [[label for label, _ in row] for row in unbookable] == [
-        ["📋 租赁详情", "📸 更多实拍", "💬 咨询顾问"],
+        ["📋 租赁详情", "📸 更多实拍"], ["💬 咨询顾问"],
     ]
     rented = official_channel_button_spec(urls, inventory_status="rented")
     assert [[label for label, _ in row] for row in rented] == [
-        ["📋 租赁详情", "🔍 更多房源", "💬 咨询顾问"],
+        ["📋 租赁详情", "🔍 更多房源"], ["💬 咨询顾问"],
     ]
     assert rented[0][1][1] == "https://t.me/QiaoLianBot?start=latest"
 
