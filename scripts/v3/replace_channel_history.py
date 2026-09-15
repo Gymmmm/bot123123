@@ -27,7 +27,7 @@ def snapshot(conn, source, channel):
         FROM source_posts s JOIN canonical_records c ON CAST(c.source_post_id AS INTEGER)=s.id
         JOIN listings_v3 l ON l.canonical_record_id=c.canonical_record_id
         JOIN listing_offers o ON o.listing_id=l.listing_id
-        WHERE s.source_name=? AND o.offer_type='rent' AND o.offer_status='active'
+        WHERE s.source_name=? AND s.parse_status='parsed' AND o.offer_type='rent' AND o.offer_status='active'
         AND o.publication_policy='telegram_rent'""", (source,)):
         row = dict(row)
         anchor = int((json.loads(row["raw_meta_json"] or "{}") or {}).get("anchor_message_id") or 0)

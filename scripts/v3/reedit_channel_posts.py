@@ -170,7 +170,7 @@ async def run(args):
                 with connect(db) as c:
                     c.execute("BEGIN IMMEDIATE")
                     for package_id, status in held:
-                        c.execute("UPDATE publication_packages_v3 SET status=?,updated_at=CURRENT_TIMESTAMP WHERE package_id=?", (status if replacement else "superseded", package_id))
+                        c.execute("UPDATE publication_packages_v3 SET status='superseded',updated_at=CURRENT_TIMESTAMP WHERE package_id=?", (package_id,))
                     c.execute("UPDATE publication_packages_v3 SET status='published',published_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE package_id=?", (new.package_id,))
                     c.execute("""UPDATE publication_instances SET package_id=?,post_text=?,listing_id=?,offer_id=?,
                         updated_at=CURRENT_TIMESTAMP WHERE instance_id=? AND channel_message_id=?""",

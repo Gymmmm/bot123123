@@ -12,7 +12,7 @@ def database():
     c.executescript("""
         CREATE TABLE publication_instances(id INTEGER,instance_id TEXT,channel_message_id TEXT,
             platform TEXT,publish_status TEXT,channel_chat_id TEXT,media_group_id TEXT);
-        CREATE TABLE source_posts(id INTEGER,raw_meta_json TEXT,source_name TEXT);
+        CREATE TABLE source_posts(id INTEGER,raw_meta_json TEXT,source_name TEXT,parse_status TEXT DEFAULT 'parsed');
         CREATE TABLE canonical_records(source_post_id TEXT,canonical_record_id TEXT);
         CREATE TABLE listings_v3(listing_id TEXT,canonical_record_id TEXT);
         CREATE TABLE listing_offers(offer_id TEXT,listing_id TEXT,offer_type TEXT,
@@ -21,7 +21,7 @@ def database():
     for i in (2, 9, 4):
         c.execute("INSERT INTO publication_instances VALUES (?,?,?,'telegram','published','-1001','')", (i, f"p{i}", str(i)))
     for i, anchor in ((1, 100), (2, 500), (3, 200), (4, 0)):
-        c.execute("INSERT INTO source_posts VALUES (?,?,?)", (i, json.dumps({"anchor_message_id": anchor}), "zufang555"))
+        c.execute("INSERT INTO source_posts(id,raw_meta_json,source_name) VALUES (?,?,?)", (i, json.dumps({"anchor_message_id": anchor}), "zufang555"))
         c.execute("INSERT INTO canonical_records VALUES (?,?)", (str(i), f"c{i}"))
         c.execute("INSERT INTO listings_v3 VALUES (?,?)", (f"l{i}", f"c{i}"))
         c.execute("INSERT INTO listing_offers VALUES (?,?,'rent','active','telegram_rent')", (f"o{i}", f"l{i}"))
