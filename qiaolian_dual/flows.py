@@ -33,8 +33,8 @@ async def start_appointment(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             update,
             text='📅 <b>预约看房</b>\n\n请先从具体房源的「预约看房」进入。',
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton('🔍 帮我找房', callback_data='home_smart_search')],
-                [InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')],
+                [InlineKeyboardButton('🔍 开始找房', callback_data='home_smart_search')],
+                [InlineKeyboardButton('💬 中文顾问', callback_data='hub:advisor')],
                 [InlineKeyboardButton('⬅️ 返回首页', callback_data='home')],
             ]),
             parse_mode=ParseMode.HTML,
@@ -46,10 +46,11 @@ async def start_appointment(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     subject = _title_layout_label(title, layout, '｜')
     qc = _display_listing_id(listing_id)
     price_line = '' if info.get('price') in (None, '', 0, '0') else f"\n💰 <b>{he(_fmt_price(info.get('price')))}</b>"
-    heading = f"🎥 <b>视频看房｜{he(qc)}</b>" if mode == 'video' else f"📅 <b>预约看房｜{he(qc)}</b>"
+    heading = f"🎥 <b>实时视频看房｜{he(qc)}</b>" if mode == 'video' else f"📅 <b>预约看房｜{he(qc)}</b>"
+    prompt = '请选择方便视频看房的日期。' if mode == 'video' else '请选择方便看房的日期。\n\n没时间到现场？也可以安排实时视频看房。'
     await render_panel(
         update,
-        text=f'{heading}\n\n🏠 <b>{he(subject)}</b>{price_line}\n\n哪天方便看房？',
+        text=f'{heading}\n\n🏠 <b>{he(subject)}</b>{price_line}\n\n{prompt}',
         reply_markup=_appointment_date_keyboard(show_video=(mode != 'video')),
         parse_mode=ParseMode.HTML,
         context=context,
@@ -66,13 +67,12 @@ async def show_search_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     await render_panel(
         update,
         text=(
-            '🔍 <b>想找什么样的房子？</b>\n\n'
-            '直接发一句话就可以：\n\n'
-            '「BKK1 一房，预算 $600」\n'
-            '「富力城两房，要能做饭」\n'
-            '「想找高层、安静一点的」\n\n'
-            '我们会根据您的需求，优先筛选 2–3 套更值得看的房源。\n\n'
-            '还没想好？也可以按条件找 👇'
+            '🔍 <b>开始找房</b>\n\n'
+            '可以直接发送一句需求：\n\n'
+            '「BKK1 预算800 一房」\n'
+            '「钻石岛 两房」\n'
+            '「500以内 单间」\n\n'
+            '也可以按区域、预算或户型继续筛选。'
         ),
         reply_markup=guided_search_keyboard(),
         parse_mode=ParseMode.HTML,
@@ -102,13 +102,24 @@ async def show_appointment_hub(update: Update, context: ContextTypes.DEFAULT_TYP
 async def show_service_hub(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     from .keyboards_search import service_hub_keyboard
     from .texts import render_panel
-    text = (
-        '🛠 <b>入住服务</b>\n\n'
-        '住下以后，有事也可以找侨联。\n\n'
-        '不管房子是不是通过侨联租的，住房或生活上遇到问题，都可以先问问我们。\n\n'
-        '能协助处理的，我们协助处理；需要专业服务的，我们帮您对接。'
-    )
-    await render_panel(update, text=text, parse_mode=ParseMode.HTML, reply_markup=service_hub_keyboard(update.effective_user.id if update.effective_user else None), context=context)
+    user_id = update.effective_user.id if update.effective_user else None
+    binding = db.get_active_binding(user_id) if user_id else None
+    if binding:
+        property_name = he(str(binding.get('property_name') or '已绑定房源'))
+        text = (
+            '🛠 <b>入住服务</b>\n\n'
+            f'🏠 <b>{property_name}</b>\n\n'
+            '需要处理什么？\n\n'
+            '房屋信息已经绑定，报修、物业、租约、续租和退租都会自动带上当前租约。'
+        )
+    else:
+        text = (
+            '🛠 <b>入住服务</b>\n\n'
+            '如果你已经通过侨联地产租房，但这里还没有显示租约，\n'
+            '请联系中文顾问协助核实并绑定。\n\n'
+            '绑定由顾问后台核实完成，不需要自己输入合同编号。'
+        )
+    await render_panel(update, text=text, parse_mode=ParseMode.HTML, reply_markup=service_hub_keyboard(user_id), context=context)
     return MAIN
 
 
@@ -143,9 +154,11 @@ async def contact_management(update: Update, context: ContextTypes.DEFAULT_TYPE,
     binding = db.get_active_binding(update.effective_user.id)
     create_lead(update.effective_user, action='consult_menu_click', source=source, listing_id=listing_id or str((binding or {}).get('property_name') or ''), payload={'binding_id': (binding or {}).get('id'), 'listing_id': listing_id})
     admin_lines = [f'用户：{_user_mention_html(update.effective_user)}', f'联系方式：{he(_user_contact_text(update.effective_user))}', f'入口：{he(source or "用户咨询")}']
+    if binding:
+        admin_lines.append(f'租客绑定：#{int(binding.get("id") or 0)}｜{he(str(binding.get("property_name") or "-"))}')
     if listing_id:
         admin_lines.append(f'咨询房源：{he(_display_listing_id(listing_id))}')
-    await _notify_admins(context, title='用户联系我们', lines=admin_lines)
+    await _notify_admins(context, title='中文顾问咨询请求', lines=admin_lines)
 
     if listing_id:
         item = listing_context(listing_id)
@@ -153,22 +166,26 @@ async def contact_management(update: Update, context: ContextTypes.DEFAULT_TYPE,
         layout = _display_layout(item.get('layout') or item.get('property_type'), item.get('property_type'))
         subject = '｜'.join(v for v in (project, layout) if v)
         response_text = (
-            '💬 <b>已记录您咨询的房源</b>\n\n'
+            '💬 <b>咨询这套</b>\n\n'
             f'🏠 <b>{he(subject)}</b>\n'
             f'💰 <b>{he(_fmt_price(item.get("price")))}</b>\n'
             f'🆔 {he(_display_listing_id(listing_id))}\n\n'
-            '点击下方即可联系我们。\n'
-            '这套房的信息已经带上，不用重新说明。'
+            '房源信息会自动一起带上，不需要重复发送。\n'
+            '直接告诉我们想了解什么即可。'
+        )
+    elif binding:
+        response_text = (
+            '💬 <b>中文顾问</b>\n\n'
+            f'🏠 当前租约：<b>{he(str(binding.get("property_name") or "当前房源"))}</b>\n\n'
+            '租约信息已经带上，不用重新说明当前房屋。\n'
+            '直接告诉我们需要处理什么即可。'
         )
     else:
         response_text = (
-            '💬 <b>有什么需要，直接告诉我们。</b>\n\n'
-            '找房的话，可以直接发送：\n'
-            '区域 + 预算 + 户型\n\n'
-            '例如：\n'
-            '「BKK1 两房，$900以内」\n'
-            '「富力城一房，要能做饭」\n\n'
-            '不方便打字，也可以直接联系我们。'
+            '💬 <b>中文顾问</b>\n\n'
+            '直接发送你想咨询的问题即可。\n\n'
+            '如果是找房，可以告诉我们区域、预算、户型或入住时间。\n\n'
+            '中文顾问会通过 Telegram 回复你。'
         )
     await render_panel(update, text=response_text, parse_mode=ParseMode.HTML, reply_markup=contact_handoff_keyboard(listing_id=listing_id), context=context)
     return MAIN
