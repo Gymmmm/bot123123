@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
-from scripts.v3.reedit_channel_posts import connect, run
+from scripts.v3.reedit_channel_posts import BeforeSendNetworkError, connect, run
 from v3_core.publishing.admin_bot import load_settings
 
 
@@ -54,6 +54,23 @@ def save(conn, task, state):
     conn.commit()
 
 
+def recover_before_send(conn, state, run_dir):
+    """Explicit recovery only for an empty pre-send report and unchanged target."""
+    if state["status"] != "blocked":
+        raise RuntimeError("recovery_requires_blocked_job")
+    target = state["targets"][state["target_index"]]
+    source = state["sources"][state["source_index"]]
+    report = json.loads((Path(run_dir) / f"{target['channel_message_id']}-{source['anchor']}" / "report.json").read_text())
+    if report.get("results") or report.get("stopped"):
+        raise RuntimeError("recovery_requires_empty_before_send_report")
+    unsettled = conn.execute("SELECT COUNT(*) FROM publication_delivery_attempts_v3 WHERE state IN ('prepared','sending','sent','unknown')").fetchone()[0]
+    row = conn.execute("SELECT listing_id FROM publication_instances WHERE instance_id=?", (target["instance_id"],)).fetchone()
+    if unsettled or not row or row[0] == source["listing_id"]:
+        raise RuntimeError("recovery_requires_receipt_inspection")
+    state["status"] = "ready"
+    state["recovery_reason"] = "verified_empty_pre_send_report"
+
+
 async def execute(args):
     settings = load_settings()
     from telegram import Bot
@@ -67,6 +84,9 @@ async def execute(args):
         row = conn.execute("SELECT state_json FROM channel_replacement_jobs_v3 WHERE task_id=?", (args.task,)).fetchone()
         if row:
             state = json.loads(row[0])
+            if getattr(args, "recover_before_send", False) and state["status"] == "blocked":
+                recover_before_send(conn, state, args.run_dir)
+                save(conn, args.task, state)
         else:
             state = snapshot(conn, args.source, channels, args.stream_task)
             conn.execute("INSERT INTO channel_replacement_jobs_v3 VALUES (?,?)", (args.task, json.dumps(state)))
@@ -111,6 +131,15 @@ async def execute(args):
                 run_dir=str(Path(args.run_dir) / f"{target['channel_message_id']}-{source['anchor']}"))
             try:
                 report = await run(params)
+            except BeforeSendNetworkError:
+                state["status"] = "waiting"
+                state["retry_count"] = int(state.get("retry_count", 0)) + 1
+                state["last_failure"] = "network_before_send"
+                save(conn, args.task, state)
+                delay = min(60, 5 * 2 ** min(state["retry_count"] - 1, 4))
+                print(json.dumps({"event": "retry_before_send", "wait_seconds": delay}), flush=True)
+                await asyncio.sleep(delay)
+                continue  # Neither cursor advances; no write was attempted.
             except Exception:
                 state["status"] = "blocked"
                 save(conn, args.task, state)
@@ -121,6 +150,7 @@ async def execute(args):
                 save(conn, args.task, state)
                 continue
             result = report["results"][0]
+            state["retry_count"] = 0
             result["source_anchor_message_id"] = source["anchor"]
             state["events"].append(result)
             if report["stopped"]:
@@ -151,4 +181,5 @@ if __name__ == "__main__":
     parser.add_argument("--task", required=True)
     parser.add_argument("--run-dir", required=True)
     parser.add_argument("--stream-task", default="")
+    parser.add_argument("--recover-before-send", action="store_true")
     asyncio.run(execute(parser.parse_args()))

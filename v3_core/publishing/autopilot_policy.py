@@ -111,7 +111,7 @@ class ProductionAutoPublishRepository(AutoPublishRepository):
             conn.execute("BEGIN IMMEDIATE")
             rows = conn.execute(
                 """SELECT r.review_id,r.review_status,r.listing_id,r.offer_id,
-                          o.offer_type,l.canonical_facts_hash,s.dedupe_hash AS source_dedupe_hash
+                          o.offer_type,l.inventory_status,l.canonical_facts_hash,s.dedupe_hash AS source_dedupe_hash
                    FROM review_items r
                    JOIN listing_offers o ON o.offer_id=r.offer_id
                    JOIN listings_v3 l ON l.listing_id=r.listing_id
@@ -124,7 +124,7 @@ class ProductionAutoPublishRepository(AutoPublishRepository):
                 offer_type = str(row["offer_type"])
                 current_token = self._token(
                     row["canonical_facts_hash"], row["source_dedupe_hash"]
-                )
+                ) + ":" + str(row["inventory_status"] or "") + ":" + str(row["review_status"] or "")
                 previous = conn.execute(
                     "SELECT canonical_facts_hash FROM publisher_auto_versions_v3 WHERE offer_id=?",
                     (offer_id,),
@@ -157,7 +157,7 @@ class ProductionAutoPublishRepository(AutoPublishRepository):
                     ignored = bool(int(existing["ignored"] or 0))
                     if offer_type == "sale" and current_state != "published":
                         state, code, text = "exception", "sale_store_only", ERROR_LABELS["sale_store_only"]
-                    elif current_state == "published" or ignored:
+                    elif current_state in {"published", "sending", "unknown"} or ignored:
                         state, code, text = current_state, "", ""
                     elif changed:
                         state, code, text = "queued", "", ""

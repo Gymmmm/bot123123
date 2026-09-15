@@ -327,6 +327,26 @@ def test_unknown_delivery_state_blocks_automatic_retry(tmp_path):
     assert result.reason_text == "发送结果待确认，禁止重复发送"
 
 
+def test_inventory_change_requeues_exception_but_not_published_or_unknown(tmp_path):
+    db = tmp_path / "qiaolian.db"
+    initialize_v3_storage(db)
+    listing, offer, _ = _insert_listing(db, suffix="9", inventory_status="pending")
+    repo = FinalAutoPublishRepository(db)
+    repo.ensure_defaults()
+    repo.sync_candidates()
+    with sqlite3.connect(db) as conn:
+        conn.execute("UPDATE publisher_auto_items_v3 SET state='exception',reason_code='listing_not_publishable' WHERE offer_id=?", (offer,))
+        conn.execute("UPDATE listings_v3 SET inventory_status='active' WHERE listing_id=?", (listing,))
+    repo.sync_candidates()
+    with sqlite3.connect(db) as conn:
+        assert conn.execute("SELECT state FROM publisher_auto_items_v3 WHERE offer_id=?", (offer,)).fetchone()[0] == 'queued'
+        conn.execute("UPDATE publisher_auto_items_v3 SET state='published' WHERE offer_id=?", (offer,))
+        conn.execute("UPDATE listings_v3 SET inventory_status='rented' WHERE listing_id=?", (listing,))
+    repo.sync_candidates()
+    with sqlite3.connect(db) as conn:
+        assert conn.execute("SELECT state FROM publisher_auto_items_v3 WHERE offer_id=?", (offer,)).fetchone()[0] == 'published'
+
+
 def test_published_listing_is_not_sent_again_after_restart(tmp_path):
     db = tmp_path / "qiaolian.db"
     initialize_v3_storage(db)

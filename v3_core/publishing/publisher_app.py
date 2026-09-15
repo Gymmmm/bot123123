@@ -60,7 +60,7 @@ class V3PublisherApplication(PublisherAdminBot):
                 failed += 1
         if failed:
             await message.reply_text(
-                f"⚠️ 房态已经更新，但有 {failed} 套频道帖子同步失败，请稍后重试。",
+                f"⚠️ 房态已经更新，{failed} 套频道帖子正在等待自动重试，无需重复操作。",
                 reply_markup=InlineKeyboardMarkup([self._home_button()]),
             )
 
@@ -74,7 +74,7 @@ class V3PublisherApplication(PublisherAdminBot):
                 handled=await self.simple.handle_callback(update,context); parts=raw.split("|")
                 if handled and len(parts)==4 and parts[1]=="status":
                     status,listing_id=parts[2],parts[3]; result=await self.manual_status_sync.sync(context.bot,listing_id=listing_id,status=status)
-                    if result.attempted and not result.synced: await query.message.reply_text("⚠️ 房源状态已更新，但频道帖子同步失败，请稍后重试。",reply_markup=InlineKeyboardMarkup([self._home_button()]))
+                    if result.attempted and not result.synced: await query.message.reply_text("⚠️ 房源状态已更新，频道帖子正在等待自动重试，无需重复操作。",reply_markup=InlineKeyboardMarkup([self._home_button()]))
                 if handled:
                     await self._sync_batch_statuses(context, query.message)
             except Exception as exc:
@@ -121,6 +121,7 @@ class V3PublisherApplication(PublisherAdminBot):
         if app.job_queue is None: raise RuntimeError("python-telegram-bot JobQueue support is required for V3 Publisher")
         app.job_queue.run_repeating(self.autopilot.scheduled_tick,interval=20,first=3,name="v3_auto_publish_tick")
         app.job_queue.run_repeating(self.broadcast.scheduled_tick,interval=20,first=5,name="v3_broadcast_tick")
+        app.job_queue.run_repeating(self.manual_status_sync.scheduled_tick,interval=20,first=7,name="v3_status_sync_tick",job_kwargs={"max_instances": 1})
         return app
 
 def run():

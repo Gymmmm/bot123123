@@ -3,7 +3,7 @@ import sqlite3
 
 import pytest
 
-from scripts.v3.replace_channel_history import snapshot
+from scripts.v3.replace_channel_history import recover_before_send, snapshot
 
 
 def database():
@@ -56,3 +56,20 @@ def test_stream_consumes_ready_sources_without_waiting_for_whole_collection():
     assert [s["anchor"] for s in snapshot(c, "zufang555", ("-1001", "@channel"), "live")["sources"]] == [500]
     c.execute("INSERT INTO history_stream_ready_v3 VALUES ('live',3)")
     assert [s["anchor"] for s in snapshot(c, "zufang555", ("-1001", "@channel"), "live")["sources"]] == [500,200]
+
+
+def test_recovery_preserves_cursors_and_refuses_unknown_receipt(tmp_path):
+    c = database()
+    c.execute("ALTER TABLE publication_instances ADD COLUMN listing_id TEXT")
+    c.execute("CREATE TABLE publication_delivery_attempts_v3(state TEXT)")
+    state = snapshot(c, "zufang555", ("-1001", "@channel"))
+    state.update(status='blocked', successful=48)
+    folder = tmp_path / '9-500'
+    folder.mkdir()
+    (folder / 'report.json').write_text(json.dumps({'results': [], 'stopped': False}))
+    c.execute("INSERT INTO publication_delivery_attempts_v3 VALUES('unknown')")
+    with pytest.raises(RuntimeError, match='receipt_inspection'):
+        recover_before_send(c, state, tmp_path)
+    c.execute("DELETE FROM publication_delivery_attempts_v3")
+    recover_before_send(c, state, tmp_path)
+    assert (state['status'], state['successful'], state['target_index'], state['source_index']) == ('ready',48,0,0)

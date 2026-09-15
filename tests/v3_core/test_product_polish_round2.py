@@ -143,7 +143,8 @@ async def test_round2_manual_status_sync_edits_exact_published_post_and_hides_bo
             """
             CREATE TABLE listings_v3(
                 listing_id TEXT PRIMARY KEY,
-                public_listing_id TEXT
+                public_listing_id TEXT,
+                inventory_status TEXT
             );
             CREATE TABLE publication_instances(
                 id INTEGER PRIMARY KEY,
@@ -155,7 +156,7 @@ async def test_round2_manual_status_sync_edits_exact_published_post_and_hides_bo
                 post_text TEXT,
                 updated_at TEXT
             );
-            INSERT INTO listings_v3 VALUES ('l_1','QL-RF-A2B3');
+            INSERT INTO listings_v3 VALUES ('l_1','QL-RF-A2B3','rented');
             INSERT INTO publication_instances VALUES
                 (7,'l_1','telegram','published','-100123','456',
                  '🏡 富力城｜2房\n\n💰 $800/月\n\n🟢 当前可预约　QL-RF-A2B3',

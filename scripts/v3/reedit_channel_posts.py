@@ -36,6 +36,10 @@ def connect(db):
     return c
 
 
+class BeforeSendNetworkError(RuntimeError):
+    """Connection failed before any publication mutation or Telegram edit."""
+
+
 async def run(args):
     settings = load_settings()
     db = Path(settings.db_path)
@@ -67,8 +71,12 @@ async def run(args):
     bot = Bot(settings.token) if args.execute else None
     try:
         if bot:
-            await bot.initialize()
-            channel = await bot.get_chat(settings.channel_chat_id)
+            from telegram.error import NetworkError
+            try:
+                await bot.initialize()
+                channel = await bot.get_chat(settings.channel_chat_id)
+            except NetworkError as exc:
+                raise BeforeSendNetworkError(type(exc).__name__) from exc
             aliases = {str(settings.channel_chat_id), str(channel.id)}
         else:
             aliases = None
@@ -194,7 +202,10 @@ async def run(args):
                 break
     finally:
         if bot:
-            await bot.shutdown()
+            try:
+                await bot.shutdown()
+            except Exception:
+                pass  # Never mask a durable receipt or the pre-send classification.
         report = {"mode": "execute" if args.execute else "dry_run", "results": results,
             "next_cursor": (min if args.newest_first else max)([args.after] + [r["message_id"] for r in results]),
             "stopped": any(r["status"] in {"unknown", "commit_attention"} for r in results)}
