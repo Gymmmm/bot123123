@@ -91,6 +91,9 @@ async def execute(args):
             state = snapshot(conn, args.source, channels, args.stream_task)
             conn.execute("INSERT INTO channel_replacement_jobs_v3 VALUES (?,?)", (args.task, json.dumps(state)))
             conn.commit()
+        if state["status"] == "complete":
+            print(json.dumps({"event": "replacement_already_complete", "successful": state["successful"]}), flush=True)
+            return
         if state["status"] not in {"ready", "waiting", "waiting_source"}:
             raise RuntimeError("replacement_job_not_resumable:" + state["status"])
         print(json.dumps({"event": "replacement_started", "targets": len(state["targets"]),
