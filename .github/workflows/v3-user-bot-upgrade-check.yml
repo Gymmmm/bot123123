@@ -46,7 +46,11 @@ jobs:
             tests/v3_core/test_user_bot_public_search.py \
             tests/v3_core/test_user_bot_search_no_match_view.py \
             tests/v3_core/test_user_bot_callback_router.py \
+            tests/v3_core/test_user_bot_home_views.py \
+            tests/v3_core/test_user_bot_assurance.py \
             tests/v3_core/test_user_bot_telegram_service_handler.py \
             tests/v3_core/test_user_bot_service_flow.py \
+            tests/v3_core/test_user_bot_tenant_final_contract.py \
+            tests/v3_core/test_user_bot_historical_callbacks_final.py \
             tests/v3_core/test_adviser_copy_engine.py \
             tests/v3_core/test_adviser_v1_production.py
