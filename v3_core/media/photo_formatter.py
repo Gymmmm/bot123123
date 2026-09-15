@@ -15,28 +15,33 @@ LANDSCAPE_THRESHOLD = 1.10
 PORTRAIT_THRESHOLD = 0.90
 
 CANVAS_PRESETS = {
-    "landscape": {"size": (1200, 900), "logo_width_ratio": 0.18},
-    "portrait": {"size": (900, 1200), "logo_width_ratio": 0.18},
-    "square": {"size": (1080, 1080), "logo_width_ratio": 0.18},
+    "landscape": {"size": (1200, 900), "logo_width_ratio": 0.22},
+    "portrait": {"size": (900, 1200), "logo_width_ratio": 0.22},
+    "square": {"size": (1080, 1080), "logo_width_ratio": 0.22},
 }
 
 LOGO_MARGIN_X_RATIO = 0.03
 LOGO_MARGIN_Y_RATIO = 0.03
-LOGO_OPACITY = 0.90
+LOGO_OPACITY = 0.94
 LOGO_MAX_PHOTO_WIDTH_RATIO = 0.32
-LOGO_MAX_PHOTO_HEIGHT_RATIO = 0.15
+LOGO_MAX_PHOTO_HEIGHT_RATIO = 0.22
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 
 ROOT = Path(__file__).resolve().parent
+RIGHT_PRICE_LOGO = ROOT / "assets" / "qiaolian_corner_right_price.png"
+BLACK_GOLD_LOGO = ROOT / "assets" / "qiaolian_corner_black_gold.png"
 DEFAULT_LOGO_CANDIDATES = (
+    RIGHT_PRICE_LOGO,
     ROOT / "assets" / "qiaolian_logo_white.png",
     ROOT / "assets" / "brand" / "qiaolian_corner_mark_120x40.png",
 )
+_BLACK_GOLD_STYLE_KEYS = frozenset({"black_gold", "villa_premium", "dark_glass"})
 NOTO_FONT_CANDIDATES = (
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
     "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc",
     "/System/Library/Fonts/PingFang.ttc",
 )
+NOTO_CJK_SC_INDEX = 2
 
 
 def detect_orientation(width: int, height: int) -> str:
@@ -90,25 +95,49 @@ def _load_font(size: int) -> ImageFont.ImageFont:
     for raw in NOTO_FONT_CANDIDATES:
         if os.path.isfile(raw):
             try:
-                return ImageFont.truetype(raw, size)
+                return ImageFont.truetype(raw, size, index=NOTO_CJK_SC_INDEX)
             except Exception:
-                continue
+                try:
+                    return ImageFont.truetype(raw, size)
+                except Exception:
+                    continue
     return ImageFont.load_default()
 
 
 def _fallback_brand_logo(canvas_width: int) -> Image.Image:
-    font = _load_font(max(24, int(canvas_width * 0.038)))
-    text = "侨联地产"
-    tmp = Image.new("RGBA", (canvas_width, max(68, int(canvas_width * 0.10))), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(tmp)
-    box = draw.textbbox((0, 0), text, font=font, stroke_width=1)
-    tw = max(1, box[2] - box[0])
-    th = max(1, box[3] - box[1])
-    out = Image.new("RGBA", (tw + 24, th + 18), (0, 0, 0, 0))
+    """Two-line cover-matching mark when PNG assets are missing."""
+    cn_font = _load_font(max(28, int(canvas_width * 0.045)))
+    en_font = _load_font(max(14, int(canvas_width * 0.014)))
+    cn, en = "侨联地产", "QIAO LIAN"
+    probe = Image.new("RGBA", (8, 8), (0, 0, 0, 0))
+    probe_draw = ImageDraw.Draw(probe)
+    cn_box = probe_draw.textbbox((0, 0), cn, font=cn_font)
+    en_box = probe_draw.textbbox((0, 0), en, font=en_font)
+    cn_w, cn_h = cn_box[2] - cn_box[0], cn_box[3] - cn_box[1]
+    en_w, en_h = en_box[2] - en_box[0], en_box[3] - en_box[1]
+    gap = max(6, int(canvas_width * 0.006))
+    pad_x, pad_y = 14, 10
+    width = max(cn_w, en_w) + pad_x * 2
+    height = cn_h + gap + en_h + pad_y * 2
+    out = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     d = ImageDraw.Draw(out)
-    d.text((13, 10), text, font=font, fill=(0, 0, 0, 105), stroke_width=1, stroke_fill=(0, 0, 0, 75))
-    d.text((11, 8), text, font=font, fill=(255, 255, 255, 240), stroke_width=1, stroke_fill=(0, 0, 0, 65))
+    cn_x = pad_x + (max(cn_w, en_w) - cn_w) // 2
+    en_x = pad_x + (max(cn_w, en_w) - en_w) // 2
+    cn_y = pad_y - cn_box[1]
+    en_y = pad_y + cn_h + gap - en_box[1]
+    for dx, dy, a in ((2, 2, 100), (1, 1, 120)):
+        d.text((cn_x + dx, cn_y + dy), cn, font=cn_font, fill=(0, 0, 0, a))
+        d.text((en_x + dx, en_y + dy), en, font=en_font, fill=(0, 0, 0, a))
+    d.text((cn_x, cn_y), cn, font=cn_font, fill=(255, 255, 255, 245))
+    d.text((en_x, en_y), en, font=en_font, fill=(255, 255, 255, 235))
     return out
+
+
+def resolve_gallery_logo_path(cover_style: str | None) -> Path | None:
+    """Map cover style to the matching gallery corner mark asset."""
+    key = str(cover_style or "").strip().lower()
+    path = BLACK_GOLD_LOGO if key in _BLACK_GOLD_STYLE_KEYS else RIGHT_PRICE_LOGO
+    return path if path.is_file() else None
 
 
 def resolve_logo(logo_path: str | Path | None, canvas_width: int) -> Image.Image:
@@ -194,6 +223,7 @@ def format_gallery_photo(
     quality: int = JPEG_QUALITY,
     add_logo: bool = True,
     enhance: bool = True,
+    cover_style: str | None = None,
 ) -> dict:
     input_path = Path(input_path)
     output_path = Path(output_path)
@@ -210,7 +240,10 @@ def format_gallery_photo(
 
     logo_box = None
     if add_logo:
-        logo = resolve_logo(logo_path, canvas_size[0])
+        effective_logo = logo_path
+        if effective_logo is None:
+            effective_logo = resolve_gallery_logo_path(cover_style)
+        logo = resolve_logo(effective_logo, canvas_size[0])
         logo = _resize_gallery_logo(
             logo,
             canvas_width=canvas_size[0],
@@ -321,6 +354,7 @@ def format_gallery_folder(
     source_order: Sequence[str | Path | dict] | None = None,
     source_manifest: str | Path | None = None,
     enhance: bool = True,
+    cover_style: str | None = None,
 ) -> list[dict]:
     output_folder = Path(output_folder)
     output_folder.mkdir(parents=True, exist_ok=True)
@@ -338,6 +372,7 @@ def format_gallery_folder(
             logo_path=logo_path,
             logo_position=logo_position,
             enhance=enhance,
+            cover_style=cover_style,
         )
         info["order"] = index
         info["source_order"] = src.name

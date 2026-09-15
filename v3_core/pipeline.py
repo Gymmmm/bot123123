@@ -136,10 +136,12 @@ class V3CorePipeline:
         *,
         source_post_id: int,
         manual_cover_path: str | None = None,
+        cover_style: str | None = None,
     ) -> PreparedSourceMedia:
         return self.media.prepare(
             source_post_id=source_post_id,
             manual_cover_path=manual_cover_path,
+            cover_style=cover_style,
         )
 
     def render_cover(

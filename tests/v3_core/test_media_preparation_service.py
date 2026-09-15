@@ -73,7 +73,7 @@ def test_media_preparation_scrubs_to_derived_files_before_selection(tmp_path):
     assert all(prepared_dir in Path(path).parents for path in prepared.gallery_paths)
     assert all(Path(path).parent.name == "gallery" for path in prepared.gallery_paths)
     assert all(Path(path).name.endswith("_gallery.jpg") for path in prepared.gallery_paths)
-    assert prepared.source_identity["gallery_brand_revision"] == "qiaolian_gallery_logo_v1"
+    assert prepared.source_identity["gallery_brand_revision"] == "qiaolian_gallery_logo_v2_cover_match"
     assert all(str(Path(path).resolve()) not in prepared.gallery_paths for path in paths)
     assert [_sha(path) for path in paths] == before
 
@@ -112,3 +112,30 @@ def test_scrub_over_eight_percent_falls_back_to_untouched_derived_copy(tmp_path,
     assert all(Path(path).name.endswith("_gallery.jpg") for path in prepared.gallery_paths)
     assert all(prepared_dir in Path(path).parents for path in prepared.gallery_paths)
     assert [_sha(path) for path in paths] == before
+
+
+def test_resolve_gallery_logo_path_maps_black_gold_separately():
+    from v3_core.media.photo_formatter import (
+        BLACK_GOLD_LOGO,
+        RIGHT_PRICE_LOGO,
+        resolve_gallery_logo_path,
+    )
+
+    right = resolve_gallery_logo_path(None)
+    gold = resolve_gallery_logo_path("black_gold")
+    alias = resolve_gallery_logo_path("villa_premium")
+    assert right == RIGHT_PRICE_LOGO
+    assert gold == BLACK_GOLD_LOGO
+    assert alias == BLACK_GOLD_LOGO
+    assert gold != right
+
+
+def test_prepare_black_gold_uses_style_keyed_gallery_filenames(tmp_path):
+    db, source_id, paths = _source(tmp_path, "gold")
+    prepared_dir = tmp_path / "prepared-gold"
+    prepared = MediaPreparationService(
+        SourceReader(str(db)), prepared_dir=prepared_dir
+    ).prepare(source_post_id=source_id, cover_style="black_gold")
+
+    assert prepared.source_identity["gallery_cover_style"] == "black_gold"
+    assert all("black_gold_" in Path(path).name for path in prepared.gallery_paths)

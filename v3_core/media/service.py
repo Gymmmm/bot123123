@@ -17,13 +17,13 @@ from typing import Any
 
 from v3_core.ingest.source_reader import SourceReader
 from .media_selection import select_publication_media
-from .photo_formatter import format_gallery_photo
+from .photo_formatter import format_gallery_photo, resolve_gallery_logo_path
 from .source_scrub import scrub_file
 
 
 MAX_SCRUB_COVERAGE = 0.08
 SCRUB_REVISION = "source_scrub_v1"
-GALLERY_BRAND_REVISION = "qiaolian_gallery_logo_v1"
+GALLERY_BRAND_REVISION = "qiaolian_gallery_logo_v2_cover_match"
 
 
 @dataclass(frozen=True)
@@ -68,38 +68,56 @@ class MediaPreparationService:
         return fallback
 
     @staticmethod
-    def _gallery_digest(path: Path) -> str:
+    def _gallery_style_key(cover_style: str | None) -> str:
+        """Stable cache key: black_gold vs default right_price mark."""
+        key = str(cover_style or "").strip().lower()
+        if key in {"black_gold", "villa_premium", "dark_glass"}:
+            return "black_gold"
+        return "right_price"
+
+    @classmethod
+    def _gallery_digest(cls, path: Path, cover_style: str | None = None) -> str:
         digest = hashlib.sha256()
-        digest.update((GALLERY_BRAND_REVISION + "\0").encode("utf-8"))
+        style_key = cls._gallery_style_key(cover_style)
+        digest.update((GALLERY_BRAND_REVISION + "\0" + style_key + "\0").encode("utf-8"))
         with path.open("rb") as handle:
             for chunk in iter(lambda: handle.read(1024 * 1024), b""):
                 digest.update(chunk)
         return digest.hexdigest()
 
     def _branded_gallery(
-        self, *, source_post_id: int | str, paths: list[str]
+        self,
+        *,
+        source_post_id: int | str,
+        paths: list[str],
+        cover_style: str | None = None,
     ) -> list[str]:
         """Create deterministic logo-bearing gallery copies without touching evidence.
 
         Cover rendering intentionally keeps using the clean selected source.  The
         returned files are only for the public ``更多实拍`` gallery, preventing a
         second brand mark from appearing underneath the cover template.
+        Gallery corner marks follow the listing cover brand (日常白 / 黑金香槟金).
         """
         target_dir = self.prepared_dir / str(int(source_post_id)) / "gallery"
         target_dir.mkdir(parents=True, exist_ok=True)
+        style_key = self._gallery_style_key(cover_style)
         branded: list[str] = []
         for raw in paths:
             source = Path(str(raw)).expanduser().resolve()
             if not source.is_file():
                 raise FileNotFoundError(f"gallery_source_not_found:{source}")
-            target = target_dir / f"{self._gallery_digest(source)[:24]}_gallery.jpg"
+            digest = self._gallery_digest(source, cover_style=cover_style)
+            target = target_dir / f"{style_key}_{digest[:20]}_gallery.jpg"
             if not target.is_file():
                 format_gallery_photo(
                     source,
                     target,
+                    logo_path=resolve_gallery_logo_path(cover_style),
                     logo_position="top_left",
                     add_logo=True,
                     enhance=False,
+                    cover_style=cover_style,
                 )
             branded.append(str(target.resolve()))
         return branded
@@ -154,6 +172,7 @@ class MediaPreparationService:
         *,
         source_post_id: int | str,
         manual_cover_path: str | None = None,
+        cover_style: str | None = None,
     ) -> PreparedSourceMedia:
         raw_paths = self.reader.source_image_paths(source_post_id)
         cleaned_paths, raw_to_clean, scrub_rejected = self._scrubbed_paths(
@@ -175,6 +194,7 @@ class MediaPreparationService:
         branded_gallery = self._branded_gallery(
             source_post_id=source_post_id,
             paths=[str(path) for path in selected["gallery_paths"]],
+            cover_style=cover_style,
         )
         rejected = [str(path) for path in scrub_rejected]
         rejected.extend(str(path) for path in selected["rejected_paths"])
@@ -185,6 +205,7 @@ class MediaPreparationService:
             source_identity={
                 **self.reader.source_identity(source_post_id),
                 "gallery_brand_revision": GALLERY_BRAND_REVISION,
+                "gallery_cover_style": self._gallery_style_key(cover_style),
             },
             duplicates=tuple(dict(item) for item in selected["duplicates"]),
             rejected_paths=tuple(rejected),
