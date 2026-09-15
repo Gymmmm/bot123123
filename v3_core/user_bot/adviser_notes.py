@@ -9,6 +9,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from v3_core.adviser_copy import adviser_tags_from_facts, generate_adviser_text
+
 from .public_inventory import PublishedListingView
 
 
@@ -178,8 +180,21 @@ def adviser_notes_for_view(
         lines = [line.strip() for line in frozen_copy.splitlines() if line.strip()]
         return "\n".join(lines[: max(0, max_points)])
 
-    # Existing already-published packages predate frozen adviser copy. Preserve
-    # their historical detail wording instead of silently changing old posts.
+    # Some already-published packages predate the frozen ``adviser_copy`` field
+    # but still contain the complete frozen canonical evidence.  Route those
+    # packages through the shared adviser engine as well, without consulting a
+    # mutable live listing/canonical row.  Keep the conservative legacy wording
+    # only when the frozen facts have no adviser signal for the engine to use.
+    if adviser_tags_from_facts(canonical):
+        public_id = str(snapshot.get("public_listing_id") or "").strip()
+        facts_hash = str(snapshot.get("canonical_facts_hash") or "").strip()
+        return generate_adviser_text(
+            canonical,
+            seed=f"{public_id}|{facts_hash}",
+            max_points=max_points,
+            allow_fallback=not allow_empty,
+        ).strip()
+
     return generate_adviser_notes(
         frozen_adviser_evidence(view),
         max_points=max_points,

@@ -93,10 +93,7 @@ def test_frozen_safe_included_list_projects_only_explicit_fee_inclusion():
     evidence = frozen_adviser_evidence(view)
     assert evidence["management_fee"] == "包含"
     assert evidence["internet_fee"] == "包含"
-    assert adviser_notes_for_view(view) == (
-        "这套位置标注为富力城，看房前可以先核对具体定位。\n"
-        "月租为$800；物业费已包含；网络费已包含。"
-    )
+    assert adviser_notes_for_view(view) == "这边物业和网费都不用另外算。"
 
 
 def test_amenity_presence_never_becomes_fee_inclusion():
@@ -105,9 +102,7 @@ def test_amenity_presence_never_becomes_fee_inclusion():
     evidence = frozen_adviser_evidence(view)
     assert "management_fee" not in evidence
     assert "internet_fee" not in evidence
-    assert adviser_notes_for_view(view) == (
-        "这套位置标注为富力城，看房前可以先核对具体定位。"
-    )
+    assert adviser_notes_for_view(view) == "楼下泳池健身房都配了。"
 
 
 def test_frozen_highlights_are_used_without_live_database_lookup():
@@ -120,6 +115,21 @@ def test_frozen_highlights_are_used_without_live_database_lookup():
         "这套标注在BKK1，项目是富力城，可以按实际通勤路线再判断。\n"
         "资料明确标注：采光好、钥匙已备；具体状态可以结合实拍确认。"
     )
+
+
+def test_older_package_with_frozen_signals_uses_shared_adviser_engine():
+    view = _view(
+        canonical_facts={
+            "adviser_signals": ["cleaning_2x", "management_wifi"],
+        }
+    )
+
+    text = adviser_notes_for_view(view, max_points=2)
+
+    assert "两次" in text
+    assert "物业" in text
+    assert "网费" in text
+    assert "位置标注" not in text
 
 
 def test_missing_frozen_canonical_facts_is_blocked_instead_of_falling_back_live():
