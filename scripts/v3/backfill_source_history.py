@@ -42,6 +42,10 @@ class Unit:
 
 async def main_async() -> None:
     app = from_environment()
+    stream_task = str(os.getenv("BACKFILL_STREAM_TASK", "")).strip()
+    if stream_task:
+        from v3_core.ingest.history_stream import set_status, publish_ready
+        set_status(app.db_path, stream_task, "running")
     source_name = str(os.getenv("SOURCE_NAME", "zufang555")).strip()
     target_groups = max(1, int(os.getenv("TARGET_GROUPS", "50") or 50))
     fetch_limit = max(target_groups, int(os.getenv("FETCH_LIMIT", "1200") or 1200))
@@ -91,7 +95,7 @@ async def main_async() -> None:
         image_count = 0
 
         # Persist oldest -> newest so downstream review ordering remains natural.
-        for unit in reversed(selected):
+        for unit in (selected if stream_task else reversed(selected)):
             try:
                 if unit.kind == "album":
                     parts = unit.messages
@@ -152,6 +156,9 @@ async def main_async() -> None:
                     duplicates += 1
                 else:
                     inserted += 1
+                if stream_task and result.source_post_pk:
+                    status = await asyncio.to_thread(publish_ready, app.db_path, stream_task, result.source_post_pk)
+                    print(f"STREAM_READY anchor={unit.newest_id} status={status}", flush=True)
             except Exception as exc:
                 failed += 1
                 print(
@@ -168,6 +175,8 @@ async def main_async() -> None:
         )
     finally:
         await client.disconnect()
+        if stream_task:
+            set_status(app.db_path, stream_task, "complete")
 
 
 def main() -> None:

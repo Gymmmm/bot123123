@@ -17,6 +17,7 @@ def database():
         CREATE TABLE listings_v3(listing_id TEXT,canonical_record_id TEXT);
         CREATE TABLE listing_offers(offer_id TEXT,listing_id TEXT,offer_type TEXT,
             offer_status TEXT,publication_policy TEXT);
+        CREATE TABLE history_stream_ready_v3(task_id TEXT,source_id INTEGER);
     """)
     for i in (2, 9, 4):
         c.execute("INSERT INTO publication_instances VALUES (?,?,?,'telegram','published','-1001','')", (i, f"p{i}", str(i)))
@@ -45,3 +46,13 @@ def test_duplicate_offers_do_not_repeat_the_same_listing():
     c = database()
     c.execute("INSERT INTO listing_offers VALUES ('extra','l2','rent','active','telegram_rent')")
     assert len(snapshot(c, "zufang555", ("-1001", "@channel"))["sources"]) == 3
+
+
+def test_stream_consumes_ready_sources_without_waiting_for_whole_collection():
+    c = database()
+    state = snapshot(c, "zufang555", ("-1001", "@channel"), "live")
+    assert state["sources"] == []
+    c.execute("INSERT INTO history_stream_ready_v3 VALUES ('live',2)")
+    assert [s["anchor"] for s in snapshot(c, "zufang555", ("-1001", "@channel"), "live")["sources"]] == [500]
+    c.execute("INSERT INTO history_stream_ready_v3 VALUES ('live',3)")
+    assert [s["anchor"] for s in snapshot(c, "zufang555", ("-1001", "@channel"), "live")["sources"]] == [500,200]

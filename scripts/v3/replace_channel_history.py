@@ -16,7 +16,7 @@ from scripts.v3.reedit_channel_posts import connect, run
 from v3_core.publishing.admin_bot import load_settings
 
 
-def snapshot(conn, source, channel):
+def snapshot(conn, source, channel, stream_task=""):
     targets = [dict(r) for r in conn.execute("""SELECT instance_id,channel_message_id
         FROM publication_instances WHERE platform='telegram' AND publish_status='published'
         AND channel_chat_id IN (?,?) AND COALESCE(media_group_id,'')=''
@@ -28,7 +28,8 @@ def snapshot(conn, source, channel):
         JOIN listings_v3 l ON l.canonical_record_id=c.canonical_record_id
         JOIN listing_offers o ON o.listing_id=l.listing_id
         WHERE s.source_name=? AND s.parse_status='parsed' AND o.offer_type='rent' AND o.offer_status='active'
-        AND o.publication_policy='telegram_rent'""", (source,)):
+        AND o.publication_policy='telegram_rent'
+        AND (?='' OR s.id IN (SELECT source_id FROM history_stream_ready_v3 WHERE task_id=?))""", (source,stream_task,stream_task)):
         row = dict(row)
         anchor = int((json.loads(row["raw_meta_json"] or "{}") or {}).get("anchor_message_id") or 0)
         if anchor <= 0:
@@ -40,7 +41,7 @@ def snapshot(conn, source, channel):
         if candidate["listing_id"] not in seen:
             seen.add(candidate["listing_id"])
             ordered.append(candidate)
-    if not targets or not ordered:
+    if not targets or (not ordered and not stream_task):
         raise ValueError("replacement_targets_or_sources_empty")
     return {"targets": targets, "sources": ordered, "target_index": 0,
             "source_index": 0, "successful": 0, "group_successful": 0,
@@ -60,19 +61,40 @@ async def execute(args):
         chat = await bot.get_chat(settings.channel_chat_id)
         channels = (str(settings.channel_chat_id), str(chat.id))
     with connect(settings.db_path) as conn:
+        from v3_core.ingest.history_stream import ensure
+        ensure(conn)
         conn.execute("CREATE TABLE IF NOT EXISTS channel_replacement_jobs_v3 (task_id TEXT PRIMARY KEY,state_json TEXT NOT NULL)")
         row = conn.execute("SELECT state_json FROM channel_replacement_jobs_v3 WHERE task_id=?", (args.task,)).fetchone()
         if row:
             state = json.loads(row[0])
         else:
-            state = snapshot(conn, args.source, channels)
+            state = snapshot(conn, args.source, channels, args.stream_task)
             conn.execute("INSERT INTO channel_replacement_jobs_v3 VALUES (?,?)", (args.task, json.dumps(state)))
             conn.commit()
-        if state["status"] not in {"ready", "waiting"}:
+        if state["status"] not in {"ready", "waiting", "waiting_source"}:
             raise RuntimeError("replacement_job_not_resumable:" + state["status"])
         print(json.dumps({"event": "replacement_started", "targets": len(state["targets"]),
                           "sources": len(state["sources"]), "direction": "newest_first"}), flush=True)
-        while state["target_index"] < len(state["targets"]) and state["source_index"] < len(state["sources"]):
+        while state["target_index"] < len(state["targets"]):
+            if state["source_index"] >= len(state["sources"]):
+                if not args.stream_task:
+                    break
+                fresh = snapshot(conn, args.source, channels, args.stream_task)["sources"]
+                seen = {s["listing_id"] for s in state["sources"]}
+                extra = [s for s in fresh if s["listing_id"] not in seen]
+                if extra and state["sources"] and extra[0]["anchor"] > state["sources"][-1]["anchor"]:
+                    state["status"] = "blocked_source_order"
+                    save(conn, args.task, state)
+                    raise RuntimeError("stream_source_order_reversed")
+                state["sources"].extend(extra)
+                if not extra:
+                    producer = conn.execute('SELECT status FROM history_streams_v3 WHERE task_id=?',(args.stream_task,)).fetchone()
+                    if producer and producer[0] == "complete":
+                        break
+                    state["status"] = "waiting_source"
+                    save(conn, args.task, state)
+                    await asyncio.sleep(3)
+                    continue
             if state["group_successful"] >= 5:
                 state["status"] = "waiting"
                 save(conn, args.task, state)
@@ -128,4 +150,5 @@ if __name__ == "__main__":
     parser.add_argument("--source", default="zufang555", choices=["zufang555"])
     parser.add_argument("--task", required=True)
     parser.add_argument("--run-dir", required=True)
+    parser.add_argument("--stream-task", default="")
     asyncio.run(execute(parser.parse_args()))
