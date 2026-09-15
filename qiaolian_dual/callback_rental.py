@@ -6,7 +6,7 @@ from pathlib import Path
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 
-from .common import MAIN
+from .common import MAIN, db
 
 
 _CALLBACKS = {
