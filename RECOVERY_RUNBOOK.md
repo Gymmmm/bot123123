@@ -6,6 +6,7 @@
 - prepared / sending / sent / unknown 或发送后提交异常：不盲目重试，先核对原消息与 durable receipt。
 - 历史 blocked 仅可使用 `--recover-before-send` 恢复：要求当前目标未绑定候选、报告 results 为空且无 stopped、全库不存在未结算尝试。
 - 服务重启可恢复 ready / waiting / waiting_source；executing 必须核对，不推测是否已发送。
+- 来源不够时，原采集程序可用 `BACKFILL_BEFORE_MESSAGE_ID` 从最旧已采集相册的 anchor 之前继续；`BACKFILL_READ_ONLY_SESSION=1` 使用内存授权只读采集，不写运行中的 collector session，不请求登录。解析、媒体与 ready 队列仍走原链路。
 - 房态变更由 SQLite 同事务触发持久 outbox。Publisher 每 20 秒处理最多 10 套，同步同房源的所有已发布消息。
 - 断网保留 outbox，10 秒起退避，最多 600 秒；重试始终读取最新房态；not modified 视为成功。修订号防止删除并发的新变更。
 - 发布候选版本包含事实、来源、房态、审核状态。修正房态会重新检查未发布异常项；已发布、ignored、sending、unknown 不自动重发；销售只存档规则保留。

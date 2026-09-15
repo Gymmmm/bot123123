@@ -17,6 +17,8 @@ from __future__ import annotations
 
 import asyncio
 import os
+import sqlite3
+from pathlib import Path
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
@@ -40,6 +42,26 @@ class Unit:
         return max(int(m.id) for m in self.messages)
 
 
+def history_client(app):
+    if os.getenv("BACKFILL_READ_ONLY_SESSION") != "1":
+        return TelegramClient(app.session_path, app.api_id, app.api_hash)
+    # Read the existing authorization into memory; never lock/write the live
+    # collector session or request a new login during a history-only run.
+    from telethon.crypto import AuthKey
+    from telethon.sessions import MemorySession
+    path = str(app.session_path)
+    if not path.endswith('.session'):
+        path += '.session'
+    with sqlite3.connect('file:' + str(Path(path).resolve()) + '?mode=ro', uri=True) as conn:
+        row = conn.execute('SELECT dc_id,server_address,port,auth_key FROM sessions LIMIT 1').fetchone()
+    if not row or not row[3]:
+        raise RuntimeError('existing_collector_authorization_required')
+    memory = MemorySession()
+    memory.set_dc(row[0], row[1], row[2])
+    memory.auth_key = AuthKey(row[3])
+    return TelegramClient(memory, app.api_id, app.api_hash, receive_updates=False)
+
+
 async def main_async() -> None:
     app = from_environment()
     stream_task = str(os.getenv("BACKFILL_STREAM_TASK", "")).strip()
@@ -58,12 +80,19 @@ async def main_async() -> None:
     if source_cfg is None:
         raise SystemExit(f"source not found: {source_name}")
 
-    client = TelegramClient(app.session_path, app.api_id, app.api_hash)
-    await client.start()
+    client = history_client(app)
+    if os.getenv("BACKFILL_READ_ONLY_SESSION") == "1":
+        await client.connect()
+        if not await client.is_user_authorized():
+            await client.disconnect()
+            raise RuntimeError('existing_collector_authorization_required')
+    else:
+        await client.start()
     try:
         entity = await client.get_entity(source_cfg["entity_id"])
         messages: list[Any] = []
-        async for message in client.iter_messages(entity, limit=fetch_limit):
+        before = max(0, int(os.getenv('BACKFILL_BEFORE_MESSAGE_ID', '0')))
+        async for message in client.iter_messages(entity, limit=fetch_limit, offset_id=before):
             messages.append(message)
 
         grouped: dict[int, list[Any]] = defaultdict(list)
