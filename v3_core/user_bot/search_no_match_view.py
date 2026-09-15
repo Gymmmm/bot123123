@@ -1,4 +1,4 @@
-"""Locked-copy no-match view for guided V3 search."""
+"""Strict no-match view for guided V3 search."""
 from __future__ import annotations
 
 from html import escape as he
@@ -24,13 +24,12 @@ def build_search_no_match_view(intent: SearchSubmitIntent) -> TransitionView:
         text=(
             "🔎 <b>暂时没有完全符合条件的房源</b>"
             f"{summary_block}\n\n"
-            "可以先看看当前可预约房源，\n"
-            "也可以调整条件或让中文顾问继续留意。"
+            "当前结果不会自动放宽您的条件。\n"
+            "可以调整条件重新筛选，或让中文顾问按原条件继续留意。"
         ),
         rows=(
-            (TransitionChoice("🏘 查看当前可约", "search_available"),),
             (TransitionChoice("✏️ 调整条件", "change_search"),),
-            (TransitionChoice("💬 联系中文顾问", "home", value="contact"),),
+            (TransitionChoice("💬 中文顾问", "home", value="contact"),),
             (TransitionChoice("🏠 返回首页", "home"),),
         ),
     )
