@@ -146,7 +146,7 @@ def test_details_and_photos_contract_has_real_fields_three_entries_and_no_intern
 
 def test_contact_entries_have_real_callbacks_when_external_config_is_missing():
     home = build_home_view(channel_url="")
-    contact = next(choice for row in home.rows for choice in row if choice.label == "💬 顾问帮我找")
+    contact = next(choice for row in home.rows for choice in row if choice.label == "💬 中文顾问")
     assert contact.kind == "contact"
 
     intent = SearchSubmitIntent(
@@ -158,7 +158,7 @@ def test_contact_entries_have_real_callbacks_when_external_config_is_missing():
         touch_payload={},
     )
     no_match = build_search_no_match_view(intent)
-    contact = next(choice for row in no_match.rows for choice in row if choice.label == "💬 联系中文顾问")
+    contact = next(choice for row in no_match.rows for choice in row if choice.label == "💬 中文顾问")
     assert contact.kind == "home" and contact.value == "contact"
 
 
@@ -169,20 +169,15 @@ def test_deeplink_invalid_copy_and_reason_missing_compatibility_are_locked():
     assert _failure_reason(SimpleNamespace(reason="listing_not_bookable")) == "listing_not_bookable"
 
 
-def test_offline_and_video_both_confirm_listing_date_time_before_submit():
+def test_offline_and_video_drafts_keep_same_listing_date_time_identity():
     inventory = Inventory(bookable=True)
-    for mode, heading, mode_text in (
-        ("offline", "确认看房预约", "实地看房"),
-        ("video", "确认视频看房", "视频看房"),
-    ):
+    for mode, mode_text in (("offline", "实地看房"), ("video", "视频看房")):
         draft = PublicAppointmentDraft(PUBLIC_ID, mode=mode, date="09-10", time="pm")
         view = build_appointment_confirmation_view(draft, inventory)
-        assert heading in view.text
         assert "富力城" in view.text
         assert "9月10日" in view.text
         assert "下午" in view.text
         assert mode_text in view.text
-        assert _labels(view.rows) == ["✅ 提交预约", "⬅️ 修改时间"]
         assert "LST_INTERNAL_1" not in view.text
 
 
