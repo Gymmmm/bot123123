@@ -5,8 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Callable
 
-from v3_core.storage.service_repository import RepairTicket, SQLiteTenantServiceRepository
-
+from v3_core.storage.service_repository import RepairTicket, SQLiteTenantServiceRepository, TenantBinding
 
 SERVICE_REQUEST_LABELS = {
     "repair_ac": "空调",
@@ -20,13 +19,7 @@ SERVICE_REQUEST_LABELS = {
     "repair_other": "其他设备",
     "property": "物业协调",
 }
-
-SERVICE_SLOT_LABELS = {
-    "today": "今天内安排",
-    "tomorrow_am": "明天上午",
-    "tomorrow_pm": "明天下午",
-}
-
+SERVICE_SLOT_LABELS = {"today": "今天内安排", "tomorrow_am": "明天上午", "tomorrow_pm": "明天下午"}
 URGENT_ISSUES = frozenset({"repair_water", "repair_power", "repair_door"})
 
 
@@ -47,14 +40,18 @@ class RepairSubmission:
 
 
 class TenantService:
-    def __init__(
-        self,
-        repository: SQLiteTenantServiceRepository,
-        *,
-        now: Callable[[], str] | None = None,
-    ):
+    def __init__(self, repository: SQLiteTenantServiceRepository, *, now: Callable[[], str] | None = None):
         self.repository = repository
         self.now = now or (lambda: datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+
+    def active_binding(self, user_id: int) -> TenantBinding | None:
+        return self.repository.get_active_binding(int(user_id))
+
+    def require_active_binding(self, user_id: int) -> TenantBinding:
+        binding = self.active_binding(int(user_id))
+        if binding is None or str(binding.status) != "active":
+            raise PermissionError("active_tenant_binding_required")
+        return binding
 
     def begin_request(self, issue_key: str, *, request_token: str) -> ServiceRequestDraft:
         clean = str(issue_key or "").strip()
@@ -77,13 +74,7 @@ class TenantService:
             request_token=draft.request_token,
         )
 
-    def submit_repair(
-        self,
-        *,
-        user_id: int,
-        draft: ServiceRequestDraft,
-        slot: str,
-    ) -> RepairSubmission:
+    def submit_repair(self, *, user_id: int, draft: ServiceRequestDraft, slot: str) -> RepairSubmission:
         clean_slot = str(slot or "").strip()
         slot_label = SERVICE_SLOT_LABELS.get(clean_slot)
         if slot_label is None:
@@ -92,7 +83,7 @@ class TenantService:
             raise ValueError("service_request_detail_required")
         if not str(draft.request_token or "").strip():
             raise ValueError("service_request_token_required")
-        binding = self.repository.get_active_binding(int(user_id))
+        binding = self.require_active_binding(int(user_id))
         write = self.repository.create_repair_ticket(
             request_token=draft.request_token,
             user_id=int(user_id),
@@ -112,10 +103,6 @@ class TenantService:
 
 
 __all__ = [
-    "RepairSubmission",
-    "SERVICE_REQUEST_LABELS",
-    "SERVICE_SLOT_LABELS",
-    "ServiceRequestDraft",
-    "TenantService",
-    "URGENT_ISSUES",
+    "RepairSubmission", "SERVICE_REQUEST_LABELS", "SERVICE_SLOT_LABELS",
+    "ServiceRequestDraft", "TenantService", "URGENT_ISSUES",
 ]
