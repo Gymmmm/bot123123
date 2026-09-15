@@ -1,0 +1,163 @@
+name: qiaolian-sale-api-deploy
+
+on:
+  push:
+    branches: [codex/qiaolian-ui-cleanup-20260829]
+    paths: [.github/ops-control/sale-request.txt]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qiaolian-sale-api-production
+  cancel-in-progress: false
+
+env:
+  PROD_HOST: 50.114.74.120
+  PROD_PORT: '22'
+  PROD_SSH_USER: root
+  PROD_SSH_HOST_FINGERPRINT: 'SHA256:sgqLYOUAZ482H3y5jREQ6q2BVvNFPXYiOg4ruyFVnsA'
+  SALE_BRANCH: codex/v3-sale-catalog-web-20260909
+
+jobs:
+  deploy-sale-api:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out control revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+
+      - name: Validate request
+        run: |
+          set -Eeuo pipefail
+          request=$(<.github/ops-control/sale-request.txt)
+          test "$(printf '%s\n' "$request" | wc -l | tr -d ' ')" = 2
+          action=$(printf '%s\n' "$request" | sed -n '1p')
+          request_id=$(printf '%s\n' "$request" | sed -n '2p')
+          test "$action" = sale-deploy
+          [[ "$request_id" =~ ^[A-Za-z0-9._:-]{1,80}$ ]]
+
+      - name: Check out sale catalog source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SALE_BRANCH }}
+          path: sale-src
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Build isolated sale API bundle
+        run: |
+          set -Eeuo pipefail
+          SALE_SHA=$(git -C sale-src rev-parse HEAD)
+          echo "SALE_SHA=$SALE_SHA" >> "$GITHUB_ENV"
+          tar -C sale-src -czf "$RUNNER_TEMP/qiaolian-sale-api.tgz" \
+            run_v3_sale_web.py \
+            v3_core/__init__.py \
+            v3_core/sale \
+            web/sale/index.html
+
+      - name: Verify production SSH host key
+        run: |
+          set -Eeuo pipefail
+          ssh-keyscan -T 10 -p "$PROD_PORT" -t ed25519 "$PROD_HOST" 2>/dev/null | grep -v '^#' > "$RUNNER_TEMP/known_hosts_observed"
+          ssh-keygen -lf "$RUNNER_TEMP/known_hosts_observed" | grep -F "$PROD_SSH_HOST_FINGERPRINT"
+
+      - name: Configure production SSH
+        env:
+          PROD_SSH_PRIVATE_KEY: '${{ secrets.PROD_SSH_PRIVATE_KEY }}'
+        run: |
+          set -Eeuo pipefail
+          test -n "$PROD_SSH_PRIVATE_KEY"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
+          cp "$RUNNER_TEMP/known_hosts_observed" "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
+
+      - name: Upload sale API bundle
+        run: |
+          set -Eeuo pipefail
+          scp -P "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 \
+            "$RUNNER_TEMP/qiaolian-sale-api.tgz" "$PROD_SSH_USER@$PROD_HOST:/var/tmp/qiaolian-sale-api-$SALE_SHA.tgz"
+
+      - name: Install isolated read-only sale API service
+        run: |
+          set -Eeuo pipefail
+          ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 \
+            "$PROD_SSH_USER@$PROD_HOST" "bash -s -- '$SALE_SHA'" <<'REMOTE'
+          set -Eeuo pipefail
+          SALE_SHA=$1
+          ROOT=/opt/qiaolian_sale_api
+          RELEASE="$ROOT/releases/$SALE_SHA"
+          CURRENT="$ROOT/current"
+          ARCHIVE="/var/tmp/qiaolian-sale-api-$SALE_SHA.tgz"
+          RUNTIME_ENV=/opt/qiaolian_v3/runtime.env
+          PYTHON=/opt/qiaolian_v3/.venv/bin/python
+
+          test -f "$ARCHIVE"
+          test -f "$RUNTIME_ENV"
+          test -x "$PYTHON"
+          install -d -m 0755 "$ROOT/releases"
+          rm -rf "$RELEASE"
+          install -d -m 0755 "$RELEASE"
+          tar -xzf "$ARCHIVE" -C "$RELEASE"
+          chown -R qiaolianbot:qiaolianbot "$RELEASE"
+          ln -sfn "$RELEASE" "$ROOT/current.next"
+          mv -Tf "$ROOT/current.next" "$CURRENT"
+
+          cat >/etc/systemd/system/qiaolian-sale-api.service <<'UNIT'
+          [Unit]
+          Description=Qiaolian V3 public sale catalog API
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=simple
+          User=qiaolianbot
+          Group=qiaolianbot
+          WorkingDirectory=/opt/qiaolian_sale_api/current
+          EnvironmentFile=/opt/qiaolian_v3/runtime.env
+          Environment=PYTHONPATH=/opt/qiaolian_sale_api/current
+          Environment=V3_SALE_WEB_HOST=0.0.0.0
+          Environment=V3_SALE_WEB_PORT=8091
+          ExecStart=/opt/qiaolian_v3/.venv/bin/python /opt/qiaolian_sale_api/current/run_v3_sale_web.py
+          Restart=on-failure
+          RestartSec=3
+          NoNewPrivileges=true
+          PrivateTmp=true
+          ProtectSystem=full
+          ProtectHome=true
+          UMask=0027
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+
+          systemctl daemon-reload
+          systemctl enable qiaolian-sale-api.service
+          systemctl restart qiaolian-sale-api.service
+          sleep 3
+          systemctl is-active --quiet qiaolian-sale-api.service
+          curl -fsS --max-time 10 http://127.0.0.1:8091/healthz
+          echo
+          curl -fsS --max-time 10 'http://127.0.0.1:8091/api/v3/sale/listings?limit=1' >/var/tmp/qiaolian-sale-listing-smoke.json
+          python3 - <<'PY'
+          import json
+          p=json.load(open('/var/tmp/qiaolian-sale-listing-smoke.json'))
+          print('SALE_API_SMOKE', {'ok':p.get('ok'), 'total':p.get('total'), 'items':len(p.get('items') or [])})
+          PY
+          rm -f /var/tmp/qiaolian-sale-listing-smoke.json "$ARCHIVE"
+          systemctl --no-pager --full status qiaolian-sale-api.service
+          REMOTE
+
+      - name: Verify public API reachability
+        run: |
+          set -Eeuo pipefail
+          curl -fsS --max-time 15 "http://$PROD_HOST:8091/healthz"
+          echo
+          curl -fsS --max-time 15 "http://$PROD_HOST:8091/api/v3/sale/listings?limit=1" | python3 -c 'import json,sys; p=json.load(sys.stdin); print({"ok":p.get("ok"),"total":p.get("total"),"items":len(p.get("items") or [])})'
+
+      - name: Remove temporary SSH material
+        if: always()
+        run: rm -f "$HOME/.ssh/qiaolian_production"
