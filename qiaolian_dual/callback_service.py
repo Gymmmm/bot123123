@@ -9,7 +9,7 @@ def matches(data: str) -> bool:
         data == 'service:hub'
         or data == 'service:promise'
         or data == 'service:contact'
-        or data in {'service:renew', 'service:change', 'service:renew_change', 'service:terminate', 'service:move', 'service:staging', 'service:addons', 'service:checkin_tips'}
+        or data in {'service:renew', 'service:terminate', 'service:move', 'service:staging', 'service:addons', 'service:checkin_tips'}
         or data in {'service:guide', 'service:local_life'}
         or data == 'service:repair_hub'
         or data in {'service:general', 'service:nearby', 'local:other'}
@@ -29,7 +29,7 @@ def _service_back_keyboard(*, parent_callback: str='service:hub', parent_label: 
 
 async def handle_service_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, query, data: str, user) -> int | None:
     from .admin_contract import _user_contact_text, _user_mention_html
-    from .flows import contact_management, show_search_entry, show_service_hub
+    from .flows import contact_management, show_service_hub
     from .keyboards_search import local_life_keyboard, nearby_area_keyboard, rfcity_back_keyboard, rfcity_keyboard, service_repair_keyboard
     from .results_admin import _notify_admins, admin_repair_keyboard
     from .search import create_lead
@@ -189,10 +189,7 @@ async def handle_service_callback(update: Update, context: ContextTypes.DEFAULT_
             await render_panel(update, text=renderer(), parse_mode=ParseMode.HTML, reply_markup=rfcity_back_keyboard(), context=context)
         return MAIN
 
-    # 历史 callback 兼容；当前 UI 不再生成这些入口。
-    if data == 'service:change':
-        return await show_search_entry(update, context)
-    if data in {'service:renew', 'service:renew_change'}:
+    if data == 'service:renew':
         from .callback_contract import handle_contract_callback
         return await handle_contract_callback(update, context, query, 'contract:renew', user)
     if data == 'service:terminate':
