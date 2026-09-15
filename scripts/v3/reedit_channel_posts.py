@@ -20,7 +20,7 @@ from v3_core.ingest.source_reader import SourceReader
 from v3_core.media.cover_service import CoverRenderService
 from v3_core.media.cover_styles import recommended_cover_style
 from v3_core.media.service import MediaPreparationService
-from v3_core.publishing.admin_bot import load_settings
+from v3_core.publishing.admin_bot import build_workflow, load_settings
 from v3_core.publishing.delivery_coordinator import TelegramSendCommand
 from v3_core.publishing.delivery_state import PublicationDeliveryStateRepository
 from v3_core.publishing.eligibility import evaluate_offer_eligibility
@@ -58,6 +58,9 @@ async def run(args):
               AND CAST(channel_message_id AS INTEGER){comparison}?
             ORDER BY CAST(channel_message_id AS INTEGER) {direction},id LIMIT ?""",
             (args.after, min(5, max(1, args.limit)))).fetchall()
+        if getattr(args, "target_instance", ""):
+            rows = c.execute("SELECT * FROM publication_instances WHERE instance_id=? AND publish_status='published'",
+                             (args.target_instance,)).fetchall()
         if args.execute and not args.no_backup:
             with sqlite3.connect(folder / "before.sqlite3") as backup:
                 c.backup(backup)
@@ -81,8 +84,12 @@ async def run(args):
                     raise ValueError("destination_channel_mismatch")
                 if str(pub.get("media_group_id") or ""):
                     raise ValueError("old_album_requires_manual_review")
-                old = packages.get(pub["package_id"])
-                if old is None:
+                replacement = getattr(args, "replacement_offer", "")
+                if replacement:
+                    selected_offer = reader.offer(replacement)
+                    pub["listing_id"] = selected_offer["listing_id"]
+                    pub["offer_id"] = replacement
+                elif packages.get(pub["package_id"]) is None:
                     raise ValueError("missing_package_identity")
                 listing = reader.listing(pub["listing_id"])
                 offer = reader.offer(pub["offer_id"])
@@ -91,6 +98,18 @@ async def run(args):
                 source = source_reader.source_post(source_id)
                 if str(source.get("source_name") or "").lower() != args.source.lower():
                     raise ValueError("source_not_selected:" + str(source.get("source_name") or ""))
+                review_id = ""
+                if replacement:
+                    with connect(db) as c:
+                        review = c.execute("SELECT review_id,review_status FROM review_items WHERE offer_id=? ORDER BY created_at DESC LIMIT 1", (replacement,)).fetchone()
+                    if review is None or review["review_status"] not in {"pending", "approved"}:
+                        raise ValueError("admin_hold_or_missing_review")
+                    quality = canonical["facts"].get("quality") or {}
+                    if quality.get("blocking_flags"):
+                        raise ValueError("canonical_blocking_flags")
+                    if listing["inventory_status"] not in {"pending", "active", "reserved"}:
+                        raise ValueError("replacement_listing_not_publishable")
+                    review_id = review["review_id"]
                 with connect(db) as c:
                     uncertain = c.execute("""SELECT 1 FROM publication_delivery_attempts_v3
                         WHERE listing_id=? AND state IN ('sending','unknown') LIMIT 1""",
@@ -100,7 +119,7 @@ async def run(args):
                 style = recommended_cover_style(listing.get("property_type"), listing.get("property_subtype"))
                 media = await asyncio.to_thread(media_service.prepare, source_post_id=source_id, cover_style=style)
                 gate = evaluate_offer_eligibility(facts=canonical["facts"], offer=offer,
-                    review_approved=reader.review_approved(offer_id=pub["offer_id"]),
+                    review_approved=bool(replacement) or reader.review_approved(offer_id=pub["offer_id"]),
                     media_count=len(media.gallery_paths), cover_exists=True)
                 if not gate.ok:
                     raise ValueError("quality:" + ",".join(gate.blocking))
@@ -114,6 +133,9 @@ async def run(args):
                     results.append(item)
                     print(json.dumps(item, ensure_ascii=False), flush=True)
                     continue
+                if review_id:
+                    await asyncio.to_thread(build_workflow(settings).approve_review,
+                        review_id=review_id, operator_user_id="system:channel_replacement")
                 with connect(db) as c:
                     held = [tuple(r) for r in c.execute("""SELECT package_id,status
                         FROM publication_packages_v3 WHERE offer_id=?
@@ -123,6 +145,9 @@ async def run(args):
                 new = builder.build(listing_id=pub["listing_id"], offer_id=pub["offer_id"],
                     cover_style=style, cover_path=cover.output_path, gallery=list(media.gallery_paths),
                     source_identity=media.source_identity)
+                if replacement:
+                    new = build_workflow(settings).approve_package(
+                        package_id=new.package_id, approved_by="system:channel_replacement")
                 packages.verify_frozen(new.package_id)
                 attempt = attempts.prepare(package_id=new.package_id, listing_id=new.listing_id,
                     offer_id=new.offer_id, channel_chat_id=pub["channel_chat_id"])
@@ -144,12 +169,12 @@ async def run(args):
                 attempts.mark_sent(attempt.attempt_id, receipt)
                 with connect(db) as c:
                     c.execute("BEGIN IMMEDIATE")
-                    for package_id, _ in held:
-                        c.execute("UPDATE publication_packages_v3 SET status='superseded',updated_at=CURRENT_TIMESTAMP WHERE package_id=?", (package_id,))
+                    for package_id, status in held:
+                        c.execute("UPDATE publication_packages_v3 SET status=?,updated_at=CURRENT_TIMESTAMP WHERE package_id=?", (status if replacement else "superseded", package_id))
                     c.execute("UPDATE publication_packages_v3 SET status='published',published_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE package_id=?", (new.package_id,))
-                    c.execute("""UPDATE publication_instances SET package_id=?,post_text=?,
+                    c.execute("""UPDATE publication_instances SET package_id=?,post_text=?,listing_id=?,offer_id=?,
                         updated_at=CURRENT_TIMESTAMP WHERE instance_id=? AND channel_message_id=?""",
-                        (new.package_id, new.post_text, pub["instance_id"], pub["channel_message_id"]))
+                        (new.package_id, new.post_text, new.listing_id, new.offer_id, pub["instance_id"], pub["channel_message_id"]))
                 attempts.mark_committed(attempt.attempt_id)
                 item.update(status="updated", package_id=new.package_id, edit_mode=receipt["edit_mode"])
                 await asyncio.sleep(2)
