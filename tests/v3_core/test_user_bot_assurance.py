@@ -9,129 +9,101 @@ from v3_core.user_bot.telegram_assurance_handler import handle_v3_assurance_call
 
 
 class FakeMessage:
-    def __init__(self, calls, *, fail_delete=False):
+    def __init__(self, calls):
         self.calls = calls
-        self.fail_delete = fail_delete
-
-    async def delete(self):
-        self.calls.append(("delete",))
-        if self.fail_delete:
-            raise RuntimeError("cannot_delete")
+        self.photo = None
 
 
 class FakeQuery:
-    def __init__(self, data, calls, *, fail_delete=False):
+    def __init__(self, data, calls):
         self.data = data
         self.calls = calls
-        self.message = FakeMessage(calls, fail_delete=fail_delete)
+        self.message = FakeMessage(calls)
 
     async def answer(self):
         self.calls.append(("answer",))
+
+    async def edit_message_text(self, text, **kwargs):
+        self.calls.append(("edit", text, kwargs.get("reply_markup")))
 
 
 class FakeBot:
     def __init__(self, calls):
         self.calls = calls
 
-    async def send_photo(self, **kwargs):
-        self.calls.append(("photo", kwargs["chat_id"]))
-
     async def send_document(self, **kwargs):
         self.calls.append(("document", kwargs["chat_id"], kwargs.get("document")))
 
-    async def send_message(self, **kwargs):
-        self.calls.append(("message", kwargs["chat_id"], kwargs["text"], kwargs["reply_markup"]))
-
 
 def _update(query):
-    return SimpleNamespace(
-        callback_query=query,
-        effective_chat=SimpleNamespace(id=888),
-    )
+    return SimpleNamespace(callback_query=query, effective_chat=SimpleNamespace(id=888))
 
 
 def _context(bot):
     return SimpleNamespace(bot=bot, user_data={})
 
 
-def _write_bundle(root, kind):
+def _write_pdf(root, kind):
     generated = root / "assets" / "v2_2" / "generated"
     generated.mkdir(parents=True)
-    (generated / f"{kind}.png").write_bytes(b"png")
     (generated / f"{kind}.pdf").write_bytes(b"pdf")
 
 
-def test_assurance_home_uses_only_v3_callbacks():
+def test_rental_service_home_is_public_content_center_with_final_labels():
     view = build_assurance_home_view()
     callbacks = [choice.callback_data for row in view.rows for choice in row if choice.callback_data]
     assert callbacks == [
+        "v3u:assure:signing",
         "v3u:assure:handover",
         "v3u:assure:deposit",
         "v3u:home:contact",
-        "v3u:home:service",
+        "v3u:t:home",
     ]
     labels = [choice.label for row in view.rows for choice in row]
     assert labels == [
-        "📋 入住交接清单",
-        "🔐 押金与退租说明",
-        "💬 联系顾问",
-        "⬅️ 返回入住服务",
+        "📝 签约前确认",
+        "📸 入住交接留档",
+        "🔐 押金与退租",
+        "💬 中文顾问",
+        "🏠 返回首页",
     ]
-    assert "搬家" not in view.text
-    assert not any(value.startswith("hub:") for value in callbacks)
+    assert "租赁服务指南" not in view.text
 
 
-def test_assurance_asset_bundle_uses_existing_locked_asset_paths(tmp_path):
+def test_assurance_asset_bundle_uses_existing_locked_pdf_paths(tmp_path):
     bundle = assurance_asset_bundle(tmp_path, "handover")
-    assert bundle.image_path == tmp_path / "assets" / "v2_2" / "generated" / "handover.png"
     assert bundle.pdf_path == tmp_path / "assets" / "v2_2" / "generated" / "handover.pdf"
-    assert bundle.title == "入住交接清单"
     assert bundle.filename == "入住交接清单.pdf"
 
 
 @pytest.mark.asyncio
-async def test_asset_callback_sends_copy_before_png_pdf(tmp_path):
-    _write_bundle(tmp_path, "handover")
+async def test_first_click_opens_content_page_and_does_not_send_file(tmp_path):
+    _write_pdf(tmp_path, "handover")
     calls = []
     query = FakeQuery("v3u:assure:handover", calls)
-    outcome = await handle_v3_assurance_callback(
-        _update(query),
-        _context(FakeBot(calls)),
-        repo_root=tmp_path,
-    )
-
-    assert outcome.handled and outcome.assets_sent
-    assert [call[0] for call in calls] == ["answer", "delete", "message", "photo", "document"]
-    markup = calls[2][3]
-    callbacks = [button.callback_data for row in markup.inline_keyboard for button in row]
-    assert callbacks == ["v3u:home:contact", "v3u:home:rental"]
-    assert "入住交接清单" in calls[2][2]
+    outcome = await handle_v3_assurance_callback(_update(query), _context(FakeBot(calls)), repo_root=tmp_path)
+    assert outcome.handled and outcome.rendered and not outcome.assets_sent
+    assert [call[0] for call in calls] == ["answer", "edit"]
+    assert "入住交接留档" in calls[1][1]
+    markup = calls[1][2]
+    callbacks = [button.callback_data for row in markup.inline_keyboard for button in row if button.callback_data]
+    assert "v3u:assure:handover_download" in callbacks
 
 
 @pytest.mark.asyncio
-async def test_panel_delete_failure_is_non_fatal_like_fixed_sha(tmp_path):
-    _write_bundle(tmp_path, "deposit")
+async def test_explicit_download_click_sends_only_requested_pdf(tmp_path):
+    _write_pdf(tmp_path, "deposit")
     calls = []
-    query = FakeQuery("v3u:assure:deposit", calls, fail_delete=True)
-
-    outcome = await handle_v3_assurance_callback(
-        _update(query),
-        _context(FakeBot(calls)),
-        repo_root=tmp_path,
-    )
-
-    assert outcome.assets_sent
-    assert [call[0] for call in calls] == ["answer", "delete", "message", "photo", "document"]
+    query = FakeQuery("v3u:assure:deposit_download", calls)
+    outcome = await handle_v3_assurance_callback(_update(query), _context(FakeBot(calls)), repo_root=tmp_path)
+    assert outcome.handled and outcome.assets_sent and not outcome.rendered
+    assert [call[0] for call in calls] == ["answer", "document"]
 
 
 @pytest.mark.asyncio
-async def test_missing_assurance_files_fail_before_bot_sends(tmp_path):
+async def test_missing_pdf_fails_only_after_explicit_download(tmp_path):
     calls = []
-    query = FakeQuery("v3u:assure:handover", calls)
+    query = FakeQuery("v3u:assure:handover_download", calls)
     with pytest.raises(FileNotFoundError):
-        await handle_v3_assurance_callback(
-            _update(query),
-            _context(FakeBot(calls)),
-            repo_root=tmp_path,
-        )
-    assert [call[0] for call in calls] == ["answer", "delete"]
+        await handle_v3_assurance_callback(_update(query), _context(FakeBot(calls)), repo_root=tmp_path)
+    assert [call[0] for call in calls] == ["answer"]
