@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from qiaolian_dual import admin_contract, callback_contract, callback_rental, keyboards_common, keyboards_search, texts
+from qiaolian_dual import admin_contract, callback_contract, callback_rental, callback_service, keyboards_common, keyboards_search, texts
 
 
 def _labels(markup):
@@ -78,6 +78,11 @@ def test_contract_actions_are_renew_or_terminate_only(monkeypatch):
     assert 'contract:change' not in callbacks
 
 
-def test_contract_router_supports_termination():
+def test_contract_router_supports_renewal_and_termination_only():
+    assert callback_contract.matches('contract:renew')
+    assert callback_contract.matches('contract:renew_yes:7')
     assert callback_contract.matches('contract:terminate')
     assert callback_contract.matches('contract:terminate_yes:7')
+    assert not callback_contract.matches('contract:change')
+    assert not callback_service.matches('service:change')
+    assert not callback_service.matches('service:renew_change')
