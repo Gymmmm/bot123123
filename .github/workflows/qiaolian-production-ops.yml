@@ -8,7 +8,7 @@ on:
         required: true
         default: inspect
         type: choice
-        options: [inspect, health, latest-draft, logs, restart]
+        options: [inspect, health, logs, restart]
   push:
     branches: [ops/gpt-production-control]
     paths: [.github/ops-control/request.txt]
@@ -24,8 +24,8 @@ env:
   PROD_HOST: 50.114.74.120
   PROD_PORT: '22'
   PROD_SSH_USER: root
-  PROD_SSH_KNOWN_HOSTS: '50.114.74.120 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILuFtkSn5SJKY7mZ52Lc/QydPRTvHFpsj87M/HcIkb/L'
-  PROD_SSH_HOST_FINGERPRINT: 'SHA256:sgqLYOUAZ482H3y5jREQ6q2BVvNFPXYiOg4ruyFVnsA'
+  PROD_SSH_KNOWN_HOSTS: '50.114.74.120 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMvdBaAbAt9/4NCEC4RmiAukQ5KK5S6OF4YEml2iLw+6'
+  PROD_SSH_HOST_FINGERPRINT: 'SHA256:fuufBlFaqRpQhlkio0vuLsuv8w8x3zUb3VFQsnUny/o'
 
 jobs:
   production-ops:
@@ -58,7 +58,7 @@ jobs:
             exit 2
           fi
           case "$action" in
-            inspect|health|latest-draft|logs|restart) ;;
+            inspect|health|logs|restart) ;;
             *) echo 'Unsupported operation' >&2; exit 2 ;;
           esac
           printf 'action=%s\n' "$action" >> "$GITHUB_OUTPUT"
@@ -80,7 +80,7 @@ jobs:
           printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
 
-      - name: Run allowlisted production operation
+      - name: Run allowlisted V3 production operation
         env:
           OPS_ACTION: '${{ steps.request.outputs.action }}'
         run: |
@@ -88,71 +88,71 @@ jobs:
           ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 "$PROD_SSH_USER@$PROD_HOST" "bash -s -- '$OPS_ACTION'" <<'REMOTE'
           set -Eeuo pipefail
           readonly ACTION=$1
-          readonly APP=/opt/qiaolian_dual_bots
-          readonly DB="$APP/data/qiaolian_dual_bot.db"
-          readonly -a SERVICES=(qiaolian-user-bot.service qiaolian-publisher-bot.service qiaolian-collector.service)
+          readonly APP=/opt/qiaolian_v3
+          readonly -a SERVICES=(
+            qiaolian-v3@canonical.service
+            qiaolian-v3@publisher.service
+            qiaolian-v3@user.service
+            qiaolian-v3@collector.service
+          )
 
           case "$ACTION" in
-            inspect|health|latest-draft|logs|restart) ;;
+            inspect|health|logs|restart) ;;
             *) echo 'Unsupported operation' >&2; exit 2 ;;
           esac
           test -d "$APP"
-          test -f "$DB"
+          test -L "$APP/current"
 
           health() {
             echo '=== DEPLOYED VERSION ==='
-            if [[ -f "$APP/.deployed_sha" ]]; then
-              tr -cd '0-9a-fA-F\n' < "$APP/.deployed_sha" | head -n 1
-            else
-              git -c safe.directory="$APP" -C "$APP" rev-parse HEAD
-            fi
+            echo "deployed_sha=$(cat "$APP/.deployed_sha" 2>/dev/null || true)"
+            echo "current=$(readlink -f "$APP/current")"
             echo '=== SERVICES ==='
             for service in "${SERVICES[@]}"; do
-              printf '%s: ' "$service"
-              systemctl is-active "$service" || true
-              systemctl show "$service" --property=ActiveState,SubState,MainPID,NRestarts,ExecMainStatus --no-pager
+              active=$(systemctl is-active "$service" 2>/dev/null || true)
+              enabled=$(systemctl is-enabled "$service" 2>/dev/null || true)
+              pid=$(systemctl show "$service" -p MainPID --value 2>/dev/null || echo 0)
+              restarts=$(systemctl show "$service" -p NRestarts --value 2>/dev/null || echo unknown)
+              policy=$(systemctl show "$service" -p Restart --value 2>/dev/null || echo unknown)
+              echo "SERVICE unit=$service active=$active enabled=$enabled pid=$pid restarts=$restarts restart=$policy"
             done
-            echo '=== DISK ==='
-            df -h --output=source,size,used,avail,pcent,target "$APP"
-          }
-
-          latest_draft() {
-            echo '=== LATEST DRAFT SAFE SUMMARY ==='
-            APP_DB="$DB" python3 - <<'PY'
-          import os
-          import sqlite3
-
-          db = sqlite3.connect(f"file:{os.environ['APP_DB']}?mode=ro", uri=True)
-          db.execute('PRAGMA query_only = ON')
-          columns = {row[1] for row in db.execute('PRAGMA table_info(drafts)')}
-          wanted = [name for name in ('id', 'draft_id', 'review_status', 'approved_at', 'published_at', 'created_at', 'updated_at') if name in columns]
-          if wanted:
-              row = db.execute(f"SELECT {','.join(wanted)} FROM drafts ORDER BY id DESC LIMIT 1").fetchone()
-              print(dict(zip(wanted, row)) if row else 'no drafts')
-          for table in ('drafts', 'listings', 'media_assets', 'publication_packages'):
-              exists = db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)).fetchone()
-              if exists:
-                  print(f'{table}: {db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]}')
-          PY
           }
 
           logs() {
-            echo '=== RECENT JOURNAL METADATA (MESSAGE CONTENT OMITTED) ==='
-            journalctl -u qiaolian-user-bot.service -u qiaolian-publisher-bot.service -u qiaolian-collector.service \
-              --since '-30 minutes' --no-pager -n 200 -o json \
-              | python3 -c 'import json,sys; allowed=("__REALTIME_TIMESTAMP","PRIORITY","_SYSTEMD_UNIT","SYSLOG_IDENTIFIER","_PID"); [print(json.dumps({k:o[k] for k in allowed if k in o}, sort_keys=True)) for line in sys.stdin if (o:=json.loads(line))]'
+            journalctl -u qiaolian-v3@canonical.service -u qiaolian-v3@publisher.service -u qiaolian-v3@user.service -u qiaolian-v3@collector.service --since '-30 minutes' -n 250 --no-pager
           }
 
           case "$ACTION" in
             health) health ;;
-            latest-draft) latest_draft ;;
             logs) logs ;;
-            inspect) health; latest_draft; logs ;;
+            inspect) health; logs ;;
             restart)
-              echo '=== RESTART ALLOWLISTED SERVICES ==='
+              echo '=== INSTALL PERSISTENT RESTART POLICY ==='
+              install -d -m 0755 /etc/systemd/system/qiaolian-v3@.service.d
+              cat >/etc/systemd/system/qiaolian-v3@.service.d/20-restart-always.conf <<'EOF'
+          [Service]
+          Restart=always
+          RestartSec=3
+          EOF
+              chmod 0644 /etc/systemd/system/qiaolian-v3@.service.d/20-restart-always.conf
+              systemctl daemon-reload
+
+              echo '=== ENABLE AND RESTART V3 SERVICES ==='
+              systemctl enable "${SERVICES[@]}"
               systemctl restart "${SERVICES[@]}"
-              for service in "${SERVICES[@]}"; do systemctl is-active --quiet "$service"; done
+              sleep 10
+
+              failed=0
+              for service in "${SERVICES[@]}"; do
+                active=$(systemctl is-active "$service" 2>/dev/null || true)
+                enabled=$(systemctl is-enabled "$service" 2>/dev/null || true)
+                policy=$(systemctl show "$service" -p Restart --value 2>/dev/null || true)
+                [[ "$active" == active ]] || failed=1
+                [[ "$enabled" == enabled ]] || failed=1
+                [[ "$policy" == always ]] || failed=1
+              done
               health
+              [[ "$failed" -eq 0 ]]
               ;;
           esac
           REMOTE
