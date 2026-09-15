@@ -1,9 +1,4 @@
-"""Outer Telegram orchestration for V3 listing/card callbacks.
-
-The generic callback adapter renders details/photos/cards/book/search transitions.
-This wrapper completes the one intentionally deferred transition: listing
-consultation, whose success copy is shown only after lead/admin effects run.
-"""
+"""Outer Telegram orchestration for V3 listing/card callbacks."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -15,11 +10,7 @@ from telegram.constants import ParseMode
 from .callback_router import CallbackRouter
 from .callbacks import encode_listing_callback
 from .lead_service import LeadUser
-from .listing_contact import (
-    ListingContactEffectExecutor,
-    ListingContactEffectResult,
-    build_listing_contact_view,
-)
+from .listing_contact import ListingContactEffectExecutor, ListingContactEffectResult, build_listing_contact_view
 from .public_inventory import PublicInventoryReader
 from .telegram_callback_handler import TelegramCallbackHandlerOutcome, handle_v3_callback
 from .telegram_navigation import advisor_handoff_url
@@ -40,12 +31,10 @@ def _lead_user(update: Any) -> LeadUser:
     display_name = str(getattr(user, "full_name", "") or "").strip()
     if not display_name:
         display_name = " ".join(
-            value
-            for value in (
+            value for value in (
                 str(getattr(user, "first_name", "") or "").strip(),
                 str(getattr(user, "last_name", "") or "").strip(),
-            )
-            if value
+            ) if value
         )
     return LeadUser(
         user_id=int(user.id),
@@ -55,41 +44,55 @@ def _lead_user(update: Any) -> LeadUser:
 
 
 async def _render_contact(query: Any, *, text: str, public_listing_id: str, advisor_url: str) -> None:
-    direct_advisor = advisor_handoff_url(
-        advisor_url, public_listing_id=public_listing_id
-    )
+    direct_advisor = advisor_handoff_url(advisor_url, public_listing_id=public_listing_id)
     contact_button = (
-        InlineKeyboardButton("💬 打开顾问对话", url=direct_advisor)
-        if direct_advisor
-        else InlineKeyboardButton("💬 联系顾问", callback_data="v3u:home:contact")
+        InlineKeyboardButton("💬 打开中文顾问", url=direct_advisor)
+        if direct_advisor else InlineKeyboardButton("💬 中文顾问", callback_data="v3u:home:contact")
     )
-    markup = InlineKeyboardMarkup(
+    markup = InlineKeyboardMarkup([
+        [contact_button],
         [
-            [contact_button],
-            [
-                InlineKeyboardButton(
-                    "📅 预约看房",
-                    callback_data=encode_listing_callback("book", public_listing_id),
-                ),
-                InlineKeyboardButton(
-                    "📸 更多实拍",
-                    callback_data=encode_listing_callback("photos", public_listing_id),
-                ),
-            ],
-            [
-                InlineKeyboardButton(
-                    "⬅️ 返回这套房",
-                    callback_data=encode_listing_callback("details", public_listing_id),
-                ),
-                InlineKeyboardButton("🔍 继续找房", callback_data="v3u:home:search"),
-            ],
-        ]
-    )
+            InlineKeyboardButton("📅 预约看房", callback_data=encode_listing_callback("book", public_listing_id)),
+            InlineKeyboardButton("📸 更多实拍", callback_data=encode_listing_callback("photos", public_listing_id)),
+        ],
+        [
+            InlineKeyboardButton("⬅️ 返回这套房", callback_data=encode_listing_callback("details", public_listing_id)),
+            InlineKeyboardButton("🔍 继续找房", callback_data="v3u:home:search"),
+        ],
+    ])
     message = getattr(query, "message", None)
     if getattr(message, "photo", None):
         await query.edit_message_caption(caption=text, parse_mode=ParseMode.HTML, reply_markup=markup)
         return
     await query.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=markup)
+
+
+def _is_historical_callback(raw: str) -> bool:
+    clean = str(raw or "").strip().lower()
+    prefixes = (
+        "hub:", "listing:", "service:", "contract:", "appointment_menu:",
+        "apdate:", "aptime:", "find", "repair", "renewal", "termination",
+        "change_home", "change:", "advisor:", "adviser:",
+    )
+    return any(clean.startswith(prefix) for prefix in prefixes)
+
+
+async def _render_updated_entry(query: Any, *, advisor_url: str = "") -> None:
+    direct = advisor_handoff_url(advisor_url)
+    advisor_button = (
+        InlineKeyboardButton("💬 中文顾问", url=direct)
+        if direct else InlineKeyboardButton("💬 中文顾问", callback_data="v3u:home:contact")
+    )
+    markup = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🏠 返回首页", callback_data="v3u:t:home")],
+        [advisor_button],
+    ])
+    text = "⚠️ 这个入口已经更新\n请使用下面的最新服务入口。"
+    message = getattr(query, "message", None)
+    if getattr(message, "photo", None):
+        await query.edit_message_caption(caption=text, reply_markup=markup)
+    else:
+        await query.edit_message_text(text, reply_markup=markup)
 
 
 async def handle_v3_listing_callback(
@@ -103,6 +106,13 @@ async def handle_v3_listing_callback(
     advisor_url: str = "",
     channel_url: str = "",
 ) -> TelegramListingCallbackOutcome:
+    query = getattr(update, "callback_query", None)
+    raw = str(getattr(query, "data", "") or "") if query is not None else ""
+    if query is not None and _is_historical_callback(raw):
+        await query.answer()
+        await _render_updated_entry(query, advisor_url=advisor_url)
+        return TelegramListingCallbackOutcome(handled=True)
+
     outcome = await handle_v3_callback(
         update,
         context,
@@ -115,12 +125,7 @@ async def handle_v3_listing_callback(
         return TelegramListingCallbackOutcome(handled=False, callback=outcome)
 
     response = outcome.response
-    if (
-        response is None
-        or response.kind != "transition"
-        or response.transition != "consult"
-        or response.consult_intent is None
-    ):
+    if response is None or response.kind != "transition" or response.transition != "consult" or response.consult_intent is None:
         return TelegramListingCallbackOutcome(handled=True, callback=outcome)
 
     effect = await contact_effects.execute(
@@ -128,22 +133,14 @@ async def handle_v3_listing_callback(
         user=_lead_user(update),
         intent=response.consult_intent,
     )
-    view = build_listing_contact_view(
-        response.consult_intent,
-        inventory,
-        advisor_url=advisor_url,
-    )
+    view = build_listing_contact_view(response.consult_intent, inventory, advisor_url=advisor_url)
     await _render_contact(
         update.callback_query,
         text=view.text,
         public_listing_id=view.public_listing_id,
         advisor_url=view.advisor_url,
     )
-    return TelegramListingCallbackOutcome(
-        handled=True,
-        callback=outcome,
-        contact_effect=effect,
-    )
+    return TelegramListingCallbackOutcome(handled=True, callback=outcome, contact_effect=effect)
 
 
 __all__ = ["TelegramListingCallbackOutcome", "handle_v3_listing_callback"]
