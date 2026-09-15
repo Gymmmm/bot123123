@@ -9,7 +9,7 @@ def matches(data: str) -> bool:
         'home', 'home_smart_search', 'home_brand', 'home_appoint', 'home_consult', 'home_living', 'home_nearby',
         'smart_project', 'smart_movein', 'keyword:handoff',
         'hub:area', 'hub:budget', 'hub:layout', 'hub:latest', 'hub:available', 'hub:find', 'hub:appoint',
-        'hub:video_tour', 'hub:advisor', 'hub:precise', 'hub:account', 'hub:favorites', 'hub:appointments',
+        'hub:video_tour', 'hub:advisor', 'hub:about', 'hub:precise', 'hub:account', 'hub:favorites', 'hub:appointments',
         'hub:contract', 'hub:service', 'hub:promise', 'hub:help',
     } or data.startswith('resume:')
 
@@ -24,7 +24,7 @@ async def handle_navigation_callback(update: Update, context: ContextTypes.DEFAU
     from .results_admin import send_find_results_as_cards
     from .session_deeplink import clear_session_for_fresh_entry
     from .start_routes import route_start_arg
-    from .texts import local_life_text, promise_text, render_panel, welcome_text
+    from .texts import about_text, local_life_text, promise_text, render_panel, welcome_text
 
     if data == 'home':
         clear_session_for_fresh_entry(context)
@@ -37,9 +37,16 @@ async def handle_navigation_callback(update: Update, context: ContextTypes.DEFAU
     if data in {'home_smart_search', 'hub:find'}:
         return await show_search_entry(update, context)
 
-    # 历史首页入口兼容：不再生成品牌故事/旧找房助手页面。
-    if data == 'home_brand':
-        await render_panel(update, text=welcome_text(), reply_markup=main_keyboard(), parse_mode=ParseMode.HTML, context=context)
+    if data in {'home_brand', 'hub:about'}:
+        rows: list[list[InlineKeyboardButton]] = []
+        channel_url = str(CHANNEL_URL or '').strip()
+        if channel_url:
+            rows.append([InlineKeyboardButton('📢 金边华人租房频道', url=channel_url)])
+        rows.extend([
+            [InlineKeyboardButton('💬 中文顾问', callback_data='hub:advisor')],
+            [InlineKeyboardButton('⬅️ 返回首页', callback_data='home')],
+        ])
+        await render_panel(update, text=about_text(), reply_markup=InlineKeyboardMarkup(rows), parse_mode=ParseMode.HTML, context=context)
         return MAIN
     if data in {'home_appoint', 'hub:appoint'}:
         return await show_appointment_hub(update, context)
@@ -66,7 +73,7 @@ async def handle_navigation_callback(update: Update, context: ContextTypes.DEFAU
         return FIND_AREA
     if data == 'hub:budget':
         context.user_data['search_pref'] = {'source': 'home_budget', 'goal': 'any', 'area': '', 'touch_payload': {}}
-        await render_panel(update, text='💰 <b>每月预算大概多少？</b>\n\n单位：USD / 月', parse_mode=ParseMode.HTML, reply_markup=find_budget_keyboard('any'), context=context)
+        await render_panel(update, text='💰 <b>每月租金预算大概多少？</b>\n\n请选择一个范围。', parse_mode=ParseMode.HTML, reply_markup=find_budget_keyboard('any'), context=context)
         return FIND_BUDGET
     if data == 'hub:layout':
         await render_panel(update, text='🛏 <b>想要什么户型？</b>', parse_mode=ParseMode.HTML, reply_markup=room_type_keyboard(), context=context)
@@ -77,7 +84,7 @@ async def handle_navigation_callback(update: Update, context: ContextTypes.DEFAU
         if matches_found:
             await send_find_results_as_cards(update, context, matches_found, 'strict')
         else:
-            await render_panel(update, text='暂时没有合适、可以安排看房的房源。\n可以调整条件，或联系中文顾问继续留意。', parse_mode=ParseMode.HTML, reply_markup=no_match_followup_keyboard(), context=context)
+            await render_panel(update, text='暂时没有合适、可以安排看房的房源。\n可以调整条件，或让中文顾问继续留意。', parse_mode=ParseMode.HTML, reply_markup=no_match_followup_keyboard(), context=context)
         return MAIN
 
     if data == 'hub:video_tour':
@@ -118,6 +125,6 @@ async def handle_navigation_callback(update: Update, context: ContextTypes.DEFAU
             state = await route_start_arg(update, context, resume_arg)
             if state is not None:
                 return state
-            await render_panel(update, text='这个房源入口已经失效。\n\n可以返回找房，或联系中文顾问确认。', reply_markup=no_match_followup_keyboard(), context=context)
+            await render_panel(update, text='这条房源入口已经失效。你可以继续查看其他房源，或者联系中文顾问确认当前房态。', reply_markup=no_match_followup_keyboard(), context=context)
             return MAIN
     return None
