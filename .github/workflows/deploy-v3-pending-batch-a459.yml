@@ -30,7 +30,6 @@ jobs:
         with:
           ref: ${{ env.CANDIDATE_SHA }}
           fetch-depth: 0
-
       - name: Verify candidate and run V3 gate
         run: |
           set -Eeuo pipefail
@@ -41,7 +40,6 @@ jobs:
           git update-ref refs/heads/actions-v3-production "$CANDIDATE_SHA"
           git bundle create "$RUNNER_TEMP/release.bundle" refs/heads/actions-v3-production
           git bundle verify "$RUNNER_TEMP/release.bundle"
-
       - name: Verify SSH host and configure key
         env:
           PROD_SSH_PRIVATE_KEY: '${{ secrets.PROD_SSH_PRIVATE_KEY }}'
@@ -54,98 +52,39 @@ jobs:
           printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
           printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
-
       - name: Upload authenticated release bundle
         run: |
           set -Eeuo pipefail
           scp -P "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes "$RUNNER_TEMP/release.bundle" "$PROD_SSH_USER@$PROD_HOST:/tmp/qiaolian-v3-a459.bundle"
-
       - name: Production preflight, cutover and verification
         run: |
           set -Eeuo pipefail
           ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes "$PROD_SSH_USER@$PROD_HOST" "bash -s -- '$CANDIDATE_SHA' '$PREVIOUS_SHA'" <<'REMOTE'
           set -Eeuo pipefail
-          EXPECTED=$1
-          PREVIOUS=$2
-          APP=/opt/qiaolian_v3
-          CURRENT=$APP/current
-          RELEASE=$APP/releases/$EXPECTED
-          DB=/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db
-          ENV=$APP/runtime.env
-          BUNDLE=/tmp/qiaolian-v3-a459.bundle
+          EXPECTED=$1; PREVIOUS=$2; APP=/opt/qiaolian_v3; CURRENT=$APP/current; RELEASE=$APP/releases/$EXPECTED
+          DB=/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db; ENV=$APP/runtime.env; BUNDLE=/tmp/qiaolian-v3-a459.bundle
           SERVICES=(qiaolian-v3@canonical.service qiaolian-v3@publisher.service qiaolian-v3@user.service qiaolian-v3@collector.service)
           ACTUAL_CURRENT=$(basename "$(readlink -f "$CURRENT")")
           echo "PRECHECK current=$ACTUAL_CURRENT marker=$(cat "$APP/.deployed_sha" 2>/dev/null || true)"
-          test "$ACTUAL_CURRENT" = "$PREVIOUS"
-          test -d "$APP/releases/$PREVIOUS"
-          test -s "$DB"
-          test -s "$ENV"
-          test -f "$BUNDLE"
-
-          BACKUP=/opt/qiaolian_backups/pending-batch-$(date -u +%Y%m%d-%H%M%S)
-          install -d -m 0700 "$BACKUP"
-          sqlite3 "$DB" ".backup '$BACKUP/qiaolian_dual_bot.db'"
-          sqlite3 "$BACKUP/qiaolian_dual_bot.db" 'PRAGMA quick_check;' | grep -Fx ok
-          cp -a "$ENV" "$BACKUP/runtime.env"
-          printf '%s\n' "$PREVIOUS" > "$BACKUP/previous_sha.txt"
-
-          rollback() {
-            rc=$?
-            if [ "$rc" -ne 0 ]; then
-              echo "DEPLOY_FAILED rc=$rc; rolling back to $PREVIOUS" >&2
-              rm -f "$CURRENT"
-              ln -s "$APP/releases/$PREVIOUS" "$CURRENT"
-              chown -h qiaolianbot:qiaolianbot "$CURRENT"
-              systemctl daemon-reload || true
-              systemctl restart "${SERVICES[@]}" || true
-            fi
-            rm -f "$BUNDLE"
-            exit "$rc"
-          }
-          trap rollback EXIT
-
-          rm -rf "$RELEASE"
-          install -d -m 0755 "$RELEASE"
-          git -C "$RELEASE" init
-          git -C "$RELEASE" fetch "$BUNDLE" refs/heads/actions-v3-production
-          test "$(git -C "$RELEASE" rev-parse FETCH_HEAD)" = "$EXPECTED"
-          git -C "$RELEASE" checkout -f --detach "$EXPECTED"
-          test "$(git -C "$RELEASE" rev-parse HEAD)" = "$EXPECTED"
-          if [ -s "$CURRENT/sources.json" ]; then install -m 0640 -o qiaolianbot -g qiaolianbot "$CURRENT/sources.json" "$RELEASE/sources.json"; fi
-          chown -R qiaolianbot:qiaolianbot "$RELEASE"
-
+          test "$ACTUAL_CURRENT" = "$PREVIOUS"; test -d "$APP/releases/$PREVIOUS"; test -s "$DB"; test -s "$ENV"; test -f "$BUNDLE"
+          BACKUP=/opt/qiaolian_backups/pending-batch-$(date -u +%Y%m%d-%H%M%S); install -d -m 0700 "$BACKUP"
+          sqlite3 "$DB" ".backup '$BACKUP/qiaolian_dual_bot.db'"; sqlite3 "$BACKUP/qiaolian_dual_bot.db" 'PRAGMA quick_check;' | grep -Fx ok
+          cp -a "$ENV" "$BACKUP/runtime.env"; printf '%s\n' "$PREVIOUS" > "$BACKUP/previous_sha.txt"
+          rollback() { rc=$?; if [ "$rc" -ne 0 ]; then echo "DEPLOY_FAILED rc=$rc; rollback=$PREVIOUS" >&2; rm -f "$CURRENT"; ln -s "$APP/releases/$PREVIOUS" "$CURRENT"; chown -h qiaolianbot:qiaolianbot "$CURRENT"; systemctl daemon-reload || true; systemctl restart "${SERVICES[@]}" || true; fi; rm -f "$BUNDLE"; exit "$rc"; }; trap rollback EXIT
+          rm -rf "$RELEASE"; install -d -m 0755 "$RELEASE"; git -C "$RELEASE" init; git -C "$RELEASE" fetch "$BUNDLE" refs/heads/actions-v3-production
+          test "$(git -C "$RELEASE" rev-parse FETCH_HEAD)" = "$EXPECTED"; git -C "$RELEASE" checkout -f --detach "$EXPECTED"; test "$(git -C "$RELEASE" rev-parse HEAD)" = "$EXPECTED"
+          if [ -s "$CURRENT/sources.json" ]; then install -m 0640 -o qiaolianbot -g qiaolianbot "$CURRENT/sources.json" "$RELEASE/sources.json"; fi; chown -R qiaolianbot:qiaolianbot "$RELEASE"
           "$APP/.venv/bin/python" -m pip install --disable-pip-version-check -r "$RELEASE/requirements.txt"
           "$APP/.venv/bin/python" -m compileall -q "$RELEASE/v3_core" "$RELEASE/run_v3_collector.py" "$RELEASE/run_v3_canonical_worker.py" "$RELEASE/run_v3_publisher_bot.py" "$RELEASE/run_v3_user_bot.py" "$RELEASE/run_v3_preflight.py"
-
-          set -a; source "$ENV"; set +a
-          export QIAOLIAN_CODE_ROOT="$RELEASE" DB_PATH="$DB" SQLITE_PATH="$DB"
-          [ -s "$RELEASE/sources.json" ] && export COLLECTOR_SOURCES_JSON="$RELEASE/sources.json"
-          cd "$RELEASE"
+          set -a; source "$ENV"; set +a; export QIAOLIAN_CODE_ROOT="$RELEASE" DB_PATH="$DB" SQLITE_PATH="$DB"; [ -s "$RELEASE/sources.json" ] && export COLLECTOR_SOURCES_JSON="$RELEASE/sources.json"; cd "$RELEASE"
           runuser -u qiaolianbot --preserve-environment -- "$APP/.venv/bin/python" run_v3_preflight.py --initialize --component all --db "$DB"
           runuser -u qiaolianbot --preserve-environment -- "$APP/.venv/bin/python" run_v3_preflight.py --component all --db "$DB"
-
-          systemctl stop "${SERVICES[@]}"
-          rm -f "$CURRENT"
-          ln -s "$RELEASE" "$CURRENT"
-          chown -h qiaolianbot:qiaolianbot "$CURRENT"
-          install -m 0644 "$CURRENT/deploy/v3/qiaolian-v3@.service" /etc/systemd/system/qiaolian-v3@.service
-          systemctl daemon-reload
-          systemctl enable "${SERVICES[@]}"
-          systemctl restart "${SERVICES[@]}"
-          sleep 12
-
-          for service in "${SERVICES[@]}"; do
-            test "$(systemctl is-active "$service")" = active
-            echo "SERVICE $service active pid=$(systemctl show "$service" -p MainPID --value) restarts=$(systemctl show "$service" -p NRestarts --value)"
-          done
-          test "$(git -C "$CURRENT" rev-parse HEAD)" = "$EXPECTED"
-          printf '%s\n' "$EXPECTED" > "$APP/.deployed_sha"
-          test "$(cat "$APP/.deployed_sha")" = "$EXPECTED"
-          echo "DEPLOY_OK sha=$EXPECTED current=$(readlink -f "$CURRENT")"
-          trap - EXIT
-          rm -f "$BUNDLE"
+          systemctl stop "${SERVICES[@]}"; rm -f "$CURRENT"; ln -s "$RELEASE" "$CURRENT"; chown -h qiaolianbot:qiaolianbot "$CURRENT"
+          install -m 0644 "$CURRENT/deploy/v3/qiaolian-v3@.service" /etc/systemd/system/qiaolian-v3@.service; systemctl daemon-reload; systemctl enable "${SERVICES[@]}"; systemctl restart "${SERVICES[@]}"; sleep 12
+          for service in "${SERVICES[@]}"; do test "$(systemctl is-active "$service")" = active; echo "SERVICE $service active pid=$(systemctl show "$service" -p MainPID --value) restarts=$(systemctl show "$service" -p NRestarts --value)"; done
+          test "$(git -C "$CURRENT" rev-parse HEAD)" = "$EXPECTED"; printf '%s\n' "$EXPECTED" > "$APP/.deployed_sha"; test "$(cat "$APP/.deployed_sha")" = "$EXPECTED"
+          echo "DEPLOY_OK sha=$EXPECTED current=$(readlink -f "$CURRENT")"; trap - EXIT; rm -f "$BUNDLE"
           REMOTE
-
       - name: Remove SSH key
         if: always()
         run: rm -f "$HOME/.ssh/qiaolian_production"
