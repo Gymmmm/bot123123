@@ -12,13 +12,12 @@ def matches(data: str) -> bool:
         or data.startswith('contract:renew_yes:')
         or data == 'contract:terminate'
         or data.startswith('contract:terminate_yes:')
-        or data == 'contract:change'  # legacy callback only; no current UI generates it.
     )
 
 
 async def handle_contract_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, query, data: str, user) -> int | None:
     from .admin_contract import _binding_contract_text, _binding_days_left, _binding_end_date, _contract_actions_keyboard, _user_contact_text, _user_mention_html
-    from .flows import show_search_entry, show_service_hub
+    from .flows import show_service_hub
     from .results_admin import _notify_admins
     from .search import create_lead
     from .session_deeplink import now_ts
@@ -179,9 +178,5 @@ async def handle_contract_callback(update: Update, context: ContextTypes.DEFAULT
             context=context,
         )
         return MAIN
-
-    if data == 'contract:change':
-        # 历史按钮兼容：不再存在“换房”租约动作，直接回到正常找房流程。
-        return await show_search_entry(update, context)
 
     return None
