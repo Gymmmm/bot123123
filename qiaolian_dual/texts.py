@@ -4,11 +4,8 @@ from __future__ import annotations
 from .common import *
 def welcome_text() -> str:
     return (
-        '💎 <b>侨联地产｜您在金边的自己人</b>\n\n'
-        '找房、约看房、入住服务，都可以从这里开始。\n\n'
-        '如果您已经在频道看到具体房源，直接点房源下方按钮进入，房源信息会自动带上。\n\n'
-        '也可以直接告诉我：<b>区域 + 预算 + 户型</b>。\n\n'
-        '请选择您现在需要的服务：'
+        '🏠 <b>侨联地产｜金边华人租房</b>\n\n'
+        '告诉我你的需求，帮你更快找到合适的房子。'
     )
 
 def channel_welcome_text(first_name: str='') -> str:
@@ -79,25 +76,32 @@ async def render_panel(update: Update, *, text: str, reply_markup: InlineKeyboar
         context.user_data[PANEL_ANCHOR_KEY] = {'chat_id': int(sent.chat_id), 'message_id': int(sent.message_id)}
 
 def promise_text() -> str:
-    return ('🛡 <b>侨联保障</b>\n\n重要的事，先帮您看清楚。\n费用、入住留档和退租核对，都尽量提前说清。')
+    return ('📄 <b>租赁服务指南</b>\n\n签约前确认费用；入住时做好交接留档；退租时按合同和入住记录逐项核对。')
 
 def deposit_text() -> str:
     return copy_deposit_text()
 
 def advisor_text() -> str:
-    return ('💬 <b>联系我们</b>\n\n有什么需要，直接告诉我们。\n具体房源会自动带上，不用重复说明。')
+    return ('💬 <b>中文顾问</b>\n\n直接发送你想咨询的问题即可。\n如果是找房，可以告诉我们区域、预算、户型或入住时间。\n\n中文顾问会通过 Telegram 回复你。')
 
 def advisor_handoff_text(*, listing_id: str='', user_id: int | None=None) -> str:
     from .admin_contract import _binding_end_date
     from .listing import listing_context
-    from .utils_formatting import _display_layout, _fmt_price
+    from .utils_formatting import _display_layout, _fmt_price, _display_listing_id
     listing_id = str(listing_id or '').strip()
     if listing_id:
         item = listing_context(listing_id)
-        area = str(item.get('area') or '金边')
+        project = str(item.get('project') or item.get('community') or item.get('area') or '这套房').strip()
         layout = _display_layout(item.get('layout') or item.get('property_type'), item.get('property_type')) or '房源'
         price_text = _fmt_price(item.get('price'))
-        return f"💬 <b>已记录您咨询的房源</b>\n\n🏠 <b>{he(area)}｜{he(layout)}</b>\n💰 <b>{he(price_text)}</b>\n\n房源信息已经带上，不用重新说明。"
+        return (
+            '💬 <b>咨询这套</b>\n\n'
+            f'🏠 <b>{he(project)}｜{he(layout)}</b>\n'
+            f'💰 <b>{he(price_text)}</b>\n'
+            f'🆔 {he(_display_listing_id(listing_id))}\n\n'
+            '房源信息会自动一起带上，不需要重复发送。\n'
+            '直接告诉我们想了解什么即可。'
+        )
     if user_id:
         binding = db.get_active_binding(user_id)
         if binding:
@@ -105,11 +109,11 @@ def advisor_handoff_text(*, listing_id: str='', user_id: int | None=None) -> str
             end_date = str(_binding_end_date(binding) or '').strip()
             facts = []
             if property_name:
-                facts.append(f"🏠 <b>当前房源：</b> {he(property_name)}")
+                facts.append(f'🏠 <b>当前租约：</b> {he(property_name)}')
             if end_date:
-                facts.append(f"📅 <b>到期：</b> {he(end_date)}")
+                facts.append(f'📅 <b>到期：</b> {he(end_date)}')
             details = ('\n\n' + '\n'.join(facts)) if facts else ''
-            return f"💬 <b>联系我们</b>{details}\n\n我们会按您当前的租约继续跟进。"
+            return f'💬 <b>中文顾问</b>{details}\n\n我们会按你当前的租约继续跟进，不用重新说明房屋信息。'
     return advisor_text()
 
 def smart_search_text() -> str:
@@ -118,11 +122,10 @@ def smart_search_text() -> str:
 def about_text() -> str:
     return (
         '🏠 <b>关于侨联</b>\n\n'
-        '这些年，我们始终专注于柬埔寨本地房产与居住服务。\n\n'
-        '在长期服务客户的过程中，我们越来越清楚，一次租房真正需要解决的，不只是找到房源，更包括信息确认、签约衔接、入住交接，以及住下以后仍然有人可以联系。\n\n'
-        '我们相信，真正有价值的服务，不止于完成一次交易，更在于建立长久而持续的信任。\n\n'
-        '从第一次认识，到长期选择，侨联希望以稳定的服务与责任，成为您在柬埔寨值得长期信赖的生活伙伴。\n\n'
-        '<b>💎 侨联地产｜您在金边的自己人</b>'
+        '侨联地产专注于柬埔寨本地房产与居住服务。\n\n'
+        '我们做的不只是把房源发给你。找房时把信息说明白，看房和签约时把重要事项核对清楚，入住后遇到房屋、物业或租约问题，也继续有人衔接。\n\n'
+        '从找房、签约到入住后的租住服务，尽量让每一步都有记录、有人跟进。\n\n'
+        '<b>侨联地产｜您在金边的自己人</b>'
     )
 
 def brand_story_text() -> str:
@@ -131,18 +134,14 @@ def brand_story_text() -> str:
 def help_text() -> str:
     return (
         '❓ <b>怎么使用</b>\n\n'
-        '找房：点“帮我找房”，也可以直接发区域、预算和户型。\n'
-        '看房：从具体房源点“预约看房”，日期页可切换实地/视频。\n'
-        '咨询：所有页面统一点“联系我们”。\n'
-        '入住后：报修、物业和生活服务都在“入住服务”。'
+        '找房：点「开始找房」，也可以直接发区域、预算和户型。\n'
+        '看房：从具体房源点「预约看房」，日期页可切换实地 / 视频。\n'
+        '咨询：具体房源会自动带上，不用重复说明。\n'
+        '入住后：租约、报修、物业、续租和退租都在「入住服务」。'
     )
 
 def service_hub_text() -> str:
-    return (
-        '🛠 <b>入住服务</b>\n\n'
-        '签约不是结束。入住后遇到设备、物业或生活服务问题，都可以从这里联系侨联。\n\n'
-        '能协助处理的，我们协助处理；需要专业服务的，我们帮助对接。'
-    )
+    return '🛠 <b>入住服务</b>\n\n已绑定租约后，这里会显示当前房源，并提供报修、物业、租约、续租和退租服务。'
 
 def local_life_text() -> str:
     return copy_local_life_text()
