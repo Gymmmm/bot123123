@@ -45,11 +45,7 @@ class FakeHistory:
 
     def build(self, user_id):
         self.calls.append(user_id)
-        return AppointmentHistoryView(
-            text="📅 <b>我的预约</b>\n\n🆔 QL-RF-A2B3",
-            items=(),
-            history_count=0,
-        )
+        return AppointmentHistoryView(text="📅 <b>我的预约</b>\n\n🆔 QL-RF-A2B3", items=(), history_count=0)
 
 
 class FakeContactEffects:
@@ -60,24 +56,14 @@ class FakeContactEffects:
         self.calls.append((bot, user, source))
         return ContactEffectResult(
             lead=LeadEffectResult(status="recorded"),
-            admin=AdminNotificationResult(
-                attempted_admin_ids=(10,),
-                sent_admin_ids=(10,),
-                failed_admin_ids=(),
-            ),
+            admin=AdminNotificationResult(attempted_admin_ids=(10,), sent_admin_ids=(10,), failed_admin_ids=()),
         )
 
 
 def _update(query):
     return SimpleNamespace(
         callback_query=query,
-        effective_user=SimpleNamespace(
-            id=123,
-            username="alice",
-            full_name="Alice",
-            first_name="Alice",
-            last_name="",
-        ),
+        effective_user=SimpleNamespace(id=123, username="alice", full_name="Alice", first_name="Alice", last_name=""),
     )
 
 
@@ -93,14 +79,7 @@ def _search_views():
 async def test_search_home_action_renders_locked_entry_then_sets_keyword_waiting_state():
     query = FakeQuery("v3u:home:search")
     context = _context()
-
-    outcome = await handle_v3_home_callback(
-        _update(query),
-        context,
-        appointment_history=FakeHistory(),
-        search_views=_search_views(),
-    )
-
+    outcome = await handle_v3_home_callback(_update(query), context, appointment_history=FakeHistory(), search_views=_search_views())
     assert outcome.handled and outcome.rendered and not outcome.deferred
     assert [call[0] for call in query.calls] == ["answer", "edit_text"]
     assert "想找什么样的房子" in query.calls[-1][1][0]
@@ -108,13 +87,8 @@ async def test_search_home_action_renders_locked_entry_then_sets_keyword_waiting
     assert context.user_data[SEARCH_PREF_SESSION_KEY]["source"] == "user_search"
     markup = query.calls[-1][2]["reply_markup"]
     callbacks = [button.callback_data for row in markup.inline_keyboard for button in row]
-    assert callbacks == [
-        "v3u:t:search_area",
-        "v3u:t:search_budget",
-        "v3u:t:search_layout",
-        "v3u:t:search_available",
-        "v3u:t:home",
-    ]
+    assert callbacks == ["v3u:t:search_area", "v3u:t:search_budget", "v3u:t:search_layout", "v3u:t:home"]
+    assert "v3u:t:search_available" not in callbacks
     assert not any(value.startswith("hub:") for value in callbacks)
 
 
@@ -122,27 +96,15 @@ async def test_search_home_action_renders_locked_entry_then_sets_keyword_waiting
 async def test_search_home_render_failure_does_not_create_keyword_waiting_state():
     query = FakeQuery("v3u:home:search", fail_edit=True)
     context = _context()
-
     with pytest.raises(RuntimeError, match="telegram_edit_failed"):
-        await handle_v3_home_callback(
-            _update(query),
-            context,
-            appointment_history=FakeHistory(),
-            search_views=_search_views(),
-        )
-
+        await handle_v3_home_callback(_update(query), context, appointment_history=FakeHistory(), search_views=_search_views())
     assert context.user_data == {}
 
 
 @pytest.mark.asyncio
 async def test_search_without_view_runtime_is_explicitly_deferred():
     query = FakeQuery("v3u:home:search")
-    outcome = await handle_v3_home_callback(
-        _update(query),
-        _context(),
-        appointment_history=FakeHistory(),
-        search_views=None,
-    )
+    outcome = await handle_v3_home_callback(_update(query), _context(), appointment_history=FakeHistory(), search_views=None)
     assert outcome.handled and outcome.deferred and not outcome.rendered
     assert [call[0] for call in query.calls] == ["answer"]
 
@@ -151,13 +113,7 @@ async def test_search_without_view_runtime_is_explicitly_deferred():
 async def test_appointments_home_action_renders_public_history_with_v3_navigation():
     query = FakeQuery("v3u:home:appointments")
     history = FakeHistory()
-
-    outcome = await handle_v3_home_callback(
-        _update(query),
-        _context(),
-        appointment_history=history,
-    )
-
+    outcome = await handle_v3_home_callback(_update(query), _context(), appointment_history=history)
     assert outcome.handled and outcome.rendered and not outcome.deferred
     assert history.calls == [123]
     assert [call[0] for call in query.calls] == ["answer", "edit_text"]
@@ -173,38 +129,25 @@ async def test_appointments_home_action_renders_public_history_with_v3_navigatio
 async def test_contact_home_action_runs_effects_before_rendering_handoff():
     query = FakeQuery("v3u:home:contact")
     effects = FakeContactEffects()
-
     outcome = await handle_v3_home_callback(
-        _update(query),
-        _context(),
-        appointment_history=FakeHistory(),
-        contact_effects=effects,
-        advisor_url="https://t.me/advisor",
+        _update(query), _context(), appointment_history=FakeHistory(),
+        contact_effects=effects, advisor_url="https://t.me/advisor",
     )
-
     assert outcome.handled and outcome.rendered
     assert outcome.contact_effect is not None
     assert len(effects.calls) == 1
     _, user, source = effects.calls[0]
     assert user.user_id == 123 and source == "hub"
     assert [call[0] for call in query.calls] == ["answer", "edit_text"]
-    assert "顾问帮我找" in query.calls[-1][1][0]
-    assert query.calls[-1][2]["reply_markup"].inline_keyboard[0][0].url.startswith(
-        "https://t.me/advisor?text="
-    )
+    assert "中文顾问" in query.calls[-1][1][0]
+    assert "顾问帮我找" not in query.calls[-1][1][0]
+    assert query.calls[-1][2]["reply_markup"].inline_keyboard[0][0].url.startswith("https://t.me/advisor?text=")
 
 
 @pytest.mark.asyncio
 async def test_contact_without_effect_executor_is_deferred_and_never_claims_success():
     query = FakeQuery("v3u:home:contact")
-
-    outcome = await handle_v3_home_callback(
-        _update(query),
-        _context(),
-        appointment_history=FakeHistory(),
-        contact_effects=None,
-    )
-
+    outcome = await handle_v3_home_callback(_update(query), _context(), appointment_history=FakeHistory(), contact_effects=None)
     assert outcome.handled and outcome.deferred and not outcome.rendered
     assert [call[0] for call in query.calls] == ["answer"]
 
@@ -215,39 +158,20 @@ async def test_contact_without_effect_executor_is_deferred_and_never_claims_succ
     [
         (
             "rental",
-            "租赁服务指南",
-            {
-                "v3u:assure:handover",
-                "v3u:assure:deposit",
-                "v3u:home:contact",
-                "v3u:home:service",
-            },
+            "租赁服务",
+            {"v3u:assure:signing", "v3u:assure:handover", "v3u:assure:deposit", "v3u:home:contact", "v3u:t:home"},
         ),
         (
             "service",
             "入住服务",
-            {
-                "v3u:service:repair",
-                "v3u:service:property",
-                "v3u:service:local",
-                "v3u:home:rental",
-                "v3u:home:contact",
-                "v3u:t:home",
-            },
+            {"v3u:service:tenant", "v3u:home:rental", "v3u:home:search", "v3u:home:contact", "v3u:t:home"},
         ),
     ],
 )
-async def test_assurance_and_service_home_actions_are_complete_v3_surfaces(
-    action,
-    expected_text,
-    expected_callbacks,
-):
+async def test_assurance_and_service_home_actions_are_complete_v3_surfaces(action, expected_text, expected_callbacks):
     query = FakeQuery(f"v3u:home:{action}")
     outcome = await handle_v3_home_callback(
-        _update(query),
-        _context(),
-        appointment_history=FakeHistory(),
-        search_views=_search_views(),
+        _update(query), _context(), appointment_history=FakeHistory(), search_views=_search_views(),
     )
     assert outcome.handled and outcome.rendered and not outcome.deferred
     assert [call[0] for call in query.calls] == ["answer", "edit_text"]
