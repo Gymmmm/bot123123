@@ -20,9 +20,9 @@ def matches(data: str) -> bool:
     )
 
 
-def _service_back_keyboard(*, parent_callback: str='service:hub', parent_label: str='返回上一页') -> InlineKeyboardMarkup:
+def _service_back_keyboard(*, parent_callback: str='service:hub', parent_label: str='返回入住服务') -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton('💬 联系我们', callback_data='service:contact')],
+        [InlineKeyboardButton('💬 中文顾问', callback_data='service:contact')],
         [InlineKeyboardButton(f'⬅️ {parent_label}', callback_data=parent_callback)],
     ])
 
@@ -40,9 +40,14 @@ async def handle_service_callback(update: Update, context: ContextTypes.DEFAULT_
         return await show_service_hub(update, context)
 
     if data == 'service:contact':
-        # Generic service contact must not inherit a listing opened earlier in the chat.
         context.user_data.pop('contact_listing_id', None)
         return await contact_management(update, context, source='service_hub')
+
+    binding = db.get_active_binding(user.id)
+
+    if data in {'service:repair_hub', 'service_request:property'} or data.startswith('service_request:') or data.startswith('service_slot:'):
+        if not binding:
+            return await show_service_hub(update, context)
 
     if data == 'service:general':
         for key in ('contact_listing_id', 'contact_touch_payload', 'appt', 'active_listing_id', 'listing_id'):
@@ -50,15 +55,15 @@ async def handle_service_callback(update: Update, context: ContextTypes.DEFAULT_
         context.user_data['awaiting_service_general'] = True
         await render_panel(
             update,
-            text='💬 <b>通用服务咨询</b>\n\n请直接说需要什么帮助，我们会按服务需求跟进。',
+            text='💬 <b>通用服务咨询</b>\n\n请直接说需要什么帮助，中文顾问会继续跟进。',
             parse_mode=ParseMode.HTML,
-            reply_markup=_service_back_keyboard(parent_callback='service:hub', parent_label='返回入住服务'),
+            reply_markup=_service_back_keyboard(),
             context=context,
         )
         return MAIN
 
     if data == 'service:nearby':
-        await render_panel(update, text='🗺 <b>周边服务</b>\n\n可查看富力城已核实的周边商家；其他区域可提交需求，我们会在1个工作日内反馈。', parse_mode=ParseMode.HTML, reply_markup=nearby_area_keyboard(), context=context)
+        await render_panel(update, text='🗺 <b>周边服务</b>\n\n可以查看已核实的周边信息；其他区域也可以提交需求。', parse_mode=ParseMode.HTML, reply_markup=nearby_area_keyboard(), context=context)
         return MAIN
 
     if data == 'local:other':
@@ -67,7 +72,7 @@ async def handle_service_callback(update: Update, context: ContextTypes.DEFAULT_
         context.user_data['awaiting_nearby_request'] = True
         await render_panel(
             update,
-            text='📍 <b>其他区域需求提交</b>\n\n请发送区域或地标，以及需要的餐饮、超市、交通或生活服务。提交后，我们会在1个工作日内回复。',
+            text='📍 <b>其他区域需求</b>\n\n请发送区域或地标，以及需要的餐饮、超市、交通或生活服务。',
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('⬅️ 返回周边推荐', callback_data='service:nearby')]]),
             context=context,
@@ -75,20 +80,16 @@ async def handle_service_callback(update: Update, context: ContextTypes.DEFAULT_
         return MAIN
 
     if data == 'service:repair_hub':
-        await render_panel(update, text='🔧 <b>设备报修</b>\n\n请选择出现问题的设备。', parse_mode=ParseMode.HTML, reply_markup=service_repair_keyboard(), context=context)
+        await render_panel(update, text='🔧 <b>报修</b>\n\n请选择需要处理的问题。\n\n房屋信息已经带上，不用重复说明。', parse_mode=ParseMode.HTML, reply_markup=service_repair_keyboard(), context=context)
         return MAIN
 
     if data == 'service_request:property':
         await render_panel(
             update,
             text=(
-                '🏢 <b>物业协调</b>\n\n'
-                '如遇噪音、停车、门禁、公共区域或垃圾处理等问题，可以直接说明具体情况。\n\n'
-                '建议包括：\n'
-                '• 发生了什么\n'
-                '• 大概从什么时候开始\n'
-                '• 是否已经与物业沟通过\n\n'
-                '我们会协助整理沟通重点，并根据实际情况对接物业。'
+                '🏢 <b>物业沟通</b>\n\n'
+                '门禁、电梯卡、停车、公共区域或其他物业事项，可以直接交给中文顾问协助沟通。\n\n'
+                f'🏠 当前房源：{he(str(binding.get("property_name") or "-"))}'
             ),
             parse_mode=ParseMode.HTML,
             reply_markup=_service_back_keyboard(),
@@ -101,12 +102,12 @@ async def handle_service_callback(update: Update, context: ContextTypes.DEFAULT_
         issue_label = SERVICE_REQUEST_LABELS.get(issue_key, issue_key)
         context.user_data['awaiting_service_request'] = {'issue_key': issue_key, 'issue_label': issue_label}
         urgent = issue_key in {'repair_water', 'repair_power', 'repair_door'}
-        note = '\n\n如果情况紧急，请直接联系我们。' if urgent else ''
+        note = '\n\n如情况紧急或可能造成进一步损失，请立即联系中文顾问。' if urgent else ''
         await render_panel(
             update,
             text=f'🔧 <b>{he(issue_label)}</b>\n\n请发送问题照片或短视频，并简单说明异常情况。\n例如：<code>空调可以启动，但一直不制冷。</code>{note}',
             parse_mode=ParseMode.HTML,
-            reply_markup=_service_back_keyboard(parent_callback='service:repair_hub'),
+            reply_markup=_service_back_keyboard(parent_callback='service:repair_hub', parent_label='返回报修'),
             context=context,
         )
         return MAIN
@@ -119,17 +120,16 @@ async def handle_service_callback(update: Update, context: ContextTypes.DEFAULT_
         issue_label = SERVICE_REQUEST_LABELS.get(issue_key, issue_key)
         slot_map = {'today': '今天内安排', 'tomorrow_am': '明天上午', 'tomorrow_pm': '明天下午'}
         slot_label = slot_map.get(slot, slot)
-        binding = db.get_active_binding(user.id)
         detail_ctx = context.user_data.pop('service_request_detail', {})
         detail = str(detail_ctx.get('detail') or f'按钮提交：{slot_label}')
-        binding_id = int((binding or {}).get('id') or 0) or None
+        binding_id = int(binding.get('id') or 0) or None
         ticket_id = db.create_repair_ticket(user.id, binding_id, issue_label, f'{detail}\n希望时间：{slot_label}', now_ts())
         create_lead(
             user,
             action='service_request_submit',
             source='service_hub',
-            listing_id=str((binding or {}).get('property_name') or ''),
-            payload={'issue_key': issue_key, 'issue_label': issue_label, 'time_slot': slot, 'detail': detail, 'binding_id': binding_id},
+            listing_id=str(binding.get('property_name') or ''),
+            payload={'issue_key': issue_key, 'issue_label': issue_label, 'time_slot': slot, 'detail': detail, 'binding_id': binding_id, 'ticket_id': ticket_id},
         )
         await _notify_admins(
             context,
@@ -137,7 +137,8 @@ async def handle_service_callback(update: Update, context: ContextTypes.DEFAULT_
             lines=[
                 f'客户：{_user_mention_html(user)}',
                 f'联系方式：{he(_user_contact_text(user))}',
-                f'房源：{he(str((binding or {}).get("property_name") or "-"))}',
+                f'绑定档案：#{binding_id}',
+                f'房源：{he(str(binding.get("property_name") or "-"))}',
                 f'问题：{he(issue_label)}',
                 f'说明：{he(detail)}',
                 f'希望时间：{he(slot_label)}',
@@ -145,27 +146,24 @@ async def handle_service_callback(update: Update, context: ContextTypes.DEFAULT_
             reply_markup=admin_repair_keyboard(ticket_id),
         )
         urgent = issue_key in {'repair_water', 'repair_power', 'repair_door'}
-        urgent_note = '\n\n如果情况紧急，请直接联系我们。' if urgent else ''
+        urgent_note = '\n\n如情况紧急或可能造成进一步损失，请立即联系中文顾问。' if urgent else ''
         await render_panel(
             update,
-            text=(
-                '✅ <b>报修信息已收到</b>\n\n'
-                '我们会根据您提供的情况进行整理，并协助对接后续处理。'
-                f'{urgent_note}'
-            ),
+            text=f'✅ <b>报修已提交</b>\n\n房屋信息已经带上，中文顾问会继续跟进。{urgent_note}',
             parse_mode=ParseMode.HTML,
-            reply_markup=_service_back_keyboard(parent_callback='service:repair_hub'),
+            reply_markup=_service_back_keyboard(parent_callback='service:hub'),
             context=context,
         )
         return MAIN
 
     if data in {'service:guide', 'service:local_life'}:
+        if not binding:
+            return await show_service_hub(update, context)
         await render_panel(update, text=local_life_text(), parse_mode=ParseMode.HTML, reply_markup=local_life_keyboard(), context=context)
         return MAIN
 
-    # 富力城周边内容仅保留历史兼容入口。正式“周边推荐”不再硬编码进入该页面。
     if data == 'local:rfcity':
-        create_lead(user, action='local_area_click', source='local_life', area='rfcity', payload={'area': 'rfcity', 'category': 'overview'})
+        create_lead(user, action='local_area_click', source='local_life', area='rfcity', payload={'area': 'rfcity', 'category': 'overview', 'binding_id': (binding or {}).get('id')})
         await render_panel(update, text=rfcity_text(), parse_mode=ParseMode.HTML, reply_markup=rfcity_keyboard(), context=context)
         return MAIN
 
@@ -182,41 +180,34 @@ async def handle_service_callback(update: Update, context: ContextTypes.DEFAULT_
         )
         category = data.split(':', 1)[1]
         text_map = {
-            'restaurant': restaurant_text,
-            'bbq': bbq_text,
-            'drinks': drinks_text,
-            'supermarket': supermarket_text,
-            'hotel': hotel_text,
-            'recreation': recreation_text,
-            'logistics': logistics_text,
-            'property': property_text,
+            'restaurant': restaurant_text, 'bbq': bbq_text, 'drinks': drinks_text, 'supermarket': supermarket_text,
+            'hotel': hotel_text, 'recreation': recreation_text, 'logistics': logistics_text, 'property': property_text,
         }
         renderer = text_map.get(category)
         if renderer:
-            create_lead(user, action='local_category_click', source='local_life', area='rfcity', payload={'category': category})
+            create_lead(user, action='local_category_click', source='local_life', area='rfcity', payload={'category': category, 'binding_id': (binding or {}).get('id')})
             await render_panel(update, text=renderer(), parse_mode=ParseMode.HTML, reply_markup=rfcity_back_keyboard(), context=context)
         return MAIN
 
-    # 以下仅保留历史 callback 兼容，新首页/入住服务不再生成这些按钮。
+    # 历史 callback 兼容；当前 UI 不再生成这些入口。
     if data == 'service:change':
         return await show_search_entry(update, context)
     if data in {'service:renew', 'service:renew_change'}:
-        await render_panel(update, text='📋 <b>租约事项</b>\n\n续租、换房或租约变更，可以直接联系我们处理。', parse_mode=ParseMode.HTML, reply_markup=_service_back_keyboard(), context=context)
-        return MAIN
+        from .callback_contract import handle_contract_callback
+        return await handle_contract_callback(update, context, query, 'contract:renew', user)
     if data == 'service:terminate':
-        await render_panel(update, text='🚪 <b>退租事项</b>\n\n退租时间、合同通知期和押金核对，可以直接联系我们。', parse_mode=ParseMode.HTML, reply_markup=_service_back_keyboard(), context=context)
-        return MAIN
+        from .callback_contract import handle_contract_callback
+        return await handle_contract_callback(update, context, query, 'contract:terminate', user)
     if data == 'service:move':
-        await render_panel(update, text='📦 <b>搬家协助</b>\n\n需要协调搬家时间、车辆或入住安排，可以直接联系我们。', parse_mode=ParseMode.HTML, reply_markup=_service_back_keyboard(), context=context)
+        await render_panel(update, text='📦 <b>搬家协助</b>\n\n需要协调搬家时间、车辆或入住安排，可以联系中文顾问。', parse_mode=ParseMode.HTML, reply_markup=_service_back_keyboard(), context=context)
         return MAIN
     if data == 'service:staging':
-        await render_panel(update, text='🎥 <b>实地 / 视频看房</b>\n\n不方便到现场，也可以安排实时视频看房。', parse_mode=ParseMode.HTML, reply_markup=_service_back_keyboard(), context=context)
+        await render_panel(update, text='🎥 <b>实地 / 视频看房</b>\n\n不方便到现场，也可以安排实时视频看房。', parse_mode=ParseMode.HTML, reply_markup=_service_back_keyboard(parent_callback='home', parent_label='返回首页'), context=context)
         return MAIN
     if data == 'service:addons':
-        await render_panel(update, text='🛋 <b>家具家电</b>\n\n入住前需要补配或协调家具家电，可以直接联系我们。', parse_mode=ParseMode.HTML, reply_markup=_service_back_keyboard(), context=context)
+        await render_panel(update, text='🛋 <b>家具家电</b>\n\n入住前需要补配或协调家具家电，可以联系中文顾问。', parse_mode=ParseMode.HTML, reply_markup=_service_back_keyboard(), context=context)
         return MAIN
     if data in {'service:checkin_tips', 'service:promise'}:
-        await render_panel(update, text='🛠 <b>入住服务</b>\n\n入住后的房屋、物业和租约事项，可以继续联系侨联。', parse_mode=ParseMode.HTML, reply_markup=_service_back_keyboard(), context=context)
-        return MAIN
+        return await show_service_hub(update, context)
 
     return None
