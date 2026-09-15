@@ -1,4 +1,11 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "git": {
+    "deploymentEnabled": {
+      "codex/v3-sale-catalog-web-20260909": true,
+      "*": false
+    }
+  },
   "rewrites": [
     {
       "source": "/api/v3/sale/:path*",
