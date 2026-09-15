@@ -12,7 +12,7 @@ from .broadcast import BroadcastService, BroadcastSettingsRepository
 from .broadcast_admin import BROADCAST_EDIT_STATE_KEY, BroadcastAdminController
 from .marketing_broadcast import MarketingBroadcastService
 from .manual_status_sync import PublisherManualStatusSynchronizer
-from .operator_flow import OperatorPublisherAdminController
+from .pending_batch_admin import BATCH_STATUS_SYNC_KEY, PendingBatchOperatorPublisherAdminController
 from .simple_admin import NEW_LISTING_STATE_KEY, SIMPLE_EDIT_STATE_KEY
 
 class V3PublisherApplication(PublisherAdminBot):
@@ -25,7 +25,7 @@ class V3PublisherApplication(PublisherAdminBot):
         self.auto_repository = FinalAutoPublishRepository(settings.db_path); self.auto_repository.ensure_defaults()
         self.runtime = RuntimeStateRepository(settings.db_path)
         self.autopilot = FinalAutoPublishService(workflow=self.workflow, repository=self.auto_repository, channel_chat_id=settings.channel_chat_id)
-        self.simple = OperatorPublisherAdminController(db_path=settings.db_path, repo_root=REPO_ROOT, workflow=self.workflow, autopilot=self.autopilot, repository=self.auto_repository, runtime=self.runtime, user_bot_username=settings.user_bot_username, channel_chat_id=settings.channel_chat_id, cover_output_dir=settings.cover_output_dir)
+        self.simple = PendingBatchOperatorPublisherAdminController(db_path=settings.db_path, repo_root=REPO_ROOT, workflow=self.workflow, autopilot=self.autopilot, repository=self.auto_repository, runtime=self.runtime, user_bot_username=settings.user_bot_username, channel_chat_id=settings.channel_chat_id, cover_output_dir=settings.cover_output_dir)
         self.manual_status_sync = PublisherManualStatusSynchronizer(
             settings.db_path,
             user_bot_username=settings.user_bot_username,
@@ -41,6 +41,29 @@ class V3PublisherApplication(PublisherAdminBot):
         if not await self._require_admin(update): return
         context.user_data.pop(BROADCAST_EDIT_STATE_KEY, None); await self.broadcast.show_center(update.effective_message)
 
+    async def _sync_batch_statuses(self, context, message) -> None:
+        queued = context.user_data.pop(BATCH_STATUS_SYNC_KEY, [])
+        if not isinstance(queued, list) or not queued:
+            return
+        failed = 0
+        for item in queued:
+            if not isinstance(item, dict):
+                continue
+            listing_id = str(item.get("listing_id") or "")
+            status = str(item.get("status") or "")
+            if not listing_id or not status:
+                continue
+            result = await self.manual_status_sync.sync(
+                context.bot, listing_id=listing_id, status=status
+            )
+            if result.attempted and not result.synced:
+                failed += 1
+        if failed:
+            await message.reply_text(
+                f"⚠️ 房态已经更新，但有 {failed} 套频道帖子同步失败，请稍后重试。",
+                reply_markup=InlineKeyboardMarkup([self._home_button()]),
+            )
+
     async def on_callback(self, update, context: ContextTypes.DEFAULT_TYPE):
         query=getattr(update,"callback_query",None); raw=str(getattr(query,"data","") or "") if query else ""
         if raw.startswith("v3smp|"):
@@ -52,7 +75,10 @@ class V3PublisherApplication(PublisherAdminBot):
                 if handled and len(parts)==4 and parts[1]=="status":
                     status,listing_id=parts[2],parts[3]; result=await self.manual_status_sync.sync(context.bot,listing_id=listing_id,status=status)
                     if result.attempted and not result.synced: await query.message.reply_text("⚠️ 房源状态已更新，但频道帖子同步失败，请稍后重试。",reply_markup=InlineKeyboardMarkup([self._home_button()]))
+                if handled:
+                    await self._sync_batch_statuses(context, query.message)
             except Exception as exc:
+                context.user_data.pop(BATCH_STATUS_SYNC_KEY, None)
                 await query.message.reply_text("操作失败，房源没有被强行发布：\n"+escape(type(exc).__name__+": "+str(exc)),parse_mode=ParseMode.HTML,reply_markup=InlineKeyboardMarkup([self._home_button()]))
             return
         if raw=="v3bc" or raw.startswith("v3bc|"):
@@ -87,7 +113,7 @@ class V3PublisherApplication(PublisherAdminBot):
         if isinstance(state,dict):
             task=state.get("_album_task")
             if task and not task.done(): task.cancel()
-        context.user_data.pop("v3_publisher_edit",None); context.user_data.pop(BROADCAST_EDIT_STATE_KEY,None); context.user_data.pop(SIMPLE_EDIT_STATE_KEY,None)
+        context.user_data.pop("v3_publisher_edit",None); context.user_data.pop(BROADCAST_EDIT_STATE_KEY,None); context.user_data.pop(SIMPLE_EDIT_STATE_KEY,None); context.user_data.pop(BATCH_STATUS_SYNC_KEY,None)
         await update.effective_message.reply_text("已取消当前操作。",reply_markup=InlineKeyboardMarkup([self._home_button()]))
 
     def build_application(self):
