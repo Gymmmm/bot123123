@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from types import SimpleNamespace
 
 import pytest
@@ -54,11 +55,7 @@ class CountingLeadService:
 
     def record(self, *, user, request, created_at):
         self.calls.append((user, request, created_at))
-        return LeadRecordResult(
-            lead_id=len(self.calls),
-            action=request.action,
-            source=request.source,
-        )
+        return LeadRecordResult(lead_id=len(self.calls), action=request.action, source=request.source)
 
 
 class CountingAdmins:
@@ -71,13 +68,7 @@ class CountingAdmins:
 
 
 def _user():
-    return SimpleNamespace(
-        id=123,
-        username="alice",
-        full_name="Alice",
-        first_name="Alice",
-        last_name="",
-    )
+    return SimpleNamespace(id=123, username="alice", full_name="Alice", first_name="Alice", last_name="")
 
 
 def _callback_update(query):
@@ -92,13 +83,18 @@ def _context(user_data=None):
     return SimpleNamespace(bot=object(), user_data={} if user_data is None else user_data)
 
 
-def _service(tmp_path):
+def _service(tmp_path, *, binding=True):
     db = tmp_path / "v3.db"
     initialize_v3_storage(db)
-    return TenantService(
-        SQLiteTenantServiceRepository(db),
-        now=lambda: "2026-09-09 03:14:00",
-    )
+    if binding:
+        with sqlite3.connect(str(db)) as conn:
+            conn.execute(
+                """INSERT INTO tenant_bindings_v3
+                   (user_id,binding_code,property_name,status,created_at)
+                   VALUES (123,'BIND-123','富力城 A3-1208','active','2026-09-09 03:00:00')"""
+            )
+            conn.commit()
+    return TenantService(SQLiteTenantServiceRepository(db), now=lambda: "2026-09-09 03:14:00")
 
 
 @pytest.mark.asyncio
@@ -106,14 +102,8 @@ async def test_issue_state_is_written_only_after_successful_telegram_render(tmp_
     service = _service(tmp_path)
     context = _context()
     query = FakeQuery("v3u:service:issue:repair_ac", fail_edit=True)
-
     with pytest.raises(RuntimeError, match="telegram_edit_failed"):
-        await handle_v3_service_callback(
-            _callback_update(query),
-            context,
-            service=service,
-        )
-
+        await handle_v3_service_callback(_callback_update(query), context, service=service)
     assert SERVICE_REQUEST_SESSION_KEY not in context.user_data
 
 
@@ -124,14 +114,8 @@ async def test_repair_detail_keeps_token_and_renders_slot_choices(tmp_path):
     query = FakeQuery("v3u:service:issue:repair_ac")
     await handle_v3_service_callback(_callback_update(query), context, service=service)
     token = context.user_data[SERVICE_REQUEST_SESSION_KEY]["request_token"]
-
     message = FakeMessage("空调可以启动，但一直不制冷。")
-    outcome = await handle_v3_service_text(
-        _text_update(message),
-        context,
-        service=service,
-    )
-
+    outcome = await handle_v3_service_text(_text_update(message), context, service=service)
     assert outcome.handled and outcome.rendered
     assert context.user_data[SERVICE_REQUEST_SESSION_KEY]["request_token"] == token
     assert context.user_data[SERVICE_REQUEST_SESSION_KEY]["detail"] == "空调可以启动，但一直不制冷。"
@@ -146,49 +130,40 @@ async def test_repair_detail_keeps_token_and_renders_slot_choices(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_retry_after_success_page_failure_reuses_ticket_and_does_not_repeat_effects(tmp_path):
+async def test_binding_invalidated_after_issue_page_blocks_followup_text(tmp_path):
     service = _service(tmp_path)
     context = _context()
     await handle_v3_service_callback(
-        _callback_update(FakeQuery("v3u:service:issue:repair_door")),
-        context,
-        service=service,
+        _callback_update(FakeQuery("v3u:service:issue:repair_ac")), context, service=service
     )
-    await handle_v3_service_text(
-        _text_update(FakeMessage("门禁刷卡没有反应。")),
-        context,
-        service=service,
-    )
+    with sqlite3.connect(str(service.repository.db_path)) as conn:
+        conn.execute("UPDATE tenant_bindings_v3 SET status='cancelled' WHERE user_id=123")
+        conn.commit()
+    message = FakeMessage("空调可以启动，但一直不制冷。")
+    outcome = await handle_v3_service_text(_text_update(message), context, service=service)
+    assert outcome.handled and outcome.action == "repair_denied"
+    assert SERVICE_REQUEST_SESSION_KEY not in context.user_data
+    with sqlite3.connect(str(service.repository.db_path)) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM repair_tickets_v3").fetchone()[0] == 0
 
+
+@pytest.mark.asyncio
+async def test_retry_after_success_page_failure_reuses_ticket_and_does_not_repeat_effects(tmp_path):
+    service = _service(tmp_path)
+    context = _context()
+    await handle_v3_service_callback(_callback_update(FakeQuery("v3u:service:issue:repair_door")), context, service=service)
+    await handle_v3_service_text(_text_update(FakeMessage("门禁刷卡没有反应。")), context, service=service)
     leads = CountingLeadService()
     admins = CountingAdmins()
-    effects = ServiceEffectExecutor(
-        leads=leads,
-        admins=admins,
-        now=lambda: "2026-09-09 03:14:01",
-    )
-
+    effects = ServiceEffectExecutor(leads=leads, admins=admins, now=lambda: "2026-09-09 03:14:01")
     first_query = FakeQuery("v3u:service:slot:today", fail_edit=True)
     with pytest.raises(RuntimeError, match="telegram_edit_failed"):
-        await handle_v3_service_callback(
-            _callback_update(first_query),
-            context,
-            service=service,
-            effects=effects,
-        )
-
+        await handle_v3_service_callback(_callback_update(first_query), context, service=service, effects=effects)
     assert SERVICE_REQUEST_SESSION_KEY in context.user_data
     assert len(leads.calls) == 1
     assert len(admins.calls) == 1
-
     second_query = FakeQuery("v3u:service:slot:today")
-    outcome = await handle_v3_service_callback(
-        _callback_update(second_query),
-        context,
-        service=service,
-        effects=effects,
-    )
-
+    outcome = await handle_v3_service_callback(_callback_update(second_query), context, service=service, effects=effects)
     assert outcome.handled and outcome.rendered
     assert outcome.ticket_id is not None
     assert len(leads.calls) == 1
@@ -197,27 +172,30 @@ async def test_retry_after_success_page_failure_reuses_ticket_and_does_not_repea
 
 
 @pytest.mark.asyncio
+async def test_no_binding_repair_callback_is_blocked_to_public_only_tenant_view(tmp_path):
+    service = _service(tmp_path, binding=False)
+    context = _context()
+    query = FakeQuery("v3u:service:repair")
+    outcome = await handle_v3_service_callback(_callback_update(query), context, service=service)
+    assert outcome.handled and outcome.rendered
+    text = query.calls[-1][1][0]
+    assert "没有绑定有效租约" in text
+    markup = query.calls[-1][2]["reply_markup"]
+    labels = [button.text for row in markup.inline_keyboard for button in row]
+    assert labels == ["📄 租赁服务", "🔍 开始找房", "💬 中文顾问", "🏠 返回首页"]
+
+
+@pytest.mark.asyncio
 async def test_general_text_is_consumed_only_when_explicit_wait_state_exists(tmp_path):
     service = _service(tmp_path)
     message = FakeMessage("需要帮忙联系物业")
     context = _context()
-
-    untouched = await handle_v3_service_text(
-        _text_update(message),
-        context,
-        service=service,
-    )
+    untouched = await handle_v3_service_text(_text_update(message), context, service=service)
     assert not untouched.handled
     assert message.calls == []
-
     query = FakeQuery("v3u:service:general")
     await handle_v3_service_callback(_callback_update(query), context, service=service)
     assert context.user_data[SERVICE_GENERAL_WAIT_KEY] is True
-
-    handled = await handle_v3_service_text(
-        _text_update(message),
-        context,
-        service=service,
-    )
+    handled = await handle_v3_service_text(_text_update(message), context, service=service)
     assert handled.handled and handled.rendered
     assert SERVICE_GENERAL_WAIT_KEY not in context.user_data
