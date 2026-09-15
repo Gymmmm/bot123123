@@ -1,15 +1,9 @@
-"""Additive V3 persistence for tenant bindings and repair tickets.
-
-The locked production User Bot reads ``tenant_bindings`` and writes
-``repair_tickets``.  V3 keeps the same user-facing service semantics while
-remaining independent from the legacy runtime tables.
-"""
+"""V3 persistence for tenant bindings and repair tickets."""
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
 import sqlite3
-
 
 DDL = """
 CREATE TABLE IF NOT EXISTS tenant_bindings_v3 (
@@ -54,6 +48,14 @@ class TenantBinding:
     user_id: int
     property_name: str
     status: str = "active"
+    binding_code: str = ""
+    lease_end_date: str = ""
+    rent_day: int | None = None
+    monthly_rent: float = 0.0
+    contract_start_date: str = ""
+    contract_end_date: str = ""
+    deposit_months: int | None = None
+    contract_notes: str = ""
 
 
 @dataclass(frozen=True)
@@ -90,6 +92,26 @@ class SQLiteTenantServiceRepository:
         return conn
 
     @staticmethod
+    def _binding(row: sqlite3.Row) -> TenantBinding:
+        keys = set(row.keys())
+        def value(name: str, default=None):
+            return row[name] if name in keys else default
+        return TenantBinding(
+            id=int(value("id", 0) or 0),
+            user_id=int(value("user_id", 0) or 0),
+            property_name=str(value("property_name", "") or ""),
+            status=str(value("status", "active") or "active"),
+            binding_code=str(value("binding_code", "") or ""),
+            lease_end_date=str(value("lease_end_date", "") or ""),
+            rent_day=int(value("rent_day")) if value("rent_day") is not None else None,
+            monthly_rent=float(value("monthly_rent", 0) or 0),
+            contract_start_date=str(value("contract_start_date", "") or ""),
+            contract_end_date=str(value("contract_end_date", "") or ""),
+            deposit_months=int(value("deposit_months")) if value("deposit_months") is not None else None,
+            contract_notes=str(value("contract_notes", "") or ""),
+        )
+
+    @staticmethod
     def _ticket(row: sqlite3.Row) -> RepairTicket:
         return RepairTicket(
             id=int(row["id"]),
@@ -108,20 +130,15 @@ class SQLiteTenantServiceRepository:
     def get_active_binding(self, user_id: int) -> TenantBinding | None:
         with self._connect() as conn:
             row = conn.execute(
-                """SELECT id,user_id,property_name,status
+                """SELECT id,user_id,binding_code,property_name,lease_end_date,rent_day,
+                          monthly_rent,contract_start_date,contract_end_date,deposit_months,
+                          contract_notes,status
                    FROM tenant_bindings_v3
                    WHERE user_id=? AND status='active'
                    ORDER BY id DESC LIMIT 1""",
                 (int(user_id),),
             ).fetchone()
-        if row is None:
-            return None
-        return TenantBinding(
-            id=int(row["id"]),
-            user_id=int(row["user_id"]),
-            property_name=str(row["property_name"] or ""),
-            status=str(row["status"] or "active"),
-        )
+        return None if row is None else self._binding(row)
 
     def create_repair_ticket(
         self,
@@ -141,6 +158,8 @@ class SQLiteTenantServiceRepository:
             raise ValueError("service_request_token_required")
         if clean_user_id <= 0:
             raise ValueError("service_user_id_required")
+        if binding is None or int(binding.user_id) != clean_user_id or str(binding.status) != "active":
+            raise PermissionError("active_tenant_binding_required")
         issue_key = str(issue_key or "").strip()
         issue_type = str(issue_type or "").strip()
         description = str(description or "").strip()
@@ -148,8 +167,8 @@ class SQLiteTenantServiceRepository:
         created_at = str(created_at or "").strip()
         if not issue_key or not issue_type or not description or not time_slot or not created_at:
             raise ValueError("service_ticket_fields_required")
-        binding_id = int(binding.id) if binding is not None else None
-        property_name = str(binding.property_name or "") if binding is not None else ""
+        binding_id = int(binding.id)
+        property_name = str(binding.property_name or "")
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             existing = conn.execute(
@@ -165,32 +184,16 @@ class SQLiteTenantServiceRepository:
                     description,time_slot,status,created_at)
                    VALUES (?,?,?,?,?,?,?,?,'new',?)""",
                 (
-                    clean_token,
-                    clean_user_id,
-                    binding_id,
-                    property_name,
-                    issue_key,
-                    issue_type,
-                    description,
-                    time_slot,
-                    created_at,
+                    clean_token, clean_user_id, binding_id, property_name, issue_key,
+                    issue_type, description, time_slot, created_at,
                 ),
             )
             ticket_id = int(cur.lastrowid)
-            row = conn.execute(
-                "SELECT * FROM repair_tickets_v3 WHERE id=?",
-                (ticket_id,),
-            ).fetchone()
+            row = conn.execute("SELECT * FROM repair_tickets_v3 WHERE id=?", (ticket_id,)).fetchone()
             conn.commit()
         if row is None:
             raise RuntimeError("service_ticket_insert_missing_row")
         return RepairTicketWrite(ticket=self._ticket(row), created=True)
 
 
-__all__ = [
-    "DDL",
-    "RepairTicket",
-    "RepairTicketWrite",
-    "SQLiteTenantServiceRepository",
-    "TenantBinding",
-]
+__all__ = ["DDL", "RepairTicket", "RepairTicketWrite", "SQLiteTenantServiceRepository", "TenantBinding"]

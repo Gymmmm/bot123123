@@ -56,7 +56,7 @@ def _view(*, canonical_facts=None, listing=None, offer=None):
     )
 
 
-def test_locked_production_location_building_and_value_wording_is_preserved():
+def test_legacy_freeform_evidence_stays_silent_without_canonical_facts():
     evidence = {
         "area": "BKK1",
         "project": "富力城",
@@ -66,36 +66,30 @@ def test_locked_production_location_building_and_value_wording_is_preserved():
         "price": "800",
         "management_fee": "包含",
     }
-
     assert generate_adviser_notes(evidence, max_points=3) == ""
 
 
-def test_locked_production_highlights_take_precedence_over_generic_building_line():
+def test_legacy_highlights_stay_silent_without_canonical_facts():
     evidence = {
         "property_type": "公寓",
         "size_sqm": "95",
         "floor": "19",
         "highlights": ["一周两次保洁", "灭虫"],
     }
-
     assert generate_adviser_notes(evidence) == ""
 
 
-def test_frozen_safe_included_list_projects_only_explicit_fee_inclusion():
+def test_frozen_safe_included_list_is_preserved_as_canonical_evidence():
     view = _view(canonical_facts={"included": ["物业费", "Wi-Fi"]})
-
     evidence = frozen_adviser_evidence(view)
     assert evidence["canonical_facts"]["included"] == ["物业费", "Wi-Fi"]
-    assert adviser_notes_for_view(view) == ""
 
 
 def test_amenity_presence_never_becomes_fee_inclusion():
     view = _view(canonical_facts={"amenities": ["游泳池", "健身房"]})
-
     evidence = frozen_adviser_evidence(view)
     assert "management_fee" not in evidence
     assert "internet_fee" not in evidence
-    assert adviser_notes_for_view(view) == ""
 
 
 def test_frozen_highlights_without_supported_signal_stay_silent():
@@ -103,7 +97,6 @@ def test_frozen_highlights_without_supported_signal_stay_silent():
         canonical_facts={"highlights": ["采光好", "钥匙已备"]},
         listing={"public_location_display": "BKK1"},
     )
-
     assert adviser_notes_for_view(view) == ""
 
 
@@ -113,12 +106,10 @@ def test_older_package_with_frozen_signals_uses_shared_adviser_engine():
             "adviser_signals": ["cleaning_2x", "management_wifi"],
         }
     )
-
     text = adviser_notes_for_view(view, max_points=2)
-
     assert "两次" in text
-    assert "物业" not in text
-    assert "网费" not in text
+    assert "物业" in text
+    assert ("网费" in text) or ("网络" in text)
     assert "位置标注" not in text
 
 
@@ -127,6 +118,5 @@ def test_missing_frozen_canonical_facts_is_blocked_instead_of_falling_back_live(
     snapshot = view.snapshot
     snapshot.pop("canonical_facts")
     view.package["snapshot_json"] = json.dumps(snapshot, ensure_ascii=False)
-
     with pytest.raises(ValueError, match="frozen_canonical_facts_missing"):
         adviser_notes_for_view(view)

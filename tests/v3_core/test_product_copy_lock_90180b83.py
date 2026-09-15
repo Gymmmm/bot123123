@@ -50,16 +50,8 @@ def _view(*, status="rented", offer_status="inactive"):
         },
     }
     return PublishedListingView(
-        listing={
-            "listing_id": "l_1",
-            "public_listing_id": "QL-RF-A2B3",
-            "inventory_status": status,
-        },
-        offer={
-            "offer_status": offer_status,
-            "offer_type": "rent",
-            "publication_policy": "telegram_rent",
-        },
+        listing={"listing_id": "l_1", "public_listing_id": "QL-RF-A2B3", "inventory_status": status},
+        offer={"offer_status": offer_status, "offer_type": "rent", "publication_policy": "telegram_rent"},
         publication={},
         package={"snapshot_json": json.dumps(snapshot, ensure_ascii=False), "gallery_json": "[]"},
     )
@@ -77,21 +69,14 @@ class MemoryPublishedInventory:
 
 def test_channel_and_sync_keyboards_use_locked_details_label():
     publish = _labels(build_channel_keyboard(dict(ACTIONS), inventory_status="active"))
-    sync = _labels(
-        appointment_channel_keyboard(
-            username="qiaolian_rent_bot",
-            public_listing_id="QL-RF-A2B3",
-            status="reserved",
-            advisor_url="https://t.me/advisor",
-        )
-    )
+    sync = _labels(appointment_channel_keyboard(username="qiaolian_rent_bot", public_listing_id="QL-RF-A2B3", status="reserved", advisor_url="https://t.me/advisor"))
     expected = ["📋 租赁详情", "📸 更多实拍", "📅 预约看房"]
     assert publish == expected
     assert sync == expected
     assert "🏠 房源详情" not in publish + sync
 
 
-def test_home_contact_and_no_match_use_advisor_label():
+def test_home_contact_and_no_match_use_final_advisor_label():
     home = [choice.label for row in build_home_view(channel_url="https://t.me/x").rows for choice in row]
     contact = [choice.label for row in build_contact_view().rows for choice in row]
     intent = SearchSubmitIntent(
@@ -103,10 +88,11 @@ def test_home_contact_and_no_match_use_advisor_label():
         touch_payload={},
     )
     no_match = [choice.label for row in build_search_no_match_view(intent).rows for choice in row]
-    assert "💬 顾问帮我找" in home
-    assert "💬 顾问帮我找" in contact
-    assert "💬 联系中文顾问" in no_match
+    assert "💬 中文顾问" in home
+    assert "💬 中文顾问" in contact
+    assert "💬 中文顾问" in no_match
     assert "💬 联系我们" not in home + contact + no_match
+    assert "💬 顾问帮我找" not in home + contact + no_match
 
 
 def test_unbookable_book_payload_keeps_details_instead_of_dead_link():
@@ -134,13 +120,7 @@ class _FakeMessage:
 @pytest.mark.asyncio
 async def test_start_handler_renders_chinese_unbookable_copy_then_details():
     details = build_details_response(_view())
-    result = PublicListingFlowResult(
-        status="blocked",
-        action="book",
-        public_listing_id="QL-RF-A2B3",
-        reason="listing_not_bookable",
-        details=details,
-    )
+    result = PublicListingFlowResult(status="blocked", action="book", public_listing_id="QL-RF-A2B3", reason="listing_not_bookable", details=details)
 
     class _Listings:
         def resolve(self, payload):
@@ -154,12 +134,7 @@ async def test_start_handler_renders_chinese_unbookable_copy_then_details():
         effective_user=SimpleNamespace(id=9, username="u", full_name="U", first_name="U", last_name=""),
     )
     context = SimpleNamespace(args=["property_QL-RF-A2B3_book"], user_data={}, bot=None)
-    outcome = await handle_v3_start(
-        update,
-        context,
-        listings=_Listings(),
-        transition_views=SimpleNamespace(build=lambda plan: None),
-    )
+    outcome = await handle_v3_start(update, context, listings=_Listings(), transition_views=SimpleNamespace(build=lambda plan: None))
     assert outcome.kind == "unbookable"
     assert outcome.handled is True
     assert message.texts[0] == "这套房暂时不能预约。可以继续看相近房源，或让顾问帮您确认其他选择。"

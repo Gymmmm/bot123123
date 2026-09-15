@@ -11,23 +11,26 @@ from v3_core.user_bot.public_inventory import PublishedListingView
 
 
 @pytest.mark.parametrize("facts,expected", [
-    (None, []), ({}, []), ({"amenities": ["泳池"]}, []),
-    ({"amenities": ["泳池", "健身房"]}, []),
+    (None, []),
+    ({}, []),
+    ({"amenities": ["泳池"]}, ["pool"]),
+    ({"amenities": ["泳池", "健身房"]}, ["pool_gym"]),
     ({"services": {"cleaning": "每周2次"}}, ["cleaning_2x"]),
-    ({"services": {"cleaning": "1次 + 2次"}}, ["cleaning_2x"]),
+    ({"services": {"cleaning": "包含"}}, ["cleaning_included"]),
     ({"adviser_signals": ["never_lived", "new_condition"]}, ["never_lived"]),
     ({"amenities": ["私人泳池", "泳池"]}, ["private_pool"]),
     ({"house": {"features": ["河景", "市景"]}}, ["river_view"]),
-    ({"adviser_signals": ["management_included", "garbage"]}, []),
+    ({"adviser_signals": ["management_included", "garbage"]}, ["management_included"]),
+    ({"adviser_signals": ["wifi_included"]}, ["wifi_included"]),
+    ({"adviser_signals": ["wifi_ready"]}, ["wifi_ready"]),
+    ({"adviser_signals": ["management_wifi"]}, ["management_wifi"]),
+    ({"adviser_signals": ["management_wifi_ready"]}, ["management_wifi_ready"]),
 ])
 def test_v1_required_boundaries(facts, expected):
     tags = adviser_tags_from_facts(facts)
     lines = generate_adviser_lines(facts, seed="QC0001", allow_fallback=True)
-    if expected:
-        assert tags == expected
-        assert len(lines) == 1
-    else:
-        assert lines == []
+    assert tags == expected
+    assert len(lines) == len(expected)
 
 
 def view(facts):
@@ -79,3 +82,9 @@ def test_numeric_floor_never_becomes_adviser_evidence():
     assert generate_adviser_lines({"floor": "39"}) == []
     assert adviser_notes_for_view(view({"floor": "39", "adviser_signals": ["high_floor"]})) == ""
     assert adviser_notes_for_view(view({"adviser_signals": ["high_floor"], "adviser_signals_version": "explicit-v1"}))
+
+
+def test_villa_type_alone_is_silent_and_never_emits_villa_wording():
+    facts = {"property_type": "别墅"}
+    assert "villa" not in adviser_tags_from_facts(facts)
+    assert generate_adviser_lines(facts, seed="villa") == []

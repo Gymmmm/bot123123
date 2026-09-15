@@ -199,12 +199,8 @@ def _budget_session():
 async def test_plain_text_is_not_claimed_without_explicit_awaiting_state():
     message = FakeMessage("BKK1 一房 600")
     outcome = await handle_v3_transition_text(
-        _update(message),
-        _context({}),
-        actions=TransitionTextActionService(),
-        views=ViewsStub(),
+        _update(message), _context({}), actions=TransitionTextActionService(), views=ViewsStub()
     )
-
     assert not outcome.handled
     assert message.calls == []
 
@@ -213,14 +209,9 @@ async def test_plain_text_is_not_claimed_without_explicit_awaiting_state():
 async def test_custom_date_reply_succeeds_before_waiting_state_advances():
     message = FakeMessage("0905")
     user_data = _appt(awaiting_date=True)
-
     outcome = await handle_v3_transition_text(
-        _update(message),
-        _context(user_data),
-        actions=TransitionTextActionService(),
-        views=ViewsStub(),
+        _update(message), _context(user_data), actions=TransitionTextActionService(), views=ViewsStub()
     )
-
     assert outcome.handled and outcome.result is not None
     assert outcome.result.next_step == "appointment_time"
     assert APPOINTMENT_AWAITING_DATE_KEY not in user_data
@@ -233,14 +224,9 @@ async def test_custom_date_reply_succeeds_before_waiting_state_advances():
 async def test_invalid_custom_date_keeps_waiting_state_and_returns_fixed_copy():
     message = FakeMessage("hello")
     user_data = _appt(awaiting_date=True)
-
     outcome = await handle_v3_transition_text(
-        _update(message),
-        _context(user_data),
-        actions=TransitionTextActionService(),
-        views=ViewsStub(),
+        _update(message), _context(user_data), actions=TransitionTextActionService(), views=ViewsStub()
     )
-
     assert outcome.result is not None and outcome.result.status == "invalid"
     assert APPOINTMENT_AWAITING_DATE_KEY in user_data
     assert "0905" in message.calls[-1][1][0]
@@ -251,15 +237,9 @@ async def test_custom_time_renders_confirmation_without_persisting():
     message = FakeMessage("20:00")
     user_data = _appt(awaiting_time=True, date="9月5日")
     executor = FakeAppointmentExecutor()
-
     outcome = await handle_v3_transition_text(
-        _update(message),
-        _context(user_data),
-        actions=TransitionTextActionService(),
-        views=ViewsStub(),
-        appointment_executor=executor,
+        _update(message), _context(user_data), actions=TransitionTextActionService(), views=ViewsStub(), appointment_executor=executor
     )
-
     assert outcome.appointment_execution is None
     assert APPOINTMENT_SESSION_KEY in user_data
     assert APPOINTMENT_AWAITING_TIME_KEY not in user_data
@@ -279,15 +259,9 @@ async def test_custom_time_does_not_invoke_failing_executor_before_confirmation(
     message = FakeMessage("20:00")
     user_data = _appt(awaiting_time=True, date="9月5日")
     executor = FakeAppointmentExecutor(fail=True)
-
     outcome = await handle_v3_transition_text(
-        _update(message),
-        _context(user_data),
-        actions=TransitionTextActionService(),
-        views=ViewsStub(),
-        appointment_executor=executor,
+        _update(message), _context(user_data), actions=TransitionTextActionService(), views=ViewsStub(), appointment_executor=executor
     )
-
     assert outcome.handled
     assert outcome.appointment_execution is None
     assert executor.calls == []
@@ -302,15 +276,9 @@ async def test_custom_budget_matched_search_sends_public_card_then_consumes_pref
     message = FakeMessage("600-900")
     user_data = _budget_session()
     bot = FakeBot()
-
     outcome = await handle_v3_transition_text(
-        _update(message),
-        _context(user_data, bot=bot),
-        actions=TransitionTextActionService(),
-        views=ViewsStub(),
-        search_executor=FakeSearchExecutor(matched=True),
+        _update(message), _context(user_data, bot=bot), actions=TransitionTextActionService(), views=ViewsStub(), search_executor=FakeSearchExecutor(matched=True)
     )
-
     assert outcome.search_presentation is not None and outcome.search_presentation.matched
     assert SEARCH_PREF_SESSION_KEY not in user_data
     assert SEARCH_AWAITING_BUDGET_KEY not in user_data
@@ -326,16 +294,10 @@ async def test_custom_budget_telegram_failure_preserves_pref_and_waiting_state()
     message = FakeMessage("600-900")
     user_data = _budget_session()
     bot = FakeBot(fail_send=True)
-
     with pytest.raises(RuntimeError, match="telegram_send_failed"):
         await handle_v3_transition_text(
-            _update(message),
-            _context(user_data, bot=bot),
-            actions=TransitionTextActionService(),
-            views=ViewsStub(),
-            search_executor=FakeSearchExecutor(matched=True),
+            _update(message), _context(user_data, bot=bot), actions=TransitionTextActionService(), views=ViewsStub(), search_executor=FakeSearchExecutor(matched=True)
         )
-
     assert SEARCH_PREF_SESSION_KEY in user_data
     assert SEARCH_AWAITING_BUDGET_KEY in user_data
     assert LAST_SEARCH_PREF_KEY not in user_data
@@ -343,26 +305,16 @@ async def test_custom_budget_telegram_failure_preserves_pref_and_waiting_state()
 
 
 @pytest.mark.asyncio
-async def test_custom_budget_no_match_offers_current_inventory_and_contact_followup():
+async def test_custom_budget_no_match_offers_strict_recovery_and_contact_followup():
     message = FakeMessage("600-900")
     user_data = _budget_session()
-
     outcome = await handle_v3_transition_text(
-        _update(message),
-        _context(user_data),
-        actions=TransitionTextActionService(),
-        views=ViewsStub(),
-        search_executor=FakeSearchExecutor(matched=False),
+        _update(message), _context(user_data), actions=TransitionTextActionService(), views=ViewsStub(), search_executor=FakeSearchExecutor(matched=False)
     )
-
     assert outcome.search_presentation is not None and not outcome.search_presentation.matched
     markup = message.calls[-1][2]["reply_markup"]
     callbacks = [button.callback_data for row in markup.inline_keyboard for button in row]
-    assert callbacks == [
-        "v3u:t:search_available",
-        "v3u:change_search",
-        "v3u:home:contact",
-        "v3u:t:home",
-    ]
+    assert callbacks == ["v3u:change_search", "v3u:home:contact", "v3u:t:home"]
+    assert "v3u:t:search_available" not in callbacks
     assert SEARCH_PREF_SESSION_KEY not in user_data
     assert SEARCH_AWAITING_BUDGET_KEY not in user_data

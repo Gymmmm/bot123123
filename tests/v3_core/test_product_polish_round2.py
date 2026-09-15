@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import sqlite3
-from types import SimpleNamespace
 
 import pytest
 
@@ -9,21 +8,17 @@ from v3_core.publishing.manual_status_sync import (
     PublisherManualStatusSynchronizer,
     caption_with_inventory_status,
 )
+from v3_core.storage.bootstrap import initialize_v3_storage
+from v3_core.storage.service_repository import SQLiteTenantServiceRepository
 from v3_core.user_bot.admin_appointments import AdminAppointmentReader
 from v3_core.user_bot.appointment_runtime_effects import _admin_appointment_keyboard
-from v3_core.user_bot.telegram_service_handler import (
-    _service_home_with_tenant_entry,
-    _tenant_binding_view,
-)
+from v3_core.user_bot.service_flow import TenantService
+from v3_core.user_bot.telegram_service_handler import _service_home_with_tenant_entry
+from v3_core.user_bot.tenant_v1 import tenant_home_view
 
 
 def _callbacks(markup):
-    return [
-        button.callback_data
-        for row in markup.inline_keyboard
-        for button in row
-        if button.callback_data
-    ]
+    return [button.callback_data for row in markup.inline_keyboard for button in row if button.callback_data]
 
 
 def test_round2_admin_notification_keyboard_exposes_operational_actions():
@@ -37,31 +32,35 @@ def test_round2_admin_notification_keyboard_exposes_operational_actions():
     assert markup.inline_keyboard[-1][0].url == "tg://user?id=12345"
 
 
-def test_round2_tenant_service_entry_and_binding_views():
+def test_round2_tenant_service_entry_and_binding_views(tmp_path):
     home = _service_home_with_tenant_entry()
     callbacks = [choice.callback_data for row in home.rows for choice in row]
     assert "v3u:service:tenant" in callbacks
 
-    missing = _tenant_binding_view(
-        SimpleNamespace(repository=SimpleNamespace(get_active_binding=lambda user_id: None)),
-        99,
-    )
-    assert missing.kind == "tenant_binding_missing"
+    db = tmp_path / "tenant.sqlite3"
+    initialize_v3_storage(db)
+    service = TenantService(SQLiteTenantServiceRepository(db))
+    missing = tenant_home_view(service, 99)
+    assert missing.kind == "tenant_missing"
     assert "没有绑定" in missing.text
+    missing_labels = [choice.label for row in missing.rows for choice in row]
+    assert missing_labels == ["📄 租赁服务", "🔍 开始找房", "💬 中文顾问", "🏠 返回首页"]
 
-    bound = _tenant_binding_view(
-        SimpleNamespace(
-            repository=SimpleNamespace(
-                get_active_binding=lambda user_id: SimpleNamespace(property_name="富力城 A2-1908")
-            )
-        ),
-        99,
-    )
-    assert bound.kind == "tenant_binding"
+    with sqlite3.connect(str(db)) as conn:
+        conn.execute(
+            """INSERT INTO tenant_bindings_v3
+               (user_id,binding_code,property_name,status,created_at)
+               VALUES (99,'BIND-99','富力城 A2-1908','active','2026-09-15 12:00:00')"""
+        )
+        conn.commit()
+    bound = tenant_home_view(service, 99)
+    assert bound.kind == "tenant_home"
     assert "富力城 A2-1908" in bound.text
     bound_callbacks = [choice.callback_data for row in bound.rows for choice in row]
     assert "v3u:service:repair" in bound_callbacks
     assert "v3u:service:property" in bound_callbacks
+    assert "v3u:service:tenant_renew" in bound_callbacks
+    assert "v3u:service:tenant_terminate" in bound_callbacks
 
 
 def _make_admin_db(path):
@@ -117,11 +116,7 @@ def test_round2_admin_status_transitions_do_not_downgrade_confirmed(tmp_path):
 
 def test_round2_manual_channel_caption_status_replaces_old_status_once():
     caption = "🏡 富力城｜2房\n\n💰 $800/月\n\n🟢 当前可预约　QL-RF-A2B3"
-    updated = caption_with_inventory_status(
-        caption,
-        status="rented",
-        public_listing_id="QL-RF-A2B3",
-    )
+    updated = caption_with_inventory_status(caption, status="rented", public_listing_id="QL-RF-A2B3")
     assert "🔴 已租出　QL-RF-A2B3" in updated
     assert "🟢 当前可预约" not in updated
     assert updated.count("QL-RF-A2B3") == 1
@@ -165,7 +160,6 @@ async def test_round2_manual_status_sync_edits_exact_published_post_and_hides_bo
         )
     bot = _FakeBot()
     sync = PublisherManualStatusSynchronizer(db_path, user_bot_username="qiaolian_rent_bot")
-
     result = await sync.sync(bot, listing_id="l_1", status="rented")
 
     assert result.attempted and result.synced

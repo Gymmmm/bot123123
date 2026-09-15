@@ -73,13 +73,7 @@ class FakeSearchExecutor:
             mode = "no_match"
         return SearchSubmitExecution(
             intent=intent,
-            result=SearchFlowResult(
-                criteria=intent.criteria,
-                mode=mode,
-                has_similar=False,
-                cards=cards,
-                public_listing_ids=ids,
-            ),
+            result=SearchFlowResult(criteria=intent.criteria, mode=mode, has_similar=False, cards=cards, public_listing_ids=ids),
         )
 
 
@@ -95,13 +89,7 @@ class FakeLeadEffects:
 def _session():
     return {
         AWAITING_KEYWORD_SESSION_KEY: {"source": "user_search"},
-        SEARCH_PREF_SESSION_KEY: {
-            "source": "user_search",
-            "goal": "any",
-            "location_keys": [],
-            "area_display": "",
-            "touch_payload": {},
-        },
+        SEARCH_PREF_SESSION_KEY: {"source": "user_search", "goal": "any", "location_keys": [], "area_display": "", "touch_payload": {}},
     }
 
 
@@ -110,13 +98,7 @@ def _update(message):
         effective_message=message,
         callback_query=None,
         effective_chat=SimpleNamespace(id=12345),
-        effective_user=SimpleNamespace(
-            id=123,
-            username="alice",
-            full_name="Alice",
-            first_name="Alice",
-            last_name="",
-        ),
+        effective_user=SimpleNamespace(id=123, username="alice", full_name="Alice", first_name="Alice", last_name=""),
     )
 
 
@@ -131,15 +113,10 @@ async def test_clear_direct_text_search_works_from_normal_home_state():
     bot = FakeBot()
     effects = FakeLeadEffects()
     executor = FakeSearchExecutor(matched=True)
-
     outcome = await handle_v3_keyword_search_text(
-        _update(message),
-        _context(user_data, bot),
-        actions=KeywordSearchActionService(),
-        search_executor=executor,
-        lead_effects=effects,
+        _update(message), _context(user_data, bot), actions=KeywordSearchActionService(),
+        search_executor=executor, lead_effects=effects,
     )
-
     assert outcome.handled and outcome.presentation is not None and outcome.presentation.matched
     assert executor.calls[0].source == "direct_text"
     assert user_data[SEARCH_SESSION_KEY] == [PUBLIC_ID]
@@ -151,10 +128,7 @@ async def test_clear_direct_text_search_works_from_normal_home_state():
 async def test_unrelated_home_text_is_not_swallowed_by_search_handler():
     message = FakeMessage("你好")
     outcome = await handle_v3_keyword_search_text(
-        _update(message),
-        _context({}, FakeBot()),
-        actions=KeywordSearchActionService(),
-        search_executor=FakeSearchExecutor(matched=True),
+        _update(message), _context({}, FakeBot()), actions=KeywordSearchActionService(), search_executor=FakeSearchExecutor(matched=True)
     )
     assert not outcome.handled
     assert message.calls == []
@@ -166,15 +140,10 @@ async def test_keyword_search_presents_public_card_then_records_keyword_lead_and
     user_data = _session()
     bot = FakeBot()
     effects = FakeLeadEffects()
-
     outcome = await handle_v3_keyword_search_text(
-        _update(message),
-        _context(user_data, bot),
-        actions=KeywordSearchActionService(),
-        search_executor=FakeSearchExecutor(matched=True),
-        lead_effects=effects,
+        _update(message), _context(user_data, bot), actions=KeywordSearchActionService(),
+        search_executor=FakeSearchExecutor(matched=True), lead_effects=effects,
     )
-
     assert outcome.handled and outcome.presentation is not None and outcome.presentation.matched
     assert [call[0] for call in bot.calls] == ["send_message"]
     assert user_data[SEARCH_SESSION_KEY] == [PUBLIC_ID]
@@ -193,16 +162,11 @@ async def test_keyword_search_telegram_failure_preserves_waiting_and_skips_lead(
     message = FakeMessage("BKK1 一房 800以内")
     user_data = _session()
     effects = FakeLeadEffects()
-
     with pytest.raises(RuntimeError, match="telegram_send_failed"):
         await handle_v3_keyword_search_text(
-            _update(message),
-            _context(user_data, FakeBot(fail_send=True)),
-            actions=KeywordSearchActionService(),
-            search_executor=FakeSearchExecutor(matched=True),
-            lead_effects=effects,
+            _update(message), _context(user_data, FakeBot(fail_send=True)),
+            actions=KeywordSearchActionService(), search_executor=FakeSearchExecutor(matched=True), lead_effects=effects,
         )
-
     assert AWAITING_KEYWORD_SESSION_KEY in user_data
     assert SEARCH_PREF_SESSION_KEY in user_data
     assert LAST_SEARCH_PREF_KEY not in user_data
@@ -210,29 +174,21 @@ async def test_keyword_search_telegram_failure_preserves_waiting_and_skips_lead(
 
 
 @pytest.mark.asyncio
-async def test_keyword_no_match_renders_current_available_and_recovery_actions_then_records_lead():
+async def test_keyword_no_match_stays_strict_and_offers_recovery_actions_then_records_lead():
     message = FakeMessage("BKK1 一房 800以内")
     user_data = _session()
     effects = FakeLeadEffects()
-
     outcome = await handle_v3_keyword_search_text(
-        _update(message),
-        _context(user_data, FakeBot()),
-        actions=KeywordSearchActionService(),
-        search_executor=FakeSearchExecutor(matched=False),
-        lead_effects=effects,
+        _update(message), _context(user_data, FakeBot()), actions=KeywordSearchActionService(),
+        search_executor=FakeSearchExecutor(matched=False), lead_effects=effects,
     )
-
     assert outcome.presentation is not None and not outcome.presentation.matched
     assert "暂时没有完全符合条件" in message.calls[-1][1][0]
+    assert "不会自动放宽" in message.calls[-1][1][0]
     markup = message.calls[-1][2]["reply_markup"]
     callbacks = [button.callback_data for row in markup.inline_keyboard for button in row]
-    assert callbacks == [
-        "v3u:t:search_available",
-        "v3u:change_search",
-        "v3u:home:contact",
-        "v3u:t:home",
-    ]
+    assert callbacks == ["v3u:change_search", "v3u:home:contact", "v3u:t:home"]
+    assert "v3u:t:search_available" not in callbacks
     assert effects.calls[0][2] == "no_match"
     assert AWAITING_KEYWORD_SESSION_KEY not in user_data
 
@@ -242,16 +198,11 @@ async def test_keyword_no_match_reply_failure_preserves_waiting_and_skips_lead()
     message = FakeMessage("BKK1 一房 800以内", fail_reply=True)
     user_data = _session()
     effects = FakeLeadEffects()
-
     with pytest.raises(RuntimeError, match="telegram_reply_failed"):
         await handle_v3_keyword_search_text(
-            _update(message),
-            _context(user_data, FakeBot()),
-            actions=KeywordSearchActionService(),
-            search_executor=FakeSearchExecutor(matched=False),
-            lead_effects=effects,
+            _update(message), _context(user_data, FakeBot()), actions=KeywordSearchActionService(),
+            search_executor=FakeSearchExecutor(matched=False), lead_effects=effects,
         )
-
     assert AWAITING_KEYWORD_SESSION_KEY in user_data
     assert SEARCH_PREF_SESSION_KEY in user_data
     assert effects.calls == []

@@ -20,13 +20,7 @@ class ServiceEffectResult:
 
 
 class ServiceEffectExecutor:
-    def __init__(
-        self,
-        *,
-        leads: LeadService,
-        admins: TelegramAdminNotifier,
-        now: Callable[[], str] | None = None,
-    ):
+    def __init__(self, *, leads: LeadService, admins: TelegramAdminNotifier, now: Callable[[], str] | None = None):
         self.leads = leads
         self.admins = admins
         self.now = now or (lambda: datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
@@ -38,13 +32,7 @@ class ServiceEffectExecutor:
             return LeadEffectResult(status="failed", error=str(exc))
         return LeadEffectResult(status="recorded", record=record)
 
-    async def repair(
-        self,
-        *,
-        bot: Any,
-        user: LeadUser,
-        submission: RepairSubmission,
-    ) -> ServiceEffectResult:
+    async def repair(self, *, bot: Any, user: LeadUser, submission: RepairSubmission) -> ServiceEffectResult:
         if not submission.created:
             return ServiceEffectResult(
                 lead=LeadEffectResult(status="skipped"),
@@ -84,25 +72,61 @@ class ServiceEffectExecutor:
         )
         return ServiceEffectResult(lead=lead, admin=admin)
 
-    async def general(
-        self,
-        *,
-        bot: Any,
-        user: LeadUser,
-        details: str,
-        nearby: bool = False,
-    ) -> ServiceEffectResult:
+    async def tenancy_request(self, *, bot: Any, user: LeadUser, binding: Any, kind: str) -> ServiceEffectResult:
+        clean_kind = str(kind or "").strip().lower()
+        if clean_kind not in {"renew", "terminate"}:
+            raise ValueError("unsupported_tenancy_request")
+        action = "tenant_renewal_request" if clean_kind == "renew" else "tenant_termination_request"
+        repository = getattr(self.leads, "repository", None)
+        find_existing = getattr(repository, "find_tenancy_request", None)
+        if callable(find_existing):
+            try:
+                existing = find_existing(user_id=user.user_id, action=action, binding_id=int(binding.id))
+            except Exception:
+                existing = None
+            if existing is not None:
+                return ServiceEffectResult(
+                    lead=LeadEffectResult(status="skipped"),
+                    admin=AdminNotificationResult((), (), ()),
+                )
+        request = LeadRequest(
+            action=action,
+            source="tenant_service",
+            listing_id=str(getattr(binding, "property_name", "") or ""),
+            payload={
+                "binding_id": int(binding.id),
+                "property_name": str(getattr(binding, "property_name", "") or ""),
+                "binding_code": str(getattr(binding, "binding_code", "") or ""),
+                "contract_end_date": str(getattr(binding, "contract_end_date", "") or getattr(binding, "lease_end_date", "") or ""),
+                "kind": clean_kind,
+            },
+        )
+        lead = self._record(user=user, request=request)
+        if lead.status != "recorded":
+            return ServiceEffectResult(lead=lead, admin=AdminNotificationResult((), (), ()))
+        title = "续租申请" if clean_kind == "renew" else "退租申请"
+        admin = await self.admins.send(
+            bot,
+            AdminNotification(
+                title=title,
+                lines=(
+                    f"客户：{user_mention_html(user)}",
+                    f"联系方式：{he(user_contact_text(user))}",
+                    f"绑定ID：<code>{int(binding.id)}</code>",
+                    f"当前房源：{he(str(getattr(binding, 'property_name', '') or '-'))}",
+                ),
+            ),
+        )
+        return ServiceEffectResult(lead=lead, admin=admin)
+
+    async def general(self, *, bot: Any, user: LeadUser, details: str, nearby: bool = False) -> ServiceEffectResult:
         kind = "周边需求" if nearby else "通用服务咨询"
         action = "nearby_request" if nearby else "service_general"
         source = "nearby_service" if nearby else "service_hub"
         clean = str(details or "").strip()[:800]
         lead = self._record(
             user=user,
-            request=LeadRequest(
-                action=action,
-                source=source,
-                payload={"kind": kind, "details": clean},
-            ),
+            request=LeadRequest(action=action, source=source, payload={"kind": kind, "details": clean}),
         )
         admin = await self.admins.send(
             bot,

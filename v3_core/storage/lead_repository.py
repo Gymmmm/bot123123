@@ -1,16 +1,10 @@
-"""Additive V3 persistence for User Bot leads.
-
-The columns mirror the locked production ``leads`` contract while writing to a
-separate ``leads_v3`` table. Construction performs no schema initialization;
-DDL is executed only by the explicit V3 storage bootstrap.
-"""
+"""Additive V3 persistence for User Bot leads."""
 from __future__ import annotations
 
 import json
 from pathlib import Path
 import sqlite3
 from typing import Any
-
 
 DDL = """
 CREATE TABLE IF NOT EXISTS leads_v3 (
@@ -129,10 +123,7 @@ class SQLiteLeadRepository:
 
     def get(self, lead_id: int) -> dict[str, Any] | None:
         with self._connect() as conn:
-            row = conn.execute(
-                "SELECT * FROM leads_v3 WHERE id=?",
-                (int(lead_id),),
-            ).fetchone()
+            row = conn.execute("SELECT * FROM leads_v3 WHERE id=?", (int(lead_id),)).fetchone()
         if row is None:
             return None
         result = dict(row)
@@ -141,6 +132,32 @@ class SQLiteLeadRepository:
         except (TypeError, ValueError, json.JSONDecodeError):
             result["payload"] = {}
         return result
+
+    def find_tenancy_request(self, *, user_id: int, action: str, binding_id: int) -> int | None:
+        """Return an existing request for the same active binding/action.
+
+        This provides idempotency without a production schema migration: the
+        binding identity is already frozen into payload_json.
+        """
+        with self._connect() as conn:
+            rows = conn.execute(
+                """SELECT id,payload_json FROM leads_v3
+                   WHERE user_id=? AND action=?
+                   ORDER BY id DESC""",
+                (int(user_id), str(action or "")),
+            ).fetchall()
+        for row in rows:
+            try:
+                payload = json.loads(str(row["payload_json"] or "{}"))
+            except (TypeError, ValueError, json.JSONDecodeError):
+                continue
+            try:
+                existing_binding = int(payload.get("binding_id") or 0)
+            except (TypeError, ValueError):
+                existing_binding = 0
+            if existing_binding == int(binding_id):
+                return int(row["id"])
+        return None
 
 
 __all__ = ["DDL", "SQLiteLeadRepository"]

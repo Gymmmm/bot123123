@@ -5,24 +5,22 @@ from dataclasses import dataclass
 from typing import Any
 
 from telegram.constants import ParseMode
+from v3_core.storage.service_repository import SQLiteTenantServiceRepository
 
 from .appointment_history import AppointmentHistoryService, AppointmentHistoryView
 from .assurance_views import build_assurance_home_view
 from .contact_effects import ContactEffectExecutor, ContactEffectResult
 from .home_callbacks import HomeAction, parse_home_callback
-from .home_views import (
-    build_about_view,
-    build_appointment_history_home_view,
-    build_booking_view,
-    build_contact_view,
-)
+from .home_views import build_about_view, build_appointment_history_home_view, build_booking_view, build_contact_view
 from .lead_service import LeadUser
+from .service_flow import TenantService
 from .service_product_views import service_home_view
 from .service_views import local_life_view
 from .telegram_assurance_handler import render_assurance_view
 from .telegram_home_ui import build_home_keyboard
 from .telegram_service_handler import render_service_view
 from .telegram_transition_ui import build_transition_keyboard
+from .tenant_v1 import tenant_home_view
 from .transition_plan import ChangeSearchTransition, TransitionPlan
 from .transition_session import apply_session_mutation, build_transition_session
 from .transition_views import TransitionView, TransitionViewService
@@ -45,12 +43,10 @@ def _lead_user(update: Any) -> LeadUser:
     display_name = str(getattr(user, "full_name", "") or "").strip()
     if not display_name:
         display_name = " ".join(
-            value
-            for value in (
+            value for value in (
                 str(getattr(user, "first_name", "") or "").strip(),
                 str(getattr(user, "last_name", "") or "").strip(),
-            )
-            if value
+            ) if value
         )
     return LeadUser(
         user_id=int(user.id),
@@ -63,34 +59,18 @@ async def _edit_home_view(query: Any, view) -> None:
     markup = build_home_keyboard(view)
     message = getattr(query, "message", None)
     if getattr(message, "photo", None):
-        await query.edit_message_caption(
-            caption=view.text,
-            parse_mode=ParseMode.HTML,
-            reply_markup=markup,
-        )
+        await query.edit_message_caption(caption=view.text, parse_mode=ParseMode.HTML, reply_markup=markup)
         return
-    await query.edit_message_text(
-        view.text,
-        parse_mode=ParseMode.HTML,
-        reply_markup=markup,
-    )
+    await query.edit_message_text(view.text, parse_mode=ParseMode.HTML, reply_markup=markup)
 
 
 async def _edit_transition_view(query: Any, view: TransitionView) -> None:
     markup = build_transition_keyboard(view) if view.rows else None
     message = getattr(query, "message", None)
     if getattr(message, "photo", None):
-        await query.edit_message_caption(
-            caption=view.text,
-            parse_mode=ParseMode.HTML,
-            reply_markup=markup,
-        )
+        await query.edit_message_caption(caption=view.text, parse_mode=ParseMode.HTML, reply_markup=markup)
         return
-    await query.edit_message_text(
-        view.text,
-        parse_mode=ParseMode.HTML,
-        reply_markup=markup,
-    )
+    await query.edit_message_text(view.text, parse_mode=ParseMode.HTML, reply_markup=markup)
 
 
 def _search_entry_plan() -> TransitionPlan:
@@ -100,6 +80,14 @@ def _search_entry_plan() -> TransitionPlan:
         effects=("render_search_entry",),
         change_search=ChangeSearchTransition(source="user_search", goal="any"),
     )
+
+
+def _tenant_service_from_history(history: AppointmentHistoryService) -> TenantService | None:
+    reader = getattr(history, "reader", None)
+    db_path = getattr(reader, "db_path", None)
+    if db_path is None:
+        return None
+    return TenantService(SQLiteTenantServiceRepository(db_path))
 
 
 async def handle_v3_home_callback(
@@ -141,25 +129,23 @@ async def handle_v3_home_callback(
         user = _lead_user(update)
         history = appointment_history.build(user.user_id)
         await _edit_home_view(query, build_appointment_history_home_view(history))
-        return TelegramHomeOutcome(
-            handled=True,
-            action=action,
-            rendered=True,
-            appointment_history=history,
-        )
+        return TelegramHomeOutcome(True, action, True, appointment_history=history)
 
     if action == "about":
         await _edit_home_view(query, build_about_view(advisor_url=advisor_url))
         return TelegramHomeOutcome(handled=True, action=action, rendered=True)
 
     if action == "rental":
-        await render_assurance_view(
-            query, build_assurance_home_view(), advisor_url=advisor_url
-        )
+        await render_assurance_view(query, build_assurance_home_view(), advisor_url=advisor_url)
         return TelegramHomeOutcome(handled=True, action=action, rendered=True)
 
     if action == "service":
-        await render_service_view(query, service_home_view(), advisor_url=advisor_url)
+        tenant_service = _tenant_service_from_history(appointment_history)
+        if tenant_service is None:
+            await render_service_view(query, service_home_view(), advisor_url=advisor_url)
+        else:
+            user = _lead_user(update)
+            await render_service_view(query, tenant_home_view(tenant_service, user.user_id), advisor_url=advisor_url)
         return TelegramHomeOutcome(handled=True, action=action, rendered=True)
 
     if action == "local":
@@ -171,16 +157,11 @@ async def handle_v3_home_callback(
             return TelegramHomeOutcome(handled=True, action=action, deferred=True)
         user = _lead_user(update)
         effect = await contact_effects.execute_general(
-            bot=getattr(context, "bot", None),
-            user=user,
-            source="hub",
+            bot=getattr(context, "bot", None), user=user, source="hub"
         )
         await _edit_home_view(query, build_contact_view(advisor_url=advisor_url))
         return TelegramHomeOutcome(
-            handled=True,
-            action=action,
-            rendered=True,
-            contact_effect=effect,
+            handled=True, action=action, rendered=True, contact_effect=effect
         )
 
     return TelegramHomeOutcome(handled=True, action=action, deferred=True)
