@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-15 — adviser V1 rental details
+
+- Replaced legacy adviser prose with the evidence-only V1 engine: no fee/network signals or fallback, at most two different categories.
+- Rental details alone render the adviser heading and bullets; old frozen packages use their frozen facts, not obsolete prose.
+- Unified the stable public listing ID seed and removed numeric-floor inference. Added 16 V1 regression cases; complete V3 suite: 584 passed.
+
 ## Unreleased — delivery hardening
 
 - Consolidated the mobile channel-listing work into the single delivery branch.

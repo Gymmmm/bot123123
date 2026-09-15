@@ -5,7 +5,7 @@ import hashlib
 from pathlib import Path
 from typing import Any
 
-from v3_core.adviser_copy import generate_adviser_text
+from v3_core.adviser_copy import generate_adviser_text, verified_canonical_adviser_facts
 from v3_core.publishing.channel_contract import official_channel_action_urls
 from v3_core.publishing.channel_renderer import render_channel_caption
 from v3_core.publishing.eligibility import evaluate_offer_eligibility
@@ -56,12 +56,12 @@ class PackageBuildService:
         canonical = self.reader.canonical(str(listing["canonical_record_id"]))
         facts = dict(canonical["facts"])
         public_id = str(listing.get("public_listing_id") or "")
-        adviser_seed = f"{public_id}|{canonical['facts_hash']}"
+        adviser_seed = public_id or str(listing_id)
         adviser_copy = generate_adviser_text(
-            facts,
+            verified_canonical_adviser_facts(facts),
             seed=adviser_seed,
-            max_points=1,
-            allow_fallback=True,
+            max_points=2,
+            allow_fallback=False,
         )
 
         caption = render_channel_caption(
@@ -112,6 +112,8 @@ class PackageBuildService:
             # Freeze the exact public wording as well.  The User Bot reads this
             # copy from the package so channel, preview and detail stay identical.
             "adviser_copy": adviser_copy,
+            "adviser_copy_version": "v1_production",
+            "adviser_seed": adviser_seed,
             "listing": {
                 key: listing.get(key)
                 for key in (

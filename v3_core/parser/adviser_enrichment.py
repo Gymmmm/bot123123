@@ -165,14 +165,9 @@ def extract_adviser_signals(raw_text: str, facts: dict[str, Any] | None = None) 
     if "别墅" in property_type or "villa" in property_type:
         signals.append("villa")
 
-    floor = str(facts.get("floor") or "")
-    floor_match = re.search(r"\d{1,3}", floor)
-    if floor_match:
-        level = int(floor_match.group(0))
-        if 1 <= level <= 5:
-            signals.append("low_floor")
-        elif level >= 20:
-            signals.append("high_floor")
+    for wording, tag in (("低楼层", "low_floor"), ("高楼层", "high_floor")):
+        if _feature_present(text, (wording,)):
+            signals.append(tag)
 
     # Preserve first-seen order and keep the persisted evidence compact.
     return list(dict.fromkeys(signals))
@@ -181,6 +176,7 @@ def extract_adviser_signals(raw_text: str, facts: dict[str, Any] | None = None) 
 def enrich_adviser_signals(raw_text: str, facts: dict[str, Any]) -> dict[str, Any]:
     enriched = dict(facts or {})
     enriched["adviser_signals"] = extract_adviser_signals(raw_text, enriched)
+    enriched["adviser_signals_version"] = "explicit-v1"
     return enriched
 
 
