@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import sqlite3
-from types import SimpleNamespace
 
 import pytest
 
@@ -42,7 +41,7 @@ def _service(tmp_path, *, with_binding=True, unknowns=False):
                     None if unknowns else 5,
                     0 if unknowns else 800,
                     "",
-                    None if unknowns else 2,
+                    0 if unknowns else 2,
                     "active",
                     "2026-09-09 03:00:00",
                 ),
@@ -100,8 +99,6 @@ async def test_renewal_and_termination_are_idempotent_per_active_binding(tmp_pat
     assert second_terminate.lead.status == "skipped"
     assert len(admins.calls) == 2
     with sqlite3.connect(str(db)) as conn:
-        rows = conn.execute(
-            "SELECT action,payload_json FROM leads_v3 WHERE user_id=123 ORDER BY id"
-        ).fetchall()
+        rows = conn.execute("SELECT action,payload_json FROM leads_v3 WHERE user_id=123 ORDER BY id").fetchall()
     assert [row[0] for row in rows] == ["tenant_renewal_request", "tenant_termination_request"]
     assert all(f'"binding_id": {binding.id}' in row[1] for row in rows)
