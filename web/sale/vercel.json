@@ -1,0 +1,17 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/v3/sale/:path*",
+      "destination": "http://50-114-74-120.nip.io:8091/api/v3/sale/:path*"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {"key": "X-Content-Type-Options", "value": "nosniff"},
+        {"key": "Referrer-Policy", "value": "strict-origin-when-cross-origin"}
+      ]
+    }
+  ]
+}
