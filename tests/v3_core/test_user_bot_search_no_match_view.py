@@ -5,7 +5,7 @@ from v3_core.user_bot.search_query import SearchCriteria
 from v3_core.user_bot.transition_actions import SearchSubmitIntent
 
 
-def test_no_match_offers_current_inventory_before_restart_or_advisor():
+def test_no_match_keeps_conditions_strict_and_offers_adjust_or_advisor_only():
     intent = SearchSubmitIntent(
         criteria=SearchCriteria(
             property_type="",
@@ -21,20 +21,11 @@ def test_no_match_offers_current_inventory_before_restart_or_advisor():
         budget_label="<= 800 USD/月",
         touch_payload={},
     )
-
     view = build_search_no_match_view(intent)
-
     assert view.kind == "search_no_match"
     assert "BKK1｜&lt;= 800 USD/月" in view.text
-    assert [choice.label for row in view.rows for choice in row] == [
-        "🏘 查看当前可约",
-        "✏️ 调整条件",
-        "💬 联系中文顾问",
-        "🏠 返回首页",
-    ]
-    assert [choice.kind for row in view.rows for choice in row] == [
-        "search_available",
-        "change_search",
-        "home",
-        "home",
-    ]
+    assert "不会自动放宽" in view.text
+    labels = [choice.label for row in view.rows for choice in row]
+    assert labels == ["✏️ 调整条件", "💬 中文顾问", "🏠 返回首页"]
+    assert "当前可约" not in " ".join(labels)
+    assert [choice.kind for row in view.rows for choice in row] == ["change_search", "home", "home"]
