@@ -85,7 +85,7 @@ def test_channel_and_sync_keyboards_use_locked_details_label():
             advisor_url="https://t.me/advisor",
         )
     )
-    expected = ["📋 租赁详情", "📸 更多实拍", "📅 预约看房", "💬 联系中文顾问"]
+    expected = ["📋 租赁详情", "📸 更多实拍", "📅 预约看房"]
     assert publish == expected
     assert sync == expected
     assert "🏠 房源详情" not in publish + sync

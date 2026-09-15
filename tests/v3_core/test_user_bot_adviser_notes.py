@@ -105,16 +105,13 @@ def test_amenity_presence_never_becomes_fee_inclusion():
     assert adviser_notes_for_view(view) == "楼下泳池健身房都配了。"
 
 
-def test_frozen_highlights_are_used_without_live_database_lookup():
+def test_frozen_highlights_without_supported_signal_stay_silent():
     view = _view(
         canonical_facts={"highlights": ["采光好", "钥匙已备"]},
         listing={"public_location_display": "BKK1"},
     )
 
-    assert adviser_notes_for_view(view) == (
-        "这套标注在BKK1，项目是富力城，可以按实际通勤路线再判断。\n"
-        "资料明确标注：采光好、钥匙已备；具体状态可以结合实拍确认。"
-    )
+    assert adviser_notes_for_view(view) == ""
 
 
 def test_older_package_with_frozen_signals_uses_shared_adviser_engine():

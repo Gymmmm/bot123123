@@ -63,7 +63,7 @@ def _labels(rows):
     return [[item.label for item in row] for row in rows]
 
 
-def test_details_response_preserves_layout_and_frozen_adviser_notes():
+def test_details_response_omits_adviser_section_without_supported_signal():
     view = _view(canonical_facts={"highlights": ["采光好", "钥匙已备"]})
 
     response = build_details_response(view)
@@ -78,10 +78,7 @@ def test_details_response_preserves_layout_and_frozen_adviser_notes():
         "📐 95㎡｜19楼\n"
         "🔑 押1付1 · 1年\n"
         "🟢 房态：当前可预约\n"
-        "🆔 QL-RF-A2B3\n"
-        "\n"
-        "💬 <b>侨联判断</b>\n"
-        "这套标注在BKK1，项目是富力城，可以按实际通勤路线再判断。"
+        "🆔 QL-RF-A2B3"
     )
     assert _actions(response.action_rows) == [["book", "consult"], ["photos"], ["similar"]]
     assert _labels(response.action_rows) == [

@@ -18,7 +18,8 @@ CHANNEL_CTA_LABELS = {
     "details": "📋 租赁详情",
     "photos": "📸 更多实拍",
     "book": "📅 预约看房",
-    "consult": "💬 联系中文顾问",
+    "consult": "💬 咨询顾问",
+    "more": "🔍 更多房源",
 }
 
 _ACTION_SUFFIX = {
@@ -109,10 +110,12 @@ def official_channel_action_urls(
 
 
 def official_channel_cta_keys(inventory_status: object = "active") -> tuple[str, ...]:
-    keys = ("details", "photos")
-    if inventory_status_bookable(inventory_status):
-        keys += ("book",)
-    return keys + ("consult",)
+    status = str(inventory_status or "").strip().lower()
+    if inventory_status_bookable(status):
+        return ("details", "photos", "book")
+    if status in {"rented", "inactive", "offline"}:
+        return ("details", "more", "consult")
+    return ("details", "photos", "consult")
 
 
 def official_channel_button_spec(
@@ -122,23 +125,32 @@ def official_channel_button_spec(
 ) -> tuple[tuple[tuple[str, str], ...], ...]:
     """Return keyboard rows as ``((label, url), ...)`` for publish and sync."""
     verified = official_channel_action_identity(actions)
-    rows: list[tuple[tuple[str, str], ...]] = [
-        (
+    status = str(inventory_status or "").strip().lower()
+    has_consult = "consult" in verified
+    if inventory_status_bookable(status):
+        return ((
             (CHANNEL_CTA_LABELS["details"], verified["details"]),
             (CHANNEL_CTA_LABELS["photos"], verified["photos"]),
-        )
-    ]
-    has_consult = "consult" in verified
-    if "book" in official_channel_cta_keys(inventory_status):
-        second_row = [(CHANNEL_CTA_LABELS["book"], verified["book"])]
+            (CHANNEL_CTA_LABELS["book"], verified["book"]),
+        ),)
+    if status in {"rented", "inactive", "offline"}:
+        details = urlparse(verified["details"])
+        more_url = f"https://t.me/{details.path.strip('/')}?start=latest"
+        row = [
+            (CHANNEL_CTA_LABELS["details"], verified["details"]),
+            (CHANNEL_CTA_LABELS["more"], more_url),
+        ]
         if has_consult:
-            second_row.append((CHANNEL_CTA_LABELS["consult"], verified["consult"]))
-        rows.append(
-            tuple(second_row)
-        )
-    elif has_consult:
-        rows.append(((CHANNEL_CTA_LABELS["consult"], verified["consult"]),))
-    return tuple(rows)
+            row.append((CHANNEL_CTA_LABELS["consult"], verified["consult"]))
+        return (tuple(row),)
+
+    row = [
+        (CHANNEL_CTA_LABELS["details"], verified["details"]),
+        (CHANNEL_CTA_LABELS["photos"], verified["photos"]),
+    ]
+    if has_consult:
+        row.append((CHANNEL_CTA_LABELS["consult"], verified["consult"]))
+    return (tuple(row),)
 
 
 def official_channel_action_identity(actions: dict[str, str]) -> dict[str, str]:

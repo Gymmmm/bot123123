@@ -175,6 +175,10 @@ def adviser_notes_for_view(
     if not isinstance(canonical, dict):
         raise ValueError("frozen_canonical_facts_missing")
 
+    tags = adviser_tags_from_facts(canonical)
+    if not tags:
+        return ""
+
     frozen_copy = str(snapshot.get("adviser_copy") or "").strip()
     if frozen_copy:
         lines = [line.strip() for line in frozen_copy.splitlines() if line.strip()]
@@ -185,21 +189,14 @@ def adviser_notes_for_view(
     # packages through the shared adviser engine as well, without consulting a
     # mutable live listing/canonical row.  Keep the conservative legacy wording
     # only when the frozen facts have no adviser signal for the engine to use.
-    if adviser_tags_from_facts(canonical):
-        public_id = str(snapshot.get("public_listing_id") or "").strip()
-        facts_hash = str(snapshot.get("canonical_facts_hash") or "").strip()
-        return generate_adviser_text(
-            canonical,
-            seed=f"{public_id}|{facts_hash}",
-            max_points=max_points,
-            allow_fallback=not allow_empty,
-        ).strip()
-
-    return generate_adviser_notes(
-        frozen_adviser_evidence(view),
+    public_id = str(snapshot.get("public_listing_id") or "").strip()
+    facts_hash = str(snapshot.get("canonical_facts_hash") or "").strip()
+    return generate_adviser_text(
+        canonical,
+        seed=f"{public_id}|{facts_hash}",
         max_points=max_points,
-        allow_empty=allow_empty,
-    )
+        allow_fallback=False,
+    ).strip()
 
 
 __all__ = [
