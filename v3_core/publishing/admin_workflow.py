@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Any, Iterable
 
 from v3_core.media.cover_service import CoverRenderService
+from v3_core.media.cover_styles import recommended_cover_style
 from v3_core.media.service import MediaPreparationService, PreparedSourceMedia
 from v3_core.storage.inventory_reader import InventoryReader
 from v3_core.storage.inventory_repository import InventoryRepository
@@ -164,9 +165,16 @@ class PublisherWorkflowService:
         source_post_id = str(detail.canonical.get("source_post_id") or "").strip()
         if not source_post_id:
             raise ValueError("canonical_record_missing_source_post_id")
+        # Resolve style before prepare so gallery corner marks match the cover brand.
+        style_for_gallery = cover_style or recommended_cover_style(
+            detail.listing.get("property_type"),
+            detail.listing.get("property_subtype"),
+            detail.listing.get("display_title"),
+        )
         media = self.media.prepare(
             source_post_id=source_post_id,
             manual_cover_path=manual_cover_path,
+            cover_style=style_for_gallery,
         )
         excluded = {str(path) for path in excluded_gallery_paths if str(path).strip()}
         gallery = [path for path in media.gallery_paths if str(path) not in excluded]
@@ -178,7 +186,7 @@ class PublisherWorkflowService:
             listing_id=str(detail.listing["listing_id"]),
             offer_id=str(detail.offer["offer_id"]),
             media=media,
-            style=cover_style,
+            style=cover_style or style_for_gallery,
         )
         return self.package_builder.build(
             listing_id=str(detail.listing["listing_id"]),
