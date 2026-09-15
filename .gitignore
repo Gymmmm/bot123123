@@ -25,3 +25,8 @@ node_modules/
 dist/
 tmp/
 .DS_Store
+
+# Keep package-shipped gallery corner marks under v3_core/media/assets
+!v3_core/media/
+!v3_core/media/assets/
+!v3_core/media/assets/**
