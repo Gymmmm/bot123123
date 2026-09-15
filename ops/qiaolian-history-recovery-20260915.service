@@ -13,6 +13,7 @@ Environment=PYTHONPATH=/opt/qiaolian_v3/current
 ExecStart=/opt/qiaolian_v3/.venv/bin/python -m scripts.v3.replace_channel_history --source zufang555 --task live-editor-20260915 --stream-task live-replacement-20260915 --run-dir /opt/qiaolian_dual_bots/media/live-replacement-20260915 --recover-before-send
 Restart=on-failure
 RestartSec=60
+RestartPreventExitStatus=78
 
 [Install]
 WantedBy=multi-user.target

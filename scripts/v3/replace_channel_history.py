@@ -113,7 +113,10 @@ async def execute(args):
                 if not extra:
                     producer = conn.execute('SELECT status FROM history_streams_v3 WHERE task_id=?',(args.stream_task,)).fetchone()
                     if producer and producer[0] == "complete":
-                        break
+                        state["status"] = "waiting_source"
+                        save(conn, args.task, state)
+                        await asyncio.sleep(30)
+                        continue  # A finished scan is not a finished replacement.
                     state["status"] = "waiting_source"
                     save(conn, args.task, state)
                     await asyncio.sleep(3)
@@ -171,7 +174,7 @@ async def execute(args):
                 state["source_index"] += 1
             state["status"] = "ready"
             save(conn, args.task, state)
-        state["status"] = "complete"
+        state["status"] = "complete" if state["target_index"] == len(state["targets"]) else "source_exhausted"
         save(conn, args.task, state)
         print(json.dumps({"event": "replacement_finished", "successful": state["successful"],
                           "targets_left": len(state["targets"]) - state["target_index"],
@@ -185,4 +188,8 @@ if __name__ == "__main__":
     parser.add_argument("--run-dir", required=True)
     parser.add_argument("--stream-task", default="")
     parser.add_argument("--recover-before-send", action="store_true")
-    asyncio.run(execute(parser.parse_args()))
+    try:
+        asyncio.run(execute(parser.parse_args()))
+    except RuntimeError:
+        print(json.dumps({"event": "replacement_requires_inspection"}), flush=True)
+        raise SystemExit(78)
