@@ -59,12 +59,7 @@ def test_channel_keyboard_booking_follows_inventory_status(status, has_book):
 
 def test_channel_reserved_status_uses_locked_user_visible_semantics():
     caption = render_channel_caption(
-        listing={
-            "project_name": "富力城",
-            "layout": "1房",
-            "property_type": "公寓",
-            "inventory_status": "reserved",
-        },
+        listing={"project_name": "富力城", "layout": "1房", "property_type": "公寓", "inventory_status": "reserved"},
         offer={"offer_type": "rent", "monthly_rent_usd": 680},
         public_listing_id="QL-RF-A2B3",
     )
@@ -138,12 +133,7 @@ def test_admin_appointment_mode_is_human_readable_and_real_public_id_is_used():
 
 @pytest.mark.parametrize(
     ("source", "label"),
-    [
-        ("hub", "首页顾问"),
-        ("listing_callback", "房源咨询"),
-        ("daily_broadcast", "每日广播咨询"),
-        ("unknown_slug", "用户咨询"),
-    ],
+    [("hub", "首页顾问"), ("listing_callback", "房源咨询"), ("daily_broadcast", "每日广播咨询"), ("unknown_slug", "用户咨询")],
 )
 def test_source_display_mapping_is_human_readable(source, label):
     assert source_display_label(source) == label
@@ -160,7 +150,7 @@ def test_no_match_page_has_existing_contact_flow_action():
     )
     view = build_search_no_match_view(intent)
     choices = [choice for row in view.rows for choice in row]
-    contact = next(choice for choice in choices if choice.label == "💬 联系中文顾问")
+    contact = next(choice for choice in choices if choice.label == "💬 中文顾问")
     assert contact.kind == "home"
     assert contact.value == "contact"
 
@@ -170,30 +160,14 @@ def _published_view() -> PublishedListingView:
         "schema": "v3_publication_snapshot.v1",
         "canonical_facts": {},
         "listing": {
-            "project_name": "富力城",
-            "property_type": "公寓",
-            "layout": "1房",
-            "public_location_display": "富力城",
-            "size_sqm": 45,
-            "floor": "8",
+            "project_name": "富力城", "property_type": "公寓", "layout": "1房",
+            "public_location_display": "富力城", "size_sqm": 45, "floor": "8",
         },
-        "offer": {
-            "monthly_rent_usd": 680,
-            "payment_terms": "押1付1",
-            "contract_term": "1年",
-        },
+        "offer": {"monthly_rent_usd": 680, "payment_terms": "押1付1", "contract_term": "1年"},
     }
     return PublishedListingView(
-        listing={
-            "listing_id": "l_1",
-            "public_listing_id": "QL-RF-A2B3",
-            "inventory_status": "active",
-        },
-        offer={
-            "offer_status": "active",
-            "offer_type": "rent",
-            "publication_policy": "telegram_rent",
-        },
+        listing={"listing_id": "l_1", "public_listing_id": "QL-RF-A2B3", "inventory_status": "active"},
+        offer={"offer_status": "active", "offer_type": "rent", "publication_policy": "telegram_rent"},
         publication={},
         package={"snapshot_json": json.dumps(snapshot, ensure_ascii=False), "gallery_json": "[]"},
     )
@@ -212,17 +186,17 @@ def test_rfcity_category_returns_to_rfcity_navigation():
     assert view.rows[-1][0].callback_data == "v3u:service:rfcity"
 
 
-def test_missing_channel_url_does_not_create_latest_listing_url_button():
+def test_missing_channel_url_does_not_create_channel_button():
     view = build_home_view(channel_url="")
     choices = [choice for row in view.rows for choice in row]
-    assert all(choice.label != "🏠 最新房源" for choice in choices)
-    assert any(choice.label == "💬 顾问帮我找" for choice in choices)
+    assert all(choice.label != "📢 房源频道" for choice in choices)
+    assert any(choice.label == "💬 中文顾问" for choice in choices)
 
 
 def test_missing_advisor_url_uses_internal_contact_callback_not_dead_url():
     view = build_contact_view(advisor_url="")
     first = view.rows[0][0]
-    assert first.label == "💬 顾问帮我找"
+    assert first.label == "💬 中文顾问"
     assert first.url == ""
     button = encode_home_choice(first)
     assert button.url is None
@@ -241,12 +215,7 @@ class _FakeContactQuery:
 @pytest.mark.asyncio
 async def test_listing_contact_missing_advisor_url_uses_existing_bot_contact_flow():
     query = _FakeContactQuery()
-    await _render_contact(
-        query,
-        text="ok",
-        public_listing_id="QL-RF-A2B3",
-        advisor_url="",
-    )
+    await _render_contact(query, text="ok", public_listing_id="QL-RF-A2B3", advisor_url="")
     first = query.kwargs["reply_markup"].inline_keyboard[0][0]
     assert first.url is None
     assert first.callback_data == "v3u:home:contact"
