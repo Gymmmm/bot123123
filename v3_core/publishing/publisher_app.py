@@ -9,10 +9,12 @@ from v3_core.ops.runtime_state import RuntimeStateRepository
 from .admin_bot import PublisherAdminBot, PublisherAdminSettings, REPO_ROOT, load_settings
 from .autopilot_anomalies import FinalAutoPublishRepository, FinalAutoPublishService
 from .broadcast import BroadcastService, BroadcastSettingsRepository
-from .broadcast_admin import BROADCAST_EDIT_STATE_KEY, BroadcastAdminController
+from .broadcast_admin import BROADCAST_EDIT_STATE_KEY
+from .inventory_operator_ui import PublisherInventoryAdminController
 from .marketing_broadcast import MarketingBroadcastService
 from .manual_status_sync import PublisherManualStatusSynchronizer
-from .pending_batch_admin import BATCH_STATUS_SYNC_KEY, PendingBatchOperatorPublisherAdminController
+from .pending_batch_admin import BATCH_STATUS_SYNC_KEY
+from .publisher_center_ui import PublisherCenterAdminController
 from .simple_admin import NEW_LISTING_STATE_KEY, SIMPLE_EDIT_STATE_KEY
 
 class V3PublisherApplication(PublisherAdminBot):
@@ -21,11 +23,11 @@ class V3PublisherApplication(PublisherAdminBot):
         timezone_name = str(os.getenv("V3_AUTO_PUBLISH_TIMEZONE") or os.getenv("AUTOPILOT_TIMEZONE") or "Asia/Phnom_Penh").strip() or "Asia/Phnom_Penh"
         broadcast_service = BroadcastService(repository=BroadcastSettingsRepository(settings.db_path), repo_root=REPO_ROOT, user_bot_username=settings.user_bot_username, timezone_name=timezone_name)
         marketing_service = MarketingBroadcastService(settings.db_path, user_bot_username=settings.user_bot_username, timezone_name=timezone_name)
-        self.broadcast = BroadcastAdminController(service=broadcast_service, marketing=marketing_service, channel_chat_id=settings.channel_chat_id, timezone_name=timezone_name)
+        self.broadcast = PublisherCenterAdminController(service=broadcast_service, marketing=marketing_service, channel_chat_id=settings.channel_chat_id, timezone_name=timezone_name)
         self.auto_repository = FinalAutoPublishRepository(settings.db_path); self.auto_repository.ensure_defaults()
         self.runtime = RuntimeStateRepository(settings.db_path)
         self.autopilot = FinalAutoPublishService(workflow=self.workflow, repository=self.auto_repository, channel_chat_id=settings.channel_chat_id)
-        self.simple = PendingBatchOperatorPublisherAdminController(db_path=settings.db_path, repo_root=REPO_ROOT, workflow=self.workflow, autopilot=self.autopilot, repository=self.auto_repository, runtime=self.runtime, user_bot_username=settings.user_bot_username, channel_chat_id=settings.channel_chat_id, cover_output_dir=settings.cover_output_dir)
+        self.simple = PublisherInventoryAdminController(db_path=settings.db_path, repo_root=REPO_ROOT, workflow=self.workflow, autopilot=self.autopilot, repository=self.auto_repository, runtime=self.runtime, user_bot_username=settings.user_bot_username, channel_chat_id=settings.channel_chat_id, cover_output_dir=settings.cover_output_dir)
         self.manual_status_sync = PublisherManualStatusSynchronizer(
             settings.db_path,
             user_bot_username=settings.user_bot_username,
@@ -60,7 +62,7 @@ class V3PublisherApplication(PublisherAdminBot):
                 failed += 1
         if failed:
             await message.reply_text(
-                f"⚠️ 房态已经更新，{failed} 套频道帖子正在等待自动重试，无需重复操作。",
+                f"⚠️ {failed} 套频道房态正在自动重试，无需重复操作。",
                 reply_markup=InlineKeyboardMarkup([self._home_button()]),
             )
 
@@ -74,7 +76,7 @@ class V3PublisherApplication(PublisherAdminBot):
                 handled=await self.simple.handle_callback(update,context); parts=raw.split("|")
                 if handled and len(parts)==4 and parts[1]=="status":
                     status,listing_id=parts[2],parts[3]; result=await self.manual_status_sync.sync(context.bot,listing_id=listing_id,status=status)
-                    if result.attempted and not result.synced: await query.message.reply_text("⚠️ 房源状态已更新，频道帖子正在等待自动重试，无需重复操作。",reply_markup=InlineKeyboardMarkup([self._home_button()]))
+                    if result.attempted and not result.synced: await query.message.reply_text("⚠️ 频道房态正在自动重试，无需重复操作。",reply_markup=InlineKeyboardMarkup([self._home_button()]))
                 if handled:
                     await self._sync_batch_statuses(context, query.message)
             except Exception as exc:
@@ -86,7 +88,7 @@ class V3PublisherApplication(PublisherAdminBot):
             if not await self._require_admin(update): await query.answer(); return
             await query.answer()
             try: await self.broadcast.handle_callback(update,context)
-            except Exception as exc: await query.message.reply_text("广播操作失败：\n"+escape(type(exc).__name__+": "+str(exc)),parse_mode=ParseMode.HTML,reply_markup=InlineKeyboardMarkup([self._home_button()]))
+            except Exception as exc: await query.message.reply_text("发布操作失败：\n"+escape(type(exc).__name__+": "+str(exc)),parse_mode=ParseMode.HTML,reply_markup=InlineKeyboardMarkup([self._home_button()]))
             return
         await super().on_callback(update,context)
 
@@ -113,7 +115,7 @@ class V3PublisherApplication(PublisherAdminBot):
         if isinstance(state,dict):
             task=state.get("_album_task")
             if task and not task.done(): task.cancel()
-        context.user_data.pop("v3_publisher_edit",None); context.user_data.pop(BROADCAST_EDIT_STATE_KEY,None); context.user_data.pop(SIMPLE_EDIT_STATE_KEY,None); context.user_data.pop(BATCH_STATUS_SYNC_KEY,None)
+        context.user_data.pop("v3_publisher_edit",None); context.user_data.pop(BROADCAST_EDIT_STATE_KEY,None); context.user_data.pop(SIMPLE_EDIT_STATE_KEY,None); context.user_data.pop(BATCH_STATUS_SYNC_KEY,None); context.user_data.pop("v3_inventory_batch_selection",None)
         await update.effective_message.reply_text("已取消当前操作。",reply_markup=InlineKeyboardMarkup([self._home_button()]))
 
     def build_application(self):
