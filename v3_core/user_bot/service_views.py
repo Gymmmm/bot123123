@@ -35,7 +35,7 @@ def service_home_view() -> ServiceView:
 def repair_home_view() -> ServiceView:
     return ServiceView(
         kind="repair_home",
-        text="🔧 <b>报修与维护</b>\n\n请选择问题类型。下一步可以直接发送文字、照片或短视频。",
+        text="🔧 <b>报修与维护</b>\n\n请选择问题类型。下一步请发送文字说明问题。",
         rows=(
             (ServiceChoice("❄️ 空调", "v3u:service:issue:repair_ac"), ServiceChoice("🚿 热水 / 漏水", "v3u:service:issue:repair_water")),
             (ServiceChoice("💡 灯具 / 电路", "v3u:service:issue:repair_power"), ServiceChoice("🔐 门锁 / 门禁", "v3u:service:issue:repair_door")),
@@ -66,7 +66,7 @@ def issue_prompt_view(draft: ServiceRequestDraft) -> ServiceView:
         kind="repair_issue",
         text=(
             f"🔧 <b>{he(draft.issue_label)}</b>\n\n"
-            "请直接发送问题描述；有照片或短视频可以一起发。\n"
+            "请直接发送文字说明问题。\n"
             f"例如：<code>空调可以启动，但一直不制冷。</code>{note}"
         ),
         rows=((ServiceChoice("💬 联系顾问", "v3u:home:contact"),), (ServiceChoice("⬅️ 重新选择问题", "v3u:service:repair"),)),

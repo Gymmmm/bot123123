@@ -278,6 +278,7 @@ def build_v3_user_bot_application(
             channel_url=config.channel_url,
             search_executor=deps.transition.searches,
             appointment_history=deps.transition.appointment_history,
+            tenant_service=deps.transition.tenant_service,
             contact_effects=deps.contact_effects,
             advisor_url=config.advisor_url,
         )

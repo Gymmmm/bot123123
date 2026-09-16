@@ -103,7 +103,7 @@ def terminate_view(service: TenantService, user_id: int) -> ServiceView:
         "提交后，中文顾问会继续确认通知期、交接安排、费用和押金核对。",
         (
             (ServiceChoice("✅ 提交退租申请", "v3u:service:tenant_terminate_submit"),),
-            (ServiceChoice("📄 押金与退租", "v3u:assure:deposit"),),
+            (ServiceChoice("📄 押金与退租", "v3u:assure:deposit_tenant"),),
             (ServiceChoice("💬 中文顾问", "v3u:home:contact"), ServiceChoice("⬅️ 返回我的租约", "v3u:service:tenant_lease")),
         ),
     )

@@ -190,15 +190,19 @@ def _search_area_view() -> TransitionView:
     return TransitionView(kind="search_area", text="📍 <b>想住哪里？</b>\n\n选一个大概位置就行。", rows=rows)
 
 
-def _search_layout_view() -> TransitionView:
+def _search_layout_view(area_display: str = "", budget_label: str = "") -> TransitionView:
     choices = tuple(TransitionChoice(label, "layout_choice", code) for code, label in LAYOUT_OPTIONS)
+    selected = "｜".join(
+        value for value in (str(area_display or "").strip(), str(budget_label or "").strip()) if value
+    )
+    selected_line = f"\n\n已选：{he(selected)}" if selected else ""
     rows = (
         (choices[0], choices[1]),
         (choices[2], choices[3]),
         (choices[4], choices[5]),
         (TransitionChoice("⬅️ 返回找房", "change_search"),),
     )
-    return TransitionView(kind="search_layout", text="🛏 <b>想要什么户型？</b>", rows=rows)
+    return TransitionView(kind="search_layout", text=f"🛏 <b>想要什么户型？</b>{selected_line}", rows=rows)
 
 
 def _similar_view(plan: TransitionPlan) -> TransitionView:
@@ -216,15 +220,19 @@ _SEARCH_ENTRY_TEXT = (
 )
 
 
-def _change_search_view(plan: TransitionPlan) -> TransitionView:
-    if plan.change_search is None:
-        raise ValueError("change_search_transition_missing_state")
+def _search_entry_view() -> TransitionView:
     rows = (
         (TransitionChoice("📍 按区域", "search_area"), TransitionChoice("💰 按预算", "search_budget")),
         (TransitionChoice("🏠 按户型", "search_layout"),),
         (TransitionChoice("🏠 返回首页", "home"),),
     )
     return TransitionView(kind="search_entry", text=_SEARCH_ENTRY_TEXT, rows=rows)
+
+
+def _change_search_view(plan: TransitionPlan) -> TransitionView:
+    if plan.change_search is None:
+        raise ValueError("change_search_transition_missing_state")
+    return _search_entry_view()
 
 
 class TransitionViewService:
@@ -258,8 +266,12 @@ class TransitionViewService:
         return _search_budget_view(area_display)
 
     @staticmethod
-    def search_layout() -> TransitionView:
-        return _search_layout_view()
+    def search_layout(area_display: str = "", budget_label: str = "") -> TransitionView:
+        return _search_layout_view(area_display, budget_label)
+
+    @staticmethod
+    def search_entry() -> TransitionView:
+        return _search_entry_view()
 
     def build(self, plan: TransitionPlan, *, today: date | None = None) -> TransitionView:
         if plan.kind == "book":

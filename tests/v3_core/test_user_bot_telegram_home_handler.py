@@ -159,7 +159,7 @@ async def test_contact_without_effect_executor_is_deferred_and_never_claims_succ
         (
             "rental",
             "租赁服务",
-            {"v3u:assure:signing", "v3u:assure:handover", "v3u:assure:deposit", "v3u:home:contact", "v3u:t:home"},
+            {"v3u:home:contact", "v3u:t:home"},
         ),
         (
             "service",

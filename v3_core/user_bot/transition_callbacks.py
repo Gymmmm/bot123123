@@ -44,7 +44,6 @@ _FLAG_KINDS = frozenset(
         "search_area",
         "search_budget",
         "search_layout",
-        "search_available",
         "area_other",
     }
 )

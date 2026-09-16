@@ -261,7 +261,7 @@ async def test_layout_choice_crosses_existing_search_executor_boundary():
 
 
 @pytest.mark.asyncio
-async def test_current_available_directly_uses_published_only_search_executor():
+async def test_retired_current_available_redirects_to_search_entry_without_searching():
     query = FakeQuery("v3u:t:search_available")
     user_data = {}
     executor = FakeSearchExecutor(matched=True)
@@ -274,11 +274,13 @@ async def test_current_available_directly_uses_published_only_search_executor():
         search_executor=executor,
     )
 
-    assert outcome.search_execution is not None
-    assert outcome.search_presentation is not None and outcome.search_presentation.matched
-    intent = executor.calls[0]
-    assert intent.source == "home_available"
-    assert intent.criteria.has_filter is False
-    assert intent.touch_payload == {"current_available": True}
-    assert user_data[SEARCH_SESSION_KEY] == [PUBLIC_ID]
-    assert "LST_" not in repr(user_data)
+    assert outcome.handled
+    assert outcome.search_execution is None
+    assert executor.calls == []
+    callbacks = _callbacks(query)
+    assert callbacks == [
+        "v3u:t:search_area",
+        "v3u:t:search_budget",
+        "v3u:t:search_layout",
+        "v3u:t:home",
+    ]

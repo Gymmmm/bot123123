@@ -23,9 +23,24 @@ class AssuranceView:
 
 
 ASSURANCE_HOME_TEXT = (
-    "📄 <b>租赁服务</b>\n\n"
-    "租房过程中，几个重要节点建议提前确认并留好记录。\n\n"
-    "可以直接查看下面的内容，不需要先绑定租约。"
+    "📄 <b>租赁服务指南</b>\n\n"
+    "租房过程中，签约、入住交接和退租押金属于同一套记录，请按顺序留好。\n\n"
+    "<b>一、签约前确认</b>\n"
+    "• 月租、押金、付款方式和租期\n"
+    "• 水电、物业、网络及其他固定费用\n"
+    "• 家具家电、维修责任和提前退租约定\n"
+    "• 房屋交付时间及双方需要保留的记录\n\n"
+    "<b>二、入住交接留档</b>\n"
+    "• 房屋整体、已有瑕疵和家具家电状态\n"
+    "• 水表、电表读数\n"
+    "• 钥匙、门卡数量\n"
+    "• 双方确认的费用和其他事项\n\n"
+    "<b>三、押金与退租</b>\n"
+    "• 提前核对通知期、押金退还条件和扣费约定\n"
+    "• 结合入住留档核对房屋及物品状态\n"
+    "• 结清水电、物业及其他费用\n"
+    "• 交还钥匙、门卡并确认押金扣费依据\n\n"
+    "最终以合同约定和实际交接结果为准。"
 )
 
 SIGNING_TEXT = (
@@ -71,11 +86,6 @@ def build_assurance_home_view() -> AssuranceView:
         kind="home",
         text=ASSURANCE_HOME_TEXT,
         rows=(
-            (AssuranceChoice("📝 签约前确认", callback_data="v3u:assure:signing"),),
-            (
-                AssuranceChoice("📸 入住交接留档", callback_data="v3u:assure:handover"),
-                AssuranceChoice("🔐 押金与退租", callback_data="v3u:assure:deposit"),
-            ),
             (AssuranceChoice("💬 中文顾问", callback_data="v3u:home:contact"),),
             (AssuranceChoice("🏠 返回首页", callback_data="v3u:t:home"),),
         ),
@@ -105,14 +115,18 @@ def build_handover_view() -> AssuranceView:
     )
 
 
-def build_deposit_view() -> AssuranceView:
+def build_deposit_view(
+    *,
+    back_label: str = "⬅️ 返回租赁服务",
+    back_callback: str = "v3u:home:rental",
+) -> AssuranceView:
     return AssuranceView(
         kind="deposit",
         text=DEPOSIT_TEXT,
         rows=(
             (AssuranceChoice("📥 下载押金与退租说明", callback_data="v3u:assure:deposit_download"),),
             (AssuranceChoice("💬 中文顾问", callback_data="v3u:home:contact"),),
-            (AssuranceChoice("⬅️ 返回租赁服务", callback_data="v3u:home:rental"),),
+            (AssuranceChoice(back_label, callback_data=back_callback),),
         ),
     )
 

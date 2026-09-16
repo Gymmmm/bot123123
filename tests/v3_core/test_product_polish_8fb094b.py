@@ -15,14 +15,16 @@ from v3_core.user_bot.admin_appointments import (
     build_admin_appointment_detail_text,
 )
 from v3_core.user_bot.home_views import build_contact_view, build_home_view
-from v3_core.user_bot.listing_responses import build_details_response
+from v3_core.user_bot.listing_responses import SemanticAction, build_details_response
 from v3_core.user_bot.public_inventory import PublishedListingView
 from v3_core.user_bot.search_no_match_view import build_search_no_match_view
 from v3_core.user_bot.search_query import SearchCriteria
 from v3_core.user_bot.source_display import source_display_label
 from v3_core.user_bot.telegram_home_ui import encode_home_choice
 from v3_core.user_bot.telegram_listing_callback import _render_contact
+from v3_core.user_bot.telegram_navigation import polish_listing_keyboard
 from v3_core.user_bot.telegram_service_handler import _rfcity_category_product_view
+from v3_core.user_bot.telegram_ui import build_action_keyboard
 from v3_core.user_bot.transition_actions import SearchSubmitIntent
 
 
@@ -201,6 +203,20 @@ def test_missing_advisor_url_uses_internal_contact_callback_not_dead_url():
     button = encode_home_choice(first)
     assert button.url is None
     assert button.callback_data == "v3u:home:contact"
+
+
+def test_listing_consult_keeps_callback_so_listing_lead_is_recorded():
+    markup = build_action_keyboard(
+        ((SemanticAction("💬 问这套房", "consult", "QL-RF-A2B3"),),)
+    )
+    polished = polish_listing_keyboard(
+        markup,
+        advisor_url="https://t.me/advisor",
+        listing_summary="富力城｜一房｜$680/月",
+    )
+    button = polished.inline_keyboard[0][0]
+    assert button.url is None
+    assert button.callback_data == "v3u:listing:consult:QL-RF-A2B3"
 
 
 class _FakeContactQuery:

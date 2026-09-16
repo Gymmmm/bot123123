@@ -61,7 +61,6 @@ _GUIDED_SEARCH_CALLBACKS = frozenset(
         "budget_custom",
         "search_layout",
         "layout_choice",
-        "search_available",
     }
 )
 
@@ -135,7 +134,13 @@ def _navigation_view(
     if navigation == "search_area":
         return views.search_area()
     if navigation == "search_layout":
-        return views.search_layout()
+        pref = preview.get(SEARCH_PREF_SESSION_KEY)
+        area_display = ""
+        budget_label = ""
+        if isinstance(pref, dict):
+            area_display = str(pref.get("area_display") or "").strip()
+            budget_label = str(pref.get("budget_label") or "").strip()
+        return views.search_layout(area_display, budget_label)
     if navigation == "search_budget":
         pref = preview.get(SEARCH_PREF_SESSION_KEY)
         area_display = ""
@@ -268,6 +273,10 @@ async def handle_v3_transition_action(
 ) -> TelegramTransitionActionOutcome:
     query = getattr(update, "callback_query", None)
     raw = str(getattr(query, "data", "") or "") if query is not None else ""
+    if query is not None and raw == "v3u:t:search_available":
+        await query.answer("入口已更新，请重新选择找房条件。")
+        await _edit_view(query, views.search_entry())
+        return TelegramTransitionActionOutcome(handled=True)
     callback = parse_transition_callback(raw)
     if query is None or callback is None:
         return TelegramTransitionActionOutcome(handled=False)

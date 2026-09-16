@@ -16,7 +16,6 @@ from .assurance_views import (
     build_moving_view,
     build_signing_view,
 )
-from .telegram_navigation import advisor_handoff_url
 
 
 @dataclass(frozen=True)
@@ -31,13 +30,10 @@ def build_assurance_keyboard(view: AssuranceView, *, advisor_url: str = "") -> I
     if not view.rows:
         return None
     rows = []
-    direct_advisor = advisor_handoff_url(advisor_url)
     for row in view.rows:
         buttons = []
         for choice in row:
-            if choice.callback_data == "v3u:home:contact" and direct_advisor:
-                buttons.append(InlineKeyboardButton(choice.label, url=direct_advisor))
-            elif choice.url:
+            if choice.url:
                 buttons.append(InlineKeyboardButton(choice.label, url=choice.url))
             else:
                 buttons.append(InlineKeyboardButton(choice.label, callback_data=choice.callback_data))
@@ -95,7 +91,7 @@ async def handle_v3_assurance_callback(
         return TelegramAssuranceOutcome(handled=False)
     action = raw[len(prefix):].strip().lower()
     allowed = {
-        "signing", "handover", "deposit", "moving",
+        "signing", "handover", "deposit", "deposit_tenant", "moving",
         "handover_download", "deposit_download",
     }
     if action not in allowed:
@@ -111,11 +107,24 @@ async def handle_v3_assurance_callback(
     if action == "deposit":
         await render_assurance_view(query, build_deposit_view(), advisor_url=advisor_url)
         return TelegramAssuranceOutcome(True, action, True, False)
+    if action == "deposit_tenant":
+        await render_assurance_view(
+            query,
+            build_deposit_view(
+                back_label="⬅️ 返回退租",
+                back_callback="v3u:service:tenant_terminate",
+            ),
+            advisor_url=advisor_url,
+        )
+        return TelegramAssuranceOutcome(True, action, True, False)
     if action == "moving":
         await render_assurance_view(query, build_moving_view(), advisor_url=advisor_url)
         return TelegramAssuranceOutcome(True, action, True, False)
 
-    kind = "handover" if action == "handover_download" else "deposit"
+    kind = {
+        "handover_download": "handover",
+        "deposit_download": "deposit",
+    }[action]
     await send_assurance_pdf(update, context, repo_root=repo_root, kind=kind)
     return TelegramAssuranceOutcome(True, action, False, True)
 

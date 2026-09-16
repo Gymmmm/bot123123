@@ -23,7 +23,9 @@ from .telegram_home_ui import build_home_keyboard
 from .telegram_navigation import advisor_handoff_url, polish_listing_keyboard
 from .telegram_search_results import present_search_flow_result
 from .service_product_views import service_home_view
+from .service_flow import TenantService
 from .telegram_service_handler import build_service_keyboard
+from .tenant_v1 import tenant_home_view
 from .telegram_transition_ui import build_transition_keyboard
 from .telegram_ui import build_action_keyboard
 from .transition_actions import SearchSubmitIntent
@@ -213,6 +215,7 @@ async def _handle_broadcast_shortcut(
     transition_views: TransitionViewService,
     search_executor: SearchSubmitExecutor | None,
     appointment_history: AppointmentHistoryService | None,
+    tenant_service: TenantService | None,
     contact_effects: ContactEffectExecutor | None,
     advisor_url: str,
     channel_url: str,
@@ -270,7 +273,11 @@ async def _handle_broadcast_shortcut(
         return TelegramStartOutcome(True, "broadcast_assurance", payload)
 
     if payload == "service":
-        view = service_home_view()
+        view = (
+            tenant_home_view(tenant_service, _lead_user(update).user_id)
+            if tenant_service is not None
+            else service_home_view()
+        )
         await message.reply_text(
             view.text,
             parse_mode=ParseMode.HTML,
@@ -294,6 +301,7 @@ async def handle_v3_start(
     channel_url: str = "",
     search_executor: SearchSubmitExecutor | None = None,
     appointment_history: AppointmentHistoryService | None = None,
+    tenant_service: TenantService | None = None,
     contact_effects: ContactEffectExecutor | None = None,
     advisor_url: str = "",
 ) -> TelegramStartOutcome:
@@ -319,6 +327,7 @@ async def handle_v3_start(
         transition_views=transition_views,
         search_executor=search_executor,
         appointment_history=appointment_history,
+        tenant_service=tenant_service,
         contact_effects=contact_effects,
         advisor_url=advisor_url,
         channel_url=channel_url,

@@ -1,8 +1,8 @@
 """Telegram-only navigation polish for public V3 listing surfaces.
 
-This module never decides listing availability or mutates business state. It only
-turns an already-valid advisor URL into a direct chat handoff with a prepared
-listing reference and appends safe return buttons to listing keyboards.
+This module never decides listing availability or mutates business state. It
+builds advisor handoff URLs where a completed contact effect already exists and
+appends safe return buttons to listing keyboards.
 """
 from __future__ import annotations
 
@@ -14,7 +14,6 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 
 _HOME_CALLBACK = "v3u:t:home"
-_CONSULT_PREFIX = "v3u:listing:consult:"
 
 
 def build_advisor_handoff_text(
@@ -81,7 +80,12 @@ def polish_listing_keyboard(
     add_home: bool = False,
     add_channel: bool = False,
 ) -> InlineKeyboardMarkup | None:
-    """Upgrade consult buttons and append non-dead return routes."""
+    """Normalize labels and append non-dead return routes.
+
+    Consult callbacks deliberately remain callbacks so the listing-specific
+    lead effect executes before the rendered contact page exposes a direct URL.
+    """
+    _ = advisor_url, listing_summary
     if markup is None:
         rows: list[list[InlineKeyboardButton]] = []
     else:
@@ -89,17 +93,8 @@ def polish_listing_keyboard(
         for row in markup.inline_keyboard:
             upgraded: list[InlineKeyboardButton] = []
             for button in row:
-                callback_data = str(getattr(button, "callback_data", "") or "")
                 label = "💬 联系中文顾问" if str(button.text or "") == "💬 联系我们" else str(button.text or "")
-                if callback_data.startswith(_CONSULT_PREFIX) and str(advisor_url or "").strip():
-                    public_id = callback_data[len(_CONSULT_PREFIX):].strip()
-                    upgraded.append(
-                        InlineKeyboardButton(
-                            label or "💬 联系中文顾问",
-                            url=advisor_handoff_url(advisor_url, public_listing_id=public_id, listing_summary=listing_summary),
-                        )
-                    )
-                elif label != str(button.text or ""):
+                if label != str(button.text or ""):
                     upgraded.append(
                         InlineKeyboardButton(
                             label,

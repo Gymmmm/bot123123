@@ -65,10 +65,12 @@ def test_service_hub_is_safe_gate_until_binding_is_known():
 def test_rental_service_is_public_parent_content_center():
     view = build_assurance_home_view()
     assert "租赁服务" in view.text
-    assert "租赁服务指南" not in view.text
-    assert _labels(view) == ["📝 签约前确认", "📸 入住交接留档", "🔐 押金与退租", "💬 中文顾问", "🏠 返回首页"]
+    assert "租赁服务指南" in view.text
+    assert "签约前确认" in view.text
+    assert "入住交接留档" in view.text
+    assert "押金与退租" in view.text
+    assert _labels(view) == ["💬 中文顾问", "🏠 返回首页"]
     assert _callbacks(view) == [
-        "v3u:assure:signing", "v3u:assure:handover", "v3u:assure:deposit",
         "v3u:home:contact", "v3u:t:home",
     ]
 

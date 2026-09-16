@@ -52,6 +52,21 @@ def test_full_home_is_exact_final_product_surface():
     assert not any(any(term in label for term in forbidden) for label in labels)
 
 
+def test_home_advisor_button_records_contact_before_external_handoff():
+    markup = build_home_keyboard(
+        build_home_view(advisor_url="https://t.me/advisor")
+    )
+    assert markup is not None
+    button = next(
+        button
+        for row in markup.inline_keyboard
+        for button in row
+        if button.text == "💬 中文顾问"
+    )
+    assert button.url is None
+    assert button.callback_data == "v3u:home:contact"
+
+
 def test_contact_and_appointment_views_return_only_v3_navigation():
     contact = build_contact_view(advisor_url="https://t.me/advisor")
     contact_markup = build_home_keyboard(contact)

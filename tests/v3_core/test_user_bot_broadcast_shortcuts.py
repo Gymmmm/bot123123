@@ -76,6 +76,12 @@ class FakeAppointmentHistory:
         return AppointmentHistoryView(text="📅 <b>目前还没有看房预约</b>", items=(), history_count=0)
 
 
+class FakeTenantService:
+    def active_binding(self, user_id):
+        assert user_id == 123
+        return SimpleNamespace(property_name="富力城 A3-1208")
+
+
 def _update(message):
     return SimpleNamespace(
         effective_message=message,
@@ -163,7 +169,32 @@ async def test_service_shortcuts_land_on_real_user_surfaces(payload, expected_ki
     assert outcome.handled and outcome.kind == expected_kind
     assert listings.calls == []
     assert expected_text in message.calls[-1][0][0]
-    assert "租赁服务指南" not in message.calls[-1][0][0]
+    if payload == "assurance":
+        assert "租赁服务指南" in message.calls[-1][0][0]
+
+
+@pytest.mark.asyncio
+async def test_service_shortcut_uses_bound_tenant_home_without_extra_gate():
+    message = FakeMessage()
+    outcome = await handle_v3_start(
+        _update(message),
+        _context("service"),
+        listings=FakeListings(),
+        transition_views=_views(),
+        tenant_service=FakeTenantService(),
+    )
+    assert outcome.handled and outcome.kind == "broadcast_service"
+    text = message.calls[-1][0][0]
+    markup = message.calls[-1][1]["reply_markup"]
+    callbacks = [
+        button.callback_data
+        for row in markup.inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
+    assert "富力城 A3-1208" in text
+    assert "v3u:service:tenant_lease" in callbacks
+    assert "v3u:service:tenant" not in callbacks
 
 
 @pytest.mark.asyncio

@@ -17,7 +17,6 @@ from .service_views import (
     repair_home_view, repair_success_view, rfcity_category_view, rfcity_home_view,
     slot_view,
 )
-from .telegram_navigation import advisor_handoff_url
 from .tenant_v1 import (
     deposit_view, guide_view, handover_view, lease_view, renew_view, submit_request,
     tenant_home_view, terminate_view,
@@ -52,16 +51,12 @@ def _tenant_binding_view(service: TenantService, user_id: int) -> ServiceView:
 def build_service_keyboard(view: ServiceView, *, advisor_url: str = "") -> InlineKeyboardMarkup | None:
     if not view.rows:
         return None
-    direct = str(advisor_url or "").strip()
     rows: list[list[InlineKeyboardButton]] = []
     for row in view.rows:
         buttons: list[InlineKeyboardButton] = []
         for choice in row:
             label = "💬 中文顾问" if str(choice.label or "") in {"💬 联系我们", "💬 联系中文顾问", "💬 联系顾问"} else str(choice.label or "")
-            if choice.callback_data == "v3u:home:contact" and direct:
-                buttons.append(InlineKeyboardButton(label, url=advisor_handoff_url(direct)))
-            else:
-                buttons.append(InlineKeyboardButton(label, callback_data=choice.callback_data))
+            buttons.append(InlineKeyboardButton(label, callback_data=choice.callback_data))
         rows.append(buttons)
     return InlineKeyboardMarkup(rows)
 

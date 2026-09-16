@@ -15,6 +15,7 @@ from v3_core.publishing.broadcast import (
     parse_hhmm,
 )
 from v3_core.publishing.publisher_app import V3PublisherApplication
+from v3_core.publishing.marketing_broadcast import TEMPLATES as MARKETING_TEMPLATES
 from v3_core.storage.bootstrap import initialize_v3_storage
 
 
@@ -42,6 +43,14 @@ def test_parse_hhmm_is_strict():
     assert parse_hhmm("9:30") is None
     assert parse_hhmm("24:00") is None
     assert parse_hhmm("12:60") is None
+
+
+def test_tuesday_marketing_button_describes_latest_listing_landing_truthfully():
+    tuesday = next(template for template in MARKETING_TEMPLATES if template.key == "tue")
+    assert tuesday.buttons == (
+        ("🏘 选择房源预约", "latest"),
+        ("🔍 继续找房", "find_home"),
+    )
 
 
 def test_missing_database_is_not_created(tmp_path):

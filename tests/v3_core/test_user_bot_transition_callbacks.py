@@ -27,7 +27,6 @@ def test_codec_uses_only_v3_namespaces_and_reuses_existing_listing_and_change_se
         TransitionChoice("📍 按区域", "search_area"),
         TransitionChoice("💰 按预算", "search_budget"),
         TransitionChoice("🏠 按户型", "search_layout"),
-        TransitionChoice("🏘 当前可约", "search_available"),
         TransitionChoice("BKK1", "area_choice", "bkk1"),
         TransitionChoice("📍 其他区域", "area_other"),
         TransitionChoice("两房", "layout_choice", "2br"),
@@ -95,7 +94,6 @@ def test_flag_callbacks_round_trip_without_values():
         "search_area",
         "search_budget",
         "search_layout",
-        "search_available",
         "area_other",
     ):
         raw = encode_transition_choice(TransitionChoice("x", kind))
@@ -114,6 +112,7 @@ def test_non_transition_v3_and_legacy_callbacks_are_not_claimed_by_transition_pa
         "findbudget:b2",
         "findarea:bkk1",
         "roompick:2房",
+        "v3u:t:search_available",
         "home",
         "",
     ):
@@ -135,3 +134,5 @@ def test_encoder_fails_closed_on_unsupported_or_invalid_choice():
         encode_transition_choice(TransitionChoice("首页", "home", "x"))
     with pytest.raises(ValueError, match="unsupported_transition_choice"):
         encode_transition_choice(TransitionChoice("未知", "unsupported"))  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="unsupported_transition_choice"):
+        encode_transition_choice(TransitionChoice("旧的当前可约", "search_available"))  # type: ignore[arg-type]

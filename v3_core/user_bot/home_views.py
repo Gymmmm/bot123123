@@ -56,11 +56,10 @@ BOOK_TEXT = (
 
 
 def build_home_view(*, channel_url: str = "", advisor_url: str = "") -> HomeView:
-    advisor = advisor_handoff_url(advisor_url)
     rows: list[tuple[HomeChoice, ...]] = [
         (HomeChoice("🔍 开始找房", "search"), HomeChoice("📅 我的预约", "appointments")),
         (HomeChoice("🛠 入住服务", "service"), HomeChoice("📄 租赁服务", "rental")),
-        (HomeChoice("💬 中文顾问", "contact", url=advisor) if advisor else HomeChoice("💬 中文顾问", "contact"),),
+        (HomeChoice("💬 中文顾问", "contact"),),
     ]
     channel = str(channel_url or "").strip()
     if channel:
@@ -70,26 +69,24 @@ def build_home_view(*, channel_url: str = "", advisor_url: str = "") -> HomeView
 
 
 def build_about_view(*, advisor_url: str = "") -> HomeView:
-    advisor = advisor_handoff_url(advisor_url)
     return HomeView(
         "about",
         ABOUT_TEXT,
         (
             (HomeChoice("🔍 开始找房", "search"), HomeChoice("📄 租赁服务", "rental")),
-            (HomeChoice("💬 中文顾问", "contact", url=advisor) if advisor else HomeChoice("💬 中文顾问", "contact"),),
+            (HomeChoice("💬 中文顾问", "contact"),),
             (HomeChoice("🏠 返回首页", "root"),),
         ),
     )
 
 
 def build_booking_view(*, advisor_url: str = "") -> HomeView:
-    advisor = advisor_handoff_url(advisor_url)
     return HomeView(
         "book",
         BOOK_TEXT,
         (
             (HomeChoice("🔍 开始找房", "search"), HomeChoice("📅 我的预约", "appointments")),
-            (HomeChoice("💬 中文顾问", "contact", url=advisor) if advisor else HomeChoice("💬 中文顾问", "contact"),),
+            (HomeChoice("💬 中文顾问", "contact"),),
             (HomeChoice("🏠 返回首页", "root"),),
         ),
     )
