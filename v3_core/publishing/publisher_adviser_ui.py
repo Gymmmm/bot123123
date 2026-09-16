@@ -1,0 +1,242 @@
+"""Publisher-side authoritative controls for 💬 侨联说.
+
+Publisher owns generation and final approval of adviser copy. Manual publishing
+may keep auto copy, replace it with 1-2 operator lines, or hide it. The final
+choice is frozen into the publication package for User Bot to consume verbatim.
+"""
+from __future__ import annotations
+
+import asyncio
+from html import escape
+from pathlib import Path
+from typing import Any
+
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.constants import ParseMode
+
+from v3_core.adviser_copy import generate_adviser_text
+from .inventory_operator_ui import PublisherInventoryAdminController
+from .operator_flow import BLOCKER_LABELS, DISPLAY_FIELDS, OPTIONAL_FIELDS
+from .package_service import _publisher_adviser_facts
+from .simple_admin import NEW_LISTING_STATE_KEY, SIMPLE_EDIT_STATE_KEY
+
+
+class PublisherAdviserAdminController(PublisherInventoryAdminController):
+    """Boss-facing Publisher UI with one authoritative adviser-copy decision."""
+
+    @staticmethod
+    def _adviser_mode(state: dict[str, Any]) -> str:
+        mode = str(state.get("adviser_mode") or "auto").strip().lower()
+        return mode if mode in {"auto", "manual", "hidden"} else "auto"
+
+    def _auto_adviser_copy(self, detail: Any) -> str:
+        facts = dict(detail.canonical.get("facts") or {})
+        public_id = str(detail.listing.get("public_listing_id") or detail.listing.get("listing_id") or "")
+        return generate_adviser_text(
+            _publisher_adviser_facts(facts),
+            seed=public_id,
+            max_points=2,
+            allow_fallback=False,
+        ).strip()
+
+    def _adviser_display(self, detail: Any, state: dict[str, Any]) -> str:
+        mode = self._adviser_mode(state)
+        if mode == "hidden":
+            return "暂不显示"
+        if mode == "manual":
+            return str(state.get("adviser_copy") or "").strip() or "暂不显示"
+        return self._auto_adviser_copy(detail) or "暂不显示"
+
+    def _adviser_override(self, state: dict[str, Any]) -> str | None:
+        mode = self._adviser_mode(state)
+        if mode == "auto":
+            return None
+        if mode == "hidden":
+            return ""
+        return str(state.get("adviser_copy") or "").strip()
+
+    async def show_manual_confirmation(self, message: Any, context: Any) -> None:
+        state = context.user_data.get(NEW_LISTING_STATE_KEY)
+        if not isinstance(state, dict) or not state.get("review_id"):
+            return
+        detail = self.workflow.review_detail(str(state["review_id"]))
+        values = self._manual_values(detail)
+        try:
+            blockers, _media = await self._manual_blockers(detail)
+        except Exception:
+            blockers = ["unreadable_media"]
+        optional_missing = [name for name in OPTIONAL_FIELDS if values.get(name) in (None, "")]
+
+        lines = ["<b>🏠 房源资料已整理</b>", ""]
+        for name, label in DISPLAY_FIELDS:
+            lines.append(f"{label}：{escape(self._display_value(name, values.get(name)))}")
+        lines.extend(
+            [
+                "",
+                f"📷 图片：{len(state.get('images') or [])} 张",
+                f"🎬 视频：{len(state.get('videos') or [])} 条",
+                "",
+                "💬 <b>侨联说</b>",
+            ]
+        )
+        adviser = self._adviser_display(detail, state)
+        lines.extend(escape(line) for line in adviser.splitlines() if line.strip())
+
+        if blockers:
+            required = "、".join(BLOCKER_LABELS.get(code, code) for code in blockers)
+            lines.extend(["", f"🔴 发布前需要补充：{escape(required)}"])
+        elif optional_missing:
+            labels = {name: label.split(" ", 1)[-1] for name, label in DISPLAY_FIELDS}
+            lines.extend(
+                ["", "✅ 当前资料已经可以发布", "💡 可选补充：" + "、".join(labels.get(name, name) for name in optional_missing)]
+            )
+        else:
+            lines.extend(["", "✅ 房源资料已满足发布条件。"])
+
+        buttons: list[list[InlineKeyboardButton]] = []
+        if blockers or optional_missing:
+            buttons.append(
+                [
+                    InlineKeyboardButton("➕ 补充资料", callback_data="v3smp|manual_supplement"),
+                    InlineKeyboardButton("✏️ 修改资料", callback_data="v3smp|manual_edit"),
+                ]
+            )
+        else:
+            buttons.append([InlineKeyboardButton("✏️ 修改资料", callback_data="v3smp|manual_edit")])
+        buttons.append([InlineKeyboardButton("💬 调整侨联说", callback_data="v3smp|manual_adviser")])
+        buttons.append(
+            [
+                InlineKeyboardButton(
+                    "📤 检查并发布" if blockers else "📤 预览并发布",
+                    callback_data="v3smp|manual_preview",
+                )
+            ]
+        )
+        buttons.append([InlineKeyboardButton("❌ 取消", callback_data="v3smp|manual_cancel")])
+        await message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(buttons))
+
+    async def show_adviser_editor(self, message: Any, context: Any) -> None:
+        state = context.user_data.get(NEW_LISTING_STATE_KEY)
+        if not isinstance(state, dict) or not state.get("review_id"):
+            return
+        detail = self.workflow.review_detail(str(state["review_id"]))
+        current = self._adviser_display(detail, state)
+        context.user_data[SIMPLE_EDIT_STATE_KEY] = {"kind": "manual_adviser"}
+        await message.reply_text(
+            "<b>💬 调整侨联说</b>\n\n"
+            "当前内容：\n"
+            + escape(current)
+            + "\n\n直接发送 1–2 句新文案，换行分开。\n"
+            "这里只调整侨联说，不修改房源事实。",
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton("🙈 不显示", callback_data="v3smp|manual_adviser_hide"),
+                        InlineKeyboardButton("↩️ 恢复自动", callback_data="v3smp|manual_adviser_auto"),
+                    ],
+                    [InlineKeyboardButton("⬅️ 返回资料确认", callback_data="v3smp|manual_back_confirm")],
+                ]
+            ),
+        )
+
+    async def prepare_manual_preview(
+        self,
+        message: Any,
+        context: Any,
+        *,
+        review_id: str,
+        offer_id: str,
+        style: str | None = None,
+        advance_cover: bool = False,
+    ) -> None:
+        detail = self.workflow.review_detail(review_id)
+        blockers, media = await self._manual_blockers(detail)
+        if blockers:
+            await self.show_manual_confirmation(message, context)
+            return
+        state = context.user_data.setdefault(NEW_LISTING_STATE_KEY, {})
+        gallery = tuple(media.gallery_paths)
+        if advance_cover and gallery:
+            state["cover_index"] = (int(state.get("cover_index") or 0) + 1) % len(gallery)
+        index = int(state.get("cover_index") or 0) % max(1, len(gallery))
+        cover_path = gallery[index] if gallery else None
+        if str(detail.review.get("review_status") or "") != "approved":
+            await asyncio.to_thread(
+                self.workflow.approve_review,
+                review_id=review_id,
+                operator_user_id="system:manual_preview",
+            )
+        package = await asyncio.to_thread(
+            self.workflow.build_package_for_review,
+            review_id=review_id,
+            cover_style=style,
+            manual_cover_path=cover_path,
+            adviser_copy_override=self._adviser_override(state),
+        )
+        self.repository.set_item(offer_id, state="preview_ready", package_id=package.package_id, origin="manual")
+        state["package_id"] = package.package_id
+        state["mode"] = "preview"
+        await self.send_manual_preview(message, package, review_id=review_id, offer_id=offer_id)
+
+    async def handle_text(self, update: Any, context: Any) -> bool:
+        edit = context.user_data.get(SIMPLE_EDIT_STATE_KEY)
+        if isinstance(edit, dict) and str(edit.get("kind") or "") == "manual_adviser":
+            raw = str(update.effective_message.text or "").strip()
+            if raw in {"不显示", "隐藏"}:
+                state = context.user_data.get(NEW_LISTING_STATE_KEY)
+                if isinstance(state, dict):
+                    state["adviser_mode"] = "hidden"
+                    state["adviser_copy"] = ""
+                context.user_data.pop(SIMPLE_EDIT_STATE_KEY, None)
+                await self.show_manual_confirmation(update.effective_message, context)
+                return True
+            if raw in {"恢复自动", "自动"}:
+                state = context.user_data.get(NEW_LISTING_STATE_KEY)
+                if isinstance(state, dict):
+                    state["adviser_mode"] = "auto"
+                    state.pop("adviser_copy", None)
+                context.user_data.pop(SIMPLE_EDIT_STATE_KEY, None)
+                await self.show_manual_confirmation(update.effective_message, context)
+                return True
+            lines = [line.strip() for line in raw.splitlines() if line.strip()]
+            if not 1 <= len(lines) <= 2:
+                await update.effective_message.reply_text("请发送 1–2 句侨联说，换行分开。")
+                return True
+            state = context.user_data.get(NEW_LISTING_STATE_KEY)
+            if not isinstance(state, dict):
+                context.user_data.pop(SIMPLE_EDIT_STATE_KEY, None)
+                return True
+            state["adviser_mode"] = "manual"
+            state["adviser_copy"] = "\n".join(lines)
+            context.user_data.pop(SIMPLE_EDIT_STATE_KEY, None)
+            await self.show_manual_confirmation(update.effective_message, context)
+            return True
+        return await super().handle_text(update, context)
+
+    async def handle_callback(self, update: Any, context: Any) -> bool:
+        query = getattr(update, "callback_query", None)
+        raw = str(getattr(query, "data", "") or "") if query is not None else ""
+        if raw == "v3smp|manual_adviser":
+            await self.show_adviser_editor(query.message, context)
+            return True
+        if raw == "v3smp|manual_adviser_hide":
+            state = context.user_data.get(NEW_LISTING_STATE_KEY)
+            if isinstance(state, dict):
+                state["adviser_mode"] = "hidden"
+                state["adviser_copy"] = ""
+            context.user_data.pop(SIMPLE_EDIT_STATE_KEY, None)
+            await self.show_manual_confirmation(query.message, context)
+            return True
+        if raw == "v3smp|manual_adviser_auto":
+            state = context.user_data.get(NEW_LISTING_STATE_KEY)
+            if isinstance(state, dict):
+                state["adviser_mode"] = "auto"
+                state.pop("adviser_copy", None)
+            context.user_data.pop(SIMPLE_EDIT_STATE_KEY, None)
+            await self.show_manual_confirmation(query.message, context)
+            return True
+        return await super().handle_callback(update, context)
+
+
+__all__ = ["PublisherAdviserAdminController"]
