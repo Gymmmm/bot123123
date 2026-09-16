@@ -159,11 +159,12 @@ def render_channel_caption(
     sections.append(_status_line(effective_status, public_id))
 
     tags = [
+        "#金边租房",
         _hashtag(area),
         _hashtag(_layout_tag(raw_layout, property_type)),
         _hashtag(_price_tag(amount)),
     ]
-    tags = [tag for tag in tags if tag]
+    tags = list(dict.fromkeys(tag for tag in tags if tag))
     if tags:
         sections.append(" ".join(tags))
 
