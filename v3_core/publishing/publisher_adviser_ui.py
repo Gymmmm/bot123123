@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 from html import escape
 from pathlib import Path
+import re
 from typing import Any
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -20,6 +21,7 @@ from .operator_flow import BLOCKER_LABELS, DISPLAY_FIELDS, OPTIONAL_FIELDS
 from .package_service import _publisher_adviser_facts
 from .package_store import FrozenPackage
 from .simple_admin import NEW_LISTING_STATE_KEY, SIMPLE_EDIT_STATE_KEY
+from .telegram_adapter import TelegramChannelAdapter, deliver_approved_package
 
 
 class PublisherAdviserAdminController(PublisherInventoryDashboardController):
@@ -62,11 +64,44 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
             return ""
         return str(state.get("adviser_copy") or "").strip()
 
+    def _repair_manual_layout_if_needed(self, detail: Any, state: dict[str, Any]) -> Any:
+        """Recover common admin-copy layouts such as ``房型：2+1``.
+
+        The generic canonical parser deliberately stays conservative. Publisher
+        manual intake, however, receives structured copy from agents where a bare
+        ``2+1`` is commonly prefixed by 房型/户型. Treat that labelled value as an
+        explicit operator fact instead of forcing the owner to re-enter it.
+        """
+        if str(detail.listing.get("layout") or "").strip():
+            return detail
+        raw = str(state.get("text") or "")
+        match = re.search(r"(?:房型|户型)\s*[:：]\s*(\d{1,2}\s*\+\s*\d{1,2})(?!\s*(?:房|卫))", raw)
+        if not match:
+            return detail
+        layout = re.sub(r"\s+", "", match.group(1))
+        self.workflow.edit_review_field(
+            review_id=str(detail.review["review_id"]),
+            field_name="layout",
+            value=layout,
+            operator_user_id="system:manual_layout_repair",
+        )
+        self._invalidate_preview(state)
+        return self.workflow.review_detail(str(detail.review["review_id"]))
+
+    async def _manual_blockers(self, detail: Any) -> tuple[list[str], Any]:
+        blockers, media = await super()._manual_blockers(detail)
+        # A newly entered manual listing starts as pending by design. That is an
+        # inventory workflow state, not bad listing data, so it must not make the
+        # owner's explicit manual publish button report the listing as unqualified.
+        blockers = [code for code in blockers if code != "listing_not_publishable"]
+        return blockers, media
+
     async def show_manual_confirmation(self, message: Any, context: Any) -> None:
         state = context.user_data.get(NEW_LISTING_STATE_KEY)
         if not isinstance(state, dict) or not state.get("review_id"):
             return
         detail = self.workflow.review_detail(str(state["review_id"]))
+        detail = self._repair_manual_layout_if_needed(detail, state)
         values = self._manual_values(detail)
         try:
             blockers, _media = await self._manual_blockers(detail)
@@ -157,12 +192,13 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
         style: str | None = None,
         advance_cover: bool = False,
     ) -> None:
+        state = context.user_data.setdefault(NEW_LISTING_STATE_KEY, {})
         detail = self.workflow.review_detail(review_id)
+        detail = self._repair_manual_layout_if_needed(detail, state)
         blockers, media = await self._manual_blockers(detail)
         if blockers:
             await self.show_manual_confirmation(message, context)
             return
-        state = context.user_data.setdefault(NEW_LISTING_STATE_KEY, {})
         gallery = tuple(media.gallery_paths)
         if advance_cover and gallery:
             state["cover_index"] = (int(state.get("cover_index") or 0) + 1) % len(gallery)
@@ -174,17 +210,31 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
                 review_id=review_id,
                 operator_user_id="system:manual_preview",
             )
-        package = await asyncio.to_thread(
-            self.workflow.build_package_for_review,
-            review_id=review_id,
-            cover_style=style,
-            manual_cover_path=cover_path,
-            adviser_copy_override=self._adviser_override(state),
-        )
+
+        # Freeze manual preview as an available rental without prematurely
+        # changing live inventory. Restore pending immediately after package build;
+        # the real inventory switches to active only after Telegram delivery succeeds.
+        original_status = str(detail.listing.get("inventory_status") or "pending")
+        preview_status_changed = original_status == "pending"
+        if preview_status_changed:
+            self.repository.set_listing_status(str(detail.listing["listing_id"]), "active")
+        try:
+            package = await asyncio.to_thread(
+                self.workflow.build_package_for_review,
+                review_id=review_id,
+                cover_style=style,
+                manual_cover_path=cover_path,
+                adviser_copy_override=self._adviser_override(state),
+            )
+        finally:
+            if preview_status_changed:
+                self.repository.set_listing_status(str(detail.listing["listing_id"]), original_status)
+
         self.repository.set_item(offer_id, state="preview_ready", package_id=package.package_id, origin="manual")
         state["package_id"] = package.package_id
         state["offer_id"] = offer_id
         state["review_id"] = review_id
+        state["listing_id"] = str(detail.listing["listing_id"])
         state["mode"] = "preview"
         await self.send_manual_preview(message, package, review_id=review_id, offer_id=offer_id)
 
@@ -278,6 +328,32 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("👀 重新生成预览", callback_data="v3smp|manual_preview")]]),
                 )
                 return True
+
+            package = await asyncio.to_thread(
+                self.workflow.approve_package,
+                package_id=parts[2],
+                approved_by="system:manual_publish",
+            )
+            result = await deliver_approved_package(
+                coordinator=self.workflow.delivery,
+                adapter=TelegramChannelAdapter(context.bot),
+                package_id=package.package_id,
+                channel_chat_id=self.channel_chat_id,
+            )
+            listing_id = str(state.get("listing_id") or package.listing_id) if isinstance(state, dict) else str(package.listing_id)
+            if listing_id:
+                self.repository.set_listing_status(listing_id, "active")
+            self.repository.set_item(
+                parts[3], state="published", package_id=package.package_id,
+                channel_message_id=str(result.publication.channel_message_id), origin="manual",
+            )
+            context.user_data.pop(NEW_LISTING_STATE_KEY, None)
+            await query.message.reply_text(
+                f"✅ 已发布到频道。频道消息：{escape(str(result.publication.channel_message_id))}",
+                parse_mode=ParseMode.HTML,
+                reply_markup=InlineKeyboardMarkup([self.home_row()]),
+            )
+            return True
         return await super().handle_callback(update, context)
 
 
