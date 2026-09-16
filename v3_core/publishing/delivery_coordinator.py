@@ -76,6 +76,16 @@ class PublicationDeliveryCoordinator:
         if str(offer.get("offer_status") or "") != "active":
             raise DeliveryBlocked("offer is not active")
 
+        existing_publication = self.publications.get_published_for_listing(
+            package.listing_id,
+            platform="telegram",
+            channel_chat_id=str(channel_chat_id),
+        )
+        if existing_publication is not None:
+            raise DeliveryBlocked(
+                "listing already has a published Telegram publication; use publication management"
+            )
+
         attempt = self.deliveries.prepare(
             package_id=package.package_id,
             listing_id=package.listing_id,
