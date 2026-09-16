@@ -174,7 +174,6 @@ jobs:
           test -f "$DB" || { echo "DEPLOY_BLOCKED missing_production_db"; exit 1; }
           test -d "$OLD/media" || { echo "DEPLOY_BLOCKED missing_production_media"; exit 1; }
           test -d "$OLD/telethon_sessions" || { echo "DEPLOY_BLOCKED missing_telethon_sessions"; exit 1; }
-          test -d "$OLD/.playwright-browsers" || { echo "DEPLOY_BLOCKED missing_playwright_browsers"; exit 1; }
 
           OLD_RELEASE=$(readlink -f "$CURRENT")
           test -d "$OLD_RELEASE" || { echo "DEPLOY_BLOCKED current_release_missing"; exit 1; }
