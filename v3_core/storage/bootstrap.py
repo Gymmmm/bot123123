@@ -1,0 +1,118 @@
+"""Explicit additive V3 storage initialization.
+
+Normal runtime/preflight code must not call this implicitly.  This module exists
+so database creation is an intentional operator action (``--initialize``) and
+all additive V3 DDL can be audited in one place.
+"""
+from __future__ import annotations
+
+from pathlib import Path
+import sqlite3
+
+from v3_core.ingest.source_repository import SOURCE_DDL
+from v3_core.inventory.identity import DDL as IDENTITY_DDL
+from v3_core.ops.runtime_state import DDL as RUNTIME_DDL
+from v3_core.publishing.autopilot import DDL as AUTOPILOT_DDL
+from v3_core.publishing.autopilot_anomalies import DDL as AUTOPILOT_ANOMALY_DDL
+from v3_core.publishing.autopilot_policy import DDL as AUTOPILOT_POLICY_DDL
+from v3_core.publishing.broadcast import DDL as BROADCAST_DDL
+from v3_core.publishing.delivery_state import DDL as DELIVERY_DDL
+from v3_core.publishing.package_store import DDL as PACKAGE_DDL
+from v3_core.publishing.publication_instances import DDL as PUBLICATION_INSTANCE_DDL
+from v3_core.storage.appointment_repository import SQLiteAppointmentRepository
+from v3_core.storage.lead_repository import DDL as LEAD_DDL
+from v3_core.storage.schema import DDL as INVENTORY_DDL
+from v3_core.storage.service_repository import DDL as SERVICE_DDL
+
+
+REQUIRED_V3_TABLES = frozenset(
+    {
+        "source_posts",
+        "media_assets",
+        "canonical_records",
+        "canonical_overrides",
+        "listings_v3",
+        "listing_offers",
+        "review_items",
+        "listing_identity_reservations_v3",
+        "publication_packages_v3",
+        "publication_delivery_attempts_v3",
+        "publication_instances",
+        "appointments_v3",
+        "leads_v3",
+        "tenant_bindings_v3",
+        "repair_tickets_v3",
+        "publisher_settings_v3",
+        "publisher_broadcast_log_v3",
+        "publisher_autopilot_settings_v3",
+        "publisher_post_windows_v3",
+        "publisher_auto_items_v3",
+        "publisher_auto_versions_v3",
+        "publisher_auto_validations_v3",
+        "publisher_review_exceptions_v3",
+        "v3_component_status",
+        "collector_source_state_v3",
+        "publisher_autopilot_lock_v3",
+    }
+)
+
+DDL_BLOCKS = (
+    SOURCE_DDL,
+    INVENTORY_DDL,
+    IDENTITY_DDL,
+    PACKAGE_DDL,
+    DELIVERY_DDL,
+    PUBLICATION_INSTANCE_DDL,
+    SQLiteAppointmentRepository.DDL,
+    LEAD_DDL,
+    SERVICE_DDL,
+    BROADCAST_DDL,
+    RUNTIME_DDL,
+    AUTOPILOT_DDL,
+    AUTOPILOT_POLICY_DDL,
+    AUTOPILOT_ANOMALY_DDL,
+)
+
+
+def initialize_v3_storage(db_path: str | Path) -> Path:
+    """Create only additive V3 tables/indexes and preserve all existing rows."""
+    path = Path(db_path).expanduser().resolve()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(path), timeout=30)
+    try:
+        conn.execute("PRAGMA busy_timeout=30000")
+        conn.execute("PRAGMA foreign_keys=ON")
+        conn.execute("BEGIN IMMEDIATE")
+        for ddl in DDL_BLOCKS:
+            conn.executescript(ddl)
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+    return path
+
+
+def existing_tables(db_path: str | Path) -> frozenset[str]:
+    """Read schema names without creating a database or changing journal mode."""
+    path = Path(db_path).expanduser().resolve()
+    if not path.is_file():
+        return frozenset()
+    uri = f"file:{path.as_posix()}?mode=ro"
+    conn = sqlite3.connect(uri, uri=True, timeout=5)
+    try:
+        rows = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()
+        return frozenset(str(row[0]) for row in rows)
+    finally:
+        conn.close()
+
+
+__all__ = [
+    "DDL_BLOCKS",
+    "REQUIRED_V3_TABLES",
+    "existing_tables",
+    "initialize_v3_storage",
+]

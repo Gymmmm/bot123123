@@ -38,8 +38,8 @@ class UserJourneyRehearsalTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(state, MAIN)
         message.reply_text.assert_awaited()
         text = message.reply_text.await_args.args[0]
-        self.assertIn("条件筛选", text)
-        self.assertIn("点击选择", text)
+        self.assertIn("提交找房需求", text)
+        self.assertIn("选出你最在意的条件即可", text)
         self.assertEqual(context.user_data["pref_select"]["source"], "channel_want_home")
         create_lead.assert_called()
         self.assertEqual(create_lead.call_args.kwargs.get("action"), "want_home_click")
@@ -60,28 +60,24 @@ class UserJourneyRehearsalTests(unittest.IsolatedAsyncioTestCase):
             patch("qiaolian_dual.user_bot.upsert_user_profile", return_value=None),
             patch("qiaolian_dual.user_bot.create_lead", Mock()) as create_lead,
             patch("qiaolian_dual.user_bot._notify_admins", AsyncMock()),
-            patch("qiaolian_dual.user_bot.db.search_listings", return_value=[sample_match]),
+            patch("qiaolian_dual.user_bot.search_listings_with_fallback", return_value=([sample_match], "strict")),
+            patch("qiaolian_dual.user_bot.send_find_results_as_cards", AsyncMock()) as send_cards,
         ):
             q1 = _mk_query("findmode:guided")
             state1 = await handle_ui_callback(SimpleNamespace(callback_query=q1, effective_user=user), context)
-            self.assertEqual(state1, MAIN)
-            self.assertIn("下面直接点按钮", q1.edit_message_text.await_args.args[0])
+            self.assertEqual(state1, FIND_AREA)
+            self.assertIn("想住哪里", q1.edit_message_text.await_args.args[0])
 
-            q2 = _mk_query("findtype:住宅")
+            q2 = _mk_query("findarea:a4")
             state2 = await handle_ui_callback(SimpleNamespace(callback_query=q2, effective_user=user), context)
-            self.assertEqual(state2, FIND_AREA)
-            self.assertIn("不需要手动输入", q2.edit_message_text.await_args.args[0])
-
-            q3 = _mk_query("findarea:a1")
-            state3 = await handle_ui_callback(SimpleNamespace(callback_query=q3, effective_user=user), context)
-            self.assertEqual(state3, FIND_BUDGET)
-            self.assertIn("第三步：请选择预算区间", q3.edit_message_text.await_args.args[0])
+            self.assertEqual(state2, FIND_BUDGET)
+            self.assertIn("每月预算大概多少", q2.edit_message_text.await_args.args[0])
 
             q4 = _mk_query("findbudget:r3")
             state4 = await handle_ui_callback(SimpleNamespace(callback_query=q4, effective_user=user), context)
             self.assertEqual(state4, MAIN)
-            q4.edit_message_text.assert_awaited()
-            self.assertIn("已为你筛出更匹配的房源", q4.edit_message_text.await_args.args[0])
+            send_cards.assert_awaited_once()
+            self.assertEqual(send_cards.await_args.args[2], [sample_match])
 
         self.assertGreaterEqual(create_lead.call_count, 1)
 
@@ -113,7 +109,7 @@ class UserJourneyRehearsalTests(unittest.IsolatedAsyncioTestCase):
         markup = query.edit_message_text.await_args.kwargs.get("reply_markup")
         button_texts = [btn.text for row in markup.inline_keyboard for btn in row]
         self.assertIn("🏠 我要换房", button_texts)
-        self.assertIn("💬 联系顾问", button_texts)
+        self.assertIn("💬 联系我们", button_texts)
         self.assertIn("📅 预约看房", button_texts)
 
 

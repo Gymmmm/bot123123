@@ -1,0 +1,52 @@
+name: v3-user-bot-upgrade-check
+
+on:
+  push:
+    branches:
+      - feat/v3-user-bot-product-upgrade
+      - feat/v3-user-bot-retention-pass1
+      - release/v3-media-userbot-ready-20260914
+  pull_request:
+    branches:
+      - feat/v3-user-bot-product-upgrade
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pytest pytest-asyncio
+      - name: Compile V3 User Bot and admin adapters
+        run: |
+          python -m compileall -q \
+            v3_core \
+            qiaolian_dual \
+            tests/v3_core \
+            run_v3_user_bot.py
+      - name: V3 isolation and upgraded User Bot contract
+        env:
+          PYTHONPATH: '${{ github.workspace }}'
+        run: |
+          python -m pytest -q \
+            tests/v3_core/test_no_legacy_runtime_imports.py \
+            tests/v3_core/test_user_bot_product_upgrade.py \
+            tests/v3_core/test_user_bot_public_flow.py \
+            tests/v3_core/test_user_bot_callback_router.py \
+            tests/v3_core/test_user_bot_deeplink_attribution.py \
+            tests/v3_core/test_user_bot_telegram_appointment_submit.py \
+            tests/v3_core/test_user_bot_telegram_search_submit.py \
+            tests/v3_core/test_user_bot_telegram_lead_effects.py
+      - name: Baseline V3 suite audit
+        continue-on-error: true
+        env:
+          PYTHONPATH: '${{ github.workspace }}'
+        run: |
+          python -m pytest -q tests/v3_core
