@@ -30,7 +30,7 @@ load_dotenv(BASE_DIR / ".env")
 os.chdir(BASE_DIR)
 sys.path.insert(0, str(BASE_DIR))
 
-from collector_bot import (  # noqa: E402
+from collectors.telegram import (  # noqa: E402
     SESSION_PATH,
     _append_image_or_video,
     _sender_label,

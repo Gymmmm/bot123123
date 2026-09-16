@@ -36,7 +36,7 @@ from dotenv import load_dotenv
 
 load_dotenv(ROOT / ".env")
 
-import cover_generator as cg
+import renderers.cover as cg
 
 DEFAULT_DB = ROOT / "data" / "qiaolian_dual_bot.db"
 DEFAULT_OUT_DIR = ROOT / "media" / "renders" / "cover_jobs"
