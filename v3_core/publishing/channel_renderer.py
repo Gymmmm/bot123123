@@ -14,18 +14,7 @@ from .formatting import display_floor, display_layout, display_property_type
 from .public_ids import normalize_public_id
 
 _EMPTY_FACTS = {
-    "",
-    "—",
-    "-",
-    "--",
-    "暂无",
-    "[暂无]",
-    "未知",
-    "待确认",
-    "待定",
-    "none",
-    "null",
-    "unknown",
+    "", "—", "-", "--", "暂无", "[暂无]", "未知", "待确认", "待定", "none", "null", "unknown",
 }
 _GENERIC_HEADINGS = {"侨联地产", "侨联精选", "精选房源", "优质房源", "房源", "金边房源"}
 
@@ -89,36 +78,20 @@ def _price_tag(amount: int) -> str:
     return "1500以上"
 
 
-def render_channel_caption(
-    *,
-    listing: dict[str, Any],
-    offer: dict[str, Any],
-    public_listing_id: object,
-    status: str | None = None,
-    adviser_note: str = "",
-) -> str:
-    """Render the short public channel post.
-
-    ``adviser_note`` is intentionally accepted for backward compatibility but
-    is not rendered here. 侨联说 belongs to the rental-detail experience, not
-    the channel feed.
-    """
+def render_channel_caption(*, listing: dict[str, Any], offer: dict[str, Any], public_listing_id: object, status: str | None = None, adviser_note: str = "") -> str:
     public_id = normalize_public_id(public_listing_id)
     if not public_id:
         raise ValueError("valid public_listing_id is required")
-
     project = _clean(listing.get("project_name") or listing.get("project"), 28)
     area = _clean(listing.get("public_location_display") or listing.get("area"), 28)
     heading = project if project and project not in _GENERIC_HEADINGS else area
     if not heading:
         heading = "金边房源"
-
     property_type_raw = _clean(listing.get("property_type"), 24)
     property_type = _clean(display_property_type(property_type_raw), 24)
     raw_layout = listing.get("layout") or ""
     layout = _clean(display_layout(raw_layout, property_type), 20)
     heading_line = "｜".join(value for value in (heading, layout) if value)
-
     offer_type = str(offer.get("offer_type") or "rent").strip().lower()
     if offer_type == "rent":
         price = offer.get("monthly_rent_usd")
@@ -131,23 +104,18 @@ def render_channel_caption(
     except (TypeError, ValueError):
         amount = 0
     price_text = f"${amount:,}" + ("/月" if offer_type == "rent" else "") if amount > 0 else ""
-
     size = _display_size(listing.get("size_sqm") or listing.get("size"))
     floor = _clean(display_floor(_clean(listing.get("floor"), 16), property_type), 18)
     property_bits = [value for value in (property_type, size, floor) if value]
-
     deposit = _clean(offer.get("payment_terms") or offer.get("deposit_terms"), 20)
     contract = _normalize_contract(offer.get("contract_term"))
     deposit_contract = "｜".join(value for value in (deposit, contract) if value)
-
     effective_status = str(status if status is not None else listing.get("inventory_status") or "pending")
-
     sections: list[str] = []
     top_lines = [f"🏡 {heading_line}"]
     if price_text:
         top_lines.append(f"💵 {price_text}")
     sections.append("\n".join(top_lines))
-
     fact_lines: list[str] = []
     if property_bits:
         fact_lines.append(f"🏢 {'｜'.join(property_bits)}")
@@ -155,19 +123,11 @@ def render_channel_caption(
         fact_lines.append(f"🗝️ {deposit_contract}")
     if fact_lines:
         sections.append("\n".join(fact_lines))
-
     sections.append(_status_line(effective_status, public_id))
-
-    tags = [
-        "#金边租房",
-        _hashtag(area),
-        _hashtag(_layout_tag(raw_layout, property_type)),
-        _hashtag(_price_tag(amount)),
-    ]
-    tags = list(dict.fromkeys(tag for tag in tags if tag))
+    tags = [_hashtag(area), _hashtag(_layout_tag(raw_layout, property_type)), _hashtag(_price_tag(amount))]
+    tags = [tag for tag in tags if tag]
     if tags:
         sections.append(" ".join(tags))
-
     return "\n\n".join(sections).strip()[:1024]
 
 
