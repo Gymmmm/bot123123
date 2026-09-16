@@ -4,7 +4,7 @@
 
 ## 只保留这一套
 
-- 主仓：`/Users/a1/projects/qiaolian_dual_bots_local`
+- 主仓：`/Users/a1/分流区/01_执行区/线路归类包_123/01_侨联Bot/bot123123-current`
 - 启动入口：`run_integrated_stack.py`
 
 不要在其它同类目录并行启动（例如 `qiaolian_dual_autopilot`），否则会出现：
@@ -18,14 +18,14 @@
 ### 1) 先清场
 
 ```bash
-cd /Users/a1/projects/qiaolian_dual_bots_local
+cd "/Users/a1/分流区/01_执行区/线路归类包_123/01_侨联Bot/bot123123-current"
 ./stop_all_qiaolian_bots.sh
 ```
 
 ### 2) 启动主栈
 
 ```bash
-cd /Users/a1/projects/qiaolian_dual_bots_local
+cd "/Users/a1/分流区/01_执行区/线路归类包_123/01_侨联Bot/bot123123-current"
 ./start_main_stack.sh --with-publisher
 ```
 
@@ -36,5 +36,5 @@ cd /Users/a1/projects/qiaolian_dual_bots_local
 
 ## 目录角色
 
-- `qiaolian_dual_bots_local`：生产/本机唯一运行主线
+- `bot123123-current`：当前本机唯一开发和交付主线
 - `qiaolian_dual_autopilot`：历史/实验目录，仅作参考，默认不运行
