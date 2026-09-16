@@ -17,13 +17,14 @@ from .package_store import FrozenPackage, FrozenPackageStore
 def _publisher_adviser_facts(facts: dict[str, Any]) -> dict[str, Any]:
     """Return verified facts suitable for Publisher-side judgement.
 
-    Generic fields are allowed as *context* so several facts can be composed
-    into a useful observation (for example 48楼 + 河景).  The adviser engine is
-    responsible for preventing any one generic field from becoming boilerplate.
-    Property type alone still never creates adviser copy.
+    Generic fields are allowed as context so several facts can be composed into
+    one useful observation. The adviser engine suppresses generic single-field
+    boilerplate while this marker is present. Property type alone still never
+    creates adviser copy.
     """
     result = verified_canonical_adviser_facts(dict(facts or {}))
     result["property_type"] = ""
+    result["_publisher_adviser_mode"] = "composite"
     return result
 
 
