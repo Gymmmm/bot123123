@@ -63,8 +63,10 @@ def test_active_tenant_home_exposes_current_tenant_actions(tmp_path):
     _, service = _service(tmp_path)
     view = tenant_home_view(service, 123)
     labels = [choice.label for row in view.rows for choice in row]
-    for label in ("📋 我的租约", "🔧 报修", "🏢 物业协调", "🔄 续租", "🚪 退租"):
+    for label in ("📋 我的租约", "🔧 报修", "🏢 物业协调"):
         assert label in labels
+    assert "🔄 续租" not in labels
+    assert "🚪 退租" not in labels
     assert "我想换房" not in " ".join(labels)
 
 
