@@ -165,10 +165,9 @@ def build_details_response(view: PublishedListingView) -> PublicDetailsResponse:
     if details.public_listing_id:
         lines.append(f"🆔 {he(details.public_listing_id)}")
 
-    notes = adviser_notes_for_view(view, max_points=2, allow_empty=True).strip()
-    if notes:
-        safe_notes = "\n".join("• " + he(line) for line in notes.splitlines() if line.strip())
-        lines.extend(["", "💬 <b>侨联说</b>", safe_notes])
+    notes = adviser_notes_for_view(view, max_points=2, allow_empty=True)
+    if notes.strip():
+        lines.extend(["", "💬 <b>侨联说</b>", he(notes)])
 
     return PublicDetailsResponse(
         text="\n".join(lines),
