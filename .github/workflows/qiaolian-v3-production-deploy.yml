@@ -18,7 +18,7 @@ concurrency:
 env:
   CANDIDATE_REF: release/v3-media-userbot-ready-20260914
   CANDIDATE_SHA: 57a2239716f67ceeb6fe58613857552f2758c3df
-  PREVIOUS_V3_SHA: c378e00eff300a4b1c62c3b7ec1a661a360b346a
+  PREVIOUS_V3_SHA: auto
   PROD_HOST: 50.114.74.120
   PROD_PORT: '22'
   PROD_SSH_USER: root
@@ -128,6 +128,11 @@ jobs:
           RUNTIME_ENV="$APP/runtime.env"
           OLD=/opt/qiaolian_dual_bots
           DB="$OLD/data/qiaolian_dual_bot.db"
+          if [ "$PREVIOUS_SHA" = auto ]; then
+            PREVIOUS_SHA=$(tr -cd '0-9a-fA-F' < "$APP/.deployed_sha")
+            echo "AUTO_ROLLBACK_BASELINE sha=$PREVIOUS_SHA"
+          fi
+          test -n "$PREVIOUS_SHA"
           if [ -f "$OLD/.env" ]; then
             ENV_SOURCE="$OLD/.env"
           else
