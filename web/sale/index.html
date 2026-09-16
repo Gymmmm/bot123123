@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0d0e">
+  <meta name="description" content="侨联地产 · 金边置业，金边真实出售房源，在线更新。">
+  <title>侨联地产 · 金边置业</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <button class="brand" id="brandButton" type="button" aria-label="返回全部出售房源">
+        <span class="brand-mark">侨</span>
+        <span><strong>侨联地产 <i>·</i> 金边置业</strong><small>金边精选出售房源 · 在线更新</small></span>
+      </button>
+      <a class="header-contact" href="https://t.me/pengqingw" target="_blank" rel="noopener">咨询</a>
+    </div>
+    <div class="filters" aria-label="房源筛选">
+      <select id="area" aria-label="区域"><option value="">全部区域</option></select>
+      <select id="type" aria-label="物业类型"><option value="">全部类型</option></select>
+      <select id="bedrooms" aria-label="卧室"><option value="">卧室不限</option></select>
+      <select id="price" aria-label="总价"><option value="">总价不限</option><option value="0-100000">$10万内</option><option value="100000-200000">$10–20万</option><option value="200000-500000">$20–50万</option><option value="500000-999999999">$50万以上</option></select>
+      <button id="resetButton" type="button">重置</button>
+    </div>
+  </header>
+
+  <main class="catalog">
+    <div class="catalog-heading"><div><span class="eyebrow">QIAOLIAN PROPERTY</span><h1>出售房源</h1></div><span id="count" class="count">读取中</span></div>
+    <section id="grid" class="listing-grid" aria-live="polite"></section>
+    <div id="pager" class="pager" hidden><button id="prev" type="button">上一页</button><span id="pageno"></span><button id="next" type="button">下一页</button></div>
+  </main>
+
+  <div id="overlay" class="overlay" hidden>
+    <section class="detail-sheet" role="dialog" aria-modal="true" aria-labelledby="detail-title">
+      <div class="detail-top"><span id="detail-id"></span><button id="closeButton" class="close" type="button" aria-label="关闭详情">×</button></div>
+      <div class="gallery-wrap"><div id="gallery" class="gallery"></div><button id="galleryPrev" class="gallery-control left" type="button" aria-label="上一张">‹</button><button id="galleryNext" class="gallery-control right" type="button" aria-label="下一张">›</button><span id="galleryCount" class="gallery-count"></span></div>
+      <div class="detail-content">
+        <span class="eyebrow">出售总价 USD</span><strong id="detail-price" class="detail-price"></strong><h2 id="detail-title"></h2>
+        <div id="detail-fields" class="detail-fields"></div>
+        <section id="descriptionBlock" class="detail-section" hidden><h3>房源介绍</h3><p id="detail-description"></p></section>
+        <section id="amenitiesBlock" class="detail-section" hidden><h3>房源特点</h3><div id="detail-amenities" class="amenities"></div></section>
+      </div>
+      <div class="detail-footer"><div id="consultContext" class="consult-context"></div><a id="consultButton" class="consult" target="_blank" rel="noopener">Telegram 咨询这套房源</a></div>
+    </section>
+  </div>
+  <script src="./app.js" defer></script>
+</body>
+</html>
