@@ -214,7 +214,6 @@ def _plus_layout(value: Any) -> str:
 
 
 def _contextual_lines(facts: dict[str, Any], tags: list[str]) -> list[str]:
-    """Combine verified fields into useful viewing/space judgements."""
     result: list[str] = []
     tagset = set(tags)
     layout = str(facts.get("layout") or "").strip()
@@ -233,13 +232,13 @@ def _contextual_lines(facts: dict[str, Any], tags: list[str]) -> list[str]:
     return result
 
 
-def _select_tags(tags: list[str], limit: int) -> list[str]:
+def _select_tags(tags: list[str], limit: int, *, suppress_generic: bool = False) -> list[str]:
     if limit <= 0 or not tags:
         return []
     selected: list[str] = []
     used: set[str] = set()
     for tag in tags:
-        if tag in _GENERIC_STANDALONE_TAGS:
+        if suppress_generic and tag in _GENERIC_STANDALONE_TAGS:
             continue
         category = TAG_CATEGORY.get(tag, tag)
         if category in used:
@@ -267,12 +266,13 @@ def generate_adviser_lines(
         return []
 
     clean_facts = dict(facts or {})
+    publisher_mode = str(clean_facts.get("_publisher_adviser_mode") or "") == "composite"
     tags = adviser_tags_from_facts(clean_facts)
-    lines = _contextual_lines(clean_facts, tags)[:limit]
+    lines = _contextual_lines(clean_facts, tags)[:limit] if publisher_mode else []
     if len(lines) >= limit:
         return lines
 
-    for tag in _select_tags(tags, limit):
+    for tag in _select_tags(tags, limit, suppress_generic=publisher_mode):
         line = _phrase(tag, seed)
         if line not in lines:
             lines.append(line)
