@@ -175,7 +175,7 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
             )
         finally:
             if preview_status_changed:
-                self.repository.set_listing_status(str(detail.listing["listing_id"]), original_status)
+                self.repository.mark_listing_pending_for_auto_publish(str(detail.listing["listing_id"]))
 
         self.repository.set_item(offer_id, state="preview_ready", package_id=package.package_id, origin="manual")
         state["package_id"] = package.package_id
