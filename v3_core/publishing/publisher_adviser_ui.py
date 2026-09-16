@@ -90,9 +90,6 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
 
     async def _manual_blockers(self, detail: Any) -> tuple[list[str], Any]:
         blockers, media = await super()._manual_blockers(detail)
-        # A newly entered manual listing starts as pending by design. That is an
-        # inventory workflow state, not bad listing data, so it must not make the
-        # owner's explicit manual publish button report the listing as unqualified.
         blockers = [code for code in blockers if code != "listing_not_publishable"]
         return blockers, media
 
@@ -112,15 +109,7 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
         lines = ["<b>🏠 房源资料已整理</b>", ""]
         for name, label in DISPLAY_FIELDS:
             lines.append(f"{label}：{escape(self._display_value(name, values.get(name)))}")
-        lines.extend(
-            [
-                "",
-                f"📷 图片：{len(state.get('images') or [])} 张",
-                f"🎬 视频：{len(state.get('videos') or [])} 条",
-                "",
-                "💬 <b>侨联说</b>",
-            ]
-        )
+        lines.extend(["", f"📷 图片：{len(state.get('images') or [])} 张", f"🎬 视频：{len(state.get('videos') or [])} 条", "", "💬 <b>侨联说</b>"])
         adviser = self._adviser_display(detail, state)
         lines.extend(escape(line) for line in adviser.splitlines() if line.strip())
 
@@ -129,31 +118,17 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
             lines.extend(["", f"🔴 发布前需要补充：{escape(required)}"])
         elif optional_missing:
             labels = {name: label.split(" ", 1)[-1] for name, label in DISPLAY_FIELDS}
-            lines.extend(
-                ["", "✅ 当前资料已经可以发布", "💡 可选补充：" + "、".join(labels.get(name, name) for name in optional_missing)]
-            )
+            lines.extend(["", "✅ 当前资料已经可以发布", "💡 可选补充：" + "、".join(labels.get(name, name) for name in optional_missing)])
         else:
             lines.extend(["", "✅ 房源资料已满足发布条件。"])
 
         buttons: list[list[InlineKeyboardButton]] = []
         if blockers or optional_missing:
-            buttons.append(
-                [
-                    InlineKeyboardButton("➕ 补充资料", callback_data="v3smp|manual_supplement"),
-                    InlineKeyboardButton("✏️ 修改资料", callback_data="v3smp|manual_edit"),
-                ]
-            )
+            buttons.append([InlineKeyboardButton("➕ 补充资料", callback_data="v3smp|manual_supplement"), InlineKeyboardButton("✏️ 修改资料", callback_data="v3smp|manual_edit")])
         else:
             buttons.append([InlineKeyboardButton("✏️ 修改资料", callback_data="v3smp|manual_edit")])
         buttons.append([InlineKeyboardButton("💬 调整侨联说", callback_data="v3smp|manual_adviser")])
-        buttons.append(
-            [
-                InlineKeyboardButton(
-                    "📤 检查并发布" if blockers else "👀 生成预览",
-                    callback_data="v3smp|manual_preview",
-                )
-            ]
-        )
+        buttons.append([InlineKeyboardButton("📤 检查并发布" if blockers else "👀 生成预览", callback_data="v3smp|manual_preview")])
         buttons.append([InlineKeyboardButton("❌ 取消", callback_data="v3smp|manual_cancel")])
         await message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(buttons))
 
@@ -165,33 +140,12 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
         current = self._adviser_display(detail, state)
         context.user_data[SIMPLE_EDIT_STATE_KEY] = {"kind": "manual_adviser"}
         await message.reply_text(
-            "<b>💬 调整侨联说</b>\n\n"
-            "当前内容：\n"
-            + escape(current)
-            + "\n\n直接发送 1–2 句新文案，换行分开。\n"
-            "保存后必须重新生成预览，发布的一定是预览里看到的版本。",
+            "<b>💬 调整侨联说</b>\n\n当前内容：\n" + escape(current) + "\n\n直接发送 1–2 句新文案，换行分开。\n保存后必须重新生成预览，发布的一定是预览里看到的版本。",
             parse_mode=ParseMode.HTML,
-            reply_markup=InlineKeyboardMarkup(
-                [
-                    [
-                        InlineKeyboardButton("🙈 不显示", callback_data="v3smp|manual_adviser_hide"),
-                        InlineKeyboardButton("↩️ 恢复自动", callback_data="v3smp|manual_adviser_auto"),
-                    ],
-                    [InlineKeyboardButton("⬅️ 返回资料确认", callback_data="v3smp|manual_back_confirm")],
-                ]
-            ),
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🙈 不显示", callback_data="v3smp|manual_adviser_hide"), InlineKeyboardButton("↩️ 恢复自动", callback_data="v3smp|manual_adviser_auto")], [InlineKeyboardButton("⬅️ 返回资料确认", callback_data="v3smp|manual_back_confirm")]]),
         )
 
-    async def prepare_manual_preview(
-        self,
-        message: Any,
-        context: Any,
-        *,
-        review_id: str,
-        offer_id: str,
-        style: str | None = None,
-        advance_cover: bool = False,
-    ) -> None:
+    async def prepare_manual_preview(self, message: Any, context: Any, *, review_id: str, offer_id: str, style: str | None = None, advance_cover: bool = False) -> None:
         state = context.user_data.setdefault(NEW_LISTING_STATE_KEY, {})
         detail = self.workflow.review_detail(review_id)
         detail = self._repair_manual_layout_if_needed(detail, state)
@@ -205,15 +159,8 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
         index = int(state.get("cover_index") or 0) % max(1, len(gallery))
         cover_path = gallery[index] if gallery else None
         if str(detail.review.get("review_status") or "") != "approved":
-            await asyncio.to_thread(
-                self.workflow.approve_review,
-                review_id=review_id,
-                operator_user_id="system:manual_preview",
-            )
+            await asyncio.to_thread(self.workflow.approve_review, review_id=review_id, operator_user_id="system:manual_preview")
 
-        # Freeze manual preview as an available rental without prematurely
-        # changing live inventory. Restore pending immediately after package build;
-        # the real inventory switches to active only after Telegram delivery succeeds.
         original_status = str(detail.listing.get("inventory_status") or "pending")
         preview_status_changed = original_status == "pending"
         if preview_status_changed:
@@ -239,23 +186,17 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
         await self.send_manual_preview(message, package, review_id=review_id, offer_id=offer_id)
 
     async def send_manual_preview(self, message: Any, package: FrozenPackage, *, review_id: str, offer_id: str) -> None:
-        """Preview the exact frozen package that the publish button will send."""
         with Path(package.cover_path).open("rb") as handle:
             await message.reply_photo(
                 photo=handle,
                 caption=package.post_text,
                 parse_mode=ParseMode.HTML,
-                reply_markup=InlineKeyboardMarkup(
-                    [
-                        [InlineKeyboardButton("📤 确认发布到频道", callback_data=f"v3smp|manual_send|{package.package_id}|{offer_id}")],
-                        [InlineKeyboardButton("💬 调整侨联说", callback_data="v3smp|manual_adviser")],
-                        [
-                            InlineKeyboardButton("🖼 更换封面图片", callback_data=f"v3smp|manual_cover|{review_id}|{offer_id}"),
-                            InlineKeyboardButton("🎨 更换封面模板", callback_data=f"v3smp|manual_templates|{review_id}|{offer_id}"),
-                        ],
-                        [InlineKeyboardButton("⬅️ 返回资料确认", callback_data="v3smp|manual_back_confirm")],
-                    ]
-                ),
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("📤 确认发布到频道", callback_data=f"v3smp|manual_send|{package.package_id}|{offer_id}")],
+                    [InlineKeyboardButton("💬 调整侨联说", callback_data="v3smp|manual_adviser")],
+                    [InlineKeyboardButton("🖼 更换封面图片", callback_data=f"v3smp|manual_cover|{review_id}|{offer_id}"), InlineKeyboardButton("🎨 更换封面模板", callback_data=f"v3smp|manual_templates|{review_id}|{offer_id}")],
+                    [InlineKeyboardButton("⬅️ 返回资料确认", callback_data="v3smp|manual_back_confirm")],
+                ]),
             )
 
     async def handle_text(self, update: Any, context: Any) -> bool:
@@ -329,24 +270,18 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
                 )
                 return True
 
-            package = await asyncio.to_thread(
-                self.workflow.approve_package,
-                package_id=parts[2],
-                approved_by="system:manual_publish",
-            )
+            package = await asyncio.to_thread(self.workflow.approve_package, package_id=parts[2], approved_by="system:manual_publish")
             result = await deliver_approved_package(
                 coordinator=self.workflow.delivery,
                 adapter=TelegramChannelAdapter(context.bot),
                 package_id=package.package_id,
                 channel_chat_id=self.channel_chat_id,
+                inventory_status_override="active",
             )
             listing_id = str(state.get("listing_id") or package.listing_id) if isinstance(state, dict) else str(package.listing_id)
             if listing_id:
                 self.repository.set_listing_status(listing_id, "active")
-            self.repository.set_item(
-                parts[3], state="published", package_id=package.package_id,
-                channel_message_id=str(result.publication.channel_message_id), origin="manual",
-            )
+            self.repository.set_item(parts[3], state="published", package_id=package.package_id, channel_message_id=str(result.publication.channel_message_id), origin="manual")
             context.user_data.pop(NEW_LISTING_STATE_KEY, None)
             await query.message.reply_text(
                 f"✅ 已发布到频道。频道消息：{escape(str(result.publication.channel_message_id))}",
