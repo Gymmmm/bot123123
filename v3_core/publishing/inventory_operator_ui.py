@@ -51,6 +51,7 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
 
     def _inventory_counts(self) -> dict[str, int]:
         counts = self._status_counts()
+        counts["pending"] = self._pending_count()
         with sqlite3.connect(self.db_path) as conn:
             today = conn.execute(
                 """SELECT COUNT(DISTINCT pi.listing_id)
@@ -73,7 +74,7 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
         lines = [
             "<b>🔵 房态管理</b>",
             "",
-            f"🟠 待确认        {c['pending']}",
+            f"🔵 待确认 {c['pending']}｜10套一组",
             f"🟢 可预约       {c['active']}",
             f"🟡 已有预约      {c['reserved']}",
             f"🔴 已租出        {c['rented']}",
@@ -87,7 +88,7 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
             reply_markup=InlineKeyboardMarkup(
                 [
                     [
-                        InlineKeyboardButton(f"🟠 待确认 {c['pending']}", callback_data="v3smp|inv_rows|pending"),
+                        InlineKeyboardButton(f"🔵 待确认 {c['pending']}｜10套一组", callback_data="v3smp|pbat|0"),
                         InlineKeyboardButton(f"🟢 可预约 {c['active']}", callback_data="v3smp|inv_rows|active"),
                     ],
                     [
@@ -235,7 +236,7 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
         await self.show_inventory_rows(message, category)
 
     async def show_pending_batch(self, message: Any, page: int = 0) -> None:
-        await self.show_inventory_rows(message, "pending")
+        await super().show_pending_batch(message, page)
 
     def _channel_post_url(self, message_id: Any) -> str:
         mid = str(message_id or "").strip()
@@ -430,7 +431,10 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
         parts = raw.split("|")
         action = parts[1] if len(parts) > 1 else ""
         if action == "inv_rows" and len(parts) == 3:
-            await self.show_inventory_rows(query.message, parts[2])
+            if parts[2] == "pending":
+                await self.show_pending_batch(query.message, 0)
+            else:
+                await self.show_inventory_rows(query.message, parts[2])
             return True
         if action == "inv_search":
             context.user_data[SIMPLE_EDIT_STATE_KEY] = {"kind": "inventory_search"}
@@ -468,8 +472,7 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
             )
             return True
         if action == "pbat":
-            await self.show_inventory_rows(query.message, "pending")
-            return True
+            return await super().handle_callback(update, context)
         return await super().handle_callback(update, context)
 
 
