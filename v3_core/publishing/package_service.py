@@ -14,21 +14,71 @@ from v3_core.storage.inventory_repository import InventoryRepository
 from .package_store import FrozenPackage, FrozenPackageStore
 
 
-def _publisher_adviser_facts(facts: dict[str, Any]) -> dict[str, Any]:
-    """Return the conservative evidence set used by Publisher for 侨联说.
+_AUTO_ADVISER_SIGNALS = frozenset(
+    {
+        "pet_allowed",
+        "never_lived",
+        "private_pool",
+        "owner_direct",
+        "cleaning_1x",
+        "cleaning_2x",
+        "cleaning_3x",
+        "cleaning_included",
+        "linen_weekly",
+        "pest_control",
+    }
+)
 
-    Property type and numeric floor are public facts, but they are not by
-    themselves a reason to create subjective adviser copy. Historical explicit
-    villa/high-floor/low-floor signals are therefore ignored here as well.
+
+def _publisher_adviser_facts(facts: dict[str, Any]) -> dict[str, Any]:
+    """Return only facts strong enough to deserve automatic 侨联说.
+
+    侨联说 is not a second facts list and must not become boilerplate such as
+    "河景以现场为准". Views, floors, ordinary amenities, furniture, balcony,
+    management/Wi-Fi and property type remain normal listing facts but never
+    create Publisher auto adviser copy. If no genuinely useful signal remains,
+    auto adviser copy is intentionally empty.
     """
     result = verified_canonical_adviser_facts(dict(facts or {}))
+
     signals = result.get("adviser_signals")
     if isinstance(signals, (list, tuple, set)):
         result["adviser_signals"] = [
-            str(tag) for tag in signals
-            if str(tag) not in {"villa", "high_floor", "low_floor"}
+            str(tag) for tag in signals if str(tag) in _AUTO_ADVISER_SIGNALS
         ]
+    else:
+        result["adviser_signals"] = []
+
+    # Remove generic inference sources. Keep only uncommon service/lease facts
+    # that can materially help a renter make a decision.
     result["property_type"] = ""
+    result["included"] = []
+
+    amenities = result.get("amenities")
+    amenity_values = amenities if isinstance(amenities, (list, tuple, set)) else []
+    result["amenities"] = [
+        value for value in amenity_values if str(value).strip() == "私人泳池"
+    ]
+
+    services = result.get("services") if isinstance(result.get("services"), dict) else {}
+    result["services"] = {
+        key: services[key]
+        for key in ("cleaning", "pest_control", "linen_change")
+        if key in services
+    }
+
+    house = result.get("house") if isinstance(result.get("house"), dict) else {}
+    features = house.get("features")
+    feature_values = features if isinstance(features, (list, tuple, set)) else []
+    result["house"] = {
+        "features": [
+            value for value in feature_values if str(value).strip() == "全新未入住"
+        ],
+        "source_type": house.get("source_type", ""),
+        "pets": house.get("pets", ""),
+        # Explicitly suppress ordinary furniture inference.
+        "furnished": False,
+    }
     return result
 
 
@@ -129,8 +179,6 @@ class PackageBuildService:
             "canonical_record_id": str(canonical["canonical_record_id"]),
             "canonical_facts_hash": str(canonical["facts_hash"]),
             "canonical_facts": facts,
-            # Publisher is the single authority for 侨联说. The exact final copy
-            # (auto/manual/hidden) is frozen here for downstream consumers.
             "adviser_copy": adviser_copy,
             "adviser_copy_version": "v1_publisher_authoritative",
             "adviser_copy_source": adviser_copy_source,
