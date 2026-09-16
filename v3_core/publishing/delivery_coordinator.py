@@ -54,7 +54,11 @@ class PublicationDeliveryCoordinator:
         self.publications = publications
 
     def prepare_send(
-        self, *, package_id: str, channel_chat_id: str
+        self,
+        *,
+        package_id: str,
+        channel_chat_id: str,
+        inventory_status_override: str | None = None,
     ) -> TelegramSendCommand:
         package = self.packages.verify_frozen(package_id)
         if package.status != "approved":
@@ -85,10 +89,18 @@ class PublicationDeliveryCoordinator:
         if attempt.state not in {"prepared", "failed_before_send"}:
             raise DeliveryBlocked(f"delivery attempt is not sendable: {attempt.state}")
 
-        # Caption/facts remain frozen in the approved package.  Only the live
-        # inventory status is read here so Telegram booking UI cannot expose a
-        # stale appointment action after the listing status changes.
+        # Caption/facts remain frozen in the approved package. Normally the live
+        # inventory status drives Telegram booking UI. Manual first-publish may
+        # explicitly supply the status that will become live only after Telegram
+        # acknowledges the send, so the first keyboard and frozen caption cannot
+        # disagree while the DB remains safely pending until success.
         listing = self.reader.listing(package.listing_id)
+        live_status = str(listing.get("inventory_status") or "pending").strip().lower()
+        override = str(inventory_status_override or "").strip().lower()
+        allowed = {"active", "reserved", "pending", "rented", "inactive", "offline"}
+        if override and override not in allowed:
+            raise ValueError(f"invalid_inventory_status_override:{inventory_status_override}")
+        effective_status = override or live_status
         return TelegramSendCommand(
             attempt_id=attempt.attempt_id,
             package_id=package.package_id,
@@ -96,7 +108,7 @@ class PublicationDeliveryCoordinator:
             cover_path=package.cover_path,
             caption=package.post_text,
             actions=dict(package.actions),
-            inventory_status=str(listing.get("inventory_status") or "pending").strip().lower(),
+            inventory_status=effective_status,
         )
 
     def mark_sending(self, attempt_id: str) -> None:
