@@ -10,10 +10,10 @@ from .admin_bot import PublisherAdminBot, PublisherAdminSettings, REPO_ROOT, loa
 from .autopilot_anomalies import FinalAutoPublishRepository, FinalAutoPublishService
 from .broadcast import BroadcastService, BroadcastSettingsRepository
 from .broadcast_admin import BROADCAST_EDIT_STATE_KEY
-from .inventory_operator_ui import PublisherInventoryAdminController
 from .marketing_broadcast import MarketingBroadcastService
 from .manual_status_sync import PublisherManualStatusSynchronizer
 from .pending_batch_admin import BATCH_STATUS_SYNC_KEY
+from .publisher_adviser_ui import PublisherAdviserAdminController
 from .publisher_center_ui import PublisherCenterAdminController
 from .simple_admin import NEW_LISTING_STATE_KEY, SIMPLE_EDIT_STATE_KEY
 
@@ -27,7 +27,7 @@ class V3PublisherApplication(PublisherAdminBot):
         self.auto_repository = FinalAutoPublishRepository(settings.db_path); self.auto_repository.ensure_defaults()
         self.runtime = RuntimeStateRepository(settings.db_path)
         self.autopilot = FinalAutoPublishService(workflow=self.workflow, repository=self.auto_repository, channel_chat_id=settings.channel_chat_id)
-        self.simple = PublisherInventoryAdminController(db_path=settings.db_path, repo_root=REPO_ROOT, workflow=self.workflow, autopilot=self.autopilot, repository=self.auto_repository, runtime=self.runtime, user_bot_username=settings.user_bot_username, channel_chat_id=settings.channel_chat_id, cover_output_dir=settings.cover_output_dir)
+        self.simple = PublisherAdviserAdminController(db_path=settings.db_path, repo_root=REPO_ROOT, workflow=self.workflow, autopilot=self.autopilot, repository=self.auto_repository, runtime=self.runtime, user_bot_username=settings.user_bot_username, channel_chat_id=settings.channel_chat_id, cover_output_dir=settings.cover_output_dir)
         self.manual_status_sync = PublisherManualStatusSynchronizer(
             settings.db_path,
             user_bot_username=settings.user_bot_username,
