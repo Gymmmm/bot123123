@@ -31,3 +31,42 @@ env:
   PROD_SSH_USER: root
   PROD_SSH_KNOWN_HOSTS: '50.114.74.120 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMvdBaAbAt9/4NCEC4RmiAukQ5KK5S6OF4YEml2iLw+6'
   PROD_SSH_HOST_FINGERPRINT: 'SHA256:fuufBlFaqRpQhlkio0vuLsuv8w8x3zUb3VFQsnUny/o'
+
+jobs:
+  verify-and-deploy:
+    if: github.event_name == 'workflow_dispatch' && inputs.confirm == 'DEPLOY'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Validate requested immutable SHA
+        env:
+          REQUESTED_SHA: '${{ inputs.deploy_sha }}'
+        run: |
+          set -Eeuo pipefail
+          [[ "$REQUESTED_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo 'DEPLOY_BLOCKED deploy_sha_must_be_full_40_hex_commit'; exit 1; }
+          test "$REQUESTED_SHA" = "$APPROVED_DEPLOY_SHA" || { echo 'DEPLOY_BLOCKED sha_not_approved'; exit 1; }
+          echo "DEPLOY_SHA=$REQUESTED_SHA" >> "$GITHUB_ENV"
+
+      - name: Checkout approved immutable SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.deploy_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify commit ancestry and tree
+        run: |
+          set -Eeuo pipefail
+          CANDIDATE_SHA=$(git rev-parse HEAD)
+          CANDIDATE_TREE=$(git rev-parse 'HEAD^{tree}')
+          CANDIDATE_PARENT=$(git rev-parse HEAD^)
+          CANDIDATE_GRANDPARENT=$(git rev-parse HEAD^^)
+          test "$CANDIDATE_SHA" = "$DEPLOY_SHA"
+          test "$CANDIDATE_SHA" = "$APPROVED_DEPLOY_SHA"
+          test "$CANDIDATE_PARENT" = "$EXPECTED_PARENT_SHA"
+          test "$CANDIDATE_GRANDPARENT" = "$EXPECTED_PRODUCTION_BASE_SHA"
+          test "$CANDIDATE_TREE" = "$EXPECTED_TREE_SHA"
+          test "$(git rev-list --count \"$EXPECTED_PRODUCTION_BASE_SHA..$CANDIDATE_SHA\")" = 2
+          git merge-base --is-ancestor "$EXPECTED_PRODUCTION_BASE_SHA" "$CANDIDATE_SHA"
+          echo "CANDIDATE_SHA=$CANDIDATE_SHA" >> "$GITHUB_ENV"
+          echo "CANDIDATE_TREE=$CANDIDATE_TREE" >> "$GITHUB_ENV"
