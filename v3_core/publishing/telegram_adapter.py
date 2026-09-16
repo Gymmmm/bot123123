@@ -167,6 +167,7 @@ async def deliver_approved_package(
     adapter: TelegramChannelAdapter,
     package_id: str,
     channel_chat_id: str,
+    inventory_status_override: str | None = None,
 ) -> Any:
     """Execute one safe delivery attempt.
 
@@ -177,6 +178,7 @@ async def deliver_approved_package(
     command = coordinator.prepare_send(
         package_id=str(package_id),
         channel_chat_id=str(channel_chat_id),
+        inventory_status_override=inventory_status_override,
     )
     coordinator.mark_sending(command.attempt_id)
     try:
