@@ -28,7 +28,7 @@ class PublisherInventoryDashboardController(PublisherInventoryAdminController):
             "<b>🔵 房态工作台</b>",
             "",
             "<b>今天先处理</b>",
-            f"🟠 待确认 {c['pending']}　　⏰ 超3天 {c['overdue']}",
+            f"🔵 待确认 {c['pending']}｜10套一组　　⏰ 超3天 {c['overdue']}",
             f"🟡 已有预约 {c['reserved']}　　🆕 今日发布 {c['today']}",
             "",
             "<b>当前库存</b>",
@@ -42,13 +42,13 @@ class PublisherInventoryDashboardController(PublisherInventoryAdminController):
             reply_markup=InlineKeyboardMarkup(
                 [
                     [
-                        InlineKeyboardButton(f"🟠 查看待确认 {c['pending']}", callback_data="v3smp|inv_rows|pending"),
+                        InlineKeyboardButton(f"🔵 待确认 {c['pending']}｜10套一组", callback_data="v3smp|pbat|0"),
                         InlineKeyboardButton(f"⏰ 超时 {c['overdue']}", callback_data="v3smp|inv_rows|overdue"),
                     ],
                     [
                         InlineKeyboardButton(
-                            f"☑️ 批量处理待确认 {c['pending']}",
-                            callback_data="v3smp|inv_batch_scope|pending_all",
+                            f"🔵 处理待确认 {c['pending']}｜10套一组",
+                            callback_data="v3smp|pbat|0",
                         )
                     ],
                     [
@@ -80,8 +80,8 @@ class PublisherInventoryDashboardController(PublisherInventoryAdminController):
                 [
                     [
                         InlineKeyboardButton(
-                            f"🟠 全部待确认 {c['pending']}",
-                            callback_data="v3smp|inv_batch_scope|pending_all",
+                            f"🔵 待确认 {c['pending']}｜10套一组",
+                            callback_data="v3smp|pbat|0",
                         )
                     ],
                     [
@@ -102,7 +102,7 @@ class PublisherInventoryDashboardController(PublisherInventoryAdminController):
     def _batch_scope_rows(self, scope: str) -> list[dict[str, Any]]:
         clean = str(scope or "").strip().lower()
         if clean == "pending_all":
-            return self._inventory_rows("pending", limit=500)
+            return self._pending_batch_rows(0)
         return super()._batch_scope_rows(clean)
 
     @staticmethod
@@ -210,6 +210,10 @@ class PublisherInventoryDashboardController(PublisherInventoryAdminController):
         raw = str(getattr(query, "data", "") or "") if query is not None else ""
         parts = raw.split("|")
         action = parts[1] if len(parts) > 1 else ""
+
+        if action == "inv_batch_scope" and len(parts) == 3 and parts[2] == "pending_all":
+            await self.show_pending_batch(query.message, 0)
+            return True
 
         if action == "inv_select_page":
             state = context.user_data.get(INVENTORY_BATCH_STATE_KEY) or {}
