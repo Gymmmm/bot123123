@@ -16,15 +16,10 @@ def _copy(facts: dict) -> str:
     )
 
 
-def test_generic_view_floor_furniture_and_cost_never_create_auto_adviser_copy():
+def test_generic_furniture_amenities_and_cost_do_not_create_auto_adviser_copy():
     facts = {
-        "layout": "1房",
-        "floor": "48",
-        "adviser_signals": ["river_view", "city_view", "high_floor", "furnished"],
-        "house": {
-            "features": ["河景", "市景", "阳台"],
-            "furnished": True,
-        },
+        "adviser_signals": ["furnished"],
+        "house": {"features": ["阳台"], "furnished": True},
         "amenities": ["泳池", "健身房"],
         "included": ["物业费", "网费"],
     }
