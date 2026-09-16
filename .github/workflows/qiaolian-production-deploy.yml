@@ -9,6 +9,10 @@ on:
         default: CANCEL
         type: choice
         options: [CANCEL, DEPLOY]
+      deploy_sha:
+        description: '输入已通过门禁的完整 40 位生产 commit SHA'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -18,7 +22,10 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  DEPLOY_SHA: c378e00eff300a4b1c62c3b7ec1a661a360b346a
+  APPROVED_DEPLOY_SHA: 8c7b06f7a6146071baba45f8d1aec7a590665768
+  EXPECTED_PARENT_SHA: bc2cab7e68a4c582cf28f6ef28d4d44f2f850268
+  EXPECTED_PRODUCTION_BASE_SHA: 44fe587fec95b8c79ca5314558627d4f8e55d16f
+  EXPECTED_TREE_SHA: 92d0d35c5322b9bb8dd3c1aa282187fadb7da399
   PROD_HOST: 50.114.74.120
   PROD_PORT: '22'
   PROD_SSH_USER: root
@@ -31,18 +38,38 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - name: Validate requested immutable SHA
+        env:
+          REQUESTED_SHA: '${{ inputs.deploy_sha }}'
+        run: |
+          set -Eeuo pipefail
+          [[ "$REQUESTED_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo 'DEPLOY_BLOCKED deploy_sha_must_be_full_40_hex_commit'; exit 1; }
+          test "$REQUESTED_SHA" = "$APPROVED_DEPLOY_SHA" || { echo 'DEPLOY_BLOCKED sha_not_approved'; exit 1; }
+          echo "DEPLOY_SHA=$REQUESTED_SHA" >> "$GITHUB_ENV"
+
       - name: Checkout approved immutable SHA
         uses: actions/checkout@v4
         with:
-          ref: ${{ env.DEPLOY_SHA }}
+          ref: ${{ inputs.deploy_sha }}
           fetch-depth: 0
+          persist-credentials: false
 
-      - name: Verify immutable SHA
+      - name: Verify commit ancestry and tree
         run: |
           set -Eeuo pipefail
           CANDIDATE_SHA=$(git rev-parse HEAD)
+          CANDIDATE_TREE=$(git rev-parse 'HEAD^{tree}')
+          CANDIDATE_PARENT=$(git rev-parse HEAD^)
+          CANDIDATE_GRANDPARENT=$(git rev-parse HEAD^^)
           test "$CANDIDATE_SHA" = "$DEPLOY_SHA"
+          test "$CANDIDATE_SHA" = "$APPROVED_DEPLOY_SHA"
+          test "$CANDIDATE_PARENT" = "$EXPECTED_PARENT_SHA"
+          test "$CANDIDATE_GRANDPARENT" = "$EXPECTED_PRODUCTION_BASE_SHA"
+          test "$CANDIDATE_TREE" = "$EXPECTED_TREE_SHA"
+          test "$(git rev-list --count "$EXPECTED_PRODUCTION_BASE_SHA..$CANDIDATE_SHA")" = 2
+          git merge-base --is-ancestor "$EXPECTED_PRODUCTION_BASE_SHA" "$CANDIDATE_SHA"
           echo "CANDIDATE_SHA=$CANDIDATE_SHA" >> "$GITHUB_ENV"
+          echo "CANDIDATE_TREE=$CANDIDATE_TREE" >> "$GITHUB_ENV"
 
       - uses: actions/setup-python@v5
         with:
@@ -57,6 +84,7 @@ jobs:
           python -m pip install -r requirements.txt pytest pytest-asyncio
           python -m compileall -q v3_core tests/v3_core run_v3_collector.py run_v3_canonical_worker.py run_v3_publisher_bot.py run_v3_user_bot.py run_v3_preflight.py
           python -m pytest -q tests/v3_core
+          git diff --check "$EXPECTED_PRODUCTION_BASE_SHA..$CANDIDATE_SHA"
 
       - name: Build immutable release bundle
         env:
@@ -97,49 +125,109 @@ jobs:
           REMOTE_BUNDLE: '/var/tmp/qiaolian-v3-${{ github.run_id }}-${{ github.sha }}.bundle'
         run: |
           set -Eeuo pipefail
-          ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 "$PROD_SSH_USER@$PROD_HOST" "bash -s -- '$REMOTE_BUNDLE' '$CANDIDATE_SHA'" <<'REMOTE'
+          ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 "$PROD_SSH_USER@$PROD_HOST" "bash -s -- '$REMOTE_BUNDLE' '$CANDIDATE_SHA' '$EXPECTED_PRODUCTION_BASE_SHA'" <<'REMOTE'
           set -Eeuo pipefail
           BUNDLE_PATH=$1
           EXPECTED_SHA=$2
+          EXPECTED_OLD_SHA=$3
           ROOT=/opt/qiaolian_v3
           OLD=/opt/qiaolian_dual_bots
           RELEASE="$ROOT/releases/$EXPECTED_SHA"
           CURRENT="$ROOT/current"
-          RUNTIME="$ROOT/runtime"
           RUNTIME_ENV="$ROOT/runtime.env"
           VENV="$ROOT/.venv"
+          DB="$OLD/data/qiaolian_dual_bot.db"
+          BACKUP_DIR=/opt/qiaolian_backups
           PYTHON_BOOTSTRAP=""
           SERVICES=(qiaolian-v3@collector.service qiaolian-v3@canonical.service qiaolian-v3@publisher.service qiaolian-v3@user.service)
-          trap 'rm -f -- "$BUNDLE_PATH"' EXIT
+          SWITCHED=0
+          OLD_RELEASE=""
+          OLD_SHA=""
+          BACKUP_PATH=""
+
+          cleanup() {
+            rm -f -- "$BUNDLE_PATH"
+          }
+
+          rollback_release() {
+            rc=$?
+            trap - ERR
+            if [ "$SWITCHED" -eq 1 ] && [ -n "$OLD_RELEASE" ] && [ -d "$OLD_RELEASE" ]; then
+              echo "ROLLBACK_START release=$OLD_RELEASE"
+              ln -sfn "$OLD_RELEASE" "$ROOT/current.rollback"
+              mv -Tf "$ROOT/current.rollback" "$CURRENT"
+              systemctl restart "${SERVICES[@]}" || true
+              if [ -n "$OLD_SHA" ]; then
+                printf '%s\n' "$OLD_SHA" > "$ROOT/.deployed_sha"
+                chmod 0644 "$ROOT/.deployed_sha"
+              fi
+              echo "ROLLBACK_COMPLETE release=$OLD_RELEASE"
+            fi
+            cleanup
+            exit "$rc"
+          }
+
+          trap cleanup EXIT
 
           test -f "$BUNDLE_PATH" || { echo "DEPLOY_BLOCKED missing_release_bundle"; exit 1; }
-          ENV_SOURCE="$RUNTIME_ENV"
-          [ -f "$ENV_SOURCE" ] || ENV_SOURCE="$ROOT/.env"
-          [ -f "$ENV_SOURCE" ] || ENV_SOURCE="$OLD/.env"
-          if [ ! -f "$ENV_SOURCE" ]; then
-            for legacy_service in qiaolian-user-bot.service qiaolian-publisher-bot.service qiaolian-collector.service; do
-              SERVICE_ENV=$(systemctl show "$legacy_service" -p EnvironmentFiles --value 2>/dev/null | awk '{print $1}')
-              if [ -n "$SERVICE_ENV" ] && [ -f "$SERVICE_ENV" ]; then
-                ENV_SOURCE="$SERVICE_ENV"
-                break
-              fi
-            done
-          fi
-          test -f "$ENV_SOURCE" || { echo "DEPLOY_BLOCKED missing_production_env"; exit 1; }
-          test -d "$OLD/data" || { echo "DEPLOY_BLOCKED missing_production_data"; exit 1; }
+          test -f "$RUNTIME_ENV" || { echo "DEPLOY_BLOCKED missing_runtime_env"; exit 1; }
+          test -f "$DB" || { echo "DEPLOY_BLOCKED missing_production_db"; exit 1; }
           test -d "$OLD/media" || { echo "DEPLOY_BLOCKED missing_production_media"; exit 1; }
           test -d "$OLD/telethon_sessions" || { echo "DEPLOY_BLOCKED missing_telethon_sessions"; exit 1; }
           test -d "$OLD/.playwright-browsers" || { echo "DEPLOY_BLOCKED missing_playwright_browsers"; exit 1; }
-          for python_candidate in "$OLD/.venv/bin/python" /opt/qiaolian-python-3.12/bin/python3 /usr/local/bin/python3.12 /usr/bin/python3.12; do
+
+          OLD_RELEASE=$(readlink -f "$CURRENT")
+          test -d "$OLD_RELEASE" || { echo "DEPLOY_BLOCKED current_release_missing"; exit 1; }
+          OLD_SHA=$(basename "$OLD_RELEASE")
+          test "$OLD_SHA" = "$EXPECTED_OLD_SHA" || { echo "DEPLOY_BLOCKED unexpected_current_sha=$OLD_SHA"; exit 1; }
+
+          for service in "${SERVICES[@]}"; do
+            test "$(systemctl is-active "$service")" = active || { echo "DEPLOY_BLOCKED service_not_active=$service"; exit 1; }
+          done
+
+          for python_candidate in "$VENV/bin/python" "$OLD/.venv/bin/python" /opt/qiaolian-python-3.12/bin/python3 /usr/local/bin/python3.12 /usr/bin/python3.12; do
             if [ -x "$python_candidate" ]; then
               PYTHON_BOOTSTRAP="$python_candidate"
               break
             fi
           done
           test -n "$PYTHON_BOOTSTRAP" || { echo "DEPLOY_BLOCKED missing_python_bootstrap"; exit 1; }
-          PYTHON_VERSION=$($PYTHON_BOOTSTRAP -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-          test "$PYTHON_VERSION" = "3.12" || { echo "DEPLOY_BLOCKED python_version=$PYTHON_VERSION"; exit 1; }
-          echo "DEPLOY_PREREQUISITES_OK python=$PYTHON_VERSION"
+
+          echo '=== PRE-DEPLOY DB CHECK ==='
+          "$PYTHON_BOOTSTRAP" - "$DB" <<'PY'
+          import sqlite3, sys
+          db = sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True)
+          db.execute("PRAGMA query_only=ON")
+          print("integrity_check=", db.execute("PRAGMA integrity_check").fetchone()[0])
+          print("quick_check=", db.execute("PRAGMA quick_check").fetchone()[0])
+          assert db.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+          assert db.execute("PRAGMA quick_check").fetchone()[0] == "ok"
+          PY
+
+          install -d -m 0750 -o root -g qiaolianbot "$BACKUP_DIR"
+          BACKUP_PATH="$BACKUP_DIR/qiaolian_before_${EXPECTED_SHA}_$(date -u +%Y%m%d_%H%M%S).db"
+          "$PYTHON_BOOTSTRAP" - "$DB" "$BACKUP_PATH" <<'PY'
+          import sqlite3, sys
+          src = sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True)
+          src.execute("PRAGMA query_only=ON")
+          dst = sqlite3.connect(sys.argv[2])
+          with dst:
+              src.backup(dst)
+          dst.close()
+          src.close()
+          check = sqlite3.connect(f"file:{sys.argv[2]}?mode=ro", uri=True)
+          check.execute("PRAGMA query_only=ON")
+          integrity = check.execute("PRAGMA integrity_check").fetchone()[0]
+          quick = check.execute("PRAGMA quick_check").fetchone()[0]
+          print("backup_integrity_check=", integrity)
+          print("backup_quick_check=", quick)
+          assert integrity == "ok"
+          assert quick == "ok"
+          check.close()
+          PY
+          chmod 0640 "$BACKUP_PATH"
+          chown root:qiaolianbot "$BACKUP_PATH"
+          echo "DB_BACKUP path=$BACKUP_PATH bytes=$(stat -c %s "$BACKUP_PATH")"
 
           install -d -m 0755 "$ROOT/releases"
           if [ ! -d "$RELEASE/.git" ]; then
@@ -147,64 +235,21 @@ jobs:
             git clone -q "$BUNDLE_PATH" --branch actions-production "$RELEASE"
           fi
           test "$(git -C "$RELEASE" rev-parse HEAD)" = "$EXPECTED_SHA"
+          printf '%s\n' "$EXPECTED_SHA" > "$RELEASE/.deployed_sha"
+          chmod 0644 "$RELEASE/.deployed_sha"
+          chown -R qiaolianbot:qiaolianbot "$RELEASE"
 
-          if [ ! -x "$VENV/bin/python" ]; then
-            "$PYTHON_BOOTSTRAP" -m venv "$VENV"
-          fi
-          "$VENV/bin/python" -m pip install --disable-pip-version-check --upgrade pip
-          "$VENV/bin/python" -m pip install --disable-pip-version-check -r "$RELEASE/requirements.txt"
+          runuser -u qiaolianbot -- bash -lc "set -a; source '$RUNTIME_ENV'; set +a; export QIAOLIAN_CODE_ROOT='$RELEASE'; exec '$PYTHON_BOOTSTRAP' '$RELEASE/run_v3_preflight.py' --component all --db '$DB'"
 
-          install -d -m 0750 -o qiaolianbot -g qiaolianbot "$RUNTIME"
-          ln -sfn "$OLD/data" "$RUNTIME/data"
-          ln -sfn "$OLD/media" "$RUNTIME/media"
-          ln -sfn "$OLD/telethon_sessions" "$RUNTIME/telethon"
-          ln -sfn "$OLD/.playwright-browsers" "$RUNTIME/playwright-browsers"
-          if [ ! -f "$RUNTIME/sources.json" ]; then
-            SOURCE_CONFIG="$ROOT/sources.json"
-            [ -f "$SOURCE_CONFIG" ] || SOURCE_CONFIG="$OLD/sources.json"
-            test -f "$SOURCE_CONFIG"
-            install -m 0640 -o qiaolianbot -g qiaolianbot "$SOURCE_CONFIG" "$RUNTIME/sources.json"
-          fi
-
-          ENV_NEXT=$(mktemp "$ROOT/runtime.env.XXXXXX")
-          awk -F= '
-            BEGIN { split("QIAOLIAN_CODE_ROOT QIAOLIAN_VENV QIAOLIAN_RUNTIME_ROOT DATA_DIR DB_PATH SQLITE_PATH MEDIA_ROOT COLLECTOR_DOWNLOAD_DIR TELETHON_SESSION_PATH COLLECTOR_SOURCES_JSON V3_COVER_OUTPUT_DIR PLAYWRIGHT_BROWSERS_PATH V3_CANONICAL_WORKER_INTERVAL_SECONDS CHANNEL_DISCUSSION_ENABLED", keys, " "); for (i in keys) managed[keys[i]]=1 }
-            /^[[:space:]]*#/ || !index($0,"=") { print; next }
-            { key=$1; gsub(/^[[:space:]]+|[[:space:]]+$/, "", key); if (!managed[key]) print }
-          ' "$ENV_SOURCE" > "$ENV_NEXT"
-          cat >> "$ENV_NEXT" <<ENV
-          QIAOLIAN_CODE_ROOT=$CURRENT
-          QIAOLIAN_VENV=$VENV
-          QIAOLIAN_RUNTIME_ROOT=$RUNTIME
-          DATA_DIR=$RUNTIME/data
-          DB_PATH=$RUNTIME/data/qiaolian_dual_bot.db
-          SQLITE_PATH=$RUNTIME/data/qiaolian_dual_bot.db
-          MEDIA_ROOT=$RUNTIME/media
-          COLLECTOR_DOWNLOAD_DIR=$RUNTIME/media/collector_downloads
-          TELETHON_SESSION_PATH=$RUNTIME/telethon/qiaolian_collector
-          COLLECTOR_SOURCES_JSON=$RUNTIME/sources.json
-          V3_COVER_OUTPUT_DIR=$RUNTIME/media/covers_v3
-          PLAYWRIGHT_BROWSERS_PATH=$RUNTIME/playwright-browsers
-          V3_CANONICAL_WORKER_INTERVAL_SECONDS=5
-          CHANNEL_DISCUSSION_ENABLED=false
-          ENV
-          install -m 0640 -o root -g qiaolianbot "$ENV_NEXT" "$RUNTIME_ENV"
-          rm -f -- "$ENV_NEXT"
-
-          chown -R qiaolianbot:qiaolianbot "$RELEASE" "$VENV"
+          trap rollback_release ERR
           ln -sfn "$RELEASE" "$ROOT/current.next"
           mv -Tf "$ROOT/current.next" "$CURRENT"
-          install -m 0644 "$CURRENT/deploy/v3/qiaolian-v3@.service" /etc/systemd/system/qiaolian-v3@.service
-          systemctl daemon-reload
+          SWITCHED=1
 
-          runuser -u qiaolianbot -- bash -lc "set -a; source '$RUNTIME_ENV'; set +a; exec '$VENV/bin/python' '$CURRENT/run_v3_preflight.py' --initialize --component all --db '$RUNTIME/data/qiaolian_dual_bot.db'"
-          runuser -u qiaolianbot -- bash -lc "set -a; source '$RUNTIME_ENV'; set +a; exec '$VENV/bin/python' '$CURRENT/run_v3_preflight.py' --component all --db '$RUNTIME/data/qiaolian_dual_bot.db'"
-
-          systemctl disable --now qiaolian-user-bot.service qiaolian-publisher-bot.service qiaolian-collector.service 2>/dev/null || true
-          systemctl enable "${SERVICES[@]}"
           ACTIVATED_AT=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
           systemctl restart "${SERVICES[@]}"
           sleep 10
+
           HEALTH_FAILED=0
           for service in "${SERVICES[@]}"; do
             ACTIVE=$(systemctl is-active "$service" 2>/dev/null || true)
@@ -215,13 +260,32 @@ jobs:
             [ "${PID:-0}" -gt 0 ] 2>/dev/null || HEALTH_FAILED=1
             [ "$RESTARTS" = 0 ] || HEALTH_FAILED=1
           done
-          if [ "$HEALTH_FAILED" -ne 0 ] || journalctl -u qiaolian-v3@collector.service -u qiaolian-v3@canonical.service -u qiaolian-v3@publisher.service -u qiaolian-v3@user.service --since "$ACTIVATED_AT" --no-pager | grep -Eq 'Traceback|ModuleNotFoundError|Main process exited|Failed with result'; then
-            systemctl --no-pager --full status "${SERVICES[@]}" || true
-            journalctl -u qiaolian-v3@collector.service -u qiaolian-v3@canonical.service -u qiaolian-v3@publisher.service -u qiaolian-v3@user.service --since "$ACTIVATED_AT" --no-pager
-            exit 1
+
+          LOGS=$(journalctl -u qiaolian-v3@collector.service -u qiaolian-v3@canonical.service -u qiaolian-v3@publisher.service -u qiaolian-v3@user.service --since "$ACTIVATED_AT" --no-pager)
+          printf '%s\n' "$LOGS"
+          if [ "$HEALTH_FAILED" -ne 0 ] || printf '%s\n' "$LOGS" | grep -Eqi 'Traceback|ModuleNotFoundError|Main process exited|Failed with result|database is locked|sqlite.*error|409.*conflict|Conflict: terminated by other getUpdates request|polling error|callback.*exception|publication.*(error|failed)|appointment.*(error|failed)|lead.*(error|failed)'; then
+            echo 'DEPLOY_HEALTH_FAILED'
+            false
           fi
+
+          "$PYTHON_BOOTSTRAP" - "$DB" <<'PY'
+          import sqlite3, sys
+          db = sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True)
+          db.execute("PRAGMA query_only=ON")
+          integrity = db.execute("PRAGMA integrity_check").fetchone()[0]
+          quick = db.execute("PRAGMA quick_check").fetchone()[0]
+          print("post_integrity_check=", integrity)
+          print("post_quick_check=", quick)
+          assert integrity == "ok"
+          assert quick == "ok"
+          PY
+
           printf '%s\n' "$EXPECTED_SHA" > "$ROOT/.deployed_sha"
           chmod 0644 "$ROOT/.deployed_sha"
-          systemctl --no-pager --full status "${SERVICES[@]}"
-          echo "V3_DEPLOYMENT_OK sha=$EXPECTED_SHA"
+          trap - ERR
+          echo "V3_DEPLOYMENT_OK sha=$EXPECTED_SHA backup=$BACKUP_PATH"
           REMOTE
+
+      - name: Remove temporary SSH material
+        if: always()
+        run: rm -f "$HOME/.ssh/qiaolian_production"
