@@ -14,71 +14,16 @@ from v3_core.storage.inventory_repository import InventoryRepository
 from .package_store import FrozenPackage, FrozenPackageStore
 
 
-_AUTO_ADVISER_SIGNALS = frozenset(
-    {
-        "pet_allowed",
-        "never_lived",
-        "private_pool",
-        "owner_direct",
-        "cleaning_1x",
-        "cleaning_2x",
-        "cleaning_3x",
-        "cleaning_included",
-        "linen_weekly",
-        "pest_control",
-    }
-)
-
-
 def _publisher_adviser_facts(facts: dict[str, Any]) -> dict[str, Any]:
-    """Return only facts strong enough to deserve automatic 侨联说.
+    """Return verified facts suitable for Publisher-side judgement.
 
-    侨联说 is not a second facts list and must not become boilerplate such as
-    "河景以现场为准". Views, floors, ordinary amenities, furniture, balcony,
-    management/Wi-Fi and property type remain normal listing facts but never
-    create Publisher auto adviser copy. If no genuinely useful signal remains,
-    auto adviser copy is intentionally empty.
+    Generic fields are allowed as *context* so several facts can be composed
+    into a useful observation (for example 48楼 + 河景).  The adviser engine is
+    responsible for preventing any one generic field from becoming boilerplate.
+    Property type alone still never creates adviser copy.
     """
     result = verified_canonical_adviser_facts(dict(facts or {}))
-
-    signals = result.get("adviser_signals")
-    if isinstance(signals, (list, tuple, set)):
-        result["adviser_signals"] = [
-            str(tag) for tag in signals if str(tag) in _AUTO_ADVISER_SIGNALS
-        ]
-    else:
-        result["adviser_signals"] = []
-
-    # Remove generic inference sources. Keep only uncommon service/lease facts
-    # that can materially help a renter make a decision.
     result["property_type"] = ""
-    result["included"] = []
-
-    amenities = result.get("amenities")
-    amenity_values = amenities if isinstance(amenities, (list, tuple, set)) else []
-    result["amenities"] = [
-        value for value in amenity_values if str(value).strip() == "私人泳池"
-    ]
-
-    services = result.get("services") if isinstance(result.get("services"), dict) else {}
-    result["services"] = {
-        key: services[key]
-        for key in ("cleaning", "pest_control", "linen_change")
-        if key in services
-    }
-
-    house = result.get("house") if isinstance(result.get("house"), dict) else {}
-    features = house.get("features")
-    feature_values = features if isinstance(features, (list, tuple, set)) else []
-    result["house"] = {
-        "features": [
-            value for value in feature_values if str(value).strip() == "全新未入住"
-        ],
-        "source_type": house.get("source_type", ""),
-        "pets": house.get("pets", ""),
-        # Explicitly suppress ordinary furniture inference.
-        "furnished": False,
-    }
     return result
 
 
