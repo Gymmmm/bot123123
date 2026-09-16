@@ -1,8 +1,8 @@
 """Evidence-driven copy engine for ``💬 侨联说``.
 
-Only frozen/canonical facts are used. Output is deterministic, contains no
-fallback, and is capped at two different categories. Property type alone never
-creates adviser copy (notably, a villa type does not create a ``villa`` tag).
+侨联说 is a compact renter-facing judgement, not a second facts list. It may
+combine several verified facts into one useful observation, but it must never
+invent market comparisons or turn a single generic field into boilerplate.
 """
 from __future__ import annotations
 
@@ -15,22 +15,22 @@ PHRASES: dict[str, tuple[str, ...]] = {
     "cleaning_1x": ("每周有一次保洁，日常维护会省事一些。",),
     "cleaning_2x": ("每周有两次保洁，日常维护会轻松不少。",),
     "cleaning_3x": ("每周有三次保洁，保洁频率比较高。",),
-    "cleaning_included": ("这套包含保洁服务，具体频率以实际确认为准。",),
-    "linen_weekly": ("床品服务也有安排，具体内容可以预约时确认。",),
+    "cleaning_included": ("这套包含保洁服务，日常维护会省事一些。",),
+    "linen_weekly": ("床品服务也有安排，日常维护会省事一些。",),
     "management_included": ("物业费已经包含，不需要另外单独计算。",),
     "wifi_included": ("网费已经包含，每月不用另外支付网络费用。",),
     "wifi_ready": ("宽带已经装好，入住后不用再另外安排安装。",),
     "management_wifi": ("物业费和网费都已经包含，每月少两项固定支出。",),
     "management_wifi_ready": ("物业费已经包含，宽带也已经装好了。",),
-    "owner_direct": ("这套是房东直接放租，具体租赁条件可以继续确认。",),
-    "never_lived": ("这套目前全新未入住，比较在意房况新旧可以留意。",),
-    "new_condition": ("这套整体房况偏新，可以现场再确认实际状态。",),
-    "furnished": ("家具配置比较完整，入住前确认实际配置即可。",),
-    "balcony": ("这套带阳台，实际大小和朝向可以看房时确认。",),
-    "city_view": ("这套资料标注为市景，实际视野以现场为准。",),
-    "river_view": ("这套资料标注为河景，实际视野以现场为准。",),
-    "pool": ("小区配有泳池，实际开放情况可以看房时确认。",),
-    "gym": ("小区配有健身房，实际设备情况可以看房时确认。",),
+    "owner_direct": ("这套是房东直接放租，租赁条件沟通会更直接。",),
+    "never_lived": ("这套目前全新未入住，比较在意房况新旧可以优先看。",),
+    "new_condition": ("这套整体房况偏新，比较在意房况可以优先看。",),
+    "furnished": ("家具配置比较完整，入住前要添置的东西会少一些。",),
+    "balcony": ("这套带阳台，实际使用感受主要看大小和朝向。",),
+    "city_view": ("这套有市景信息。",),
+    "river_view": ("这套有河景信息。",),
+    "pool": ("小区配有泳池。",),
+    "gym": ("小区配有健身房。",),
     "pool_gym": ("泳池和健身房都有，平时运动会比较方便。",),
     "pickleball": ("小区配有匹克球场，这项配套比较少见。",),
     "tennis": ("小区配有网球场，平时会打球可以留意。",),
@@ -39,15 +39,15 @@ PHRASES: dict[str, tuple[str, ...]] = {
     "kids_area": ("小区有儿童活动区，带小孩入住可以留意。",),
     "sauna": ("小区配有桑拿设施。",),
     "jacuzzi": ("小区配有按摩池。",),
-    "rooftop": ("楼内有公共天台，可以看房时顺便看看实际空间。",),
+    "rooftop": ("楼内有公共天台。",),
     "coworking": ("楼内有共享办公空间，经常远程办公会比较方便。",),
     "concierge": ("楼内有前台管家服务，日常需要协助时有人可以找。",),
-    "parking": ("这边有停车条件，车位和费用可以预约时再确认。",),
+    "parking": ("这边有停车条件，有车的话这点比较实用。",),
     "private_pool": ("这套自带私人泳池，是比较明显的一项配置。",),
     "large_layout": ("这套空间偏大，对居住空间有要求可以留意。",),
-    "high_floor": ("这套属于较高楼层，实际视野和居住感受以现场为准。",),
-    "low_floor": ("这套属于较低楼层，实际居住感受以现场为准。",),
-    "pet_allowed": ("这套允许带宠物入住，有宠物可以留意。",),
+    "high_floor": ("这套属于较高楼层。",),
+    "low_floor": ("这套属于较低楼层。",),
+    "pet_allowed": ("这套允许带宠物入住，有宠物可以优先看。",),
 }
 
 _PRIORITY = (
@@ -83,6 +83,12 @@ TAG_CATEGORY = {
 
 VALID_TAGS = frozenset(PHRASES)
 COMMON_AMENITY_TAGS = frozenset({"pool_gym", "pool", "gym", "table_tennis", "billiards", "sauna", "jacuzzi"})
+_GENERIC_STANDALONE_TAGS = frozenset({
+    "river_view", "city_view", "high_floor", "low_floor", "furnished", "balcony",
+    "management_included", "wifi_included", "wifi_ready", "management_wifi",
+    "management_wifi_ready", "pool_gym", "pool", "gym", "table_tennis",
+    "billiards", "sauna", "jacuzzi", "rooftop",
+})
 
 
 def _strings(value: Any) -> set[str]:
@@ -119,11 +125,7 @@ def adviser_tags_from_facts(facts: dict[str, Any] | None) -> list[str]:
     elif cleaning.lower() in {"包含", "有", "提供", "yes", "included"}:
         tags.append("cleaning_included")
 
-    for field, tag in (
-        ("pest_control", "pest_control"),
-        ("linen_change", "linen_weekly"),
-        ("concierge", "concierge"),
-    ):
+    for field, tag in (("pest_control", "pest_control"), ("linen_change", "linen_weekly"), ("concierge", "concierge")):
         if services.get(field) is True:
             tags.append(tag)
 
@@ -140,11 +142,10 @@ def adviser_tags_from_facts(facts: dict[str, Any] | None) -> list[str]:
     amenities = _strings(facts.get("amenities"))
     amenity_map = {
         "游泳池": "pool", "泳池": "pool", "私人泳池": "private_pool",
-        "健身房": "gym", "匹克球": "pickleball", "网球": "tennis",
-        "网球场": "tennis", "乒乓球": "table_tennis", "台球": "billiards",
-        "儿童游乐区": "kids_area", "儿童活动区": "kids_area", "桑拿": "sauna",
-        "按摩池": "jacuzzi", "按摩浴缸": "jacuzzi", "共享办公": "coworking",
-        "停车位": "parking", "停车场": "parking",
+        "健身房": "gym", "匹克球": "pickleball", "网球": "tennis", "网球场": "tennis",
+        "乒乓球": "table_tennis", "台球": "billiards", "儿童游乐区": "kids_area",
+        "儿童活动区": "kids_area", "桑拿": "sauna", "按摩池": "jacuzzi",
+        "按摩浴缸": "jacuzzi", "共享办公": "coworking", "停车位": "parking", "停车场": "parking",
     }
     tags.extend(tag for source, tag in amenity_map.items() if source.lower() in amenities)
 
@@ -180,16 +181,10 @@ def adviser_tags_from_facts(facts: dict[str, Any] | None) -> list[str]:
     if "river_view" in tagset:
         tagset.discard("city_view")
 
-    cleaning_tags = [
-        tag for tag in ("cleaning_3x", "cleaning_2x", "cleaning_1x", "cleaning_included")
-        if tag in tagset
-    ]
+    cleaning_tags = [tag for tag in ("cleaning_3x", "cleaning_2x", "cleaning_1x", "cleaning_included") if tag in tagset]
     if cleaning_tags:
         tagset.difference_update({"cleaning_3x", "cleaning_2x", "cleaning_1x", "cleaning_included"})
         tagset.add(cleaning_tags[0])
-
-    # Collapse only semantically equivalent fee/network combinations. Never infer
-    # installation from a fee-included fact, or fee inclusion from an installed fact.
     if "management_wifi" in tagset:
         tagset.difference_update({"management_included", "wifi_included"})
     if "management_wifi_ready" in tagset:
@@ -204,12 +199,48 @@ def _phrase(tag: str, seed: str) -> str:
     return choices[int(digest[:12], 16) % len(choices)]
 
 
+def _floor_number(value: Any) -> int | None:
+    match = re.search(r"(?<!\d)(\d{1,3})(?!\d)", str(value or ""))
+    if not match:
+        return None
+    number = int(match.group(1))
+    return number if 0 < number < 200 else None
+
+
+def _plus_layout(value: Any) -> str:
+    text = re.sub(r"\s+", "", str(value or ""))
+    match = re.search(r"(?<!\d)(\d{1,2})\+(\d{1,2})(?!\d)", text)
+    return f"{match.group(1)}+{match.group(2)}" if match else ""
+
+
+def _contextual_lines(facts: dict[str, Any], tags: list[str]) -> list[str]:
+    """Combine verified fields into useful viewing/space judgements."""
+    result: list[str] = []
+    tagset = set(tags)
+    layout = str(facts.get("layout") or "").strip()
+    plus_layout = _plus_layout(layout)
+    floor = _floor_number(facts.get("floor"))
+    view = "河景" if "river_view" in tagset else "市景" if "city_view" in tagset else ""
+
+    if plus_layout:
+        result.append(f"{plus_layout} 的布局多一个可用空间，做书房、储物或临时房会更灵活。")
+
+    if view and floor:
+        result.append(f"{floor} 楼这套又有{view}信息，看房时重点看客厅视野、窗面和采光。")
+    elif view and layout:
+        result.append(f"{layout} 又带{view}信息，这套更值得现场看的是客厅视野、采光和空间怎么分配。")
+
+    return result
+
+
 def _select_tags(tags: list[str], limit: int) -> list[str]:
     if limit <= 0 or not tags:
         return []
     selected: list[str] = []
     used: set[str] = set()
     for tag in tags:
+        if tag in _GENERIC_STANDALONE_TAGS:
+            continue
         category = TAG_CATEGORY.get(tag, tag)
         if category in used:
             continue
@@ -227,13 +258,27 @@ def generate_adviser_lines(
     max_points: int = 2,
     allow_fallback: bool = False,
 ) -> list[str]:
+    del allow_fallback
     try:
         limit = max(0, min(int(max_points), 2))
     except (TypeError, ValueError):
         limit = 2
     if limit == 0:
         return []
-    return [_phrase(tag, seed) for tag in _select_tags(adviser_tags_from_facts(facts), limit)]
+
+    clean_facts = dict(facts or {})
+    tags = adviser_tags_from_facts(clean_facts)
+    lines = _contextual_lines(clean_facts, tags)[:limit]
+    if len(lines) >= limit:
+        return lines
+
+    for tag in _select_tags(tags, limit):
+        line = _phrase(tag, seed)
+        if line not in lines:
+            lines.append(line)
+        if len(lines) >= limit:
+            break
+    return lines
 
 
 def generate_adviser_text(
@@ -243,9 +288,7 @@ def generate_adviser_text(
     max_points: int = 2,
     allow_fallback: bool = False,
 ) -> str:
-    return "\n".join(
-        generate_adviser_lines(facts, seed=seed, max_points=max_points, allow_fallback=allow_fallback)
-    )
+    return "\n".join(generate_adviser_lines(facts, seed=seed, max_points=max_points, allow_fallback=allow_fallback))
 
 
 __all__ = [
