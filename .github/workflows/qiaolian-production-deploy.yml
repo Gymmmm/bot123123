@@ -70,3 +70,82 @@ jobs:
           git merge-base --is-ancestor "$EXPECTED_PRODUCTION_BASE_SHA" "$CANDIDATE_SHA"
           echo "CANDIDATE_SHA=$CANDIDATE_SHA" >> "$GITHUB_ENV"
           echo "CANDIDATE_TREE=$CANDIDATE_TREE" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run complete V3 regression gate
+        env:
+          PYTHONPATH: '${{ github.workspace }}'
+        run: |
+          set -Eeuo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pytest pytest-asyncio
+          python -m compileall -q v3_core tests/v3_core run_v3_collector.py run_v3_canonical_worker.py run_v3_publisher_bot.py run_v3_user_bot.py run_v3_preflight.py
+          python -m pytest -q tests/v3_core
+          git diff --check "$EXPECTED_PRODUCTION_BASE_SHA..$CANDIDATE_SHA"
+
+      - name: Build immutable release bundle
+        env:
+          RELEASE_BUNDLE: '${{ runner.temp }}/qiaolian-v3-release.bundle'
+        run: |
+          set -Eeuo pipefail
+          git update-ref refs/heads/actions-production "$CANDIDATE_SHA"
+          git bundle create "$RELEASE_BUNDLE" refs/heads/actions-production
+          git bundle verify "$RELEASE_BUNDLE"
+
+      - name: Verify production SSH host key
+        run: |
+          set -Eeuo pipefail
+          ssh-keyscan -T 10 -p "$PROD_PORT" -t ed25519 "$PROD_HOST" 2>/dev/null | grep -v '^#' > "$RUNNER_TEMP/qiaolian_observed_known_hosts"
+          ssh-keygen -lf "$RUNNER_TEMP/qiaolian_observed_known_hosts" | grep -F "$PROD_SSH_HOST_FINGERPRINT"
+
+      - name: Configure production SSH
+        env:
+          PROD_SSH_PRIVATE_KEY: '${{ secrets.PROD_SSH_PRIVATE_KEY }}'
+        run: |
+          set -Eeuo pipefail
+          test -n "$PROD_SSH_PRIVATE_KEY"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
+          printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
+
+      - name: Upload verified release bundle
+        env:
+          RELEASE_BUNDLE: '${{ runner.temp }}/qiaolian-v3-release.bundle'
+          REMOTE_BUNDLE: '/var/tmp/qiaolian-v3-${{ github.run_id }}-${{ github.sha }}.bundle'
+        run: |
+          set -Eeuo pipefail
+          scp -P "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 "$RELEASE_BUNDLE" "$PROD_SSH_USER@$PROD_HOST:$REMOTE_BUNDLE"
+
+      - name: Deploy and verify four V3 components
+        env:
+          REMOTE_BUNDLE: '/var/tmp/qiaolian-v3-${{ github.run_id }}-${{ github.sha }}.bundle'
+        run: |
+          set -Eeuo pipefail
+          ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 "$PROD_SSH_USER@$PROD_HOST" "bash -s -- '$REMOTE_BUNDLE' '$CANDIDATE_SHA' '$EXPECTED_PRODUCTION_BASE_SHA'" <<'REMOTE'
+          set -Eeuo pipefail
+          BUNDLE_PATH=$1
+          EXPECTED_SHA=$2
+          EXPECTED_OLD_SHA=$3
+          ROOT=/opt/qiaolian_v3
+          OLD=/opt/qiaolian_dual_bots
+          RELEASE=\"$ROOT/releases/$EXPECTED_SHA\"
+          CURRENT=\"$ROOT/current\"
+          RUNTIME_ENV=\"$ROOT/runtime.env\"
+          VENV=\"$ROOT/.venv\"
+          DB=\"$OLD/data/qiaolian_dual_bot.db\"
+          BACKUP_DIR=/opt/qiaolian_backups
+          PYTHON_BOOTSTRAP=\"\"
+          SERVICES=(qiaolian-v3@collector.service qiaolian-v3@canonical.service qiaolian-v3@publisher.service qiaolian-v3@user.service)
+          SWITCHED=0
+          OLD_RELEASE=\"\"
+          OLD_SHA=\"\"
+          BACKUP_PATH=\"\"
+          REMOTE
+
+      - name: Remove temporary SSH material
+        if: always()
+        run: rm -f "$HOME/.ssh/qiaolian_production"
