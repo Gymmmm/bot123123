@@ -66,7 +66,7 @@ jobs:
           test "$CANDIDATE_PARENT" = "$EXPECTED_PARENT_SHA"
           test "$CANDIDATE_GRANDPARENT" = "$EXPECTED_PRODUCTION_BASE_SHA"
           test "$CANDIDATE_TREE" = "$EXPECTED_TREE_SHA"
-          test "$(git rev-list --count \"$EXPECTED_PRODUCTION_BASE_SHA..$CANDIDATE_SHA\")" = 2
+          test "$(git rev-list --count "$EXPECTED_PRODUCTION_BASE_SHA..$CANDIDATE_SHA")" = 2
           git merge-base --is-ancestor "$EXPECTED_PRODUCTION_BASE_SHA" "$CANDIDATE_SHA"
           echo "CANDIDATE_SHA=$CANDIDATE_SHA" >> "$GITHUB_ENV"
           echo "CANDIDATE_TREE=$CANDIDATE_TREE" >> "$GITHUB_ENV"
@@ -132,18 +132,158 @@ jobs:
           EXPECTED_OLD_SHA=$3
           ROOT=/opt/qiaolian_v3
           OLD=/opt/qiaolian_dual_bots
-          RELEASE=\"$ROOT/releases/$EXPECTED_SHA\"
-          CURRENT=\"$ROOT/current\"
-          RUNTIME_ENV=\"$ROOT/runtime.env\"
-          VENV=\"$ROOT/.venv\"
-          DB=\"$OLD/data/qiaolian_dual_bot.db\"
+          RELEASE="$ROOT/releases/$EXPECTED_SHA"
+          CURRENT="$ROOT/current"
+          RUNTIME_ENV="$ROOT/runtime.env"
+          VENV="$ROOT/.venv"
+          DB="$OLD/data/qiaolian_dual_bot.db"
           BACKUP_DIR=/opt/qiaolian_backups
-          PYTHON_BOOTSTRAP=\"\"
+          PYTHON_BOOTSTRAP=""
           SERVICES=(qiaolian-v3@collector.service qiaolian-v3@canonical.service qiaolian-v3@publisher.service qiaolian-v3@user.service)
           SWITCHED=0
-          OLD_RELEASE=\"\"
-          OLD_SHA=\"\"
-          BACKUP_PATH=\"\"
+          OLD_RELEASE=""
+          OLD_SHA=""
+          BACKUP_PATH=""
+
+          cleanup() {
+            rm -f -- "$BUNDLE_PATH"
+          }
+
+          rollback_release() {
+            rc=$?
+            trap - ERR
+            if [ "$SWITCHED" -eq 1 ] && [ -n "$OLD_RELEASE" ] && [ -d "$OLD_RELEASE" ]; then
+              echo "ROLLBACK_START release=$OLD_RELEASE"
+              ln -sfn "$OLD_RELEASE" "$ROOT/current.rollback"
+              mv -Tf "$ROOT/current.rollback" "$CURRENT"
+              systemctl restart "${SERVICES[@]}" || true
+              if [ -n "$OLD_SHA" ]; then
+                printf '%s\n' "$OLD_SHA" > "$ROOT/.deployed_sha"
+                chmod 0644 "$ROOT/.deployed_sha"
+              fi
+              echo "ROLLBACK_COMPLETE release=$OLD_RELEASE"
+            fi
+            cleanup
+            exit "$rc"
+          }
+
+          trap cleanup EXIT
+
+          test -f "$BUNDLE_PATH" || { echo "DEPLOY_BLOCKED missing_release_bundle"; exit 1; }
+          test -f "$RUNTIME_ENV" || { echo "DEPLOY_BLOCKED missing_runtime_env"; exit 1; }
+          test -f "$DB" || { echo "DEPLOY_BLOCKED missing_production_db"; exit 1; }
+          test -d "$OLD/media" || { echo "DEPLOY_BLOCKED missing_production_media"; exit 1; }
+          test -d "$OLD/telethon_sessions" || { echo "DEPLOY_BLOCKED missing_telethon_sessions"; exit 1; }
+          test -d "$OLD/.playwright-browsers" || { echo "DEPLOY_BLOCKED missing_playwright_browsers"; exit 1; }
+
+          OLD_RELEASE=$(readlink -f "$CURRENT")
+          test -d "$OLD_RELEASE" || { echo "DEPLOY_BLOCKED current_release_missing"; exit 1; }
+          OLD_SHA=$(basename "$OLD_RELEASE")
+          test "$OLD_SHA" = "$EXPECTED_OLD_SHA" || { echo "DEPLOY_BLOCKED unexpected_current_sha=$OLD_SHA"; exit 1; }
+
+          for service in "${SERVICES[@]}"; do
+            test "$(systemctl is-active "$service")" = active || { echo "DEPLOY_BLOCKED service_not_active=$service"; exit 1; }
+          done
+
+          for python_candidate in "$VENV/bin/python" "$OLD/.venv/bin/python" /opt/qiaolian-python-3.12/bin/python3 /usr/local/bin/python3.12 /usr/bin/python3.12; do
+            if [ -x "$python_candidate" ]; then
+              PYTHON_BOOTSTRAP="$python_candidate"
+              break
+            fi
+          done
+          test -n "$PYTHON_BOOTSTRAP" || { echo "DEPLOY_BLOCKED missing_python_bootstrap"; exit 1; }
+
+          echo '=== PRE-DEPLOY DB CHECK ==='
+          "$PYTHON_BOOTSTRAP" - "$DB" <<'PY'
+          import sqlite3, sys
+          db = sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True)
+          db.execute("PRAGMA query_only=ON")
+          print("integrity_check=", db.execute("PRAGMA integrity_check").fetchone()[0])
+          print("quick_check=", db.execute("PRAGMA quick_check").fetchone()[0])
+          assert db.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+          assert db.execute("PRAGMA quick_check").fetchone()[0] == "ok"
+          PY
+
+          install -d -m 0750 -o root -g qiaolianbot "$BACKUP_DIR"
+          BACKUP_PATH="$BACKUP_DIR/qiaolian_before_${EXPECTED_SHA}_$(date -u +%Y%m%d_%H%M%S).db"
+          "$PYTHON_BOOTSTRAP" - "$DB" "$BACKUP_PATH" <<'PY'
+          import sqlite3, sys
+          src = sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True)
+          src.execute("PRAGMA query_only=ON")
+          dst = sqlite3.connect(sys.argv[2])
+          with dst:
+              src.backup(dst)
+          dst.close()
+          src.close()
+          check = sqlite3.connect(f"file:{sys.argv[2]}?mode=ro", uri=True)
+          check.execute("PRAGMA query_only=ON")
+          integrity = check.execute("PRAGMA integrity_check").fetchone()[0]
+          quick = check.execute("PRAGMA quick_check").fetchone()[0]
+          print("backup_integrity_check=", integrity)
+          print("backup_quick_check=", quick)
+          assert integrity == "ok"
+          assert quick == "ok"
+          check.close()
+          PY
+          chmod 0640 "$BACKUP_PATH"
+          chown root:qiaolianbot "$BACKUP_PATH"
+          echo "DB_BACKUP path=$BACKUP_PATH bytes=$(stat -c %s "$BACKUP_PATH")"
+
+          install -d -m 0755 "$ROOT/releases"
+          if [ ! -d "$RELEASE/.git" ]; then
+            rm -rf -- "$RELEASE"
+            git clone -q "$BUNDLE_PATH" --branch actions-production "$RELEASE"
+          fi
+          test "$(git -C "$RELEASE" rev-parse HEAD)" = "$EXPECTED_SHA"
+          printf '%s\n' "$EXPECTED_SHA" > "$RELEASE/.deployed_sha"
+          chmod 0644 "$RELEASE/.deployed_sha"
+          chown -R qiaolianbot:qiaolianbot "$RELEASE"
+
+          runuser -u qiaolianbot -- bash -lc "set -a; source '$RUNTIME_ENV'; set +a; export QIAOLIAN_CODE_ROOT='$RELEASE'; exec '$PYTHON_BOOTSTRAP' '$RELEASE/run_v3_preflight.py' --component all --db '$DB'"
+
+          trap rollback_release ERR
+          ln -sfn "$RELEASE" "$ROOT/current.next"
+          mv -Tf "$ROOT/current.next" "$CURRENT"
+          SWITCHED=1
+
+          ACTIVATED_AT=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          systemctl restart "${SERVICES[@]}"
+          sleep 10
+
+          HEALTH_FAILED=0
+          for service in "${SERVICES[@]}"; do
+            ACTIVE=$(systemctl is-active "$service" 2>/dev/null || true)
+            PID=$(systemctl show "$service" -p MainPID --value 2>/dev/null || echo 0)
+            RESTARTS=$(systemctl show "$service" -p NRestarts --value 2>/dev/null || echo unknown)
+            echo "SERVICE_HEALTH unit=$service active=$ACTIVE pid=$PID restarts=$RESTARTS"
+            [ "$ACTIVE" = active ] || HEALTH_FAILED=1
+            [ "${PID:-0}" -gt 0 ] 2>/dev/null || HEALTH_FAILED=1
+            [ "$RESTARTS" = 0 ] || HEALTH_FAILED=1
+          done
+
+          LOGS=$(journalctl -u qiaolian-v3@collector.service -u qiaolian-v3@canonical.service -u qiaolian-v3@publisher.service -u qiaolian-v3@user.service --since "$ACTIVATED_AT" --no-pager)
+          printf '%s\n' "$LOGS"
+          if [ "$HEALTH_FAILED" -ne 0 ] || printf '%s\n' "$LOGS" | grep -Eqi 'Traceback|ModuleNotFoundError|Main process exited|Failed with result|database is locked|sqlite.*error|409.*conflict|Conflict: terminated by other getUpdates request|polling error|callback.*exception|publication.*(error|failed)|appointment.*(error|failed)|lead.*(error|failed)'; then
+            echo 'DEPLOY_HEALTH_FAILED'
+            false
+          fi
+
+          "$PYTHON_BOOTSTRAP" - "$DB" <<'PY'
+          import sqlite3, sys
+          db = sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True)
+          db.execute("PRAGMA query_only=ON")
+          integrity = db.execute("PRAGMA integrity_check").fetchone()[0]
+          quick = db.execute("PRAGMA quick_check").fetchone()[0]
+          print("post_integrity_check=", integrity)
+          print("post_quick_check=", quick)
+          assert integrity == "ok"
+          assert quick == "ok"
+          PY
+
+          printf '%s\n' "$EXPECTED_SHA" > "$ROOT/.deployed_sha"
+          chmod 0644 "$ROOT/.deployed_sha"
+          trap - ERR
+          echo "V3_DEPLOYMENT_OK sha=$EXPECTED_SHA backup=$BACKUP_PATH"
           REMOTE
 
       - name: Remove temporary SSH material
