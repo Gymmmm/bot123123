@@ -15,19 +15,26 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 
 from v3_core.adviser_copy import generate_adviser_text
-from .inventory_operator_ui import PublisherInventoryAdminController
+from .inventory_dashboard_ui import PublisherInventoryDashboardController
 from .operator_flow import BLOCKER_LABELS, DISPLAY_FIELDS, OPTIONAL_FIELDS
 from .package_service import _publisher_adviser_facts
+from .package_store import FrozenPackage
 from .simple_admin import NEW_LISTING_STATE_KEY, SIMPLE_EDIT_STATE_KEY
 
 
-class PublisherAdviserAdminController(PublisherInventoryAdminController):
+class PublisherAdviserAdminController(PublisherInventoryDashboardController):
     """Boss-facing Publisher UI with one authoritative adviser-copy decision."""
 
     @staticmethod
     def _adviser_mode(state: dict[str, Any]) -> str:
         mode = str(state.get("adviser_mode") or "auto").strip().lower()
         return mode if mode in {"auto", "manual", "hidden"} else "auto"
+
+    @staticmethod
+    def _invalidate_preview(state: dict[str, Any]) -> None:
+        """Invalidate any old frozen preview after adviser-copy changes."""
+        state.pop("package_id", None)
+        state["mode"] = "confirm"
 
     def _auto_adviser_copy(self, detail: Any) -> str:
         facts = dict(detail.canonical.get("facts") or {})
@@ -107,7 +114,7 @@ class PublisherAdviserAdminController(PublisherInventoryAdminController):
         buttons.append(
             [
                 InlineKeyboardButton(
-                    "📤 检查并发布" if blockers else "📤 预览并发布",
+                    "📤 检查并发布" if blockers else "👀 生成预览",
                     callback_data="v3smp|manual_preview",
                 )
             ]
@@ -127,7 +134,7 @@ class PublisherAdviserAdminController(PublisherInventoryAdminController):
             "当前内容：\n"
             + escape(current)
             + "\n\n直接发送 1–2 句新文案，换行分开。\n"
-            "这里只调整侨联说，不修改房源事实。",
+            "保存后必须重新生成预览，发布的一定是预览里看到的版本。",
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(
                 [
@@ -176,26 +183,49 @@ class PublisherAdviserAdminController(PublisherInventoryAdminController):
         )
         self.repository.set_item(offer_id, state="preview_ready", package_id=package.package_id, origin="manual")
         state["package_id"] = package.package_id
+        state["offer_id"] = offer_id
+        state["review_id"] = review_id
         state["mode"] = "preview"
         await self.send_manual_preview(message, package, review_id=review_id, offer_id=offer_id)
+
+    async def send_manual_preview(self, message: Any, package: FrozenPackage, *, review_id: str, offer_id: str) -> None:
+        """Preview the exact frozen package that the publish button will send."""
+        with Path(package.cover_path).open("rb") as handle:
+            await message.reply_photo(
+                photo=handle,
+                caption=package.post_text,
+                parse_mode=ParseMode.HTML,
+                reply_markup=InlineKeyboardMarkup(
+                    [
+                        [InlineKeyboardButton("📤 确认发布到频道", callback_data=f"v3smp|manual_send|{package.package_id}|{offer_id}")],
+                        [InlineKeyboardButton("💬 调整侨联说", callback_data="v3smp|manual_adviser")],
+                        [
+                            InlineKeyboardButton("🖼 更换封面图片", callback_data=f"v3smp|manual_cover|{review_id}|{offer_id}"),
+                            InlineKeyboardButton("🎨 更换封面模板", callback_data=f"v3smp|manual_templates|{review_id}|{offer_id}"),
+                        ],
+                        [InlineKeyboardButton("⬅️ 返回资料确认", callback_data="v3smp|manual_back_confirm")],
+                    ]
+                ),
+            )
 
     async def handle_text(self, update: Any, context: Any) -> bool:
         edit = context.user_data.get(SIMPLE_EDIT_STATE_KEY)
         if isinstance(edit, dict) and str(edit.get("kind") or "") == "manual_adviser":
             raw = str(update.effective_message.text or "").strip()
+            state = context.user_data.get(NEW_LISTING_STATE_KEY)
             if raw in {"不显示", "隐藏"}:
-                state = context.user_data.get(NEW_LISTING_STATE_KEY)
                 if isinstance(state, dict):
                     state["adviser_mode"] = "hidden"
                     state["adviser_copy"] = ""
+                    self._invalidate_preview(state)
                 context.user_data.pop(SIMPLE_EDIT_STATE_KEY, None)
                 await self.show_manual_confirmation(update.effective_message, context)
                 return True
             if raw in {"恢复自动", "自动"}:
-                state = context.user_data.get(NEW_LISTING_STATE_KEY)
                 if isinstance(state, dict):
                     state["adviser_mode"] = "auto"
                     state.pop("adviser_copy", None)
+                    self._invalidate_preview(state)
                 context.user_data.pop(SIMPLE_EDIT_STATE_KEY, None)
                 await self.show_manual_confirmation(update.effective_message, context)
                 return True
@@ -203,12 +233,12 @@ class PublisherAdviserAdminController(PublisherInventoryAdminController):
             if not 1 <= len(lines) <= 2:
                 await update.effective_message.reply_text("请发送 1–2 句侨联说，换行分开。")
                 return True
-            state = context.user_data.get(NEW_LISTING_STATE_KEY)
             if not isinstance(state, dict):
                 context.user_data.pop(SIMPLE_EDIT_STATE_KEY, None)
                 return True
             state["adviser_mode"] = "manual"
             state["adviser_copy"] = "\n".join(lines)
+            self._invalidate_preview(state)
             context.user_data.pop(SIMPLE_EDIT_STATE_KEY, None)
             await self.show_manual_confirmation(update.effective_message, context)
             return True
@@ -217,6 +247,7 @@ class PublisherAdviserAdminController(PublisherInventoryAdminController):
     async def handle_callback(self, update: Any, context: Any) -> bool:
         query = getattr(update, "callback_query", None)
         raw = str(getattr(query, "data", "") or "") if query is not None else ""
+        parts = raw.split("|")
         if raw == "v3smp|manual_adviser":
             await self.show_adviser_editor(query.message, context)
             return True
@@ -225,6 +256,7 @@ class PublisherAdviserAdminController(PublisherInventoryAdminController):
             if isinstance(state, dict):
                 state["adviser_mode"] = "hidden"
                 state["adviser_copy"] = ""
+                self._invalidate_preview(state)
             context.user_data.pop(SIMPLE_EDIT_STATE_KEY, None)
             await self.show_manual_confirmation(query.message, context)
             return True
@@ -233,9 +265,19 @@ class PublisherAdviserAdminController(PublisherInventoryAdminController):
             if isinstance(state, dict):
                 state["adviser_mode"] = "auto"
                 state.pop("adviser_copy", None)
+                self._invalidate_preview(state)
             context.user_data.pop(SIMPLE_EDIT_STATE_KEY, None)
             await self.show_manual_confirmation(query.message, context)
             return True
+        if len(parts) == 4 and parts[1] == "manual_send":
+            state = context.user_data.get(NEW_LISTING_STATE_KEY)
+            current_package = str(state.get("package_id") or "") if isinstance(state, dict) else ""
+            if not current_package or current_package != str(parts[2]):
+                await query.message.reply_text(
+                    "⚠️ 这张预览已经失效。侨联说或资料有过调整，请重新生成预览后再发布。",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("👀 重新生成预览", callback_data="v3smp|manual_preview")]]),
+                )
+                return True
         return await super().handle_callback(update, context)
 
 
