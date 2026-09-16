@@ -300,6 +300,16 @@ def _extract_physical_area(text: str) -> tuple[str | None, str | None, str | Non
     return item.key, item.display, item.level, "confirmed", evidence, []
 
 
+_NEARBY_LOCATION_CONTEXT = re.compile(
+    r"(?:周边配套|周边|生活配套)\s*[:：][^\n]*",
+    flags=re.I,
+)
+
+
+def _inside_nearby_context(text: str, position: int) -> bool:
+    return any(match.start() <= position < match.end() for match in _NEARBY_LOCATION_CONTEXT.finditer(str(text or "")))
+
+
 def _extract_markets(text: str) -> tuple[list[str], list[str], list[dict[str, Any]], list[str]]:
     matches: list[tuple[MarketLocation, str, int]] = []
     for item in MARKET_LOCATIONS:
@@ -307,6 +317,18 @@ def _extract_markets(text: str) -> tuple[list[str], list[str], list[dict[str, An
         if hit:
             alias, position = hit
             matches.append((item, alias, position))
+    # Prefer one semantic location when aliases overlap in the same phrase.
+    # Example: ``新机场附近`` matches both 新机场 and 机场附近; those are not two
+    # independent location claims. Earliest start wins, with the longer alias
+    # winning when both begin at the same position.
+    non_overlapping: list[tuple[MarketLocation, str, int]] = []
+    for match in sorted(matches, key=lambda value: (value[2], -len(value[1]))):
+        start, end = match[2], match[2] + len(match[1])
+        if any(start < kept_pos + len(kept_alias) and kept_pos < end for _kept, kept_alias, kept_pos in non_overlapping):
+            continue
+        non_overlapping.append(match)
+    matches = non_overlapping
+
     relation_priority = {"district": 0, "corridor": 1, "project_market": 2, "nearby": 3}
     matches.sort(key=lambda match: (relation_priority.get(match[0].relation, 9), match[2], -len(match[1])))
     unique: list[tuple[MarketLocation, str, int]] = []
@@ -319,17 +341,36 @@ def _extract_markets(text: str) -> tuple[list[str], list[str], list[dict[str, An
     displays = [item.display for item, _alias, _position in unique]
     evidence = [_evidence(item.key, "raw_market_alias", "high", alias) for item, alias, _position in unique]
     flags: list[str] = []
-    if unique:
-        best_priority = relation_priority.get(unique[0][0].relation, 9)
-        if sum(relation_priority.get(item.relation, 9) == best_priority for item, _alias, _position in unique) > 1:
+    # Multiple landmarks explicitly labelled as 周边/生活配套 are useful
+    # nearby evidence, not competing claims about the listing's own location.
+    # Only non-nearby-context matches participate in ambiguity blocking.
+    primary = [match for match in unique if not _inside_nearby_context(text, match[2])]
+    if primary:
+        best_priority = relation_priority.get(primary[0][0].relation, 9)
+        if sum(relation_priority.get(item.relation, 9) == best_priority for item, _alias, _position in primary) > 1:
             flags.append("ambiguous_market_location")
     return keys, displays, evidence, flags
 
 
+_NEARBY_PROJECT_CONTEXT = _NEARBY_LOCATION_CONTEXT
+
+_FALSE_EXPLICIT_PROJECT_VALUES = {"物业费", "网络", "房间保洁", "保洁", "停车位"}
+
+
+def _project_identity_text(text: str) -> str:
+    """Remove nearby/amenity tails before selecting the listing's project.
+
+    Nearby landmarks remain available to the location extractor, but they must
+    not compete at project-identity confidence with the listing headline.
+    """
+    return _NEARBY_PROJECT_CONTEXT.sub("", str(text or ""))
+
+
 def _extract_project(text: str) -> tuple[str | None, str | None, str | None, str | None, str | None, list[dict[str, Any]], list[str]]:
+    project_text = _project_identity_text(text)
     matches: list[tuple[ProjectIdentity, str, int]] = []
     for item in PROJECT_IDENTITIES:
-        hit = _find_alias(text, item.aliases)
+        hit = _find_alias(project_text, item.aliases)
         if hit:
             alias, position = hit
             matches.append((item, alias, position))
@@ -356,8 +397,9 @@ def _extract_project(text: str) -> tuple[str | None, str | None, str | None, str
     # developer slogans or property types into a project/location fact.
     if not project:
         explicit = re.search(
-            r"(?:项目|楼盘|小区|社区|公寓名)\s*[:：]\s*([^\n，,；;｜|]{2,60})",
-            str(text or ""), flags=re.I,
+            r"(?<![A-Za-z0-9\u4e00-\u9fff])(?:项目(?:名称)?|楼盘|小区|社区|公寓名)"
+            r"\s*[:：]\s*([^\n，,；;｜|]{2,60})",
+            project_text, flags=re.I,
         )
         if explicit:
             candidate = clean_text(explicit.group(1))
@@ -365,7 +407,16 @@ def _extract_project(text: str) -> tuple[str | None, str | None, str | None, str
                 r"(?:出租|招租|for\s+rent|公寓|住宅|别墅|排屋)\s*$", "", candidate,
                 flags=re.I,
             ).strip(" -｜|·•,，:：")
-            if candidate and candidate not in {"金边", "房源", "出租", "公寓", "住宅"}:
+            if (
+                candidate
+                and candidate not in {"金边", "房源", "出租", "公寓", "住宅"}
+                and candidate not in _FALSE_EXPLICIT_PROJECT_VALUES
+                and not all(
+                    part.strip() in _FALSE_EXPLICIT_PROJECT_VALUES
+                    for part in re.split(r"[、,/，\s]+", candidate)
+                    if part.strip()
+                )
+            ):
                 slug = re.sub(r"[^a-z0-9\u4e00-\u9fff]+", "_", candidate.lower()).strip("_")[:40]
                 project_key = f"project:{slug}" if slug else None
                 project_name = candidate

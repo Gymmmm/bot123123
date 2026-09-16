@@ -88,6 +88,33 @@ class InventoryRepository:
         assert row is not None
         return row
 
+    def manual_overrides_for_source(self, source_post_id: object) -> dict[str, Any]:
+        """Return the latest administrator override per field for one source.
+
+        Canonical revision refresh must preserve explicit human corrections.
+        Overrides remain attached to historical canonical rows, so resolve them
+        through the shared source identity rather than copying rows or schema.
+        """
+        source_key = str(source_post_id or "").strip()
+        if not source_key:
+            return {}
+        with self._connect() as conn:
+            rows = conn.execute(
+                """SELECT o.field_name,o.new_value_json,o.override_id,o.created_at
+                   FROM canonical_overrides o
+                   JOIN canonical_records c ON c.canonical_record_id=o.canonical_record_id
+                   WHERE c.source_post_id=?
+                   ORDER BY o.created_at ASC,o.override_id ASC""",
+                (source_key,),
+            ).fetchall()
+        values: dict[str, Any] = {}
+        for row in rows:
+            try:
+                values[str(row["field_name"])] = json.loads(str(row["new_value_json"]))
+            except (TypeError, ValueError, json.JSONDecodeError):
+                continue
+        return values
+
     def canonical_facts(self, canonical_record_id: str) -> dict[str, Any]:
         with self._connect() as conn:
             row = conn.execute(
