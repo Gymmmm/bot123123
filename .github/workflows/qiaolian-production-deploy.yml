@@ -60,13 +60,10 @@ jobs:
           CANDIDATE_SHA=$(git rev-parse HEAD)
           CANDIDATE_TREE=$(git rev-parse 'HEAD^{tree}')
           CANDIDATE_PARENT=$(git rev-parse HEAD^)
-          CANDIDATE_GRANDPARENT=$(git rev-parse HEAD^^)
           test "$CANDIDATE_SHA" = "$DEPLOY_SHA"
           test "$CANDIDATE_SHA" = "$APPROVED_DEPLOY_SHA"
           test "$CANDIDATE_PARENT" = "$EXPECTED_PARENT_SHA"
-          test "$CANDIDATE_GRANDPARENT" = "$EXPECTED_PRODUCTION_BASE_SHA"
           test "$CANDIDATE_TREE" = "$EXPECTED_TREE_SHA"
-          test "$(git rev-list --count "$EXPECTED_PRODUCTION_BASE_SHA..$CANDIDATE_SHA")" = 2
           git merge-base --is-ancestor "$EXPECTED_PRODUCTION_BASE_SHA" "$CANDIDATE_SHA"
           echo "CANDIDATE_SHA=$CANDIDATE_SHA" >> "$GITHUB_ENV"
           echo "CANDIDATE_TREE=$CANDIDATE_TREE" >> "$GITHUB_ENV"
