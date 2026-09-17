@@ -61,6 +61,7 @@ class _ManualWorkflow:
         return SimpleNamespace(
             review=dict(self.review),
             listing=dict(self.listing),
+            offer={"offer_id": "OFF_1", "listing_id": "l_manual"},
             canonical={"facts": {}},
         )
 
@@ -78,11 +79,15 @@ class _ManualWorkflow:
             status="package_ready",
         )
 
+    def package(self, package_id: str):
+        return SimpleNamespace(package_id=package_id, listing_id="l_manual", offer_id="OFF_1")
+
     def approve_package(self, *, package_id: str, approved_by: str):
         self.package_status = "approved"
         return SimpleNamespace(
             package_id=package_id,
             listing_id="l_manual",
+            offer_id="OFF_1",
             cover_path=str(self.cover_path),
             post_text="preview",
             status="approved",
@@ -125,6 +130,16 @@ async def test_pending_manual_preview_restores_pending_and_only_send_activates(t
     assert workflow.channel_message_id is None
     assert context.user_data[NEW_LISTING_STATE_KEY]["package_id"] == "PKG_1"
     assert message.calls[-1]["kind"] == "photo"
+    preview_markup = message.calls[-1]["reply_markup"]
+    callbacks = [button.callback_data for row in preview_markup.inline_keyboard for button in row if button.callback_data]
+    assert callbacks == [
+        "v3smp|manual_send",
+        "v3smp|manual_adviser",
+        "v3smp|manual_cover",
+        "v3smp|manual_templates",
+        "v3smp|manual_back_confirm",
+    ]
+    assert all(len(data.encode("utf-8")) <= 64 for data in callbacks)
 
     async def fake_deliver(**kwargs):
         workflow.publication_count += 1
@@ -135,7 +150,7 @@ async def test_pending_manual_preview_restores_pending_and_only_send_activates(t
     callback_message = _Message()
     update = SimpleNamespace(
         callback_query=SimpleNamespace(
-            data="v3smp|manual_send|PKG_1|OFF_1",
+            data="v3smp|manual_send",
             message=callback_message,
         )
     )
@@ -151,6 +166,87 @@ async def test_pending_manual_preview_restores_pending_and_only_send_activates(t
     # cannot create a second first publication.
     assert await controller.handle_callback(update, context) is True
     assert workflow.publication_count == 1
+
+
+@pytest.mark.asyncio
+async def test_manual_preview_short_callbacks_recover_real_length_session_ids(tmp_path: Path, monkeypatch):
+    cover = tmp_path / "cover.jpg"
+    cover.write_bytes(b"cover")
+    workflow = _ManualWorkflow(cover)
+    repository = _ManualRepository()
+    controller = object.__new__(PublisherAdviserAdminController)
+    controller.workflow = workflow
+    controller.repository = repository
+    controller.channel_chat_id = "-100123"
+    real_ids = {
+        "listing_id": "l_273",
+        "review_id": "REV_" + "b" * 32,
+        "offer_id": "OFF_" + "6" * 32,
+        "package_id": "PKG3_" + "8" * 32,
+        "mode": "preview",
+    }
+    workflow.review["review_id"] = real_ids["review_id"]
+    workflow.listing["listing_id"] = real_ids["listing_id"]
+    workflow.review_detail = lambda review_id: SimpleNamespace(
+        review={"review_id": review_id, "review_status": "approved"},
+        listing={"listing_id": real_ids["listing_id"], "inventory_status": "pending"},
+        offer={"offer_id": real_ids["offer_id"], "listing_id": real_ids["listing_id"]},
+        canonical={"facts": {}},
+    )
+    workflow.package = lambda package_id: SimpleNamespace(
+        package_id=package_id, listing_id=real_ids["listing_id"], offer_id=real_ids["offer_id"]
+    )
+    calls = []
+    async def fake_preview(message, context, **kwargs):
+        calls.append(kwargs)
+    controller.prepare_manual_preview = fake_preview
+    context = SimpleNamespace(user_data={NEW_LISTING_STATE_KEY: dict(real_ids)}, bot=object())
+
+    for data, expected in [
+        ("v3smp|manual_cover", {"review_id": real_ids["review_id"], "offer_id": real_ids["offer_id"], "advance_cover": True}),
+        ("v3smp|manual_style|black_gold", {"review_id": real_ids["review_id"], "offer_id": real_ids["offer_id"], "style": "black_gold"}),
+    ]:
+        update = SimpleNamespace(callback_query=SimpleNamespace(data=data, message=_Message()))
+        assert await controller.handle_callback(update, context) is True
+        assert calls[-1] == expected
+
+    templates_message = _Message()
+    update = SimpleNamespace(callback_query=SimpleNamespace(data="v3smp|manual_templates", message=templates_message))
+    assert await controller.handle_callback(update, context) is True
+    template_callbacks = [b.callback_data for row in templates_message.calls[-1]["reply_markup"].inline_keyboard for b in row if b.callback_data]
+    assert all(len(data.encode("utf-8")) <= 64 for data in template_callbacks)
+    assert "v3smp|manual_style|black_gold" in template_callbacks
+
+    # Missing/expired state is rejected before any package/review action.
+    expired = SimpleNamespace(user_data={}, bot=object())
+    expired_message = _Message()
+    update = SimpleNamespace(callback_query=SimpleNamespace(data="v3smp|manual_cover", message=expired_message))
+    assert await controller.handle_callback(update, expired) is True
+    assert calls[-1] == {"review_id": real_ids["review_id"], "offer_id": real_ids["offer_id"], "style": "black_gold"}
+    assert "已经失效" in expired_message.calls[-1]["text"]
+
+    # Contract proof: old production payloads exceed Telegram's 64-byte limit.
+    old = [
+        f"v3smp|manual_send|{real_ids['package_id']}|{real_ids['offer_id']}",
+        f"v3smp|manual_cover|{real_ids['review_id']}|{real_ids['offer_id']}",
+        f"v3smp|manual_templates|{real_ids['review_id']}|{real_ids['offer_id']}",
+    ]
+    assert [len(x.encode("utf-8")) for x in old] == [92, 92, 96]
+
+    sent = []
+    async def fake_deliver(**kwargs):
+        sent.append(kwargs["package_id"])
+        return SimpleNamespace(publication=SimpleNamespace(channel_message_id="9001"))
+    monkeypatch.setattr("v3_core.publishing.publisher_adviser_ui.deliver_approved_package", fake_deliver)
+    workflow.approve_package = lambda *, package_id, approved_by: SimpleNamespace(
+        package_id=package_id, listing_id=real_ids["listing_id"], offer_id=real_ids["offer_id"]
+    )
+    send_context = SimpleNamespace(user_data={NEW_LISTING_STATE_KEY: dict(real_ids)}, bot=object())
+    send_update = SimpleNamespace(callback_query=SimpleNamespace(data="v3smp|manual_send", message=_Message()))
+    assert await controller.handle_callback(send_update, send_context) is True
+    assert sent == [real_ids["package_id"]]
+    assert repository.items[-1]["offer_id"] == real_ids["offer_id"]
+    assert repository.items[-1]["package_id"] == real_ids["package_id"]
 
 
 def _build_pending_dashboard_db(path: Path) -> None:
