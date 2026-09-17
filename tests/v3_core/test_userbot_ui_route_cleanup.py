@@ -7,7 +7,7 @@ from telegram import ReplyKeyboardRemove
 
 from v3_core.user_bot.app import admin_command_menu, public_command_menu, remove_legacy_reply_keyboard
 from v3_core.user_bot.assurance_views import build_assurance_home_view
-from v3_core.user_bot.legacy_routes import legacy_home_action
+from v3_core.user_bot.legacy_routes import legacy_home_action, legacy_reply_text_action, legacy_start_payload
 from v3_core.user_bot.listing_contact import build_listing_contact_view
 from v3_core.user_bot.search_cards import build_search_card
 from v3_core.user_bot.service_product_views import service_home_view
@@ -136,3 +136,85 @@ def test_public_service_buttons_use_generic_chinese_advisor_name():
         assert all("联系我们" not in label for label in labels)
         if any("顾问" in label for label in labels):
             assert "💬 中文顾问" in labels
+
+
+def test_legacy_reply_button_texts_have_explicit_frozen_destinations():
+    expected = {
+        "开始找房": "search",
+        "帮我找房": "search",
+        "精准筛选": "search",
+        "预约看房": "search",
+        "我的收藏": "search",
+        "我的预约": "appointments",
+        "我的租约": "service",
+        "入住服务": "service",
+        "售后服务": "rental",
+        "服务保障": "rental",
+        "租后服务": "rental",
+        "联系顾问": "contact",
+        "联系我们": "contact",
+        "中文顾问": "contact",
+        "使用说明": "home",
+        "关于侨联": "rental",
+        "首页": "home",
+        "返回首页": "home",
+    }
+    assert {label: legacy_reply_text_action(label) for label in expected} == expected
+    assert legacy_reply_text_action("普通搜索文字") is None
+
+
+def test_legacy_reply_destinations_reuse_existing_new_product_start_payloads():
+    assert legacy_start_payload("search") == "find_home"
+    assert legacy_start_payload("appointments") == "appointments"
+    assert legacy_start_payload("service") == "service"
+    assert legacy_start_payload("rental") == "assurance"
+    assert legacy_start_payload("contact") == "advisor"
+    assert legacy_start_payload("home") == ""
+
+
+def test_legacy_reply_semantics_do_not_turn_old_navigation_into_keywords():
+    for label in ("精准筛选", "我的收藏", "预约看房", "帮我找房"):
+        assert legacy_reply_text_action(label) == "search"
+        assert legacy_start_payload(legacy_reply_text_action(label)) == "find_home"
+    assert legacy_reply_text_action("我的租约") == "service"
+    assert legacy_reply_text_action("联系顾问") == "contact"
+    for label in ("售后服务", "服务保障", "关于侨联"):
+        assert legacy_reply_text_action(label) == "rental"
+
+
+def test_legacy_reply_text_intercept_precedes_all_normal_text_pipelines():
+    source = open("v3_core/user_bot/app.py", encoding="utf-8").read()
+    text_start = source.index("    async def text(update, context):")
+    text_end = source.index("    async def heartbeat(context):", text_start)
+    block = source[text_start:text_end]
+    intercept = block.index("legacy_reply_text_action")
+    early_return = block.index("            return", intercept)
+    transition = block.index("handle_v3_transition_text")
+    service = block.index("handle_v3_service_text")
+    keyword = block.index("handle_v3_keyword_search_text")
+    remove = block.index("remove_legacy_reply_keyboard")
+    assert remove < intercept < early_return < transition < service < keyword
+
+
+def test_legacy_reply_text_never_exposes_internal_listing_ids():
+    labels = (
+        "开始找房", "帮我找房", "精准筛选", "预约看房", "我的收藏",
+        "我的预约", "我的租约", "入住服务", "售后服务", "服务保障",
+        "租后服务", "联系顾问", "联系我们", "中文顾问", "使用说明",
+        "关于侨联", "首页", "返回首页",
+    )
+    rendered_contract = " ".join(
+        f"{label}:{legacy_reply_text_action(label)}:{legacy_start_payload(legacy_reply_text_action(label))}"
+        for label in labels
+    )
+    assert "l_" not in rendered_contract.lower()
+
+
+def test_legacy_contact_and_aftercare_destinations_render_new_names():
+    from v3_core.user_bot.home_views import build_contact_view
+    contact = build_contact_view(advisor_url="https://t.me/advisor")
+    assert "中文顾问" in contact.text
+    assert "联系顾问" not in _labels(contact)
+    rental = build_assurance_home_view()
+    assert "租到房，不代表服务就结束了" in rental.text
+    assert "关于侨联" not in rental.text

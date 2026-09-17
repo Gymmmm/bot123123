@@ -1,4 +1,4 @@
-"""Compatibility-only routing for retired public User Bot callbacks."""
+"""Compatibility-only routing for retired public User Bot inputs."""
 from __future__ import annotations
 
 from typing import Literal
@@ -25,9 +25,52 @@ _LEGACY_HOME_ACTIONS: dict[str, LegacyHomeAction] = {
     "appointment_menu:contact": "contact",
 }
 
+_LEGACY_REPLY_TEXT_ACTIONS: dict[str, LegacyHomeAction] = {
+    "开始找房": "search",
+    "帮我找房": "search",
+    "精准筛选": "search",
+    "预约看房": "search",
+    "我的收藏": "search",
+    "我的预约": "appointments",
+    "我的租约": "service",
+    "入住服务": "service",
+    "售后服务": "rental",
+    "服务保障": "rental",
+    "租后服务": "rental",
+    "联系顾问": "contact",
+    "联系我们": "contact",
+    "中文顾问": "contact",
+    "使用说明": "home",
+    "关于侨联": "rental",
+    "首页": "home",
+    "返回首页": "home",
+}
+
+_LEGACY_START_PAYLOADS: dict[LegacyHomeAction, str] = {
+    "home": "",
+    "search": "find_home",
+    "appointments": "appointments",
+    "rental": "assurance",
+    "service": "service",
+    "contact": "advisor",
+}
+
 
 def legacy_home_action(value: object) -> LegacyHomeAction | None:
     return _LEGACY_HOME_ACTIONS.get(str(value or "").strip().lower())
 
 
-__all__ = ["LegacyHomeAction", "legacy_home_action"]
+def legacy_reply_text_action(value: object) -> LegacyHomeAction | None:
+    return _LEGACY_REPLY_TEXT_ACTIONS.get(str(value or "").strip())
+
+
+def legacy_start_payload(action: LegacyHomeAction) -> str:
+    return _LEGACY_START_PAYLOADS[action]
+
+
+__all__ = [
+    "LegacyHomeAction",
+    "legacy_home_action",
+    "legacy_reply_text_action",
+    "legacy_start_payload",
+]

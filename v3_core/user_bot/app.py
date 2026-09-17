@@ -34,7 +34,7 @@ from .channel_status_sync import V3AppointmentChannelSynchronizer
 from .contact_effects import ContactEffectExecutor
 from .home_views import build_home_view
 from .listing_contact import ListingContactEffectExecutor
-from .legacy_routes import legacy_home_action
+from .legacy_routes import legacy_home_action, legacy_reply_text_action, legacy_start_payload
 from .runtime import UserBotReadRuntime, build_read_runtime
 from .service_effects import ServiceEffectExecutor
 from .telegram_assurance_handler import handle_v3_assurance_callback
@@ -448,6 +448,11 @@ def build_v3_user_bot_application(
     async def text(update, context):
         runtime_state.heartbeat("user", state="running", event=True)
         await remove_legacy_reply_keyboard(update, context)
+        message = getattr(update, "effective_message", None)
+        legacy_action = legacy_reply_text_action(getattr(message, "text", "") if message is not None else "")
+        if legacy_action is not None:
+            await _run_start_payload(update, context, legacy_start_payload(legacy_action))
+            return
         if is_admin(update) and admin_contract_text_handler is not None:
             admin_result = await admin_contract_text_handler(update, context)
             if admin_result is not None:
