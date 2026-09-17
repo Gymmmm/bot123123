@@ -36,6 +36,6 @@ def test_black_gold_uses_new_1280x720_layout_and_existing_fields(tmp_path: Path,
     html = cover_template_path("black_gold", allow_video=False).read_text(encoding="utf-8")
     for placeholder in ("{{BG_SRC}}", "{{AREA}}", "{{PROJECT}}", "{{LAYOUT}}", "{{PRICE_LINE}}"):
         assert placeholder in html
-    assert "QIAOLIAN REALTY" in html
-    assert "width: 1280px" in html
-    assert "height: 720px" in html
+    assert "QIAO LIAN PROPERTY" in html
+    assert "width:1280px" in html
+    assert "height:720px" in html

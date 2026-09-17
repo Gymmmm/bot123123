@@ -1,7 +1,8 @@
 """Fast Pillow-based cover generator for V3 Publisher.
 
-This is the production cover path for channel listings. It intentionally avoids
-HTML/Playwright and renders directly from resolved V3 listing facts.
+The three production styles share one restrained brand system while keeping
+three distinct layout languages. Rendering is local Pillow-only and consumes
+resolved V3 listing facts without changing publication semantics.
 """
 from __future__ import annotations
 
@@ -9,8 +10,44 @@ from dataclasses import dataclass
 import math
 import os
 from pathlib import Path
+import re
 
 from PIL import Image, ImageDraw, ImageFont
+
+
+BRAND_CN = "侨联地产"
+BRAND_EN = "QIAO LIAN PROPERTY"
+BRAND_BLUE = (18, 57, 103)
+BRAND_BLUE_SOFT = (40, 89, 142)
+BRAND_GOLD = (211, 179, 98)
+BRAND_GOLD_SOFT = (236, 214, 156)
+WARM_WHITE = (249, 247, 240)
+TEXT_LIGHT = (231, 236, 243)
+TEXT_MUTED = (182, 194, 208)
+
+STYLE_LAYOUTS = {
+    "classic_blue": {
+        "size": (1200, 900),
+        "safe": 48,
+        "brand_box": (48, 42, 324, 118),
+        "card": (48, 642, 1152, 858),
+        "card_radius": 18,
+    },
+    "right_price": {
+        "size": (1200, 900),
+        "safe": 48,
+        "gradient_width": 520,
+        "price_card": (850, 722, 1156, 856),
+        "price_radius": 18,
+    },
+    "black_gold": {
+        "size": (1280, 720),
+        "safe": 44,
+        "mask_width": 520,
+        "price_card": (938, 574, 1236, 674),
+        "price_radius": 12,
+    },
+}
 
 
 @dataclass(frozen=True)
@@ -47,7 +84,7 @@ def _font_path(*, bold: bool) -> str:
 
 
 def _font(size: int, *, bold: bool = False) -> ImageFont.FreeTypeFont:
-    """Load the Simplified-Chinese face from a TTC instead of relying on index 0."""
+    """Load Simplified Chinese Noto CJK when available, never emoji fonts."""
     path = _font_path(bold=bold)
     fallback: ImageFont.FreeTypeFont | None = None
     for index in range(32):
@@ -72,25 +109,29 @@ def _font(size: int, *, bold: bool = False) -> ImageFont.FreeTypeFont:
     return ImageFont.truetype(path, size)
 
 
-def _rounded_card_with_shadow(
-    canvas: Image.Image,
-    draw: ImageDraw.ImageDraw,
-    bbox: list[int],
-    *,
-    radius: int,
-    fill: tuple[int, int, int, int],
-) -> None:
-    x1, y1, x2, y2 = bbox
-    shadow = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
-    shadow_draw = ImageDraw.Draw(shadow)
-    for offset, alpha in ((6, 15), (4, 25), (2, 35)):
-        shadow_draw.rounded_rectangle(
-            [x1, y1 + offset, x2, y2 + offset],
-            radius=radius,
-            fill=(0, 0, 0, alpha),
-        )
-    canvas.alpha_composite(shadow)
-    draw.rounded_rectangle(bbox, radius=radius, fill=fill, outline=(255, 255, 255, 180), width=2)
+def _text_width(font: ImageFont.FreeTypeFont, text: str) -> int:
+    bbox = font.getbbox(str(text or ""))
+    return max(0, int(bbox[2] - bbox[0]))
+
+
+def _fit_font(text: str, *, max_width: int, preferred: int, minimum: int, bold: bool = False) -> ImageFont.FreeTypeFont:
+    """Shrink one single-line label just enough to stay inside its safe area."""
+    value = str(text or "")
+    for size in range(preferred, minimum - 1, -2):
+        font = _font(size, bold=bold)
+        if _text_width(font, value) <= max_width:
+            return font
+    return _font(minimum, bold=bold)
+
+
+def _format_layout(value: str) -> str:
+    """Visual-only layout normalization: 3房1厅2卫 -> 3房1厅｜2卫."""
+    text = re.sub(r"\s+", "", str(value or "").strip())
+    if "｜" not in text:
+        match = re.search(r"(\d+卫)$", text)
+        if match and match.start() > 0:
+            text = f"{text[:match.start()]}｜{match.group(1)}"
+    return text
 
 
 def _cover_price(data: CoverRenderData) -> str:
@@ -106,24 +147,8 @@ def _cover_price(data: CoverRenderData) -> str:
     return raw
 
 
-def generate_cover(
-    *,
-    style: str = "pillow_v1",
-    source_image: str,
-    output_path: str,
-    data: CoverRenderData,
-) -> str:
-    """Generate one 1200x900 listing cover using Pillow only."""
-    style = str(style or "right_price").strip().lower()
-    if style not in {"classic_blue", "right_price", "black_gold"}:
-        style = "right_price"
-    source = Path(source_image).expanduser().resolve()
-    output = Path(output_path).expanduser().resolve()
-    if not source.is_file():
-        raise FileNotFoundError(f"cover_source_not_found:{source}")
-    output.parent.mkdir(parents=True, exist_ok=True)
-
-    target_width, target_height = ((1280, 720) if style == "black_gold" else (1200, 900))
+def _cover_crop(source: Path, size: tuple[int, int]) -> Image.Image:
+    target_width, target_height = size
     bg = Image.open(source).convert("RGBA")
     bg_ratio = bg.width / bg.height
     target_ratio = target_width / target_height
@@ -136,108 +161,185 @@ def generate_cover(
     bg = bg.resize((new_width, new_height), Image.Resampling.LANCZOS)
     left = (new_width - target_width) // 2
     top = (new_height - target_height) // 2
-    bg = bg.crop((left, top, left + target_width, top + target_height))
+    return bg.crop((left, top, left + target_width, top + target_height))
 
+
+def _rounded_card_with_shadow(
+    canvas: Image.Image,
+    draw: ImageDraw.ImageDraw,
+    bbox: tuple[int, int, int, int],
+    *,
+    radius: int,
+    fill: tuple[int, int, int, int],
+) -> None:
+    x1, y1, x2, y2 = bbox
+    shadow = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+    shadow_draw = ImageDraw.Draw(shadow)
+    for offset, alpha in ((5, 12), (3, 20), (1, 28)):
+        shadow_draw.rounded_rectangle([x1, y1 + offset, x2, y2 + offset], radius=radius, fill=(0, 0, 0, alpha))
+    canvas.alpha_composite(shadow)
+    draw.rounded_rectangle(bbox, radius=radius, fill=fill)
+
+
+def _draw_brand(
+    draw: ImageDraw.ImageDraw,
+    *,
+    x: int,
+    y: int,
+    accent: tuple[int, int, int],
+    cn_fill: tuple[int, int, int] = (255, 255, 255),
+    en_fill: tuple[int, int, int] | None = None,
+    compact: bool = False,
+) -> None:
+    en_fill = en_fill or accent
+    bar_h = 34 if compact else 40
+    draw.rounded_rectangle([x, y + 2, x + 3, y + 2 + bar_h], radius=2, fill=accent)
+    cn_size = 20 if compact else 24
+    en_size = 10 if compact else 11
+    draw.text((x + 16, y), BRAND_CN, fill=cn_fill, font=_font(cn_size, bold=True))
+    draw.text((x + 16, y + cn_size + 7), BRAND_EN, fill=en_fill, font=_font(en_size, bold=True))
+
+
+def _render_classic_blue(bg: Image.Image, *, title: str, layout: str, location: str, price: str) -> Image.Image:
+    cfg = STYLE_LAYOUTS["classic_blue"]
+    canvas = bg.copy()
+    overlay = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+    od = ImageDraw.Draw(overlay)
+    bx1, by1, bx2, by2 = cfg["brand_box"]
+    od.rounded_rectangle([bx1, by1, bx2, by2], radius=14, fill=(10, 39, 80, 210))
+    cx1, cy1, cx2, cy2 = cfg["card"]
+    od.rounded_rectangle([cx1, cy1, cx2, cy2], radius=cfg["card_radius"], fill=(11, 46, 91, 207))
+    od.rectangle([cx1 + 18, cy1, cx2 - 18, cy1 + 2], fill=(*BRAND_GOLD, 180))
+    canvas = Image.alpha_composite(canvas, overlay)
+    draw = ImageDraw.Draw(canvas)
+
+    _draw_brand(draw, x=66, y=57, accent=BRAND_GOLD, en_fill=(218, 228, 240), compact=True)
+
+    title_font = _fit_font(title, max_width=620, preferred=50, minimum=34, bold=True)
+    layout_font = _fit_font(layout, max_width=610, preferred=29, minimum=22, bold=True)
+    location_font = _fit_font(location, max_width=610, preferred=21, minimum=17)
+    price_font = _fit_font(price, max_width=340, preferred=50, minimum=34, bold=True)
+
+    draw.text((72, 669), title, fill=WARM_WHITE, font=title_font)
+    draw.text((72, 729), layout, fill=TEXT_LIGHT, font=layout_font)
+    draw.text((72, 779), location, fill=TEXT_MUTED, font=location_font)
+
+    price_width = _text_width(price_font, price)
+    price_x = 1118 - price_width
+    draw.text((price_x, 711), price, fill=BRAND_GOLD_SOFT, font=price_font)
+    return canvas
+
+
+def _render_black_gold(bg: Image.Image, *, title: str, layout: str, location: str, price: str, price_label: str) -> Image.Image:
+    cfg = STYLE_LAYOUTS["black_gold"]
+    width, height = cfg["size"]
+    canvas = bg.copy()
+    overlay = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+    od = ImageDraw.Draw(overlay)
+
+    mask_width = cfg["mask_width"]
+    for x in range(mask_width):
+        progress = x / max(1, mask_width - 1)
+        alpha = int(210 * math.pow(1 - progress, 1.35))
+        od.line([(x, 0), (x, height)], fill=(9, 9, 10, alpha))
+    for y in range(110):
+        alpha = int(78 * (1 - y / 109))
+        od.line([(0, y), (width, y)], fill=(0, 0, 0, alpha))
+
+    canvas = Image.alpha_composite(canvas, overlay)
+    draw = ImageDraw.Draw(canvas)
+    _draw_brand(draw, x=44, y=38, accent=BRAND_GOLD, en_fill=BRAND_GOLD, compact=True)
+
+    title_font = _fit_font(title, max_width=500, preferred=54, minimum=34, bold=True)
+    layout_font = _fit_font(layout, max_width=500, preferred=25, minimum=19)
+    location_font = _fit_font(location, max_width=500, preferred=18, minimum=15)
+
+    draw.text((44, 438), title, fill=WARM_WHITE, font=title_font)
+    draw.text((44, 504), layout, fill=TEXT_LIGHT, font=layout_font)
+    draw.line([(44, 544), (86, 544)], fill=BRAND_GOLD, width=1)
+    draw.text((44, 555), location, fill=BRAND_GOLD_SOFT, font=location_font)
+
+    x1, y1, x2, y2 = cfg["price_card"]
+    draw.rounded_rectangle([x1, y1, x2, y2], radius=cfg["price_radius"], fill=(12, 12, 13, 205), outline=BRAND_GOLD, width=2)
+    label_font = _font(14, bold=True)
+    value_font = _fit_font(price, max_width=(x2 - x1) - 30, preferred=38, minimum=28, bold=True)
+    draw.text((x1 + 18, y1 + 14), price_label, fill=(185, 167, 125), font=label_font)
+    value_width = _text_width(value_font, price)
+    draw.text((x2 - 18 - value_width, y1 + 42), price, fill=BRAND_GOLD, font=value_font)
+    return canvas
+
+
+def _render_right_price(bg: Image.Image, *, title: str, layout: str, location: str, price: str, price_label: str) -> Image.Image:
+    cfg = STYLE_LAYOUTS["right_price"]
+    width, height = cfg["size"]
+    mask = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    md = ImageDraw.Draw(mask)
+    gradient_w = cfg["gradient_width"]
+    for x in range(gradient_w):
+        progress = x / max(1, gradient_w - 1)
+        alpha = int(180 * math.pow(1 - progress, 1.45))
+        md.line([(x, 0), (x, height)], fill=(7, 16, 31, alpha))
+    canvas = Image.alpha_composite(bg, mask)
+    draw = ImageDraw.Draw(canvas)
+
+    _draw_brand(draw, x=52, y=46, accent=BRAND_BLUE_SOFT, en_fill=(220, 229, 240), compact=False)
+
+    title_font = _fit_font(title, max_width=530, preferred=68, minimum=42, bold=True)
+    draw.text((54, 282), title, fill="white", font=title_font)
+    title_box = title_font.getbbox(title)
+    title_h = max(1, title_box[3] - title_box[1])
+
+    pill_y = 282 + title_h + 26
+    layout_font = _fit_font(layout, max_width=450, preferred=27, minimum=20, bold=True)
+    layout_w = _text_width(layout_font, layout)
+    pill_w = min(500, layout_w + 36)
+    draw.rounded_rectangle([54, pill_y, 54 + pill_w, pill_y + 44], radius=18, fill=(255, 255, 255, 238))
+    draw.text((72, pill_y + 7), layout, fill=(26, 39, 57), font=layout_font)
+
+    location_font = _fit_font(location, max_width=500, preferred=23, minimum=18)
+    draw.text((54, pill_y + 72), location, fill=TEXT_LIGHT, font=location_font)
+
+    x1, y1, x2, y2 = cfg["price_card"]
+    _rounded_card_with_shadow(canvas, draw, (x1, y1, x2, y2), radius=cfg["price_radius"], fill=(253, 254, 255, 246))
+    label_font = _font(17)
+    value_font = _fit_font(price, max_width=(x2 - x1) - 34, preferred=46, minimum=32, bold=True)
+    label_width = _text_width(label_font, price_label)
+    value_width = _text_width(value_font, price)
+    draw.text((x1 + (x2 - x1 - label_width) // 2, y1 + 18), price_label, fill=(120, 137, 157), font=label_font)
+    draw.text((x1 + (x2 - x1 - value_width) // 2, y1 + 55), price, fill=BRAND_BLUE, font=value_font)
+    return canvas
+
+
+def generate_cover(
+    *,
+    style: str = "pillow_v1",
+    source_image: str,
+    output_path: str,
+    data: CoverRenderData,
+) -> str:
+    """Generate one production listing cover with the style's existing ratio."""
+    style = str(style or "right_price").strip().lower()
+    if style not in STYLE_LAYOUTS:
+        style = "right_price"
+    source = Path(source_image).expanduser().resolve()
+    output = Path(output_path).expanduser().resolve()
+    if not source.is_file():
+        raise FileNotFoundError(f"cover_source_not_found:{source}")
+    output.parent.mkdir(parents=True, exist_ok=True)
+
+    bg = _cover_crop(source, STYLE_LAYOUTS[style]["size"])
     title = str(data.project or data.property_type or "优质房源").strip()
-    tag = str(data.layout or data.property_type or "房源").strip()
-    location = str(data.area or "位置待确认").strip()
+    layout = _format_layout(data.layout or data.property_type or "房源")
+    location = str(data.area or data.project or "位置待确认").strip()
     price = _cover_price(data)
     price_label = "租金" if str(data.deal_type or "rent").lower() == "rent" else "售价"
 
     if style == "classic_blue":
-        canvas = bg.copy()
-        overlay = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
-        od = ImageDraw.Draw(overlay)
-        od.rectangle([0, 0, 430, 150], fill=(10, 47, 122, 238))
-        od.rounded_rectangle([28, 590, 860, 870], radius=28, fill=(17, 71, 178, 232))
-        canvas = Image.alpha_composite(canvas, overlay)
-        draw = ImageDraw.Draw(canvas)
-        draw.text((34, 28), "侨联地产", fill="white", font=_font(48, bold=True))
-        draw.text((36, 88), "QIAO LIAN PROPERTY", fill=(230, 238, 255), font=_font(20))
-        draw.text((58, 620), title, fill="white", font=_font(62, bold=True))
-        draw.text((58, 706), tag, fill=(236, 244, 255), font=_font(34, bold=True))
-        draw.text((58, 770), location, fill=(236, 244, 255), font=_font(28))
-        draw.text((500, 745), price, fill=(246, 201, 72), font=_font(58, bold=True))
+        canvas = _render_classic_blue(bg, title=title, layout=layout, location=location, price=price)
     elif style == "black_gold":
-        canvas = bg.copy()
-        overlay = Image.new("RGBA", (target_width, target_height), (0, 0, 0, 0))
-        od = ImageDraw.Draw(overlay)
-
-        # 650px cinematic left mask: near-black at the edge, fading to clear.
-        mask_width = min(650, target_width)
-        for x in range(mask_width):
-            progress = x / max(1, mask_width - 1)
-            if progress <= 0.5:
-                alpha = int(240 + (191 - 240) * (progress / 0.5))
-            else:
-                alpha = int(191 * (1 - (progress - 0.5) / 0.5))
-            od.line([(x, 0), (x, target_height)], fill=(13, 13, 14, max(0, alpha)))
-
-        # Subtle top protection gradient for the compact brand header.
-        top_height = min(140, target_height)
-        for y in range(top_height):
-            alpha = int(115 * (1 - y / max(1, top_height - 1)))
-            od.line([(0, y), (target_width, y)], fill=(0, 0, 0, alpha))
-
-        canvas = Image.alpha_composite(canvas, overlay)
-        draw = ImageDraw.Draw(canvas)
-        matte_gold = (212, 175, 55)
-        champagne = (254, 240, 138)
-        light_text = (226, 232, 240)
-
-        # Brand header.
-        draw.rounded_rectangle([48, 48, 51, 88], radius=2, fill=matte_gold)
-        draw.text((67, 47), "侨联地产", fill="white", font=_font(20, bold=True))
-        draw.text((67, 73), "QIAOLIAN REALTY", fill=matte_gold, font=_font(11, bold=True))
-
-        # Left-bottom property information stack.
-        x = 48
-        price_y = target_height - 48 - 48
-        layout_y = price_y - 24 - 24
-        project_y = layout_y - 12 - 62
-        location_y = project_y - 8 - 24
-        draw.text((x, location_y), location, fill=matte_gold, font=_font(18, bold=True))
-        draw.text((x, project_y), title, fill="white", font=_font(56, bold=True))
-        draw.text((x, layout_y), tag, fill=light_text, font=_font(24))
-        draw.text((x, price_y), price, fill=champagne, font=_font(48, bold=True))
+        canvas = _render_black_gold(bg, title=title, layout=layout, location=location, price=price, price_label=price_label)
     else:
-        mask = Image.new("RGBA", (target_width, target_height), (0, 0, 0, 0))
-        mask_draw = ImageDraw.Draw(mask)
-        gradient_w = int(target_width * 0.48)
-        for x in range(gradient_w):
-            progress = x / gradient_w
-            alpha = int(220 * (1 - math.pow(progress, 1.3)))
-            mask_draw.line([(x, 0), (x, target_height)], fill=(5, 12, 24, alpha))
-        canvas = Image.alpha_composite(bg, mask)
-        draw = ImageDraw.Draw(canvas)
-        x_offset = 60
-        curr_y = 50
-        draw.line([(x_offset, curr_y + 4), (x_offset, curr_y + 54)], fill="white", width=4)
-        logo_x = x_offset + 20
-        draw.text((logo_x, curr_y), "侨联地产", fill="white", font=_font(36, bold=True))
-        draw.text((logo_x, curr_y + 42), "QIAO LIAN", fill=(210, 215, 225), font=_font(18))
-        curr_y = 260
-        title_font = _font(76, bold=True)
-        draw.text((x_offset, curr_y), title, fill="white", font=title_font)
-        title_bbox = title_font.getbbox(title)
-        curr_y += (title_bbox[3] - title_bbox[1]) + 30
-        tag_font = _font(32, bold=True)
-        tag_bbox = tag_font.getbbox(tag)
-        tag_w = tag_bbox[2] - tag_bbox[0] + 44
-        draw.rounded_rectangle([x_offset, curr_y, x_offset + tag_w, curr_y + 52], radius=26, fill="white")
-        draw.text((x_offset + 22, curr_y + 8), tag, fill="#111827", font=tag_font)
-        curr_y += 87
-        draw.text((x_offset, curr_y), f"📍  {location}", fill="white", font=_font(32))
-        card_w, card_h = 360, 160
-        card_x2, card_y2 = target_width - 50, target_height - 50
-        card_x1, card_y1 = card_x2 - card_w, card_y2 - card_h
-        _rounded_card_with_shadow(canvas, draw, [card_x1, card_y1, card_x2, card_y2], radius=24, fill=(252, 253, 255, 248))
-        label_font = _font(24)
-        value_font = _font(60, bold=True)
-        label_bbox = label_font.getbbox(price_label)
-        draw.text((card_x1 + (card_w - (label_bbox[2]-label_bbox[0])) // 2, card_y1 + 24), price_label, fill="#64748B", font=label_font)
-        price_bbox = value_font.getbbox(price)
-        draw.text((card_x1 + (card_w - (price_bbox[2]-price_bbox[0])) // 2, card_y1 + 64), price, fill="#0F4C81", font=value_font)
+        canvas = _render_right_price(bg, title=title, layout=layout, location=location, price=price, price_label=price_label)
 
     if output.suffix.lower() not in {".jpg", ".jpeg"}:
         output = output.with_suffix(".jpg")
@@ -254,10 +356,10 @@ def generate_property_cover(
     location: str = "金街附近",
     price: str = "$300/月",
     price_label: str = "租金",
-    brand_title: str = "侨联地产",
-    brand_sub: str = "QIAO LIAN",
+    brand_title: str = BRAND_CN,
+    brand_sub: str = BRAND_EN,
 ) -> str:
-    """Compatibility wrapper matching the standalone generator supplied by the owner."""
+    """Compatibility wrapper for the historical standalone generator."""
     del price_label, brand_title, brand_sub
     raw_price = str(price or "").replace("/月", "").replace("$", "").strip()
     return generate_cover(
@@ -274,4 +376,11 @@ def generate_property_cover(
     )
 
 
-__all__ = ["CoverRenderData", "generate_cover", "generate_property_cover"]
+__all__ = [
+    "BRAND_CN",
+    "BRAND_EN",
+    "STYLE_LAYOUTS",
+    "CoverRenderData",
+    "generate_cover",
+    "generate_property_cover",
+]
