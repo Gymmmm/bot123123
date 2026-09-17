@@ -1,0 +1,131 @@
+name: rollback-production-to-96d5ac-20260918
+
+on:
+  push:
+    branches:
+      - ops/rollback-production-to-96d5ac-20260918
+    paths:
+      - '.github/workflows/rollback-production-to-96d5ac-20260918.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qiaolian-production
+  cancel-in-progress: false
+
+env:
+  EXPECTED_CURRENT_SHA: 57a2239716f67ceeb6fe58613857552f2758c3df
+  TARGET_SHA: 96d5ac76afd5aeecb53c36dc571b35eabec1574a
+  PROD_HOST: 50.114.74.120
+  PROD_PORT: '22'
+  PROD_SSH_USER: root
+  PROD_SSH_KNOWN_HOSTS: '50.114.74.120 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMvdBaAbAt9/4NCEC4RmiAukQ5KK5S6OF4YEml2iLw+6'
+  PROD_SSH_HOST_FINGERPRINT: 'SHA256:fuufBlFaqRpQhlkio0vuLsuv8w8x3zUb3VFQsnUny/o'
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Verify production SSH host key
+        run: |
+          set -Eeuo pipefail
+          ssh-keyscan -T 10 -p "$PROD_PORT" -t ed25519 "$PROD_HOST" 2>/dev/null | grep -v '^#' > "$RUNNER_TEMP/qiaolian_observed_known_hosts"
+          ssh-keygen -lf "$RUNNER_TEMP/qiaolian_observed_known_hosts" | grep -F "$PROD_SSH_HOST_FINGERPRINT"
+
+      - name: Configure production SSH
+        env:
+          PROD_SSH_PRIVATE_KEY: '${{ secrets.PROD_SSH_PRIVATE_KEY }}'
+        run: |
+          set -Eeuo pipefail
+          test -n "$PROD_SSH_PRIVATE_KEY"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
+          printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
+
+      - name: Roll back exact production release and verify
+        run: |
+          set -Eeuo pipefail
+          ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 \
+            "$PROD_SSH_USER@$PROD_HOST" \
+            "bash -s -- '$EXPECTED_CURRENT_SHA' '$TARGET_SHA'" <<'REMOTE'
+          set -Eeuo pipefail
+          EXPECTED_CURRENT_SHA=$1
+          TARGET_SHA=$2
+          ROOT=/opt/qiaolian_v3
+          CURRENT="$ROOT/current"
+          DB=/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db
+          SERVICES=(qiaolian-v3@collector.service qiaolian-v3@canonical.service qiaolian-v3@publisher.service qiaolian-v3@user.service)
+
+          CURRENT_RELEASE=$(readlink -f "$CURRENT")
+          CURRENT_SHA=$(basename "$CURRENT_RELEASE")
+          test "$CURRENT_SHA" = "$EXPECTED_CURRENT_SHA" || { echo "ROLLBACK_BLOCKED unexpected_current_sha=$CURRENT_SHA"; exit 1; }
+          test -d "$ROOT/releases/$TARGET_SHA" || { echo "ROLLBACK_BLOCKED target_release_missing=$TARGET_SHA"; exit 1; }
+          test -f "$DB" || { echo "ROLLBACK_BLOCKED production_db_missing"; exit 1; }
+
+          PYTHON_BOOTSTRAP=''
+          for python_candidate in "$ROOT/.venv/bin/python" /opt/qiaolian-python-3.12/bin/python3 /usr/local/bin/python3.12 /usr/bin/python3.12; do
+            if [ -x "$python_candidate" ]; then PYTHON_BOOTSTRAP="$python_candidate"; break; fi
+          done
+          test -n "$PYTHON_BOOTSTRAP" || { echo "ROLLBACK_BLOCKED missing_python"; exit 1; }
+
+          echo '=== PRE-ROLLBACK DB CHECK ==='
+          "$PYTHON_BOOTSTRAP" - "$DB" <<'PY'
+          import sqlite3,sys
+          db=sqlite3.connect(f"file:{sys.argv[1]}?mode=ro",uri=True); db.execute("PRAGMA query_only=ON")
+          integrity=db.execute("PRAGMA integrity_check").fetchone()[0]
+          quick=db.execute("PRAGMA quick_check").fetchone()[0]
+          print("integrity_check=",integrity); print("quick_check=",quick)
+          assert integrity=="ok" and quick=="ok"
+          PY
+
+          ln -sfn "$ROOT/releases/$TARGET_SHA" "$ROOT/current.rollback"
+          mv -Tf "$ROOT/current.rollback" "$CURRENT"
+          chown -h qiaolianbot:qiaolianbot "$CURRENT"
+          printf '%s\n' "$TARGET_SHA" > "$ROOT/.deployed_sha"
+          chown qiaolianbot:qiaolianbot "$ROOT/.deployed_sha"
+          chmod 0644 "$ROOT/.deployed_sha"
+
+          ACTIVATED_AT=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          systemctl restart "${SERVICES[@]}"
+          sleep 10
+
+          HEALTH_FAILED=0
+          for service in "${SERVICES[@]}"; do
+            ACTIVE=$(systemctl is-active "$service" 2>/dev/null || true)
+            PID=$(systemctl show "$service" -p MainPID --value 2>/dev/null || echo 0)
+            RESTARTS=$(systemctl show "$service" -p NRestarts --value 2>/dev/null || echo unknown)
+            echo "SERVICE_HEALTH unit=$service active=$ACTIVE pid=$PID restarts=$RESTARTS"
+            [ "$ACTIVE" = active ] || HEALTH_FAILED=1
+            [ "${PID:-0}" -gt 0 ] 2>/dev/null || HEALTH_FAILED=1
+            [ "$RESTARTS" = 0 ] || HEALTH_FAILED=1
+          done
+
+          LOGS=$(journalctl -u qiaolian-v3@collector.service -u qiaolian-v3@canonical.service -u qiaolian-v3@publisher.service -u qiaolian-v3@user.service --since "$ACTIVATED_AT" --no-pager)
+          printf '%s\n' "$LOGS"
+          if [ "$HEALTH_FAILED" -ne 0 ] || printf '%s\n' "$LOGS" | grep -Eqi 'Traceback|ModuleNotFoundError|ImportError|database is locked|sqlite.*error|409.*conflict|Conflict: terminated by other getUpdates request|polling error|callback.*exception|publication.*(error|failed)|appointment.*(error|failed)|lead.*(error|failed)|Main process exited|Failed with result'; then
+            echo 'ROLLBACK_HEALTH_FAILED'
+            exit 1
+          fi
+
+          echo '=== POST-ROLLBACK DB CHECK ==='
+          "$PYTHON_BOOTSTRAP" - "$DB" <<'PY'
+          import sqlite3,sys
+          db=sqlite3.connect(f"file:{sys.argv[1]}?mode=ro",uri=True); db.execute("PRAGMA query_only=ON")
+          integrity=db.execute("PRAGMA integrity_check").fetchone()[0]
+          quick=db.execute("PRAGMA quick_check").fetchone()[0]
+          print("post_integrity_check=",integrity); print("post_quick_check=",quick)
+          assert integrity=="ok" and quick=="ok"
+          PY
+
+          test "$(basename "$(readlink -f "$CURRENT")")" = "$TARGET_SHA"
+          test "$(tr -cd '0-9a-fA-F' < "$ROOT/.deployed_sha")" = "$TARGET_SHA"
+          echo "ROLLBACK_OK sha=$TARGET_SHA"
+          REMOTE
+
+      - name: Remove temporary SSH material
+        if: always()
+        run: rm -f "$HOME/.ssh/qiaolian_production"
