@@ -48,54 +48,159 @@ jobs:
           echo "DEPLOY_SHA=$REQUESTED_SHA" >> "$GITHUB_ENV"
 
       - name: Checkout approved immutable SHA
-        uses: actions/checkoupˆÚ]‚ˆ™YŽˆ	ÞÈ[œ]Ë™\ÞWÜÚH_Bˆ™]ÚY\ˆˆ\œÚ\ÝXÜ™Y[X[Îˆ˜[ÙB‚ˆH˜[YNˆ™\šYžHÛÛ[Z][˜Ù\ÝžH[™™YBˆ[ŽˆˆÙ]QY][È\Y˜Z[ˆÐS‘QUWÔÒOI
-Ú]™]‹\\œÙHPQ
-BˆÐS‘QUWÕ‘QOI
-Ú]™]‹\\œÙH	ÒPQžÝ™Y_IÊBˆÐS‘QUWÔT‘S•I
-Ú]™]‹\\œÙHPQŠBˆ\Ý‰ÐS‘QUWÔÒHˆH‰TÖWÔÒH‚ˆ\Ý‰ÐS‘QUWÔÒHˆH‰T“Õ‘QÑTÖWÔÒH‚ˆ\Ý‰ÐS‘QUWÔT‘S•ˆH‰VPÕQÔT‘S•ÔÒH‚ˆ\Ý‰ÐS‘QUWÕ‘QHˆH‰VPÕQÕ‘QWÔÒH‚ˆÚ]Y\™ÙKX˜\ÙHKZ\ËX[˜Ù\ÝÜˆ‰VPÕQÔ“ÑPÕSÓ—ÐTÑWÔÒHˆ‰ÐS‘QUWÔÒH‚ˆXÚÈÐS‘QUWÔÒOIÐS‘QUWÔÒHˆˆ‰ÒUP—ÑS•ˆ‚ˆXÚÈÐS‘QUWÕ‘QOIÐS‘QUWÕ‘QHˆˆ‰ÒUP—ÑS•ˆ‚‚ˆH\Ù\ÎˆXÝ[ÛœËÜÙ]\\]ÛBˆÚ]‚ˆ]Û‹]™\œÚ[ÛŽˆ	ÌËŒL‰Â‚ˆH˜[YNˆ[ˆÛÛ\]HŒÈ™YÜ™\ÜÚ[ÛˆØ]Bˆ[Ž‚ˆUÓ”Uˆ	ÉÞÈÚ]X‹ÛÜšÜÜXÙH_IÂˆ[ŽˆˆÙ]QY][È\Y˜Z[ˆ]Ûˆ[H\[œÝ[K]\Ü˜YH\ˆ]Ûˆ[H\[œÝ[\ˆ™\]Z\™[Y[Ë]\Ý]\ÝX\Þ[˜Ú[Âˆ]Ûˆ[HÛÛ\[X[\HŒ×ØÛÜ™H\ÝËÝŒ×ØÛÜ™H[—ÝŒ×ØÛÛXÝÜ‹œH[—ÝŒ×ØØ[›ÛšXØ[ÝÛÜšÙ\‹œH[—ÝŒ×ÜX›\Ú\—Ø›ÝœH[—ÝŒ×Ý\Ù\—Ø›ÝœH[—ÝŒ×Ü™Y›YÚœBˆ]Ûˆ[H]\Ý\H\ÝËÝŒ×ØÛÜ™BˆÚ]Y™ˆKXÚXÚÈ‰VPÕQÔ“ÑPÕSÓ—ÐTÑWÔÒK‹‰ÐS‘QUWÔÒH‚‚ˆH˜[YNˆZ[[[]]X›H™[X\ÙH[™Bˆ[Ž‚ˆ‘SPTÑWÐ•S‘Nˆ	ÉÞÈ[›™\‹[\_KÜZX[ÛX[‹]ŒË\™[X\ÙK˜[™IÂˆ[ŽˆˆÙ]QY][È\Y˜Z[ˆÚ]\]K\™Yˆ™YœËÚXYËØXÝ[ÛœË\›ÙXÝ[Ûˆ‰ÐS‘QUWÔÒH‚ˆÚ][™HÜ™X]H‰‘SPTÑWÐ•S‘Hˆ™YœËÚXYËØXÝ[ÛœË\›ÙXÝ[Û‚ˆÚ][™H™\šYžH‰‘SPTÑWÐ•S‘H‚‚ˆH˜[YNˆ™\šYžH›ÙXÝ[ÛˆÔÒÜÝÙ^Bˆ[ŽˆˆÙ]QY][È\Y˜Z[ˆÜÚZÙ^\ØØ[ˆUL\‰“ÑÔÔ•ˆ]YMLNH‰“ÑÒÔÕˆ‹Ù]‹Û[Ü™\]ˆ	×ˆÉÈˆ‰•S“‘T—ÕSTÜZX[ÛX[—ÛØœÙ\™YÚÛ›ÝÛ—ÚÜÝÈ‚ˆÜÚZÙ^YÙ[ˆ[ˆ‰•S“‘T—ÕSTÜZX[ÛX[—ÛØœÙ\™YÚÛ›ÝÛ—ÚÜÝÈˆÜ™\Qˆ‰“ÑÔÔÒÒÔÕÑ’S‘ÑT”’S•‚‚ˆH˜[YNˆÛÛ™šYÝ\™H›ÙXÝ[ÛˆÔÒˆ[Ž‚ˆ“ÑÔÔÒÔ’UUWÒÑVNˆ	ÉÞÈÙXÜ™]Ë”“ÑÔÔÒÔ’UUWÒÑVH_IÂˆ[ŽˆˆÙ]QY][È\Y˜Z[ˆ\Ý[ˆ‰“ÑÔÔÒÔ’UUWÒÑVH‚ˆ[œÝ[Y[HÌ‰ÓQKËœÜÚ‚ˆš[ˆ	É\×‰È‰“ÑÔÔÒÔ’UUWÒÑVHˆˆ‰ÓQKËœÜÚÜZX[ÛX[—Ü›ÙXÝ[Ûˆ‚ˆš[ˆ	É\×‰È‰“ÑÔÔÒÒÓ“ÕÓ—ÒÔÕÈˆˆ‰ÓQKËœÜÚÚÛ›ÝÛ—ÚÜÝÈ‚ˆÚ[ÙŒ‰ÓQKËœÜÚÜZX[ÛX[—Ü›ÙXÝ[Ûˆˆ‰ÓQKËœÜÚÚÛ›ÝÛ—ÚÜÝÈ‚‚ˆH˜[YNˆ\ØY™\šYšYY™[X\ÙH[™Bˆ[Ž‚ˆ‘SPTÑWÐ•S‘Nˆ	ÉÞÈ[›™\‹[\_KÜZX[ÛX[‹]ŒË\™[X\ÙK˜[™IÂˆ‘SSÕWÐ•S‘Nˆ	ËÝ˜\‹Ý\ÜZX[ÛX[‹]ŒËIÞÈÚ]X‹œ[—ÚY_KIÞÈÚ]X‹œÚH_K˜[™IÂˆ[ŽˆˆÙ]QY][È\Y˜Z[ˆØÜT‰“ÑÔÔ•ˆZH‰ÓQKËœÜÚÜZX[ÛX[—Ü›ÙXÝ[Ûˆˆ[È˜]Ú[ÙO^Y\È[ÈY[]Y\ÓÛ›O^Y\È[ÈÛÛ›™XÝ[Y[Ý]LŒ‰‘SPTÑWÐ•S‘Hˆ‰“ÑÔÔÒÕTÑT	“ÑÒÔÕ‰‘SSÕWÐ•S‘H‚‚ˆH˜[YNˆ\ÞH[™™\šYžH›Ý\ˆŒÈÛÛ\Û™[Âˆ[Ž‚ˆ‘SSÕWÐ•S‘Nˆ	ËÝ˜\‹Ý\ÜZX[ÛX[‹]ŒËIÞÈÚ]X‹œ[—ÚY_KIÞÈÚ]X‹œÚH_K˜[™IÂˆ[ŽˆˆÙ]QY][È\Y˜Z[ˆÜÚ\‰“ÑÔÔ•ˆZH‰ÓQKËœÜÚÜZX[ÛX[—Ü›ÙXÝ[Ûˆˆ[È˜]Ú[ÙO^Y\È[ÈY[]Y\ÓÛ›O^Y\È[ÈÛÛ›™XÝ[Y[Ý]LŒ‰“ÑÔÔÒÕTÑT	“ÑÒÔÕˆ˜˜\Ú\ÈKH	É‘SSÕWÐ•S‘IÈ	ÉÐS‘QUWÔÒIÈ	ÉVPÕQÔ“ÑPÕSÓ—ÐTÑWÔÒIÈˆ	Ô‘SSÕIÂˆÙ]QY][È\Y˜Z[ˆ•S‘WÔUIBˆVPÕQÔÒOI‚ˆVPÕQÓÓÔÒOIÂˆ“ÓÕKÛÜÜZX[ÛX[—ÝŒÂˆÓKÛÜÜZX[ÛX[—ÙX[Ø›ÝÂˆ‘SPTÑOH‰“ÓÕÜ™[X\Ù\ËÉVPÕQÔÒH‚ˆÕT”‘S•H‰“ÓÕØÝ\œ™[‚ˆ•S•SQWÑS•H‰“ÓÕÜ[[YK™[ˆ‚ˆ‘S•H‰“ÓÕË™[ˆ‚ˆH‰ÓÙ]KÜZX[ÛX[—ÙX[Ø›Ý™ˆ‚ˆPÒÕTÑTKÛÜÜZX[ÛX[—Ø˜XÚÝ\ÂˆUÓ—Ð“ÓÕÕTHˆ‚ˆÑT•’PÑTÏJZX[ÛX[‹]ŒÐÛÛXÝÜ‹œÙ\šXÙHZX[ÛX[‹]ŒÐØ[›ÛšXØ[œÙ\šXÙHZX[ÛX[‹]ŒÐX›\Ú\‹œÙ\šXÙHZX[ÛX[‹]ŒÐ\Ù\‹œÙ\šXÙJBˆÕÒUÒQLˆÓÔ‘SPTÑOHˆ‚ˆÓÔÒOHˆ‚ˆPÒÕTÔUHˆ‚ˆÛX[\
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.deploy_sha }}
+          fetch-depth: 0
+          persist-credentials: false
 
-HÈ›HYˆKH‰•S‘WÔUŽÈBˆ›Û˜XÚ×Ü™[X\ÙJ
-HÂˆ˜ÏIÎÈ˜\HT”‚ˆYˆÈ‰ÕÒUÒQˆY\HHH	‰ˆÈ[ˆ‰ÓÔ‘SPTÑHˆH	‰ˆÈY‰ÓÔ‘SPTÑHˆNÈ[‚ˆXÚÈ”“ÓPÒ×ÔÕT•™[X\ÙOIÓÔ‘SPTÑH‚ˆˆ\Ù›ˆ‰ÓÔ‘SPTÑHˆ‰“ÓÕØÝ\œ™[œ›Û˜XÚÈŽÈ]ˆUˆ‰“ÓÕØÝ\œ™[œ›Û˜XÚÈˆ‰ÕT”‘S•‚ˆÞ\Ý[XÝ™\Ý\‰ÔÑT•’PÑTÖÐ_HˆYBˆYˆÈ[ˆ‰ÓÔÒHˆNÈ[ˆš[ˆ	É\×‰È‰ÓÔÒHˆˆ‰“ÓÕË™\ÞYYÜÚHŽÈÚ[Ù‰“ÓÕË™\ÞYYÜÚHŽÈšBˆXÚÈ”“ÓPÒ×ÐÓÓTUH™[X\ÙOIÓÔ‘SPTÑH‚ˆšBˆÛX[\È^]‰˜È‚ˆBˆ˜\ÛX[\VUˆ\ÝYˆ‰•S‘WÔUˆÈXÚÈ‘TÖWÐ“ÐÒÑQZ\ÜÚ[™×Ü™[X\ÙWØ[™HŽÈ^]NÈBˆ\ÝYˆ‰•S•SQWÑS•ˆˆÈXÚÈ‘TÖWÐ“ÐÒÑQZ\ÜÚ[™×Ü[[YWÙ[ˆŽÈ^]NÈBˆ\ÝYˆ‰ˆˆÈXÚÈ‘TÖWÐ“ÐÒÑQZ\ÜÚ[™×Ü›ÙXÝ[Û—ÙˆŽÈ^]NÈBˆ\ÝY‰ÓÛYYXHˆÈXÚÈ‘TÖWÐ“ÐÒÑQZ\ÜÚ[™×Ü›ÙXÝ[Û—ÛYYXHŽÈ^]NÈBˆ\ÝY‰ÓÝ[]Û—ÜÙ\ÜÚ[ÛœÈˆÈXÚÈ‘TÖWÐ“ÐÒÑQZ\ÜÚ[™×Ý[]Û—ÜÙ\ÜÚ[ÛœÈŽÈ^]NÈBˆÓÔ‘SPTÑOI
-™XY[šÈYˆ‰ÕT”‘S•ŠNÈ\ÝY‰ÓÔ‘SPTÑHˆÈXÚÈ‘TÖWÐ“ÐÒÑQÝ\œ™[Ü™[X\ÙWÛZ\ÜÚ[™ÈŽÈ^]NÈBˆÓÔÒOI
-˜\Ù[˜[YH‰ÓÔ‘SPTÑHŠNÈ\Ý‰ÓÔÒHˆH‰VPÕQÓÓÔÒHˆÈXÚÈ‘TÖWÐ“ÐÒÑQ[™^XÝYØÝ\œ™[ÜÚOIÓÔÒHŽÈ^]NÈBˆ›ÜˆÙ\šXÙH[ˆ‰ÔÑT•’PÑTÖÐ_HŽÈÈ\Ý‰
-Þ\Ý[XÝ\ËXXÝ]™H‰Ù\šXÙHŠHˆHXÝ]™HÈXÚÈ‘TÖWÐ“ÐÒÑQÙ\šXÙWÛ›ÝØXÝ]™OIÙ\šXÙHŽÈ^]NÈNÈÛ™Bˆ›Üˆ]Û—ØØ[™Y]H[ˆ‰‘S•‹Øš[‹Ü]Ûˆˆ‰ÓË™[‹Øš[‹Ü]ÛˆˆÛÜÜZX[ÛX[‹\]Û‹LËŒL‹Øš[‹Ü]ÛŒÈÝ\Ü‹ÛØØ[Øš[‹Ü]ÛŒËŒLˆÝ\Ü‹Øš[‹Ü]ÛŒËŒLŽÈÈYˆÈ^‰]Û—ØØ[™Y]HˆNÈ[ˆUÓ—Ð“ÓÕÕTH‰]Û—ØØ[™Y]HŽÈœ™XZÎÈšNÈÛ™Bˆ\Ý[ˆ‰UÓ—Ð“ÓÕÕTˆÈXÚÈ‘TÖWÐ“ÐÒÑQZ\ÜÚ[™×Ü]Û—Ø›ÛÝÝ˜\ŽÈ^]NÈBˆXÚÈ	ÏOOH‘KQTÖHˆÒPÒÈOOIÂˆ‰UÓ—Ð“ÓÕÕTˆH‰ˆˆ	ÔIÂˆ[\ÜÜ[]LËÞ\Âˆ\Ü[]LË˜ÛÛ›™XÝ
-ˆ™š[NžÜÞ\Ë˜\™Ý–ÌW_OÛ[ÙO\›È‹\šOUYJNÈ‹™^XÝ]J”QÓPH]Y\žWÛÛ›OSÓˆŠBˆš[
-š[YÜš]WØÚXÚÏH‹‹™^XÝ]J”QÓPH[YÜš]WØÚXÚÈŠK™™]ÚÛ™J
-VÌJNÈš[
-œ]ZXÚ×ØÚXÚÏH‹‹™^XÝ]J”QÓPH]ZXÚ×ØÚXÚÈŠK™™]ÚÛ™J
-VÌJBˆ\ÜÙ\‹™^XÝ]J”QÓPH[YÜš]WØÚXÚÈŠK™™]ÚÛ™J
-VÌOOH›ÚÈŽÈ\ÜÙ\‹™^XÝ]J”QÓPH]ZXÚ×ØÚXÚÈŠK™™]ÚÛ™J
-VÌOOH›ÚÈ‚ˆBˆ[œÝ[Y[HÍL[È›ÛÝYÈZX[ÛX[˜›Ý‰PÒÕTÑTˆ‚ˆPÒÕTÔUH‰PÒÕTÑT‹ÜZX[ÛX[—Ø™Y›Ü™WÉÑVPÕQÔÒ_WÉ
-]H]H
-ÉVI[IYÉR	SITÊK™ˆ‚ˆ‰UÓ—Ð“ÓÕÕTˆH‰ˆˆ‰PÒÕTÔUˆ	ÔIÂˆ[\ÜÜ[]LËÞ\ÂˆÜ˜Ï\Ü[]LË˜ÛÛ›™XÝ
-ˆ™š[NžÜÞ\Ë˜\™Ý–ÌW_OÛ[ÙO\›È‹\šOUYJNÈÜ˜Ë™^XÝ]J”QÓPH]Y\žWÛÛ›OSÓˆŠNÈÝ\Ü[]LË˜ÛÛ›™XÝ
-Þ\Ë˜\™Ý–Ì—JNÈÜ˜Ë˜˜XÚÝ\
-Ý
-NÈÝ˜ÛÜÙJ
-NÈÜ˜Ë˜ÛÜÙJ
-BˆÚXÚÏ\Ü[]LË˜ÛÛ›™XÝ
-ˆ™š[NžÜÞ\Ë˜\™Ý–Ì—_OÛ[ÙO\›È‹\šOUYJNÈÚXÚË™^XÝ]J”QÓPH]Y\žWÛÛ›OSÓˆŠNÈ[YÜš]OXÚXÚË™^XÝ]J”QÓPH[YÜš]WØÚXÚÈŠK™™]ÚÛ™J
-VÌNÈ]ZXÚÏXÚXÚË™^XÝ]J”QÓPH]ZXÚ×ØÚXÚÈŠK™™]ÚÛ™J
-VÌBˆš[
-˜˜XÚÝ\Ú[YÜš]WØÚXÚÏH‹[YÜš]JNÈš[
-˜˜XÚÝ\Ü]ZXÚ×ØÚXÚÏH‹]ZXÚÊNÈ\ÜÙ\[YÜš]OOH›ÚÈŽÈ\ÜÙ\]ZXÚÏOH›ÚÈŽÈÚXÚË˜ÛÜÙJ
-BˆBˆÚ[Ù‰PÒÕTÔUŽÈÚÝÛˆ›ÛÝœZX[ÛX[˜›Ý‰PÒÕTÔUŽÈXÚÈ‘—ÐPÒÕT]IPÒÕTÔUž]\ÏI
-Ý]XÈ	\È‰PÒÕTÔUŠH‚ˆ[œÝ[Y[HÍMH‰“ÓÕÜ™[X\Ù\È‚ˆYˆÈHY‰‘SPTÑKË™Ú]ˆNÈ[ˆ›H\™ˆKH‰‘SPTÑHŽÈÚ]ÛÛ™H\H‰•S‘WÔUˆKXœ˜[˜ÚXÝ[ÛœË\›ÙXÝ[Ûˆ‰‘SPTÑHŽÈšBˆ\Ý‰
-Ú]PÈ‰‘SPTÑHˆ™]‹\\œÙHPQ
-HˆH‰VPÕQÔÒH‚ˆš[ˆ	É\×‰È‰VPÕQÔÒHˆˆ‰‘SPTÑKË™\ÞYYÜÚHŽÈÚ[Ù‰‘SPTÑKË™\ÞYYÜÚHŽÈÚÝÛˆTˆZX[ÛX[˜›ÝœZX[ÛX[˜›Ý‰‘SPTÑH‚ˆ[\Ù\ˆ]HZX[ÛX[˜›ÝKH˜\Ú[ÈœÙ]XNÈÛÝ\˜ÙH	É•S•SQWÑS•‰ÎÈÙ]
-ØNÈ^ÜRPSÓPS—ÐÓÑWÔ“ÓÕIÉ‘SPTÑIÎÈ^XÈ	ÉUÓ—Ð“ÓÕÕT	È	É‘SPTÑKÜ[—ÝŒ×Ü™Y›YÚœIÈKXÛÛ\Û™[[KYˆ	É‰È‚ˆ˜\›Û˜XÚ×Ü™[X\ÙHT”‚ˆˆ\Ù›ˆ‰‘SPTÑHˆ‰“ÓÕØÝ\œ™[›™^ŽÈ]ˆUˆ‰“ÓÕØÝ\œ™[›™^ˆ‰ÕT”‘S•ŽÈÕÒUÒQLBˆPÕUUQÐUI
-]H]H	ÊÉVKI[KIY	R‰SN‰TÈUÉÊNÈÞ\Ý[XÝ™\Ý\‰ÔÑT•’PÑTÖÐ_HŽÈÛY\LˆPSÑRSQLˆ›ÜˆÙ\šXÙH[ˆ‰ÔÑT•’PÑTÖÐ_HŽÈÈPÕU‘OI
-Þ\Ý[XÝ\ËXXÝ]™H‰Ù\šXÙHˆ‹Ù]‹Û[YJNÈQI
-Þ\Ý[XÝÚÝÈ‰Ù\šXÙHˆ\XZ[”QK]˜[YH‹Ù]‹Û[XÚÈ
-NÈ‘TÕT•ÏI
-Þ\Ý[XÝÚÝÈ‰Ù\šXÙHˆ\”™\Ý\ÈK]˜[YH‹Ù]‹Û[XÚÈ[šÛ›ÝÛŠNÈXÚÈ”ÑT•’PÑWÒPS[š]IÙ\šXÙHXÝ]™OIPÕU‘HYIQ™\Ý\ÏI‘TÕT•ÈŽÈÈ‰PÕU‘HˆHXÝ]™H_PSÑRSQLNÈÈ‰ÔQ‹LHˆYÝH‹Ù]‹Û[PSÑRSQLNÈÈ‰‘TÕT•ÈˆH_PSÑRSQLNÈÛ™BˆÑÔÏI
-›Ý\›˜[Ý]HZX[ÛX[‹]ŒÐÛÛXÝÜ‹œÙ\šXÙH]HZX[ÛX[‹]ŒÐØ[›ÛšXØ[œÙ\šXÙH]HZX[ÛX[‹]ŒÐX›\Ú\‹œÙ\šXÙH]HZX[ÛX[‹]ŒÐ\Ù\‹œÙ\šXÙHK\Ú[˜ÙH‰PÕUUQÐUˆK[›Ë\YÙ\ŠNÈš[ˆ	É\×‰È‰ÑÔÈ‚ˆYˆÈ‰PSÑRSQˆ[™HHš[ˆ	É\×‰È‰ÑÔÈˆÜ™\Q\ZH	Õ˜XÙX˜XÚß[Ù[S›Ý›Ý[™\œ›ÜŸXZ[ˆ›ØÙ\ÜÈ^]Y˜Z[YÚ]™\Ý[]X˜\ÙH\ÈØÚÙYÜ[]KŠ™\œ›ÜŸKŠ˜ÛÛ™›XÝÛÛ™›XÝˆ\›Z[˜]YžHÝ\ˆÙ]\]\È™\]Y\ÝÛ[™È\œ›ÜŸØ[˜XÚËŠ™^Ù\[ÛŸX›XØ][Û‹ŠŠ\œ›ÜŸ˜Z[Y
-_\Ú[Y[Š\œ›ÜŸ˜Z[Y
-_XYŠŠ\œ›ÜŸ˜Z[Y
-IÎÈ[ˆXÚÈ	ÑTÖWÒPSÑRSQ	ÎÈ˜[ÙNÈšBˆ‰UÓ—Ð“ÓÕÕUˆH‰ˆˆ	ÔIÂˆ[\ÜÜ[]LËÞ\Âˆ\Ü[]LË˜ÛÛ›™XÝ
-ˆ™š[NžÜÞ\Ë˜\™Ý–ÌW_OÛ[ÙO\›È‹\šOUYJNÈ‹™^XÝ]J”QÓPH]Y\žWÛÛ›OSÓˆŠNÈ[YÜš]OY‹™^XÝ]J”QÓPH[YÜš]WØÚXÚÈŠK™™]ÚÛ™J
-VÌNÈ]ZXÚÏY‹™^XÝ]J”QÓPH]ZXÚ×ØÚXÚÈŠK™™]ÚÛ™J
-VÌBˆš[
-œÜÝÚ[YÜš]WØÚXÚÏH‹[YÜš]JNÈš[
-œÜÝÜ]ZXÚ×ØÚXÚÏH‹]ZXÚÊNÈ\ÜÙ\[YÜš]OOH›ÚÈŽÈ\ÜÙ\]ZXÚÏOH›ÚÈ‚ˆBˆš[ˆ	É\×‰È‰VPÕQÔÒHˆˆ‰“ÓÕË™\ÞYYÜÚHŽÈÚ[Ù‰“ÓÕË™\ÞYYÜÚHŽÈ˜\HT”‚ˆXÚÈ•Œ×ÑTÖSQS•ÓÒÈÚOIVPÕQÔÒH˜XÚÝ\IPÒÕTÔU‚ˆ‘SSÕB‚ˆH˜[YNˆ™[[Ý™H[\Ü˜\žHÔÒX]\šX[ˆYŽˆ[Ø^\Ê
-Bˆ[Žˆ›HYˆ‰ÓQKËœÜÚÜZX[ÛX[—Ü›ÙXÝ[Ûˆ‚
+      - name: Verify commit ancestry and tree
+        run: |
+          set -Eeuo pipefail
+          CANDIDATE_SHA=$(git rev-parse HEAD)
+          CANDIDATE_TREE=$(git rev-parse 'HEAD^{tree}')
+          CANDIDATE_PARENT=$(git rev-parse HEAD^)
+          test "$CANDIDATE_SHA" = "$DEPLOY_SHA"
+          test "$CANDIDATE_SHA" = "$APPROVED_DEPLOY_SHA"
+          test "$CANDIDATE_PARENT" = "$EXPECTED_PARENT_SHA"
+          test "$CANDIDATE_TREE" = "$EXPECTED_TREE_SHA"
+          git merge-base --is-ancestor "$EXPECTED_PRODUCTION_BASE_SHA" "$CANDIDATE_SHA"
+          echo "CANDIDATE_SHA=$CANDIDATE_SHA" >> "$GITHUB_ENV"
+          echo "CANDIDATE_TREE=$CANDIDATE_TREE" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run complete V3 regression gate
+        env:
+          PYTHONPATH: '${{ github.workspace }}'
+        run: |
+          set -Eeuo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pytest pytest-asyncio
+          python -m compileall -q v3_core tests/v3_core run_v3_collector.py run_v3_canonical_worker.py run_v3_publisher_bot.py run_v3_user_bot.py run_v3_preflight.py
+          python -m pytest -q tests/v3_core
+          git diff --check "$EXPECTED_PRODUCTION_BASE_SHA..$CANDIDATE_SHA"
+
+      - name: Build immutable release bundle
+        env:
+          RELEASE_BUNDLE: '${{ runner.temp }}/qiaolian-v3-release.bundle'
+        run: |
+          set -Eeuo pipefail
+          git update-ref refs/heads/actions-production "$CANDIDATE_SHA"
+          git bundle create "$RELEASE_BUNDLE" refs/heads/actions-production
+          git bundle verify "$RELEASE_BUNDLE"
+
+      - name: Verify production SSH host key
+        run: |
+          set -Eeuo pipefail
+          ssh-keyscan -T 10 -p "$PROD_PORT" -t ed25519 "$PROD_HOST" 2>/dev/null | grep -v '^#' > "$RUNNER_TEMP/qiaolian_observed_known_hosts"
+          ssh-keygen -lf "$RUNNER_TEMP/qiaolian_observed_known_hosts" | grep -F "$PROD_SSH_HOST_FINGERPRINT"
+
+      - name: Configure production SSH
+        env:
+          PROD_SSH_PRIVATE_KEY: '${{ secrets.PROD_SSH_PRIVATE_KEY }}'
+        run: |
+          set -Eeuo pipefail
+          test -n "$PROD_SSH_PRIVATE_KEY"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
+          printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
+
+      - name: Upload verified release bundle
+        env:
+          RELEASE_BUNDLE: '${{ runner.temp }}/qiaolian-v3-release.bundle'
+          REMOTE_BUNDLE: '/var/tmp/qiaolian-v3-${{ github.run_id }}-${{ github.sha }}.bundle'
+        run: |
+          set -Eeuo pipefail
+          scp -P "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 "$RELEASE_BUNDLE" "$PROD_SSH_USER@$PROD_HOST:$REMOTE_BUNDLE"
+
+      - name: Deploy and verify four V3 components
+        env:
+          REMOTE_BUNDLE: '/var/tmp/qiaolian-v3-${{ github.run_id }}-${{ github.sha }}.bundle'
+        run: |
+          set -Eeuo pipefail
+          ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 "$PROD_SSH_USER@$PROD_HOST" "bash -s -- '$REMOTE_BUNDLE' '$CANDIDATE_SHA' '$EXPECTED_PRODUCTION_BASE_SHA'" <<'REMOTE'
+          set -Eeuo pipefail
+          BUNDLE_PATH=$1
+          EXPECTED_SHA=$2
+          EXPECTED_OLD_SHA=$3
+          ROOT=/opt/qiaolian_v3
+          OLD=/opt/qiaolian_dual_bots
+          RELEASE="$ROOT/releases/$EXPECTED_SHA"
+          CURRENT="$ROOT/current"
+          RUNTIME_ENV="$ROOT/runtime.env"
+          VENV="$ROOT/.venv"
+          DB="$OLD/data/qiaolian_dual_bot.db"
+          BACKUP_DIR=/opt/qiaolian_backups
+          PYTHON_BOOTSTRAP=""
+          SERVICES=(qiaolian-v3@collector.service qiaolian-v3@canonical.service qiaolian-v3@publisher.service qiaolian-v3@user.service)
+          SWITCHED=0
+          OLD_RELEASE=""
+          OLD_SHA=""
+          BACKUP_PATH=""
+          cleanup() { rm -f -- "$BUNDLE_PATH"; }
+          rollback_release() {
+            rc=$?; trap - ERR
+            if [ "$SWITCHED" -eq 1 ] && [ -n "$OLD_RELEASE" ] && [ -d "$OLD_RELEASE" ]; then
+              echo "ROLLBACK_START release=$OLD_RELEASE"
+              ln -sfn "$OLD_RELEASE" "$ROOT/current.rollback"; mv -Tf "$ROOT/current.rollback" "$CURRENT"
+              systemctl restart "${SERVICES[@]}" || true
+              if [ -n "$OLD_SHA" ]; then printf '%s\n' "$OLD_SHA" > "$ROOT/.deployed_sha"; chmod 0644 "$ROOT/.deployed_sha"; fi
+              echo "ROLLBACK_COMPLETE release=$OLD_RELEASE"
+            fi
+            cleanup; exit "$rc"
+          }
+          trap cleanup EXIT
+          test -f "$BUNDLE_PATH" || { echo "DEPLOY_BLOCKED missing_release_bundle"; exit 1; }
+          test -f "$RUNTIME_ENV" || { echo "DEPLOY_BLOCKED missing_runtime_env"; exit 1; }
+          test -f "$DB" || { echo "DEPLOY_BLOCKED missing_production_db"; exit 1; }
+          test -d "$OLD/media" || { echo "DEPLOY_BLOCKED missing_production_media"; exit 1; }
+          test -d "$OLD/telethon_sessions" || { echo "DEPLOY_BLOCKED missing_telethon_sessions"; exit 1; }
+          OLD_RELEASE=$(readlink -f "$CURRENT"); test -d "$OLD_RELEASE" || { echo "DEPLOY_BLOCKED current_release_missing"; exit 1; }
+          OLD_SHA=$(basename "$OLD_RELEASE"); test "$OLD_SHA" = "$EXPECTED_OLD_SHA" || { echo "DEPLOY_BLOCKED unexpected_current_sha=$OLD_SHA"; exit 1; }
+          for service in "${SERVICES[@]}"; do test "$(systemctl is-active "$service")" = active || { echo "DEPLOY_BLOCKED service_not_active=$service"; exit 1; }; done
+          for python_candidate in "$VENV/bin/python" "$OLD/.venv/bin/python" /opt/qiaolian-python-3.12/bin/python3 /usr/local/bin/python3.12 /usr/bin/python3.12; do if [ -x "$python_candidate" ]; then PYTHON_BOOTSTRAP="$python_candidate"; break; fi; done
+          test -n "$PYTHON_BOOTSTRAP" || { echo "DEPLOY_BLOCKED missing_python_bootstrap"; exit 1; }
+          echo '=== PRE-DEPLOY DB CHECK ==='
+          "$PYTHON_BOOTSTRAP" - "$DB" <<'PY'
+          import sqlite3, sys
+          db=sqlite3.connect(f"file:{sys.argv[1]}?mode=ro",uri=True); db.execute("PRAGMA query_only=ON")
+          print("integrity_check=",db.execute("PRAGMA integrity_check").fetchone()[0]); print("quick_check=",db.execute("PRAGMA quick_check").fetchone()[0])
+          assert db.execute("PRAGMA integrity_check").fetchone()[0]=="ok"; assert db.execute("PRAGMA quick_check").fetchone()[0]=="ok"
+          PY
+          install -d -m 0750 -o root -g qiaolianbot "$BACKUP_DIR"
+          BACKUP_PATH="$BACKUP_DIR/qiaolian_before_${EXPECTED_SHA}_$(date -u +%Y%m%d_%H%M%S).db"
+          "$PYTHON_BOOTSTRAP" - "$DB" "$BACKUP_PATH" <<'PY'
+          import sqlite3,sys
+          src=sqlite3.connect(f"file:{sys.argv[1]}?mode=ro",uri=True); src.execute("PRAGMA query_only=ON"); dst=sqlite3.connect(sys.argv[2]); src.backup(dst); dst.close(); src.close()
+          check=sqlite3.connect(f"file:{sys.argv[2]}?mode=ro",uri=True); check.execute("PRAGMA query_only=ON"); integrity=check.execute("PRAGMA integrity_check").fetchone()[0]; quick=check.execute("PRAGMA quick_check").fetchone()[0]
+          print("backup_integrity_check=",integrity); print("backup_quick_check=",quick); assert integrity=="ok"; assert quick=="ok"; check.close()
+          PY
+          chmod 0640 "$BACKUP_PATH"; chown root:qiaolianbot "$BACKUP_PATH"; echo "DB_BACKUP path=$BACKUP_PATH bytes=$(stat -c %s "$BACKUP_PATH")"
+          install -d -m 0755 "$ROOT/releases"
+          if [ ! -d "$RELEASE/.git" ]; then rm -rf -- "$RELEASE"; git clone -q "$BUNDLE_PATH" --branch actions-production "$RELEASE"; fi
+          test "$(git -C "$RELEASE" rev-parse HEAD)" = "$EXPECTED_SHA"
+          printf '%s\n' "$EXPECTED_SHA" > "$RELEASE/.deployed_sha"; chmod 0644 "$RELEASE/.deployed_sha"; chown -R qiaolianbot:qiaolianbot "$RELEASE"
+          runuser -u qiaolianbot -- bash -lc "set -a; source '$RUNTIME_ENV'; set +a; export QIAOLIAN_CODE_ROOT='$RELEASE'; exec '$PYTHON_BOOTSTRAP' '$RELEASE/run_v3_preflight.py' --component all --db '$DB'"
+          trap rollback_release ERR
+          ln -sfn "$RELEASE" "$ROOT/current.next"; mv -Tf "$ROOT/current.next" "$CURRENT"; SWITCHED=1
+          ACTIVATED_AT=$(date -u '+%Y-%m-%d %H:%M:%S UTC'); systemctl restart "${SERVICES[@]}"; sleep 10
+          HEALTH_FAILED=0
+          for service in "${SERVICES[@]}"; do ACTIVE=$(systemctl is-active "$service" 2>/dev/null||true); PID=$(systemctl show "$service" -p MainPID --value 2>/dev/null||echo 0); RESTARTS=$(systemctl show "$service" -p NRestarts --value 2>/dev/null||echo unknown); echo "SERVICE_HEALTH unit=$service active=$ACTIVE pid=$PID restarts=$RESTARTS"; [ "$ACTIVE" = active ]||HEALTH_FAILED=1; [ "${PID:-0}" -gt 0 ] 2>/dev/null||HEALTH_FAILED=1; [ "$RESTARTS" = 0 ]||HEALTH_FAILED=1; done
+          LOGS=$(journalctl -u qiaolian-v3@collector.service -u qiaolian-v3@canonical.service -u qiaolian-v3@publisher.service -u qiaolian-v3@user.service --since "$ACTIVATED_AT" --no-pager); printf '%s\n' "$LOGS"
+          if [ "$HEALTH_FAILED" -ne 0 ] || printf '%s\n' "$LOGS" | grep -Eqi 'Traceback|ModuleNotFoundError|Main process exited|Failed with result|database is locked|sqlite.*error|409.*conflict|Conflict: terminated by other getUpdates request|polling error|callback.*exception|publication.*(error|failed)|appointment.*(error|failed)|lead.*(error|failed)'; then echo 'DEPLOY_HEALTH_FAILED'; false; fi
+          "$PYTHON_BOOTSTRAP" - "$DB" <<'PY'
+          import sqlite3,sys
+          db=sqlite3.connect(f"file:{sys.argv[1]}?mode=ro",uri=True); db.execute("PRAGMA query_only=ON"); integrity=db.execute("PRAGMA integrity_check").fetchone()[0]; quick=db.execute("PRAGMA quick_check").fetchone()[0]
+          print("post_integrity_check=",integrity); print("post_quick_check=",quick); assert integrity=="ok"; assert quick=="ok"
+          PY
+          printf '%s\n' "$EXPECTED_SHA" > "$ROOT/.deployed_sha"; chmod 0644 "$ROOT/.deployed_sha"; trap - ERR
+          echo "V3_DEPLOYMENT_OK sha=$EXPECTED_SHA backup=$BACKUP_PATH"
+          REMOTE
+
+      - name: Remove temporary SSH material
+        if: always()
+        run: rm -f "$HOME/.ssh/qiaolian_production"
