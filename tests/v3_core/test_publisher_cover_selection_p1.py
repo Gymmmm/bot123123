@@ -148,12 +148,13 @@ async def test_manual_cover_picker_selects_real_photo_and_preserves_it_across_te
     assert await controller.handle_callback(update, context) is True
     assert workflow.build_calls[-1]["manual_cover_path"] == candidates[2]
 
-    # Switch template: selected photo 2 survives and the style is persisted.
-    update = SimpleNamespace(callback_query=SimpleNamespace(data="v3smp|manual_style|black_gold", message=_Message()))
-    assert await controller.handle_callback(update, context) is True
-    assert workflow.build_calls[-1]["manual_cover_path"] == candidates[2]
-    assert workflow.build_calls[-1]["cover_style"] == "black_gold"
-    assert context.user_data[NEW_LISTING_STATE_KEY]["cover_style"] == "black_gold"
+    # Switch through all image templates: selected photo 2 always survives.
+    for style in ("classic_blue", "right_price", "black_gold"):
+        update = SimpleNamespace(callback_query=SimpleNamespace(data=f"v3smp|manual_style|{style}", message=_Message()))
+        assert await controller.handle_callback(update, context) is True
+        assert workflow.build_calls[-1]["manual_cover_path"] == candidates[2]
+        assert workflow.build_calls[-1]["cover_style"] == style
+        assert context.user_data[NEW_LISTING_STATE_KEY]["cover_style"] == style
 
     # Regenerate without an explicit style: session style and selected photo still win.
     await controller.prepare_manual_preview(_Message(), context, review_id=workflow.review["review_id"], offer_id=workflow.offer["offer_id"])
@@ -171,3 +172,54 @@ def test_cover_related_callbacks_stay_within_telegram_contract():
         "v3smp|manual_cover_pick|999",
     ]
     assert all(len(value.encode("utf-8")) <= 64 for value in callbacks)
+
+@pytest.mark.asyncio
+async def test_manual_selected_cover_survives_all_three_template_switches(tmp_path: Path):
+    candidates = []
+    for index, value in enumerate((55, 125, 205)):
+        path = tmp_path / f"stable_photo_{index}.jpg"
+        _image(path, value)
+        candidates.append(str(path.resolve()))
+    media = SimpleNamespace(
+        cover_source_path=candidates[0],
+        gallery_paths=tuple(candidates),
+        ranking=tuple({"file": path, "reject": False} for path in candidates),
+    )
+    workflow = _Workflow(media)
+    controller = object.__new__(PublisherAdviserAdminController)
+    controller.workflow = workflow
+    controller.repository = _Repo()
+    controller.channel_chat_id = "-100123"
+    controller.home_row = lambda: []
+
+    async def no_blockers(detail):
+        return [], media
+
+    controller._manual_blockers = no_blockers
+    state = {
+        "review_id": workflow.review["review_id"],
+        "offer_id": workflow.offer["offer_id"],
+        "listing_id": "l_cover",
+        "package_id": "PKG3_" + "a" * 32,
+        "mode": "preview",
+    }
+    context = SimpleNamespace(user_data={NEW_LISTING_STATE_KEY: state}, bot=object())
+
+    await controller.prepare_manual_preview(
+        _Message(),
+        context,
+        review_id=workflow.review["review_id"],
+        offer_id=workflow.offer["offer_id"],
+    )
+    picker = SimpleNamespace(callback_query=SimpleNamespace(data="v3smp|manual_cover", message=_Message()))
+    assert await controller.handle_callback(picker, context) is True
+
+    pick = SimpleNamespace(callback_query=SimpleNamespace(data="v3smp|manual_cover_pick|1", message=_Message()))
+    assert await controller.handle_callback(pick, context) is True
+    assert workflow.build_calls[-1]["manual_cover_path"] == candidates[1]
+
+    for style in ("classic_blue", "right_price", "black_gold"):
+        update = SimpleNamespace(callback_query=SimpleNamespace(data=f"v3smp|manual_style|{style}", message=_Message()))
+        assert await controller.handle_callback(update, context) is True
+        assert workflow.build_calls[-1]["manual_cover_path"] == candidates[1]
+        assert workflow.build_calls[-1]["cover_style"] == style

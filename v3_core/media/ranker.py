@@ -123,6 +123,52 @@ def _color(img) -> float:
     return max(0.0, 100.0 - abs(saturation - 75.0))
 
 
+def _cover_scene_metrics(img) -> dict[str, Any]:
+    """Estimate whether a photo primarily shows livable interior space.
+
+    This is deliberately a small local CV heuristic, not a room classifier.
+    It prevents sharp/bright skyline or balcony views from outranking usable
+    interior photos while retaining the existing quality gates.
+    """
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    height = max(1, img.shape[0])
+    lower = hsv[int(height * 0.45):, :, :]
+    upper = hsv[:max(1, int(height * 0.45)), :, :]
+
+    neutral_lower = float(np.mean((lower[:, :, 1] < 80) & (lower[:, :, 2] > 110)))
+    blue_upper = float(np.mean(
+        (upper[:, :, 0] >= 85)
+        & (upper[:, :, 0] <= 130)
+        & (upper[:, :, 1] > 25)
+        & (upper[:, :, 2] > 100)
+    ))
+    bright_gray_upper = float(np.mean((upper[:, :, 1] < 45) & (upper[:, :, 2] > 185)))
+    edges = cv2.Canny(gray, 60, 160)
+    edge_ratio = float(np.count_nonzero(edges) / max(1, edges.size))
+    sky_view_signal = min(1.0, blue_upper * 1.6 + max(0.0, bright_gray_upper - 0.25) * 1.1)
+
+    if neutral_lower >= 0.45:
+        priority, kind = 4, "interior_spacious"
+    elif edge_ratio < 0.03 and neutral_lower >= 0.20:
+        priority, kind = 3, "interior_room"
+    elif edge_ratio > 0.065 and sky_view_signal >= 0.18:
+        if sky_view_signal >= 0.30:
+            priority, kind = 0, "outdoor_view"
+        else:
+            priority, kind = 1, "building_or_balcony"
+    else:
+        priority, kind = 2, "interior_compact_or_mixed"
+
+    return {
+        "cover_scene_priority": priority,
+        "cover_scene_kind": kind,
+        "neutral_lower_ratio": round(neutral_lower, 4),
+        "sky_view_signal": round(sky_view_signal, 4),
+        "edge_ratio": round(edge_ratio, 4),
+    }
+
+
 def _cv_metrics(path: Path) -> dict[str, Any] | None:
     img = _read_cv(path)
     if img is None:
@@ -136,6 +182,7 @@ def _cv_metrics(path: Path) -> dict[str, Any] | None:
     orientation, ratio = _orientation(img)
     space = _space(img)
     color = _color(img)
+    scene = _cover_scene_metrics(img)
 
     rejected = False
     reason = ""
@@ -178,6 +225,7 @@ def _cv_metrics(path: Path) -> dict[str, Any] | None:
         "space": round(space, 2),
         "color": round(color, 2),
         "ratio": round(ratio, 3),
+        **scene,
     }
 
 
@@ -205,6 +253,11 @@ def _score_one(path: Path, source_order: int) -> dict[str, Any]:
             "space": 0.0,
             "color": 0.0,
             "ratio": round(ratio, 3),
+            "cover_scene_priority": 2,
+            "cover_scene_kind": "unknown_no_cv",
+            "neutral_lower_ratio": 0.0,
+            "sky_view_signal": 0.0,
+            "edge_ratio": 0.0,
         }
     return {
         "file": str(path),
@@ -228,6 +281,8 @@ def rank_photo_paths(paths: Iterable[str | Path]) -> list[dict[str, Any]]:
         landscape = ratio >= 1.05
         return (
             0 if item.get("reject") else 1,
+            int(item.get("cover_scene_priority") or 0),
+            float(item.get("space") or 0),
             1 if landscape else 0,
             float(item.get("orientation") or 0),
             float(item.get("sharpness") or 0),
