@@ -56,6 +56,7 @@ class PackageBuildService:
         gallery: list[str],
         source_identity: dict[str, Any] | None = None,
         adviser_copy_override: str | None = None,
+        inventory_status_override: str | None = None,
     ) -> FrozenPackage:
         listing = self.reader.listing(listing_id)
         offer = self.reader.offer(offer_id)
@@ -84,11 +85,14 @@ class PackageBuildService:
             adviser_copy = str(adviser_copy_override).strip()
             adviser_copy_source = "hidden" if not adviser_copy else "manual"
 
+        frozen_status = str(
+            inventory_status_override or listing.get("inventory_status") or "active"
+        ).strip().lower()
         caption = render_channel_caption(
             listing=listing,
             offer=offer,
             public_listing_id=public_id,
-            status=str(listing.get("inventory_status") or "active"),
+            status=frozen_status,
             adviser_note=adviser_copy,
         )
         rent = offer.get("monthly_rent_usd")
@@ -130,8 +134,9 @@ class PackageBuildService:
             "adviser_copy_source": adviser_copy_source,
             "adviser_seed": adviser_seed,
             "listing": {
-                key: listing.get(key)
-                for key in (
+                **{
+                    key: listing.get(key)
+                    for key in (
                     "project_name",
                     "project_alias",
                     "project_brand",
@@ -147,8 +152,10 @@ class PackageBuildService:
                     "bathrooms",
                     "size_sqm",
                     "floor",
-                    "inventory_status",
-                )
+                        "inventory_status",
+                    )
+                },
+                "inventory_status": frozen_status,
             },
             "offer": {
                 key: offer.get(key)

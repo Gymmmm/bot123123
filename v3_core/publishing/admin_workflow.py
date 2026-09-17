@@ -154,6 +154,7 @@ class PublisherWorkflowService:
         manual_cover_path: str | None = None,
         excluded_gallery_paths: Iterable[str] = (),
         adviser_copy_override: str | None = None,
+        inventory_status_override: str | None = None,
     ) -> FrozenPackage:
         detail = self.review_detail(review_id)
         if str(detail.review.get("review_status") or "") != "approved":
@@ -196,6 +197,7 @@ class PublisherWorkflowService:
             gallery=gallery,
             source_identity=dict(media.source_identity),
             adviser_copy_override=adviser_copy_override,
+            inventory_status_override=inventory_status_override,
         )
 
     def package(self, package_id: str) -> FrozenPackage:
