@@ -24,7 +24,6 @@ def build_appointment_success_view(
     *,
     submission_kind: str,
 ) -> TransitionView:
-    """Render success without ever exposing the internal listing id."""
     subject = ""
     try:
         published = inventory.resolve(draft.public_listing_id)
@@ -32,14 +31,12 @@ def build_appointment_success_view(
             details = build_public_listing_details(published)
             subject = details.subject or details.location or ""
     except (FileNotFoundError, OSError, ValueError):
-        # Persistence has already succeeded. A display-only lookup must never
-        # turn that success into an internal-id leak or a false failure page.
         subject = ""
 
     if str(submission_kind or "") == "updated":
-        heading = "✅ <b>预约时间已修改</b>"
+        heading = "✅ <b>预约时间已改好</b>"
     else:
-        heading = "✅ <b>预约申请已提交</b>"
+        heading = "✅ <b>预约已经提交</b>"
 
     short_time = {
         "am": "上午",
@@ -54,10 +51,8 @@ def build_appointment_success_view(
             f"📅 {he(_date_display(draft.date))} · {he(short_time)}",
             f"🆔 {he(draft.public_listing_id)}",
             "",
-            "中文顾问会确认房态和具体时间，",
-            "之后通过 Telegram 与您联系。",
-            "",
-            "房源信息已带上，无需重复发送。",
+            "顾问会确认房态和时间，再通过 Telegram 联系你。",
+            "这套房的信息已经带上，不用再发一遍。",
         ]
     )
 
@@ -67,9 +62,9 @@ def build_appointment_success_view(
         rows=(
             (
                 TransitionChoice("📅 我的预约", "home", value="appointments"),
-                TransitionChoice("🏠 继续看房", "home"),
+                TransitionChoice("🔍 继续找房", "home", value="search"),
             ),
-            (TransitionChoice("💬 联系中文顾问", "home", value="contact"),),
+            (TransitionChoice("💬 问这套房", "listing_details", public_listing_id=draft.public_listing_id),),
         ),
     )
 
