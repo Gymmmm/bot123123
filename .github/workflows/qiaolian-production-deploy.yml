@@ -22,10 +22,10 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  APPROVED_DEPLOY_SHA: aa9586da1121f53a1ee6f6d3f4b335731b9c9a14
-  EXPECTED_PARENT_SHA: 65acb78b8fe388e81937a4efb4a37efbfcd6f938
+  APPROVED_DEPLOY_SHA: fa38659cb3e86e19a7d331315f6f2c5662862535
+  EXPECTED_PARENT_SHA: aa9586da1121f53a1ee6f6d3f4b335731b9c9a14
   EXPECTED_PRODUCTION_BASE_SHA: 65acb78b8fe388e81937a4efb4a37efbfcd6f938
-  EXPECTED_TREE_SHA: 98ad9097e5c30d7e6840d691abfef91b49b9f1fb
+  EXPECTED_TREE_SHA: f2a8ede38acae868f22e3aede6b91c72c4a82a3a
   PROD_HOST: 50.114.74.120
   PROD_PORT: '22'
   PROD_SSH_USER: root
@@ -141,7 +141,6 @@ jobs:
           OLD_RELEASE=""
           OLD_SHA=""
           BACKUP_PATH=""
-
           cleanup() { rm -f -- "$BUNDLE_PATH"; }
           rollback_release() {
             rc=$?; trap - ERR
