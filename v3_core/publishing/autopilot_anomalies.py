@@ -9,7 +9,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from .autopilot import ERROR_LABELS
+from .autopilot import AutoPublishResult, ERROR_LABELS
+from .autopilot_first_publish import AutoFirstPublishService
 from .autopilot_policy import ProductionAutoPublishRepository, ProductionAutoPublishService
 
 
@@ -201,6 +202,26 @@ class FinalAutoPublishRepository(ProductionAutoPublishRepository):
 
 class FinalAutoPublishService(ProductionAutoPublishService):
     repository: FinalAutoPublishRepository
+
+    async def process_one(self, *, bot, force_offer_id: str = "", origin: str | None = None):
+        self.repository.sync_candidates()
+        if force_offer_id:
+            self.repository.requeue(force_offer_id)
+            item = self.repository.candidate_for_offer(force_offer_id)
+            if item is None:
+                return AutoPublishResult("idle")
+            checked = await self._validate_item(item)
+            if checked.status != "ready":
+                return checked
+            return await AutoFirstPublishService.process_one(
+                self, bot=bot, force_offer_id=str(force_offer_id), origin=origin
+            )
+        item = self.repository.next_ready_item()
+        if item is None:
+            return AutoPublishResult("idle")
+        return await AutoFirstPublishService.process_one(
+            self, bot=bot, force_offer_id=str(item["offer_id"]), origin=origin
+        )
 
 
 __all__ = ["DDL", "FinalAutoPublishRepository", "FinalAutoPublishService"]
