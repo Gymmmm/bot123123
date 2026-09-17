@@ -144,7 +144,7 @@ async def test_manual_cover_picker_selects_real_photo_and_preserves_it_across_te
     assert workflow.build_calls[-1]["manual_cover_path"] == candidates[1]
 
     # Select photo 2.
-    update = SimpleNamespace(callback_query=SimpleNamespaace(data="v3smp|manual_cover_pick|2", message=_Message()))
+    update = SimpleNamespace(callback_query=SimpleNamespace(data="v3smp|manual_cover_pick|2", message=_Message()))
     assert await controller.handle_callback(update, context) is True
     assert workflow.build_calls[-1]["manual_cover_path"] == candidates[2]
 
