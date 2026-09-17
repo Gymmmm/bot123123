@@ -22,6 +22,8 @@ def _seed_listing(
     offer_status: str = "active",
     published: bool = True,
     layout: str = "2房1厅",
+    project_name: str = "",
+    project_alias: str = "",
 ):
     listing_id = f"LST_{suffix}"
     canonical_id = f"CAN_{suffix}"
@@ -41,16 +43,17 @@ def _seed_listing(
         )
         conn.execute(
             """INSERT INTO listings_v3
-               (listing_id,public_listing_id,canonical_record_id,project_name,
+               (listing_id,public_listing_id,canonical_record_id,project_name,project_alias,
                 property_type,public_location_key,public_location_display,
                 canonical_area_key,layout,canonical_facts_hash,
                 canonical_facts_schema,inventory_status)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 listing_id,
                 public_id,
                 canonical_id,
-                f"项目{suffix}",
+                project_name or f"项目{suffix}",
+                project_alias,
                 property_type,
                 location_key,
                 location_key,
@@ -298,3 +301,26 @@ def test_search_reader_is_read_only_and_does_not_create_missing_db(tmp_path):
         reader.search()
 
     assert not missing.exists()
+
+
+def test_bkk1_agile_query_hits_project_without_polluting_registry_location(tmp_path):
+    db = _db(tmp_path)
+    _seed_listing(
+        db,
+        suffix="H",
+        public_id="QL-AG-H8J9",
+        property_type="公寓",
+        location_key="BKK3",
+        rent=880,
+        project_name="雅居乐",
+        project_alias="Agile Sky Residence",
+    )
+    service = PublicSearchService(PublicSearchReader(db))
+    criteria = parse_search_criteria("BKK1 雅居乐 1000以内")
+
+    assert "BKK1" in criteria.location_keys
+    assert "雅居乐" in criteria.project_terms
+    result = service.strict(criteria, limit=10)
+
+    assert result.mode == "strict"
+    assert [item.public_listing_id for item in result.items] == ["QL-AG-H8J9"]

@@ -1,64 +1,37 @@
-"""Evidence-driven copy engine for ``💬 侨联说``.
+"""Evidence-driven V2 copy engine for the public adviser section.
 
-Only frozen/canonical facts are used. Output is deterministic, contains no
-fallback, and is capped at two different categories. Property type alone never
-creates adviser copy (notably, a villa type does not create a ``villa`` tag).
+The public copy is either empty or one judgement with one practical viewing
+focus. It never exists merely to restate ordinary listing parameters.
 """
 from __future__ import annotations
 
-import hashlib
 import re
 from typing import Any
 
-PHRASES: dict[str, tuple[str, ...]] = {
-    "pest_control": ("这边有灭虫服务安排，比较在意这一点可以记一下。",),
-    "cleaning_1x": ("每周有一次保洁，日常维护会省事一些。",),
-    "cleaning_2x": ("每周有两次保洁，日常维护会轻松不少。",),
-    "cleaning_3x": ("每周有三次保洁，保洁频率比较高。",),
-    "cleaning_included": ("这套包含保洁服务，具体频率以实际确认为准。",),
-    "linen_weekly": ("床品服务也有安排，具体内容可以预约时确认。",),
-    "management_included": ("物业费已经包含，不需要另外单独计算。",),
-    "wifi_included": ("网费已经包含，每月不用另外支付网络费用。",),
-    "wifi_ready": ("宽带已经装好，入住后不用再另外安排安装。",),
-    "management_wifi": ("物业费和网费都已经包含，每月少两项固定支出。",),
-    "management_wifi_ready": ("物业费已经包含，宽带也已经装好了。",),
-    "owner_direct": ("这套是房东直接放租，具体租赁条件可以继续确认。",),
-    "never_lived": ("这套目前全新未入住，比较在意房况新旧可以留意。",),
-    "new_condition": ("这套整体房况偏新，可以现场再确认实际状态。",),
-    "furnished": ("家具配置比较完整，入住前确认实际配置即可。",),
-    "balcony": ("这套带阳台，实际大小和朝向可以看房时确认。",),
-    "city_view": ("这套资料标注为市景，实际视野以现场为准。",),
-    "river_view": ("这套资料标注为河景，实际视野以现场为准。",),
-    "pool": ("小区配有泳池，实际开放情况可以看房时确认。",),
-    "gym": ("小区配有健身房，实际设备情况可以看房时确认。",),
-    "pool_gym": ("泳池和健身房都有，平时运动会比较方便。",),
-    "pickleball": ("小区配有匹克球场，这项配套比较少见。",),
-    "tennis": ("小区配有网球场，平时会打球可以留意。",),
-    "table_tennis": ("小区配有乒乓球设施。",),
-    "billiards": ("小区配有台球设施。",),
-    "kids_area": ("小区有儿童活动区，带小孩入住可以留意。",),
-    "sauna": ("小区配有桑拿设施。",),
-    "jacuzzi": ("小区配有按摩池。",),
-    "rooftop": ("楼内有公共天台，可以看房时顺便看看实际空间。",),
-    "coworking": ("楼内有共享办公空间，经常远程办公会比较方便。",),
-    "concierge": ("楼内有前台管家服务，日常需要协助时有人可以找。",),
-    "parking": ("这边有停车条件，车位和费用可以预约时再确认。",),
-    "private_pool": ("这套自带私人泳池，是比较明显的一项配置。",),
-    "large_layout": ("这套空间偏大，对居住空间有要求可以留意。",),
-    "high_floor": ("这套属于较高楼层，实际视野和居住感受以现场为准。",),
-    "low_floor": ("这套属于较低楼层，实际居住感受以现场为准。",),
-    "pet_allowed": ("这套允许带宠物入住，有宠物可以留意。",),
-}
+
+_SUPPORTED_TAGS = (
+    "pest_control", "cleaning_1x", "cleaning_2x", "cleaning_3x", "cleaning_included",
+    "linen_weekly", "management_included", "wifi_included", "wifi_ready",
+    "management_wifi", "management_wifi_ready", "owner_direct", "never_lived",
+    "new_condition", "furnished", "balcony", "city_view", "river_view", "pool",
+    "gym", "pool_gym", "pickleball", "tennis", "table_tennis", "billiards",
+    "kids_area", "sauna", "jacuzzi", "rooftop", "coworking", "concierge",
+    "parking", "private_pool", "large_layout", "high_floor", "low_floor",
+    "pet_allowed",
+)
+PHRASES: dict[str, tuple[str, ...]] = {tag: () for tag in _SUPPORTED_TAGS}
+VALID_TAGS = frozenset(_SUPPORTED_TAGS)
+COMMON_AMENITY_TAGS = frozenset({"pool_gym", "pool", "gym", "table_tennis", "billiards", "sauna", "jacuzzi"})
 
 _PRIORITY = (
-    "pet_allowed", "never_lived", "private_pool", "river_view", "large_layout",
-    "owner_direct", "new_condition", "furnished", "balcony", "city_view",
-    "high_floor", "low_floor", "cleaning_3x", "cleaning_2x", "cleaning_1x",
-    "cleaning_included", "linen_weekly", "pest_control", "management_wifi",
-    "management_wifi_ready", "management_included", "wifi_included", "wifi_ready",
-    "coworking", "kids_area", "parking", "pickleball", "tennis", "concierge",
-    "rooftop", "pool_gym", "pool", "gym", "table_tennis", "billiards",
-    "sauna", "jacuzzi",
+    "pet_allowed", "never_lived", "new_condition", "private_pool", "river_view",
+    "city_view", "owner_direct", "cleaning_3x", "cleaning_2x", "cleaning_1x",
+    "cleaning_included", "management_wifi", "management_wifi_ready",
+    "management_included", "wifi_included", "wifi_ready", "coworking",
+    "kids_area", "pickleball", "tennis", "concierge", "parking", "balcony",
+    "furnished", "high_floor", "low_floor", "pool_gym", "pool", "gym",
+    "table_tennis", "billiards", "sauna", "jacuzzi", "rooftop",
+    "linen_weekly", "pest_control", "large_layout",
 )
 
 TAG_CATEGORY = {
@@ -80,9 +53,6 @@ TAG_CATEGORY = {
         "sauna", "jacuzzi",
     )},
 }
-
-VALID_TAGS = frozenset(PHRASES)
-COMMON_AMENITY_TAGS = frozenset({"pool_gym", "pool", "gym", "table_tennis", "billiards", "sauna", "jacuzzi"})
 
 
 def _strings(value: Any) -> set[str]:
@@ -111,19 +81,33 @@ def adviser_tags_from_facts(facts: dict[str, Any] | None) -> list[str]:
     facts = dict(facts or {})
     tags = _explicit_signals(facts)
 
+    direct_true = {
+        "pet_allowed": "pet_allowed", "never_lived": "never_lived",
+        "balcony": "balcony", "river_view": "river_view", "city_view": "city_view",
+        "furnished": "furnished", "private_pool": "private_pool",
+        "owner_direct": "owner_direct", "management_included": "management_included",
+        "wifi_included": "wifi_included", "wifi_ready": "wifi_ready",
+    }
+    for field, tag in direct_true.items():
+        if facts.get(field) is True:
+            tags.append(tag)
+
+    condition = str(facts.get("condition") or "").strip().lower()
+    if any(token in condition for token in ("全新未入住", "从未入住", "never lived")):
+        tags.append("never_lived")
+    elif any(token in condition for token in ("全新", "较新", "新装修", "new")):
+        tags.append("new_condition")
+
     services = facts.get("services") if isinstance(facts.get("services"), dict) else {}
-    cleaning = str(services.get("cleaning") or "").strip()
+    cleaning_value = services.get("cleaning", facts.get("cleaning"))
+    cleaning = str(cleaning_value or "").strip()
     frequencies = [int(value) for value in re.findall(r"(?:每周|一周)?\s*([123])\s*次", cleaning)]
     if frequencies:
         tags.append(f"cleaning_{max(frequencies)}x")
     elif cleaning.lower() in {"包含", "有", "提供", "yes", "included"}:
         tags.append("cleaning_included")
 
-    for field, tag in (
-        ("pest_control", "pest_control"),
-        ("linen_change", "linen_weekly"),
-        ("concierge", "concierge"),
-    ):
+    for field, tag in (("pest_control", "pest_control"), ("linen_change", "linen_weekly"), ("concierge", "concierge")):
         if services.get(field) is True:
             tags.append(tag)
 
@@ -140,11 +124,10 @@ def adviser_tags_from_facts(facts: dict[str, Any] | None) -> list[str]:
     amenities = _strings(facts.get("amenities"))
     amenity_map = {
         "游泳池": "pool", "泳池": "pool", "私人泳池": "private_pool",
-        "健身房": "gym", "匹克球": "pickleball", "网球": "tennis",
-        "网球场": "tennis", "乒乓球": "table_tennis", "台球": "billiards",
-        "儿童游乐区": "kids_area", "儿童活动区": "kids_area", "桑拿": "sauna",
-        "按摩池": "jacuzzi", "按摩浴缸": "jacuzzi", "共享办公": "coworking",
-        "停车位": "parking", "停车场": "parking",
+        "健身房": "gym", "匹克球": "pickleball", "网球": "tennis", "网球场": "tennis",
+        "乒乓球": "table_tennis", "台球": "billiards", "儿童游乐区": "kids_area",
+        "儿童活动区": "kids_area", "桑拿": "sauna", "按摩池": "jacuzzi",
+        "按摩浴缸": "jacuzzi", "共享办公": "coworking", "停车位": "parking", "停车场": "parking",
     }
     tags.extend(tag for source, tag in amenity_map.items() if source.lower() in amenities)
 
@@ -180,16 +163,10 @@ def adviser_tags_from_facts(facts: dict[str, Any] | None) -> list[str]:
     if "river_view" in tagset:
         tagset.discard("city_view")
 
-    cleaning_tags = [
-        tag for tag in ("cleaning_3x", "cleaning_2x", "cleaning_1x", "cleaning_included")
-        if tag in tagset
-    ]
+    cleaning_tags = [tag for tag in ("cleaning_3x", "cleaning_2x", "cleaning_1x", "cleaning_included") if tag in tagset]
     if cleaning_tags:
         tagset.difference_update({"cleaning_3x", "cleaning_2x", "cleaning_1x", "cleaning_included"})
         tagset.add(cleaning_tags[0])
-
-    # Collapse only semantically equivalent fee/network combinations. Never infer
-    # installation from a fee-included fact, or fee inclusion from an installed fact.
     if "management_wifi" in tagset:
         tagset.difference_update({"management_included", "wifi_included"})
     if "management_wifi_ready" in tagset:
@@ -198,54 +175,139 @@ def adviser_tags_from_facts(facts: dict[str, Any] | None) -> list[str]:
     return [tag for tag in _PRIORITY if tag in tagset]
 
 
-def _phrase(tag: str, seed: str) -> str:
-    choices = PHRASES[tag]
-    digest = hashlib.sha256(f"{seed}|{tag}".encode("utf-8")).hexdigest()
-    return choices[int(digest[:12], 16) % len(choices)]
+def _floor_number(value: Any) -> int | None:
+    match = re.search(r"(?<!\d)(\d{1,3})(?!\d)", str(value or ""))
+    if not match:
+        return None
+    number = int(match.group(1))
+    return number if 0 < number < 200 else None
 
 
-def _select_tags(tags: list[str], limit: int) -> list[str]:
-    if limit <= 0 or not tags:
-        return []
-    selected: list[str] = []
-    used: set[str] = set()
-    for tag in tags:
-        category = TAG_CATEGORY.get(tag, tag)
-        if category in used:
-            continue
-        selected.append(tag)
-        used.add(category)
-        if len(selected) >= limit:
-            break
-    return selected
+def _plus_layout(value: Any) -> str:
+    text = re.sub(r"\s+", "", str(value or ""))
+    match = re.search(r"(?<!\d)(\d{1,2})\+(\d{1,2})(?!\d)", text)
+    return f"{match.group(1)}+{match.group(2)}" if match else ""
+
+
+def _bedrooms(facts: dict[str, Any]) -> int | None:
+    value = facts.get("bedrooms")
+    if isinstance(value, (int, float)) and int(value) == value and 0 <= int(value) <= 20:
+        return int(value)
+    layout = str(facts.get("layout") or "").strip()
+    if re.search(r"\bstudio\b|单间", layout, re.I):
+        return 0
+    match = re.search(r"(?<!\d)(\d{1,2})\s*房", layout)
+    return int(match.group(1)) if match else None
+
+
+def _room_word(value: int) -> str:
+    words = {1: "一", 2: "两", 3: "三", 4: "四", 5: "五", 6: "六"}
+    return words.get(value, str(value))
+
+
+def _single_adviser_judgement(facts: dict[str, Any], tags: list[str]) -> str:
+    tagset = set(tags)
+    layout = str(facts.get("layout") or "").strip()
+    bedrooms = _bedrooms(facts)
+    floor = _floor_number(facts.get("floor"))
+    view = "河景" if "river_view" in tagset else "市景" if "city_view" in tagset else ""
+
+    if "pet_allowed" in tagset:
+        return "如果带宠物入住，这套值得优先确认；看房时重点看宠物实际活动空间，并现场确认物业对宠物的具体要求。"
+    if "never_lived" in tagset:
+        return "全新未入住是已经确认的房况信息；看房时重点确认家具家电实际状态、使用痕迹和交付细节。"
+    if "new_condition" in tagset:
+        return "这套房况偏新的信息已经确认；看房时重点确认家具家电实际状态、使用痕迹和交付细节。"
+    plus_layout = _plus_layout(layout)
+    if plus_layout and view and floor:
+        return (
+            f"{plus_layout} 布局和 {floor} 楼{view}信息都已经明确；"
+            "看房时重点确认额外空间能否满足书房或收纳需求，并一起看客厅视野、采光和遮挡。"
+        )
+    if view and floor:
+        return f"{floor} 楼和{view}信息都比较明确；现场更值得确认客厅视野和窗面，重点看实际采光和遮挡情况。"
+    if plus_layout:
+        return f"{plus_layout} 的额外空间需要现场确认实际尺度；看房时重点看它更适合做书房、收纳还是临时使用空间。"
+
+    if bedrooms == 0:
+        return "这套单间更值得现场确认睡眠区和主要活动区的实际尺度；看房时重点看收纳、采光和动线是否适合长期住。"
+    if bedrooms == 1:
+        return "这套一房更值得现场确认客厅和卧室的实际尺度；看房时重点看收纳、采光和动线是否适合长期住。"
+    if bedrooms == 2:
+        return "这套两房更值得现场确认实际空间分配；看房时重点看次卧大小、收纳和客厅采光是否符合自己的使用习惯。"
+    if bedrooms is not None and bedrooms >= 3:
+        room_word = _room_word(bedrooms)
+        return f"这套{room_word}房更值得现场确认各房间的实际尺度；看房时重点看次卧大小、收纳和公共空间够不够用。"
+
+    if "private_pool" in tagset:
+        return "私人泳池是已经确认的独立配置；看房时重点确认实际尺寸、维护状态和使用管理要求。"
+    if "owner_direct" in tagset:
+        return "房东直租是已经确认的来源信息；看房时重点把交付清单、押付条件和后续维修责任确认清楚。"
+
+    cleaning = next((tag for tag in ("cleaning_3x", "cleaning_2x", "cleaning_1x", "cleaning_included") if tag in tagset), "")
+    if cleaning:
+        return "保洁服务是已经确认的租住条件；看房时重点确认服务范围、执行方式以及交付后是否按同一条件持续提供。"
+
+    if "management_wifi" in tagset:
+        return "物业费和网费的包含关系已经明确；看房时重点确认这两项是否随租金持续包含，以及实际结算和开通方式。"
+    if "management_wifi_ready" in tagset:
+        return "物业费包含且宽带已就绪的信息已经明确；看房时重点确认网络实际可用状态和后续费用承担方式。"
+    if "management_included" in tagset:
+        return "物业费包含关系已经明确；看房时重点确认包含周期、物业服务范围和合同里的实际写法。"
+    if "wifi_included" in tagset:
+        return "网费包含关系已经明确；看房时重点确认网络套餐、实际可用状态和合同里的费用写法。"
+    if "wifi_ready" in tagset:
+        return "宽带已就绪的信息已经明确；看房时重点确认现场网络实际可用状态、套餐和后续费用。"
+
+    special = {
+        "coworking": "共享办公空间",
+        "kids_area": "儿童活动区",
+        "pickleball": "匹克球设施",
+        "tennis": "网球设施",
+        "concierge": "前台管家服务",
+    }
+    for tag, label in special.items():
+        if tag in tagset:
+            return f"{label}是已经确认的特殊配套；看房时重点确认实际开放状态、使用规则和与房屋之间的动线。"
+
+    if floor:
+        return "楼层信息已经明确；看房时更值得确认窗外遮挡和电梯实际使用感受，重点看采光与上下楼等待是否能接受。"
+
+    return ""
 
 
 def generate_adviser_lines(
     facts: dict[str, Any] | None,
     *,
     seed: str = "",
-    max_points: int = 2,
+    max_points: int = 1,
     allow_fallback: bool = False,
 ) -> list[str]:
+    del seed, allow_fallback
     try:
-        limit = max(0, min(int(max_points), 2))
+        limit = max(0, min(int(max_points), 1))
     except (TypeError, ValueError):
-        limit = 2
+        limit = 1
     if limit == 0:
         return []
-    return [_phrase(tag, seed) for tag in _select_tags(adviser_tags_from_facts(facts), limit)]
+
+    clean_facts = dict(facts or {})
+    tags = adviser_tags_from_facts(clean_facts)
+    line = re.sub(r"\s+", " ", _single_adviser_judgement(clean_facts, tags)).strip()
+    return [line] if line else []
 
 
 def generate_adviser_text(
     facts: dict[str, Any] | None,
     *,
     seed: str = "",
-    max_points: int = 2,
+    max_points: int = 1,
     allow_fallback: bool = False,
 ) -> str:
-    return "\n".join(
-        generate_adviser_lines(facts, seed=seed, max_points=max_points, allow_fallback=allow_fallback)
+    lines = generate_adviser_lines(
+        facts, seed=seed, max_points=max_points, allow_fallback=allow_fallback
     )
+    return lines[0] if lines else ""
 
 
 __all__ = [
