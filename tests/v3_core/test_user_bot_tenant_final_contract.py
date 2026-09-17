@@ -54,7 +54,7 @@ def test_unbound_tenant_home_exposes_public_actions_only(tmp_path):
     _, service = _service(tmp_path, with_binding=False)
     view = tenant_home_view(service, 123)
     labels = [choice.label for row in view.rows for choice in row]
-    assert labels == ["📄 租赁服务", "🔍 开始找房", "💬 中文顾问", "🏠 返回首页"]
+    assert labels == ["💬 中文顾问", "🛡 看租后服务", "🔍 开始找房", "⬅️ 回首页"]
     forbidden = ("租约", "报修", "物业", "续租", "退租")
     assert not any(any(word in label for word in forbidden) for label in labels)
 
@@ -63,7 +63,7 @@ def test_active_tenant_home_exposes_current_tenant_actions(tmp_path):
     _, service = _service(tmp_path)
     view = tenant_home_view(service, 123)
     labels = [choice.label for row in view.rows for choice in row]
-    for label in ("📋 我的租约", "🔧 报修", "🏢 物业协调"):
+    for label in ("📋 我的租约", "🔧 报修", "🏢 物业协调", "📍 周边服务"):
         assert label in labels
     assert "🔄 续租" not in labels
     assert "🚪 退租" not in labels
