@@ -11,20 +11,26 @@ def _copy(facts: dict) -> str:
     return generate_adviser_text(
         _publisher_adviser_facts(facts),
         seed="QL-POLICY-TEST",
-        max_points=2,
+        max_points=1,
         allow_fallback=False,
     )
 
 
-def test_generic_furniture_amenities_and_cost_do_not_create_auto_adviser_copy():
+def test_generic_furniture_and_common_amenities_do_not_create_auto_adviser_copy():
     facts = {
         "adviser_signals": ["furnished"],
         "house": {"features": ["阳台"], "furnished": True},
         "amenities": ["泳池", "健身房"],
-        "included": ["物业费", "网费"],
     }
 
     assert _copy(facts) == ""
+
+
+def test_verified_cost_inclusions_may_create_one_practical_viewing_focus():
+    copy = _copy({"included": ["物业费", "网费"]})
+    assert copy
+    assert "物业费" in copy and "网费" in copy
+    assert "\n" not in copy
 
 
 def test_useful_uncommon_signals_can_still_create_auto_adviser_copy():

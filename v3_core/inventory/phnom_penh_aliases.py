@@ -128,27 +128,21 @@ MARKET_ALIAS_EXTENSIONS: dict[str, tuple[str, ...]] = {
 
 
 def apply_phnom_penh_aliases(taxonomy: Any) -> None:
-    """Add market aliases once to the existing V3 taxonomy module."""
-    project_keys = {item.key for item in taxonomy.PROJECT_IDENTITIES}
-    projects = list(taxonomy.PROJECT_IDENTITIES)
-    for key, display, aliases, family in PROJECTS:
-        if key not in project_keys:
-            projects.append(taxonomy.ProjectIdentity(key, display, "project", aliases, property_family=family))
-    extended_projects = []
-    for item in projects:
-        extra = PROJECT_ALIAS_EXTENSIONS.get(item.key, ())
-        aliases = tuple(dict.fromkeys((*item.aliases, *extra)))
-        extended_projects.append(taxonomy.ProjectIdentity(item.key, item.display, item.kind, aliases, item.property_family))
-    taxonomy.PROJECT_IDENTITIES = tuple(extended_projects)
+    """Extend only MARKET aliases.
 
+    Project identity is authoritative in phnom_penh_location_registry and is
+    already installed by listing_taxonomy. Keeping PROJECTS above is historical
+    reference/compatibility data only; it must never append a second identity
+    for the same real project.
+    """
     market_keys = {item.key for item in taxonomy.MARKET_LOCATIONS}
     markets = list(taxonomy.MARKET_LOCATIONS)
-    for key, display, relation, aliases in MARKET_LOCATIONS:
+    for key, display, relation, market_aliases in MARKET_LOCATIONS:
         if key not in market_keys:
-            markets.append(taxonomy.MarketLocation(key, display, relation, aliases))
+            markets.append(taxonomy.MarketLocation(key, display, relation, market_aliases))
     extended_markets = []
     for item in markets:
         extra = MARKET_ALIAS_EXTENSIONS.get(item.key, ())
-        aliases = tuple(dict.fromkeys((*item.aliases, *extra)))
-        extended_markets.append(taxonomy.MarketLocation(item.key, item.display, item.relation, aliases))
+        merged = tuple(dict.fromkeys((*item.aliases, *extra)))
+        extended_markets.append(taxonomy.MarketLocation(item.key, item.display, item.relation, merged))
     taxonomy.MARKET_LOCATIONS = tuple(extended_markets)

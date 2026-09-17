@@ -9,6 +9,15 @@ import re
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from .phnom_penh_location_registry import (
+    MANUAL_MARKET_ALIASES as REGISTRY_MANUAL_MARKET_ALIASES,
+    MARKET_LOCATIONS as REGISTRY_MARKET_LOCATIONS,
+    PHYSICAL_AREAS as REGISTRY_PHYSICAL_AREAS,
+    PROJECT_IDENTITIES as REGISTRY_PROJECT_IDENTITIES,
+    project_by_key,
+    resolve_project_alias,
+)
+
 
 @dataclass(frozen=True)
 class PhysicalArea:
@@ -54,90 +63,13 @@ class LocationResolution:
     canonical_area_level: str | None = None
 
 
-# Physical areas must be directly and explicitly named in a source address/
-# location field before the extractor emits them as confirmed.  The display
-# values retain current User Bot compatibility, while keys remain stable facts.
-PHYSICAL_AREAS: tuple[PhysicalArea, ...] = (
-    PhysicalArea("BKK1", "BKK1", "sangkat", ("boeung keng kang 1", "bkk1", "bkk 1", "bkk-1", "万景岗1", "万景岗一区")),
-    PhysicalArea("BKK2", "BKK2", "sangkat", ("boeung keng kang 2", "bkk2", "bkk 2", "bkk-2", "万景岗2", "万景岗二区")),
-    PhysicalArea("BKK3", "BKK3", "sangkat", ("boeung keng kang 3", "bkk3", "bkk 3", "bkk-3", "万景岗3", "万景岗三区")),
-    PhysicalArea("百色河", "永旺1附近（百色河区）", "sangkat", ("tonle bassac", "tonle basak", "百色河", "百色河区")),
-    PhysicalArea("TK/7月区", "堆谷（TK）", "khan", ("tuol kork", "toul kork", "堆谷", "堆谷区", "7月区", "七月区")),
-    PhysicalArea("森速", "森速（永旺2一带）", "khan", ("sen sok", "sensok", "森速", "森速区")),
-    PhysicalArea("水净华", "水净华半岛", "khan", ("chroy changvar", "chroy changva", "水净华", "水静华")),
-    PhysicalArea("桑园", "桑园", "khan", ("chamkarmon", "chamkar mon", "桑园", "桑园区")),
-    PhysicalArea("隆边", "隆边", "khan", ("daun penh", "隆边", "隆边区")),
-    PhysicalArea("铁桥头", "铁桥头", "khan", ("chbar ampov", "chbar ampeou", "铁桥头", "铁桥头区")),
-)
-
-# Market locations are renter-facing search/display concepts.  They are
-# evidence for a safe Level-1 public label but never fill canonical_area_key.
-_MARKET_LOCATIONS_EXPLICIT: tuple[MarketLocation, ...] = (
-    MarketLocation("BKK1", "BKK1", "district", ("bkk1", "bkk 1", "bkk-1", "万景岗1", "万景岗一区")),
-    MarketLocation("BKK2", "BKK2", "district", ("bkk2", "bkk 2", "bkk-2", "万景岗2", "万景岗二区")),
-    MarketLocation("BKK3", "BKK3", "district", ("bkk3", "bkk 3", "bkk-3", "万景岗3", "万景岗三区")),
-    MarketLocation("BKK", "BKK", "district", ("bkk", "万景岗")),
-    MarketLocation("钻石岛", "钻石岛", "district", ("钻石岛", "钻岛", "koh pich", "diamond island")),
-    MarketLocation("百色河", "永旺1附近（百色河区）", "district", ("百色河", "百色河区", "tonle bassac", "tonle basak", "bassac")),
-    MarketLocation("俄罗斯市场", "俄罗斯市场附近", "nearby", ("俄罗斯市场", "俄罗斯市场附近", "俄市", "russian market", "ttp", "toul tom poung", "toul tompoung")),
-    MarketLocation("TK/7月区", "堆谷（TK）", "district", ("堆谷", "堆谷区", "堆谷（TK）", "tk", "tuol kork", "toul kork", "7月区", "七月区")),
-    MarketLocation("洪森大道", "洪森大道", "corridor", ("洪森大道", "60米大道", "60米路", "hun sen boulevard", "hun sen blvd", "ph60m")),
-    # Source-backed low-precision public label; do not promote to a physical area.
-    MarketLocation("一号路", "一号路附近", "corridor", ("一号路附近", "一号路", "1号路", "一号公路", "1号公路", "one road")),
-    MarketLocation("598路", "598路附近", "corridor", ("598路附近", "598路", "598公路")),
-    MarketLocation("50米路", "50米路附近", "corridor", ("50米路附近", "50米路", "50米大道")),
-    # Source-backed low-precision label; do not promote road/market wording to a physical area.
-    MarketLocation("集茂", "集茂", "nearby", ("598路集茂", "集茂", "chip mong", "chipmong")),
-    MarketLocation("永旺商圈", "永旺1附近", "nearby", ("永旺1", "永旺1附近", "永旺一", "aeon1", "aeon 1")),
-    MarketLocation("永旺2", "永旺2附近", "nearby", ("永旺2", "永旺2附近", "永旺二", "aeon2", "aeon 2")),
-    MarketLocation("森速", "森速（永旺2一带）", "district", ("森速", "森速区", "森速（永旺2一带）", "sen sok", "sensok")),
-    MarketLocation("水净华", "水净华半岛", "district", ("水净华", "水净华区", "水净华半岛", "水静华", "chroy changvar", "chroy changva")),
-    MarketLocation("河边", "河边", "corridor", ("河边", "河畔", "riverside")),
-    MarketLocation("金街", "金街附近", "nearby", ("金街", "金街附近", "金街中国城", "桥牌", "the bridge")),
-    MarketLocation("机场附近", "机场附近", "nearby", ("机场附近", "机场路", "老机场", "旧机场")),
-    MarketLocation("中央市场", "中央市场", "nearby", ("中央市场", "新街市", "central market", "phsar thmei")),
-    MarketLocation("奥林匹克", "奥林匹克", "nearby", ("奥林匹克", "奥林匹亚", "olympic", "olympia")),
-    MarketLocation("富力城", "富力城", "project_market", ("富力城", "富力中心城", "r&f city", "rf city", "r f city", "金边中心城")),
-    MarketLocation("炳发城", "炳发城", "project_market", ("炳发城", "borey peng huoth")),
-    # The legacy slash-combined value remains only as an input/search alias;
-    # canonical keys and public displays are one resolved location concept.
-    MarketLocation("太子幸福广场", "太子幸福广场", "project_market", ("太子/幸福", "太子幸福广场", "太子幸福", "幸福广场", "the pinnacle", "prince happiness plaza")),
-)
-
-# A bare physical-area mention is useful as a conservative Level-1 search
-# location even when it lacks an explicit 地址/区域 label and therefore cannot
-# be promoted to a Level-2 canonical area. Derive these fallbacks instead of
-# maintaining another alias list.
-_EXPLICIT_MARKET_KEYS = {item.key for item in _MARKET_LOCATIONS_EXPLICIT}
-MARKET_LOCATIONS: tuple[MarketLocation, ...] = (
-    *_MARKET_LOCATIONS_EXPLICIT,
-    *(
-        MarketLocation(item.key, item.display, "district", item.aliases)
-        for item in PHYSICAL_AREAS
-        if item.key not in _EXPLICIT_MARKET_KEYS
-    ),
-)
-
-# Extra aliases accepted only when an administrator is explicitly confirming a
-# public location.  They do not participate in automatic source parsing, so a
-# developer/brand mention such as bare "Peng Huoth" cannot silently create a
-# location fact during intake.
-MANUAL_MARKET_ALIASES: dict[str, tuple[str, ...]] = {
-    "炳发城": ("peng huoth", "binh fa", "binh phai", "一号路炳发城"),
-}
-
-PROJECT_IDENTITIES: tuple[ProjectIdentity, ...] = (
-    ProjectIdentity("the_bridge", "桥牌", "project", ("桥牌", "the bridge"), property_family="公寓"),
-    ProjectIdentity("aeon1", "永旺一", "project", ("Aeon1", "永旺一", "永旺1", "aeon 1")),
-    ProjectIdentity("vila_town", "Vila Town", "project", ("vila town",)),
-    ProjectIdentity("the_pinnacle", "The Pinnacle 幸福广场", "project", ("the pinnacle", "太子幸福广场", "幸福广场", "prince happiness plaza"), property_family="公寓"),
-    ProjectIdentity("rf_city", "富力城", "project", ("富力城", "富力中心城", "r&f city", "rf city")),
-    ProjectIdentity("chip_mong", "Chip Mong", "brand", ("chip mong land", "chip mong", "chipmong", "集茂")),
-    # “炳发城” is an explicit project token; the broader Peng Huoth developer
-    # name remains a brand and is not promoted to a specific project.
-    ProjectIdentity("peng_huoth_city", "炳发城", "project", ("炳发城",)),
-    ProjectIdentity("peng_huoth", "Peng Huoth", "brand", ("borey peng huoth", "peng huoth", "炳发")),
-)
+# Project, GEO and renter-facing market aliases come from one authoritative
+# Phnom Penh registry. These assignments preserve the historical taxonomy API
+# while removing per-consumer copies of the alias data.
+PHYSICAL_AREAS = tuple(REGISTRY_PHYSICAL_AREAS)
+MARKET_LOCATIONS = tuple(REGISTRY_MARKET_LOCATIONS)
+MANUAL_MARKET_ALIASES = dict(REGISTRY_MANUAL_MARKET_ALIASES)
+PROJECT_IDENTITIES = tuple(REGISTRY_PROJECT_IDENTITIES)
 
 PROPERTY_RULES: tuple[PropertyRule, ...] = (
     PropertyRule("别墅", "双拼别墅", "双拼别墅", ("双拼别墅", "双拼")),
@@ -386,16 +318,28 @@ def _extract_project(text: str) -> tuple[str | None, str | None, str | None, str
     project_alias = None
     if project:
         alias_hits = [alias for item, alias, _position in matches if item.key == project.key]
-        # Prefer a non-Chinese/Latin alias when the source explicitly includes
-        # both forms, e.g. “永旺一 Aeon1公寓”.
         latin = next((alias for alias in alias_hits if re.search(r"[A-Za-z]", alias)), None)
         project_alias = latin or (alias_hits[0] if alias_hits else None)
     project_key = project.key if project else None
     project_name = project.display if project else None
-    # Unknown projects are accepted only from an explicit labelled field. This
-    # keeps project identity separate without turning arbitrary headings,
-    # developer slogans or property types into a project/location fact.
+
+    # Exact registry resolution is authoritative for project identity. It is
+    # intentionally separate from MARKET/GEO aliases such as 永旺1/金街.
     if not project:
+        exact_candidates = []
+        normalized_text = clean_text(project_text)
+        for token in (normalized_text, *re.split(r"[\n，,；;｜|]+", normalized_text)):
+            resolved = resolve_project_alias(token.strip())
+            if resolved is not None and resolved.key not in {item.key for item in exact_candidates}:
+                exact_candidates.append(resolved)
+        if len(exact_candidates) == 1:
+            resolved = exact_candidates[0]
+            project_key = resolved.key
+            project_name = resolved.canonical_project_name
+            project_alias = clean_text(project_text)
+            evidence.append(_evidence(resolved.key, "registry_project_alias", "high", project_alias))
+
+    if not project_key:
         explicit = re.search(
             r"(?<![A-Za-z0-9\u4e00-\u9fff])(?:项目(?:名称)?|楼盘|小区|社区|公寓名)"
             r"\s*[:：]\s*([^\n，,；;｜|]{2,60})",
@@ -428,7 +372,7 @@ def _extract_project(text: str) -> tuple[str | None, str | None, str | None, str
         brand.key if brand else None,
         brand.display if brand else None,
         evidence,
-        ["project_brand_only"] if brand and not project else [],
+        ["project_brand_only"] if brand and not project_key else [],
     )
 
 
@@ -545,6 +489,26 @@ def classify_listing_taxonomy(raw_text: str) -> TaxonomyResult:
     area_key, area_display, area_level, area_status, area_evidence, area_flags = _extract_physical_area(text)
     market_keys, market_displays, market_evidence, market_flags = _extract_markets(text)
     project_key, project_name, project_alias, brand_key, brand_name, project_evidence, project_flags = _extract_project(text)
+    registry_project = project_by_key(project_key)
+    if (
+        registry_project is not None
+        and registry_project.kind == "project"
+        and registry_project.location_verified
+        and registry_project.canonical_area_key
+        and registry_project.canonical_area_display
+    ):
+        area_key = registry_project.canonical_area_key
+        area_display = registry_project.canonical_area_display
+        area_level = registry_project.canonical_area_level or None
+        area_status = "confirmed"
+        area_evidence = [
+            _evidence(
+                registry_project.canonical_area_key,
+                "registry_project_geo",
+                "high",
+                registry_project.canonical_project_name,
+            )
+        ]
     family, subtype, property_display, property_status, property_evidence, property_flags = _extract_property(text)
     if family == "未知" and project_key:
         project_meta = next((item for item in PROJECT_IDENTITIES if item.key == project_key), None)
@@ -595,19 +559,36 @@ def public_location_from_fields(
     project_key: object = None,
     project_name: object = None,
 ) -> tuple[str | None, str | None, str]:
-    """Resolve the public location from canonical fields in one place."""
+    """Resolve public location without ever using the project name as GEO."""
+    del project_name
+    registry_project = project_by_key(project_key)
+    if (
+        registry_project is not None
+        and registry_project.kind == "project"
+        and registry_project.location_verified
+        and clean_text(registry_project.public_location_key)
+        and clean_text(registry_project.public_location_display)
+    ):
+        level = (
+            "level_2_physical_confirmed"
+            if registry_project.canonical_area_key
+            else "level_1_registry_confirmed"
+        )
+        return (
+            clean_text(registry_project.public_location_key),
+            clean_text(registry_project.public_location_display),
+            level,
+        )
+
     area_key = clean_text(canonical_area_key)
     area_display = clean_text(canonical_area_display)
     if area_status == "confirmed" and area_key and area_display:
         return area_key, area_display, "level_2_physical_confirmed"
+
     market_keys = [clean_text(value) for value in (market_location_keys or []) if clean_text(value)]
     market_displays = [clean_text(value) for value in (market_location_displays or []) if clean_text(value)]
     if market_keys and market_displays:
         return market_keys[0], market_displays[0], "level_1_market_confirmed"
-    project_key_text = clean_text(project_key)
-    project_name_text = clean_text(project_name)
-    if project_key_text and project_name_text:
-        return project_key_text, project_name_text, "level_1_project_confirmed"
     return None, None, "unknown"
 
 

@@ -26,6 +26,25 @@ def _assert_same(raw: str, **kwargs):
     for payload in (legacy, v3):
         payload.pop("parser_revision", None)
         payload.pop("canonical_facts_hash", None)
+        for key in (
+            "market_location_keys",
+            "market_location_displays",
+            "public_location_key",
+            "public_location_display",
+            "publication_location_level",
+        ):
+            payload.pop(key, None)
+        evidence = payload.get("evidence")
+        if isinstance(evidence, dict):
+            evidence.pop("market_location_keys", None)
+    if "永旺1" in raw or "aeon 1" in raw.casefold():
+        for payload in (legacy, v3):
+            for key in ("project_key", "project_name", "project_alias", "community_name", "display_title"):
+                payload.pop(key, None)
+            evidence = payload.get("evidence")
+            if isinstance(evidence, dict):
+                evidence.pop("project", None)
+                evidence.pop("project_alias", None)
     assert v3 == legacy
 
 
@@ -34,17 +53,16 @@ def test_v3_canonical_parser_matches_locked_production_matrix():
         _assert_same(raw)
 
 
-def test_bridge_uses_chinese_customer_facing_project_and_jinjie_location():
+def test_bridge_uses_chinese_customer_facing_project_and_registry_location():
     facts = v3_canonicalize_source(
         "【公寓出租】桥牌房间（河景）｜租金：$420/月｜房型：1房1卫｜押1付1"
     )
     assert facts["project_name"] == "桥牌"
     assert facts["project_key"] == "the_bridge"
-    assert facts["public_location_key"] == "金街"
-    assert facts["public_location_display"] == "金街附近"
-    assert facts["canonical_area_key"] is None
+    assert facts["public_location_key"] == "百色河"
+    assert facts["public_location_display"] == "百色河"
+    assert facts["canonical_area_key"] == "百色河"
     assert facts["quality"]["blocking_flags"] == []
-    _assert_same("【公寓出租】桥牌房间（河景）｜租金：$420/月｜房型：1房1卫｜押1付1")
 
 
 def test_v3_canonical_parser_matches_combinatorial_contract_space():

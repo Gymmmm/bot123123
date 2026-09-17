@@ -77,12 +77,12 @@ class PackageBuildService:
             adviser_copy = generate_adviser_text(
                 _publisher_adviser_facts(facts),
                 seed=adviser_seed,
-                max_points=2,
+                max_points=1,
                 allow_fallback=False,
             )
             adviser_copy_source = "auto"
         else:
-            adviser_copy = str(adviser_copy_override).strip()
+            adviser_copy = " ".join(str(adviser_copy_override).split())
             adviser_copy_source = "hidden" if not adviser_copy else "manual"
 
         frozen_status = str(
@@ -130,7 +130,7 @@ class PackageBuildService:
             "canonical_facts_hash": str(canonical["facts_hash"]),
             "canonical_facts": facts,
             "adviser_copy": adviser_copy,
-            "adviser_copy_version": "v1_publisher_authoritative",
+            "adviser_copy_version": "v2_publisher_authoritative",
             "adviser_copy_source": adviser_copy_source,
             "adviser_seed": adviser_seed,
             "listing": {
