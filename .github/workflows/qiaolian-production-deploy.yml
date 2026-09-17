@@ -60,11 +60,11 @@ jobs:
           CANDIDATE_SHA=$(git rev-parse HEAD)
           CANDIDATE_TREE=$(git rev-parse 'HEAD^{tree}')
           CANDIDATE_PARENT=$(git rev-parse HEAD^)
-          test "$CANDIDATE_SHA" = "$DEPLOY_SHA"
-          test "$CANDIDATE_SHA" = "$APPROVED_DEPLOY_SHA"
-          test "$CANDIDATE_PARENT" = "$EXPECTED_PARENT_SHA"
-          test "$CANDIDATE_TREE" = "$EXPECTED_TREE_SHA"
-          git merge-base --is-ancestor "$EXPECTED_PRODUCTION_BASE_SHA" "$CANDIDATE_SHA"
+          test "$CANDIDATE_SHA" = "$DEPLOY_SHA" || { echo "DEPLOY_BLOCKED deploy_sha_mismatch expected=$DEPLOY_SHA actual=$CANDIDATE_SHA"; exit 1; }
+          test "$CANDIDATE_SHA" = "$APPROVED_DEPLOY_SHA" || { echo "DEPLOY_BLOCKED approved_sha_mismatch expected=$APPROVED_DEPLOY_SHA actual=$CANDIDATE_SHA"; exit 1; }
+          test "$CANDIDATE_PARENT" = "$EXPECTED_PARENT_SHA" || { echo "DEPLOY_BLOCKED parent_mismatch expected=$EXPECTED_PARENT_SHA actual=$CANDIDATE_PARENT"; exit 1; }
+          test "$CANDIDATE_TREE" = "$EXPECTED_TREE_SHA" || { echo "DEPLOY_BLOCKED tree_mismatch expected=$EXPECTED_TREE_SHA actual=$CANDIDATE_TREE"; exit 1; }
+          git merge-base --is-ancestor "$EXPECTED_PRODUCTION_BASE_SHA" "$CANDIDATE_SHA" || { echo "DEPLOY_BLOCKED production_base_mismatch expected_ancestor=$EXPECTED_PRODUCTION_BASE_SHA candidate=$CANDIDATE_SHA"; exit 1; }
           echo "CANDIDATE_SHA=$CANDIDATE_SHA" >> "$GITHUB_ENV"
           echo "CANDIDATE_TREE=$CANDIDATE_TREE" >> "$GITHUB_ENV"
 
@@ -161,7 +161,7 @@ jobs:
           test -d "$OLD/media" || { echo "DEPLOY_BLOCKED missing_production_media"; exit 1; }
           test -d "$OLD/telethon_sessions" || { echo "DEPLOY_BLOCKED missing_telethon_sessions"; exit 1; }
           OLD_RELEASE=$(readlink -f "$CURRENT"); test -d "$OLD_RELEASE" || { echo "DEPLOY_BLOCKED current_release_missing"; exit 1; }
-          OLD_SHA=$(basename "$OLD_RELEASE"); test "$OLD_SHA" = "$EXPECTED_OLD_SHA" || { echo "DEPLOY_BLOCKED unexpected_current_sha=$OLD_SHA"; exit 1; }
+          OLD_SHA=$(basename "$OLD_RELEASE"); test "$OLD_SHA" = "$EXPECTED_OLD_SHA" || { echo "DEPLOY_BLOCKED current_production_mismatch expected=$EXPECTED_OLD_SHA actual=$OLD_SHA"; exit 1; }
           for service in "${SERVICES[@]}"; do test "$(systemctl is-active "$service")" = active || { echo "DEPLOY_BLOCKED service_not_active=$service"; exit 1; }; done
           for python_candidate in "$VENV/bin/python" "$OLD/.venv/bin/python" /opt/qiaolian-python-3.12/bin/python3 /usr/local/bin/python3.12 /usr/bin/python3.12; do if [ -x "$python_candidate" ]; then PYTHON_BOOTSTRAP="$python_candidate"; break; fi; done
           test -n "$PYTHON_BOOTSTRAP" || { echo "DEPLOY_BLOCKED missing_python_bootstrap"; exit 1; }
