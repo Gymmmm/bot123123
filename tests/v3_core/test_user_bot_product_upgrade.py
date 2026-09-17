@@ -25,8 +25,8 @@ def test_v3_home_uses_final_conversion_navigation():
     view = build_home_view(channel_url="https://t.me/qiaolian")
     labels = _labels(view)
     assert labels == [
-        "🔍 开始找房", "📅 我的预约", "🛠 入住服务", "📄 租赁服务",
-        "💬 中文顾问", "📢 房源频道", "🏠 关于侨联",
+        "🔍 开始找房", "📅 我的预约", "🛠 入住服务", "🏠 关于侨联",
+        "💬 中文顾问", "📢 房源频道",
     ]
     forbidden = ("智能找房", "顾问帮我找", "最新房源", "侨联保障", "租赁服务指南", "我想换房")
     assert not any(any(term in label for term in forbidden) for label in labels)
@@ -35,15 +35,19 @@ def test_v3_home_uses_final_conversion_navigation():
 def test_home_without_channel_keeps_core_conversion_actions():
     labels = _labels(build_home_view())
     assert labels == [
-        "🔍 开始找房", "📅 我的预约", "🛠 入住服务", "📄 租赁服务",
-        "💬 中文顾问", "🏠 关于侨联",
+        "🔍 开始找房", "📅 我的预约", "🛠 入住服务", "🏠 关于侨联",
+        "💬 中文顾问",
     ]
 
 
 def test_about_and_booking_are_compatible_secondary_home_actions():
     assert parse_home_callback(encode_home_callback("about")).action == "about"
     assert parse_home_callback(encode_home_callback("book")).action == "book"
-    assert "关于侨联" in build_about_view().text
+    about = build_about_view().text
+    assert "关于侨联｜租赁服务" in about
+    assert "签约前确认" in about
+    assert "入住交接" in about
+    assert "退租核对" in about
     assert "预约申请已提交" in build_booking_view().text
     assert "换房" not in build_about_view().text
 

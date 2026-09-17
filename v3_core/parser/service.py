@@ -85,11 +85,13 @@ class CanonicalParseService:
         }
 
         try:
+            manual_overrides = self.inventory.manual_overrides_for_source(int(row["id"]))
             facts = canonicalize_source(
                 raw_text=raw_text,
                 sanitized_text=sanitized_text,
                 source_identity=identity,
                 media_summary=media_summary,
+                manual_overrides=manual_overrides,
             )
             facts = enrich_authoritative_facts(sanitized_text, facts)
             canonical = self.inventory.store_canonical(

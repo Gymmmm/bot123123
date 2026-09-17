@@ -18,7 +18,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  DEPLOY_SHA: 57a2239716f67ceeb6fe58613857552f2758c3df
+  DEPLOY_SHA: c378e00eff300a4b1c62c3b7ec1a661a360b346a
   PROD_HOST: 50.114.74.120
   PROD_PORT: '22'
   PROD_SSH_USER: root

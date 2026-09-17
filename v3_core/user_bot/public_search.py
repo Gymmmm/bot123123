@@ -48,6 +48,7 @@ class PublicSearchReader:
         self,
         *,
         property_type: str = "",
+        project_terms: tuple[str, ...] = (),
         location_keys: tuple[str, ...] = (),
         budget_min: int | None = None,
         budget_max: int | None = None,
@@ -68,6 +69,22 @@ class PublicSearchReader:
         if clean_type:
             clauses.append("l.property_type=?")
             params.append(clean_type)
+
+        clean_projects = tuple(
+            dict.fromkeys(
+                str(value or "").strip()
+                for value in project_terms
+                if str(value or "").strip()
+            )
+        )
+        if clean_projects:
+            placeholders = ",".join("?" for _ in clean_projects)
+            clauses.append(
+                f"(l.project_name COLLATE NOCASE IN ({placeholders}) "
+                f"OR l.project_alias COLLATE NOCASE IN ({placeholders}))"
+            )
+            params.extend(clean_projects)
+            params.extend(clean_projects)
 
         clean_locations = tuple(
             dict.fromkeys(
@@ -137,7 +154,8 @@ class PublicSearchService:
     def strict(self, criteria: SearchCriteria, *, limit: int = 3) -> SearchExecution:
         items = self.reader.search(
             property_type=criteria.property_type,
-            location_keys=criteria.location_keys,
+            project_terms=criteria.project_terms,
+            location_keys=() if criteria.project_terms else criteria.location_keys,
             budget_min=criteria.budget_min,
             budget_max=criteria.budget_max,
             limit=limit,
@@ -149,7 +167,8 @@ class PublicSearchService:
             (
                 "no_type",
                 dict(
-                    location_keys=criteria.location_keys,
+                    project_terms=criteria.project_terms,
+                    location_keys=() if criteria.project_terms else criteria.location_keys,
                     budget_min=criteria.budget_min,
                     budget_max=criteria.budget_max,
                 ),
@@ -158,6 +177,7 @@ class PublicSearchService:
                 "no_area",
                 dict(
                     property_type=criteria.property_type,
+                    project_terms=criteria.project_terms,
                     budget_min=criteria.budget_min,
                     budget_max=criteria.budget_max,
                 ),

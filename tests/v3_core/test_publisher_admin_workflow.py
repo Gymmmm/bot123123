@@ -1,4 +1,5 @@
 from pathlib import Path
+import sqlite3
 
 import pytest
 from PIL import Image, ImageDraw
@@ -9,6 +10,8 @@ from v3_core.inventory.service import InventoryMaterializationService
 from v3_core.media.cover_service import CoverRenderService
 from v3_core.media.service import MediaPreparationService
 from v3_core.publishing.admin_workflow import PublisherWorkflowService
+from v3_core.publishing.autopilot_anomalies import FinalAutoPublishRepository, FinalAutoPublishService
+from v3_core.publishing.delivery_coordinator import DeliveryBlocked
 from v3_core.publishing.delivery_coordinator import PublicationDeliveryCoordinator
 from v3_core.publishing.delivery_state import PublicationDeliveryStateRepository
 from v3_core.publishing.package_service import PackageApprovalService, PackageBuildService
@@ -17,6 +20,7 @@ from v3_core.publishing.publication_instances import PublicationInstanceReposito
 from v3_core.storage.bootstrap import initialize_v3_storage
 from v3_core.storage.inventory_reader import InventoryReader
 from v3_core.storage.inventory_repository import InventoryRepository
+from v3_core.storage.appointment_repository import V3ListingBookabilityChecker
 
 
 def _facts(deal_type="rent"):
@@ -248,3 +252,122 @@ def test_sale_review_is_stored_and_approvable_but_never_builds_rental_package(tm
 
     with pytest.raises(ValueError, match="publisher_only_builds_rent_packages"):
         workflow.build_package_for_review(review_id=review_id)
+
+
+class _AutoPublishMessage:
+    def __init__(self, message_id: int = 9001):
+        self.message_id = message_id
+
+
+class _AutoPublishBot:
+    def __init__(self, *, error: Exception | None = None):
+        self.error = error
+        self.calls: list[dict] = []
+
+    async def send_photo(self, **kwargs):
+        self.calls.append(kwargs)
+        if self.error is not None:
+            raise self.error
+        return _AutoPublishMessage()
+
+
+def _pending_autopublish(tmp_path: Path):
+    workflow, _inventory, reader, review_id, offer_id = _workflow(tmp_path)
+    listing_id = str(reader.offer(offer_id)["listing_id"])
+    repo = FinalAutoPublishRepository(reader.db_path)
+    repo.ensure_defaults()
+    repo.mark_listing_pending_for_auto_publish(listing_id)
+    service = FinalAutoPublishService(
+        workflow=workflow,
+        repository=repo,
+        channel_chat_id="-100123",
+    )
+    return workflow, reader, repo, service, listing_id, offer_id, review_id
+
+
+def test_pending_autopublish_success_commits_publication_then_activates_and_is_bookable(tmp_path):
+    workflow, reader, repo, service, listing_id, offer_id, _review_id = _pending_autopublish(tmp_path)
+    bot = _AutoPublishBot()
+
+    result = __import__("asyncio").run(service.process_one(bot=bot, force_offer_id=offer_id))
+
+    assert result.status == "published"
+    assert reader.listing(listing_id)["inventory_status"] == "active"
+    package = workflow.package(result.package_id)
+    assert package.status == "published"
+    assert "🟢 当前可预约" in package.post_text
+    assert package.snapshot["listing"]["inventory_status"] == "active"
+    assert len(bot.calls) == 1
+    labels = [button.text for row in bot.calls[0]["reply_markup"].inline_keyboard for button in row]
+    assert "📅 预约看房" in labels
+    with sqlite3.connect(reader.db_path) as conn:
+        assert conn.execute(
+            "SELECT COUNT(*) FROM publication_instances WHERE listing_id=? AND publish_status='published'",
+            (listing_id,),
+        ).fetchone()[0] == 1
+    assert V3ListingBookabilityChecker(reader.db_path).is_bookable(listing_id) is True
+
+    replay = __import__("asyncio").run(service.process_one(bot=bot, force_offer_id=offer_id))
+    assert replay.status == "already_published"
+    assert len(bot.calls) == 1
+    with sqlite3.connect(reader.db_path) as conn:
+        assert conn.execute(
+            "SELECT COUNT(*) FROM publication_instances WHERE listing_id=? AND publish_status='published'",
+            (listing_id,),
+        ).fetchone()[0] == 1
+
+
+def test_pending_autopublish_failed_before_send_keeps_listing_pending(tmp_path, monkeypatch):
+    _workflow_obj, reader, _repo, service, listing_id, offer_id, _review_id = _pending_autopublish(tmp_path)
+
+    async def fail_before_send(**kwargs):
+        raise DeliveryBlocked("telegram failed before send")
+
+    monkeypatch.setattr("v3_core.publishing.autopilot.deliver_approved_package", fail_before_send)
+    result = __import__("asyncio").run(service.process_one(bot=object(), force_offer_id=offer_id))
+
+    assert result.status == "exception"
+    assert result.reason_code == "telegram_failed"
+    assert reader.listing(listing_id)["inventory_status"] == "pending"
+    with sqlite3.connect(reader.db_path) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM publication_instances WHERE listing_id=?", (listing_id,)).fetchone()[0] == 0
+
+
+def test_pending_autopublish_unknown_keeps_listing_pending(tmp_path):
+    _workflow_obj, reader, _repo, service, listing_id, offer_id, _review_id = _pending_autopublish(tmp_path)
+    bot = _AutoPublishBot(error=RuntimeError("network uncertain"))
+
+    result = __import__("asyncio").run(service.process_one(bot=bot, force_offer_id=offer_id))
+
+    assert result.status == "exception"
+    assert result.reason_code == "telegram_unknown"
+    assert reader.listing(listing_id)["inventory_status"] == "pending"
+    with sqlite3.connect(reader.db_path) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM publication_instances WHERE listing_id=?", (listing_id,)).fetchone()[0] == 0
+        state = conn.execute(
+            "SELECT state FROM publication_delivery_attempts_v3 WHERE listing_id=? LIMIT 1",
+            (listing_id,),
+        ).fetchone()[0]
+    assert state == "unknown"
+
+
+def test_pending_autopublish_package_freezes_active_without_pre_send_db_activation(tmp_path, monkeypatch):
+    workflow, reader, _repo, service, listing_id, offer_id, _review_id = _pending_autopublish(tmp_path)
+    seen = {}
+
+    async def stop_after_package(**kwargs):
+        package = workflow.package(kwargs["package_id"])
+        seen["caption"] = package.post_text
+        seen["snapshot_status"] = package.snapshot["listing"]["inventory_status"]
+        seen["db_status"] = reader.listing(listing_id)["inventory_status"]
+        seen["delivery_override"] = kwargs.get("inventory_status_override")
+        raise DeliveryBlocked("telegram failed before send")
+
+    monkeypatch.setattr("v3_core.publishing.autopilot.deliver_approved_package", stop_after_package)
+    __import__("asyncio").run(service.process_one(bot=object(), force_offer_id=offer_id))
+
+    assert seen["snapshot_status"] == "active"
+    assert seen["db_status"] == "pending"
+    assert seen["delivery_override"] == "active"
+    assert "🟢 当前可预约" in seen["caption"]
+    assert reader.listing(listing_id)["inventory_status"] == "pending"

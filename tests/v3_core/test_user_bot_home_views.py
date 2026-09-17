@@ -30,19 +30,17 @@ def test_full_home_is_exact_final_product_surface():
         "🔍 开始找房",
         "📅 我的预约",
         "🛠 入住服务",
-        "📄 租赁服务",
+        "🏠 关于侨联",
         "💬 中文顾问",
         "📢 房源频道",
-        "🏠 关于侨联",
     ]
     callbacks = _callbacks(markup)
     assert callbacks == [
         "v3u:home:search",
         "v3u:home:appointments",
         "v3u:home:service",
-        "v3u:home:rental",
-        "v3u:home:contact",
         "v3u:home:about",
+        "v3u:home:contact",
     ]
     assert markup.inline_keyboard[3][0].url == "https://t.me/qiaolian"
     forbidden = {

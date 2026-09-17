@@ -11,6 +11,7 @@ from dataclasses import dataclass
 import re
 
 from v3_core.inventory.listing_taxonomy import MARKET_LOCATIONS, PHYSICAL_AREAS, clean_text
+from v3_core.inventory.phnom_penh_location_registry import project_search_terms
 
 
 _ROOM_TYPE_HINTS = {
@@ -78,6 +79,10 @@ def _location_aliases() -> tuple[tuple[str, tuple[str, ...]], ...]:
 _LOCATION_ALIASES = _location_aliases()
 
 
+def detect_project_terms(text: str) -> tuple[str, ...]:
+    return project_search_terms(text)
+
+
 def detect_location_keys(text: str) -> tuple[str, ...]:
     raw = clean_text(text).casefold()
     if not raw or "不限" in raw:
@@ -109,11 +114,13 @@ class SearchCriteria:
     budget_max: int | None = None
     room_type: str = ""
     raw_text: str = ""
+    project_terms: tuple[str, ...] = ()
 
     @property
     def has_filter(self) -> bool:
         return bool(
             self.property_type
+            or self.project_terms
             or self.location_keys
             or self.budget_min is not None
             or self.budget_max is not None
@@ -125,6 +132,7 @@ def parse_search_criteria(text: str) -> SearchCriteria:
     budget_min, budget_max = parse_budget_range(raw)
     return SearchCriteria(
         property_type=detect_property_type(raw),
+        project_terms=detect_project_terms(raw),
         location_keys=detect_location_keys(raw),
         budget_min=budget_min,
         budget_max=budget_max,
@@ -136,6 +144,7 @@ def parse_search_criteria(text: str) -> SearchCriteria:
 __all__ = [
     "SearchCriteria",
     "detect_location_keys",
+    "detect_project_terms",
     "detect_property_type",
     "detect_room_type",
     "parse_budget_range",

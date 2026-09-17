@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from v3_core.user_bot.search_query import (
     detect_location_keys,
+    detect_project_terms,
     detect_property_type,
     detect_room_type,
     parse_budget_range,
@@ -28,7 +29,8 @@ def test_property_and_room_detection_match_locked_keywords():
 
 def test_location_detection_is_derived_from_canonical_taxonomy():
     assert detect_location_keys("BKK1 一房 800以内") == ("BKK1",)
-    assert "富力城" in detect_location_keys("富力城两房")
+    assert "富力城" not in detect_location_keys("富力城两房")
+    assert "富力城" in detect_project_terms("富力城两房")
     assert "钻石岛" in detect_location_keys("diamond island apartment")
     assert detect_location_keys("BKK2 / BKK3") == ("BKK2", "BKK3")
     assert detect_location_keys("不限区域") == ()
