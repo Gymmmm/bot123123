@@ -5,7 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from PIL import Image
+from PIL import Image, ImageFont
 
 from v3_core.media.cover_generator import CoverRenderData, generate_cover
 from v3_core.media.cover_styles import cover_template_path
@@ -73,10 +73,12 @@ def _image(path: Path, value: int):
     Image.new("RGB", (1000, 750), (value, 120, 180)).save(path)
 
 
-def test_three_cover_styles_map_to_distinct_template_paths_and_render_differently(tmp_path: Path):
+def test_three_cover_styles_map_to_distinct_template_paths_and_render_differently(tmp_path: Path, monkeypatch):
     paths = [cover_template_path(key, allow_video=False).resolve() for key in ("classic_blue", "right_price", "black_gold")]
     assert len(set(paths)) == 3
     assert all(path.is_file() for path in paths)
+
+    monkeypatch.setattr("v3_core.media.cover_generator._font", lambda size, bold=False: ImageFont.load_default(size=size))
 
     source = tmp_path / "source.jpg"
     _image(source, 80)
@@ -121,10 +123,12 @@ async def test_manual_cover_picker_selects_real_photo_and_preserves_it_across_te
     }
     context = SimpleNamespace(user_data={NEW_LISTING_STATE_KEY: state}, bot=object())
 
+    # Default preview uses candidate 0.
     preview = _Message()
     await controller.prepare_manual_preview(preview, context, review_id=workflow.review["review_id"], offer_id=workflow.offer["offer_id"])
     assert workflow.build_calls[-1]["manual_cover_path"] == candidates[0]
 
+    # Picker shows every real candidate and uses short callbacks.
     picker_message = _Message()
     update = SimpleNamespace(callback_query=SimpleNamespace(data="v3smp|manual_cover", message=picker_message))
     assert await controller.handle_callback(update, context) is True
@@ -134,20 +138,24 @@ async def test_manual_cover_picker_selects_real_photo_and_preserves_it_across_te
     assert callbacks == ["v3smp|manual_cover_pick|0", "v3smp|manual_cover_pick|1", "v3smp|manual_cover_pick|2"]
     assert all(len(value.encode("utf-8")) <= 64 for value in callbacks)
 
+    # Select photo 1.
     update = SimpleNamespace(callback_query=SimpleNamespace(data="v3smp|manual_cover_pick|1", message=_Message()))
     assert await controller.handle_callback(update, context) is True
     assert workflow.build_calls[-1]["manual_cover_path"] == candidates[1]
 
-    update = SimpleNamespace(callback_query=SimpleNamespace(data="v3smp|manual_cover_pick|2", message=_Message()))
+    # Select photo 2.
+    update = SimpleNamespace(callback_query=SimpleNamespaace(data="v3smp|manual_cover_pick|2", message=_Message()))
     assert await controller.handle_callback(update, context) is True
     assert workflow.build_calls[-1]["manual_cover_path"] == candidates[2]
 
+    # Switch template: selected photo 2 survives and the style is persisted.
     update = SimpleNamespace(callback_query=SimpleNamespace(data="v3smp|manual_style|black_gold", message=_Message()))
     assert await controller.handle_callback(update, context) is True
     assert workflow.build_calls[-1]["manual_cover_path"] == candidates[2]
     assert workflow.build_calls[-1]["cover_style"] == "black_gold"
     assert context.user_data[NEW_LISTING_STATE_KEY]["cover_style"] == "black_gold"
 
+    # Regenerate without an explicit style: session style and selected photo still win.
     await controller.prepare_manual_preview(_Message(), context, review_id=workflow.review["review_id"], offer_id=workflow.offer["offer_id"])
     assert workflow.build_calls[-1]["manual_cover_path"] == candidates[2]
     assert workflow.build_calls[-1]["cover_style"] == "black_gold"
