@@ -11,7 +11,7 @@ from .appointment_history import AppointmentHistoryService, AppointmentHistoryVi
 from .assurance_views import build_assurance_home_view
 from .contact_effects import ContactEffectExecutor, ContactEffectResult
 from .home_callbacks import HomeAction, parse_home_callback
-from .home_views import build_about_view, build_appointment_history_home_view, build_booking_view, build_contact_view
+from .home_views import build_appointment_history_home_view, build_booking_view, build_contact_view
 from .lead_service import LeadUser
 from .service_flow import TenantService
 from .service_product_views import service_home_view
@@ -131,11 +131,7 @@ async def handle_v3_home_callback(
         await _edit_home_view(query, build_appointment_history_home_view(history))
         return TelegramHomeOutcome(True, action, True, appointment_history=history)
 
-    if action == "about":
-        await _edit_home_view(query, build_about_view(advisor_url=advisor_url))
-        return TelegramHomeOutcome(handled=True, action=action, rendered=True)
-
-    if action == "rental":
+    if action in {"about", "rental"}:
         await render_assurance_view(query, build_assurance_home_view(), advisor_url=advisor_url)
         return TelegramHomeOutcome(handled=True, action=action, rendered=True)
 
@@ -149,7 +145,15 @@ async def handle_v3_home_callback(
         return TelegramHomeOutcome(handled=True, action=action, rendered=True)
 
     if action == "local":
-        await render_service_view(query, local_life_view(), advisor_url=advisor_url)
+        tenant_service = _tenant_service_from_history(appointment_history)
+        if tenant_service is None:
+            await render_service_view(query, service_home_view(), advisor_url=advisor_url)
+        else:
+            user = _lead_user(update)
+            if tenant_service.active_binding(user.user_id) is None:
+                await render_service_view(query, tenant_home_view(tenant_service, user.user_id), advisor_url=advisor_url)
+            else:
+                await render_service_view(query, local_life_view(), advisor_url=advisor_url)
         return TelegramHomeOutcome(handled=True, action=action, rendered=True)
 
     if action == "contact":

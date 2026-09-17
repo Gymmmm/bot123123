@@ -25,9 +25,9 @@ def _safe_text(value: Any, fallback: str = "待补全") -> str:
 
 def _public_rows() -> tuple[tuple[ServiceChoice, ...], ...]:
     return (
-        (ServiceChoice("📄 租赁服务", "v3u:home:rental"), ServiceChoice("🔍 开始找房", "v3u:home:search")),
         (ServiceChoice("💬 中文顾问", "v3u:home:contact"),),
-        (ServiceChoice("🏠 返回首页", "v3u:t:home"),),
+        (ServiceChoice("🛡 看租后服务", "v3u:home:rental"), ServiceChoice("🔍 开始找房", "v3u:home:search")),
+        (ServiceChoice("⬅️ 回首页", "v3u:t:home"),),
     )
 
 
@@ -36,20 +36,22 @@ def tenant_home_view(service: TenantService, user_id: int) -> ServiceView:
     if binding is None:
         return ServiceView(
             "tenant_missing",
-            "🛠 <b>入住服务</b>\n\n当前账号还没有绑定有效租约。\n\n"
-            "未绑定时仍可查看公开租赁服务、继续找房或联系中文顾问。",
+            "🛠 <b>入住服务</b>\n\n这边还没有显示你的住房信息。\n\n"
+            "如果已经通过侨联入住，但这里还没有显示，可以联系中文顾问处理。\n"
+            "还没租房的话，可以先了解入住之后侨联怎么服务，或继续找房。",
             _public_rows(),
         )
     property_name = he(_safe_text(binding.property_name, "已绑定住房"))
     return ServiceView(
         "tenant_home",
         f"🛠 <b>入住服务</b>\n\n🏠 当前住房：<b>{property_name}</b>\n\n"
-        "这里处理当前有效租约对应的住房事项。",
+        "这里处理这套房子入住之后的事情。",
         (
             (ServiceChoice("📋 我的租约", "v3u:service:tenant_lease"),),
             (ServiceChoice("🔧 报修", "v3u:service:repair"), ServiceChoice("🏢 物业协调", "v3u:service:property")),
-            (ServiceChoice("📄 租赁服务", "v3u:home:rental"), ServiceChoice("💬 中文顾问", "v3u:home:contact")),
-            (ServiceChoice("🏠 返回首页", "v3u:t:home"),),
+            (ServiceChoice("📍 周边服务", "v3u:service:local"),),
+            (ServiceChoice("💬 中文顾问", "v3u:home:contact"),),
+            (ServiceChoice("⬅️ 回首页", "v3u:t:home"),),
         ),
     )
 
@@ -72,7 +74,8 @@ def lease_view(service: TenantService, user_id: int) -> ServiceView:
         "🟢 当前状态｜有效租约",
         (
             (ServiceChoice("🔄 续租", "v3u:service:tenant_renew"), ServiceChoice("🚪 退租", "v3u:service:tenant_terminate")),
-            (ServiceChoice("🛠 返回入住服务", "v3u:service:tenant"), ServiceChoice("💬 中文顾问", "v3u:home:contact")),
+            (ServiceChoice("💬 中文顾问", "v3u:home:contact"),),
+            (ServiceChoice("⬅️ 返回入住服务", "v3u:service:tenant"),),
         ),
     )
 
@@ -83,11 +86,13 @@ def renew_view(service: TenantService, user_id: int) -> ServiceView:
     prop = he(_safe_text(binding.property_name))
     return ServiceView(
         "tenant_renew",
-        f"🔄 <b>续租</b>\n\n🏠 当前房源：{prop}\n📅 到期日：{end}\n\n"
-        "提交后，中文顾问会核对新的租期和价格。",
+        f"🔄 <b>续租</b>\n\n🏠 {prop}\n📅 到期日：{end}\n\n"
+        "提交后，中文顾问会核对新的租期和价格。\n"
+        "这一步是提出需求，不是已经续好。",
         (
-            (ServiceChoice("✅ 提交续租申请", "v3u:service:tenant_renew_submit"),),
-            (ServiceChoice("💬 中文顾问", "v3u:home:contact"), ServiceChoice("⬅️ 返回我的租约", "v3u:service:tenant_lease")),
+            (ServiceChoice("✅ 提交续租需求", "v3u:service:tenant_renew_submit"),),
+            (ServiceChoice("💬 中文顾问", "v3u:home:contact"),),
+            (ServiceChoice("⬅️ 返回我的租约", "v3u:service:tenant_lease"),),
         ),
     )
 
@@ -98,23 +103,23 @@ def terminate_view(service: TenantService, user_id: int) -> ServiceView:
     prop = he(_safe_text(binding.property_name))
     return ServiceView(
         "tenant_terminate",
-        f"🚪 <b>退租</b>\n\n🏠 当前房源：{prop}\n📅 合同到期：{end}\n\n"
-        "提交后，中文顾问会继续确认通知期、交接安排、费用和押金核对。",
+        f"🚪 <b>退租</b>\n\n🏠 {prop}\n📅 合同到期：{end}\n\n"
+        "提交后，顾问会确认通知期、交接、费用和押金核对。\n"
+        "这一步是提出需求，不是已经退好。",
         (
-            (ServiceChoice("✅ 提交退租申请", "v3u:service:tenant_terminate_submit"),),
-            (ServiceChoice("📄 押金与退租", "v3u:assure:deposit_tenant"),),
-            (ServiceChoice("💬 中文顾问", "v3u:home:contact"), ServiceChoice("⬅️ 返回我的租约", "v3u:service:tenant_lease")),
+            (ServiceChoice("✅ 提交退租需求", "v3u:service:tenant_terminate_submit"),),
+            (ServiceChoice("📋 入住交接留档", "v3u:assure:handover"),),
+            (ServiceChoice("💬 中文顾问", "v3u:home:contact"),),
+            (ServiceChoice("⬅️ 返回我的租约", "v3u:service:tenant_lease"),),
         ),
     )
 
 
-# Historical tenant-guide callbacks are mapped to the public service center by
-# the callback handler. These functions remain for import compatibility only.
 def guide_view(service: TenantService, user_id: int) -> ServiceView:
     return ServiceView(
         "tenant_guide_updated",
-        "⚠️ 这个入口已经更新\n请使用下面的最新服务入口。",
-        ((ServiceChoice("📄 租赁服务", "v3u:home:rental"),), (ServiceChoice("🏠 返回首页", "v3u:t:home"), ServiceChoice("💬 中文顾问", "v3u:home:contact"))),
+        "🛡 <b>租到房，不代表服务就结束了。</b>\n\n请从租后服务查看入住之后侨联怎么接着服务。",
+        ((ServiceChoice("🛡 看租后服务", "v3u:home:rental"),), (ServiceChoice("⬅️ 回首页", "v3u:t:home"), ServiceChoice("💬 中文顾问", "v3u:home:contact"))),
     )
 
 
@@ -145,26 +150,24 @@ async def submit_request(*, kind: str, service: TenantService, effects, update, 
     duplicate = bool(effect and effect.lead.status == "skipped")
     if kind == "renew":
         text = (
-            "💬 <b>续租申请正在跟进</b>\n\n之前已经提交过当前租约的续租申请，中文顾问会继续处理。"
+            "💬 <b>续租需求正在跟进</b>\n\n之前已经提交过当前租约的续租需求，中文顾问会继续处理。"
             if duplicate else
-            "✅ <b>续租申请已提交</b>\n\n中文顾问会核对新的租期和价格，再反馈结果。"
+            "✅ <b>续租需求已提交</b>\n\n中文顾问会核对新的租期和价格，再反馈结果。"
         )
     else:
         text = (
-            "💬 <b>退租申请正在跟进</b>\n\n之前已经提交过当前租约的退租申请，中文顾问会继续处理。"
+            "💬 <b>退租需求正在跟进</b>\n\n之前已经提交过当前租约的退租需求，中文顾问会继续处理。"
             if duplicate else
-            "✅ <b>退租申请已提交</b>\n\n中文顾问会确认通知期、交接、费用和押金核对安排。"
+            "✅ <b>退租需求已提交</b>\n\n中文顾问会确认通知期、交接、费用和押金核对安排。"
         )
     return ServiceView(
         "tenant_submit",
         text,
-        ((ServiceChoice("💬 中文顾问", "v3u:home:contact"),), (ServiceChoice("📋 返回我的租约", "v3u:service:tenant_lease"),)),
+        ((ServiceChoice("💬 中文顾问", "v3u:home:contact"),), (ServiceChoice("⬅️ 返回我的租约", "v3u:service:tenant_lease"),)),
     ), effect
 
 
 async def send_pdf(*, kind, service, user_id, repo_root, context, chat_id):
-    # Kept only for historical callback compatibility. Binding is rechecked at
-    # action time before any file is sent.
     service.require_active_binding(user_id)
     bundle = assurance_asset_bundle(Path(repo_root), kind)
     if not bundle.pdf_path.is_file():

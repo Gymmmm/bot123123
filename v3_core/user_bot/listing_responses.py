@@ -1,10 +1,4 @@
-"""Telegram-neutral public listing responses for the V3 User Bot.
-
-The renderer preserves the locked production details/photos presentation while
-consuming only a durably published V3 view. Telegram adapters later translate
-semantic actions/media groups into framework objects; they do not re-decide
-business state.
-"""
+"""Telegram-neutral public listing responses for the V3 User Bot."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -69,7 +63,6 @@ def listing_summary_bits(
     monthly_rent_usd: int | None = None,
     location: object = "",
 ) -> str:
-    """Compact identity line for advisor handoff / consult prefill."""
     return "｜".join(
         part
         for part in (
@@ -95,21 +88,15 @@ def _details_actions(
     public_listing_id: str,
 ) -> tuple[tuple[SemanticAction, ...], ...]:
     target = str(public_listing_id or "").strip()
-    if bookable:
-        return (
-            (
-                SemanticAction("📅 预约看房", "book", target),
-                SemanticAction("💬 问这套房", "consult", target),
-            ),
-            (SemanticAction("📸 更多实拍", "photos", target),),
-            (SemanticAction("🔍 看相近房源", "similar", target),),
-        )
+    book_row = (
+        (SemanticAction("📅 预约看房", "book", target), SemanticAction("💬 问这套房", "consult", target))
+        if bookable
+        else (SemanticAction("💬 问这套房", "consult", target),)
+    )
     return (
-        (
-            SemanticAction("📸 更多实拍", "photos", target),
-            SemanticAction("💬 问这套房", "consult", target),
-        ),
-        (SemanticAction("🔍 看相近房源", "similar", target),),
+        book_row,
+        (SemanticAction("📸 更多实拍", "photos", target),),
+        (SemanticAction("✏️ 换个条件找", "change_search"),),
     )
 
 
@@ -119,21 +106,14 @@ def _photo_actions(
     public_listing_id: str,
 ) -> tuple[tuple[SemanticAction, ...], ...]:
     target = str(public_listing_id or "").strip()
-    if bookable:
-        return (
-            (
-                SemanticAction("📅 预约看房", "book", target),
-                SemanticAction("💬 问这套房", "consult", target),
-            ),
-            (SemanticAction("📋 租赁详情", "details", target),),
-            (SemanticAction("🔍 看相近房源", "similar", target),),
-        )
+    book_row = (
+        (SemanticAction("📅 预约看房", "book", target), SemanticAction("💬 问这套房", "consult", target))
+        if bookable
+        else (SemanticAction("💬 问这套房", "consult", target),)
+    )
     return (
-        (
-            SemanticAction("📋 租赁详情", "details", target),
-            SemanticAction("💬 问这套房", "consult", target),
-        ),
-        (SemanticAction("🔍 看相近房源", "similar", target),),
+        book_row,
+        (SemanticAction("📋 租赁详情", "details", target),),
     )
 
 
@@ -205,9 +185,9 @@ def build_photos_response(view: PublishedListingView) -> PublicPhotosResponse:
     photos = _existing_gallery(details.gallery)
     groups = tuple(tuple(photos[offset : offset + 10]) for offset in range(0, len(photos), 10))
     if groups:
-        text = "📸 <b>以上是这套房目前保存的现场实拍。</b>"
+        text = "📸 <b>这些是这套房目前留下的现场实拍。</b>"
     else:
-        text = "📸 <b>这套房源目前的实拍已经全部显示。</b>"
+        text = "📸 <b>这套房目前没有更多实拍。</b>"
     return PublicPhotosResponse(
         media_groups=groups,
         text=text,

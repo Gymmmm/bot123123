@@ -42,9 +42,9 @@ def test_round2_tenant_service_entry_and_binding_views(tmp_path):
     service = TenantService(SQLiteTenantServiceRepository(db))
     missing = tenant_home_view(service, 99)
     assert missing.kind == "tenant_missing"
-    assert "没有绑定" in missing.text
+    assert "这边还没有显示你的住房信息" in missing.text
     missing_labels = [choice.label for row in missing.rows for choice in row]
-    assert missing_labels == ["📄 租赁服务", "🔍 开始找房", "💬 中文顾问", "🏠 返回首页"]
+    assert missing_labels == ["💬 中文顾问", "🛡 看租后服务", "🔍 开始找房", "⬅️ 回首页"]
 
     with sqlite3.connect(str(db)) as conn:
         conn.execute(
@@ -62,6 +62,7 @@ def test_round2_tenant_service_entry_and_binding_views(tmp_path):
     assert "v3u:service:tenant_renew" not in bound_callbacks
     assert "v3u:service:tenant_terminate" not in bound_callbacks
     assert "v3u:service:tenant_lease" in bound_callbacks
+    assert "v3u:service:local" in bound_callbacks
 
 
 def _make_admin_db(path):

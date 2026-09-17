@@ -25,17 +25,17 @@ def test_v3_home_uses_final_conversion_navigation():
     view = build_home_view(channel_url="https://t.me/qiaolian")
     labels = _labels(view)
     assert labels == [
-        "🔍 开始找房", "📅 我的预约", "🛠 入住服务", "🏠 关于侨联",
-        "💬 中文顾问", "📢 房源频道",
+        "🔍 开始找房", "📅 我的预约", "🛠 入住服务", "🛡 租后服务",
+        "💬 中文顾问", "📢 最新房源",
     ]
-    forbidden = ("智能找房", "顾问帮我找", "最新房源", "侨联保障", "租赁服务指南", "我想换房")
+    forbidden = ("智能找房", "顾问帮我找", "关于侨联", "房源频道", "侨联保障", "租赁服务指南", "我想换房")
     assert not any(any(term in label for term in forbidden) for label in labels)
 
 
 def test_home_without_channel_keeps_core_conversion_actions():
     labels = _labels(build_home_view())
     assert labels == [
-        "🔍 开始找房", "📅 我的预约", "🛠 入住服务", "🏠 关于侨联",
+        "🔍 开始找房", "📅 我的预约", "🛠 入住服务", "🛡 租后服务",
         "💬 中文顾问",
     ]
 
@@ -44,38 +44,36 @@ def test_about_and_booking_are_compatible_secondary_home_actions():
     assert parse_home_callback(encode_home_callback("about")).action == "about"
     assert parse_home_callback(encode_home_callback("book")).action == "book"
     about = build_about_view().text
-    assert "关于侨联｜租赁服务" in about
-    assert "签约前确认" in about
-    assert "入住交接" in about
-    assert "退租核对" in about
-    assert "预约申请已提交" in build_booking_view().text
+    assert "租到房，不代表服务就结束了" in about
+    assert "签约前" in about
+    assert "入住时" in about
+    assert "退租时" in about
+    assert "预约看房" in build_booking_view().text
     assert "换房" not in build_about_view().text
 
 
 def test_service_hub_is_safe_gate_until_binding_is_known():
     view = service_home_view()
     labels = _labels(view)
-    assert labels == ["🛠 检查当前租约", "📄 租赁服务", "🔍 开始找房", "💬 中文顾问", "🏠 返回首页"]
+    assert labels == ["💬 中文顾问", "🛡 看租后服务", "🔍 开始找房", "⬅️ 回首页"]
     callbacks = _callbacks(view)
     assert callbacks == [
-        "v3u:service:tenant", "v3u:home:rental", "v3u:home:search",
-        "v3u:home:contact", "v3u:t:home",
+        "v3u:home:contact", "v3u:home:rental", "v3u:home:search", "v3u:t:home",
     ]
     assert "报修" not in " ".join(labels)
     assert "续租" not in " ".join(labels)
     assert "退租" not in " ".join(labels)
+    assert "租约" not in " ".join(labels)
 
 
 def test_rental_service_is_public_parent_content_center():
     view = build_assurance_home_view()
-    assert "租赁服务" in view.text
-    assert "租赁服务指南" in view.text
-    assert "签约前确认" in view.text
-    assert "入住交接留档" in view.text
-    assert "押金与退租" in view.text
-    assert _labels(view) == ["💬 中文顾问", "🏠 返回首页"]
+    assert "租到房，不代表服务就结束了" in view.text
+    assert "入住时" in view.text
+    assert "房屋、表计、家具家电拍照留档" in view.text
+    assert _labels(view) == ["📋 入住交接留档", "🔍 开始找房", "💬 中文顾问", "⬅️ 回首页"]
     assert _callbacks(view) == [
-        "v3u:home:contact", "v3u:t:home",
+        "v3u:assure:handover", "v3u:home:search", "v3u:home:contact", "v3u:t:home",
     ]
 
 

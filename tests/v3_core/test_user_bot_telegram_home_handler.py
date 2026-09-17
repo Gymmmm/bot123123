@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import sqlite3
 from types import SimpleNamespace
 
 import pytest
 
+from v3_core.storage.bootstrap import initialize_v3_storage
 from v3_core.user_bot.admin_notifications import AdminNotificationResult
 from v3_core.user_bot.appointment_history import AppointmentHistoryView
 from v3_core.user_bot.contact_effects import ContactEffectResult
@@ -40,8 +42,9 @@ class FakeQuery:
 
 
 class FakeHistory:
-    def __init__(self):
+    def __init__(self, db_path=None):
         self.calls = []
+        self.reader = SimpleNamespace(db_path=db_path) if db_path is not None else None
 
     def build(self, user_id):
         self.calls.append(user_id)
@@ -75,6 +78,20 @@ def _search_views():
     return TransitionViewService(EmptyInventory())
 
 
+def _tenant_db(tmp_path, *, bound=False):
+    db = tmp_path / "home-tenant.db"
+    initialize_v3_storage(db)
+    if bound:
+        with sqlite3.connect(str(db)) as conn:
+            conn.execute(
+                """INSERT INTO tenant_bindings_v3
+                   (user_id,binding_code,property_name,status,created_at)
+                   VALUES (123,'BIND-123','富力城 A3-1208','active','2026-09-09 03:00:00')"""
+            )
+            conn.commit()
+    return db
+
+
 @pytest.mark.asyncio
 async def test_search_home_action_renders_locked_entry_then_sets_keyword_waiting_state():
     query = FakeQuery("v3u:home:search")
@@ -82,7 +99,7 @@ async def test_search_home_action_renders_locked_entry_then_sets_keyword_waiting
     outcome = await handle_v3_home_callback(_update(query), context, appointment_history=FakeHistory(), search_views=_search_views())
     assert outcome.handled and outcome.rendered and not outcome.deferred
     assert [call[0] for call in query.calls] == ["answer", "edit_text"]
-    assert "想找什么样的房子" in query.calls[-1][1][0]
+    assert "想住什么样的房子" in query.calls[-1][1][0]
     assert context.user_data[AWAITING_KEYWORD_SESSION_KEY] == {"source": "user_search"}
     assert context.user_data[SEARCH_PREF_SESSION_KEY]["source"] == "user_search"
     markup = query.calls[-1][2]["reply_markup"]
@@ -158,13 +175,13 @@ async def test_contact_without_effect_executor_is_deferred_and_never_claims_succ
     [
         (
             "rental",
-            "租赁服务",
-            {"v3u:home:contact", "v3u:t:home"},
+            "租到房，不代表服务就结束了",
+            {"v3u:assure:handover", "v3u:home:search", "v3u:home:contact", "v3u:t:home"},
         ),
         (
             "service",
             "入住服务",
-            {"v3u:service:tenant", "v3u:home:rental", "v3u:home:search", "v3u:home:contact", "v3u:t:home"},
+            {"v3u:home:contact", "v3u:home:rental", "v3u:home:search", "v3u:t:home"},
         ),
     ],
 )
@@ -180,3 +197,36 @@ async def test_assurance_and_service_home_actions_are_complete_v3_surfaces(actio
     callbacks = {button.callback_data for row in markup.inline_keyboard for button in row}
     assert callbacks == expected_callbacks
     assert not any(value.startswith(("hub:", "service:")) for value in callbacks)
+    labels = [button.text for row in markup.inline_keyboard for button in row]
+    if action == "service":
+        assert "报修" not in "".join(labels)
+        assert "租约" not in "".join(labels)
+        assert "物业" not in "".join(labels)
+
+
+@pytest.mark.asyncio
+async def test_home_service_unbound_user_goes_through_binding_gate(tmp_path):
+    query = FakeQuery("v3u:home:service")
+    history = FakeHistory(_tenant_db(tmp_path, bound=False))
+    outcome = await handle_v3_home_callback(_update(query), _context(), appointment_history=history)
+    assert outcome.handled and outcome.rendered
+    text = query.calls[-1][1][0]
+    labels = [button.text for row in query.calls[-1][2]["reply_markup"].inline_keyboard for button in row]
+    assert "这边还没有显示你的住房信息" in text
+    assert labels == ["💬 中文顾问", "🛡 看租后服务", "🔍 开始找房", "⬅️ 回首页"]
+    assert all(word not in "".join(labels) for word in ("报修", "租约", "物业"))
+
+
+@pytest.mark.asyncio
+async def test_home_service_bound_user_opens_resident_home(tmp_path):
+    query = FakeQuery("v3u:home:service")
+    history = FakeHistory(_tenant_db(tmp_path, bound=True))
+    outcome = await handle_v3_home_callback(_update(query), _context(), appointment_history=history)
+    assert outcome.handled and outcome.rendered
+    text = query.calls[-1][1][0]
+    labels = [button.text for row in query.calls[-1][2]["reply_markup"].inline_keyboard for button in row]
+    assert "富力城 A3-1208" in text
+    assert "📋 我的租约" in labels
+    assert "🔧 报修" in labels
+    assert "🏢 物业协调" in labels
+    assert "📍 周边服务" in labels

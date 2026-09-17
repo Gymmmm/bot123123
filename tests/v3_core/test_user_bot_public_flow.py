@@ -158,10 +158,9 @@ def test_rented_book_is_blocked_before_appointment_flow_is_created():
         actions = [action for row in result.details.action_rows for action in row]
         labels = [action.label for action in actions]
         assert "📅 预约看房" not in labels
-        assert any(label.endswith("看相近房源") for label in labels)
-        similar = next(action for action in actions if action.label.endswith("看相近房源"))
-        assert similar.action == "similar"
-        assert similar.target_public_listing_id == "QL-RF-A2B3"
+        assert any(label.endswith("换个条件找") for label in labels)
+        change = next(action for action in actions if action.label.endswith("换个条件找"))
+        assert change.action == "change_search"
 
 
 def test_direct_action_rejects_invalid_identity_and_non_public_action():

@@ -103,8 +103,11 @@ def test_unbookable_book_payload_keeps_details_instead_of_dead_link():
     assert result.book is None
     assert result.details is not None
     assert "🏠 <b>富力城｜1房</b>" in result.details.text
-    assert result.details.action_rows[0][0].label == "📸 更多实拍"
-    assert result.details.action_rows[0][1].label == "💬 问这套房"
+    labels = [item.label for row in result.details.action_rows for item in row]
+    assert "💬 问这套房" in labels
+    assert "📸 更多实拍" in labels
+    assert "📅 预约看房" not in labels
+    assert "🔍 看相近房源" not in labels
 
 
 class _FakeMessage:
@@ -137,7 +140,11 @@ async def test_start_handler_renders_chinese_unbookable_copy_then_details():
     outcome = await handle_v3_start(update, context, listings=_Listings(), transition_views=SimpleNamespace(build=lambda plan: None))
     assert outcome.kind == "unbookable"
     assert outcome.handled is True
-    assert message.texts[0] == "这套房暂时不能预约。可以继续看相近房源，或让顾问帮您确认其他选择。"
+    assert message.texts[0] == "这套房现在暂时不能预约。\n\n可以先看详情，或让顾问帮你看别的选择。"
     assert "🏠 <b>富力城｜1房</b>" in message.texts[1]
     actions = [button.text for row in message.markups[1].inline_keyboard for button in row]
-    assert actions == ["📸 更多实拍", "💬 问这套房", "🔍 看相近房源", "🏠 返回首页"]
+    assert "💬 问这套房" in actions
+    assert "📸 更多实拍" in actions
+    assert "🔍 看相近房源" not in actions
+    assert "🏠 返回首页" not in actions
+    assert "📅 预约看房" not in actions

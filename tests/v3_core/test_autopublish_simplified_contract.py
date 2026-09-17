@@ -499,6 +499,6 @@ def test_invalid_link_copy_is_exact_and_has_three_recovery_buttons():
 
     message = Message()
     asyncio.run(_render_invalid_link(message))
-    assert message.text == "这个链接已经失效或房源信息已更新。\n\n可以重新找房，或让顾问继续帮您找。"
+    assert message.text == "这套房的入口已经失效，或信息刚刚更新过。\n\n可以重新找房，或让顾问按你的条件接着看。"
     labels = [button.text for row in message.markup.inline_keyboard for button in row]
-    assert labels == ["🔍 智能找房", "💬 顾问帮我找", "🏠 返回首页"]
+    assert labels == ["🔍 开始找房", "💬 中文顾问", "⬅️ 回首页"]

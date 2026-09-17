@@ -28,47 +28,42 @@ class HomeView:
 
 WELCOME_TEXT = (
     "💎 <b>侨联地产｜您在金边的自己人</b>\n\n"
-    "找房、预约、签约和入住后的住房服务，都可以从这里开始。\n\n"
-    "如果已经在频道看到具体房源，直接从该房源进入，系统会继续带着同一套房源信息。\n\n"
-    "请选择您现在需要的服务："
+    "找房、预约看房，都可以从这里开始。\n"
+    "租到以后，住房的事情也还能找侨联。"
 )
 
 ABOUT_TEXT = (
-    "🏠 <b>关于侨联｜租赁服务</b>\n\n"
-    "侨联地产面向在柬埔寨生活、找房和租房的中文客户。\n\n"
-    "找房时把房源和费用说明白，看房、签约、入住按同一条流程留好记录；"
-    "入住后遇到房屋、物业、续租或退租问题，也继续由中文服务衔接。\n\n"
-    "📄 <b>租赁服务</b>\n"
-    "1. <b>签约前确认</b>｜租金、押金、付款方式、水电、物业及其他费用\n"
-    "2. <b>入住交接</b>｜房屋现状、表计、家具家电拍照留档\n"
-    "3. <b>退租核对</b>｜按合同和入住留档逐项确认押金与费用\n\n"
-    "有对不上的，侨联协助与房东、物业沟通处理。\n\n"
-    "<b>看对房 · 签约稳 · 入住顺</b>"
+    "🛡 <b>租到房，不代表服务就结束了。</b>\n\n"
+    "找房只是开始。住进去以后的事情，侨联也接着管。\n\n"
+    "签约前　核对租金、押金和相关费用\n"
+    "入住时　房屋、表计、家具家电拍照留档\n"
+    "入住后　报修或物业沟通，可以找侨联\n"
+    "退租时　按入住记录协助逐项核对\n\n"
+    "从找房到住进去以后，有需要都可以找侨联。"
 )
 
 CONTACT_TEXT = (
     "💬 <b>中文顾问</b>\n\n"
-    "直接发送您想咨询的问题即可。\n\n"
-    "找房可以发送：<b>区域 + 预算 + 户型 + 入住时间</b>。\n"
-    "如果从具体房源进入，系统会自动带上该房源信息，不需要重复说明。"
+    "直接把问题发给我。\n"
+    "找房可以说：区域、预算、几房、什么时候入住。"
 )
 
 BOOK_TEXT = (
     "📅 <b>预约看房</b>\n\n"
-    "请从具体房源详情进入预约，依次选择日期和时间后直接提交。\n\n"
-    "提交后表示<b>预约申请已提交</b>，不代表时间已经确认；最终房态和看房时间由中文顾问确认。"
+    "请从具体房源详情进入预约，依次选择日期和时间后提交。\n\n"
+    "提交后表示<b>预约申请已提交</b>，不代表时间已经确认。"
 )
 
 
 def build_home_view(*, channel_url: str = "", advisor_url: str = "") -> HomeView:
     rows: list[tuple[HomeChoice, ...]] = [
         (HomeChoice("🔍 开始找房", "search"), HomeChoice("📅 我的预约", "appointments")),
-        (HomeChoice("🛠 入住服务", "service"), HomeChoice("🏠 关于侨联", "about")),
+        (HomeChoice("🛠 入住服务", "service"), HomeChoice("🛡 租后服务", "rental")),
         (HomeChoice("💬 中文顾问", "contact"),),
     ]
     channel = str(channel_url or "").strip()
     if channel:
-        rows.append((HomeChoice("📢 房源频道", "root", url=channel),))
+        rows.append((HomeChoice("📢 最新房源", "root", url=channel),))
     return HomeView("home", WELCOME_TEXT, tuple(rows))
 
 
@@ -77,9 +72,9 @@ def build_about_view(*, advisor_url: str = "") -> HomeView:
         "about",
         ABOUT_TEXT,
         (
-            (HomeChoice("🔍 开始找房", "search"), HomeChoice("🛠 入住服务", "service")),
-            (HomeChoice("💬 中文顾问", "contact"),),
-            (HomeChoice("🏠 返回首页", "root"),),
+            (HomeChoice("📋 入住交接留档", "rental"),),
+            (HomeChoice("🔍 开始找房", "search"), HomeChoice("💬 中文顾问", "contact")),
+            (HomeChoice("⬅️ 回首页", "root"),),
         ),
     )
 
@@ -91,7 +86,7 @@ def build_booking_view(*, advisor_url: str = "") -> HomeView:
         (
             (HomeChoice("🔍 开始找房", "search"), HomeChoice("📅 我的预约", "appointments")),
             (HomeChoice("💬 中文顾问", "contact"),),
-            (HomeChoice("🏠 返回首页", "root"),),
+            (HomeChoice("⬅️ 回首页", "root"),),
         ),
     )
 
@@ -102,15 +97,16 @@ def build_contact_view(*, advisor_url: str = "") -> HomeView:
     return HomeView(
         "contact",
         CONTACT_TEXT,
-        ((first,), (HomeChoice("🔍 开始找房", "search"),), (HomeChoice("🏠 返回首页", "root"),)),
+        ((first,), (HomeChoice("🔍 开始找房", "search"),), (HomeChoice("⬅️ 回首页", "root"),)),
     )
 
 
 def build_appointment_history_home_view(history: AppointmentHistoryView) -> HomeView:
+    find_label = "🔍 去找房" if history.history_count == 0 and not history.items else "🔍 继续找房"
     return HomeView(
         "appointments",
         history.text,
-        ((HomeChoice("🔍 继续找房", "search"),), (HomeChoice("🏠 返回首页", "root"),)),
+        ((HomeChoice(find_label, "search"),), (HomeChoice("⬅️ 回首页", "root"),)),
     )
 
 

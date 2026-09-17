@@ -80,11 +80,11 @@ def test_details_response_omits_adviser_section_without_supported_signal():
         "🟢 房态：当前可预约\n"
         "🆔 QL-RF-A2B3"
     )
-    assert _actions(response.action_rows) == [["book", "consult"], ["photos"], ["similar"]]
+    assert _actions(response.action_rows) == [["book", "consult"], ["photos"], ["change_search"]]
     assert _labels(response.action_rows) == [
         ["📅 预约看房", "💬 问这套房"],
         ["📸 更多实拍"],
-        ["🔍 看相近房源"],
+        ["✏️ 换个条件找"],
     ]
 
 
@@ -94,10 +94,11 @@ def test_details_response_uses_live_rented_state_but_keeps_frozen_public_facts()
 
     assert "💵 <b>$800/月</b>" in response.text
     assert "🔴 房态：已租出" in response.text
-    assert _actions(response.action_rows) == [["photos", "consult"], ["similar"]]
+    assert _actions(response.action_rows) == [["consult"], ["photos"], ["change_search"]]
     assert _labels(response.action_rows) == [
-        ["📸 更多实拍", "💬 问这套房"],
-        ["🔍 看相近房源"],
+        ["💬 问这套房"],
+        ["📸 更多实拍"],
+        ["✏️ 换个条件找"],
     ]
 
 
@@ -117,16 +118,15 @@ def test_photos_response_chunks_existing_frozen_gallery_by_ten(tmp_path):
     assert tuple(len(group) for group in response.media_groups) == (10, 2)
     flattened = [item for group in response.media_groups for item in group]
     assert flattened == files
-    assert response.text == "📸 <b>以上是这套房目前保存的现场实拍。</b>"
+    assert response.text == "📸 <b>这些是这套房目前留下的现场实拍。</b>"
     assert "QL-RF-A2B3" not in response.text
     assert "富力城" not in response.text
     assert "$800" not in response.text
     assert "BKK1" not in response.text
-    assert _actions(response.action_rows) == [["book", "consult"], ["details"], ["similar"]]
+    assert _actions(response.action_rows) == [["book", "consult"], ["details"]]
     assert _labels(response.action_rows) == [
         ["📅 预约看房", "💬 问这套房"],
         ["📋 租赁详情"],
-        ["🔍 看相近房源"],
     ]
 
 
@@ -136,11 +136,10 @@ def test_photos_response_drops_missing_files_and_uses_locked_fallback_text(tmp_p
 
     assert not response.has_media
     assert response.media_groups == ()
-    assert response.text == "📸 <b>这套房源目前的实拍已经全部显示。</b>"
+    assert response.text == "📸 <b>这套房目前没有更多实拍。</b>"
     assert _labels(response.action_rows) == [
         ["📅 预约看房", "💬 问这套房"],
         ["📋 租赁详情"],
-        ["🔍 看相近房源"],
     ]
 
 
@@ -151,8 +150,8 @@ def test_rented_photos_response_keeps_details_and_contact_but_removes_book(tmp_p
         _view(status="rented", offer_status="inactive", gallery=[str(photo)])
     )
 
-    assert _actions(response.action_rows) == [["details", "consult"], ["similar"]]
+    assert _actions(response.action_rows) == [["consult"], ["details"]]
     assert _labels(response.action_rows) == [
-        ["📋 租赁详情", "💬 问这套房"],
-        ["🔍 看相近房源"],
+        ["💬 问这套房"],
+        ["📋 租赁详情"],
     ]

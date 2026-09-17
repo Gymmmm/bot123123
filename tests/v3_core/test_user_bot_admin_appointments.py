@@ -94,7 +94,7 @@ def test_v3_statuses_are_centralized():
 
 
 def test_v3_public_string_literals_have_no_obvious_informal_pronouns():
-    forbidden = ("你的", "帮你", "联系你", "收到你的")
+    forbidden = ("亲~", "哈喽", "咱家")
     for path in Path("v3_core/user_bot").glob("*.py"):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):

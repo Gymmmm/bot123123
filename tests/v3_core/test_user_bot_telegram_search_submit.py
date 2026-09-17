@@ -171,7 +171,7 @@ async def test_no_match_renders_locked_copy_with_strict_recovery_actions():
     assert SEARCH_PREF_SESSION_KEY not in user_data
     assert [call[0] for call in query.calls] == ["answer", "edit_text"]
     text = query.calls[-1][1][0]
-    assert "暂时没有完全符合条件的房源" in text
+    assert "这组条件暂时没有对上的房源" in text
     assert "BKK1｜$400–600" in text
     markup = query.calls[-1][2]["reply_markup"]
     callbacks = [button.callback_data for row in markup.inline_keyboard for button in row]

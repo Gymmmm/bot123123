@@ -179,10 +179,11 @@ async def test_no_binding_repair_callback_is_blocked_to_public_only_tenant_view(
     outcome = await handle_v3_service_callback(_callback_update(query), context, service=service)
     assert outcome.handled and outcome.rendered
     text = query.calls[-1][1][0]
-    assert "没有绑定有效租约" in text
+    assert "这边还没有显示你的住房信息" in text
     markup = query.calls[-1][2]["reply_markup"]
     labels = [button.text for row in markup.inline_keyboard for button in row]
-    assert labels == ["📄 租赁服务", "🔍 开始找房", "💬 中文顾问", "🏠 返回首页"]
+    assert labels == ["💬 中文顾问", "🛡 看租后服务", "🔍 开始找房", "⬅️ 回首页"]
+    assert all(word not in "".join(labels) for word in ("报修", "租约", "物业"))
 
 
 @pytest.mark.asyncio
