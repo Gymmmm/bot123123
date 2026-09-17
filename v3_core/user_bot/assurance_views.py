@@ -124,7 +124,7 @@ def assurance_asset_bundle(repo_root: str | Path, kind: str) -> AssuranceAssetBu
         pdf_path=generated / ("handover.pdf" if clean == "handover" else "deposit.pdf"),
         title="入住交接留档",
         instruction=HANDOVER_TEXT,
-        filename="入住交接留档.pdf",
+        filename="入住交接清单.pdf",
     )
 
 
