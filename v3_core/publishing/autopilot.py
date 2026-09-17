@@ -710,6 +710,7 @@ class AutoPublishService:
             package = await asyncio.to_thread(
                 self.workflow.build_package_for_review,
                 review_id=str(item["review_id"]),
+                inventory_status_override="active",
             )
             package = await asyncio.to_thread(
                 self.workflow.approve_package,
@@ -723,6 +724,7 @@ class AutoPublishService:
                 adapter=TelegramChannelAdapter(bot),
                 package_id=package.package_id,
                 channel_chat_id=self.channel_chat_id,
+                inventory_status_override="active",
             )
         except DeliveryBlocked as exc:
             code = "telegram_unknown" if "unknown" in str(exc).lower() or "sending" in str(exc).lower() or "sent" in str(exc).lower() else "telegram_failed"
@@ -730,6 +732,7 @@ class AutoPublishService:
         except Exception:
             return self._mark_exception(offer_id, "telegram_unknown")
         message_id = str(result.publication.channel_message_id)
+        self.repository.set_listing_status(listing_id, "active")
         self.repository.set_item(
             offer_id, state="published", package_id=package.package_id,
             channel_message_id=message_id, origin=origin,

@@ -15,7 +15,7 @@ from typing import Any
 from .listing_taxonomy import classify_listing_taxonomy, public_location_from_fields
 
 SCHEMA_VERSION = "canonical_facts.v1"
-PARSER_REVISION = "v1.2"
+PARSER_REVISION = "v1.3"
 CITY_KEY = "phnom_penh"
 CITY_DISPLAY = "金边"
 
@@ -62,6 +62,38 @@ def _has_any(text: str, aliases: tuple[str, ...]) -> tuple[str, int] | None:
 
 def _extract_layout(text: str) -> tuple[str | None, dict[str, int | None], list[dict[str, Any]]]:
     source = _normalize_cn_numbers(text)
+
+    # Admin/source copy often carries a labelled compact layout such as
+    # ``房型：2+1``.  Accept it only behind an explicit 房型/户型 label so a
+    # bare arithmetic-looking ``2+1`` elsewhere cannot become a layout fact.
+    labelled_compact = re.search(
+        r"(?:房型|户型)\s*[:：]\s*(\d{1,2}\s*\+\s*\d{1,2})(?!\s*(?:房|卫|厅))",
+        source,
+        flags=re.I,
+    )
+    if labelled_compact:
+        layout = re.sub(r"\s+", "", labelled_compact.group(1))
+        return layout, {
+            "bedrooms": None,
+            "living_rooms": None,
+            "bathrooms": None,
+            "helper_rooms": None,
+        }, [_evidence(layout, "raw_explicit_layout", "high", labelled_compact.group(0), labelled_compact.start(1), labelled_compact.end(1))]
+
+    # ``两室一厅`` normalizes to ``2室1厅``.  Treat 室 as the ordinary bedroom
+    # noun, but do not infer bathrooms or any other absent field.
+    room_living = re.search(r"(?<!\d)(\d{1,2})\s*室\s*(\d{1,2})\s*厅", source)
+    if room_living:
+        bedrooms = int(room_living.group(1))
+        living_rooms = int(room_living.group(2))
+        layout = f"{bedrooms}房{living_rooms}厅"
+        return layout, {
+            "bedrooms": bedrooms,
+            "living_rooms": living_rooms,
+            "bathrooms": None,
+            "helper_rooms": None,
+        }, [_evidence(layout, "raw_explicit_layout", "high", room_living.group(0), room_living.start(), room_living.end())]
+
     english = re.search(
         r"\b(\d{1,2})\s*(?:bedrooms?|beds?|br)\b"
         r"(?:\s*[/|,，&+]\s*|\s+)"

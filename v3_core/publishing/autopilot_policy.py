@@ -132,7 +132,7 @@ class ProductionAutoPublishRepository(AutoPublishRepository):
                 previous_token = str(previous["canonical_facts_hash"] or "") if previous else ""
                 changed = bool(previous is not None and previous_token != current_token)
                 existing = conn.execute(
-                    "SELECT state,ignored FROM publisher_auto_items_v3 WHERE offer_id=?",
+                    "SELECT state,reason_code,ignored FROM publisher_auto_items_v3 WHERE offer_id=?",
                     (offer_id,),
                 ).fetchone()
                 reason_code = "sale_store_only" if offer_type == "sale" else ""
@@ -154,12 +154,17 @@ class ProductionAutoPublishRepository(AutoPublishRepository):
                     )
                 else:
                     current_state = str(existing["state"] or "")
+                    current_reason = str(existing["reason_code"] or "")
                     ignored = bool(int(existing["ignored"] or 0))
                     if offer_type == "sale" and current_state != "published":
                         state, code, text = "exception", "sale_store_only", ERROR_LABELS["sale_store_only"]
                     elif current_state in {"published", "sending", "unknown"} or ignored:
                         state, code, text = current_state, "", ""
-                    elif changed:
+                    elif changed or (current_state == "exception" and current_reason == "listing_not_publishable"):
+                        # ``listing_not_publishable`` was previously produced for
+                        # otherwise-valid pending inventory. Revalidate it once
+                        # under the pending-aware production policy. Other real
+                        # blockers stay exception until their revision changes.
                         state, code, text = "queued", "", ""
                     else:
                         state, code, text = current_state or "queued", None, None
@@ -212,6 +217,37 @@ class ProductionAutoPublishRepository(AutoPublishRepository):
                   AND v.revision_token=(COALESCE(l.canonical_facts_hash,'') || ':' || COALESCE(s.dedupe_hash,''))
                 ORDER BY a.created_at ASC,a.offer_id ASC LIMIT 1"""
         )
+
+    def set_offer_readiness(
+        self, offer_id: str, *, publishable: bool, block_reason: str = ""
+    ) -> None:
+        """Persist candidate readiness without changing review/package approval.
+
+        This mirrors the existing rent-offer publication flag contract but keeps
+        production validation independent from a concrete workflow object.
+        """
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute(
+                "SELECT offer_type,publication_policy FROM listing_offers WHERE offer_id=?",
+                (str(offer_id),),
+            ).fetchone()
+            if row is None:
+                conn.rollback()
+                raise KeyError(offer_id)
+            if publishable and (
+                str(row["offer_type"] or "") != "rent"
+                or str(row["publication_policy"] or "") != "telegram_rent"
+            ):
+                conn.rollback()
+                raise ValueError("only telegram_rent offers may become publishable")
+            conn.execute(
+                """UPDATE listing_offers
+                   SET publishable=?,publish_block_reason=?,updated_at=CURRENT_TIMESTAMP
+                   WHERE offer_id=?""",
+                (int(bool(publishable)), str(block_reason or ""), str(offer_id)),
+            )
+            conn.commit()
 
     def mark_validated(self, offer_id: str, revision_token: str) -> None:
         with self._connect() as conn:
@@ -280,10 +316,16 @@ class ProductionAutoPublishService(AutoPublishService):
             return self._mark_exception(offer_id, "telegram_unknown")
 
         if self.repository.probable_duplicate(listing_id, offer_id):
+            self.repository.set_offer_readiness(
+                offer_id, publishable=False, block_reason="duplicate_listing"
+            )
             return self._mark_exception(offer_id, "duplicate_listing")
 
         detail = self.workflow.review_detail(str(item["review_id"]))
         if str(detail.review.get("review_status") or "") in {"hold", "rejected"}:
+            self.repository.set_offer_readiness(
+                offer_id, publishable=False, block_reason="admin_hold"
+            )
             return self._mark_exception(offer_id, "admin_hold")
         facts = dict(detail.canonical.get("facts") or {})
         try:
@@ -291,11 +333,28 @@ class ProductionAutoPublishService(AutoPublishService):
                 self.workflow.review_media, review_id=str(item["review_id"])
             )
         except Exception:
+            self.repository.set_offer_readiness(
+                offer_id, publishable=False, block_reason="unreadable_media"
+            )
             return self._mark_exception(offer_id, "unreadable_media")
-        blockers = self._strict_blockers(item, facts, media)
+        blockers = self._strict_blockers(item, facts, media, allow_pending=True)
         if blockers:
-            return self._mark_exception(offer_id, blockers[0])
+            reason = blockers[0]
+            self.repository.set_offer_readiness(
+                offer_id, publishable=False, block_reason=reason
+            )
+            return self._mark_exception(offer_id, reason)
 
+        # Candidate readiness is intentionally weaker than review/package/send
+        # approval. It only allows this complete pending rental into the normal
+        # operator queue; review remains pending and package approval still
+        # enforces the independent eligibility contract.
+        self.repository.set_offer_readiness(
+            offer_id, publishable=True, block_reason=""
+        )
+        self.repository.set_item(
+            offer_id, state="queued", reason_code="", reason_text=""
+        )
         self.repository.mark_validated(offer_id, str(item.get("revision_token") or ""))
         return AutoPublishResult("ready", offer_id=offer_id, listing_id=listing_id)
 

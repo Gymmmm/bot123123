@@ -59,8 +59,9 @@ def test_round2_tenant_service_entry_and_binding_views(tmp_path):
     bound_callbacks = [choice.callback_data for row in bound.rows for choice in row]
     assert "v3u:service:repair" in bound_callbacks
     assert "v3u:service:property" in bound_callbacks
-    assert "v3u:service:tenant_renew" in bound_callbacks
-    assert "v3u:service:tenant_terminate" in bound_callbacks
+    assert "v3u:service:tenant_renew" not in bound_callbacks
+    assert "v3u:service:tenant_terminate" not in bound_callbacks
+    assert "v3u:service:tenant_lease" in bound_callbacks
 
 
 def _make_admin_db(path):

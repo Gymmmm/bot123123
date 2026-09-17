@@ -48,7 +48,6 @@ def tenant_home_view(service: TenantService, user_id: int) -> ServiceView:
         (
             (ServiceChoice("📋 我的租约", "v3u:service:tenant_lease"),),
             (ServiceChoice("🔧 报修", "v3u:service:repair"), ServiceChoice("🏢 物业协调", "v3u:service:property")),
-            (ServiceChoice("🔄 续租", "v3u:service:tenant_renew"), ServiceChoice("🚪 退租", "v3u:service:tenant_terminate")),
             (ServiceChoice("📄 租赁服务", "v3u:home:rental"), ServiceChoice("💬 中文顾问", "v3u:home:contact")),
             (ServiceChoice("🏠 返回首页", "v3u:t:home"),),
         ),

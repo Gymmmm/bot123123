@@ -104,6 +104,19 @@ class PublicationInstanceRepository:
             ).fetchone()
         return self._model(row) if row else None
 
+    def get_published_for_listing(
+        self, listing_id: str, *, platform: str, channel_chat_id: str
+    ) -> PublicationInstance | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                """SELECT * FROM publication_instances
+                   WHERE listing_id=? AND platform=? AND channel_chat_id=?
+                     AND publish_status='published'
+                   ORDER BY updated_at DESC,id DESC LIMIT 1""",
+                (str(listing_id), str(platform), str(channel_chat_id)),
+            ).fetchone()
+        return self._model(row) if row else None
+
     def record_telegram_publication(
         self,
         *,

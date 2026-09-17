@@ -21,6 +21,34 @@ from .operator_flow import OperatorPublisherAdminController
 PENDING_BATCH_SIZE = 10
 BATCH_STATUS_SYNC_KEY = "v3_pending_batch_status_sync"
 
+_PENDING_ELIGIBLE_WHERE = """
+l.inventory_status='pending'
+AND EXISTS (
+    SELECT 1 FROM listing_offers o
+     WHERE o.listing_id=l.listing_id
+       AND o.offer_type='rent'
+       AND o.offer_status='active'
+       AND o.publication_policy='telegram_rent'
+       AND COALESCE(o.publishable,0)=1
+)
+AND NOT EXISTS (
+    SELECT 1 FROM publication_instances pi
+     WHERE pi.listing_id=l.listing_id
+       AND pi.platform='telegram'
+       AND pi.publish_status='published'
+)
+AND NOT EXISTS (
+    SELECT 1 FROM publication_packages_v3 pp
+     WHERE pp.listing_id=l.listing_id
+       AND pp.status='published'
+)
+AND NOT EXISTS (
+    SELECT 1 FROM publisher_auto_items_v3 a
+     WHERE a.listing_id=l.listing_id
+       AND a.state IN ('published','exception')
+)
+"""
+
 
 class PendingBatchOperatorPublisherAdminController(OperatorPublisherAdminController):
     """Operator controller with a ten-listing pending review queue."""
@@ -28,7 +56,7 @@ class PendingBatchOperatorPublisherAdminController(OperatorPublisherAdminControl
     def _pending_count(self) -> int:
         with sqlite3.connect(self.db_path) as conn:
             row = conn.execute(
-                "SELECT COUNT(*) FROM listings_v3 WHERE inventory_status='pending'"
+                f"SELECT COUNT(*) FROM listings_v3 l WHERE {_PENDING_ELIGIBLE_WHERE}"
             ).fetchone()
         return int(row[0] or 0) if row else 0
 
@@ -38,21 +66,31 @@ class PendingBatchOperatorPublisherAdminController(OperatorPublisherAdminControl
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(
-                """SELECT l.listing_id,l.public_listing_id,l.display_title,l.project_name,
-                          l.inventory_status,l.updated_at,
-                          (SELECT o.monthly_rent_usd
-                             FROM listing_offers o
-                            WHERE o.listing_id=l.listing_id
-                              AND o.offer_type='rent'
-                              AND o.offer_status='active'
-                            ORDER BY o.rowid DESC LIMIT 1) AS monthly_rent_usd
-                     FROM listings_v3 l
-                    WHERE l.inventory_status='pending'
-                    ORDER BY l.updated_at ASC,l.listing_id ASC
-                    LIMIT ? OFFSET ?""",
+                f"""SELECT l.listing_id,l.public_listing_id,l.display_title,l.project_name,
+                           l.inventory_status,l.updated_at,
+                           (SELECT o.monthly_rent_usd
+                              FROM listing_offers o
+                             WHERE o.listing_id=l.listing_id
+                               AND o.offer_type='rent'
+                               AND o.offer_status='active'
+                               AND o.publication_policy='telegram_rent'
+                               AND COALESCE(o.publishable,0)=1
+                             ORDER BY o.rowid DESC LIMIT 1) AS monthly_rent_usd
+                      FROM listings_v3 l
+                     WHERE {_PENDING_ELIGIBLE_WHERE}
+                     ORDER BY l.updated_at ASC,l.listing_id ASC
+                     LIMIT ? OFFSET ?""",
                 (PENDING_BATCH_SIZE, offset),
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def _is_pending_eligible(self, listing_id: str) -> bool:
+        with sqlite3.connect(self.db_path) as conn:
+            row = conn.execute(
+                f"SELECT 1 FROM listings_v3 l WHERE l.listing_id=? AND {_PENDING_ELIGIBLE_WHERE} LIMIT 1",
+                (str(listing_id),),
+            ).fetchone()
+        return row is not None
 
     def _status_counts(self) -> dict[str, int]:
         with sqlite3.connect(self.db_path) as conn:
@@ -72,7 +110,7 @@ class PendingBatchOperatorPublisherAdminController(OperatorPublisherAdminControl
 
     async def show_listing_categories(self, message: Any) -> None:
         counts = self._status_counts()
-        pending = counts["pending"]
+        pending = self._pending_count()
         pending_label = (
             f"🔵 待确认 {pending}｜10套一组" if pending else "✅ 暂无待确认房源"
         )
@@ -207,10 +245,10 @@ class PendingBatchOperatorPublisherAdminController(OperatorPublisherAdminControl
         public_id = str(row.get("public_listing_id") or listing_id)
         title = str(row.get("display_title") or row.get("project_name") or "未命名房源")
         status = str(row.get("inventory_status") or "").strip().lower()
-        if status != "pending":
+        if status != "pending" or not self._is_pending_eligible(str(listing_id)):
             await message.reply_text(
                 f"<b>{escape(public_id)}</b>｜{escape(title)}\n\n"
-                "这套房的房态已经被其他操作修改，不再属于待确认。",
+                "这套房已不属于普通待确认队列，请进入房态、待审核或发布记录管理。",
                 parse_mode=ParseMode.HTML,
                 reply_markup=InlineKeyboardMarkup(
                     [[InlineKeyboardButton("⬅️ 返回本组", callback_data=f"v3smp|pbat|{max(0, int(page or 0))}")], self.home_row()]
