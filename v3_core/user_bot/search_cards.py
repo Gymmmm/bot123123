@@ -1,9 +1,4 @@
-"""Telegram-neutral search result cards for published V3 rent inventory.
-
-Card copy consumes only ``PublishedListingView`` objects. Public facts and cover
-selection come from the frozen publication package; only current availability
-comes from live inventory. No legacy listing/media lookup is permitted here.
-"""
+"""Telegram-neutral search result cards for published V3 rent inventory."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -77,38 +72,14 @@ def _card_actions(
 
     rows.append(
         (
-            SemanticAction(
-                "🏠 租赁详情",
-                "details",
-                target_public_listing_id=current_public_id,
-            ),
-            SemanticAction(
-                "📸 更多实拍",
-                "photos",
-                target_public_listing_id=current_public_id,
-            ),
+            SemanticAction("📋 租赁详情", "details", target_public_listing_id=current_public_id),
+            SemanticAction("📸 更多实拍", "photos", target_public_listing_id=current_public_id),
         )
     )
     if bookable:
-        rows.append(
-            (
-                SemanticAction(
-                    "📅 预约看房",
-                    "book",
-                    target_public_listing_id=current_public_id,
-                ),
-            )
-        )
-    rows.append(
-        (
-            SemanticAction(
-                "💬 联系中文顾问",
-                "consult",
-                target_public_listing_id=current_public_id,
-            ),
-        )
-    )
-    rows.append((SemanticAction("✏️ 调整条件", "change_search"),))
+        rows.append((SemanticAction("📅 预约看房", "book", target_public_listing_id=current_public_id),))
+    rows.append((SemanticAction("💬 问这套房", "consult", target_public_listing_id=current_public_id),))
+    rows.append((SemanticAction("✏️ 换个条件找", "change_search"),))
     return tuple(rows)
 
 
@@ -164,8 +135,4 @@ def build_search_cards(
     return tuple(build_search_card(items, index) for index in range(len(items)))
 
 
-__all__ = [
-    "SearchCardResponse",
-    "build_search_card",
-    "build_search_cards",
-]
+__all__ = ["SearchCardResponse", "build_search_card", "build_search_cards"]
