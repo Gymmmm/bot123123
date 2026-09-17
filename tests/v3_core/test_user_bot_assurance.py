@@ -66,7 +66,8 @@ def test_rental_service_home_is_public_content_center_with_final_labels():
         "⬅️ 回首页",
     ]
     assert "租到房，不代表服务就结束了" in view.text
-    assert "入住交接留档" in view.text
+    assert "入住时" in view.text
+    assert "房屋、表计、家具家电拍照留档" in view.text
 
     markup = build_assurance_keyboard(view, advisor_url="https://t.me/advisor")
     contact = markup.inline_keyboard[1][1]
