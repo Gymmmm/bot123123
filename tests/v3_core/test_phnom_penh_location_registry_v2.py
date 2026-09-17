@@ -73,11 +73,11 @@ def test_bkk1_agile_search_terms_keep_project_identity_separate_from_market_alia
 
 
 def test_registry_exposes_counts_and_unverified_projects_without_guessing_geo():
-    assert registry_project_count() >= 19
+    assert registry_project_count() == 19
     assert registry_alias_count() > registry_project_count()
     needs = set(unresolved_project_names())
-    assert {"玫瑰滨江园", "The Pinnacle 幸福广场", "太子国际广场", "太子·寰宇中心", "财富大厦", "首都国金", "皇家一号", "Picasso City Garden 毕加索", "摩根", "The Gateway", "首都·国金 Urban Village Phase 2", "炳发城"}.issubset(needs)
-    assert {"雅居乐", "桥牌", "香格里拉", "富力城"}.isdisjoint(needs)
+    assert {"玫瑰滨江园", "The Pinnacle 幸福广场", "太子国际广场", "太子·寰宇中心", "财富大厦", "Picasso City Garden 毕加索", "首都·国金 Urban Village Phase 2", "炳发城"}.issubset(needs)
+    assert {"雅居乐", "桥牌", "The Peak 香格里拉", "富力城"}.isdisjoint(needs)
 
 
 @pytest.mark.parametrize(

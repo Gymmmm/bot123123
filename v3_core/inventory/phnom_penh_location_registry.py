@@ -158,18 +158,14 @@ PROJECT_IDENTITIES: tuple[ProjectRegistryEntry, ...] = (
         public_location_key="洪森大道", public_location_display="洪森大道",
         location_verified=True,
     ),
-    ProjectRegistryEntry("rose_apple", "玫瑰滨江园", ("玫瑰滨江园", "玫瑰滨江", "Rose Apple"), project_name_en="Rose Apple"),
+    ProjectRegistryEntry("rose_garden", "玫瑰滨江园", ("玫瑰滨江园", "玫瑰滨江", "Rose Apple"), project_name_en="Rose Apple"),
     ProjectRegistryEntry("the_pinnacle", "The Pinnacle 幸福广场", ("太子幸福", "太子幸福广场", "幸福广场", "The Pinnacle", "Prince Happiness Plaza"), project_name_en="The Pinnacle", property_family="公寓"),
     ProjectRegistryEntry("prince_international_plaza", "太子国际广场", ("太子国际", "太子国际广场")),
     ProjectRegistryEntry("prince_huan_yu_center", "太子·寰宇中心", ("太子寰宇", "太子寰宇中心", "太子·寰宇中心", "金边寰宇中心", "寰宇中心", "寰宇", "Prince Huan Yu Center", "Prince Huanyu Center", "Prince Huan Yu", "Huan Yu Center")),
     ProjectRegistryEntry("prince_modern_plaza", "太子现代广场", ("太子现代广场",)),
     ProjectRegistryEntry("prince_central_plaza", "Prince Central Plaza 太子中央广场", ("太子中央广场", "Prince Central Plaza"), project_name_en="Prince Central Plaza"),
     ProjectRegistryEntry("wealth_mansion", "财富大厦", ("财富大厦", "Wealth Mansion"), project_name_en="Wealth Mansion"),
-    ProjectRegistryEntry("capital_gold", "首都国金", ("首都国金",)),
-    ProjectRegistryEntry("royal_one", "皇家一号", ("皇家一号", "Royal One"), project_name_en="Royal One"),
     ProjectRegistryEntry("picasso_city_garden", "Picasso City Garden 毕加索", ("毕加索", "Picasso", "毕加索城市花园", "毕加索一期", "Picasso City Garden", "Picasso Garden City", "Picasso Garden"), project_name_en="Picasso City Garden"),
-    ProjectRegistryEntry("morgan", "摩根", ("摩根", "Morgan"), project_name_en="Morgan"),
-    ProjectRegistryEntry("the_gateway", "The Gateway", ("The Gateway", "Gateway"), project_name_en="The Gateway"),
     ProjectRegistryEntry("urban_village_2", "首都·国金 Urban Village Phase 2", ("Urban Village", "Urban Village Phase 2", "首都国金二期"), project_name_en="Urban Village Phase 2"),
     ProjectRegistryEntry("peng_huoth_city", "炳发城", ("炳发城",)),
     ProjectRegistryEntry("vila_town", "Vila Town", ("Vila Town",), project_name_en="Vila Town"),
@@ -177,8 +173,6 @@ PROJECT_IDENTITIES: tuple[ProjectRegistryEntry, ...] = (
     ProjectRegistryEntry("le_conde_bkk1", "王府·观邸 Le Condé BKK1", ("Le Conde", "Le Condé", "王府观邸", "王府·观邸"), project_name_en="Le Condé BKK1"),
     ProjectRegistryEntry("time_square_9", "Time Square 9", ("Time Square 9", "Times Square 9"), project_name_en="Time Square 9"),
     ProjectRegistryEntry("sky_villa", "Sky Villa 天空别墅", ("Sky Villa", "金边Sky Villa豪宅", "天空别墅"), project_name_en="Sky Villa"),
-    ProjectRegistryEntry("chip_mong", "Chip Mong", ("Chip Mong Land", "Chip Mong", "ChipMong", "集茂"), kind="brand"),
-    ProjectRegistryEntry("peng_huoth", "Peng Huoth", ("Borey Peng Huoth", "Peng Huoth", "炳发"), kind="brand"),
 )
 
 MANUAL_MARKET_ALIASES: dict[str, tuple[str, ...]] = {}

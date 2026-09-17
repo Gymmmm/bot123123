@@ -69,7 +69,17 @@ class LocationResolution:
 PHYSICAL_AREAS = tuple(REGISTRY_PHYSICAL_AREAS)
 MARKET_LOCATIONS = tuple(REGISTRY_MARKET_LOCATIONS)
 MANUAL_MARKET_ALIASES = dict(REGISTRY_MANUAL_MARKET_ALIASES)
-PROJECT_IDENTITIES = tuple(REGISTRY_PROJECT_IDENTITIES)
+PROJECT_IDENTITIES: tuple[ProjectIdentity, ...] = (
+    ProjectIdentity("the_bridge", "桥牌", "project", ("桥牌", "the bridge"), property_family="公寓"),
+    ProjectIdentity("vila_town", "Vila Town", "project", ("vila town",)),
+    ProjectIdentity("the_pinnacle", "The Pinnacle 幸福广场", "project", ("the pinnacle", "太子幸福广场", "幸福广场", "prince happiness plaza"), property_family="公寓"),
+    ProjectIdentity("rf_city", "富力城", "project", ("富力城", "富力中心城", "r&f city", "rf city")),
+    ProjectIdentity("chip_mong", "Chip Mong", "brand", ("chip mong land", "chip mong", "chipmong", "集茂")),
+    # “炳发城” is an explicit project token; the broader Peng Huoth developer
+    # name remains a brand and is not promoted to a specific project.
+    ProjectIdentity("peng_huoth_city", "炳发城", "project", ("炳发城",)),
+    ProjectIdentity("peng_huoth", "Peng Huoth", "brand", ("borey peng huoth", "peng huoth", "炳发")),
+)
 
 PROPERTY_RULES: tuple[PropertyRule, ...] = (
     PropertyRule("别墅", "双拼别墅", "双拼别墅", ("双拼别墅", "双拼")),
