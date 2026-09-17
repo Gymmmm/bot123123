@@ -30,22 +30,22 @@ def test_full_home_is_exact_final_product_surface():
         "🔍 开始找房",
         "📅 我的预约",
         "🛠 入住服务",
-        "🏠 关于侨联",
+        "🛡 租后服务",
         "💬 中文顾问",
-        "📢 房源频道",
+        "📢 最新房源",
     ]
     callbacks = _callbacks(markup)
     assert callbacks == [
         "v3u:home:search",
         "v3u:home:appointments",
         "v3u:home:service",
-        "v3u:home:about",
+        "v3u:home:rental",
         "v3u:home:contact",
     ]
-    assert markup.inline_keyboard[3][0].url == "https://t.me/qiaolian"
+    assert markup.inline_keyboard[-1][0].url == "https://t.me/qiaolian"
     forbidden = {
-        "侨联保障", "安心租房", "帮我找房", "联系我们", "联系顾问", "侨联小管家",
-        "小彭", "我想换房", "租赁指南", "租赁服务指南",
+        "关于侨联", "侨联保障", "安心租房", "帮我找房", "联系我们", "联系顾问", "侨联小管家",
+        "小彭", "我想换房", "租赁指南", "租赁服务指南", "房源频道",
     }
     assert not any(any(term in label for term in forbidden) for label in labels)
 
@@ -79,4 +79,4 @@ def test_contact_and_appointment_views_return_only_v3_navigation():
     assert appointment_markup is not None
     assert _callbacks(appointment_markup) == ["v3u:home:search", "v3u:t:home"]
     labels = [button.text for row in appointment_markup.inline_keyboard for button in row]
-    assert labels == ["🔍 继续找房", "🏠 返回首页"]
+    assert labels == ["🔍 去找房", "⬅️ 回首页"]
