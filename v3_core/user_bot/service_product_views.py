@@ -9,14 +9,14 @@ def service_home_view() -> ServiceView:
         kind="service_home",
         text=(
             "🛠 <b>入住服务</b>\n\n"
-            "入住服务会按当前有效租约开放。\n\n"
-            "如果当前账号还没有绑定有效租约，可以先查看公开租赁服务、继续找房或联系中文顾问。"
+            "这边还没有显示你的住房信息。\n\n"
+            "如果已经通过侨联入住，但这里还没有显示，可以联系中文顾问处理。\n"
+            "还没租房的话，可以先了解入住之后侨联怎么服务，或继续找房。"
         ),
         rows=(
-            (ServiceChoice("🛠 检查当前租约", "v3u:service:tenant"),),
-            (ServiceChoice("📄 租赁服务", "v3u:home:rental"), ServiceChoice("🔍 开始找房", "v3u:home:search")),
             (ServiceChoice("💬 中文顾问", "v3u:home:contact"),),
-            (ServiceChoice("🏠 返回首页", "v3u:t:home"),),
+            (ServiceChoice("🛡 看租后服务", "v3u:home:rental"), ServiceChoice("🔍 开始找房", "v3u:home:search")),
+            (ServiceChoice("⬅️ 回首页", "v3u:t:home"),),
         ),
     )
 
