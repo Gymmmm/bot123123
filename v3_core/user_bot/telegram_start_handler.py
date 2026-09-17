@@ -95,7 +95,7 @@ def _listing_keyboard(result, *, advisor_url: str = "", channel_url: str = ""):
         advisor_url=advisor_url,
         channel_url=channel_url,
         listing_summary=str(getattr(result, "listing_summary", "") or ""),
-        add_home=True,
+        add_home=False,
         add_channel=True,
     )
 
@@ -148,17 +148,17 @@ async def _render_photos(
 
 def _support_keyboard(*, advisor_url: str = "", channel_url: str = "") -> InlineKeyboardMarkup:
     rows = [
-        [InlineKeyboardButton("🔍 智能找房", callback_data="v3u:home:search")],
+        [InlineKeyboardButton("🔍 开始找房", callback_data="v3u:home:search")],
     ]
     clean_advisor = str(advisor_url or "").strip()
     if clean_advisor:
-        rows.append([InlineKeyboardButton("💬 顾问帮我找", url=advisor_handoff_url(clean_advisor))])
+        rows.append([InlineKeyboardButton("💬 中文顾问", url=advisor_handoff_url(clean_advisor))])
     else:
-        rows.append([InlineKeyboardButton("💬 顾问帮我找", callback_data="v3u:home:contact")])
+        rows.append([InlineKeyboardButton("💬 中文顾问", callback_data="v3u:home:contact")])
     clean_channel = str(channel_url or "").strip()
     if clean_channel:
-        rows.append([InlineKeyboardButton("🏠 最新房源", url=clean_channel)])
-    rows.append([InlineKeyboardButton("🏠 返回首页", callback_data="v3u:t:home")])
+        rows.append([InlineKeyboardButton("📢 最新房源", url=clean_channel)])
+    rows.append([InlineKeyboardButton("⬅️ 回首页", callback_data="v3u:t:home")])
     return InlineKeyboardMarkup(rows)
 
 
@@ -166,7 +166,7 @@ async def _render_invalid_link(
     message: Any, *, advisor_url: str = "", channel_url: str = ""
 ) -> None:
     await message.reply_text(
-        "这个链接已经失效或房源信息已更新。\n\n可以重新找房，或让顾问继续帮您找。",
+        "这套房的入口已经失效，或信息刚刚更新过。\n\n可以重新找房，或让顾问按你的条件接着看。",
         parse_mode=ParseMode.HTML,
         reply_markup=_support_keyboard(
             advisor_url=advisor_url, channel_url=channel_url
@@ -181,7 +181,10 @@ async def _render_unbookable(
     advisor_url: str = "",
     channel_url: str = "",
 ) -> None:
-    await message.reply_text("这套房暂时不能预约。可以继续看相近房源，或让顾问帮您确认其他选择。", parse_mode=ParseMode.HTML)
+    await message.reply_text(
+        "这套房现在暂时不能预约。\n\n可以先看详情，或让顾问帮你看别的选择。",
+        parse_mode=ParseMode.HTML,
+    )
     if getattr(result, "details", None) is not None:
         await _render_details(
             message, result, advisor_url=advisor_url, channel_url=channel_url
