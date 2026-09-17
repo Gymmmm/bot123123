@@ -129,7 +129,7 @@ def test_details_and_photos_contract_has_real_fields_three_entries_and_no_intern
     view = _published(bookable=True)
     details = build_details_response(view)
     labels = _labels(details.action_rows)
-    assert labels == ["📅 预约看房", "💬 问这套房", "📸 更多实拍", "🔍 看相近房源"]
+    assert labels == ["📅 预约看房", "💬 问这套房", "📸 更多实拍", "✏️ 换个条件找"]
     assert "富力城" in details.text and "$680/月" in details.text
     assert PUBLIC_ID in details.text
     assert "LST_INTERNAL_1" not in details.text
@@ -140,7 +140,7 @@ def test_details_and_photos_contract_has_real_fields_three_entries_and_no_intern
     assert "📋 租赁详情" in photo_labels
     assert "📅 预约看房" in photo_labels
     assert "💬 问这套房" in photo_labels
-    assert "🔍 看相近房源" in photo_labels
+    assert "看相近房源" not in photo_labels
     assert "LST_INTERNAL_1" not in photos.text
 
 
@@ -164,7 +164,8 @@ def test_contact_entries_have_real_callbacks_when_external_config_is_missing():
 
 def test_deeplink_invalid_copy_and_reason_missing_compatibility_are_locked():
     source = inspect.getsource(_render_invalid_link)
-    assert "这个链接已经失效或房源信息已更新。\\n\\n可以重新找房，或让顾问继续帮您找。" in source
+    assert "这套房的入口已经失效，或信息刚刚更新过。" in source
+    assert "可以重新找房，或让顾问按你的条件接着看。" in source
     assert _failure_reason(SimpleNamespace()) == ""
     assert _failure_reason(SimpleNamespace(reason="listing_not_bookable")) == "listing_not_bookable"
 
@@ -184,7 +185,7 @@ def test_offline_and_video_drafts_keep_same_listing_date_time_identity():
 def test_success_copy_requires_actual_success_and_contains_locked_phrase():
     draft = PublicAppointmentDraft(PUBLIC_ID, mode="offline", date="09-10", time="pm")
     success = build_appointment_success_view(draft, Inventory(), submission_kind="created")
-    assert "预约申请已提交" in success.text
+    assert "预约已经提交" in success.text
     assert "LST_INTERNAL_1" not in success.text
 
 
