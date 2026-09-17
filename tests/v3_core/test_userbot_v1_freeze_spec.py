@@ -13,7 +13,7 @@ from v3_core.user_bot.telegram_navigation import polish_listing_keyboard
 from v3_core.user_bot.tenant_v1 import lease_view, renew_view, tenant_home_view, terminate_view
 from v3_core.user_bot.transition_actions import SearchSubmitIntent
 from v3_core.user_bot.transition_callbacks import encode_transition_choice
-from v3_core.user_bot.transition_views import TransitionChoice, TransitionViewService
+from v3_core.user_bot.transition_views import TransitionViewService
 from v3_core.user_bot.search_query import SearchCriteria
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
@@ -45,9 +45,8 @@ def test_home_has_no_about_and_uses_aftercare():
 def test_legacy_about_callback_encodes_home_about():
     assert encode_home_callback("about") == "v3u:home:about"
     assert encode_home_callback("rental") == "v3u:home:rental"
-    assert handle_v3_home_callback.__code__.co_consts or True
     source = open(handle_v3_home_callback.__code__.co_filename, encoding="utf-8").read()
-    assert 'action in {"about", "rental"}' in source or "about", "rental" in source
+    assert 'action in {"about", "rental"}' in source
 
 
 def test_listing_surfaces_drop_similar_copy():
@@ -97,7 +96,6 @@ def test_channel_book_uses_see_details_not_back():
                 bookable = True
             return _View()
 
-    # Avoid listing presenter by stubbing resolve + monkeypatch helper via draft source only.
     from v3_core.user_bot import transition_views as tv
 
     original = tv._resolve_bookable_details
@@ -197,7 +195,14 @@ def test_search_entry_freeze_copy():
 
 def test_no_match_uses_change_search_label():
     view = build_search_no_match_view(
-        SearchSubmitIntent(criteria=SearchCriteria(raw_text="BKK1"), area_display="BKK1", budget_label="$600–800")
+        SearchSubmitIntent(
+            criteria=SearchCriteria(raw_text="BKK1"),
+            source="user_search",
+            goal="any",
+            area_display="BKK1",
+            budget_label="$600–800",
+            touch_payload={},
+        )
     )
     assert "✏️ 换个条件找" in _labels(view)
 
