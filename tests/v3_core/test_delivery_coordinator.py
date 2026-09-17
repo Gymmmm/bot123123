@@ -187,3 +187,20 @@ def test_saved_sent_receipt_can_finalize_without_resending(tmp_path):
     assert result.publication.channel_message_id == "888"
     assert packages.get(package.package_id).status == "published"
     assert publications.get(result.publication.instance_id).channel_message_id == "888"
+
+
+def test_prepare_send_blocks_stale_first_publish_for_already_published_listing(tmp_path):
+    package, coordinator, _, _, publications = _setup(tmp_path)
+    publications.record_telegram_publication(
+        package_id="PKG_PREVIOUS",
+        listing_id=package.listing_id,
+        offer_id=package.offer_id,
+        channel_chat_id="-100123",
+        telegram_result=_receipt(999),
+    )
+
+    with pytest.raises(DeliveryBlocked, match="listing already has a published Telegram publication"):
+        coordinator.prepare_send(
+            package_id=package.package_id,
+            channel_chat_id="-100123",
+        )

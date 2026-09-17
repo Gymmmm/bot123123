@@ -153,6 +153,8 @@ class PublisherWorkflowService:
         cover_style: str | None = None,
         manual_cover_path: str | None = None,
         excluded_gallery_paths: Iterable[str] = (),
+        adviser_copy_override: str | None = None,
+        inventory_status_override: str | None = None,
     ) -> FrozenPackage:
         detail = self.review_detail(review_id)
         if str(detail.review.get("review_status") or "") != "approved":
@@ -165,7 +167,6 @@ class PublisherWorkflowService:
         source_post_id = str(detail.canonical.get("source_post_id") or "").strip()
         if not source_post_id:
             raise ValueError("canonical_record_missing_source_post_id")
-        # Resolve style before prepare so gallery corner marks match the cover brand.
         style_for_gallery = cover_style or recommended_cover_style(
             detail.listing.get("property_type"),
             detail.listing.get("property_subtype"),
@@ -195,6 +196,8 @@ class PublisherWorkflowService:
             cover_path=rendered.output_path,
             gallery=gallery,
             source_identity=dict(media.source_identity),
+            adviser_copy_override=adviser_copy_override,
+            inventory_status_override=inventory_status_override,
         )
 
     def package(self, package_id: str) -> FrozenPackage:

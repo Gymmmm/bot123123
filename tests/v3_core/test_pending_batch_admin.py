@@ -49,7 +49,26 @@ def _build_db(path: Path, pending_count: int = 12) -> None:
                 listing_id TEXT,
                 offer_type TEXT,
                 offer_status TEXT,
-                monthly_rent_usd REAL
+                monthly_rent_usd REAL,
+                publication_policy TEXT,
+                publishable INTEGER,
+                publish_block_reason TEXT
+            )"""
+        )
+        conn.execute(
+            """CREATE TABLE publication_instances (
+                id INTEGER PRIMARY KEY,
+                listing_id TEXT, offer_id TEXT, platform TEXT, publish_status TEXT
+            )"""
+        )
+        conn.execute(
+            """CREATE TABLE publication_packages_v3 (
+                id INTEGER PRIMARY KEY, package_id TEXT, listing_id TEXT, offer_id TEXT, status TEXT
+            )"""
+        )
+        conn.execute(
+            """CREATE TABLE publisher_auto_items_v3 (
+                offer_id TEXT PRIMARY KEY, listing_id TEXT, state TEXT
             )"""
         )
         for index in range(1, pending_count + 1):
@@ -69,9 +88,9 @@ def _build_db(path: Path, pending_count: int = 12) -> None:
             )
             conn.execute(
                 """INSERT INTO listing_offers
-                   (offer_id,listing_id,offer_type,offer_status,monthly_rent_usd)
-                   VALUES (?,?,?,?,?)""",
-                (f"off_{index:02d}", listing_id, "rent", "active", 500 + index),
+                   (offer_id,listing_id,offer_type,offer_status,monthly_rent_usd,publication_policy,publishable,publish_block_reason)
+                   VALUES (?,?,?,?,?,?,?,?)""",
+                (f"off_{index:02d}", listing_id, "rent", "active", 500 + index, "telegram_rent", 1, ""),
             )
         conn.commit()
 
@@ -178,3 +197,111 @@ def test_batch_does_not_overwrite_listing_that_is_no_longer_pending(tmp_path: Pa
         statuses = dict(conn.execute("SELECT listing_id,inventory_status FROM listings_v3"))
     assert statuses["l_01"] == "active"
     assert statuses["l_02"] == "rented"
+
+
+def test_pending_queue_excludes_listing_with_successful_publication(tmp_path: Path):
+    db = tmp_path / "qiaolian.db"
+    _build_db(db, pending_count=2)
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            "INSERT INTO publication_instances(listing_id,offer_id,platform,publish_status) VALUES (?,?,?,?)",
+            ("l_01", "off_01", "telegram", "published"),
+        )
+        conn.commit()
+    controller = _controller(db)
+
+    assert [row["listing_id"] for row in controller._pending_batch_rows(0)] == ["l_02"]
+    assert controller._pending_count() == 1
+
+
+def test_pending_queue_excludes_sale_only_store_only(tmp_path: Path):
+    db = tmp_path / "qiaolian.db"
+    _build_db(db, pending_count=1)
+    with sqlite3.connect(db) as conn:
+        conn.execute("DELETE FROM listing_offers WHERE listing_id='l_01'")
+        conn.execute(
+            """INSERT INTO listing_offers
+               (offer_id,listing_id,offer_type,offer_status,monthly_rent_usd,publication_policy,publishable,publish_block_reason)
+               VALUES ('sale_01','l_01','sale','active',NULL,'store_only',0,'sale_not_enabled_for_telegram')"""
+        )
+        conn.commit()
+    controller = _controller(db)
+
+    assert controller._pending_batch_rows(0) == []
+    assert controller._pending_count() == 0
+
+
+def test_pending_queue_excludes_review_required_exception(tmp_path: Path):
+    db = tmp_path / "qiaolian.db"
+    _build_db(db, pending_count=1)
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            "UPDATE listing_offers SET publishable=0,publish_block_reason='review_required' WHERE offer_id='off_01'"
+        )
+        conn.execute(
+            "INSERT INTO publisher_auto_items_v3(offer_id,listing_id,state) VALUES ('off_01','l_01','exception')"
+        )
+        conn.commit()
+    controller = _controller(db)
+
+    assert controller._pending_batch_rows(0) == []
+    assert controller._pending_count() == 0
+
+
+def test_new_unpublished_publishable_rental_enters_pending_queue(tmp_path: Path):
+    db = tmp_path / "qiaolian.db"
+    _build_db(db, pending_count=1)
+    controller = _controller(db)
+
+    rows = controller._pending_batch_rows(0)
+    assert len(rows) == 1
+    assert rows[0]["listing_id"] == "l_01"
+    assert rows[0]["monthly_rent_usd"] == 501
+
+
+def test_old_pending_detail_callback_no_longer_treats_published_listing_as_actionable(tmp_path: Path):
+    db = tmp_path / "qiaolian.db"
+    _build_db(db, pending_count=1)
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            "INSERT INTO publication_instances(listing_id,offer_id,platform,publish_status) VALUES ('l_01','off_01','telegram','published')"
+        )
+        conn.commit()
+    controller = _controller(db)
+    controller._listing_detail = lambda listing_id: {
+        "listing_id": listing_id,
+        "public_listing_id": "QL-0001",
+        "display_title": "测试房源1",
+        "inventory_status": "pending",
+    }
+    message = _Message()
+
+    asyncio.run(controller.show_pending_one(message, "l_01", 0))
+
+    assert "已不属于普通待确认队列" in message.calls[-1]["text"]
+    assert "pboneapply" not in " ".join(_callbacks(message.calls[-1]["reply_markup"]))
+
+
+def test_pending_batch_cas_still_skips_status_changed_after_screen_opened(tmp_path: Path):
+    db = tmp_path / "qiaolian.db"
+    _build_db(db, pending_count=2)
+    controller = _controller(db)
+    stale_rows = controller._pending_batch_rows(0)
+    with sqlite3.connect(db) as conn:
+        conn.execute("UPDATE listings_v3 SET inventory_status='rented' WHERE listing_id='l_02'")
+        conn.commit()
+    controller._pending_batch_rows = lambda page=0: stale_rows
+
+    updated, skipped = controller._apply_pending_batch("active", 0)
+
+    assert updated == ["l_01"]
+    assert skipped == ["l_02"]
+
+
+def test_eleven_eligible_pending_split_into_ten_and_one(tmp_path: Path):
+    db = tmp_path / "qiaolian.db"
+    _build_db(db, pending_count=11)
+    controller = _controller(db)
+
+    assert len(controller._pending_batch_rows(0)) == 10
+    assert [row["listing_id"] for row in controller._pending_batch_rows(1)] == ["l_11"]

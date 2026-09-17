@@ -34,10 +34,15 @@ WELCOME_TEXT = (
 )
 
 ABOUT_TEXT = (
-    "🏠 <b>关于侨联</b>\n\n"
+    "🏠 <b>关于侨联｜租赁服务</b>\n\n"
     "侨联地产面向在柬埔寨生活、找房和租房的中文客户。\n\n"
     "找房时把房源和费用说明白，看房、签约、入住按同一条流程留好记录；"
     "入住后遇到房屋、物业、续租或退租问题，也继续由中文服务衔接。\n\n"
+    "📄 <b>租赁服务</b>\n"
+    "1. <b>签约前确认</b>｜租金、押金、付款方式、水电、物业及其他费用\n"
+    "2. <b>入住交接</b>｜房屋现状、表计、家具家电拍照留档\n"
+    "3. <b>退租核对</b>｜按合同和入住留档逐项确认押金与费用\n\n"
+    "有对不上的，侨联协助与房东、物业沟通处理。\n\n"
     "<b>看对房 · 签约稳 · 入住顺</b>"
 )
 
@@ -58,13 +63,12 @@ BOOK_TEXT = (
 def build_home_view(*, channel_url: str = "", advisor_url: str = "") -> HomeView:
     rows: list[tuple[HomeChoice, ...]] = [
         (HomeChoice("🔍 开始找房", "search"), HomeChoice("📅 我的预约", "appointments")),
-        (HomeChoice("🛠 入住服务", "service"), HomeChoice("📄 租赁服务", "rental")),
+        (HomeChoice("🛠 入住服务", "service"), HomeChoice("🏠 关于侨联", "about")),
         (HomeChoice("💬 中文顾问", "contact"),),
     ]
     channel = str(channel_url or "").strip()
     if channel:
         rows.append((HomeChoice("📢 房源频道", "root", url=channel),))
-    rows.append((HomeChoice("🏠 关于侨联", "about"),))
     return HomeView("home", WELCOME_TEXT, tuple(rows))
 
 
@@ -73,7 +77,7 @@ def build_about_view(*, advisor_url: str = "") -> HomeView:
         "about",
         ABOUT_TEXT,
         (
-            (HomeChoice("🔍 开始找房", "search"), HomeChoice("📄 租赁服务", "rental")),
+            (HomeChoice("🔍 开始找房", "search"), HomeChoice("🛠 入住服务", "service")),
             (HomeChoice("💬 中文顾问", "contact"),),
             (HomeChoice("🏠 返回首页", "root"),),
         ),
