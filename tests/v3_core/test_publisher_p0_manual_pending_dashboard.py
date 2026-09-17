@@ -65,6 +65,13 @@ class _ManualWorkflow:
             canonical={"facts": {}},
         )
 
+    def review_media(self, *, review_id: str, manual_cover_path=None):
+        return SimpleNamespace(
+            cover_source_path=str(self.cover_path),
+            gallery_paths=(str(self.cover_path),),
+            ranking=({"file": str(self.cover_path), "reject": False},),
+        )
+
     def approve_review(self, *, review_id: str, operator_user_id: str):
         self.review["review_status"] = "approved"
         return self.review_detail(review_id)
@@ -106,7 +113,7 @@ async def test_pending_manual_preview_restores_pending_and_only_send_activates(t
     controller.channel_chat_id = "-100123"
 
     async def no_blockers(detail):
-        return [], SimpleNamespace(gallery_paths=(str(cover),))
+        return [], SimpleNamespace(cover_source_path=str(cover), gallery_paths=(str(cover),), ranking=({"file": str(cover), "reject": False},))
 
     controller._manual_blockers = no_blockers
     message = _Message()
@@ -162,8 +169,6 @@ async def test_pending_manual_preview_restores_pending_and_only_send_activates(t
     assert workflow.channel_message_id == "777"
     assert repository.items[-1]["state"] == "published"
 
-    # The successful send clears the preview state, so replaying the same callback
-    # cannot create a second first publication.
     assert await controller.handle_callback(update, context) is True
     assert workflow.publication_count == 1
 
@@ -202,13 +207,20 @@ async def test_manual_preview_short_callbacks_recover_real_length_session_ids(tm
     controller.prepare_manual_preview = fake_preview
     context = SimpleNamespace(user_data={NEW_LISTING_STATE_KEY: dict(real_ids)}, bot=object())
 
-    for data, expected in [
-        ("v3smp|manual_cover", {"review_id": real_ids["review_id"], "offer_id": real_ids["offer_id"], "advance_cover": True}),
-        ("v3smp|manual_style|black_gold", {"review_id": real_ids["review_id"], "offer_id": real_ids["offer_id"], "style": "black_gold"}),
-    ]:
-        update = SimpleNamespace(callback_query=SimpleNamespace(data=data, message=_Message()))
-        assert await controller.handle_callback(update, context) is True
-        assert calls[-1] == expected
+    cover_message = _Message()
+    update = SimpleNamespace(callback_query=SimpleNamespace(data="v3smp|manual_cover", message=cover_message))
+    assert await controller.handle_callback(update, context) is True
+    cover_callbacks = [
+        b.callback_data
+        for call in cover_message.calls if call.get("kind") == "photo"
+        for row in call["reply_markup"].inline_keyboard for b in row if b.callback_data
+    ]
+    assert cover_callbacks == ["v3smp|manual_cover_pick|0"]
+    assert all(len(data.encode("utf-8")) <= 64 for data in cover_callbacks)
+
+    update = SimpleNamespace(callback_query=SimpleNamespace(data="v3smp|manual_style|black_gold", message=_Message()))
+    assert await controller.handle_callback(update, context) is True
+    assert calls[-1] == {"review_id": real_ids["review_id"], "offer_id": real_ids["offer_id"], "style": "black_gold"}
 
     templates_message = _Message()
     update = SimpleNamespace(callback_query=SimpleNamespace(data="v3smp|manual_templates", message=templates_message))
@@ -217,7 +229,6 @@ async def test_manual_preview_short_callbacks_recover_real_length_session_ids(tm
     assert all(len(data.encode("utf-8")) <= 64 for data in template_callbacks)
     assert "v3smp|manual_style|black_gold" in template_callbacks
 
-    # Missing/expired state is rejected before any package/review action.
     expired = SimpleNamespace(user_data={}, bot=object())
     expired_message = _Message()
     update = SimpleNamespace(callback_query=SimpleNamespace(data="v3smp|manual_cover", message=expired_message))
@@ -225,7 +236,6 @@ async def test_manual_preview_short_callbacks_recover_real_length_session_ids(tm
     assert calls[-1] == {"review_id": real_ids["review_id"], "offer_id": real_ids["offer_id"], "style": "black_gold"}
     assert "已经失效" in expired_message.calls[-1]["text"]
 
-    # Contract proof: old production payloads exceed Telegram's 64-byte limit.
     old = [
         f"v3smp|manual_send|{real_ids['package_id']}|{real_ids['offer_id']}",
         f"v3smp|manual_cover|{real_ids['review_id']}|{real_ids['offer_id']}",
@@ -304,7 +314,6 @@ def _build_pending_dashboard_db(path: Path) -> None:
                 (f"off_{index:02d}", listing_id, "rent", "active", 500 + index, "telegram_rent", 1, ""),
             )
 
-        # l_01..l_11 remain the only eligible queue.
         conn.execute("UPDATE listing_offers SET publishable=0,publish_block_reason='missing_layout' WHERE offer_id='off_12'")
         conn.execute(
             "INSERT INTO publication_instances(listing_id,offer_id,platform,publish_status,published_at) VALUES ('l_13','off_13','telegram','published','2026-09-16 01:00:00')"
@@ -351,7 +360,6 @@ async def test_dashboard_pending_uses_existing_eligible_ten_at_a_time_queue(tmp_
     assert [row["listing_id"] for row in second] == ["l_11"]
     assert not ({"l_12", "l_13", "l_14", "l_15", "l_16", "l_17"} & {row["listing_id"] for row in first + second})
 
-    # Historical raw-pending callbacks are routed into the same eligible queue.
     callback_message = _Message()
     update = SimpleNamespace(callback_query=SimpleNamespace(data="v3smp|inv_rows|pending", message=callback_message))
     context = SimpleNamespace(user_data={})

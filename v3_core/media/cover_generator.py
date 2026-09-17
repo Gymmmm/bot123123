@@ -114,7 +114,9 @@ def generate_cover(
     data: CoverRenderData,
 ) -> str:
     """Generate one 1200x900 listing cover using Pillow only."""
-    del style  # retained only for the existing service/package contract
+    style = str(style or "right_price").strip().lower()
+    if style not in {"classic_blue", "right_price", "black_gold"}:
+        style = "right_price"
     source = Path(source_image).expanduser().resolve()
     output = Path(output_path).expanduser().resolve()
     if not source.is_file():
@@ -136,85 +138,85 @@ def generate_cover(
     top = (new_height - target_height) // 2
     bg = bg.crop((left, top, left + target_width, top + target_height))
 
-    mask = Image.new("RGBA", (target_width, target_height), (0, 0, 0, 0))
-    mask_draw = ImageDraw.Draw(mask)
-    gradient_w = int(target_width * 0.48)
-    for x in range(gradient_w):
-        progress = x / gradient_w
-        alpha = int(220 * (1 - math.pow(progress, 1.3)))
-        mask_draw.line([(x, 0), (x, target_height)], fill=(5, 12, 24, alpha))
-
-    canvas = Image.alpha_composite(bg, mask)
-    draw = ImageDraw.Draw(canvas)
-
-    font_brand = _font(36, bold=True)
-    font_brand_sub = _font(18)
-    font_title = _font(76, bold=True)
-    font_tag = _font(32, bold=True)
-    font_location = _font(32)
-    font_price_label = _font(24)
-    font_price_value = _font(60, bold=True)
-
-    x_offset = 60
-    curr_y = 50
-    draw.line([(x_offset, curr_y + 4), (x_offset, curr_y + 54)], fill="white", width=4)
-    logo_x = x_offset + 20
-    draw.text((logo_x, curr_y), "侨联地产", fill="white", font=font_brand)
-    draw.text((logo_x, curr_y + 42), "QIAO LIAN", fill=(210, 215, 225), font=font_brand_sub)
-
     title = str(data.project or data.property_type or "优质房源").strip()
     tag = str(data.layout or data.property_type or "房源").strip()
     location = str(data.area or "位置待确认").strip()
     price = _cover_price(data)
-
-    curr_y = 260
-    draw.text((x_offset, curr_y), title, fill="white", font=font_title)
-    title_bbox = font_title.getbbox(title)
-    curr_y += (title_bbox[3] - title_bbox[1]) + 30
-
-    tag_bbox = font_tag.getbbox(tag)
-    tag_w = tag_bbox[2] - tag_bbox[0] + 44
-    tag_h = 52
-    draw.rounded_rectangle(
-        [x_offset, curr_y, x_offset + tag_w, curr_y + tag_h],
-        radius=26,
-        fill="white",
-    )
-    text_w = tag_bbox[2] - tag_bbox[0]
-    draw.text((x_offset + (tag_w - text_w) // 2, curr_y + 8), tag, fill="#111827", font=font_tag)
-    curr_y += tag_h + 35
-    draw.text((x_offset, curr_y), f"📍  {location}", fill="white", font=font_location)
-
-    card_w, card_h = 360, 160
-    card_x2 = target_width - 50
-    card_y2 = target_height - 50
-    card_x1 = card_x2 - card_w
-    card_y1 = card_y2 - card_h
-    _rounded_card_with_shadow(
-        canvas,
-        draw,
-        [card_x1, card_y1, card_x2, card_y2],
-        radius=24,
-        fill=(252, 253, 255, 248),
-    )
-
     price_label = "租金" if str(data.deal_type or "rent").lower() == "rent" else "售价"
-    label_bbox = font_price_label.getbbox(price_label)
-    label_w = label_bbox[2] - label_bbox[0]
-    draw.text(
-        (card_x1 + (card_w - label_w) // 2, card_y1 + 24),
-        price_label,
-        fill="#64748B",
-        font=font_price_label,
-    )
-    price_bbox = font_price_value.getbbox(price)
-    price_w = price_bbox[2] - price_bbox[0]
-    draw.text(
-        (card_x1 + (card_w - price_w) // 2, card_y1 + 64),
-        price,
-        fill="#0F4C81",
-        font=font_price_value,
-    )
+
+    if style == "classic_blue":
+        canvas = bg.copy()
+        overlay = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+        od = ImageDraw.Draw(overlay)
+        od.rectangle([0, 0, 430, 150], fill=(10, 47, 122, 238))
+        od.rounded_rectangle([28, 590, 860, 870], radius=28, fill=(17, 71, 178, 232))
+        canvas = Image.alpha_composite(canvas, overlay)
+        draw = ImageDraw.Draw(canvas)
+        draw.text((34, 28), "侨联地产", fill="white", font=_font(48, bold=True))
+        draw.text((36, 88), "QIAO LIAN PROPERTY", fill=(230, 238, 255), font=_font(20))
+        draw.text((58, 620), title, fill="white", font=_font(62, bold=True))
+        draw.text((58, 706), tag, fill=(236, 244, 255), font=_font(34, bold=True))
+        draw.text((58, 770), location, fill=(236, 244, 255), font=_font(28))
+        draw.text((500, 745), price, fill=(246, 201, 72), font=_font(58, bold=True))
+    elif style == "black_gold":
+        shade = Image.new("RGBA", (target_width, target_height), (0, 0, 0, 0))
+        sd = ImageDraw.Draw(shade)
+        for x in range(int(target_width * 0.58)):
+            progress = x / max(1, int(target_width * 0.58))
+            alpha = int(225 * (1 - progress))
+            sd.line([(x, 0), (x, target_height)], fill=(4, 4, 4, alpha))
+        canvas = Image.alpha_composite(bg, shade)
+        draw = ImageDraw.Draw(canvas)
+        gold=(242, 207, 121)
+        draw.text((48, 42), "侨联地产", fill=gold, font=_font(44, bold=True))
+        draw.text((50, 96), "QIAO LIAN", fill=(219, 194, 142), font=_font(18))
+        draw.text((48, 280), title, fill=(255, 248, 232), font=_font(72, bold=True))
+        tag_box=[48, 390, 48+max(190, len(tag)*54), 458]
+        draw.rounded_rectangle(tag_box, radius=34, fill=(24,24,24,230), outline=gold, width=3)
+        draw.text((70, 400), tag, fill=gold, font=_font(36, bold=True))
+        draw.text((48, 510), f"区域 · {location}", fill=(245,233,204), font=_font(30, bold=True))
+        card=[780, 680, 1150, 850]
+        draw.rounded_rectangle(card, radius=28, fill=(14,14,14,225), outline=gold, width=3)
+        draw.text((805, 704), price_label, fill=(219,194,142), font=_font(26, bold=True))
+        draw.text((805, 752), price, fill=gold, font=_font(50, bold=True))
+    else:
+        mask = Image.new("RGBA", (target_width, target_height), (0, 0, 0, 0))
+        mask_draw = ImageDraw.Draw(mask)
+        gradient_w = int(target_width * 0.48)
+        for x in range(gradient_w):
+            progress = x / gradient_w
+            alpha = int(220 * (1 - math.pow(progress, 1.3)))
+            mask_draw.line([(x, 0), (x, target_height)], fill=(5, 12, 24, alpha))
+        canvas = Image.alpha_composite(bg, mask)
+        draw = ImageDraw.Draw(canvas)
+        x_offset = 60
+        curr_y = 50
+        draw.line([(x_offset, curr_y + 4), (x_offset, curr_y + 54)], fill="white", width=4)
+        logo_x = x_offset + 20
+        draw.text((logo_x, curr_y), "侨联地产", fill="white", font=_font(36, bold=True))
+        draw.text((logo_x, curr_y + 42), "QIAO LIAN", fill=(210, 215, 225), font=_font(18))
+        curr_y = 260
+        title_font = _font(76, bold=True)
+        draw.text((x_offset, curr_y), title, fill="white", font=title_font)
+        title_bbox = title_font.getbbox(title)
+        curr_y += (title_bbox[3] - title_bbox[1]) + 30
+        tag_font = _font(32, bold=True)
+        tag_bbox = tag_font.getbbox(tag)
+        tag_w = tag_bbox[2] - tag_bbox[0] + 44
+        draw.rounded_rectangle([x_offset, curr_y, x_offset + tag_w, curr_y + 52], radius=26, fill="white")
+        draw.text((x_offset + 22, curr_y + 8), tag, fill="#111827", font=tag_font)
+        curr_y += 87
+        draw.text((x_offset, curr_y), f"📍  {location}", fill="white", font=_font(32))
+        card_w, card_h = 360, 160
+        card_x2, card_y2 = target_width - 50, target_height - 50
+        card_x1, card_y1 = card_x2 - card_w, card_y2 - card_h
+        _rounded_card_with_shadow(canvas, draw, [card_x1, card_y1, card_x2, card_y2], radius=24, fill=(252, 253, 255, 248))
+        label_font = _font(24)
+        value_font = _font(60, bold=True)
+        label_bbox = label_font.getbbox(price_label)
+        draw.text((card_x1 + (card_w - (label_bbox[2]-label_bbox[0])) // 2, card_y1 + 24), price_label, fill="#64748B", font=label_font)
+        price_bbox = value_font.getbbox(price)
+        draw.text((card_x1 + (card_w - (price_bbox[2]-price_bbox[0])) // 2, card_y1 + 64), price, fill="#0F4C81", font=value_font)
 
     if output.suffix.lower() not in {".jpg", ".jpeg"}:
         output = output.with_suffix(".jpg")

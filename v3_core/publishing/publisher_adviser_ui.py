@@ -65,13 +65,6 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
         return str(state.get("adviser_copy") or "").strip()
 
     def _repair_manual_layout_if_needed(self, detail: Any, state: dict[str, Any]) -> Any:
-        """Recover common admin-copy layouts such as ``房型：2+1``.
-
-        The generic canonical parser deliberately stays conservative. Publisher
-        manual intake, however, receives structured copy from agents where a bare
-        ``2+1`` is commonly prefixed by 房型/户型. Treat that labelled value as an
-        explicit operator fact instead of forcing the owner to re-enter it.
-        """
         if str(detail.listing.get("layout") or "").strip():
             return detail
         raw = str(state.get("text") or "")
@@ -145,6 +138,43 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🙈 不显示", callback_data="v3smp|manual_adviser_hide"), InlineKeyboardButton("↩️ 恢复自动", callback_data="v3smp|manual_adviser_auto")], [InlineKeyboardButton("⬅️ 返回资料确认", callback_data="v3smp|manual_back_confirm")]]),
         )
 
+    @staticmethod
+    def _manual_cover_candidates(media: Any) -> tuple[str, ...]:
+        candidates: list[str] = []
+        preferred = str(getattr(media, "cover_source_path", "") or "").strip()
+        if preferred:
+            candidates.append(preferred)
+        for item in tuple(getattr(media, "ranking", ()) or ()):
+            if item.get("reject"):
+                continue
+            path = str(item.get("file") or "").strip()
+            if path and path not in candidates:
+                candidates.append(path)
+        return tuple(candidates)
+
+    async def show_manual_cover_picker(self, message: Any, context: Any, *, review_id: str) -> None:
+        state = context.user_data.get(NEW_LISTING_STATE_KEY)
+        if not isinstance(state, dict):
+            return
+        media = await asyncio.to_thread(self.workflow.review_media, review_id=review_id)
+        candidates = self._manual_cover_candidates(media)
+        if not candidates:
+            await message.reply_text("⚠️ 当前没有可用的封面照片。")
+            return
+        state["cover_candidates"] = list(candidates)
+        selected = str(state.get("selected_cover_path") or "")
+        await message.reply_text("<b>🖼 选择封面照片</b>\n\n点击图片下方按钮选择。", parse_mode=ParseMode.HTML)
+        for index, path in enumerate(candidates):
+            with Path(path).open("rb") as handle:
+                marker = " · 当前" if path == selected or (not selected and index == 0) else ""
+                await message.reply_photo(
+                    photo=handle,
+                    caption=f"封面候选 {index + 1}/{len(candidates)}{marker}",
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton(f"选择第 {index + 1} 张", callback_data=f"v3smp|manual_cover_pick|{index}")
+                    ]]),
+                )
+
     async def prepare_manual_preview(self, message: Any, context: Any, *, review_id: str, offer_id: str, style: str | None = None, advance_cover: bool = False) -> None:
         state = context.user_data.setdefault(NEW_LISTING_STATE_KEY, {})
         detail = self.workflow.review_detail(review_id)
@@ -153,11 +183,29 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
         if blockers:
             await self.show_manual_confirmation(message, context)
             return
-        gallery = tuple(media.gallery_paths)
-        if advance_cover and gallery:
-            state["cover_index"] = (int(state.get("cover_index") or 0) + 1) % len(gallery)
-        index = int(state.get("cover_index") or 0) % max(1, len(gallery))
-        cover_path = gallery[index] if gallery else None
+        candidates = self._manual_cover_candidates(media)
+        if not candidates:
+            await self.show_manual_confirmation(message, context)
+            return
+        selected_cover = str(state.get("selected_cover_path") or "").strip()
+        if selected_cover not in candidates:
+            selected_cover = ""
+        if advance_cover:
+            current_index = candidates.index(selected_cover) if selected_cover in candidates else int(state.get("cover_index") or 0) % len(candidates)
+            current_index = (current_index + 1) % len(candidates)
+            selected_cover = candidates[current_index]
+            state["cover_index"] = current_index
+            state["selected_cover_path"] = selected_cover
+        elif selected_cover:
+            state["cover_index"] = candidates.index(selected_cover)
+        else:
+            state["cover_index"] = 0
+            selected_cover = candidates[0]
+        state["cover_candidates"] = list(candidates)
+        cover_path = selected_cover
+        effective_style = str(style or state.get("cover_style") or "").strip() or None
+        if style:
+            state["cover_style"] = str(style)
         if str(detail.review.get("review_status") or "") != "approved":
             await asyncio.to_thread(self.workflow.approve_review, review_id=review_id, operator_user_id="system:manual_preview")
 
@@ -169,7 +217,7 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
             package = await asyncio.to_thread(
                 self.workflow.build_package_for_review,
                 review_id=review_id,
-                cover_style=style,
+                cover_style=effective_style,
                 manual_cover_path=cover_path,
                 adviser_copy_override=self._adviser_override(state),
             )
@@ -260,7 +308,7 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
             context.user_data.pop(SIMPLE_EDIT_STATE_KEY, None)
             await self.show_manual_confirmation(query.message, context)
             return True
-        if raw in {"v3smp|manual_send", "v3smp|manual_cover", "v3smp|manual_templates"} or (len(parts) == 3 and parts[1] == "manual_style"):
+        if raw in {"v3smp|manual_send", "v3smp|manual_cover", "v3smp|manual_templates"} or (len(parts) == 3 and parts[1] in {"manual_style", "manual_cover_pick"}):
             state = context.user_data.get(NEW_LISTING_STATE_KEY)
             current_package = str(state.get("package_id") or "") if isinstance(state, dict) else ""
             current_offer = str(state.get("offer_id") or "") if isinstance(state, dict) else ""
@@ -286,7 +334,20 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
                 )
                 return True
             if raw == "v3smp|manual_cover":
-                await self.prepare_manual_preview(query.message, context, review_id=current_review, offer_id=current_offer, advance_cover=True)
+                await self.show_manual_cover_picker(query.message, context, review_id=current_review)
+                return True
+            if len(parts) == 3 and parts[1] == "manual_cover_pick":
+                try:
+                    index = int(parts[2])
+                except ValueError:
+                    index = -1
+                candidates = tuple(state.get("cover_candidates") or ()) if isinstance(state, dict) else ()
+                if index < 0 or index >= len(candidates) or not Path(str(candidates[index])).is_file():
+                    await query.message.reply_text("⚠️ 封面候选已失效，请重新选择封面照片。")
+                    return True
+                state["cover_index"] = index
+                state["selected_cover_path"] = str(candidates[index])
+                await self.prepare_manual_preview(query.message, context, review_id=current_review, offer_id=current_offer)
                 return True
             if raw == "v3smp|manual_templates":
                 await query.message.reply_text(

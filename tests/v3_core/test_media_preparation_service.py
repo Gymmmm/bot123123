@@ -139,3 +139,14 @@ def test_prepare_black_gold_uses_style_keyed_gallery_filenames(tmp_path):
 
     assert prepared.source_identity["gallery_cover_style"] == "black_gold"
     assert all("black_gold_" in Path(path).name for path in prepared.gallery_paths)
+
+
+def test_prepare_accepts_previous_clean_derivative_as_manual_cover(tmp_path: Path):
+    db, source_id, paths = _source(tmp_path, "clean-manual")
+    service = MediaPreparationService(SourceReader(str(db)), prepared_dir=tmp_path / "prepared")
+    first = service.prepare(source_post_id=source_id)
+    candidates = [str(item["file"]) for item in first.ranking if not item.get("reject")]
+    assert candidates
+    chosen = candidates[-1]
+    second = service.prepare(source_post_id=source_id, manual_cover_path=chosen)
+    assert second.cover_source_path == chosen
