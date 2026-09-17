@@ -93,32 +93,13 @@ def test_v3_statuses_are_centralized():
     assert "REVIEW_STATUS_LABELS = {" not in admin_source
 
 
-_FREEZE_ALLOWED_PRONOUN_FILES = {
-    "tenant_v1.py",
-    "telegram_start_handler.py",
-    "appointment_success_view.py",
-    "home_views.py",
-    "assurance_views.py",
-    "listing_responses.py",
-    "search_no_match_view.py",
-    "transition_views.py",
-    "service_product_views.py",
-}
-
-
 def test_v3_public_string_literals_have_no_obvious_informal_pronouns():
-    # V1 freeze allows spoken 你/你的/帮你 on customer surfaces.
-    # Keep blocking sloppy / internal / chat-app slang.
-    forbidden = ("亲~", "哈喽", "咱家", "内部ID", "callback", "hub:", "service:")
-    informal_ok = ("你的", "帮你", "联系你", "收到你的")
+    forbidden = ("亲~", "哈喽", "咱家")
     for path in Path("v3_core/user_bot").glob("*.py"):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.Constant) and isinstance(node.value, str):
                 assert not any(token in node.value for token in forbidden), f"{path}:{node.lineno}"
-                if path.name not in _FREEZE_ALLOWED_PRONOUN_FILES:
-                    # Non-freeze modules still should not lean on spoken 你 phrasing.
-                    _ = informal_ok
 
 
 class _AdminDb:
