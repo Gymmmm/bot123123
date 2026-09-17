@@ -11,6 +11,7 @@ from v3_core.media.cover_generator import (
     BRAND_CN,
     BRAND_EN,
     CoverRenderData,
+    _clean_cover_location,
     _fit_font,
     _format_layout,
     _text_width,
@@ -100,3 +101,13 @@ def test_cover_crop_never_stretches_source(tmp_path: Path):
     for size in ((1200, 900), (1280, 720)):
         cropped = cover_generator._cover_crop(source, size)
         assert cropped.size == size
+
+
+def test_cover_location_is_plain_text_and_never_falls_back_to_project():
+    assert _clean_cover_location("☒ 莫尼旺大道") == "莫尼旺大道"
+    assert _clean_cover_location("📍 BKK3 · 莫尼旺大道") == "BKK3 · 莫尼旺大道"
+    assert _clean_cover_location("") == "金边"
+
+    renderer_source = inspect.getsource(cover_generator)
+    assert "data.area or data.project" not in renderer_source
+    assert 'BRAND_EN = "QIAOLIAN REALTY"' in renderer_source

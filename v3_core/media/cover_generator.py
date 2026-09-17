@@ -134,6 +134,14 @@ def _format_layout(value: str) -> str:
     return text
 
 
+def _clean_cover_location(value: object) -> str:
+    """Return plain location text; never substitute a project name for GEO."""
+    text = str(value or "").strip()
+    while text and not (text[0].isalnum() or "\u4e00" <= text[0] <= "\u9fff"):
+        text = text[1:].lstrip()
+    return text or "金边"
+
+
 def _cover_price(data: CoverRenderData) -> str:
     raw = str(data.price or "").strip()
     if not raw:
@@ -330,7 +338,7 @@ def generate_cover(
     bg = _cover_crop(source, STYLE_LAYOUTS[style]["size"])
     title = str(data.project or data.property_type or "优质房源").strip()
     layout = _format_layout(data.layout or data.property_type or "房源")
-    location = str(data.area or data.project or "位置待确认").strip()
+    location = _clean_cover_location(data.area)
     price = _cover_price(data)
     price_label = "租金" if str(data.deal_type or "rent").lower() == "rent" else "售价"
 
