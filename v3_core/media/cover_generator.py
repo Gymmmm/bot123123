@@ -123,7 +123,7 @@ def generate_cover(
         raise FileNotFoundError(f"cover_source_not_found:{source}")
     output.parent.mkdir(parents=True, exist_ok=True)
 
-    target_width, target_height = 1200, 900
+    target_width, target_height = ((1280, 720) if style == "black_gold" else (1200, 900))
     bg = Image.open(source).convert("RGBA")
     bg_ratio = bg.width / bg.height
     target_ratio = target_width / target_height
@@ -159,26 +159,47 @@ def generate_cover(
         draw.text((58, 770), location, fill=(236, 244, 255), font=_font(28))
         draw.text((500, 745), price, fill=(246, 201, 72), font=_font(58, bold=True))
     elif style == "black_gold":
-        shade = Image.new("RGBA", (target_width, target_height), (0, 0, 0, 0))
-        sd = ImageDraw.Draw(shade)
-        for x in range(int(target_width * 0.58)):
-            progress = x / max(1, int(target_width * 0.58))
-            alpha = int(225 * (1 - progress))
-            sd.line([(x, 0), (x, target_height)], fill=(4, 4, 4, alpha))
-        canvas = Image.alpha_composite(bg, shade)
+        canvas = bg.copy()
+        overlay = Image.new("RGBA", (target_width, target_height), (0, 0, 0, 0))
+        od = ImageDraw.Draw(overlay)
+
+        # 650px cinematic left mask: near-black at the edge, fading to clear.
+        mask_width = min(650, target_width)
+        for x in range(mask_width):
+            progress = x / max(1, mask_width - 1)
+            if progress <= 0.5:
+                alpha = int(240 + (191 - 240) * (progress / 0.5))
+            else:
+                alpha = int(191 * (1 - (progress - 0.5) / 0.5))
+            od.line([(x, 0), (x, target_height)], fill=(13, 13, 14, max(0, alpha)))
+
+        # Subtle top protection gradient for the compact brand header.
+        top_height = min(140, target_height)
+        for y in range(top_height):
+            alpha = int(115 * (1 - y / max(1, top_height - 1)))
+            od.line([(0, y), (target_width, y)], fill=(0, 0, 0, alpha))
+
+        canvas = Image.alpha_composite(canvas, overlay)
         draw = ImageDraw.Draw(canvas)
-        gold=(242, 207, 121)
-        draw.text((48, 42), "侨联地产", fill=gold, font=_font(44, bold=True))
-        draw.text((50, 96), "QIAO LIAN", fill=(219, 194, 142), font=_font(18))
-        draw.text((48, 280), title, fill=(255, 248, 232), font=_font(72, bold=True))
-        tag_box=[48, 390, 48+max(190, len(tag)*54), 458]
-        draw.rounded_rectangle(tag_box, radius=34, fill=(24,24,24,230), outline=gold, width=3)
-        draw.text((70, 400), tag, fill=gold, font=_font(36, bold=True))
-        draw.text((48, 510), f"区域 · {location}", fill=(245,233,204), font=_font(30, bold=True))
-        card=[780, 680, 1150, 850]
-        draw.rounded_rectangle(card, radius=28, fill=(14,14,14,225), outline=gold, width=3)
-        draw.text((805, 704), price_label, fill=(219,194,142), font=_font(26, bold=True))
-        draw.text((805, 752), price, fill=gold, font=_font(50, bold=True))
+        matte_gold = (212, 175, 55)
+        champagne = (254, 240, 138)
+        light_text = (226, 232, 240)
+
+        # Brand header.
+        draw.rounded_rectangle([48, 48, 51, 88], radius=2, fill=matte_gold)
+        draw.text((67, 47), "侨联地产", fill="white", font=_font(20, bold=True))
+        draw.text((67, 73), "QIAOLIAN REALTY", fill=matte_gold, font=_font(11, bold=True))
+
+        # Left-bottom property information stack.
+        x = 48
+        price_y = target_height - 48 - 48
+        layout_y = price_y - 24 - 24
+        project_y = layout_y - 12 - 62
+        location_y = project_y - 8 - 24
+        draw.text((x, location_y), location, fill=matte_gold, font=_font(18, bold=True))
+        draw.text((x, project_y), title, fill="white", font=_font(56, bold=True))
+        draw.text((x, layout_y), tag, fill=light_text, font=_font(24))
+        draw.text((x, price_y), price, fill=champagne, font=_font(48, bold=True))
     else:
         mask = Image.new("RGBA", (target_width, target_height), (0, 0, 0, 0))
         mask_draw = ImageDraw.Draw(mask)
