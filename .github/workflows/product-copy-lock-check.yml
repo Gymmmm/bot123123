@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - codex/product-copy-lock-90180b83-20260910
+      - fix/userbot-v1-freeze-copy-20260917
   pull_request:
     branches:
       - codex/v3-core-extraction-20260908
@@ -22,6 +23,12 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt pytest pytest-asyncio
+      - name: Verify checked out SHA
+        run: git rev-parse HEAD
+      - name: User Bot V1 freeze spec
+        env:
+          PYTHONPATH: '${{ github.workspace }}'
+        run: python -m pytest -q tests/v3_core/test_userbot_v1_freeze_spec.py
       - name: Targeted locked-copy tests
         env:
           PYTHONPATH: '${{ github.workspace }}'
