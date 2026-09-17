@@ -64,7 +64,7 @@ def build_appointment_success_view(
                 TransitionChoice("📅 我的预约", "home", value="appointments"),
                 TransitionChoice("🔍 继续找房", "home", value="search"),
             ),
-            (TransitionChoice("💬 问这套房", "listing_details", public_listing_id=draft.public_listing_id),),
+            (TransitionChoice("💬 问这套房", "listing_consult", public_listing_id=draft.public_listing_id),),
         ),
     )
 

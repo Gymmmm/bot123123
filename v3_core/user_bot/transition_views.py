@@ -1,9 +1,4 @@
-"""Telegram-neutral view models for side-effect-free V3 transitions.
-
-Callbacks are represented as semantic choices instead of legacy callback strings.
-Consult remains outside this pure view layer because contact effects are handled
-at the Telegram boundary.
-"""
+"""Telegram-neutral view models for side-effect-free V3 transitions."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -20,6 +15,9 @@ from .transition_plan import TransitionPlan
 
 
 _PHNOM_PENH_TZ = ZoneInfo("Asia/Phnom_Penh")
+_CHANNEL_BOOK_SOURCES = frozenset(
+    {"channel_deeplink", "channel_listing", "channel"}
+)
 
 TransitionChoiceKind = Literal[
     "appointment_date",
@@ -29,6 +27,7 @@ TransitionChoiceKind = Literal[
     "appointment_other_time",
     "appointment_back_date",
     "listing_details",
+    "listing_consult",
     "home",
     "budget_choice",
     "budget_custom",
@@ -75,6 +74,11 @@ def _phnom_penh_today() -> date:
     return datetime.now(_PHNOM_PENH_TZ).date()
 
 
+def _channel_direct_book(draft: PublicAppointmentDraft) -> bool:
+    source = str(draft.source or "").strip().lower()
+    return source in _CHANNEL_BOOK_SOURCES or source.startswith("channel")
+
+
 def _resolve_bookable_details(inventory: PublicInventoryReader, public_listing_id: str):
     view = inventory.resolve(public_listing_id)
     if view is None:
@@ -91,22 +95,26 @@ def _appointment_date_view(draft: PublicAppointmentDraft, inventory: PublicInven
     price = _format_price(details.monthly_rent_usd)
     price_line = f"\n💰 {he(price)}" if price else ""
     if draft.mode == "video":
-        heading = f"🎥 <b>视频看房｜{he(public_id)}</b>"
-        question = "哪天方便视频看房？"
-        mode_choice = TransitionChoice("🚶 改为实地看房", "appointment_mode", "offline")
+        heading = f"🎥 <b>视频看房</b>\n🆔 {he(public_id)}"
+        question = "哪天方便视频看？"
+        mode_choice = TransitionChoice("🚶 改成实地看房", "appointment_mode", "offline")
     else:
-        heading = f"📅 <b>预约看房｜{he(public_id)}</b>"
-        question = "哪天方便看房？"
-        mode_choice = TransitionChoice("🎥 改为视频看房", "appointment_mode", "video")
+        heading = f"📅 <b>预约看房</b>\n🆔 {he(public_id)}"
+        question = "哪天方便看？"
+        mode_choice = TransitionChoice("🎥 改成视频看房", "appointment_mode", "video")
     text = f"{heading}\n\n🏠 <b>{he(subject)}</b>{price_line}\n\n{question}"
     today_value = today.strftime("%m-%d")
     tomorrow_value = (today + timedelta(days=1)).strftime("%m-%d")
     after_value = (today + timedelta(days=2)).strftime("%m-%d")
+    if _channel_direct_book(draft):
+        back = TransitionChoice("📋 先看详情", "listing_details", public_listing_id=public_id)
+    else:
+        back = TransitionChoice("⬅️ 返回租赁详情", "listing_details", public_listing_id=public_id)
     rows = (
         (TransitionChoice("今天", "appointment_date", today_value), TransitionChoice("明天", "appointment_date", tomorrow_value)),
         (TransitionChoice("后天", "appointment_date", after_value), TransitionChoice("📅 其他日期", "appointment_other_date")),
         (mode_choice,),
-        (TransitionChoice("⬅️ 返回租赁详情", "listing_details", public_listing_id=public_id), TransitionChoice("🏠 返回首页", "home")),
+        (back,),
     )
     return TransitionView(kind="appointment_date", text=text, rows=rows)
 
@@ -116,13 +124,13 @@ def _appointment_time_view(draft: PublicAppointmentDraft, inventory: PublicInven
         raise ValueError("appointment_time_view_requires_date")
     details = _resolve_bookable_details(inventory, draft.public_listing_id)
     subject = details.subject or details.location or "这套房"
-    text = "🕐 <b>选择时间</b>\n\n" f"📅 {he(_date_display(draft.date))}\n" f"🏠 {he(subject)}"
+    text = "🕐 <b>选一个大概时间</b>\n\n" f"📅 {he(_date_display(draft.date))}\n" f"🏠 {he(subject)}"
     rows = (
         (TransitionChoice("上午 09:00–12:00", "appointment_time", "am"),),
         (TransitionChoice("下午 14:00–17:00", "appointment_time", "pm"),),
         (TransitionChoice("晚上 17:00–19:00", "appointment_time", "evening"),),
         (TransitionChoice("✍️ 其他时间", "appointment_other_time"),),
-        (TransitionChoice("⬅️ 修改日期", "appointment_back_date"), TransitionChoice("🏠 返回首页", "home")),
+        (TransitionChoice("⬅️ 改日期", "appointment_back_date"),),
     )
     return TransitionView(kind="appointment_time", text=text, rows=rows)
 
@@ -171,7 +179,7 @@ def _search_budget_view(area_display: str = "", *, back_label: str = "⬅️ 返
         (TransitionChoice("✍️ 自己输入", "budget_custom"),),
         (TransitionChoice(back_label, "change_search"),),
     )
-    return TransitionView(kind="search_budget", text=f"💰 <b>每月预算大概多少？</b>\n\n单位：USD / 月{area_line}", rows=rows)
+    return TransitionView(kind="search_budget", text=f"💰 <b>每月预算大概多少？</b>\n\n单位：美元 / 月{area_line}", rows=rows)
 
 
 def _search_area_view() -> TransitionView:
@@ -184,7 +192,7 @@ def _search_area_view() -> TransitionView:
         (choices[7],),
         (choices[8], choices[9]),
         (choices[10],),
-        (TransitionChoice("📍 其他区域", "area_other"),),
+        (TransitionChoice("📍 其他位置", "area_other"),),
         (TransitionChoice("⬅️ 返回找房", "change_search"),),
     )
     return TransitionView(kind="search_area", text="📍 <b>想住哪里？</b>\n\n选一个大概位置就行。", rows=rows)
@@ -202,29 +210,29 @@ def _search_layout_view(area_display: str = "", budget_label: str = "") -> Trans
         (choices[4], choices[5]),
         (TransitionChoice("⬅️ 返回找房", "change_search"),),
     )
-    return TransitionView(kind="search_layout", text=f"🛏 <b>想要什么户型？</b>{selected_line}", rows=rows)
+    return TransitionView(kind="search_layout", text=f"🛏 <b>想要几房？</b>{selected_line}", rows=rows)
 
 
 def _similar_view(plan: TransitionPlan) -> TransitionView:
     if plan.similar is None:
         raise ValueError("similar_transition_missing_intent")
-    return _search_budget_view(plan.similar.intent.area_display, back_label="⬅️ 返回")
+    return _search_entry_view()
 
 
 _SEARCH_ENTRY_TEXT = (
-    "🔍 <b>想找什么样的房子？</b>\n\n"
-    "直接发送需求，例如：\n"
+    "🔍 <b>想住什么样的房子？</b>\n\n"
+    "可以直接发，例如：\n"
     "<code>BKK1 一房，预算 $600</code>\n"
     "<code>富力城两房，要能做饭</code>\n\n"
-    "也可以按条件找："
+    "也可以按条件选："
 )
 
 
 def _search_entry_view() -> TransitionView:
     rows = (
         (TransitionChoice("📍 按区域", "search_area"), TransitionChoice("💰 按预算", "search_budget")),
-        (TransitionChoice("🏠 按户型", "search_layout"),),
-        (TransitionChoice("🏠 返回首页", "home"),),
+        (TransitionChoice("🛏 按户型", "search_layout"),),
+        (TransitionChoice("⬅️ 回首页", "home"),),
     )
     return TransitionView(kind="search_entry", text=_SEARCH_ENTRY_TEXT, rows=rows)
 
