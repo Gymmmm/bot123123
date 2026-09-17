@@ -47,18 +47,15 @@ async def _render_contact(query: Any, *, text: str, public_listing_id: str, advi
     direct_advisor = advisor_handoff_url(advisor_url, public_listing_id=public_listing_id)
     contact_button = (
         InlineKeyboardButton("💬 打开中文顾问", url=direct_advisor)
-        if direct_advisor else InlineKeyboardButton("💬 中文顾问", callback_data="v3u:home:contact")
+        if direct_advisor
+        else InlineKeyboardButton(
+            "💬 打开中文顾问",
+            callback_data=encode_listing_callback("consult", public_listing_id),
+        )
     )
     markup = InlineKeyboardMarkup([
         [contact_button],
-        [
-            InlineKeyboardButton("📅 预约看房", callback_data=encode_listing_callback("book", public_listing_id)),
-            InlineKeyboardButton("📸 更多实拍", callback_data=encode_listing_callback("photos", public_listing_id)),
-        ],
-        [
-            InlineKeyboardButton("⬅️ 返回这套房", callback_data=encode_listing_callback("details", public_listing_id)),
-            InlineKeyboardButton("🔍 继续找房", callback_data="v3u:home:search"),
-        ],
+        [InlineKeyboardButton("⬅️ 返回这套房", callback_data=encode_listing_callback("details", public_listing_id))],
     ])
     message = getattr(query, "message", None)
     if getattr(message, "photo", None):
@@ -84,7 +81,7 @@ async def _render_updated_entry(query: Any, *, advisor_url: str = "") -> None:
         if direct else InlineKeyboardButton("💬 中文顾问", callback_data="v3u:home:contact")
     )
     markup = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🏠 返回首页", callback_data="v3u:t:home")],
+        [InlineKeyboardButton("⬅️ 回首页", callback_data="v3u:t:home")],
         [advisor_button],
     ])
     text = "⚠️ 这个入口已经更新\n请使用下面的最新服务入口。"

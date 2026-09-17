@@ -23,11 +23,11 @@ class ServiceView:
 def service_home_view() -> ServiceView:
     return ServiceView(
         kind="service_home",
-        text="🛡 <b>入住服务</b>\n\n已入住后的住房问题，可以从这里继续处理。",
+        text="🛠 <b>入住服务</b>\n\n已入住后的住房问题，可以从这里继续处理。",
         rows=(
             (ServiceChoice("🔧 报修与维护", "v3u:service:repair"), ServiceChoice("🏢 物业沟通", "v3u:service:property")),
             (ServiceChoice("🚚 搬家协助", "v3u:assure:moving"), ServiceChoice("🧭 周边服务", "v3u:service:local")),
-            (ServiceChoice("💬 联系顾问", "v3u:home:contact"), ServiceChoice("🏠 返回首页", "v3u:t:home")),
+            (ServiceChoice("💬 中文顾问", "v3u:home:contact"), ServiceChoice("🏠 返回首页", "v3u:t:home")),
         ),
     )
 
@@ -52,16 +52,16 @@ def property_view() -> ServiceView:
         kind="property",
         text=(
             "🏢 <b>物业沟通</b>\n\n"
-            "噪音、停车、门禁、公共区域、垃圾处理等需要物业协调的问题，可以直接联系顾问。\n\n"
+            "噪音、停车、门禁、公共区域、垃圾处理等需要物业协调的问题，可以直接联系中文顾问。\n\n"
             "说明 <b>发生了什么 + 大概时间 + 是否已经联系过物业</b>，我们会协助整理并跟进。"
         ),
-        rows=((ServiceChoice("💬 联系顾问", "v3u:home:contact"),), (ServiceChoice("⬅️ 返回入住服务", "v3u:home:service"),)),
+        rows=((ServiceChoice("💬 中文顾问", "v3u:home:contact"),), (ServiceChoice("⬅️ 返回入住服务", "v3u:home:service"),)),
     )
 
 
 def issue_prompt_view(draft: ServiceRequestDraft) -> ServiceView:
     urgent = draft.issue_key in {"repair_water", "repair_power", "repair_door"}
-    note = "\n\n如涉及持续漏水、断电或无法正常进出，请同时直接联系顾问。" if urgent else ""
+    note = "\n\n如涉及持续漏水、断电或无法正常进出，请同时直接联系中文顾问。" if urgent else ""
     return ServiceView(
         kind="repair_issue",
         text=(
@@ -69,7 +69,7 @@ def issue_prompt_view(draft: ServiceRequestDraft) -> ServiceView:
             "请直接发送文字说明问题。\n"
             f"例如：<code>空调可以启动，但一直不制冷。</code>{note}"
         ),
-        rows=((ServiceChoice("💬 联系顾问", "v3u:home:contact"),), (ServiceChoice("⬅️ 重新选择问题", "v3u:service:repair"),)),
+        rows=((ServiceChoice("💬 中文顾问", "v3u:home:contact"),), (ServiceChoice("⬅️ 重新选择问题", "v3u:service:repair"),)),
     )
 
 
@@ -86,11 +86,11 @@ def slot_view(draft: ServiceRequestDraft) -> ServiceView:
 
 
 def repair_success_view(*, urgent: bool) -> ServiceView:
-    urgent_note = "\n\n如情况仍在扩大，请直接联系顾问。" if urgent else ""
+    urgent_note = "\n\n如情况仍在扩大，请直接联系中文顾问。" if urgent else ""
     return ServiceView(
         kind="repair_success",
         text="✅ <b>报修已提交</b>\n\n顾问会根据您提交的问题和时间安排后续处理。" + urgent_note,
-        rows=((ServiceChoice("💬 联系顾问", "v3u:home:contact"),), (ServiceChoice("⬅️ 返回入住服务", "v3u:home:service"),)),
+        rows=((ServiceChoice("💬 中文顾问", "v3u:home:contact"),), (ServiceChoice("⬅️ 返回入住服务", "v3u:home:service"),)),
     )
 
 
@@ -104,7 +104,7 @@ def general_prompt_view(*, nearby: bool = False) -> ServiceView:
     return ServiceView(
         kind="general_prompt",
         text="💬 <b>其他需求</b>\n\n直接发送需要处理的事情，顾问会按您这条内容继续跟进。",
-        rows=((ServiceChoice("💬 联系顾问", "v3u:home:contact"),), (ServiceChoice("⬅️ 返回入住服务", "v3u:home:service"),)),
+        rows=((ServiceChoice("💬 中文顾问", "v3u:home:contact"),), (ServiceChoice("⬅️ 返回入住服务", "v3u:home:service"),)),
     )
 
 

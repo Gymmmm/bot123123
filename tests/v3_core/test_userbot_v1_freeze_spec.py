@@ -59,7 +59,9 @@ def test_listing_surfaces_drop_similar_copy():
     assert "看相近房源" not in details_src
     assert "看相近房源" not in cards_src
     assert "看相近房源" not in photos_src
-    assert "换个条件找" in details_src
+    assert "换个条件找" not in details_src
+    assert "换个条件找" in cards_src
+    assert "问这套房" in details_src
     assert "问这套房" in cards_src
 
 

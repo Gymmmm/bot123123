@@ -126,7 +126,7 @@ def _updated_entry_view() -> ServiceView:
     return ServiceView(
         "historical_updated",
         "⚠️ 这个入口已经更新\n请使用下面的最新服务入口。",
-        ((ServiceChoice("🏠 返回首页", "v3u:t:home"), ServiceChoice("💬 中文顾问", "v3u:home:contact")),),
+        ((ServiceChoice("⬅️ 回首页", "v3u:t:home"), ServiceChoice("💬 中文顾问", "v3u:home:contact")),),
     )
 
 

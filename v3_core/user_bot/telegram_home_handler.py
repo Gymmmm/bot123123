@@ -90,23 +90,21 @@ def _tenant_service_from_history(history: AppointmentHistoryService) -> TenantSe
     return TenantService(SQLiteTenantServiceRepository(db_path))
 
 
-async def handle_v3_home_callback(
+async def handle_v3_home_action(
     update: Any,
     context: Any,
     *,
+    action: HomeAction,
     appointment_history: AppointmentHistoryService,
     search_views: TransitionViewService | None = None,
     contact_effects: ContactEffectExecutor | None = None,
     advisor_url: str = "",
 ) -> TelegramHomeOutcome:
     query = getattr(update, "callback_query", None)
-    raw = str(getattr(query, "data", "") or "") if query is not None else ""
-    callback = parse_home_callback(raw)
-    if query is None or callback is None:
+    if query is None:
         return TelegramHomeOutcome(handled=False)
 
     await query.answer()
-    action = callback.action
 
     if action == "search":
         if search_views is None:
@@ -171,4 +169,29 @@ async def handle_v3_home_callback(
     return TelegramHomeOutcome(handled=True, action=action, deferred=True)
 
 
-__all__ = ["TelegramHomeOutcome", "handle_v3_home_callback"]
+async def handle_v3_home_callback(
+    update: Any,
+    context: Any,
+    *,
+    appointment_history: AppointmentHistoryService,
+    search_views: TransitionViewService | None = None,
+    contact_effects: ContactEffectExecutor | None = None,
+    advisor_url: str = "",
+) -> TelegramHomeOutcome:
+    query = getattr(update, "callback_query", None)
+    raw = str(getattr(query, "data", "") or "") if query is not None else ""
+    callback = parse_home_callback(raw)
+    if query is None or callback is None:
+        return TelegramHomeOutcome(handled=False)
+    return await handle_v3_home_action(
+        update,
+        context,
+        action=callback.action,
+        appointment_history=appointment_history,
+        search_views=search_views,
+        contact_effects=contact_effects,
+        advisor_url=advisor_url,
+    )
+
+
+__all__ = ["TelegramHomeOutcome", "handle_v3_home_action", "handle_v3_home_callback"]

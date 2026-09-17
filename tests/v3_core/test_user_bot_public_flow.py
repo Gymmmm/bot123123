@@ -158,9 +158,9 @@ def test_rented_book_is_blocked_before_appointment_flow_is_created():
         actions = [action for row in result.details.action_rows for action in row]
         labels = [action.label for action in actions]
         assert "📅 预约看房" not in labels
-        assert any(label.endswith("换个条件找") for label in labels)
-        change = next(action for action in actions if action.label.endswith("换个条件找"))
-        assert change.action == "change_search"
+        assert "📸 更多实拍" in labels
+        assert "💬 问这套房" in labels
+        assert all("换个条件找" not in label for label in labels)
 
 
 def test_direct_action_rejects_invalid_identity_and_non_public_action():

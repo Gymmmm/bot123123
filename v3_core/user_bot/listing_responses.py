@@ -88,15 +88,13 @@ def _details_actions(
     public_listing_id: str,
 ) -> tuple[tuple[SemanticAction, ...], ...]:
     target = str(public_listing_id or "").strip()
-    book_row = (
-        (SemanticAction("📅 预约看房", "book", target), SemanticAction("💬 问这套房", "consult", target))
-        if bookable
-        else (SemanticAction("💬 问这套房", "consult", target),)
-    )
+    if bookable:
+        return (
+            (SemanticAction("📅 预约看房", "book", target), SemanticAction("📸 更多实拍", "photos", target)),
+            (SemanticAction("💬 问这套房", "consult", target),),
+        )
     return (
-        book_row,
-        (SemanticAction("📸 更多实拍", "photos", target),),
-        (SemanticAction("✏️ 换个条件找", "change_search"),),
+        (SemanticAction("📸 更多实拍", "photos", target), SemanticAction("💬 问这套房", "consult", target)),
     )
 
 

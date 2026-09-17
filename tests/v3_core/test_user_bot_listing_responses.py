@@ -80,11 +80,10 @@ def test_details_response_omits_adviser_section_without_supported_signal():
         "🟢 房态：当前可预约\n"
         "🆔 QL-RF-A2B3"
     )
-    assert _actions(response.action_rows) == [["book", "consult"], ["photos"], ["change_search"]]
+    assert _actions(response.action_rows) == [["book", "photos"], ["consult"]]
     assert _labels(response.action_rows) == [
-        ["📅 预约看房", "💬 问这套房"],
-        ["📸 更多实拍"],
-        ["✏️ 换个条件找"],
+        ["📅 预约看房", "📸 更多实拍"],
+        ["💬 问这套房"],
     ]
 
 
@@ -94,11 +93,9 @@ def test_details_response_uses_live_rented_state_but_keeps_frozen_public_facts()
 
     assert "💵 <b>$800/月</b>" in response.text
     assert "🔴 房态：已租出" in response.text
-    assert _actions(response.action_rows) == [["consult"], ["photos"], ["change_search"]]
+    assert _actions(response.action_rows) == [["photos", "consult"]]
     assert _labels(response.action_rows) == [
-        ["💬 问这套房"],
-        ["📸 更多实拍"],
-        ["✏️ 换个条件找"],
+        ["📸 更多实拍", "💬 问这套房"],
     ]
 
 

@@ -279,22 +279,22 @@ async def _notify_user_status(
     if public_id:
         if status == "cancelled":
             rows.append([InlineKeyboardButton("📅 重新预约", callback_data=encode_listing_callback("book", public_id))])
-        rows.append([InlineKeyboardButton("🏠 租赁详情", callback_data=encode_listing_callback("details", public_id))])
+        rows.append([InlineKeyboardButton("📋 租赁详情", callback_data=encode_listing_callback("details", public_id))])
     clean_advisor = str(advisor_url or "").strip()
     if clean_advisor:
         rows.append([
             InlineKeyboardButton(
-                "💬 联系中文顾问",
+                "💬 问这套房",
                 url=advisor_handoff_url(clean_advisor, public_listing_id=public_id),
             )
         ])
     else:
-        rows.append([InlineKeyboardButton("💬 联系中文顾问", callback_data="v3u:home:contact")])
-    rows.append([InlineKeyboardButton("📅 查看我的预约", callback_data="v3u:home:appointments")])
+        rows.append([InlineKeyboardButton("💬 问这套房", callback_data="v3u:home:contact")])
+    rows.append([InlineKeyboardButton("📅 我的预约", callback_data="v3u:home:appointments")])
     clean_channel = str(channel_url or "").strip()
     if clean_channel:
-        rows.append([InlineKeyboardButton("📣 返回房源频道", url=clean_channel)])
-    rows.append([InlineKeyboardButton("🏠 返回首页", callback_data="v3u:t:home")])
+        rows.append([InlineKeyboardButton("📢 回频道看房源", url=clean_channel)])
+    rows.append([InlineKeyboardButton("⬅️ 回首页", callback_data="v3u:t:home")])
     await context.bot.send_message(
         chat_id=user_id,
         text=text,
