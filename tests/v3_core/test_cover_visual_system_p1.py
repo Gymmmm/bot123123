@@ -75,7 +75,7 @@ def test_long_project_price_and_layout_fit_their_safe_widths(monkeypatch):
 
 def test_brand_and_font_contract_are_identical_across_three_templates():
     assert BRAND_CN == "侨联地产"
-    assert BRAND_EN == "QIAO LIAN PROPERTY"
+    assert BRAND_EN == "QIAOLIAN REALTY"
     for style in ("classic_blue", "right_price", "black_gold"):
         html = cover_template_path(style, allow_video=False).read_text(encoding="utf-8")
         assert BRAND_CN in html
@@ -85,7 +85,7 @@ def test_brand_and_font_contract_are_identical_across_three_templates():
         assert "{{AREA}}" in html
         assert "{{PRICE_LINE}}" in html
         assert "📍" not in html
-        assert "QIAOLIAN REALTY" not in html
+        assert "QIAO LIAN PROPERTY" not in html
         assert ">QIAO LIAN<" not in html
 
     renderer_source = inspect.getsource(cover_generator)

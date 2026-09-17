@@ -16,7 +16,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 
 BRAND_CN = "侨联地产"
-BRAND_EN = "QIAO LIAN PROPERTY"
+BRAND_EN = "QIAOLIAN REALTY"
 BRAND_BLUE = (18, 57, 103)
 BRAND_BLUE_SOFT = (40, 89, 142)
 BRAND_GOLD = (211, 179, 98)
