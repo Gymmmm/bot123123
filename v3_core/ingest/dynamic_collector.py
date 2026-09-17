@@ -68,10 +68,6 @@ class DynamicTelegramCollectorApp(TelegramCollectorApp):
 
     async def run(self) -> None:
         registry = AdminSourceRegistry(base_path=self.sources_path, db_path=self.db_path)
-        initial = registry.rows()
-        if not initial:
-            raise RuntimeError("sources.json 中没有可用源")
-
         client = TelegramClient(self.session_path, self.api_id, self.api_hash)
         await client.start()
         heartbeat_task = asyncio.create_task(self._heartbeat_loop())
@@ -95,7 +91,18 @@ class DynamicTelegramCollectorApp(TelegramCollectorApp):
                         registered.add(name)
 
                 if not registered:
-                    raise RuntimeError("所有采集源均无法连接")
+                    reason = "sources.json 中没有可用源" if not current else "所有采集源暂时无法连接"
+                    self.runtime.heartbeat(
+                        "collector",
+                        state="running",
+                        event=True,
+                        error=reason,
+                        meta={"configured_sources": len(current), "registered_sources": 0},
+                    )
+                    log.warning("collector waiting for sources: %s", reason)
+                    await asyncio.sleep(10)
+                    continue
+
                 self.runtime.heartbeat(
                     "collector",
                     state="running",

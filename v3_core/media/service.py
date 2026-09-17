@@ -185,7 +185,7 @@ class MediaPreparationService:
         manual_clean = ""
         if manual_cover_path:
             manual_raw = str(Path(manual_cover_path).expanduser().resolve())
-            manual_clean = raw_to_clean.get(manual_raw, "")
+            manual_clean = manual_raw if manual_raw in cleaned_paths else raw_to_clean.get(manual_raw, "")
 
         selected = select_publication_media(
             cleaned_paths,
