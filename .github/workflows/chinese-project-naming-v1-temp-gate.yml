@@ -1,0 +1,29 @@
+name: chinese-project-naming-v1-temp-gate
+on:
+  push:
+    branches: [tmp/chinese-project-naming-v1-gate-20260918]
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: python -m pip install -r requirements.txt pytest pytest-asyncio
+      - name: Project Registry and Chinese Naming
+        run: python -m pytest -q tests/v3_core/test_project_registry_v3.py tests/v3_core/test_chinese_project_naming_v1.py
+      - name: Search
+        run: python -m pytest -q tests/v3_core/test_user_bot_search_query.py tests/v3_core/test_user_bot_public_search.py
+      - name: Parser
+        run: python -m pytest -q tests/v3_core/test_canonical_parser_parity.py tests/v3_core/test_pipeline_r2_parser_taxonomy.py
+      - name: Publisher and Cover
+        run: python -m pytest -q tests/v3_core/test_publisher_admin_workflow.py tests/v3_core/test_publisher_adviser_product_policy.py tests/v3_core/test_cover_service.py
+      - name: Full V3
+        run: python -m pytest -q tests/v3_core
+      - name: Compile
+        run: python -m compileall -q v3_core
+      - name: Critical imports
+        run: python -c "import v3_core.inventory,v3_core.inventory.project_registry,v3_core.inventory.chinese_project_naming,v3_core.inventory.listing_taxonomy,v3_core.user_bot.search_query,v3_core.user_bot.search_query_v3,v3_core.user_bot.public_search,v3_core.publishing.package_service"
+      - name: Diff check
+        run: git diff --check HEAD^ HEAD

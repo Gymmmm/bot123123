@@ -17,7 +17,7 @@ from .phnom_penh_location_registry import (
     project_by_key as legacy_project_by_key,
 )
 from .project_registry import (
-    RESEARCH_PROJECTS as REGISTRY_V3_PROJECTS,
+    ACTIVE_PROJECTS as REGISTRY_V3_PROJECTS,
     FAMILIES as REGISTRY_V3_FAMILIES,
     canonical_location_projection as registry_v3_location_projection,
     project_by_key as registry_v3_project_by_key,
