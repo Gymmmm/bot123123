@@ -96,7 +96,6 @@ def _details_actions(
     return (
         book_row,
         (SemanticAction("📸 更多实拍", "photos", target),),
-        (SemanticAction("✏️ 换个条件找", "change_search"),),
     )
 
 

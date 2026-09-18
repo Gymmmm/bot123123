@@ -98,15 +98,16 @@ async def handle_v3_home_callback(
     search_views: TransitionViewService | None = None,
     contact_effects: ContactEffectExecutor | None = None,
     advisor_url: str = "",
+    action_override: HomeAction | None = None,
 ) -> TelegramHomeOutcome:
     query = getattr(update, "callback_query", None)
     raw = str(getattr(query, "data", "") or "") if query is not None else ""
-    callback = parse_home_callback(raw)
-    if query is None or callback is None:
+    callback = parse_home_callback(raw) if action_override is None else None
+    if query is None or (callback is None and action_override is None):
         return TelegramHomeOutcome(handled=False)
 
     await query.answer()
-    action = callback.action
+    action = action_override or callback.action
 
     if action == "search":
         if search_views is None:
