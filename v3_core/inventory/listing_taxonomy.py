@@ -91,6 +91,10 @@ _LEGACY_PROJECT_DISPLAY = {
     "prince-universe": "太子·寰宇中心",
     "sky-villa": "Sky Villa 天空别墅",
     "picasso-city-garden": "Picasso City Garden 毕加索",
+    "times-square-9": "Time Square 9",
+}
+_LEGACY_FAMILY_DISPLAY = {
+    "family:peng-huoth": "Peng Huoth",
 }
 
 PROJECT_IDENTITIES: tuple[ProjectIdentity, ...] = tuple(
@@ -113,7 +117,7 @@ PROJECT_IDENTITIES: tuple[ProjectIdentity, ...] = tuple(
 ) + tuple(
     ProjectIdentity(
         family.family_id,
-        family.name_cn or family.name_en,
+        _LEGACY_FAMILY_DISPLAY.get(family.family_id, family.name_cn or family.name_en),
         "brand",
         tuple(dict.fromkeys((*family.ambiguous_aliases, family.name_cn, family.name_en))),
     )
