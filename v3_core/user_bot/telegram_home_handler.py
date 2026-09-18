@@ -137,24 +137,11 @@ async def handle_v3_home_callback(
         return TelegramHomeOutcome(handled=True, action=action, rendered=True)
 
     if action == "service":
-        tenant_service = _tenant_service_from_history(appointment_history)
-        if tenant_service is None:
-            await render_service_view(query, service_home_view(), advisor_url=advisor_url)
-        else:
-            user = _lead_user(update)
-            await render_service_view(query, tenant_home_view(tenant_service, user.user_id), advisor_url=advisor_url)
+        await render_service_view(query, service_home_view(), advisor_url=advisor_url)
         return TelegramHomeOutcome(handled=True, action=action, rendered=True)
 
     if action == "local":
-        tenant_service = _tenant_service_from_history(appointment_history)
-        if tenant_service is None:
-            await render_service_view(query, service_home_view(), advisor_url=advisor_url)
-        else:
-            user = _lead_user(update)
-            if tenant_service.active_binding(user.user_id) is None:
-                await render_service_view(query, tenant_home_view(tenant_service, user.user_id), advisor_url=advisor_url)
-            else:
-                await render_service_view(query, local_life_view(), advisor_url=advisor_url)
+        await render_service_view(query, local_life_view(), advisor_url=advisor_url)
         return TelegramHomeOutcome(handled=True, action=action, rendered=True)
 
     if action == "contact":

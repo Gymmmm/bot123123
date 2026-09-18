@@ -36,7 +36,13 @@ def _format_size(value: float | None) -> str:
 
 def _frozen_cover(view: PublishedListingView) -> str:
     candidate = str(view.package.get("cover_path") or "").strip()
-    return candidate if candidate and Path(candidate).is_file() else ""
+    if candidate and Path(candidate).is_file():
+        return candidate
+    for raw in getattr(view, "gallery", ()):
+        gallery_path = str(raw or "").strip()
+        if gallery_path and Path(gallery_path).is_file():
+            return gallery_path
+    return ""
 
 
 def _card_actions(

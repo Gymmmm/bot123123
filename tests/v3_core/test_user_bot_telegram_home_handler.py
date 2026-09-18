@@ -181,7 +181,11 @@ async def test_contact_without_effect_executor_is_deferred_and_never_claims_succ
         (
             "service",
             "入住服务",
-            {"v3u:home:contact", "v3u:home:rental", "v3u:home:search", "v3u:t:home"},
+            {
+                "v3u:assure:handover", "v3u:assure:moving",
+                "v3u:service:repair", "v3u:service:property", "v3u:service:local",
+                "v3u:home:contact", "v3u:t:home",
+            },
         ),
     ],
 )
@@ -199,34 +203,41 @@ async def test_assurance_and_service_home_actions_are_complete_v3_surfaces(actio
     assert not any(value.startswith(("hub:", "service:")) for value in callbacks)
     labels = [button.text for row in markup.inline_keyboard for button in row]
     if action == "service":
-        assert "报修" not in "".join(labels)
-        assert "租约" not in "".join(labels)
-        assert "物业" not in "".join(labels)
+        assert labels == [
+            "📋 入住交接留档", "🚚 搬家协助",
+            "🔧 房屋问题报修", "🏢 物业沟通",
+            "📍 周边生活", "💬 中文顾问", "⬅️ 回首页",
+        ]
 
 
 @pytest.mark.asyncio
-async def test_home_service_unbound_user_goes_through_binding_gate(tmp_path):
+async def test_home_service_unbound_user_opens_public_service_home(tmp_path):
     query = FakeQuery("v3u:home:service")
     history = FakeHistory(_tenant_db(tmp_path, bound=False))
     outcome = await handle_v3_home_callback(_update(query), _context(), appointment_history=history)
     assert outcome.handled and outcome.rendered
     text = query.calls[-1][1][0]
     labels = [button.text for row in query.calls[-1][2]["reply_markup"].inline_keyboard for button in row]
-    assert "这边还没有显示你的住房信息" in text
-    assert labels == ["💬 中文顾问", "🛡 看租后服务", "🔍 开始找房", "⬅️ 回首页"]
-    assert all(word not in "".join(labels) for word in ("报修", "租约", "物业"))
+    assert "房子定下来以后" in text
+    assert "没有显示你的住房信息" not in text
+    assert labels == [
+        "📋 入住交接留档", "🚚 搬家协助",
+        "🔧 房屋问题报修", "🏢 物业沟通",
+        "📍 周边生活", "💬 中文顾问", "⬅️ 回首页",
+    ]
 
 
 @pytest.mark.asyncio
-async def test_home_service_bound_user_opens_resident_home(tmp_path):
+async def test_home_service_bound_user_still_opens_same_public_service_home(tmp_path):
     query = FakeQuery("v3u:home:service")
     history = FakeHistory(_tenant_db(tmp_path, bound=True))
     outcome = await handle_v3_home_callback(_update(query), _context(), appointment_history=history)
     assert outcome.handled and outcome.rendered
     text = query.calls[-1][1][0]
     labels = [button.text for row in query.calls[-1][2]["reply_markup"].inline_keyboard for button in row]
-    assert "富力城 A3-1208" in text
-    assert "📋 我的租约" in labels
-    assert "🔧 报修" in labels
-    assert "🏢 物业协调" in labels
-    assert "📍 周边服务" in labels
+    assert "富力城 A3-1208" not in text
+    assert labels == [
+        "📋 入住交接留档", "🚚 搬家协助",
+        "🔧 房屋问题报修", "🏢 物业沟通",
+        "📍 周边生活", "💬 中文顾问", "⬅️ 回首页",
+    ]

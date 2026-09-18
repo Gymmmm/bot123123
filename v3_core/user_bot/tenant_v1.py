@@ -10,6 +10,7 @@ from telegram import InputFile
 from .assurance_views import assurance_asset_bundle
 from .lead_service import LeadUser
 from .service_flow import TenantService
+from .service_product_views import service_home_view
 from .service_views import ServiceChoice, ServiceView
 
 _UNKNOWN = {"", "none", "null", "undefined", "n/a", "na", "-"}
@@ -32,29 +33,19 @@ def _public_rows() -> tuple[tuple[ServiceChoice, ...], ...]:
 
 
 def tenant_home_view(service: TenantService, user_id: int) -> ServiceView:
-    binding = service.active_binding(user_id)
-    if binding is None:
-        return ServiceView(
-            "tenant_missing",
-            "🛠 <b>入住服务</b>\n\n这边还没有显示你的住房信息。\n\n"
-            "如果已经通过侨联入住，但这里还没有显示，可以联系中文顾问处理。\n"
-            "还没租房的话，可以先了解入住之后侨联怎么服务，或继续找房。",
-            _public_rows(),
-        )
-    property_name = he(_safe_text(binding.property_name, "已绑定住房"))
+    _ = service, user_id
+    return service_home_view()
+
+
+def missing_lease_view() -> ServiceView:
     return ServiceView(
-        "tenant_home",
-        f"🛠 <b>入住服务</b>\n\n🏠 当前住房：<b>{property_name}</b>\n\n"
-        "这里处理这套房子入住之后的事情。",
+        "tenant_lease_missing",
+        "📋 <b>我的租约</b>\n\n暂时没有识别到你的租约信息，请联系中文顾问核对。",
         (
-            (ServiceChoice("📋 我的租约", "v3u:service:tenant_lease"),),
-            (ServiceChoice("🔧 报修", "v3u:service:repair"), ServiceChoice("🏢 物业协调", "v3u:service:property")),
-            (ServiceChoice("📍 周边服务", "v3u:service:local"),),
             (ServiceChoice("💬 中文顾问", "v3u:home:contact"),),
-            (ServiceChoice("⬅️ 回首页", "v3u:t:home"),),
+            (ServiceChoice("⬅️ 返回入住服务", "v3u:home:service"),),
         ),
     )
-
 
 def lease_view(service: TenantService, user_id: int) -> ServiceView:
     binding = service.require_active_binding(user_id)
@@ -177,6 +168,6 @@ async def send_pdf(*, kind, service, user_id, repo_root, context, chat_id):
 
 
 __all__ = [
-    "tenant_home_view", "lease_view", "guide_view", "handover_view", "deposit_view",
+    "tenant_home_view", "missing_lease_view", "lease_view", "guide_view", "handover_view", "deposit_view",
     "renew_view", "terminate_view", "submit_request", "send_pdf",
 ]

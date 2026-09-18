@@ -23,11 +23,15 @@ class ServiceView:
 def service_home_view() -> ServiceView:
     return ServiceView(
         kind="service_home",
-        text="🛡 <b>入住服务</b>\n\n已入住后的住房问题，可以从这里继续处理。",
+        text=(
+            "🛠 <b>入住服务</b>\n\n"
+            "房子定下来以后，入住和居住过程中需要处理的事情，可以从这里找侨联。"
+        ),
         rows=(
-            (ServiceChoice("🔧 报修与维护", "v3u:service:repair"), ServiceChoice("🏢 物业沟通", "v3u:service:property")),
-            (ServiceChoice("🚚 搬家协助", "v3u:assure:moving"), ServiceChoice("🧭 周边服务", "v3u:service:local")),
-            (ServiceChoice("💬 中文顾问", "v3u:home:contact"), ServiceChoice("🏠 返回首页", "v3u:t:home")),
+            (ServiceChoice("📋 入住交接留档", "v3u:assure:handover"), ServiceChoice("🚚 搬家协助", "v3u:assure:moving")),
+            (ServiceChoice("🔧 房屋问题报修", "v3u:service:repair"), ServiceChoice("🏢 物业沟通", "v3u:service:property")),
+            (ServiceChoice("📍 周边生活", "v3u:service:local"), ServiceChoice("💬 中文顾问", "v3u:home:contact")),
+            (ServiceChoice("⬅️ 回首页", "v3u:t:home"),),
         ),
     )
 
@@ -117,31 +121,25 @@ def local_life_view() -> ServiceView:
     return ServiceView(
         kind="local_life",
         text=(
-            "🧭 <b>周边服务</b>\n\n"
-            "入住后常用的生活服务可以从这里找：\n\n"
-            "• 餐饮 / 超市 / 快递\n"
-            "• 保洁 / 搬家 / 维修\n"
-            "• 医院 / 药店 / 其他日常服务\n\n"
-            "商家信息会持续更新，价格和实际服务以商家回复为准。"
+            "🗺 <b>金边华人生活配套</b>\n\n"
+            "侨联逐步整理各区域常用生活信息：\n\n"
+            "• 中餐 / 夜宵\n"
+            "• 超市 / 送货 / 搬家\n"
+            "• 洗衣 / 保洁 / 维修\n"
+            "• 医院 / 药店\n"
+            "• 其他日常生活服务"
         ),
         rows=(
-            (ServiceChoice("🧹 保洁家政", "v3u:home:contact"), ServiceChoice("🚚 搬家协助", "v3u:assure:moving")),
-            (ServiceChoice("🗺 周边推荐", "v3u:service:nearby"), ServiceChoice("💬 其他需求", "v3u:service:general")),
+            (ServiceChoice("🏙 富力城周边", "v3u:service:rfcity"),),
+            (ServiceChoice("📍 其他区域需求", "v3u:service:nearby_other"),),
             (ServiceChoice("⬅️ 返回入住服务", "v3u:home:service"),),
         ),
     )
 
 
 def nearby_view() -> ServiceView:
-    return ServiceView(
-        kind="nearby",
-        text="🗺 <b>周边推荐</b>\n\n目前可直接查看富力城已整理的生活商家；其他区域可以提交位置和需求。",
-        rows=(
-            (ServiceChoice("🏙 富力城导航", "v3u:service:rfcity"),),
-            (ServiceChoice("📍 提交其他区域", "v3u:service:nearby_other"),),
-            (ServiceChoice("⬅️ 返回周边服务", "v3u:service:local"),),
-        ),
-    )
+    view = local_life_view()
+    return ServiceView(kind="nearby", text=view.text, rows=view.rows)
 
 
 _RFCITY_FOOTER = (

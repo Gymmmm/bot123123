@@ -32,19 +32,26 @@ def test_round2_admin_notification_keyboard_exposes_operational_actions():
     assert markup.inline_keyboard[-1][0].url == "tg://user?id=12345"
 
 
-def test_round2_tenant_service_entry_and_binding_views(tmp_path):
+def test_round2_tenant_service_entry_is_public_regardless_of_binding(tmp_path):
     home = _service_home_with_tenant_entry()
     callbacks = [choice.callback_data for row in home.rows for choice in row]
-    assert "v3u:service:tenant" in callbacks
+    assert callbacks == [
+        "v3u:assure:handover", "v3u:assure:moving",
+        "v3u:service:repair", "v3u:service:property",
+        "v3u:service:local", "v3u:home:contact", "v3u:t:home",
+    ]
 
     db = tmp_path / "tenant.sqlite3"
     initialize_v3_storage(db)
     service = TenantService(SQLiteTenantServiceRepository(db))
     missing = tenant_home_view(service, 99)
-    assert missing.kind == "tenant_missing"
-    assert "这边还没有显示你的住房信息" in missing.text
     missing_labels = [choice.label for row in missing.rows for choice in row]
-    assert missing_labels == ["💬 中文顾问", "🛡 看租后服务", "🔍 开始找房", "⬅️ 回首页"]
+    assert missing_labels == [
+        "📋 入住交接留档", "🚚 搬家协助",
+        "🔧 房屋问题报修", "🏢 物业沟通",
+        "📍 周边生活", "💬 中文顾问", "⬅️ 回首页",
+    ]
+    assert "没有显示你的住房信息" not in missing.text
 
     with sqlite3.connect(str(db)) as conn:
         conn.execute(
@@ -54,15 +61,7 @@ def test_round2_tenant_service_entry_and_binding_views(tmp_path):
         )
         conn.commit()
     bound = tenant_home_view(service, 99)
-    assert bound.kind == "tenant_home"
-    assert "富力城 A2-1908" in bound.text
-    bound_callbacks = [choice.callback_data for row in bound.rows for choice in row]
-    assert "v3u:service:repair" in bound_callbacks
-    assert "v3u:service:property" in bound_callbacks
-    assert "v3u:service:tenant_renew" not in bound_callbacks
-    assert "v3u:service:tenant_terminate" not in bound_callbacks
-    assert "v3u:service:tenant_lease" in bound_callbacks
-    assert "v3u:service:local" in bound_callbacks
+    assert bound == missing
 
 
 def _make_admin_db(path):

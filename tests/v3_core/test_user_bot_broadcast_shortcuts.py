@@ -175,7 +175,7 @@ async def test_service_shortcuts_land_on_real_user_surfaces(payload, expected_ki
 
 
 @pytest.mark.asyncio
-async def test_service_shortcut_uses_bound_tenant_home_without_extra_gate():
+async def test_service_shortcut_ignores_binding_and_opens_public_service_home():
     message = FakeMessage()
     outcome = await handle_v3_start(
         _update(message),
@@ -193,9 +193,12 @@ async def test_service_shortcut_uses_bound_tenant_home_without_extra_gate():
         for button in row
         if button.callback_data
     ]
-    assert "富力城 A3-1208" in text
-    assert "v3u:service:tenant_lease" in callbacks
-    assert "v3u:service:tenant" not in callbacks
+    assert "富力城 A3-1208" not in text
+    assert callbacks == [
+        "v3u:assure:handover", "v3u:assure:moving",
+        "v3u:service:repair", "v3u:service:property",
+        "v3u:service:local", "v3u:home:contact", "v3u:t:home",
+    ]
 
 
 @pytest.mark.asyncio

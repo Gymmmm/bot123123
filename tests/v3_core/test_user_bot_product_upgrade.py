@@ -52,18 +52,21 @@ def test_about_and_booking_are_compatible_secondary_home_actions():
     assert "换房" not in build_about_view().text
 
 
-def test_service_hub_is_safe_gate_until_binding_is_known():
+def test_service_hub_is_public_and_does_not_require_binding():
     view = service_home_view()
     labels = _labels(view)
-    assert labels == ["💬 中文顾问", "🛡 看租后服务", "🔍 开始找房", "⬅️ 回首页"]
+    assert labels == [
+        "📋 入住交接留档", "🚚 搬家协助",
+        "🔧 房屋问题报修", "🏢 物业沟通",
+        "📍 周边生活", "💬 中文顾问", "⬅️ 回首页",
+    ]
     callbacks = _callbacks(view)
     assert callbacks == [
-        "v3u:home:contact", "v3u:home:rental", "v3u:home:search", "v3u:t:home",
+        "v3u:assure:handover", "v3u:assure:moving",
+        "v3u:service:repair", "v3u:service:property",
+        "v3u:service:local", "v3u:home:contact", "v3u:t:home",
     ]
-    assert "报修" not in " ".join(labels)
-    assert "续租" not in " ".join(labels)
-    assert "退租" not in " ".join(labels)
-    assert "租约" not in " ".join(labels)
+    assert "没有显示你的住房信息" not in view.text
 
 
 def test_rental_service_is_public_parent_content_center():

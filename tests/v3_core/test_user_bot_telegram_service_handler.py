@@ -130,7 +130,7 @@ async def test_repair_detail_keeps_token_and_renders_slot_choices(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_binding_invalidated_after_issue_page_blocks_followup_text(tmp_path):
+async def test_binding_invalidated_after_issue_page_does_not_block_public_repair_text(tmp_path):
     service = _service(tmp_path)
     context = _context()
     await handle_v3_service_callback(
@@ -141,8 +141,9 @@ async def test_binding_invalidated_after_issue_page_blocks_followup_text(tmp_pat
         conn.commit()
     message = FakeMessage("空调可以启动，但一直不制冷。")
     outcome = await handle_v3_service_text(_text_update(message), context, service=service)
-    assert outcome.handled and outcome.action == "repair_denied"
-    assert SERVICE_REQUEST_SESSION_KEY not in context.user_data
+    assert outcome.handled and outcome.action == "repair_detail"
+    assert SERVICE_REQUEST_SESSION_KEY in context.user_data
+    assert context.user_data[SERVICE_REQUEST_SESSION_KEY]["detail"] == "空调可以启动，但一直不制冷。"
     with sqlite3.connect(str(service.repository.db_path)) as conn:
         assert conn.execute("SELECT COUNT(*) FROM repair_tickets_v3").fetchone()[0] == 0
 
@@ -172,18 +173,19 @@ async def test_retry_after_success_page_failure_reuses_ticket_and_does_not_repea
 
 
 @pytest.mark.asyncio
-async def test_no_binding_repair_callback_is_blocked_to_public_only_tenant_view(tmp_path):
+async def test_no_binding_repair_callback_opens_public_repair_flow(tmp_path):
     service = _service(tmp_path, binding=False)
     context = _context()
     query = FakeQuery("v3u:service:repair")
     outcome = await handle_v3_service_callback(_callback_update(query), context, service=service)
     assert outcome.handled and outcome.rendered
     text = query.calls[-1][1][0]
-    assert "这边还没有显示你的住房信息" in text
+    assert "报修与维护" in text
+    assert "没有显示你的住房信息" not in text
     markup = query.calls[-1][2]["reply_markup"]
     labels = [button.text for row in markup.inline_keyboard for button in row]
-    assert labels == ["💬 中文顾问", "🛡 看租后服务", "🔍 开始找房", "⬅️ 回首页"]
-    assert all(word not in "".join(labels) for word in ("报修", "租约", "物业"))
+    assert "❄️ 空调" in labels
+    assert "🔧 其他问题" in labels
 
 
 @pytest.mark.asyncio

@@ -168,15 +168,14 @@ class _Service:
         return self._binding
 
 
-def test_bound_resident_sees_local_life():
-    view = tenant_home_view(_Service(_Binding()), 1)
-    assert "📍 周边服务" in _labels(view)
-
-
-def test_unbound_resident_has_no_local_life():
-    view = tenant_home_view(_Service(None), 1)
-    assert "📍 周边服务" not in _labels(view)
-    assert "看租后服务" in "".join(_labels(view))
+def test_tenant_home_is_public_for_bound_and_unbound_users():
+    expected = [
+        "📋 入住交接留档", "🚚 搬家协助",
+        "🔧 房屋问题报修", "🏢 物业沟通",
+        "📍 周边生活", "💬 中文顾问", "⬅️ 回首页",
+    ]
+    assert _labels(tenant_home_view(_Service(_Binding()), 1)) == expected
+    assert _labels(tenant_home_view(_Service(None), 1)) == expected
 
 
 def test_renew_terminate_are_requests():

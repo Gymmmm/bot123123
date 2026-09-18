@@ -10,7 +10,7 @@ from telegram.constants import ParseMode
 
 from .lead_service import LeadUser
 from .service_effects import ServiceEffectExecutor, ServiceEffectResult
-from .service_flow import ServiceRequestDraft, TenantService
+from .service_flow import SERVICE_SLOT_LABELS, ServiceRequestDraft, TenantService
 from .service_views import (
     ServiceChoice, ServiceView, general_prompt_view, general_success_view,
     issue_prompt_view, local_life_view, nearby_view, property_view,
@@ -18,7 +18,7 @@ from .service_views import (
     slot_view,
 )
 from .tenant_v1 import (
-    deposit_view, guide_view, handover_view, lease_view, renew_view, submit_request,
+    deposit_view, guide_view, handover_view, lease_view, missing_lease_view, renew_view, submit_request,
     tenant_home_view, terminate_view,
 )
 
@@ -37,11 +37,8 @@ class TelegramServiceOutcome:
 
 
 def _service_home_with_tenant_entry() -> ServiceView:
-    return ServiceView(
-        "service_entry",
-        "🛠 <b>入住服务</b>\n\n系统会按当前账号的有效租约开放对应服务。",
-        ((ServiceChoice("🛠 查看入住服务", "v3u:service:tenant"),),),
-    )
+    from .service_product_views import service_home_view
+    return service_home_view()
 
 
 def _tenant_binding_view(service: TenantService, user_id: int) -> ServiceView:
@@ -114,10 +111,8 @@ def _rfcity_category_product_view(category: str) -> ServiceView:
 
 
 def _requires_binding(action: str) -> bool:
-    if action.startswith(("issue:", "slot:")):
-        return True
     return action in {
-        "repair", "property", "tenant_lease", "tenant_renew", "tenant_terminate",
+        "tenant_lease", "tenant_renew", "tenant_terminate",
         "tenant_renew_submit", "tenant_terminate_submit",
     }
 
@@ -154,11 +149,12 @@ async def handle_v3_service_callback(
     # the moment every lease/repair/property/renew/terminate action is clicked.
     if _requires_binding(action) and service.active_binding(user.user_id) is None:
         user_data.pop(SERVICE_REQUEST_SESSION_KEY, None)
-        await render_service_view(query, tenant_home_view(service, user.user_id), advisor_url=advisor_url)
+        await render_service_view(query, missing_lease_view(), advisor_url=advisor_url)
         return TelegramServiceOutcome(True, action, True)
 
     if action == "tenant":
-        await render_service_view(query, tenant_home_view(service, user.user_id), advisor_url=advisor_url)
+        from .service_product_views import service_home_view
+        await render_service_view(query, service_home_view(), advisor_url=advisor_url)
         return TelegramServiceOutcome(True, action, True)
     if action == "tenant_lease":
         await render_service_view(query, lease_view(service, user.user_id), advisor_url=advisor_url)
@@ -219,7 +215,26 @@ async def handle_v3_service_callback(
         draft = _draft_from_session(user_data.get(SERVICE_REQUEST_SESSION_KEY))
         if draft is None or not draft.detail:
             return TelegramServiceOutcome(True, action, False)
-        submission = service.submit_repair(user_id=user.user_id, draft=draft, slot=action.split(":", 1)[1])
+        slot = action.split(":", 1)[1]
+        binding = service.active_binding(user.user_id)
+        if binding is None:
+            slot_label = SERVICE_SLOT_LABELS.get(slot)
+            if slot_label is None:
+                raise ValueError("unsupported_service_slot")
+            detail = f"报修：{draft.issue_label}\n说明：{draft.detail}\n希望时间：{slot_label}"
+            effect = await effects.general(
+                bot=getattr(context, "bot", None),
+                user=user,
+                details=detail,
+            ) if effects else None
+            await render_service_view(
+                query,
+                repair_success_view(urgent=draft.issue_key in {"repair_water", "repair_power", "repair_door"}),
+                advisor_url=advisor_url,
+            )
+            user_data.pop(SERVICE_REQUEST_SESSION_KEY, None)
+            return TelegramServiceOutcome(True, action, True, effect, None)
+        submission = service.submit_repair(user_id=user.user_id, draft=draft, slot=slot)
         effect = await effects.repair(bot=getattr(context, "bot", None), user=user, submission=submission) if effects else None
         await render_service_view(query, repair_success_view(urgent=submission.urgent), advisor_url=advisor_url)
         user_data.pop(SERVICE_REQUEST_SESSION_KEY, None)
@@ -242,11 +257,6 @@ async def handle_v3_service_text(
     text = str(getattr(message, "text", "") or "").strip()
     draft = _draft_from_session(user_data.get(SERVICE_REQUEST_SESSION_KEY))
     if draft is not None and not draft.detail:
-        user = _lead_user(update)
-        if service.active_binding(user.user_id) is None:
-            user_data.pop(SERVICE_REQUEST_SESSION_KEY, None)
-            await _reply(message, tenant_home_view(service, user.user_id), advisor_url=advisor_url)
-            return TelegramServiceOutcome(True, "repair_denied", True)
         if len(text) < 4:
             await message.reply_text("请简单描述发生了什么，例如：空调可以启动，但一直不制冷。")
             return TelegramServiceOutcome(True, "repair_detail", True)

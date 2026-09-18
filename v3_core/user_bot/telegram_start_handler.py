@@ -276,11 +276,7 @@ async def _handle_broadcast_shortcut(
         return TelegramStartOutcome(True, "broadcast_assurance", payload)
 
     if payload == "service":
-        view = (
-            tenant_home_view(tenant_service, _lead_user(update).user_id)
-            if tenant_service is not None
-            else service_home_view()
-        )
+        view = service_home_view()
         await message.reply_text(
             view.text,
             parse_mode=ParseMode.HTML,
