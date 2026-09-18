@@ -1,15 +1,15 @@
-from v3_core.inventory.project_registry import RESEARCH_PROJECTS,FAMILIES,active_alias_count,ambiguous_family_alias_count,resolve_project,canonical_location_projection,project_search_terms
+from v3_core.inventory.project_registry import RESEARCH_PROJECTS,ACTIVE_PROJECTS,FAMILIES,active_alias_count,ambiguous_family_alias_count,resolve_project,canonical_location_projection,project_search_terms
 from v3_core.inventory import listing_taxonomy
 from v3_core.inventory.project_relations import RELATIONS
 from v3_core.inventory.project_living_facts import CONFLICT_ROWS,evidence_for,safe_project_value
 def test_counts():
-    assert len(RESEARCH_PROJECTS)==107 and len(FAMILIES)==13 and active_alias_count()==367
+    assert len(RESEARCH_PROJECTS)==107 and len(ACTIVE_PROJECTS)==114 and len(FAMILIES)==13 and active_alias_count()==429
     assert len(RELATIONS)==39 and len(CONFLICT_ROWS)==12
 def test_search():
-    r=resolve_project("60米炳发");assert r.ambiguity and r.candidate_scores[:2]==(("project:the-star-diamond",90),("project:the-star-diamond-ii",90))
-    assert resolve_project("50米炳发").project_entity_id=="project:the-star-mera-garden"
+    r=resolve_project("60米炳发");assert r.ambiguity and set(r.candidates)=={"project:the-star-diamond","project:the-star-diamond-ii"}
+    assert resolve_project("50米炳发").ambiguity and resolve_project("50米炳发").candidates==("project:the-star-mera-garden",)
     for q in ("一号路炳发","铁桥头炳发","Norea附近炳发","Morgan","Urban Village","Time Square"):assert resolve_project(q).ambiguity
-    assert resolve_project("BKK1雅居乐").project_entity_id=="project:agile-sky-residence"
+    assert resolve_project("BKK1雅居乐").ambiguity and resolve_project("BKK1雅居乐").candidates==("project:agile-sky-residence",)
     assert resolve_project("Chip Mong 271").project_entity_id=="project:chip-mong-landmark-271"
     assert resolve_project("Orkide 2004").project_entity_id=="project:orkide-the-royal"
 def test_geo_separation():
@@ -22,13 +22,13 @@ def test_owner_specific_gate():
 
 def test_runtime_identity_parity_and_search_terms():
     taxonomy_projects={item.key.replace("_","-") for item in listing_taxonomy.PROJECT_IDENTITIES if item.kind=="project"}
-    assert taxonomy_projects=={item.key for item in RESEARCH_PROJECTS}
-    assert len(taxonomy_projects)==107
-    assert ambiguous_family_alias_count()==37
+    assert taxonomy_projects=={item.key for item in ACTIVE_PROJECTS}
+    assert len(taxonomy_projects)==114
+    assert ambiguous_family_alias_count()==40
     assert "雅居乐" in project_search_terms("BKK1 雅居乐 1000以内")
 
 def test_required_semantics():
-    assert resolve_project("50米炳发").project_entity_id=="project:the-star-mera-garden"
+    assert resolve_project("50米炳发").ambiguity and resolve_project("50米炳发").candidates==("project:the-star-mera-garden",)
     assert resolve_project("60米炳发").project_entity_id==""
     assert resolve_project("60米炳发").ambiguity
     assert resolve_project("Morgan").ambiguity

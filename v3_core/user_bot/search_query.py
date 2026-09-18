@@ -79,8 +79,8 @@ def _location_aliases() -> tuple[tuple[str, tuple[str, ...]], ...]:
 _LOCATION_ALIASES = _location_aliases()
 
 
-def detect_project_terms(text: str) -> tuple[str, ...]:
-    return project_search_terms(text)
+def detect_project_terms(text: str, *, residential_only: bool = True) -> tuple[str, ...]:
+    return project_search_terms(text, residential_only=residential_only)
 
 
 def detect_location_keys(text: str) -> tuple[str, ...]:
@@ -130,9 +130,10 @@ class SearchCriteria:
 def parse_search_criteria(text: str) -> SearchCriteria:
     raw = str(text or "").strip()
     budget_min, budget_max = parse_budget_range(raw)
+    property_type = detect_property_type(raw)
     return SearchCriteria(
-        property_type=detect_property_type(raw),
-        project_terms=detect_project_terms(raw),
+        property_type=property_type,
+        project_terms=detect_project_terms(raw, residential_only=property_type != "办公室"),
         location_keys=detect_location_keys(raw),
         budget_min=budget_min,
         budget_max=budget_max,
