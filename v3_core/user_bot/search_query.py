@@ -11,7 +11,7 @@ from dataclasses import dataclass
 import re
 
 from v3_core.inventory.listing_taxonomy import MARKET_LOCATIONS, PHYSICAL_AREAS, clean_text
-from v3_core.inventory.phnom_penh_location_registry import project_search_terms
+from v3_core.inventory.project_registry import project_search_terms
 
 
 _ROOM_TYPE_HINTS = {

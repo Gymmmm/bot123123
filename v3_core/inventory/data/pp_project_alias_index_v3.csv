@@ -1,0 +1,546 @@
+normalized_alias,raw_alias,project_entity_id,alias_kind,weight,search_only,conflict_flag
+雅居乐天空公馆,雅居乐天空公馆,project:agile-sky-residence,EXACT_PROJECT_NAME,100,False,False
+agileskyresidence,Agile Sky Residence,project:agile-sky-residence,EXACT_PROJECT_NAME,100,False,False
+bkk1雅居乐,BKK1雅居乐,project:agile-sky-residence,STRONG_PROJECT_ALIAS,95,True,False
+bkk雅居乐,BKK雅居乐,project:agile-sky-residence,STRONG_PROJECT_ALIAS,95,True,False
+莫尼旺雅居乐,莫尼旺雅居乐,project:agile-sky-residence,STRONG_PROJECT_ALIAS,95,True,False
+雅居乐,雅居乐,project:agile-sky-residence,STRONG_PROJECT_ALIAS,95,True,False
+雅居乐天空公馆,雅居乐天空公馆,project:agile-sky-residence,STRONG_PROJECT_ALIAS,95,True,False
+agileskyresidence,Agile Sky Residence,project:agile-sky-residence,STRONG_PROJECT_ALIAS,95,True,False
+bkk3雅居乐,BKK3雅居乐,project:agile-sky-residence,STRONG_PROJECT_ALIAS,95,True,False
+bkkmansion,BKK Mansion,project:bkk-mansion,EXACT_PROJECT_NAME,100,False,False
+bkk,BKK,project:bkk-mansion,STRONG_PROJECT_ALIAS,95,True,False
+bkkmansion,BKK Mansion,project:bkk-mansion,STRONG_PROJECT_ALIAS,95,True,False
+casabymeridian,CASA by Meridian,project:casa-meridian,EXACT_PROJECT_NAME,100,False,False
+钻石岛,钻石岛,project:casa-meridian,STRONG_PROJECT_ALIAS,95,True,True
+casameridian,CASA Meridian,project:casa-meridian,STRONG_PROJECT_ALIAS,95,True,False
+chieftower,Chief Tower,project:chief-tower,EXACT_PROJECT_NAME,100,False,False
+chieftower,Chief Tower,project:chief-tower,STRONG_PROJECT_ALIAS,95,True,False
+decastleroyal,De Castle Royal,project:de-castle-royal,EXACT_PROJECT_NAME,100,False,False
+"德城堡,decastleroyal","德城堡,De Castle Royal",project:de-castle-royal,STRONG_PROJECT_ALIAS,95,True,False
+钻石湾花园,钻石湾花园,project:diamond-bay-garden,EXACT_PROJECT_NAME,100,False,False
+diamondbaygarden,Diamond Bay Garden,project:diamond-bay-garden,EXACT_PROJECT_NAME,100,False,False
+钻石岛,钻石岛,project:diamond-bay-garden,STRONG_PROJECT_ALIAS,95,True,True
+diamondbaygarden,Diamond Bay Garden,project:diamond-bay-garden,STRONG_PROJECT_ALIAS,95,True,False
+钻石名邸,钻石名邸,project:diamond-mansion,EXACT_PROJECT_NAME,100,False,False
+（待核）,（待核）,project:diamond-mansion,EXACT_PROJECT_NAME,100,False,False
+钻石岛,钻石岛,project:diamond-mansion,STRONG_PROJECT_ALIAS,95,True,True
+钻石名邸,钻石名邸,project:diamond-mansion,STRONG_PROJECT_ALIAS,95,True,False
+diamondone,Diamond One,project:diamond-one,EXACT_PROJECT_NAME,100,False,False
+钻石岛,钻石岛,project:diamond-one,STRONG_PROJECT_ALIAS,95,True,True
+"钻石一号,diamondone","钻石一号,Diamond One",project:diamond-one,STRONG_PROJECT_ALIAS,95,True,False
+diamondtwintower,Diamond Twin Tower,project:diamond-twin-tower,EXACT_PROJECT_NAME,100,False,False
+钻石岛,钻石岛,project:diamond-twin-tower,STRONG_PROJECT_ALIAS,95,True,True
+"钻石双塔,diamondtwintower","钻石双塔,Diamond Twin Tower",project:diamond-twin-tower,STRONG_PROJECT_ALIAS,95,True,False
+鼎利大厦,鼎利大厦,project:ding-li-tower,EXACT_PROJECT_NAME,100,False,False
+dinglitower,Ding Li Tower,project:ding-li-tower,EXACT_PROJECT_NAME,100,False,False
+"鼎利,dinglitower","鼎利,Ding Li Tower",project:ding-li-tower,STRONG_PROJECT_ALIAS,95,True,False
+jtower1,J Tower 1,project:j-tower-1,EXACT_PROJECT_NAME,100,False,False
+"堆谷,时代商圈","堆谷,时代商圈",project:j-tower-1,STRONG_PROJECT_ALIAS,95,True,False
+"j1,jtower1","J1,J Tower 1",project:j-tower-1,STRONG_PROJECT_ALIAS,95,True,False
+jtower2,J Tower 2,project:j-tower-2,EXACT_PROJECT_NAME,100,False,False
+堆谷,堆谷,project:j-tower-2,STRONG_PROJECT_ALIAS,95,True,True
+"j2,jtower2","J2,J Tower 2",project:j-tower-2,STRONG_PROJECT_ALIAS,95,True,False
+jtower3,J Tower 3,project:j-tower-3,EXACT_PROJECT_NAME,100,False,False
+堆谷,堆谷,project:j-tower-3,STRONG_PROJECT_ALIAS,95,True,True
+"j3,jtower3","J3,J Tower 3",project:j-tower-3,STRONG_PROJECT_ALIAS,95,True,False
+lavistaone,La Vista One,project:la-vista-one,EXACT_PROJECT_NAME,100,False,False
+lavistaone,La Vista One,project:la-vista-one,STRONG_PROJECT_ALIAS,95,True,False
+lecondébkk1,Le Condé BKK1,project:le-conde-bkk1,EXACT_PROJECT_NAME,100,False,False
+lecondé,Le Condé,project:le-conde-bkk1,EXACT_PROJECT_NAME,100,False,False
+bkk1,BKK1,project:le-conde-bkk1,STRONG_PROJECT_ALIAS,95,True,False
+"康帝,leconde,lecondébkk1","康帝,Le Conde,Le Condé BKK1",project:le-conde-bkk1,STRONG_PROJECT_ALIAS,95,True,False
+mresidence,M Residence,project:m-residence,EXACT_PROJECT_NAME,100,False,False
+mresidence,M Residence,project:m-residence,STRONG_PROJECT_ALIAS,95,True,False
+mesong,MESONG,project:mesong,EXACT_PROJECT_NAME,100,False,False
+钻石岛,钻石岛,project:mesong,STRONG_PROJECT_ALIAS,95,True,True
+"湄松,mesong,themesa?","湄松,MESONG,The Mesa?",project:mesong,STRONG_PROJECT_ALIAS,95,True,False
+摩根天御,摩根天御,project:morgan-enmaison,EXACT_PROJECT_NAME,100,False,False
+morganenmaison,Morgan EnMaison,project:morgan-enmaison,EXACT_PROJECT_NAME,100,False,False
+"水净华,摩根","水净华,摩根",project:morgan-enmaison,STRONG_PROJECT_ALIAS,95,True,False
+"morganenmaison,enmaison,摩根天御","Morgan EnMaison,EnMaison,摩根天御",project:morgan-enmaison,STRONG_PROJECT_ALIAS,95,True,False
+摩根大厦,摩根大厦,project:morgan-tower,EXACT_PROJECT_NAME,100,False,False
+morgantower,Morgan Tower,project:morgan-tower,EXACT_PROJECT_NAME,100,False,False
+摩根,摩根,project:morgan-tower,STRONG_PROJECT_ALIAS,95,True,True
+"morgantower,摩根大厦,摩根塔","Morgan Tower,摩根大厦,摩根塔",project:morgan-tower,STRONG_PROJECT_ALIAS,95,True,False
+olympiacity,Olympia City,project:olympia-city,EXACT_PROJECT_NAME,100,False,False
+"俄市方向,奥林匹克商圈","俄市方向,奥林匹克商圈",project:olympia-city,STRONG_PROJECT_ALIAS,95,True,False
+"奥林匹克城,奥林匹亚,olympiacity,olympia","奥林匹克城,奥林匹亚,Olympia City,Olympia",project:olympia-city,STRONG_PROJECT_ALIAS,95,True,False
+one70,ONE 70,project:one-70,EXACT_PROJECT_NAME,100,False,False
+"170,one70,one70","170,ONE70,One 70",project:one-70,STRONG_PROJECT_ALIAS,95,True,False
+onepark,One Park,project:one-park,EXACT_PROJECT_NAME,100,False,False
+oneparkresidence,One Park Residence,project:one-park,EXACT_PROJECT_NAME,100,False,False
+"森速,堆谷方向","森速,堆谷方向",project:one-park,STRONG_PROJECT_ALIAS,95,True,False
+"一公园,onepark","一公园,One Park",project:one-park,STRONG_PROJECT_ALIAS,95,True,False
+parc21,Parc 21,project:parc-21,EXACT_PROJECT_NAME,100,False,False
+parc21,Parc 21,project:parc-21,STRONG_PROJECT_ALIAS,95,True,False
+毕加索,毕加索,project:picasso-city-garden,EXACT_PROJECT_NAME,100,False,False
+picassocitygarden,Picasso City Garden,project:picasso-city-garden,EXACT_PROJECT_NAME,100,False,False
+"毕加索花园,picasso,picassocitygarden","毕加索花园,Picasso,Picasso City Garden",project:picasso-city-garden,STRONG_PROJECT_ALIAS,95,True,False
+太子中央广场,太子中央广场,project:prince-central-plaza,EXACT_PROJECT_NAME,100,False,False
+princecentralplaza,Prince Central Plaza,project:prince-central-plaza,EXACT_PROJECT_NAME,100,False,False
+独立碑商圈,独立碑商圈,project:prince-central-plaza,PROJECT_LANDMARK,85,True,False
+"太子中央,princecentralplaza","太子中央,Prince Central Plaza",project:prince-central-plaza,STRONG_PROJECT_ALIAS,95,True,False
+太子国际广场,太子国际广场,project:prince-international-plaza,EXACT_PROJECT_NAME,100,False,False
+princeinternationalplaza,Prince International Plaza,project:prince-international-plaza,EXACT_PROJECT_NAME,100,False,False
+太子系,太子系,project:prince-international-plaza,STRONG_PROJECT_ALIAS,95,True,True
+"太子国际,princeinternationalplaza","太子国际,Prince International Plaza",project:prince-international-plaza,STRONG_PROJECT_ALIAS,95,True,False
+太子现代广场,太子现代广场,project:prince-modern-plaza,EXACT_PROJECT_NAME,100,False,False
+princemodernplaza,Prince Modern Plaza,project:prince-modern-plaza,EXACT_PROJECT_NAME,100,False,False
+太子系,太子系,project:prince-modern-plaza,STRONG_PROJECT_ALIAS,95,True,True
+"太子现代,princemodernplaza","太子现代,Prince Modern Plaza",project:prince-modern-plaza,STRONG_PROJECT_ALIAS,95,True,False
+太子寰宇中心,太子寰宇中心,project:prince-universe,EXACT_PROJECT_NAME,100,False,False
+princeuniverse太子寰宇中心,Prince Universe / 太子·寰宇中心,project:prince-universe,EXACT_PROJECT_NAME,100,False,False
+太子系,太子系,project:prince-universe,STRONG_PROJECT_ALIAS,95,True,True
+"太子寰宇,princeuniverse","太子寰宇,Prince Universe",project:prince-universe,STRONG_PROJECT_ALIAS,95,True,False
+富力城,富力城,project:rf-city,EXACT_PROJECT_NAME,100,False,False
+r&fcity,R&F City,project:rf-city,EXACT_PROJECT_NAME,100,False,False
+60米富力城,60米富力城,project:rf-city,PROJECT_ROAD,90,True,False
+洪森大道富力城,洪森大道富力城,project:rf-city,PROJECT_ROAD,90,True,False
+永旺3富力城,永旺3富力城,project:rf-city,PROJECT_LANDMARK,85,True,False
+"富力,富力中心城,金边中心城,近富力,r&fcity,rfcity,randf","富力,富力中心城,金边中心城,近富力,R&F City,RF City,R and F",project:rf-city,STRONG_PROJECT_ALIAS,95,True,False
+玫瑰滨江园,玫瑰滨江园,project:rose-garden,EXACT_PROJECT_NAME,100,False,False
+rosegarden,Rose Garden,project:rose-garden,EXACT_PROJECT_NAME,100,False,False
+玫瑰滨江园,玫瑰滨江园,project:rose-garden,STRONG_PROJECT_ALIAS,95,True,False
+百色河玫瑰,百色河玫瑰,project:rose-garden,STRONG_PROJECT_ALIAS,95,True,False
+诺罗敦玫瑰,诺罗敦玫瑰,project:rose-garden,STRONG_PROJECT_ALIAS,95,True,False
+"玫瑰滨江园,玫瑰滨江,玫瑰园,rosegarden,rosegardencondominium,rosegardencondo","玫瑰滨江园,玫瑰滨江,玫瑰园,Rose Garden,Rose Garden Condominium,Rose Garden Condo",project:rose-garden,STRONG_PROJECT_ALIAS,95,True,False
+皇家一号,皇家一号,project:royal-one,EXACT_PROJECT_NAME,100,False,True
+royalone,Royal One,project:royal-one,EXACT_PROJECT_NAME,100,False,True
+"皇家一号,royalone","皇家一号,Royal One",project:royal-one,STRONG_PROJECT_ALIAS,95,True,False
+skyvilla,Sky Villa,project:sky-villa,EXACT_PROJECT_NAME,100,False,False
+"天空别墅（易混天空树）,skyvilla","天空别墅（易混天空树）,Sky Villa",project:sky-villa,STRONG_PROJECT_ALIAS,95,True,False
+天空树,天空树,project:skytree,EXACT_PROJECT_NAME,100,False,False
+skytree,SKYTREE,project:skytree,EXACT_PROJECT_NAME,100,False,False
+"天空树,skytree,skytree","天空树,SKYTREE,Sky Tree",project:skytree,STRONG_PROJECT_ALIAS,95,True,False
+桥牌世桥,桥牌 / 世桥,project:the-bridge,EXACT_PROJECT_NAME,100,False,False
+thebridge,The Bridge,project:the-bridge,EXACT_PROJECT_NAME,100,False,False
+桥牌,桥牌,project:the-bridge,STRONG_PROJECT_ALIAS,95,True,False
+世桥,世桥,project:the-bridge,STRONG_PROJECT_ALIAS,95,True,False
+钻石岛桥牌,钻石岛桥牌,project:the-bridge,STRONG_PROJECT_ALIAS,95,True,False
+金街桥牌,金街桥牌,project:the-bridge,STRONG_PROJECT_ALIAS,95,True,False
+永旺1桥牌,永旺1桥牌,project:the-bridge,PROJECT_LANDMARK,85,True,False
+"桥牌,世桥,桥,thebridge,bridge","桥牌,世桥,桥,The Bridge,Bridge",project:the-bridge,STRONG_PROJECT_ALIAS,95,True,False
+thegateway,The Gateway,project:the-gateway,EXACT_PROJECT_NAME,100,False,False
+"网关,thegateway","网关,The Gateway",project:the-gateway,STRONG_PROJECT_ALIAS,95,True,False
+thepeak香格里拉,The Peak 香格里拉,project:the-peak,EXACT_PROJECT_NAME,100,False,False
+thepeak,The Peak,project:the-peak,EXACT_PROJECT_NAME,100,False,False
+香格里拉,香格里拉,project:the-peak,STRONG_PROJECT_ALIAS,95,True,False
+钻石岛香格里拉,钻石岛香格里拉,project:the-peak,STRONG_PROJECT_ALIAS,95,True,False
+金界香格里拉,金界香格里拉,project:the-peak,PROJECT_LANDMARK,85,True,False
+永旺1香格里拉,永旺1香格里拉,project:the-peak,PROJECT_LANDMARK,85,True,False
+"香格里拉,峰会,peak,thepeak,peakresidences","香格里拉,峰会,Peak,The Peak,Peak Residences",project:the-peak,STRONG_PROJECT_ALIAS,95,True,False
+太子幸福广场,太子幸福广场,project:the-pinnacle,EXACT_PROJECT_NAME,100,False,False
+thepinnacleresidence,The Pinnacle Residence,project:the-pinnacle,EXACT_PROJECT_NAME,100,False,False
+"永旺3方向,271,洪森大道口","永旺3方向,271,洪森大道口",project:the-pinnacle,PROJECT_LANDMARK,85,True,False
+"thepinnacle,thepinnacleresidence,princehappinessplaza,太子幸福广场,太子幸福,幸福广场","The Pinnacle,The Pinnacle Residence,Prince Happiness Plaza,太子幸福广场,太子幸福,幸福广场",project:the-pinnacle,STRONG_PROJECT_ALIAS,95,True,False
+theview,The View,project:the-view,EXACT_PROJECT_NAME,100,False,False
+theviewservicedresidence,The View Serviced Residence,project:the-view,EXACT_PROJECT_NAME,100,False,False
+theview,The View,project:the-view,STRONG_PROJECT_ALIAS,95,True,False
+时代广场1,时代广场1,project:times-square-1,EXACT_PROJECT_NAME,100,False,False
+timesquare1,Time Square 1,project:times-square-1,EXACT_PROJECT_NAME,100,False,False
+"堆谷,俄罗斯市场方向","堆谷,俄罗斯市场方向",project:times-square-1,PROJECT_LANDMARK,85,True,False
+"时代1,时代,timesquare1,timessquare1","时代1,时代,Time Square 1,Times Square 1",project:times-square-1,STRONG_PROJECT_ALIAS,95,True,False
+时代广场11,时代广场11,project:times-square-11,EXACT_PROJECT_NAME,100,False,False
+timesquare11,Time Square 11,project:times-square-11,EXACT_PROJECT_NAME,100,False,False
+"时代11,timesquare11","时代11,Time Square 11",project:times-square-11,STRONG_PROJECT_ALIAS,95,True,False
+时代广场2,时代广场2,project:times-square-2,EXACT_PROJECT_NAME,100,False,False
+timesquare2,Time Square 2,project:times-square-2,EXACT_PROJECT_NAME,100,False,False
+堆谷,堆谷,project:times-square-2,STRONG_PROJECT_ALIAS,95,True,True
+"时代2,timesquare2","时代2,Time Square 2",project:times-square-2,STRONG_PROJECT_ALIAS,95,True,False
+时代广场3,时代广场3,project:times-square-3,EXACT_PROJECT_NAME,100,False,False
+timesquare3,Time Square 3,project:times-square-3,EXACT_PROJECT_NAME,100,False,False
+堆谷,堆谷,project:times-square-3,STRONG_PROJECT_ALIAS,95,True,True
+"时代3,timesquare3","时代3,Time Square 3",project:times-square-3,STRONG_PROJECT_ALIAS,95,True,False
+时代广场5,时代广场5,project:times-square-5,EXACT_PROJECT_NAME,100,False,False
+timesquare5,Time Square 5,project:times-square-5,EXACT_PROJECT_NAME,100,False,False
+堆谷,堆谷,project:times-square-5,STRONG_PROJECT_ALIAS,95,True,True
+"时代5,timesquare5","时代5,Time Square 5",project:times-square-5,STRONG_PROJECT_ALIAS,95,True,False
+时代广场7,时代广场7,project:times-square-7,EXACT_PROJECT_NAME,100,False,False
+timesquare7,Time Square 7,project:times-square-7,EXACT_PROJECT_NAME,100,False,False
+"时代7,timesquare7","时代7,Time Square 7",project:times-square-7,STRONG_PROJECT_ALIAS,95,True,False
+时代广场8,时代广场8,project:times-square-8,EXACT_PROJECT_NAME,100,False,False
+timesquare8,Time Square 8,project:times-square-8,EXACT_PROJECT_NAME,100,False,False
+"时代8,timesquare8","时代8,Time Square 8",project:times-square-8,STRONG_PROJECT_ALIAS,95,True,False
+时代广场9,时代广场9,project:times-square-9,EXACT_PROJECT_NAME,100,False,False
+timesquare9,Time Square 9,project:times-square-9,EXACT_PROJECT_NAME,100,False,False
+"时代9,timesquare9","时代9,Time Square 9",project:times-square-9,STRONG_PROJECT_ALIAS,95,True,False
+tkroyalone,TK Royal One,project:tk-royal-one,EXACT_PROJECT_NAME,100,False,False
+"tk,堆谷","TK,堆谷",project:tk-royal-one,STRONG_PROJECT_ALIAS,95,True,False
+"tkroyalone,tk皇家一号","TK Royal One,TK皇家一号",project:tk-royal-one,STRONG_PROJECT_ALIAS,95,True,False
+首都国金一期,首都·国金一期,project:urban-village-1,EXACT_PROJECT_NAME,100,False,False
+urbanvillagephase1,Urban Village Phase 1,project:urban-village-1,EXACT_PROJECT_NAME,100,False,False
+"60米,factoryphnompenh附近","60米,Factory Phnom Penh附近",project:urban-village-1,PROJECT_LANDMARK,85,True,True
+"urbanvillagephase1,urbanvillage1,uv1,首都国金一期,国金一期","Urban Village Phase 1,Urban Village 1,UV1,首都国金一期,国金一期",project:urban-village-1,STRONG_PROJECT_ALIAS,95,True,False
+首都国金二期,首都·国金二期,project:urban-village-2,EXACT_PROJECT_NAME,100,False,False
+urbanvillagephase2,Urban Village Phase 2,project:urban-village-2,EXACT_PROJECT_NAME,100,False,False
+"60米,factoryphnompenh附近","60米,Factory Phnom Penh附近",project:urban-village-2,PROJECT_LANDMARK,85,True,True
+"urbanvillagephase2,urbanvillage2,uv2,首都国金二期,国金二期","Urban Village Phase 2,Urban Village 2,UV2,首都国金二期,国金二期",project:urban-village-2,STRONG_PROJECT_ALIAS,95,True,False
+vilatown,Vila Town,project:vila-town,EXACT_PROJECT_NAME,100,False,False
+"维拉,vilatown","维拉,Vila Town",project:vila-town,STRONG_PROJECT_ALIAS,95,True,False
+vueaston,Vue Aston,project:vue-aston,EXACT_PROJECT_NAME,100,False,False
+"钻石岛方向,铁桥头方向","钻石岛方向,铁桥头方向",project:vue-aston,STRONG_PROJECT_ALIAS,95,True,False
+vueaston,Vue Aston,project:vue-aston,STRONG_PROJECT_ALIAS,95,True,False
+财富大厦,财富大厦,project:wealth-mansion,EXACT_PROJECT_NAME,100,False,False
+wealthmansion,Wealth Mansion,project:wealth-mansion,EXACT_PROJECT_NAME,100,False,False
+"财富大厦,威尔斯公馆,wealthmansion","财富大厦,威尔斯公馆,Wealth Mansion",project:wealth-mansion,STRONG_PROJECT_ALIAS,95,True,False
+威尔斯公馆,威尔斯公馆,project:wells-mansion,EXACT_PROJECT_NAME,100,False,False
+wellsmansion?,Wells Mansion?,project:wells-mansion,EXACT_PROJECT_NAME,100,False,False
+威尔斯,威尔斯,project:wells-mansion,STRONG_PROJECT_ALIAS,95,True,False
+金边星河花园,金边星河花园,project:xinghe-garden,EXACT_PROJECT_NAME,100,False,False
+phnompenhgalaxygarden,Phnom Penh Galaxy Garden,project:xinghe-garden,EXACT_PROJECT_NAME,100,False,False
+星河花园,星河花园,project:xinghe-garden,STRONG_PROJECT_ALIAS,95,True,False
+炳发thestarplatinum,炳发 The Star Platinum,project:the-star-platinum,EXACT_PROJECT_NAME,100,False,False
+thestarplatinum,The Star Platinum,project:the-star-platinum,EXACT_PROJECT_NAME,100,False,False
+铁桥头,铁桥头,project:the-star-platinum,STRONG_PROJECT_ALIAS,95,True,False
+一号路炳发,一号路炳发,project:the-star-platinum,FAMILY_GEO,70,True,True
+boeungsnor炳发,Boeung Snor炳发,project:the-star-platinum,FAMILY_GEO,70,True,False
+thestarplatinum,The Star Platinum,project:the-star-platinum,STRONG_PROJECT_ALIAS,95,True,False
+炳发thestarplatinum,炳发 The Star Platinum,project:the-star-platinum,FAMILY_GEO,70,True,False
+炳发athina,炳发 Athina,project:the-star-platinum-athina,EXACT_PROJECT_NAME,100,False,False
+thestarplatinumathina,The Star Platinum Athina,project:the-star-platinum-athina,EXACT_PROJECT_NAME,100,False,False
+一号路炳发,一号路炳发,project:the-star-platinum-athina,FAMILY_GEO,70,True,True
+铁桥头炳发,铁桥头炳发,project:the-star-platinum-athina,FAMILY_GEO,70,True,True
+thestarplatinumathina,The Star Platinum Athina,project:the-star-platinum-athina,STRONG_PROJECT_ALIAS,95,True,False
+炳发athina,炳发 Athina,project:the-star-platinum-athina,FAMILY_GEO,70,True,False
+炳发thestarlight,炳发 The Star Light,project:the-star-light,EXACT_PROJECT_NAME,100,False,False
+thestarlight,The Star Light,project:the-star-light,EXACT_PROJECT_NAME,100,False,False
+598炳发,598炳发,project:the-star-light,FAMILY_GEO,70,True,True
+森速方向炳发,森速方向炳发,project:the-star-light,FAMILY_GEO,70,True,True
+thestarlight,The Star Light,project:the-star-light,STRONG_PROJECT_ALIAS,95,True,False
+炳发thestarlight,炳发 The Star Light,project:the-star-light,FAMILY_GEO,70,True,False
+炳发thestarpremier,炳发 The Star Premier,project:the-star-premier,EXACT_PROJECT_NAME,100,False,False
+thestarpremier,The Star Premier,project:the-star-premier,EXACT_PROJECT_NAME,100,False,False
+598炳发,598炳发,project:the-star-premier,FAMILY_GEO,70,True,True
+森速方向炳发,森速方向炳发,project:the-star-premier,FAMILY_GEO,70,True,True
+thestarpremier,The Star Premier,project:the-star-premier,STRONG_PROJECT_ALIAS,95,True,False
+炳发thestarpremier,炳发 The Star Premier,project:the-star-premier,FAMILY_GEO,70,True,False
+炳发chamkardong,炳发 Chamkar Dong,project:peng-huoth-chamkardong,EXACT_PROJECT_NAME,100,False,False
+boreypenghuothchamkardong,Borey Peng Huoth Chamkardong,project:peng-huoth-chamkardong,EXACT_PROJECT_NAME,100,False,False
+chamkardong炳发,Chamkar Dong炳发,project:peng-huoth-chamkardong,FAMILY_GEO,70,True,False
+boreypenghuothchamkardong,Borey Peng Huoth Chamkardong,project:peng-huoth-chamkardong,STRONG_PROJECT_ALIAS,95,True,False
+炳发chamkardong,炳发 Chamkar Dong,project:peng-huoth-chamkardong,FAMILY_GEO,70,True,False
+炳发vengsreng,炳发 Veng Sreng,project:peng-huoth-veng-sreng,EXACT_PROJECT_NAME,100,False,False
+boreypenghuothvengsreng,Borey Peng Huoth Veng Sreng,project:peng-huoth-veng-sreng,EXACT_PROJECT_NAME,100,False,False
+vengsreng炳发,Veng Sreng炳发,project:peng-huoth-veng-sreng,FAMILY_GEO,70,True,False
+boreypenghuothvengsreng,Borey Peng Huoth Veng Sreng,project:peng-huoth-veng-sreng,STRONG_PROJECT_ALIAS,95,True,False
+炳发vengsreng,炳发 Veng Sreng,project:peng-huoth-veng-sreng,FAMILY_GEO,70,True,False
+炳发thestarquateria,炳发 The Star Quateria,project:the-star-quateria,EXACT_PROJECT_NAME,100,False,False
+thestarquateria,The Star Quateria,project:the-star-quateria,EXACT_PROJECT_NAME,100,False,False
+森速炳发,森速炳发,project:the-star-quateria,FAMILY_GEO,70,True,True
+mongreththy炳发,Mong Reththy炳发,project:the-star-quateria,FAMILY_GEO,70,True,False
+thestarquateria,The Star Quateria,project:the-star-quateria,STRONG_PROJECT_ALIAS,95,True,False
+炳发thestarquateria,炳发 The Star Quateria,project:the-star-quateria,FAMILY_GEO,70,True,False
+炳发herminus,炳发 Herminus,project:the-star-platinum-herminus,EXACT_PROJECT_NAME,100,False,False
+thestarplatinumherminus,The Star Platinum Herminus,project:the-star-platinum-herminus,EXACT_PROJECT_NAME,100,False,False
+一号路炳发,一号路炳发,project:the-star-platinum-herminus,FAMILY_GEO,70,True,True
+铁桥头炳发,铁桥头炳发,project:the-star-platinum-herminus,FAMILY_GEO,70,True,True
+thestarplatinumherminus,The Star Platinum Herminus,project:the-star-platinum-herminus,STRONG_PROJECT_ALIAS,95,True,False
+炳发herminus,炳发 Herminus,project:the-star-platinum-herminus,FAMILY_GEO,70,True,False
+炳发thestaremeraldii,炳发 The Star Emerald II,project:the-star-emerald-ii,EXACT_PROJECT_NAME,100,False,False
+thestaremeraldii,The Star Emerald II,project:the-star-emerald-ii,EXACT_PROJECT_NAME,100,False,False
+森速炳发,森速炳发,project:the-star-emerald-ii,FAMILY_GEO,70,True,True
+thestaremeraldii,The Star Emerald II,project:the-star-emerald-ii,STRONG_PROJECT_ALIAS,95,True,False
+炳发thestaremeraldii,炳发 The Star Emerald II,project:the-star-emerald-ii,FAMILY_GEO,70,True,False
+炳发mercureani,炳发 Mercurean I,project:the-star-platinum-mercurean-i,EXACT_PROJECT_NAME,100,False,False
+thestarplatinummercureani,The Star Platinum Mercurean I,project:the-star-platinum-mercurean-i,EXACT_PROJECT_NAME,100,False,False
+一号路炳发,一号路炳发,project:the-star-platinum-mercurean-i,FAMILY_GEO,70,True,True
+铁桥头炳发,铁桥头炳发,project:the-star-platinum-mercurean-i,FAMILY_GEO,70,True,True
+thestarplatinummercureani,The Star Platinum Mercurean I,project:the-star-platinum-mercurean-i,STRONG_PROJECT_ALIAS,95,True,False
+炳发mercureani,炳发 Mercurean I,project:the-star-platinum-mercurean-i,STRONG_PROJECT_ALIAS,95,True,False
+炳发capitalone,炳发 Capital One,project:the-star-platinum-capital-one,EXACT_PROJECT_NAME,100,False,False
+thestarplatinumcapitalone,The Star Platinum Capital One,project:the-star-platinum-capital-one,EXACT_PROJECT_NAME,100,False,False
+一号路炳发,一号路炳发,project:the-star-platinum-capital-one,FAMILY_GEO,70,True,True
+铁桥头炳发,铁桥头炳发,project:the-star-platinum-capital-one,FAMILY_GEO,70,True,True
+thestarplatinumcapitalone,The Star Platinum Capital One,project:the-star-platinum-capital-one,STRONG_PROJECT_ALIAS,95,True,False
+炳发capitalone,炳发 Capital One,project:the-star-platinum-capital-one,FAMILY_GEO,70,True,False
+炳发polaris23公寓,炳发 Polaris 23 公寓,project:the-star-polaris-23-condominium,EXACT_PROJECT_NAME,100,False,False
+thestarpolaris23condominium,The Star Polaris 23 Condominium,project:the-star-polaris-23-condominium,EXACT_PROJECT_NAME,100,False,False
+一号路炳发,一号路炳发,project:the-star-polaris-23-condominium,FAMILY_GEO,70,True,True
+铁桥头炳发,铁桥头炳发,project:the-star-polaris-23-condominium,FAMILY_GEO,70,True,True
+thestarpolaris23condominium,The Star Polaris 23 Condominium,project:the-star-polaris-23-condominium,STRONG_PROJECT_ALIAS,95,True,False
+炳发polaris23公寓,炳发 Polaris 23 公寓,project:the-star-polaris-23-condominium,STRONG_PROJECT_ALIAS,95,True,False
+炳发polarisii,炳发 Polaris II,project:the-star-platinum-polaris-ii,EXACT_PROJECT_NAME,100,False,False
+thestarplatinumpolarisii,The Star Platinum Polaris II,project:the-star-platinum-polaris-ii,EXACT_PROJECT_NAME,100,False,False
+一号路炳发,一号路炳发,project:the-star-platinum-polaris-ii,FAMILY_GEO,70,True,True
+铁桥头炳发,铁桥头炳发,project:the-star-platinum-polaris-ii,FAMILY_GEO,70,True,True
+thestarplatinumpolarisii,The Star Platinum Polaris II,project:the-star-platinum-polaris-ii,STRONG_PROJECT_ALIAS,95,True,False
+炳发polarisii,炳发 Polaris II,project:the-star-platinum-polaris-ii,STRONG_PROJECT_ALIAS,95,True,False
+炳发euroville,炳发 Euro Ville,project:the-star-platinum-euro-ville,EXACT_PROJECT_NAME,100,False,False
+thestarplatinumeuroville,The Star Platinum Euro Ville,project:the-star-platinum-euro-ville,EXACT_PROJECT_NAME,100,False,False
+一号路炳发,一号路炳发,project:the-star-platinum-euro-ville,FAMILY_GEO,70,True,True
+铁桥头炳发,铁桥头炳发,project:the-star-platinum-euro-ville,FAMILY_GEO,70,True,True
+norea附近炳发,Norea附近炳发,project:the-star-platinum-euro-ville,FAMILY_GEO,70,True,True
+thestarplatinumeuroville,The Star Platinum Euro Ville,project:the-star-platinum-euro-ville,STRONG_PROJECT_ALIAS,95,True,False
+炳发euroville,炳发 Euro Ville,project:the-star-platinum-euro-ville,STRONG_PROJECT_ALIAS,95,True,False
+炳发thestardiamond,炳发 The Star Diamond,project:the-star-diamond,EXACT_PROJECT_NAME,100,False,False
+thestardiamond,The Star Diamond,project:the-star-diamond,EXACT_PROJECT_NAME,100,False,False
+60米炳发,60米炳发,project:the-star-diamond,FAMILY_GEO,70,True,True
+洪森大道炳发,洪森大道炳发,project:the-star-diamond,FAMILY_GEO,70,True,True
+永旺3炳发,永旺3炳发,project:the-star-diamond,FAMILY_GEO,70,True,True
+永旺3附近炳发,永旺3附近炳发,project:the-star-diamond,FAMILY_GEO,70,True,False
+thestardiamond,The Star Diamond,project:the-star-diamond,STRONG_PROJECT_ALIAS,95,True,False
+炳发thestardiamond,炳发 The Star Diamond,project:the-star-diamond,STRONG_PROJECT_ALIAS,95,True,False
+炳发thestardiamondii,炳发 The Star Diamond II,project:the-star-diamond-ii,EXACT_PROJECT_NAME,100,False,False
+thestardiamondii,The Star Diamond II,project:the-star-diamond-ii,EXACT_PROJECT_NAME,100,False,False
+60米炳发,60米炳发,project:the-star-diamond-ii,FAMILY_GEO,70,True,True
+洪森大道炳发,洪森大道炳发,project:the-star-diamond-ii,FAMILY_GEO,70,True,True
+永旺3炳发,永旺3炳发,project:the-star-diamond-ii,FAMILY_GEO,70,True,True
+thestardiamondii,The Star Diamond II,project:the-star-diamond-ii,STRONG_PROJECT_ALIAS,95,True,False
+炳发thestardiamondii,炳发 The Star Diamond II,project:the-star-diamond-ii,STRONG_PROJECT_ALIAS,95,True,False
+炳发thestarmunirah,炳发 The Star Munirah,project:the-star-munirah,EXACT_PROJECT_NAME,100,False,False
+thestarmunirah,The Star Munirah,project:the-star-munirah,EXACT_PROJECT_NAME,100,False,False
+6a炳发,6A炳发,project:the-star-munirah,FAMILY_GEO,70,True,True
+水净华方向炳发,水净华方向炳发,project:the-star-munirah,FAMILY_GEO,70,True,True
+thestarmunirah,The Star Munirah,project:the-star-munirah,STRONG_PROJECT_ALIAS,95,True,False
+炳发thestarmunirah,炳发 The Star Munirah,project:the-star-munirah,FAMILY_GEO,70,True,False
+炳发roseville,炳发 Roseville,project:the-star-platinum-roseville,EXACT_PROJECT_NAME,100,False,False
+thestarplatinumroseville,The Star Platinum Roseville,project:the-star-platinum-roseville,EXACT_PROJECT_NAME,100,False,False
+一号路炳发,一号路炳发,project:the-star-platinum-roseville,FAMILY_GEO,70,True,True
+铁桥头炳发,铁桥头炳发,project:the-star-platinum-roseville,FAMILY_GEO,70,True,True
+norea附近炳发,Norea附近炳发,project:the-star-platinum-roseville,FAMILY_GEO,70,True,True
+thestarplatinumroseville,The Star Platinum Roseville,project:the-star-platinum-roseville,STRONG_PROJECT_ALIAS,95,True,False
+炳发roseville,炳发 Roseville,project:the-star-platinum-roseville,STRONG_PROJECT_ALIAS,95,True,False
+炳发mastery,炳发 Mastery,project:the-star-platinum-mastery,EXACT_PROJECT_NAME,100,False,False
+thestarplatinummastery,The Star Platinum Mastery,project:the-star-platinum-mastery,EXACT_PROJECT_NAME,100,False,False
+一号路炳发,一号路炳发,project:the-star-platinum-mastery,FAMILY_GEO,70,True,True
+铁桥头炳发,铁桥头炳发,project:the-star-platinum-mastery,FAMILY_GEO,70,True,True
+thestarplatinummastery,The Star Platinum Mastery,project:the-star-platinum-mastery,STRONG_PROJECT_ALIAS,95,True,False
+炳发mastery,炳发 Mastery,project:the-star-platinum-mastery,STRONG_PROJECT_ALIAS,95,True,False
+炳发thestarmeragarden,炳发 The Star Mera Garden,project:the-star-mera-garden,EXACT_PROJECT_NAME,100,False,False
+thestarmeragarden,The Star Mera Garden,project:the-star-mera-garden,EXACT_PROJECT_NAME,100,False,False
+50米炳发,50米炳发,project:the-star-mera-garden,FAMILY_GEO,70,True,True
+meragarden,Mera Garden,project:the-star-mera-garden,STRONG_PROJECT_ALIAS,95,True,False
+炳发meragarden,炳发Mera Garden,project:the-star-mera-garden,STRONG_PROJECT_ALIAS,95,True,False
+thestarmeragarden,The Star Mera Garden,project:the-star-mera-garden,STRONG_PROJECT_ALIAS,95,True,False
+炳发thestarmeragarden,炳发 The Star Mera Garden,project:the-star-mera-garden,STRONG_PROJECT_ALIAS,95,True,False
+炳发ecoromance,炳发 Eco Romance,project:the-star-platinum-eco-romance,EXACT_PROJECT_NAME,100,False,False
+thestarplatinumecoromance,The Star Platinum Eco Romance,project:the-star-platinum-eco-romance,EXACT_PROJECT_NAME,100,False,False
+一号路炳发,一号路炳发,project:the-star-platinum-eco-romance,FAMILY_GEO,70,True,True
+铁桥头炳发,铁桥头炳发,project:the-star-platinum-eco-romance,FAMILY_GEO,70,True,True
+eco区炳发,Eco区炳发,project:the-star-platinum-eco-romance,STRONG_PROJECT_ALIAS,95,True,True
+thestarplatinumecoromance,The Star Platinum Eco Romance,project:the-star-platinum-eco-romance,STRONG_PROJECT_ALIAS,95,True,False
+炳发ecoromance,炳发 Eco Romance,project:the-star-platinum-eco-romance,STRONG_PROJECT_ALIAS,95,True,False
+炳发ecovaranda,炳发 Eco Varanda,project:the-star-platinum-eco-varanda,EXACT_PROJECT_NAME,100,False,False
+thestarplatinumecovaranda,The Star Platinum Eco Varanda,project:the-star-platinum-eco-varanda,EXACT_PROJECT_NAME,100,False,False
+一号路炳发,一号路炳发,project:the-star-platinum-eco-varanda,FAMILY_GEO,70,True,True
+铁桥头炳发,铁桥头炳发,project:the-star-platinum-eco-varanda,FAMILY_GEO,70,True,True
+eco区炳发,Eco区炳发,project:the-star-platinum-eco-varanda,STRONG_PROJECT_ALIAS,95,True,True
+thestarplatinumecovaranda,The Star Platinum Eco Varanda,project:the-star-platinum-eco-varanda,STRONG_PROJECT_ALIAS,95,True,False
+炳发ecovaranda,炳发 Eco Varanda,project:the-star-platinum-eco-varanda,STRONG_PROJECT_ALIAS,95,True,False
+炳发ecosunrise,炳发 Eco Sunrise,project:the-star-platinum-eco-sunrise,EXACT_PROJECT_NAME,100,False,False
+thestarplatinumecosunrise,The Star Platinum Eco Sunrise,project:the-star-platinum-eco-sunrise,EXACT_PROJECT_NAME,100,False,False
+一号路炳发,一号路炳发,project:the-star-platinum-eco-sunrise,FAMILY_GEO,70,True,True
+铁桥头炳发,铁桥头炳发,project:the-star-platinum-eco-sunrise,FAMILY_GEO,70,True,True
+eco区炳发,Eco区炳发,project:the-star-platinum-eco-sunrise,STRONG_PROJECT_ALIAS,95,True,True
+thestarplatinumecosunrise,The Star Platinum Eco Sunrise,project:the-star-platinum-eco-sunrise,STRONG_PROJECT_ALIAS,95,True,False
+炳发ecosunrise,炳发 Eco Sunrise,project:the-star-platinum-eco-sunrise,STRONG_PROJECT_ALIAS,95,True,False
+炳发thestareternal,炳发 The Star Eternal,project:the-star-eternal,EXACT_PROJECT_NAME,100,False,False
+thestareternal,The Star Eternal,project:the-star-eternal,EXACT_PROJECT_NAME,100,False,False
+217炳发,217炳发,project:the-star-eternal,FAMILY_GEO,70,True,False
+monireth炳发,Monireth炳发,project:the-star-eternal,FAMILY_GEO,70,True,False
+thestareternal,The Star Eternal,project:the-star-eternal,STRONG_PROJECT_ALIAS,95,True,False
+炳发thestareternal,炳发 The Star Eternal,project:the-star-eternal,FAMILY_GEO,70,True,False
+炳发thestarnatural,炳发 The Star Natural,project:the-star-natural,EXACT_PROJECT_NAME,100,False,False
+thestarnatural,The Star Natural,project:the-star-natural,EXACT_PROJECT_NAME,100,False,False
+371炳发,371炳发,project:the-star-natural,FAMILY_GEO,70,True,False
+thestarnatural,The Star Natural,project:the-star-natural,STRONG_PROJECT_ALIAS,95,True,False
+炳发thestarnatural,炳发 The Star Natural,project:the-star-natural,FAMILY_GEO,70,True,False
+炳发mercureanii,炳发 Mercurean II,project:the-star-platinum-mercurean-ii,EXACT_PROJECT_NAME,100,False,False
+thestarplatinummercureanii,The Star Platinum Mercurean II,project:the-star-platinum-mercurean-ii,EXACT_PROJECT_NAME,100,False,False
+一号路炳发,一号路炳发,project:the-star-platinum-mercurean-ii,FAMILY_GEO,70,True,True
+铁桥头炳发,铁桥头炳发,project:the-star-platinum-mercurean-ii,FAMILY_GEO,70,True,True
+thestarplatinummercureanii,The Star Platinum Mercurean II,project:the-star-platinum-mercurean-ii,STRONG_PROJECT_ALIAS,95,True,False
+炳发mercureanii,炳发 Mercurean II,project:the-star-platinum-mercurean-ii,STRONG_PROJECT_ALIAS,95,True,False
+炳发thestarjumeirah,炳发 The Star Jumeirah,project:the-star-jumeirah,EXACT_PROJECT_NAME,100,False,False
+thestarjumeirah,The Star Jumeirah,project:the-star-jumeirah,EXACT_PROJECT_NAME,100,False,False
+6a炳发,6A炳发,project:the-star-jumeirah,FAMILY_GEO,70,True,True
+水净华方向炳发,水净华方向炳发,project:the-star-jumeirah,FAMILY_GEO,70,True,True
+thestarjumeirah,The Star Jumeirah,project:the-star-jumeirah,STRONG_PROJECT_ALIAS,95,True,False
+炳发thestarjumeirah,炳发 The Star Jumeirah,project:the-star-jumeirah,FAMILY_GEO,70,True,False
+炳发rosato,炳发 Rosato,project:the-star-platinum-rosato,EXACT_PROJECT_NAME,100,False,False
+thestarplatinumrosato,The Star Platinum Rosato,project:the-star-platinum-rosato,EXACT_PROJECT_NAME,100,False,False
+一号路炳发,一号路炳发,project:the-star-platinum-rosato,FAMILY_GEO,70,True,True
+铁桥头炳发,铁桥头炳发,project:the-star-platinum-rosato,FAMILY_GEO,70,True,True
+norea附近炳发,Norea附近炳发,project:the-star-platinum-rosato,FAMILY_GEO,70,True,True
+thestarplatinumrosato,The Star Platinum Rosato,project:the-star-platinum-rosato,STRONG_PROJECT_ALIAS,95,True,False
+炳发rosato,炳发 Rosato,project:the-star-platinum-rosato,STRONG_PROJECT_ALIAS,95,True,False
+炳发paradigm,炳发 Paradigm,project:the-star-platinum-paradigm,EXACT_PROJECT_NAME,100,False,False
+thestarplatinumparadigm,The Star Platinum Paradigm,project:the-star-platinum-paradigm,EXACT_PROJECT_NAME,100,False,False
+一号路炳发,一号路炳发,project:the-star-platinum-paradigm,FAMILY_GEO,70,True,True
+铁桥头炳发,铁桥头炳发,project:the-star-platinum-paradigm,FAMILY_GEO,70,True,True
+thestarplatinumparadigm,The Star Platinum Paradigm,project:the-star-platinum-paradigm,STRONG_PROJECT_ALIAS,95,True,False
+炳发paradigm,炳发 Paradigm,project:the-star-platinum-paradigm,STRONG_PROJECT_ALIAS,95,True,False
+炳发polarisi,炳发 Polaris I,project:the-star-platinum-polaris-i,EXACT_PROJECT_NAME,100,False,False
+thestarplatinumpolarisi,The Star Platinum Polaris I,project:the-star-platinum-polaris-i,EXACT_PROJECT_NAME,100,False,False
+一号路炳发,一号路炳发,project:the-star-platinum-polaris-i,FAMILY_GEO,70,True,True
+铁桥头炳发,铁桥头炳发,project:the-star-platinum-polaris-i,FAMILY_GEO,70,True,True
+thestarplatinumpolarisi,The Star Platinum Polaris I,project:the-star-platinum-polaris-i,STRONG_PROJECT_ALIAS,95,True,False
+炳发polarisi,炳发 Polaris I,project:the-star-platinum-polaris-i,STRONG_PROJECT_ALIAS,95,True,False
+炳发ecomelody,炳发 Eco Melody,project:the-star-platinum-eco-melody,EXACT_PROJECT_NAME,100,False,False
+thestarplatinumecomelody,The Star Platinum Eco Melody,project:the-star-platinum-eco-melody,EXACT_PROJECT_NAME,100,False,False
+一号路炳发,一号路炳发,project:the-star-platinum-eco-melody,FAMILY_GEO,70,True,True
+铁桥头炳发,铁桥头炳发,project:the-star-platinum-eco-melody,FAMILY_GEO,70,True,True
+eco区炳发,Eco区炳发,project:the-star-platinum-eco-melody,STRONG_PROJECT_ALIAS,95,True,True
+thestarplatinumecomelody,The Star Platinum Eco Melody,project:the-star-platinum-eco-melody,STRONG_PROJECT_ALIAS,95,True,False
+炳发ecomelody,炳发 Eco Melody,project:the-star-platinum-eco-melody,STRONG_PROJECT_ALIAS,95,True,False
+炳发ecodelta,炳发 Eco Delta,project:the-star-platinum-eco-delta,EXACT_PROJECT_NAME,100,False,False
+thestarplatinumecodelta,The Star Platinum Eco Delta,project:the-star-platinum-eco-delta,EXACT_PROJECT_NAME,100,False,False
+一号路炳发,一号路炳发,project:the-star-platinum-eco-delta,FAMILY_GEO,70,True,True
+铁桥头炳发,铁桥头炳发,project:the-star-platinum-eco-delta,FAMILY_GEO,70,True,True
+eco区炳发,Eco区炳发,project:the-star-platinum-eco-delta,STRONG_PROJECT_ALIAS,95,True,True
+thestarplatinumecodelta,The Star Platinum Eco Delta,project:the-star-platinum-eco-delta,STRONG_PROJECT_ALIAS,95,True,False
+炳发ecodelta,炳发 Eco Delta,project:the-star-platinum-eco-delta,STRONG_PROJECT_ALIAS,95,True,False
+orkidetheroyal别墅社区,Orkide The Royal 别墅社区,project:orkide-the-royal,EXACT_PROJECT_NAME,100,False,False
+orkidetheroyal,Orkide The Royal,project:orkide-the-royal,EXACT_PROJECT_NAME,100,False,False
+奥凯德2004,奥凯德2004,project:orkide-the-royal,STRONG_PROJECT_ALIAS,95,True,False
+orkide2004,Orkide 2004,project:orkide-the-royal,STRONG_PROJECT_ALIAS,95,True,False
+orkidetheroyal,Orkide The Royal,project:orkide-the-royal,STRONG_PROJECT_ALIAS,95,True,False
+奥凯德theroyal,奥凯德The Royal,project:orkide-the-royal,STRONG_PROJECT_ALIAS,95,True,False
+2004奥凯德,2004奥凯德,project:orkide-the-royal,STRONG_PROJECT_ALIAS,95,True,True
+orkidethegrand,Orkide The Grand,project:orkide-the-grand,EXACT_PROJECT_NAME,100,False,False
+奥凯德thegrand,奥凯德The Grand,project:orkide-the-grand,STRONG_PROJECT_ALIAS,95,True,False
+orkidegrand,Orkide Grand,project:orkide-the-grand,STRONG_PROJECT_ALIAS,95,True,False
+orkidethegrand,Orkide The Grand,project:orkide-the-grand,STRONG_PROJECT_ALIAS,95,True,False
+2004奥凯德grand,2004奥凯德Grand,project:orkide-the-grand,STRONG_PROJECT_ALIAS,95,True,False
+orkidebotaniccity,Orkide Botanic City,project:orkide-botanic-city,EXACT_PROJECT_NAME,100,False,False
+orkidethebotaniccity,Orkide The Botanic City,project:orkide-botanic-city,EXACT_PROJECT_NAME,100,False,False
+奥凯德botaniccity,奥凯德Botanic City,project:orkide-botanic-city,STRONG_PROJECT_ALIAS,95,True,False
+奥凯德6a,奥凯德6A,project:orkide-botanic-city,PROJECT_ROAD,90,True,False
+orkidebotaniccity,Orkide Botanic City,project:orkide-botanic-city,STRONG_PROJECT_ALIAS,95,True,False
+6a奥凯德,6A奥凯德,project:orkide-botanic-city,PROJECT_ROAD,90,True,False
+orkidepochentong,Orkide Pochentong,project:orkide-pochentong,EXACT_PROJECT_NAME,100,False,False
+orkidethepochentong,Orkide The Pochentong,project:orkide-pochentong,EXACT_PROJECT_NAME,100,False,False
+奥凯德pochentong,奥凯德Pochentong,project:orkide-pochentong,STRONG_PROJECT_ALIAS,95,True,False
+orkidepochentong,Orkide Pochentong,project:orkide-pochentong,STRONG_PROJECT_ALIAS,95,True,False
+chipmongparkland598,Chip Mong Park Land 598,project:chip-mong-park-land-598,EXACT_PROJECT_NAME,100,False,False
+parkland598,Park Land 598,project:chip-mong-park-land-598,EXACT_PROJECT_NAME,100,False,False
+598路,598路,project:chip-mong-park-land-598,PROJECT_ROAD,90,True,False
+森速,森速,project:chip-mong-park-land-598,STRONG_PROJECT_ALIAS,95,True,False
+chipmongparkland598,Chip Mong Park Land 598,project:chip-mong-park-land-598,PROJECT_ROAD,90,True,False
+parkland598,Park Land 598,project:chip-mong-park-land-598,PROJECT_ROAD,90,True,False
+chipmongparkland50m,Chip Mong Park Land 50M,project:chip-mong-park-land-50m,EXACT_PROJECT_NAME,100,False,False
+parkland50m,Park Land 50M,project:chip-mong-park-land-50m,EXACT_PROJECT_NAME,100,False,False
+50米chipmong,50米Chip Mong,project:chip-mong-park-land-50m,PROJECT_ROAD,90,True,False
+chamkardong,Chamkar Dong,project:chip-mong-park-land-50m,STRONG_PROJECT_ALIAS,95,True,False
+chipmongparkland50m,Chip Mong Park Land 50M,project:chip-mong-park-land-50m,STRONG_PROJECT_ALIAS,95,True,False
+parkland50m,Park Land 50M,project:chip-mong-park-land-50m,STRONG_PROJECT_ALIAS,95,True,False
+chipmongparklandsensok,Chip Mong Park Land Sen Sok,project:chip-mong-park-land-sen-sok,EXACT_PROJECT_NAME,100,False,False
+parklandsensok,Park Land Sen Sok,project:chip-mong-park-land-sen-sok,EXACT_PROJECT_NAME,100,False,False
+森速chipmong,森速Chip Mong,project:chip-mong-park-land-sen-sok,STRONG_PROJECT_ALIAS,95,True,True
+永旺2方向,永旺2方向,project:chip-mong-park-land-sen-sok,PROJECT_LANDMARK,85,True,False
+chipmongparklandsensok,Chip Mong Park Land Sen Sok,project:chip-mong-park-land-sen-sok,STRONG_PROJECT_ALIAS,95,True,False
+parklandsensok,Park Land Sen Sok,project:chip-mong-park-land-sen-sok,STRONG_PROJECT_ALIAS,95,True,False
+chipmongparklandtk,Chip Mong Park Land TK,project:chip-mong-park-land-tk,EXACT_PROJECT_NAME,100,False,False
+parklandtk,Park Land TK,project:chip-mong-park-land-tk,EXACT_PROJECT_NAME,100,False,False
+tkchipmong,TK Chip Mong,project:chip-mong-park-land-tk,STRONG_PROJECT_ALIAS,95,True,False
+chipmongparklandtk,Chip Mong Park Land TK,project:chip-mong-park-land-tk,STRONG_PROJECT_ALIAS,95,True,False
+parklandtk,Park Land TK,project:chip-mong-park-land-tk,STRONG_PROJECT_ALIAS,95,True,False
+chipmongparkland6a,Chip Mong Park Land 6A,project:chip-mong-park-land-6a,EXACT_PROJECT_NAME,100,False,False
+parkland6a,Park Land 6A,project:chip-mong-park-land-6a,EXACT_PROJECT_NAME,100,False,False
+6achipmong,6A Chip Mong,project:chip-mong-park-land-6a,PROJECT_ROAD,90,True,False
+水净华方向,水净华方向,project:chip-mong-park-land-6a,STRONG_PROJECT_ALIAS,95,True,False
+chipmongparkland6a,Chip Mong Park Land 6A,project:chip-mong-park-land-6a,PROJECT_ROAD,90,True,False
+parkland6a,Park Land 6A,project:chip-mong-park-land-6a,PROJECT_ROAD,90,True,False
+chipmonglandmark271,Chip Mong Landmark 271,project:chip-mong-landmark-271,EXACT_PROJECT_NAME,100,False,False
+landmark271,Landmark 271,project:chip-mong-landmark-271,EXACT_PROJECT_NAME,100,False,False
+271chipmong,271 Chip Mong,project:chip-mong-landmark-271,PROJECT_ROAD,90,True,False
+chipmong271附近,Chip Mong 271附近,project:chip-mong-landmark-271,PROJECT_LANDMARK,85,True,False
+chipmonglandmark271,Chip Mong Landmark 271,project:chip-mong-landmark-271,PROJECT_ROAD,90,True,False
+landmark271,Landmark 271,project:chip-mong-landmark-271,PROJECT_ROAD,90,True,False
+chipmonglandmark60m,Chip Mong Landmark 60M,project:chip-mong-landmark-60m,EXACT_PROJECT_NAME,100,False,False
+landmark60m,Landmark 60M,project:chip-mong-landmark-60m,EXACT_PROJECT_NAME,100,False,False
+60米chipmong,60米Chip Mong,project:chip-mong-landmark-60m,PROJECT_ROAD,90,True,False
+永旺3方向,永旺3方向,project:chip-mong-landmark-60m,PROJECT_LANDMARK,85,True,False
+chipmonglandmark60m,Chip Mong Landmark 60M,project:chip-mong-landmark-60m,STRONG_PROJECT_ALIAS,95,True,False
+landmark60m,Landmark 60M,project:chip-mong-landmark-60m,STRONG_PROJECT_ALIAS,95,True,False
+chipmonggrandphnompenhcity,Chip Mong Grand Phnom Penh City,project:chip-mong-grand-phnom-penh-city,EXACT_PROJECT_NAME,100,False,False
+grandphnompenhcity,Grand Phnom Penh City,project:chip-mong-grand-phnom-penh-city,EXACT_PROJECT_NAME,100,False,False
+grandphnompenh,Grand Phnom Penh,project:chip-mong-grand-phnom-penh-city,STRONG_PROJECT_ALIAS,95,True,False
+森速chipmong,森速Chip Mong,project:chip-mong-grand-phnom-penh-city,STRONG_PROJECT_ALIAS,95,True,True
+chipmonggrandphnompenhcity,Chip Mong Grand Phnom Penh City,project:chip-mong-grand-phnom-penh-city,STRONG_PROJECT_ALIAS,95,True,False
+grandphnompenhcity,Grand Phnom Penh City,project:chip-mong-grand-phnom-penh-city,STRONG_PROJECT_ALIAS,95,True,False
+chipmonglandrichechamkardong,Chip Mong Land Riche Chamkar Dong,project:chip-mong-landriche-chamkar-dong,EXACT_PROJECT_NAME,100,False,False
+landrichechamkardong,Land Riche Chamkar Dong,project:chip-mong-landriche-chamkar-dong,EXACT_PROJECT_NAME,100,False,False
+chamkardongchipmong,Chamkar Dong Chip Mong,project:chip-mong-landriche-chamkar-dong,STRONG_PROJECT_ALIAS,95,True,False
+chipmonglandrichechamkardong,Chip Mong Land Riche Chamkar Dong,project:chip-mong-landriche-chamkar-dong,STRONG_PROJECT_ALIAS,95,True,False
+landrichechamkardong,Land Riche Chamkar Dong,project:chip-mong-landriche-chamkar-dong,STRONG_PROJECT_ALIAS,95,True,False
+chipmongparklandtk公寓,Chip Mong Park Land TK 公寓,project:chip-mong-park-land-tk-condo,EXACT_PROJECT_NAME,100,False,False
+parklandtkcondo,Park Land TK Condo,project:chip-mong-park-land-tk-condo,EXACT_PROJECT_NAME,100,False,False
+tkcondo,TK Condo,project:chip-mong-park-land-tk-condo,STRONG_PROJECT_ALIAS,95,True,False
+森速chipmong公寓,森速Chip Mong公寓,project:chip-mong-park-land-tk-condo,STRONG_PROJECT_ALIAS,95,True,False
+chipmongparklandtk公寓,Chip Mong Park Land TK 公寓,project:chip-mong-park-land-tk-condo,STRONG_PROJECT_ALIAS,95,True,False
+parklandtkcondo,Park Land TK Condo,project:chip-mong-park-land-tk-condo,STRONG_PROJECT_ALIAS,95,True,False
+新世界koursrov1&2,新世界 Kour Srov 1&2,project:new-world-kour-srov-1-2,EXACT_PROJECT_NAME,100,False,False
+boreynewworldkoursrov1&2,Borey New World Kour Srov 1&2,project:new-world-kour-srov-1-2,EXACT_PROJECT_NAME,100,False,False
+新世界koursrov,新世界Kour Srov,project:new-world-kour-srov-1-2,STRONG_PROJECT_ALIAS,95,True,False
+newworldkoursrov1&2,New World Kour Srov 1&2,project:new-world-kour-srov-1-2,STRONG_PROJECT_ALIAS,95,True,False
+新世界koursrov3,新世界 Kour Srov 3,project:new-world-kour-srov-3,EXACT_PROJECT_NAME,100,False,False
+boreynewworldkoursrov3,Borey New World Kour Srov 3,project:new-world-kour-srov-3,EXACT_PROJECT_NAME,100,False,False
+新世界3,新世界3,project:new-world-kour-srov-3,STRONG_PROJECT_ALIAS,95,True,False
+newworldkoursrov3,New World Kour Srov 3,project:new-world-kour-srov-3,STRONG_PROJECT_ALIAS,95,True,False
+koursrov新世界,Kour Srov新世界,project:new-world-kour-srov-3,STRONG_PROJECT_ALIAS,95,True,True
+新世界生活皮普特梅sensok社区,新世界生活/皮普特梅 Sen Sok社区,project:piphup-thmey-sen-sok,EXACT_PROJECT_NAME,100,False,False
+boreypiphupthmeysensok,Borey Piphup Thmey Sen Sok,project:piphup-thmey-sen-sok,EXACT_PROJECT_NAME,100,False,False
+piphupthmeysensok,Piphup Thmey Sen Sok,project:piphup-thmey-sen-sok,STRONG_PROJECT_ALIAS,95,True,False
+森速piphupthmey,森速Piphup Thmey,project:piphup-thmey-sen-sok,STRONG_PROJECT_ALIAS,95,True,False
+永旺2piphupthmey,永旺2 Piphup Thmey,project:piphup-thmey-sen-sok,PROJECT_LANDMARK,85,True,False
+partial,PARTIAL,project:piphup-thmey-sen-sok,STRONG_PROJECT_ALIAS,95,True,False
+piphupthmeychamkardong,Piphup Thmey Chamkar Dong,project:piphup-thmey-chamkar-dong,EXACT_PROJECT_NAME,100,False,False
+boreypiphupthmeychamkardong,Borey Piphup Thmey Chamkar Dong,project:piphup-thmey-chamkar-dong,EXACT_PROJECT_NAME,100,False,False
+chamkardongpiphupthmey,Chamkar Dong Piphup Thmey,project:piphup-thmey-chamkar-dong,STRONG_PROJECT_ALIAS,95,True,False
+piphupthmeychamkardong,Piphup Thmey Chamkar Dong,project:piphup-thmey-chamkar-dong,STRONG_PROJECT_ALIAS,95,True,False
+piphupthmey4号路社区,Piphup Thmey 4号路社区,project:piphup-thmey-nr4,EXACT_PROJECT_NAME,100,False,False
+boreypiphupthmeynationalroad4,Borey Piphup Thmey National Road 4,project:piphup-thmey-nr4,EXACT_PROJECT_NAME,100,False,False
+4号路piphupthmey,4号路Piphup Thmey,project:piphup-thmey-nr4,PROJECT_ROAD,90,True,False
+piphupthmeynr4,Piphup Thmey NR4,project:piphup-thmey-nr4,STRONG_PROJECT_ALIAS,95,True,False
+chankiripalmcreek,Chankiri Palm Creek,project:chankiri-palm-creek,EXACT_PROJECT_NAME,100,False,False
+chankiri,Chankiri,project:chankiri-palm-creek,STRONG_PROJECT_ALIAS,95,True,True
+palmcreek,Palm Creek,project:chankiri-palm-creek,STRONG_PROJECT_ALIAS,95,True,True
+永旺3chankiri,永旺3 Chankiri,project:chankiri-palm-creek,PROJECT_LANDMARK,85,True,False
+chankiripalmcreek,Chankiri Palm Creek,project:chankiri-palm-creek,STRONG_PROJECT_ALIAS,95,True,False
+2号路chankiri,2号路Chankiri,project:chankiri-palm-creek,PROJECT_ROAD,90,True,False
+thepalms棕榈社区,The Palms 棕榈社区,project:the-palms,EXACT_PROJECT_NAME,100,False,False
+thepalms,The Palms,project:the-palms,EXACT_PROJECT_NAME,100,False,False
+thepalms,The Palms,project:the-palms,STRONG_PROJECT_ALIAS,95,True,False
+棕榈社区,棕榈社区,project:the-palms,STRONG_PROJECT_ALIAS,95,True,False
+一号路thepalms,一号路The Palms,project:the-palms,PROJECT_ROAD,90,True,False
+norea附近thepalms,Norea附近The Palms,project:the-palms,PROJECT_LANDMARK,85,True,False
+verified,VERIFIED,project:the-palms,STRONG_PROJECT_ALIAS,95,True,False
+炳发,炳发,family:peng-huoth,AMBIGUOUS_FAMILY,20,True,False
+penghuoth,Peng Huoth,family:peng-huoth,FAMILY_GEO,70,True,False
+一号路炳发,一号路炳发,family:peng-huoth,FAMILY_GEO,70,True,True
+铁桥头炳发,铁桥头炳发,family:peng-huoth,FAMILY_GEO,70,True,True
+60米炳发,60米炳发,family:peng-huoth,FAMILY_GEO,70,True,True
+50米炳发,50米炳发,family:peng-huoth,FAMILY_GEO,70,True,True
+永旺3炳发,永旺3炳发,family:peng-huoth,FAMILY_GEO,70,True,True
+norea附近炳发,Norea附近炳发,family:peng-huoth,FAMILY_GEO,70,True,True
+时代,时代,family:time-square,AMBIGUOUS_FAMILY,20,True,False
+时代广场,时代广场,family:time-square,AMBIGUOUS_FAMILY,20,True,False
+timesquare,Time Square,family:time-square,FAMILY_GEO,70,True,False
+urbanvillage,Urban Village,family:urban-village,FAMILY_GEO,70,True,False
+首都国金,首都国金,family:urban-village,FAMILY_GEO,70,True,False
+morgan,Morgan,family:morgan,AMBIGUOUS_FAMILY,20,True,False
+摩根,摩根,family:morgan,AMBIGUOUS_FAMILY,20,True,True
+太子,太子,family:prince,AMBIGUOUS_FAMILY,20,True,False
+prince,Prince,family:prince,AMBIGUOUS_FAMILY,20,True,False
+jtower,J Tower,family:j-tower,FAMILY_GEO,70,True,False
+j塔,J塔,family:j-tower,FAMILY_GEO,70,True,False
+orkide,Orkide,family:orkide,FAMILY_GEO,70,True,False
+orkidevilla,Orkide Villa,family:orkide,FAMILY_GEO,70,True,False
+奥凯德,奥凯德,family:orkide,FAMILY_GEO,70,True,False
+2004奥凯德,2004奥凯德,family:orkide,FAMILY_GEO,70,True,True
+chipmong,Chip Mong,family:chip-mong,AMBIGUOUS_FAMILY,20,True,False
+集茂,集茂,family:chip-mong,AMBIGUOUS_FAMILY,20,True,False
+chipmongland,Chip Mong Land,family:chip-mong,FAMILY_GEO,70,True,False
+newworld,New World,family:new-world,AMBIGUOUS_FAMILY,20,True,False
+新世界,新世界,family:new-world,AMBIGUOUS_FAMILY,20,True,False
+koursrov新世界,Kour Srov新世界,family:new-world,FAMILY_GEO,70,True,True
+piphupthmey,Piphup Thmey,family:piphup-thmey,FAMILY_GEO,70,True,False
+ពិភពថ្មី,ពិភពថ្មី,family:piphup-thmey,FAMILY_GEO,70,True,False
+worldbridge,Worldbridge,family:oxley-worldbridge,FAMILY_GEO,70,True,False
+oxleyworldbridge,Oxley Worldbridge,family:oxley-worldbridge,FAMILY_GEO,70,True,False
+royalone,Royal One,family:royal-one,FAMILY_GEO,70,True,True
+皇家一号,皇家一号,family:royal-one,FAMILY_GEO,70,True,True
+chankiri,Chankiri,family:chankiri,FAMILY_GEO,70,True,True
+palmcreek,Palm Creek,family:chankiri,FAMILY_GEO,70,True,True

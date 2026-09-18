@@ -1,0 +1,26 @@
+name: project-registry-v3-gate
+on:
+  push:
+    branches: [feat/project-registry-v3-living-facts-v2-20260918]
+  workflow_dispatch:
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: python -m pip install -r requirements.txt pytest pytest-asyncio
+      - name: Registry
+        run: python -m pytest -q tests/v3_core/test_project_registry_v3.py
+      - name: Parser Canonical Publisher Search Cover
+        run: python -m pytest -q tests/v3_core/test_canonical_parser_parity.py tests/v3_core/test_pipeline_r2_parser_taxonomy.py tests/v3_core/test_publisher_admin_workflow.py tests/v3_core/test_publisher_adviser_product_policy.py tests/v3_core/test_user_bot_search_query.py tests/v3_core/test_user_bot_public_search.py tests/v3_core/test_cover_service.py
+      - name: Full V3
+        run: python -m pytest -q tests/v3_core
+      - name: Compile
+        run: python -m compileall -q v3_core
+      - name: Critical imports
+        run: python -c "import v3_core.inventory,v3_core.inventory.project_registry,v3_core.inventory.project_relations,v3_core.inventory.project_living_facts,v3_core.inventory.listing_taxonomy,v3_core.user_bot.public_search,v3_core.publishing.package_service"
+      - name: Diff check
+        run: git diff --check HEAD^ HEAD

@@ -1,0 +1,13 @@
+project_entity_id,fact_key,value_a,value_b,source_a,source_b,conflict_type,recommended_rule,needs_manual_review
+project:agile-sky-residence,water_rate,0.50-0.60,1.0,realestate.com.kh,CAM Realty,SOURCE_VARIANCE,Store market range; verify unit/contract at viewing.,True
+project:the-pinnacle,electricity_rate,0.30,0.25,CAM Realty,Realtor listing,OWNER_OR_CONTRACT_VARIANCE,Use 0.25–0.30 market range; confirm exact unit.,True
+project:j-tower-2,electricity_rate,.25,0.3,realestate.com.kh listings,realestate.com.kh listing 250141,OWNER_OR_CONTRACT_VARIANCE,Store 0.25–0.30 market range.,True
+project:de-castle-royal,water_rate,.35,0.62,CAM Realty,realestate.com.kh,SOURCE_VARIANCE,Store market range and verify current management tariff.,True
+project:parc-21,electricity_rate,.30,0.25,CAM Realty,IPS Cambodia,SOURCE_VARIANCE,Store 0.25–0.30 market range; verify rental package.,True
+project:parc-21,water_rate,.30,0.25,CAM Realty,IPS Cambodia,SOURCE_VARIANCE,Store 0.25–0.30 market range; verify rental package.,True
+project:m-residence,water_rate,$5/month,$0.35/m3,M Residence official/ERA,Malay Nop,不同计费模型,不得做min/max；分别保留固定月费与按量计费证据。,True
+project:m-residence,car_parking_fee,$50/month,$80/month,Malay Nop,ERA Cambodia,市场收费差异,MARKET_RANGE 50-80；不视为项目官方统一价。,False
+project:parc-21,electricity_rate,$0.25/kWh,$0.30/kWh,realestate.com.kh,CAM Realty/IPS,市场收费差异,MARKET_RANGE 0.25-0.30。,False
+project:parc-21,water_rate,$0.25/m3,$0.30/m3,realestate.com.kh,CAM Realty/IPS,市场收费差异,MARKET_RANGE 0.25-0.30。,False
+project:tk-royal-one,unit_count,119/146,183,multiple project/platform pages,other market pages,统计口径冲突,保持PARTIAL，不输出单一unit_count。,True
+project:morgan-tower,project_identity,Morgan Tower office,Morgan Tower 2 residential listing,CAM Realty building page,IPS rental listing,identity混淆,不得把Morgan Tower 2住宅收费并入Morgan Tower；单独核identity。,True

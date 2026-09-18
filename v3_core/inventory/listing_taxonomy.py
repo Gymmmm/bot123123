@@ -13,9 +13,16 @@ from .phnom_penh_location_registry import (
     MANUAL_MARKET_ALIASES as REGISTRY_MANUAL_MARKET_ALIASES,
     MARKET_LOCATIONS as REGISTRY_MARKET_LOCATIONS,
     PHYSICAL_AREAS as REGISTRY_PHYSICAL_AREAS,
-    PROJECT_IDENTITIES as REGISTRY_PROJECT_IDENTITIES,
-    project_by_key,
-    resolve_project_alias,
+    PROJECT_IDENTITIES as LEGACY_REGISTRY_PROJECTS,
+    project_by_key as legacy_project_by_key,
+)
+from .project_registry import (
+    RESEARCH_PROJECTS as REGISTRY_V3_PROJECTS,
+    FAMILIES as REGISTRY_V3_FAMILIES,
+    canonical_location_projection as registry_v3_location_projection,
+    project_by_key as registry_v3_project_by_key,
+    project_identity_aliases as registry_v3_identity_aliases,
+    resolve_project as resolve_project_v3,
 )
 
 
@@ -69,17 +76,50 @@ class LocationResolution:
 PHYSICAL_AREAS = tuple(REGISTRY_PHYSICAL_AREAS)
 MARKET_LOCATIONS = tuple(REGISTRY_MARKET_LOCATIONS)
 MANUAL_MARKET_ALIASES = dict(REGISTRY_MANUAL_MARKET_ALIASES)
-PROJECT_IDENTITIES: tuple[ProjectIdentity, ...] = (
-    ProjectIdentity("the_bridge", "桥牌", "project", ("桥牌", "the bridge"), property_family="公寓"),
-    ProjectIdentity("vila_town", "Vila Town", "project", ("vila town",)),
-    ProjectIdentity("the_pinnacle", "The Pinnacle 幸福广场", "project", ("the pinnacle", "太子幸福广场", "幸福广场", "prince happiness plaza"), property_family="公寓"),
-    ProjectIdentity("rf_city", "富力城", "project", ("富力城", "富力中心城", "r&f city", "rf city")),
-    ProjectIdentity("chip_mong", "Chip Mong", "brand", ("chip mong land", "chip mong", "chipmong", "集茂")),
-    # “炳发城” is an explicit project token; the broader Peng Huoth developer
-    # name remains a brand and is not promoted to a specific project.
-    ProjectIdentity("peng_huoth_city", "炳发城", "project", ("炳发城",)),
-    ProjectIdentity("peng_huoth", "Peng Huoth", "brand", ("borey peng huoth", "peng huoth", "炳发")),
+_LEGACY_KEY_TO_V3 = {"prince_huan_yu_center": "prince-universe"}
+_LEGACY_PROJECT_BY_V3_KEY = {
+    _LEGACY_KEY_TO_V3.get(item.key, item.key.replace("_", "-")): item
+    for item in LEGACY_REGISTRY_PROJECTS
+    if item.key != "peng_huoth_city"
+}
+_PARSER_COMPAT_PROJECT_KEYS = {
+    item.key.replace("_", "-"): item.key for item in LEGACY_REGISTRY_PROJECTS
+}
+_PARSER_COMPAT_PROJECT_KEYS["prince-universe"] = "prince_huan_yu_center"
+
+_LEGACY_PROJECT_DISPLAY = {
+    "prince-universe": "太子·寰宇中心",
+    "sky-villa": "Sky Villa 天空别墅",
+    "picasso-city-garden": "Picasso City Garden 毕加索",
+}
+
+PROJECT_IDENTITIES: tuple[ProjectIdentity, ...] = tuple(
+    ProjectIdentity(
+        item.key,
+        _LEGACY_PROJECT_DISPLAY.get(
+            item.key,
+            _LEGACY_PROJECT_BY_V3_KEY[item.key].canonical_project_name
+            if item.key in _LEGACY_PROJECT_BY_V3_KEY
+            else item.name,
+        ),
+        "project",
+        tuple(dict.fromkeys((
+            *registry_v3_identity_aliases(item),
+            *(_LEGACY_PROJECT_BY_V3_KEY[item.key].project_aliases if item.key in _LEGACY_PROJECT_BY_V3_KEY else ()),
+        ))),
+        property_family=None,
+    )
+    for item in REGISTRY_V3_PROJECTS
+) + tuple(
+    ProjectIdentity(
+        family.family_id,
+        family.name_cn or family.name_en,
+        "brand",
+        tuple(dict.fromkeys((*family.ambiguous_aliases, family.name_cn, family.name_en))),
+    )
+    for family in REGISTRY_V3_FAMILIES
 )
+
 
 PROPERTY_RULES: tuple[PropertyRule, ...] = (
     PropertyRule("别墅", "双拼别墅", "双拼别墅", ("双拼别墅", "双拼")),
@@ -319,7 +359,15 @@ def _extract_project(text: str) -> tuple[str | None, str | None, str | None, str
     matches.sort(key=lambda item: (item[2], -len(item[1])))
     project_matches = [item for item in matches if item[0].kind == "project"]
     brand_matches = [item for item in matches if item[0].kind == "brand"]
-    evidence = [_evidence(item.key, f"raw_{item.kind}_alias", "high", alias) for item, alias, _position in matches]
+    evidence = [
+        _evidence(
+            _PARSER_COMPAT_PROJECT_KEYS.get(item.key, item.key) if item.kind == "project" else item.key,
+            f"raw_{item.kind}_alias",
+            "high",
+            alias,
+        )
+        for item, alias, _position in matches
+    ]
     unique_projects = {item.key for item, _alias, _position in project_matches}
     if len(unique_projects) > 1:
         return None, None, None, None, None, evidence, ["ambiguous_project"]
@@ -330,24 +378,20 @@ def _extract_project(text: str) -> tuple[str | None, str | None, str | None, str
         alias_hits = [alias for item, alias, _position in matches if item.key == project.key]
         latin = next((alias for alias in alias_hits if re.search(r"[A-Za-z]", alias)), None)
         project_alias = latin or (alias_hits[0] if alias_hits else None)
-    project_key = project.key if project else None
+    project_key = _PARSER_COMPAT_PROJECT_KEYS.get(project.key, project.key) if project else None
     project_name = project.display if project else None
 
-    # Exact registry resolution is authoritative for project identity. It is
-    # intentionally separate from MARKET/GEO aliases such as 永旺1/金街.
+    # Registry V3 is the sole PROJECT identity resolver. Family/market aliases
+    # may return ambiguity, but never silently become a concrete project.
     if not project:
-        exact_candidates = []
-        normalized_text = clean_text(project_text)
-        for token in (normalized_text, *re.split(r"[\n，,；;｜|]+", normalized_text)):
-            resolved = resolve_project_alias(token.strip())
-            if resolved is not None and resolved.key not in {item.key for item in exact_candidates}:
-                exact_candidates.append(resolved)
-        if len(exact_candidates) == 1:
-            resolved = exact_candidates[0]
-            project_key = resolved.key
-            project_name = resolved.canonical_project_name
-            project_alias = clean_text(project_text)
-            evidence.append(_evidence(resolved.key, "registry_project_alias", "high", project_alias))
+        resolved = resolve_project_v3(project_text)
+        if resolved.project_entity_id and not resolved.ambiguity:
+            project_key = resolved.project_key
+            project_name = resolved.project_name
+            project_alias = resolved.match_alias or clean_text(project_text)
+            evidence.append(_evidence(project_key, "registry_v3_project_alias", "high", project_alias))
+        elif resolved.ambiguity:
+            evidence.append(_evidence(resolved.family_id or "project_family", "registry_v3_ambiguous_family", "medium", resolved.match_alias or project_text))
 
     if not project_key:
         explicit = re.search(
@@ -499,7 +543,7 @@ def classify_listing_taxonomy(raw_text: str) -> TaxonomyResult:
     area_key, area_display, area_level, area_status, area_evidence, area_flags = _extract_physical_area(text)
     market_keys, market_displays, market_evidence, market_flags = _extract_markets(text)
     project_key, project_name, project_alias, brand_key, brand_name, project_evidence, project_flags = _extract_project(text)
-    registry_project = project_by_key(project_key)
+    registry_project = legacy_project_by_key(project_key)
     if (
         registry_project is not None
         and registry_project.kind == "project"
@@ -571,7 +615,7 @@ def public_location_from_fields(
 ) -> tuple[str | None, str | None, str]:
     """Resolve public location without ever using the project name as GEO."""
     del project_name
-    registry_project = project_by_key(project_key)
+    registry_project = legacy_project_by_key(project_key)
     if (
         registry_project is not None
         and registry_project.kind == "project"
