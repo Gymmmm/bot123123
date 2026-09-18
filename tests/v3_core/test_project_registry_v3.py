@@ -9,7 +9,7 @@ def test_search():
     r=resolve_project("60米炳发");assert r.ambiguity and set(r.candidates)=={"project:the-star-diamond","project:the-star-diamond-ii"}
     assert resolve_project("50米炳发").ambiguity and resolve_project("50米炳发").candidates==("project:the-star-mera-garden",)
     for q in ("一号路炳发","铁桥头炳发","Norea附近炳发","Morgan","Urban Village","Time Square"):assert resolve_project(q).ambiguity
-    assert resolve_project("BKK1雅居乐").project_entity_id=="project:agile-sky-residence"
+    assert resolve_project("BKK1雅居乐").ambiguity and resolve_project("BKK1雅居乐").candidates==("project:agile-sky-residence",)
     assert resolve_project("Chip Mong 271").project_entity_id=="project:chip-mong-landmark-271"
     assert resolve_project("Orkide 2004").project_entity_id=="project:orkide-the-royal"
 def test_geo_separation():
