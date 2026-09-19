@@ -179,12 +179,24 @@ class TransitionActionService:
             "appointment_time",
             "appointment_other_time",
             "appointment_back_date",
+            "appointment_back_mode",
         }:
             draft = _load_appointment(session)
             if draft is None:
                 return TransitionActionResult(
                     status="expired",
                     reason="appointment_session_expired",
+                )
+
+            if kind == "appointment_back_mode":
+                return TransitionActionResult(
+                    status="ok",
+                    next_step="appointment_mode",
+                    appointment=draft,
+                    mutation=SessionMutationPlan(
+                        set_values={APPOINTMENT_SESSION_KEY: _appointment_values(draft)},
+                        delete_keys=(APPOINTMENT_AWAITING_DATE_KEY, APPOINTMENT_AWAITING_TIME_KEY),
+                    ),
                 )
 
             if kind == "appointment_mode":

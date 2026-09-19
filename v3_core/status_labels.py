@@ -12,17 +12,18 @@ DELIVERY_STATE_LABELS = {
     "failed_before_send": "发送前失败", "unknown": "状态未知",
 }
 APPOINTMENT_STATUS_LABELS = {
-    "pending": ("🟡", "等待确认"), "assigned": ("🟡", "等待确认"),
-    "contacted": ("🟡", "等待确认"), "confirmed": ("🟢", "预约已确认"),
+    "pending": ("🟡", "待顾问确认"), "assigned": ("🟡", "待顾问确认"),
+    "contacted": ("🟡", "待顾问确认"), "confirmed": ("🟢", "看房已确认"),
     "done": ("🔵", "看房已完成"), "cancelled": ("⚪", "已取消"),
 }
 INVENTORY_STATUS_LABELS = {
     "active": ("🟢", "当前可预约"),
-    "reserved": ("🟡", "已有预约 · 仍可预约"),
-    "pending": ("🔵", "房态待确认"),
+    "reserved": ("🟡", "已有预约，仍可预约"),
+    "pending": ("⚪", "暂不可预约"),
     "rented": ("🔴", "已租出"),
-    "inactive": ("⚫", "已下架"),
-    "offline": ("⚫", "已下架"),
+    "inactive": ("⚪", "暂不可预约"),
+    "offline": ("⚪", "暂不可预约"),
+    "withdrawn": ("⚪", "暂不可预约"),
 }
 
 
@@ -31,7 +32,7 @@ def status_label(mapping, value: object, default: str = "待确认"):
 
 
 def inventory_status_presentation(value: object) -> tuple[str, str]:
-    return status_label(INVENTORY_STATUS_LABELS, value, ("🔵", "房态待确认"))
+    return status_label(INVENTORY_STATUS_LABELS, value, ("⚪", "暂不可预约"))
 
 
 def inventory_status_bookable(value: object) -> bool:

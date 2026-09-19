@@ -55,9 +55,8 @@ def test_tenant_home_is_public_with_or_without_binding(tmp_path):
     unbound_view = tenant_home_view(unbound, 123)
     unbound_labels = [choice.label for row in unbound_view.rows for choice in row]
     assert unbound_labels == [
-        "📋 入住交接留档", "🚚 搬家协助",
-        "🔧 房屋问题报修", "🏢 物业沟通",
-        "📍 周边生活", "💬 中文顾问", "⬅️ 回首页",
+        "我的租约", "入住管家", "安心租房", "周边生活",
+        "中文顾问", "回首页",
     ]
 
     other = tmp_path / "bound"
@@ -65,7 +64,6 @@ def test_tenant_home_is_public_with_or_without_binding(tmp_path):
     _, bound = _service(other, with_binding=True)
     bound_view = tenant_home_view(bound, 123)
     assert bound_view == unbound_view
-    assert "我的租约" not in " ".join(unbound_labels)
 
 
 def test_lease_unknown_values_are_never_rendered_as_null_or_1970(tmp_path):

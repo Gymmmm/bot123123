@@ -38,6 +38,7 @@ class PublicListingDetails:
     subject: str
     location: str
     monthly_rent_usd: int | None
+    published_monthly_rent_usd: int | None
     size_sqm: float | None
     floor: str
     deposit_terms: str
@@ -102,7 +103,11 @@ def build_public_listing_details(view: PublishedListingView) -> PublicListingDet
         layout=layout,
         subject=subject,
         location=location,
-        monthly_rent_usd=_optional_int(offer.get("monthly_rent_usd")),
+        monthly_rent_usd=(
+            _optional_int(getattr(view, "offer", {}).get("monthly_rent_usd"))
+            or _optional_int(offer.get("monthly_rent_usd"))
+        ),
+        published_monthly_rent_usd=_optional_int(offer.get("monthly_rent_usd")),
         size_sqm=_optional_float(listing.get("size_sqm")),
         floor=_visible_text(listing.get("floor")),
         deposit_terms=_visible_text(

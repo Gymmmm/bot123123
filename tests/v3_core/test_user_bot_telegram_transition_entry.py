@@ -57,7 +57,15 @@ class FakeQuery:
 
 
 class FakeBot:
-    pass
+    def __init__(self, *, fail_send=False):
+        self.fail_send = fail_send
+        self.calls = []
+
+    async def send_message(self, **kwargs):
+        self.calls.append(("send_message", kwargs))
+        if self.fail_send:
+            raise RuntimeError("telegram_send_failed")
+        return SimpleNamespace(chat_id=kwargs.get("chat_id"), message_id=901)
 
 
 def _update(query):
@@ -67,8 +75,8 @@ def _update(query):
     )
 
 
-def _context():
-    return SimpleNamespace(bot=FakeBot(), user_data={})
+def _context(*, fail_send=False):
+    return SimpleNamespace(bot=FakeBot(fail_send=fail_send), user_data={})
 
 
 def _book_dispatch():
@@ -133,7 +141,8 @@ async def test_book_entry_renders_transition_and_persists_public_only_session_af
 
     assert outcome.handled and outcome.response is not None
     assert outcome.response.transition == "book"
-    assert [call[0] for call in query.calls] == ["answer", "edit_caption"]
+    assert [call[0] for call in query.calls] == ["answer"]
+    assert [call[0] for call in context.bot.calls] == ["send_message"]
     assert len(views.plans) == 1 and views.plans[0].kind == "book"
     assert context.user_data[APPOINTMENT_SESSION_KEY] == {
         "public_listing_id": PUBLIC_ID,
@@ -143,18 +152,18 @@ async def test_book_entry_renders_transition_and_persists_public_only_session_af
         "source": "listing_callback",
     }
     assert "LST_1" not in repr(context.user_data)
-    markup = query.calls[-1][2]["reply_markup"]
+    markup = context.bot.calls[-1][1]["reply_markup"]
     assert markup.inline_keyboard[0][0].callback_data == "v3u:t:appointment_date:09-08"
 
 
 @pytest.mark.asyncio
 async def test_transition_session_does_not_advance_when_telegram_edit_fails():
-    query = FakeQuery(f"v3u:listing:book:{PUBLIC_ID}", fail_edit=True)
+    query = FakeQuery(f"v3u:listing:book:{PUBLIC_ID}")
     router = RouterStub(_book_dispatch())
     views = ViewServiceStub(_appointment_view())
-    context = _context()
+    context = _context(fail_send=True)
 
-    with pytest.raises(RuntimeError, match="telegram_edit_failed"):
+    with pytest.raises(RuntimeError, match="telegram_send_failed"):
         await handle_v3_callback(
             _update(query),
             context,

@@ -100,6 +100,21 @@ async def _render_transition_view(query: Any, view: TransitionView) -> None:
     await query.edit_message_text(view.text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
 
 
+async def _send_transition_view(update: Any, context: Any, query: Any, view: TransitionView) -> None:
+    keyboard = build_transition_keyboard(view)
+    message = getattr(query, "message", None)
+    reply = getattr(message, "reply_text", None)
+    if callable(reply):
+        await reply(view.text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+        return
+    await context.bot.send_message(
+        chat_id=_chat_id(update),
+        text=view.text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=keyboard,
+    )
+
+
 async def render_search_card_response(update: Any, context: Any, response: TelegramCallbackResponse, *, query: Any | None = None) -> None:
     if response.kind != "card":
         raise ValueError("search_card_renderer_requires_card_response")
@@ -202,8 +217,8 @@ async def handle_v3_callback(
                 channel_url=channel_url,
                 back_to_search_callback=back_to_search_callback,
                 listing_summary=str(getattr(response, "listing_summary", "") or ""),
-                add_home=response.kind in {"details", "photos"},
-                add_channel=response.kind in {"details", "photos"},
+                add_home=response.kind == "details",
+                add_channel=response.kind == "details",
             ),
         )
     await query.answer()
@@ -220,7 +235,10 @@ async def handle_v3_callback(
         plan = build_transition_plan(response)
         mutation = build_transition_session(plan)
         view = transition_views.build(plan)
-        await _render_transition_view(query, view)
+        if response.transition in {"book", "change_search"}:
+            await _send_transition_view(update, context, query, view)
+        else:
+            await _render_transition_view(query, view)
         user_data = getattr(context, "user_data", None)
         if not isinstance(user_data, dict):
             raise ValueError("telegram_user_data_missing_for_transition")

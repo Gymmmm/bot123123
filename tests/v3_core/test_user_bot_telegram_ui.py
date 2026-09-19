@@ -67,11 +67,8 @@ def test_details_keyboard_is_encoded_from_public_listing_identity():
     markup = build_action_keyboard(response.action_rows)
 
     assert _callback_rows(markup) == [
-        [
-            "v3u:listing:book:QL-RF-A2B3",
-            "v3u:listing:consult:QL-RF-A2B3",
-        ],
-        ["v3u:listing:photos:QL-RF-A2B3"],
+        ["v3u:listing:book:QL-RF-A2B3"],
+        ["v3u:listing:consult:QL-RF-A2B3"],
     ]
     assert "LST_1" not in repr(_callback_rows(markup))
 
@@ -90,11 +87,9 @@ def test_search_card_keyboard_encodes_navigation_with_public_ids():
     ]
     assert rows[1] == [
         "v3u:listing:details:QL-RF-A2B3",
-        "v3u:listing:photos:QL-RF-A2B3",
+        "v3u:listing:book:QL-RF-A2B3",
     ]
-    assert rows[2] == ["v3u:listing:book:QL-RF-A2B3"]
-    assert rows[3] == ["v3u:listing:consult:QL-RF-A2B3"]
-    assert rows[4] == ["v3u:change_search"]
+    assert rows[2] == ["v3u:change_search"]
     assert "LST_" not in repr(rows)
 
 

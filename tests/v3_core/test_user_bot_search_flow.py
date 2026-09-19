@@ -188,7 +188,7 @@ def test_explicit_similar_is_a_separate_flow_and_preserves_relaxation_mode():
     assert result.criteria is criteria
     assert result.mode == "no_type"
     assert result.public_listing_ids == ("QL-B2-E6F7",)
-    assert "已有预约 · 仍可预约" in result.cards[0].text
+    assert "已有预约，仍可预约" in result.cards[0].text
     assert [call[0] for call in search.calls] == ["similar"]
     assert search.calls[0][2] == 3
 

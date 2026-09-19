@@ -155,7 +155,7 @@ async def test_details_from_search_session_offer_one_tap_return_to_same_card():
 
     markup = query.calls[-1][2]["reply_markup"]
     buttons = [button for row in markup.inline_keyboard for button in row]
-    back = next(button for button in buttons if button.text == "⬅️ 返回结果")
+    back = next(button for button in buttons if button.text == "返回房源")
     assert back.callback_data == "v3u:card:1:QL-RF-A2B3"
 
 

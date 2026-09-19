@@ -88,8 +88,8 @@ def test_home_contact_and_no_match_use_final_advisor_label():
         touch_payload={},
     )
     no_match = [choice.label for row in build_search_no_match_view(intent).rows for choice in row]
-    assert "💬 中文顾问" in home
-    assert "💬 中文顾问" in contact
+    assert "中文顾问" in home
+    assert "中文顾问" in contact
     assert "💬 中文顾问" in no_match
     assert "💬 联系我们" not in home + contact + no_match
     assert "💬 顾问帮我找" not in home + contact + no_match
@@ -102,10 +102,10 @@ def test_unbookable_book_payload_keeps_details_instead_of_dead_link():
     assert result.reason == "listing_not_bookable"
     assert result.book is None
     assert result.details is not None
-    assert "🏠 <b>富力城｜1房</b>" in result.details.text
+    assert "<b>富力城 · 1房</b>" in result.details.text
     labels = [item.label for row in result.details.action_rows for item in row]
-    assert "💬 问这套房" in labels
-    assert "📸 更多实拍" in labels
+    assert "咨询这套" in labels
+    assert "更多实拍" not in labels
     assert "📅 预约看房" not in labels
     assert "🔍 看相近房源" not in labels
 
@@ -141,10 +141,10 @@ async def test_start_handler_renders_chinese_unbookable_copy_then_details():
     assert outcome.kind == "unbookable"
     assert outcome.handled is True
     assert message.texts[0] == "这套房现在暂时不能预约。\n\n可以先看详情，或让顾问帮你看别的选择。"
-    assert "🏠 <b>富力城｜1房</b>" in message.texts[1]
+    assert "<b>富力城 · 1房</b>" in message.texts[1]
     actions = [button.text for row in message.markups[1].inline_keyboard for button in row]
-    assert "💬 问这套房" in actions
-    assert "📸 更多实拍" in actions
+    assert "咨询这套" in actions
+    assert "更多实拍" not in actions
     assert "🔍 看相近房源" not in actions
     assert "🏠 返回首页" not in actions
     assert "📅 预约看房" not in actions

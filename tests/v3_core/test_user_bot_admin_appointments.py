@@ -88,7 +88,7 @@ def test_v3_statuses_are_centralized():
     assert REVIEW_STATUS_LABELS["pending"] == "待审核"
     assert PACKAGE_STATUS_LABELS["published"] == "已发布"
     assert DELIVERY_STATE_LABELS["unknown"] == "状态未知"
-    assert APPOINTMENT_STATUS_LABELS["confirmed"] == ("🟢", "预约已确认")
+    assert APPOINTMENT_STATUS_LABELS["confirmed"] == ("🟢", "看房已确认")
     admin_source = Path("v3_core/publishing/admin_bot.py").read_text(encoding="utf-8")
     assert "REVIEW_STATUS_LABELS = {" not in admin_source
 

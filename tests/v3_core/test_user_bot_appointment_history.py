@@ -112,8 +112,8 @@ def test_empty_history_matches_fixed_sha_empty_copy(tmp_path):
 
     assert view.items == ()
     assert view.history_count == 0
-    assert "目前还没有看房预约" in view.text
-    assert "预约看房" in view.text
+    assert "目前没有待进行的看房预约" in view.text
+    assert "看到合适的房源后直接预约" in view.text
 
 
 def test_history_shows_only_two_upcoming_and_counts_terminal_or_past_rows(tmp_path):
@@ -129,11 +129,10 @@ def test_history_shows_only_two_upcoming_and_counts_terminal_or_past_rows(tmp_pa
         now=datetime(2026, 9, 9, 12, 0, tzinfo=ZoneInfo("Asia/Phnom_Penh")),
     )
 
-    assert [item.appointment_id for item in view.items] == [3, 2]
+    assert [item.appointment_id for item in view.items] == [1, 2]
     assert view.history_count == 2
-    assert "🟢 <b>预约已确认</b>" in view.text
-    assert "🎥 实时视频看房" in view.text
-    assert "📁 历史预约 · 2 条" in view.text
+    assert "当前状态：🟡 待顾问确认" in view.text
+    assert "看房方式：实时视频看房" in view.text
     assert PUBLIC_ID in view.text
     assert "LST_PRIVATE_1" not in view.text
 
@@ -145,4 +144,4 @@ def test_other_users_appointments_are_not_visible(tmp_path):
     view = service.build(123, now=datetime(2026, 9, 9, tzinfo=ZoneInfo("Asia/Phnom_Penh")))
 
     assert view.items == ()
-    assert "目前还没有看房预约" in view.text
+    assert "目前没有待进行的看房预约" in view.text

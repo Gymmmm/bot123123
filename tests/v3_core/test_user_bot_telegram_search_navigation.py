@@ -282,5 +282,7 @@ async def test_retired_current_available_redirects_to_search_entry_without_searc
         "v3u:t:search_area",
         "v3u:t:search_budget",
         "v3u:t:search_layout",
+        "v3u:home:contact",
+        "v3u:home:appointments",
         "v3u:t:home",
     ]

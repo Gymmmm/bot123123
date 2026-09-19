@@ -1,82 +1,65 @@
-from __future__ import annotations
 
 from datetime import date
 import json
-
 import pytest
-
 from v3_core.user_bot.public_appointment import PublicAppointmentDraft
 from v3_core.user_bot.public_inventory import PublishedListingView
 from v3_core.user_bot.similar_intent import SimilarSearchIntent
 from v3_core.user_bot.transition_plan import BookTransition, ChangeSearchTransition, SimilarTransition, TransitionPlan
 from v3_core.user_bot.transition_views import TransitionViewService
 
-PUBLIC_ID = "QL-RF-A2B3"
+PUBLIC_ID="QL-RF-A2B3"
 
 class InventoryStub:
-    def __init__(self, view): self.view, self.calls = view, []
+    def __init__(self, view): self.view=view; self.calls=[]
     def resolve(self, public_listing_id): self.calls.append(public_listing_id); return self.view
 
 def _published_view(*, listing_status="active", offer_status="active"):
-    snapshot = {"schema":"v3_publication_snapshot.v1","listing":{"project_name":"富力城","property_type":"公寓","layout":"2房1厅","public_location_display":"富力城","size_sqm":95,"floor":"19楼"},"offer":{"monthly_rent_usd":800,"payment_terms":"押1付1","contract_term":"1年"}}
-    return PublishedListingView(listing={"listing_id":"LST_1","public_listing_id":PUBLIC_ID,"inventory_status":listing_status},offer={"offer_id":"OFF_1","offer_type":"rent","publication_policy":"telegram_rent","offer_status":offer_status},publication={"instance_id":"PUB_1"},package={"snapshot_json":json.dumps(snapshot,ensure_ascii=False),"gallery_json":"[]"})
+    snapshot={"schema":"v3_publication_snapshot.v1","listing":{"project_name":"富力城","layout":"2房1厅","public_location_display":"富力城","size_sqm":95,"floor":"19楼"},"offer":{"monthly_rent_usd":800,"payment_terms":"押1付1","contract_term":"1年"}}
+    return PublishedListingView(
+        listing={"listing_id":"LST_1","public_listing_id":PUBLIC_ID,"inventory_status":listing_status},
+        offer={"offer_id":"OFF_1","offer_type":"rent","publication_policy":"telegram_rent","offer_status":offer_status},
+        publication={"instance_id":"PUB_1"},
+        package={"snapshot_json":json.dumps(snapshot,ensure_ascii=False),"gallery_json":"[]"},
+    )
 
-def _book_plan(*, mode="offline", source="listing_callback"):
-    return TransitionPlan(kind="book",next_step="appointment_date",effects=("render_appointment_date",),book=BookTransition(draft=PublicAppointmentDraft(public_listing_id=PUBLIC_ID,mode=mode,source=source)))
+def _book_plan():
+    return TransitionPlan(kind="book",next_step="appointment_mode",effects=("render_appointment_mode",),book=BookTransition(draft=PublicAppointmentDraft(public_listing_id=PUBLIC_ID)))
 
-def test_book_view_matches_fixed_sha_date_entry_and_uses_public_identity_only():
-    inventory=InventoryStub(_published_view()); service=TransitionViewService(inventory); view=service.build(_book_plan(),today=date(2026,9,8))
-    assert view.kind=="appointment_date"
+def _labels(view): return [c.label for row in view.rows for c in row]
+
+def test_booking_starts_with_mode_surface():
+    service=TransitionViewService(InventoryStub(_published_view()))
+    view=service.build(_book_plan(),today=date(2026,9,19))
+    assert view.kind=="appointment_mode"
     assert "预约看房" in view.text
-    assert "QL-RF-A2B3" in view.text
     assert "富力城" in view.text
-    assert "$800/月" in view.text
-    assert "哪天方便看" in view.text
+    assert _labels(view)==["实地看房","视频代看","退出预约"]
     assert "LST_1" not in view.text
-    assert inventory.calls==[PUBLIC_ID]
-    assert [button.label for row in view.rows for button in row]==["今天","明天","后天","📅 其他日期","🎥 改成视频看房","⬅️ 返回租赁详情"]
-    assert view.rows[0][0].value=="09-08"; assert view.rows[0][1].value=="09-09"; assert view.rows[1][0].value=="09-10"; assert view.rows[-1][0].public_listing_id==PUBLIC_ID
 
-def test_channel_direct_book_uses_see_details_label():
-    view=TransitionViewService(InventoryStub(_published_view())).build(_book_plan(source="channel_deeplink"),today=date(2026,9,8))
-    labels=[button.label for row in view.rows for button in row]
-    assert "📋 先看详情" in labels
-    assert "⬅️ 返回租赁详情" not in labels
+def test_date_and_time_steps_are_light_and_supported():
+    service=TransitionViewService(InventoryStub(_published_view()))
+    draft=PublicAppointmentDraft(public_listing_id=PUBLIC_ID,mode="offline")
+    date_view=service.appointment_date(draft,today=date(2026,9,19))
+    assert _labels(date_view)==["今天 (9月19日)","明天 (9月20日)","后天 (9月21日)","其他日期","返回"]
+    timed=draft.with_date("09-19")
+    time_view=service.appointment_time(timed)
+    assert _labels(time_view)==["上午 09:00–12:00","下午 14:00–17:00","返回"]
+    assert "晚上" not in time_view.text + repr(_labels(time_view))
 
-def test_video_mode_date_view_switches_fixed_sha_heading_question_and_toggle():
-    view=TransitionViewService(InventoryStub(_published_view())).build(_book_plan(mode="video"),today=date(2026,9,8))
-    assert "视频看房" in view.text
-    assert "哪天方便视频看" in view.text
-    toggle=view.rows[2][0]
-    assert toggle.label=="🚶 改成实地看房"
-    assert toggle.kind=="appointment_mode"
-    assert toggle.value=="offline"
-
-def test_appointment_time_view_matches_fixed_sha_time_order():
-    service=TransitionViewService(InventoryStub(_published_view())); draft=PublicAppointmentDraft(public_listing_id=PUBLIC_ID,mode="offline",date="09-10",source="listing_callback"); view=service.appointment_time(draft)
-    assert view.kind=="appointment_time"; assert "选一个大概时间" in view.text; assert "9月10日" in view.text; assert "富力城" in view.text; assert "LST_1" not in view.text
-    assert [(row[0].label,row[0].kind,row[0].value) for row in view.rows[:4]]==[("上午 09:00–12:00","appointment_time","am"),("下午 14:00–17:00","appointment_time","pm"),("晚上 17:00–19:00","appointment_time","evening"),("✍️ 其他时间","appointment_other_time","")]
-    assert [choice.label for choice in view.rows[-1]]==["⬅️ 改日期"]
-
-def test_custom_appointment_prompts_match_fixed_sha_and_need_no_keyboard():
-    service=TransitionViewService(InventoryStub(None)); date_prompt=service.custom_date_prompt(); time_prompt=service.custom_time_prompt(); assert date_prompt.rows==(); assert date_prompt.text=="📅 <b>请输入日期</b>\n\n例如：<code>0905</code>、<code>9月5日</code> 或 <code>下周三</code>"; assert time_prompt.rows==(); assert time_prompt.text=="🕐 <b>其他时间</b>\n\n直接输入，例如：<code>20:00</code> 或 <code>晚上8点</code>"
-
-def test_book_view_rechecks_live_bookability_before_rendering_date_step():
+def test_bookability_rechecked_before_booking_surface():
     service=TransitionViewService(InventoryStub(_published_view(listing_status="rented",offer_status="inactive")))
-    with pytest.raises(ValueError,match="listing_not_bookable"): service.build(_book_plan(),today=date(2026,9,8))
+    with pytest.raises(ValueError,match="listing_not_bookable"):
+        service.build(_book_plan())
 
-def test_similar_view_returns_to_search_entry():
-    service=TransitionViewService(InventoryStub(None)); plan=TransitionPlan(kind="similar",next_step="search_budget",effects=("render_search_budget",),similar=SimilarTransition(intent=SimilarSearchIntent(listing_id="LST_1",public_listing_id=PUBLIC_ID,source="similar_listing",goal="any",location_keys=("BKK1",),area_display="BKK1",next_step="budget"))); view=service.build(plan)
-    assert view.kind=="search_entry"
-    assert "想住什么样的房子" in view.text
+def test_search_entry_is_final_direct_filter_panel():
+    service=TransitionViewService(InventoryStub(None))
+    plan=TransitionPlan(kind="change_search",next_step="search_entry",effects=("render_search_entry",),change_search=ChangeSearchTransition())
+    view=service.build(plan)
+    assert _labels(view)==["选择区域","选择预算","选择户型","不知道怎么选？问顾问","我的预约","回首页"]
+    assert "BKK1 两房 800 美金以内" in view.text
 
-def test_change_search_view_matches_final_strict_entry_copy_and_button_order():
-    service=TransitionViewService(InventoryStub(None)); plan=TransitionPlan(kind="change_search",next_step="search_entry",effects=("render_search_entry",),change_search=ChangeSearchTransition()); view=service.build(plan)
-    assert view.kind=="search_entry"; assert "想住什么样的房子" in view.text; assert "BKK1 一房，预算 $600" in view.text
-    labels=[button.label for row in view.rows for button in row]
-    assert labels==["📍 按区域","💰 按预算","🛏 按户型","⬅️ 回首页"]
-    assert "🏘 当前可约" not in labels
-
-def test_consult_view_is_blocked_until_effect_executor_exists():
-    service=TransitionViewService(InventoryStub(None)); plan=TransitionPlan(kind="consult",next_step="contact_handoff",effects=("record_lead","notify_admin","render_contact_handoff"))
-    with pytest.raises(ValueError,match="consult_transition_requires_effect_executor"): service.build(plan)
+def test_similar_returns_to_same_search_panel():
+    service=TransitionViewService(InventoryStub(None))
+    plan=TransitionPlan(kind="similar",next_step="search_entry",effects=(),similar=SimilarTransition(intent=SimilarSearchIntent(listing_id="LST_1",public_listing_id=PUBLIC_ID,source="similar_listing",goal="any",location_keys=("BKK1",),area_display="BKK1",next_step="budget")))
+    assert service.build(plan).kind=="search_entry"

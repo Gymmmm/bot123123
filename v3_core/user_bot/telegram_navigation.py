@@ -79,12 +79,10 @@ def polish_listing_keyboard(
             for button in row:
                 raw_label = str(button.text or "")
                 label = raw_label
-                if raw_label == "💬 联系我们":
-                    label = "💬 问这套房"
-                elif raw_label == "💬 联系中文顾问":
-                    label = "💬 问这套房"
-                elif raw_label == "🔍 看相近房源":
-                    label = "✏️ 换个条件找"
+                if raw_label in {"💬 联系我们", "💬 联系中文顾问", "问这套房", "联系我们"}:
+                    label = "咨询这套"
+                elif raw_label in {"🔍 看相近房源", "✏️ 换个条件找"}:
+                    label = "换条件"
                 if label != raw_label:
                     upgraded.append(
                         InlineKeyboardButton(
@@ -100,14 +98,14 @@ def polish_listing_keyboard(
 
     existing_labels = {str(button.text or "") for row in rows for button in row}
     back_search = str(back_to_search_callback or "").strip()
-    if back_search and "⬅️ 返回结果" not in existing_labels:
-        rows.append([InlineKeyboardButton("⬅️ 返回结果", callback_data=back_search)])
-        existing_labels.add("⬅️ 返回结果")
+    if back_search and "返回房源" not in existing_labels:
+        rows.append([InlineKeyboardButton("返回房源", callback_data=back_search)])
+        existing_labels.add("返回房源")
     clean_channel = str(channel_url or "").strip()
-    if add_channel and clean_channel and not back_search and "📢 回频道看房源" not in existing_labels:
-        rows.append([InlineKeyboardButton("📢 回频道看房源", url=clean_channel)])
-    if add_home and not back_search and not add_channel and "⬅️ 回首页" not in existing_labels:
-        rows.append([InlineKeyboardButton("⬅️ 回首页", callback_data=_HOME_CALLBACK)])
+    if add_channel and clean_channel and not back_search and "回频道看房源" not in existing_labels:
+        rows.append([InlineKeyboardButton("回频道看房源", url=clean_channel)])
+    if add_home and not back_search and not add_channel and "回首页" not in existing_labels:
+        rows.append([InlineKeyboardButton("回首页", callback_data=_HOME_CALLBACK)])
     return InlineKeyboardMarkup(rows) if rows else None
 
 

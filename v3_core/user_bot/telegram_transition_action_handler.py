@@ -94,6 +94,10 @@ async def _edit_view(query: Any, view: TransitionView) -> None:
 
 
 def _view_for_result(views: TransitionViewService, result: TransitionActionResult) -> TransitionView | None:
+    if result.next_step == "appointment_mode":
+        if result.appointment is None:
+            raise ValueError("appointment_mode_action_missing_draft")
+        return views.appointment_mode(result.appointment)
     if result.next_step == "appointment_date":
         if result.appointment is None:
             raise ValueError("appointment_date_action_missing_draft")
@@ -288,6 +292,19 @@ async def handle_v3_transition_action(
     # These two callbacks are the explicit confirmation boundary added by
     # Issue #25. They operate on the same public appointment session and do not
     # introduce a second controller or persistence path.
+    if callback.kind == "appointment_exit":
+        await query.answer()
+        await _edit_view(
+            query,
+            TransitionView(
+                kind="appointment_exit",
+                text="<b>已退出本次预约</b>\n\n您可以继续查看上方房源。",
+                rows=(),
+            ),
+        )
+        apply_session_mutation(user_data, _appointment_success_cleanup())
+        return TelegramTransitionActionOutcome(handled=True)
+
     if callback.kind in {"appointment_submit", "appointment_back_time"}:
         await query.answer()
         draft = _load_confirmation_draft(user_data)

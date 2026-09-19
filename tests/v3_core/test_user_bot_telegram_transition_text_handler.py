@@ -246,7 +246,7 @@ async def test_custom_time_renders_confirmation_without_persisting():
     assert user_data[APPOINTMENT_SESSION_KEY]["time"] == "20:00"
     assert executor.calls == []
     rendered = message.calls[-1][1][0]
-    assert "确认看房预约" in rendered
+    assert "确认预约信息" in rendered
     assert "9月5日" in rendered
     assert "20:00" in rendered
     assert "LST_INTERNAL_1" not in rendered
@@ -268,7 +268,7 @@ async def test_custom_time_does_not_invoke_failing_executor_before_confirmation(
     assert APPOINTMENT_SESSION_KEY in user_data
     assert user_data[APPOINTMENT_SESSION_KEY]["time"] == "20:00"
     assert APPOINTMENT_AWAITING_TIME_KEY not in user_data
-    assert "确认看房预约" in message.calls[-1][1][0]
+    assert "确认预约信息" in message.calls[-1][1][0]
 
 
 @pytest.mark.asyncio

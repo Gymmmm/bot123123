@@ -31,6 +31,8 @@ _FLAG_KINDS = frozenset(
         "appointment_other_date",
         "appointment_other_time",
         "appointment_back_date",
+        "appointment_back_mode",
+        "appointment_exit",
         "appointment_submit",
         "appointment_back_time",
         "home",

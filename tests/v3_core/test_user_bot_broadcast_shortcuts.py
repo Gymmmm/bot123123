@@ -108,7 +108,7 @@ async def test_find_home_shortcut_enters_guided_search_without_property_resoluti
     outcome = await handle_v3_start(_update(message), context, listings=listings, transition_views=_views())
     assert outcome.handled and outcome.kind == "broadcast_find_home"
     assert listings.calls == []
-    assert "想住什么样的房子" in message.calls[0][0][0]
+    assert "请输入您的找房需求" in message.calls[0][0][0]
     assert context.user_data[AWAITING_KEYWORD_SESSION_KEY] == {"source": "daily_broadcast"}
     assert context.user_data[SEARCH_PREF_SESSION_KEY]["source"] == "daily_broadcast"
     assert "stale" not in context.user_data
@@ -122,7 +122,7 @@ async def test_budget_shortcut_opens_budget_filter_directly():
     outcome = await handle_v3_start(_update(message), context, listings=listings, transition_views=_views())
     assert outcome.handled and outcome.kind == "broadcast_budget"
     assert listings.calls == []
-    assert "每月预算大概多少" in message.calls[-1][0][0]
+    assert "选择预算" in message.calls[-1][0][0]
     assert context.user_data[SEARCH_PREF_SESSION_KEY]["source"] == "daily_broadcast"
 
 
@@ -159,7 +159,7 @@ async def test_appointments_shortcut_uses_real_appointment_history():
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("payload", "expected_kind", "expected_text"),
-    [("assurance", "broadcast_assurance", "租到房，不代表服务就结束了"), ("service", "broadcast_service", "入住服务")],
+    [("assurance", "broadcast_assurance", "租到房，不代表服务就结束了"), ("service", "broadcast_service", "侨联服务")],
 )
 async def test_service_shortcuts_land_on_real_user_surfaces(payload, expected_kind, expected_text):
     message = FakeMessage()
@@ -195,9 +195,9 @@ async def test_service_shortcut_ignores_binding_and_opens_public_service_home():
     ]
     assert "富力城 A3-1208" not in text
     assert callbacks == [
-        "v3u:assure:handover", "v3u:assure:moving",
-        "v3u:service:repair", "v3u:service:property",
-        "v3u:service:local", "v3u:home:contact", "v3u:t:home",
+        "v3u:service:tenant_lease", "v3u:service:concierge",
+        "v3u:home:rental", "v3u:service:local",
+        "v3u:home:contact", "v3u:t:home",
     ]
 
 
@@ -258,5 +258,5 @@ async def test_unbookable_property_book_deeplink_shows_lock_copy_then_contextual
     markup = message.calls[1][1]["reply_markup"]
     labels = [button.text for row in markup.inline_keyboard for button in row]
     assert "📅 预约看房" not in labels
-    assert "✏️ 换个条件找" in labels
+    assert "换条件" in labels
     assert "看相近房源" not in " ".join(labels)

@@ -193,10 +193,11 @@ async def test_time_choice_renders_confirmation_and_does_not_persist():
     assert [call[0] for call in query.calls] == ["answer", "edit_text"]
     assert user_data[APPOINTMENT_SESSION_KEY]["time"] == "pm"
     rendered = query.calls[-1][1][0]
-    assert "确认看房预约" in rendered
+    assert "确认预约信息" in rendered
     markup = query.calls[-1][2]["reply_markup"]
     assert markup.inline_keyboard[0][0].callback_data == "v3u:t:appointment_submit"
-    assert markup.inline_keyboard[1][0].callback_data == "v3u:t:appointment_back_time"
+    assert markup.inline_keyboard[1][0].callback_data == "v3u:t:appointment_back_date"
+    assert markup.inline_keyboard[1][1].callback_data == "v3u:t:appointment_back_time"
 
 
 @pytest.mark.asyncio

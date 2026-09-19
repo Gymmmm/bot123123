@@ -65,7 +65,7 @@ def test_channel_reserved_status_uses_locked_user_visible_semantics():
         offer={"offer_type": "rent", "monthly_rent_usd": 680},
         public_listing_id="QL-RF-A2B3",
     )
-    assert "🟡 已有预约 · 仍可预约" in caption
+    assert "🟡 已有预约，仍可预约" in caption
     assert "🟢 当前可预约" not in caption
 
 
@@ -177,14 +177,14 @@ def _published_view() -> PublishedListingView:
 
 def test_details_labels_public_id_as_real_photo_reference():
     text = build_details_response(_published_view()).text
-    assert "🏠 <b>富力城｜1房</b>" in text
-    assert "💵 <b>$680/月</b>" in text
-    assert "🆔 QL-RF-A2B3" in text
+    assert "<b>富力城 · 1房</b>" in text
+    assert "<b>$680/月</b>" in text
+    assert "QL-RF-A2B3" in text and "🆔" not in text
 
 
 def test_rfcity_category_returns_to_rfcity_navigation():
     view = _rfcity_category_product_view("restaurant")
-    assert view.rows[-1][0].label == "⬅️ 返回富力导航"
+    assert view.rows[-1][0].label == "返回富力导航"
     assert view.rows[-1][0].callback_data == "v3u:service:rfcity"
 
 
@@ -192,13 +192,13 @@ def test_missing_channel_url_does_not_create_channel_button():
     view = build_home_view(channel_url="")
     choices = [choice for row in view.rows for choice in row]
     assert all(choice.label != "📢 房源频道" for choice in choices)
-    assert any(choice.label == "💬 中文顾问" for choice in choices)
+    assert any(choice.label == "中文顾问" for choice in choices)
 
 
 def test_missing_advisor_url_uses_internal_contact_callback_not_dead_url():
     view = build_contact_view(advisor_url="")
     first = view.rows[0][0]
-    assert first.label == "💬 中文顾问"
+    assert first.label == "中文顾问"
     assert first.url == ""
     button = encode_home_choice(first)
     assert button.url is None

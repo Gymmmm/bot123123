@@ -42,7 +42,7 @@ from .telegram_home_handler import handle_v3_home_callback
 from .telegram_home_ui import build_home_keyboard
 from .telegram_keyword_search_handler import handle_v3_keyword_search_text
 from .telegram_listing_callback import handle_v3_listing_callback
-from .telegram_service_handler import handle_v3_service_callback, handle_v3_service_text
+from .telegram_service_handler import handle_v3_service_callback, handle_v3_service_media, handle_v3_service_text
 from .telegram_start_handler import handle_v3_start
 from .telegram_transition_action_handler import handle_v3_transition_action
 from .telegram_transition_text_handler import handle_v3_transition_text
@@ -59,7 +59,7 @@ def public_command_menu() -> tuple[BotCommand, ...]:
         BotCommand("start", "回到首页"),
         BotCommand("find", "开始找房"),
         BotCommand("appointments", "我的预约"),
-        BotCommand("service", "入住服务"),
+        BotCommand("service", "侨联服务"),
     )
 
 
@@ -486,6 +486,19 @@ def build_v3_user_bot_application(
             lead_effects=deps.transition.lead_effects,
         )
 
+    async def media(update, context):
+        runtime_state.heartbeat("user", state="running", event=True)
+        await remove_legacy_reply_keyboard(update, context)
+        service = await handle_v3_service_media(
+            update,
+            context,
+            service=deps.transition.tenant_service,
+            effects=deps.service_effects,
+            advisor_url=config.advisor_url,
+        )
+        if service.handled:
+            return
+
     async def heartbeat(context):
         runtime_state.heartbeat("user", state="running")
 
@@ -519,6 +532,7 @@ def build_v3_user_bot_application(
         group=0,
     )
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text), group=0)
+    app.add_handler(MessageHandler((filters.PHOTO | filters.VIDEO) & ~filters.COMMAND, media), group=0)
     app.add_error_handler(errors)
     if app.job_queue is not None:
         app.job_queue.run_repeating(heartbeat, interval=30, first=5, name="v3_user_runtime_heartbeat")

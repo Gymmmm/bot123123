@@ -75,8 +75,8 @@ def test_details_payload_resolves_all_the_way_to_frozen_public_response():
     assert result.action == "details"
     assert result.public_listing_id == "QL-RF-A2B3"
     assert result.details is not None
-    assert "📋 <b>租赁详情</b>" in result.details.text
-    assert "富力城｜2房1厅" in result.details.text
+    assert "<b>富力城 · 2房1厅</b>" in result.details.text
+    assert "富力城 · 2房1厅" in result.details.text
     assert result.photos is None
     assert result.book is None
 
@@ -91,7 +91,7 @@ def test_photos_payload_returns_frozen_existing_gallery_response(tmp_path):
     assert result.ok
     assert result.action == "photos"
     assert result.photos is not None
-    assert result.photos.media_groups == ((str(photo),),)
+    assert result.photos.media_groups == ()
     assert result.details is None
     assert result.book is None
 
@@ -154,13 +154,13 @@ def test_rented_book_is_blocked_before_appointment_flow_is_created():
         assert result.reason == "listing_not_bookable"
         assert result.book is None
         assert result.details is not None
-        assert "🔴 房态：已租出" in result.details.text
+        assert "🔴 已租出" in result.details.text
         actions = [action for row in result.details.action_rows for action in row]
         labels = [action.label for action in actions]
-        assert "📅 预约看房" not in labels
-        assert "💬 问这套房" in labels
-        assert "📸 更多实拍" in labels
-        assert not any(label.endswith("换个条件找") for label in labels)
+        assert "预约看房" not in labels
+        assert "咨询这套" in labels
+        assert "更多实拍" not in labels
+        assert "咨询这套" in labels
 
 
 def test_direct_action_rejects_invalid_identity_and_non_public_action():

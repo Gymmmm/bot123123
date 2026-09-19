@@ -90,6 +90,8 @@ def _search_entry_plan() -> TransitionPlan:
 
 
 def _listing_keyboard(result, *, advisor_url: str = "", channel_url: str = ""):
+    if not result.action_rows:
+        return None
     return polish_listing_keyboard(
         build_action_keyboard(result.action_rows),
         advisor_url=advisor_url,

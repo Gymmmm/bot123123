@@ -57,7 +57,8 @@ def test_rental_details_use_publisher_frozen_copy_only(source):
         adviser_copy_source=source,
     )
     text = build_details_response(listing).text
-    assert "💬 <b>侨联说</b>\nPublisher 第一句。\nPublisher 第二句。" in text
+    assert "<b>侨联说</b>" in text
+    assert "<blockquote>Publisher 第一句。\nPublisher 第二句。</blockquote>" in text
     assert sum(line.startswith("• ") for line in text.splitlines()) == 0
 
 

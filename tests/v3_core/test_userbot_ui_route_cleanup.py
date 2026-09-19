@@ -30,7 +30,7 @@ def test_public_command_menu_hides_retired_and_admin_entries():
         ("start", "回到首页"),
         ("find", "开始找房"),
         ("appointments", "我的预约"),
-        ("service", "入住服务"),
+        ("service", "侨联服务"),
     ]
     assert not {"about", "contact", "help", "admin", "contracts"} & {name for name, _ in commands}
 
@@ -111,9 +111,8 @@ async def test_property_advisor_buttons_are_only_handoff_and_return():
 def test_aftercare_and_public_resident_buttons_stay_frozen():
     assert _labels(build_assurance_home_view()) == ["📋 入住交接留档", "🔍 开始找房", "💬 中文顾问", "⬅️ 回首页"]
     expected = [
-        "📋 入住交接留档", "🚚 搬家协助",
-        "🔧 房屋问题报修", "🏢 物业沟通",
-        "📍 周边生活", "💬 中文顾问", "⬅️ 回首页",
+        "我的租约", "入住管家", "安心租房", "周边生活",
+        "中文顾问", "回首页",
     ]
     assert _labels(service_home_view()) == expected
     class Service:
@@ -130,7 +129,7 @@ def test_search_card_order_and_public_identity(monkeypatch):
     monkeypatch.setattr(mod, "build_public_listing_details", lambda view: D())
     card = build_search_card((V(),), 0)
     labels = [choice.label for row in card.action_rows for choice in row]
-    assert labels == ["📋 租赁详情", "📸 更多实拍", "📅 预约看房", "💬 问这套房", "✏️ 换个条件找"]
+    assert labels == ["房源详情", "预约看房", "换条件"]
     assert "l_" not in repr(card).lower()
 
 

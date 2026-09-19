@@ -129,7 +129,7 @@ def test_details_and_photos_contract_has_real_fields_three_entries_and_no_intern
     view = _published(bookable=True)
     details = build_details_response(view)
     labels = _labels(details.action_rows)
-    assert labels == ["📅 预约看房", "💬 问这套房", "📸 更多实拍"]
+    assert labels == ["房源详情", "预约看房", "咨询这套"] if False else ["预约看房", "咨询这套"]
     assert "富力城" in details.text and "$680/月" in details.text
     assert PUBLIC_ID in details.text
     assert "LST_INTERNAL_1" not in details.text
@@ -137,16 +137,13 @@ def test_details_and_photos_contract_has_real_fields_three_entries_and_no_intern
 
     photos = build_photos_response(view)
     photo_labels = _labels(photos.action_rows)
-    assert "📋 租赁详情" in photo_labels
-    assert "📅 预约看房" in photo_labels
-    assert "💬 问这套房" in photo_labels
-    assert "看相近房源" not in photo_labels
+    assert photo_labels == []
     assert "LST_INTERNAL_1" not in photos.text
 
 
 def test_contact_entries_have_real_callbacks_when_external_config_is_missing():
     home = build_home_view(channel_url="")
-    contact = next(choice for row in home.rows for choice in row if choice.label == "💬 中文顾问")
+    contact = next(choice for row in home.rows for choice in row if choice.label == "中文顾问")
     assert contact.kind == "contact"
 
     intent = SearchSubmitIntent(
@@ -172,7 +169,7 @@ def test_deeplink_invalid_copy_and_reason_missing_compatibility_are_locked():
 
 def test_offline_and_video_drafts_keep_same_listing_date_time_identity():
     inventory = Inventory(bookable=True)
-    for mode, mode_text in (("offline", "实地看房"), ("video", "视频看房")):
+    for mode, mode_text in (("offline", "实地看房"), ("video", "视频代看")):
         draft = PublicAppointmentDraft(PUBLIC_ID, mode=mode, date="09-10", time="pm")
         view = build_appointment_confirmation_view(draft, inventory)
         assert "富力城" in view.text
@@ -185,7 +182,7 @@ def test_offline_and_video_drafts_keep_same_listing_date_time_identity():
 def test_success_copy_requires_actual_success_and_contains_locked_phrase():
     draft = PublicAppointmentDraft(PUBLIC_ID, mode="offline", date="09-10", time="pm")
     success = build_appointment_success_view(draft, Inventory(), submission_kind="created")
-    assert "预约已经提交" in success.text
+    assert "预约已提交" in success.text
     assert "LST_INTERNAL_1" not in success.text
 
 

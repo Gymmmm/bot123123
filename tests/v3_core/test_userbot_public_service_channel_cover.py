@@ -162,25 +162,14 @@ async def test_channel_deeplink_start_handler_keeps_listing_context(tmp_path, pa
         assert PUBLIC_ID in rendered
         assert "侨联地产｜您在金边的自己人" not in rendered
     elif expected_kind == "photos":
-        sent_photo = next(call for call in bot.calls if call[0] == "send_photo")
-        assert sent_photo[1] == str(photo)
+        assert not any(call[0] == "send_photo" for call in bot.calls)
         action = next(call for call in bot.calls if call[0] == "send_message")
-        callbacks = [
-            button.callback_data
-            for row in action[2]["reply_markup"].inline_keyboard
-            for button in row
-            if button.callback_data
-        ]
-        assert any(PUBLIC_ID in value for value in callbacks)
+        assert "暂无更多实拍图片" in action[1]
     else:
         rendered = message.calls[-1][1]
-        assert PUBLIC_ID in rendered
-        labels = [
-            button.text
-            for row in message.calls[-1][2]["reply_markup"].inline_keyboard
-            for button in row
-        ]
-        assert "📋 先看详情" in labels
+        assert "预约看房" in rendered
+        assert "富力城｜2房1厅" in rendered
+        assert PUBLIC_ID not in rendered
 
     public_text = repr((message.calls, bot.calls, context.user_data))
     assert "LST_INTERNAL_1" not in public_text
@@ -208,21 +197,15 @@ def test_public_service_home_matches_frozen_product():
     view = service_home_view()
     labels = [choice.label for row in view.rows for choice in row]
     callbacks = [choice.callback_data for row in view.rows for choice in row]
-    assert view.text == (
-        "🛠 <b>入住服务</b>\n\n"
-        "房子定下来以后，入住和居住过程中需要处理的事情，可以从这里找侨联。"
-    )
+    assert "<b>侨联服务</b>" in view.text
     assert labels == [
-        "📋 入住交接留档", "🚚 搬家协助",
-        "🔧 房屋问题报修", "🏢 物业沟通",
-        "📍 周边生活", "💬 中文顾问",
-        "⬅️ 回首页",
+        "我的租约", "入住管家", "安心租房", "周边生活",
+        "中文顾问", "回首页",
     ]
     assert callbacks == [
-        "v3u:assure:handover", "v3u:assure:moving",
-        "v3u:service:repair", "v3u:service:property",
-        "v3u:service:local", "v3u:home:contact",
-        "v3u:t:home",
+        "v3u:service:tenant_lease", "v3u:service:concierge",
+        "v3u:home:rental", "v3u:service:local",
+        "v3u:home:contact", "v3u:t:home",
     ]
     assert "没有显示你的住房信息" not in view.text
 
@@ -253,8 +236,8 @@ async def test_service_start_ignores_previous_listing_session_and_never_renders_
 
     assert outcome.kind == "broadcast_service"
     rendered = message.calls[-1][1]
-    assert "🛠 <b>入住服务</b>" in rendered
-    assert "📋 <b>租赁详情</b>" not in rendered
+    assert "<b>侨联服务</b>" in rendered
+    assert "QL-" not in rendered
     assert PUBLIC_ID not in rendered
     assert context.user_data == {}
 
@@ -278,6 +261,7 @@ class FakeQuery:
 def _callback_update(query):
     return SimpleNamespace(
         callback_query=query,
+        effective_chat=SimpleNamespace(id=1001),
         effective_user=SimpleNamespace(id=123, username="alice", full_name="Alice"),
     )
 
@@ -299,36 +283,39 @@ def _unbound_service(tmp_path):
 @pytest.mark.parametrize(
     ("callback", "expected"),
     [
-        ("v3u:service:repair", "报修与维护"),
-        ("v3u:service:property", "物业沟通"),
-        ("v3u:service:local", "金边华人生活配套"),
+        ("v3u:service:repair", "房屋报修"),
+        ("v3u:service:property", "物业协调"),
+        ("v3u:service:local", "周边生活"),
     ],
 )
 async def test_public_service_actions_do_not_require_binding(tmp_path, callback, expected):
     service = _unbound_service(tmp_path)
     query = FakeQuery(callback)
+    bot = FakeBot()
     outcome = await handle_v3_service_callback(
         _callback_update(query),
-        SimpleNamespace(user_data={}, bot=FakeBot()),
+        SimpleNamespace(user_data={}, bot=bot),
         service=service,
     )
     assert outcome.handled and outcome.rendered
-    assert expected in query.calls[-1][1]
-    assert "没有显示你的住房信息" not in query.calls[-1][1]
+    rendered = bot.calls[-1][1] if bot.calls else query.calls[-1][1]
+    assert expected in rendered
+    assert "没有显示你的住房信息" not in rendered
 
 
 @pytest.mark.asyncio
 async def test_missing_binding_is_only_a_lease_gate(tmp_path):
     service = _unbound_service(tmp_path)
     query = FakeQuery("v3u:service:tenant_lease")
+    bot = FakeBot()
     outcome = await handle_v3_service_callback(
         _callback_update(query),
-        SimpleNamespace(user_data={}, bot=FakeBot()),
+        SimpleNamespace(user_data={}, bot=bot),
         service=service,
     )
     assert outcome.handled and outcome.rendered
-    text = query.calls[-1][1]
-    assert "暂时没有识别到你的租约信息，请联系中文顾问核对。" in text
+    text = bot.calls[-1][1]
+    assert "目前没有查到已绑定的租约记录" in text
 
 
 class FakeEffects:
@@ -337,7 +324,7 @@ class FakeEffects:
 
     async def general(self, **kwargs):
         self.general_calls.append(kwargs)
-        return SimpleNamespace(kind="general")
+        return SimpleNamespace(kind="general", lead=SimpleNamespace(status="recorded"), admin=SimpleNamespace(sent_admin_ids=()))
 
 
 @pytest.mark.asyncio
@@ -364,7 +351,19 @@ async def test_unbound_repair_flow_reuses_general_service_effect_without_fake_bi
     assert detail.handled and detail.rendered
     assert context.user_data[SERVICE_REQUEST_SESSION_KEY]["detail"] == "空调可以启动，但一直不制冷。"
 
-    query = FakeQuery("v3u:service:slot:today")
+    await handle_v3_service_callback(
+        _callback_update(FakeQuery("v3u:service:repair_media_skip")),
+        context,
+        service=service,
+        effects=effects,
+    )
+    await handle_v3_service_callback(
+        _callback_update(FakeQuery("v3u:service:slot:today")),
+        context,
+        service=service,
+        effects=effects,
+    )
+    query = FakeQuery("v3u:service:repair_confirm")
     submitted = await handle_v3_service_callback(
         _callback_update(query),
         context,
@@ -377,7 +376,7 @@ async def test_unbound_repair_flow_reuses_general_service_effect_without_fake_bi
     details = effects.general_calls[0]["details"]
     assert "报修：空调" in details
     assert "空调可以启动，但一直不制冷。" in details
-    assert "希望时间：今天内安排" in details
+    assert "希望时间：今天内" in details
     assert SERVICE_REQUEST_SESSION_KEY not in context.user_data
 
     with sqlite3.connect(str(service.repository.db_path)) as conn:
@@ -389,15 +388,8 @@ def test_local_life_is_phnom_penh_hub_with_real_rfcity_and_other_area_paths():
     view = local_life_view()
     labels = [choice.label for row in view.rows for choice in row]
     callbacks = [choice.callback_data for row in view.rows for choice in row]
-    assert "🗺 <b>金边华人生活配套</b>" in view.text
-    for line in (
-        "• 中餐 / 夜宵",
-        "• 超市 / 送货 / 搬家",
-        "• 洗衣 / 保洁 / 维修",
-        "• 医院 / 药店",
-        "• 其他日常生活服务",
-    ):
-        assert line in view.text
-    assert labels == ["🏙 富力城周边", "📍 其他区域需求", "⬅️ 返回入住服务"]
-    assert callbacks == ["v3u:service:rfcity", "v3u:service:nearby_other", "v3u:home:service"]
+    assert "<b>周边生活</b>" in view.text
+    assert "富力城" in view.text
+    assert labels == ["富力城周边", "问问其他区域", "返回侨联服务"]
+    assert callbacks == ["v3u:service:rfcity", "v3u:home:contact", "v3u:home:service"]
     assert "LST_" not in repr(view)

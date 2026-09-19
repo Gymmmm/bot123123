@@ -62,7 +62,8 @@ def test_publisher_copy_is_returned_and_rendered_verbatim(source):
     view = _view(adviser_copy=frozen, adviser_copy_source=source)
     assert adviser_notes_for_view(view) == frozen
     text = build_details_response(view).text
-    assert "💬 <b>侨联说</b>\n" + frozen in text
+    assert "<b>侨联说</b>" in text
+    assert f"<blockquote>{frozen}</blockquote>" in text
     assert "• 第一句" not in text
 
 
@@ -98,9 +99,9 @@ def test_listing_facts_never_generate_user_bot_adviser_copy(facts, listing):
 def test_other_details_and_actions_remain_present_with_authoritative_copy():
     view = _view(adviser_copy="已冻结建议。", adviser_copy_source="auto")
     response = build_details_response(view)
-    assert "📋 <b>租赁详情</b>" in response.text
-    assert "💵 <b>$800/月</b>" in response.text
-    assert "房态：当前可预约" in response.text
+    assert "<b>富力城 · 公寓</b>" in response.text
+    assert "<b>$800/月</b>" in response.text
+    assert "🟢 当前可预约" in response.text
     labels = [action.label for row in response.action_rows for action in row]
-    assert "📅 预约看房" in labels
-    assert "💬 问这套房" in labels
+    assert "预约看房" in labels
+    assert "咨询这套" in labels

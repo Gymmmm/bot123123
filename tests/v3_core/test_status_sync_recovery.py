@@ -36,7 +36,7 @@ async def test_status_change_is_durable_and_syncs_every_bound_post(tmp_path):
     bot.edit_message_caption = AsyncMock()
     await restarted.scheduled_tick(SimpleNamespace(bot=bot))
     assert [c.kwargs['message_id'] for c in bot.edit_message_caption.call_args_list] == [10, 11]
-    assert all('待确认' in c.kwargs['caption'] for c in bot.edit_message_caption.call_args_list)
+    assert all('暂不可预约' in c.kwargs['caption'] for c in bot.edit_message_caption.call_args_list)
     with sqlite3.connect(db) as conn:
         assert conn.execute('SELECT count(*) FROM publisher_status_sync_outbox_v3').fetchone()[0] == 0
 
