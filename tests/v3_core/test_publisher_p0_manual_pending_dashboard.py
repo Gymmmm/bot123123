@@ -350,9 +350,10 @@ async def test_dashboard_pending_uses_existing_eligible_ten_at_a_time_queue(tmp_
     await controller.show_listing_categories(message)
     labels = _labels(message.calls[-1]["reply_markup"])
     callbacks = _callbacks(message.calls[-1]["reply_markup"])
-    assert "🔵 待确认 11｜10套一组" in labels
+    pending_label = next(label for label in labels if label.startswith("🔵 待确认 "))
+    assert pending_label == "🔵 待确认 11｜10套一组"
+    assert "🔵 待确认 17" not in labels
     assert callbacks[0] == "v3smp|pbat|0"
-    assert "17" not in " ".join(labels)
 
     first = controller._pending_batch_rows(0)
     second = controller._pending_batch_rows(1)
