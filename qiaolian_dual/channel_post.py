@@ -116,9 +116,12 @@ def format_channel_listing_post(
 ) -> str:
     """频道主帖：一眼判断房子、租金、基础条件和房态。"""
     del appointment_count, extra_tags  # 后台预约数量和营销 tag 不公开。
-    project = _clean(d.get('project') or d.get('project_name'), 24)
+    project = _clean(d.get('preferred_project_name_cn') or d.get('project') or d.get('project_name'), 24)
+    project_en = _clean(d.get('canonical_project_name_en') or d.get('project_name_en'), 32)
     area = _clean(d.get('public_location_display') or d.get('area'), 24)
     heading = project if project and project not in _GENERIC_HEADINGS else (area or '金边房源')
+    if project_en and project_en.casefold() != heading.casefold():
+        heading = f"{heading} / {project_en}"
     property_type = _clean(d.get('property_type'), 16)
     layout = _clean(_display_layout(d.get('layout') or d.get('room_type') or property_type or '整租', property_type), 18)
 
