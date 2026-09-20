@@ -160,3 +160,21 @@ def test_executor_factory_does_not_initialize_missing_database(tmp_path):
     with pytest.raises(FileNotFoundError):
         executor.execute(user=AppointmentUser(123), draft=_ready_public())
     assert not db.exists()
+
+
+def test_offline_listing_is_not_bookable_and_writes_no_appointment(tmp_path):
+    db = tmp_path / "v3.db"
+    initialize_v3_storage(db)
+    _seed_published_rent(db)
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            "UPDATE listings_v3 SET inventory_status='offline' WHERE listing_id='LST_1'"
+        )
+        conn.commit()
+    executor = build_sqlite_appointment_submit_executor(db)
+
+    with pytest.raises(ValueError, match="listing_not_bookable"):
+        executor.execute(user=AppointmentUser(123), draft=_ready_public())
+
+    with sqlite3.connect(db) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM appointments_v3").fetchone()[0] == 0
