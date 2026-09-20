@@ -369,23 +369,14 @@ def _cover_search_roots(view: PublishedListingView) -> list[Path]:
 
 def _looks_like_rendered_cover(path: Path, *, public_id: str, style: str) -> bool:
     name = path.name.lower()
-    parts_lower = {part.lower() for part in path.parts}
-    if "covers_v3" in parts_lower or (path.parent.name.lower() == "covers"):
+    pid = str(public_id or "").strip().lower()
+    if not pid or pid not in name:
+        return False
+    if path.suffix.lower() not in {".png", ".jpg", ".jpeg", ".webp"}:
+        return False
+    if style and style.lower() in name:
         return True
-    pid = public_id.lower()
-    if pid and pid in name:
-        if style and style.lower() in name:
-            return True
-        if name.startswith(pid.lower() + "_") and path.suffix.lower() in {
-            ".png",
-            ".jpg",
-            ".jpeg",
-            ".webp",
-        }:
-            return True
-    if name in {"cover.jpg", "cover.jpeg", "cover.png", "cover.webp"}:
-        return True
-    return False
+    return name.startswith(pid + "_") or name.startswith(pid + ".")
 
 
 def _frozen_cover_path(view: PublishedListingView) -> str:
@@ -411,9 +402,6 @@ def _frozen_cover_path(view: PublishedListingView) -> str:
         Path(explicit), public_id=public_id, style=style
     ):
         return explicit
-    # Explicit path exists but looks like a raw/source still usable as placeholder
-    # only when no rendered cover can be rediscovered below.
-    explicit_fallback = explicit
 
     candidates: list[str] = []
     if public_id and style:
@@ -433,19 +421,14 @@ def _frozen_cover_path(view: PublishedListingView) -> str:
             except OSError:
                 continue
 
-    for raw in getattr(view, "gallery", ()) or ():
-        path = str(raw or "").strip()
-        if not path:
-            continue
-        if Path(path).name.lower() in {"cover.jpg", "cover.jpeg", "cover.png", "cover.webp"}:
-            candidates.append(path)
-
     for candidate in candidates:
         found = _existing_file(candidate)
-        if found:
+        if found and _looks_like_rendered_cover(
+            Path(found), public_id=public_id, style=style
+        ):
             return found
 
-    return explicit_fallback or ""
+    return ""
 
 
 def _flipper_photo_paths(view: PublishedListingView) -> tuple[str, ...]:
