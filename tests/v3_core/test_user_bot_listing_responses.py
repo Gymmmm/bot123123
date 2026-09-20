@@ -282,4 +282,3 @@ def test_build_detail_caption_alias_matches_sectioned_body():
     text = build_detail_caption(_view())
     assert "🏢 金边优质房源出租" in text
     assert "QL-RF-A2B3" in text
-
