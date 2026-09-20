@@ -61,7 +61,6 @@ _GUIDED_SEARCH_CALLBACKS = frozenset(
         "budget_custom",
         "search_layout",
         "layout_choice",
-        "search_available",
     }
 )
 
@@ -95,6 +94,10 @@ async def _edit_view(query: Any, view: TransitionView) -> None:
 
 
 def _view_for_result(views: TransitionViewService, result: TransitionActionResult) -> TransitionView | None:
+    if result.next_step == "appointment_mode":
+        if result.appointment is None:
+            raise ValueError("appointment_mode_action_missing_draft")
+        return views.appointment_mode(result.appointment)
     if result.next_step == "appointment_date":
         if result.appointment is None:
             raise ValueError("appointment_date_action_missing_draft")
@@ -135,7 +138,13 @@ def _navigation_view(
     if navigation == "search_area":
         return views.search_area()
     if navigation == "search_layout":
-        return views.search_layout()
+        pref = preview.get(SEARCH_PREF_SESSION_KEY)
+        area_display = ""
+        budget_label = ""
+        if isinstance(pref, dict):
+            area_display = str(pref.get("area_display") or "").strip()
+            budget_label = str(pref.get("budget_label") or "").strip()
+        return views.search_layout(area_display, budget_label)
     if navigation == "search_budget":
         pref = preview.get(SEARCH_PREF_SESSION_KEY)
         area_display = ""
@@ -268,6 +277,10 @@ async def handle_v3_transition_action(
 ) -> TelegramTransitionActionOutcome:
     query = getattr(update, "callback_query", None)
     raw = str(getattr(query, "data", "") or "") if query is not None else ""
+    if query is not None and raw == "v3u:t:search_available":
+        await query.answer("入口已更新，请重新选择找房条件。")
+        await _edit_view(query, views.search_entry())
+        return TelegramTransitionActionOutcome(handled=True)
     callback = parse_transition_callback(raw)
     if query is None or callback is None:
         return TelegramTransitionActionOutcome(handled=False)
@@ -279,6 +292,19 @@ async def handle_v3_transition_action(
     # These two callbacks are the explicit confirmation boundary added by
     # Issue #25. They operate on the same public appointment session and do not
     # introduce a second controller or persistence path.
+    if callback.kind == "appointment_exit":
+        await query.answer()
+        await _edit_view(
+            query,
+            TransitionView(
+                kind="appointment_exit",
+                text="<b>已退出本次预约</b>\n\n您可以继续查看上方房源。",
+                rows=(),
+            ),
+        )
+        apply_session_mutation(user_data, _appointment_success_cleanup())
+        return TelegramTransitionActionOutcome(handled=True)
+
     if callback.kind in {"appointment_submit", "appointment_back_time"}:
         await query.answer()
         draft = _load_confirmation_draft(user_data)

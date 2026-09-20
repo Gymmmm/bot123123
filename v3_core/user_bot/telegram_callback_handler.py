@@ -84,7 +84,11 @@ async def _render_photos(
     *,
     query: Any | None = None,
 ) -> None:
-    """Render one photo + detail caption; flip in place via editMessageMedia."""
+    """Render one photo + short caption; flip in place via editMessageMedia.
+
+    Full sectioned detail (if present) is sent as a separate text message on
+    first open only — never as the photo caption.
+    """
     chat_id = _chat_id(update)
     bot = context.bot
     photo_path = str(getattr(response, "photo_path", "") or "").strip()
@@ -98,6 +102,7 @@ async def _render_photos(
 
     message = getattr(query, "message", None) if query is not None else None
     has_photo = bool(getattr(message, "photo", None))
+    flipping = bool(query is not None and has_photo)
 
     if query is not None and has_photo and path is not None:
         await query.edit_message_media(
@@ -125,13 +130,16 @@ async def _render_photos(
                 parse_mode=ParseMode.HTML,
                 reply_markup=response.keyboard,
             )
-        return
-    await bot.send_message(
-        chat_id=chat_id,
-        text=response.text,
-        parse_mode=ParseMode.HTML,
-        reply_markup=response.keyboard,
-    )
+    else:
+        await bot.send_message(
+            chat_id=chat_id,
+            text=response.text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=response.keyboard,
+        )
+    detail = str(getattr(response, "detail_text", "") or "").strip()
+    if detail and not flipping:
+        await bot.send_message(chat_id=chat_id, text=detail, parse_mode=ParseMode.HTML)
 
 
 async def _render_transition_view(query: Any, view: TransitionView) -> None:
@@ -141,6 +149,21 @@ async def _render_transition_view(query: Any, view: TransitionView) -> None:
         await query.edit_message_caption(caption=view.text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
         return
     await query.edit_message_text(view.text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+
+
+async def _send_transition_view(update: Any, context: Any, query: Any, view: TransitionView) -> None:
+    keyboard = build_transition_keyboard(view)
+    message = getattr(query, "message", None)
+    reply = getattr(message, "reply_text", None)
+    if callable(reply):
+        await reply(view.text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+        return
+    await context.bot.send_message(
+        chat_id=_chat_id(update),
+        text=view.text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=keyboard,
+    )
 
 
 async def render_search_card_response(update: Any, context: Any, response: TelegramCallbackResponse, *, query: Any | None = None) -> None:
@@ -267,7 +290,10 @@ async def handle_v3_callback(
         plan = build_transition_plan(response)
         mutation = build_transition_session(plan)
         view = transition_views.build(plan)
-        await _render_transition_view(query, view)
+        if response.transition in {"book", "change_search"}:
+            await _send_transition_view(update, context, query, view)
+        else:
+            await _render_transition_view(query, view)
         user_data = getattr(context, "user_data", None)
         if not isinstance(user_data, dict):
             raise ValueError("telegram_user_data_missing_for_transition")

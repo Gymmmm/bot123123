@@ -63,7 +63,8 @@ def test_presenter_uses_frozen_snapshot_for_public_facts():
     assert details.layout == "2房1厅"
     assert details.subject == "富力城｜2房1厅"
     assert details.location == "金边·富力城"
-    assert details.monthly_rent_usd == 800
+    assert details.monthly_rent_usd == 9999
+    assert details.published_monthly_rent_usd == 800
     assert details.size_sqm == 95.0
     assert details.floor == "19"
     assert details.lease_summary == "押1付1 · 1年"
@@ -86,7 +87,7 @@ def test_reserved_remains_bookable_and_uses_current_status_label():
 
     assert details.bookable
     assert details.status_icon == "🟡"
-    assert details.status_label == "已有预约 · 仍可预约"
+    assert details.status_label == "已有预约，仍可预约"
 
 
 def test_placeholder_strings_are_normalized_to_empty_public_fields():

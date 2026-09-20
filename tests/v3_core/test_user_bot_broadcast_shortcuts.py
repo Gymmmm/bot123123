@@ -76,6 +76,12 @@ class FakeAppointmentHistory:
         return AppointmentHistoryView(text="📅 <b>目前还没有看房预约</b>", items=(), history_count=0)
 
 
+class FakeTenantService:
+    def active_binding(self, user_id):
+        assert user_id == 123
+        return SimpleNamespace(property_name="富力城 A3-1208")
+
+
 def _update(message):
     return SimpleNamespace(
         effective_message=message,
@@ -102,7 +108,7 @@ async def test_find_home_shortcut_enters_guided_search_without_property_resoluti
     outcome = await handle_v3_start(_update(message), context, listings=listings, transition_views=_views())
     assert outcome.handled and outcome.kind == "broadcast_find_home"
     assert listings.calls == []
-    assert "想找什么样的房子" in message.calls[0][0][0]
+    assert "直接发需求" in message.calls[0][0][0]
     assert context.user_data[AWAITING_KEYWORD_SESSION_KEY] == {"source": "daily_broadcast"}
     assert context.user_data[SEARCH_PREF_SESSION_KEY]["source"] == "daily_broadcast"
     assert "stale" not in context.user_data
@@ -116,7 +122,7 @@ async def test_budget_shortcut_opens_budget_filter_directly():
     outcome = await handle_v3_start(_update(message), context, listings=listings, transition_views=_views())
     assert outcome.handled and outcome.kind == "broadcast_budget"
     assert listings.calls == []
-    assert "每月预算大概多少" in message.calls[-1][0][0]
+    assert "选择预算" in message.calls[-1][0][0]
     assert context.user_data[SEARCH_PREF_SESSION_KEY]["source"] == "daily_broadcast"
 
 
@@ -134,7 +140,7 @@ async def test_latest_shortcut_uses_published_search_executor_not_property_resol
     assert limit == 5
     assert intent.source == "daily_broadcast_latest"
     assert intent.touch_payload == {"daily_broadcast": True, "latest": True}
-    assert "暂时没有完全符合条件的房源" in message.calls[-1][0][0]
+    assert "这组条件暂时没有对上的房源" in message.calls[-1][0][0]
 
 
 @pytest.mark.asyncio
@@ -153,7 +159,7 @@ async def test_appointments_shortcut_uses_real_appointment_history():
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("payload", "expected_kind", "expected_text"),
-    [("assurance", "broadcast_assurance", "租赁服务"), ("service", "broadcast_service", "入住服务")],
+    [("assurance", "broadcast_assurance", "租到房，不代表服务就结束了"), ("service", "broadcast_service", "侨联服务")],
 )
 async def test_service_shortcuts_land_on_real_user_surfaces(payload, expected_kind, expected_text):
     message = FakeMessage()
@@ -163,7 +169,36 @@ async def test_service_shortcuts_land_on_real_user_surfaces(payload, expected_ki
     assert outcome.handled and outcome.kind == expected_kind
     assert listings.calls == []
     assert expected_text in message.calls[-1][0][0]
-    assert "租赁服务指南" not in message.calls[-1][0][0]
+    if payload == "assurance":
+        assert "入住时" in message.calls[-1][0][0]
+        assert "关于侨联" not in message.calls[-1][0][0]
+
+
+@pytest.mark.asyncio
+async def test_service_shortcut_ignores_binding_and_opens_public_service_home():
+    message = FakeMessage()
+    outcome = await handle_v3_start(
+        _update(message),
+        _context("service"),
+        listings=FakeListings(),
+        transition_views=_views(),
+        tenant_service=FakeTenantService(),
+    )
+    assert outcome.handled and outcome.kind == "broadcast_service"
+    text = message.calls[-1][0][0]
+    markup = message.calls[-1][1]["reply_markup"]
+    callbacks = [
+        button.callback_data
+        for row in markup.inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
+    assert "富力城 A3-1208" not in text
+    assert callbacks == [
+        "v3u:service:tenant_lease", "v3u:service:concierge",
+        "v3u:home:rental", "v3u:service:local",
+        "v3u:home:contact", "v3u:t:home",
+    ]
 
 
 @pytest.mark.asyncio
@@ -197,7 +232,7 @@ async def test_unknown_start_payload_without_reason_still_falls_through_without_
     assert outcome.handled and outcome.kind == "invalid_link"
     assert listings.calls == ["not_a_real_shortcut"]
     assert message.calls[-1][0][0] == (
-        "这个链接已经失效或房源信息已更新。\n\n可以重新找房，或让顾问继续帮您找。"
+        "这套房的入口已经失效，或信息刚刚更新过。\n\n可以重新找房，或让顾问按你的条件接着看。"
     )
 
 
@@ -207,8 +242,9 @@ async def test_unbookable_property_book_deeplink_shows_lock_copy_then_contextual
     details = PublicDetailsResponse(
         text="🏠 <b>房源详情</b>\n\n🔴 房态：已租出",
         action_rows=(
-            (SemanticAction("📸 更多实拍", "photos", public_id), SemanticAction("💬 联系我们", "consult", public_id)),
-            (SemanticAction("🏘 看相近房源", "similar", public_id),),
+            (SemanticAction("💬 问这套房", "consult", public_id),),
+            (SemanticAction("📸 更多实拍", "photos", public_id),),
+            (SemanticAction("✏️ 换个条件找", "change_search"),),
         ),
     )
     listings = FakeListings(SimpleNamespace(ok=False, reason="listing_not_bookable", details=details, action="book", public_listing_id=public_id))
@@ -217,12 +253,10 @@ async def test_unbookable_property_book_deeplink_shows_lock_copy_then_contextual
     outcome = await handle_v3_start(_update(message), context, listings=listings, transition_views=_views())
     assert outcome.handled and outcome.kind == "unbookable"
     assert listings.calls == [f"property_{public_id}_book"]
-    assert message.calls[0][0][0] == "这套房暂时不能预约。可以继续看相近房源，或让顾问帮您确认其他选择。"
+    assert message.calls[0][0][0] == "这套房现在暂时不能预约。\n\n可以先看详情，或让顾问帮你看别的选择。"
     assert "🔴 房态：已租出" in message.calls[1][0][0]
     markup = message.calls[1][1]["reply_markup"]
     labels = [button.text for row in markup.inline_keyboard for button in row]
-    callbacks = [button.callback_data for row in markup.inline_keyboard for button in row]
     assert "📅 预约看房" not in labels
-    assert "🏘 看相近房源" in labels
-    similar_index = labels.index("🏘 看相近房源")
-    assert public_id in callbacks[similar_index]
+    assert "换条件" in labels
+    assert "看相近房源" not in " ".join(labels)

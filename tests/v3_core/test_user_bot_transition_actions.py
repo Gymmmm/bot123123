@@ -205,18 +205,42 @@ def test_layout_choice_reaches_search_boundary_without_internal_identity():
     assert "LST_" not in repr(result)
 
 
-def test_current_available_is_direct_published_only_search_boundary():
+def test_retired_current_available_action_cannot_cross_search_boundary():
     result = TransitionActionService().apply(
         TransitionCallback(kind="search_available"),
         {},
     )
 
+    assert result.status == "invalid"
+    assert result.reason == "unsupported_transition_action"
+    assert result.search is None
+
+
+def test_home_area_budget_then_layout_combines_all_selected_filters():
+    service = TransitionActionService()
+    session = {
+        SEARCH_PREF_SESSION_KEY: {
+            "source": "home_area",
+            "goal": "any",
+            "location_keys": ["BKK1"],
+            "area_display": "BKK1（市中心）",
+            "touch_payload": {},
+        }
+    }
+    budget = service.apply(TransitionCallback(kind="budget_choice", value="b2"), session)
+    assert budget.ok and budget.navigation == "search_layout"
+    assert budget.search is None and budget.mutation is not None
+    apply_session_mutation(session, budget.mutation)
+
+    result = service.apply(TransitionCallback(kind="layout_choice", value="2br"), session)
     assert result.ok and result.next_step == "search_submit"
-    assert result.navigation is None
     assert result.search is not None
-    assert result.search.source == "home_available"
-    assert result.search.criteria.has_filter is False
-    assert result.search.touch_payload == {"current_available": True}
+    assert result.search.criteria.location_keys == ("BKK1",)
+    assert result.search.criteria.budget_min == 400
+    assert result.search.criteria.budget_max == 600
+    assert result.search.criteria.room_type == "2房"
+    assert result.search.area_display == "BKK1（市中心）"
+    assert result.search.budget_label == "$400–600"
 
 
 def test_budget_requires_live_search_pref_and_remaining_navigation_is_explicit():

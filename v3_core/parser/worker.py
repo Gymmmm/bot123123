@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import sqlite3
 
 from v3_core.ingest.source_repository import SourceRepository
+from v3_core.inventory.canonical_facts import PARSER_REVISION
 from v3_core.inventory.identity import IdentityService
 from v3_core.inventory.service import InventoryMaterializationService
 from v3_core.ops.runtime_state import RuntimeStateRepository
@@ -41,10 +42,11 @@ class CanonicalWorker:
                           AND NOT EXISTS (
                               SELECT 1 FROM canonical_records c
                               WHERE c.source_post_id=CAST(source_posts.id AS TEXT)
+                                AND c.parser_revision=?
                           )
                       )
                    ORDER BY id ASC LIMIT ?""",
-                (max(1, int(limit)),),
+                (PARSER_REVISION, max(1, int(limit))),
             ).fetchall()
         return [int(row[0]) for row in rows]
 

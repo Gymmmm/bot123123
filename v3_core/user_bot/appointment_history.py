@@ -126,7 +126,7 @@ def _sort_key(record: AppointmentHistoryRecord) -> tuple[int, int, str]:
 
 
 def _is_upcoming(record: AppointmentHistoryRecord, *, now: datetime) -> bool:
-    if record.status in {"done", "cancelled"}:
+    if record.status not in {"pending", "confirmed"}:
         return False
     bits = record.appointment_date.replace("/", "-").split("-")
     try:
@@ -158,15 +158,13 @@ def _item(record: AppointmentHistoryRecord, inventory: PublicInventoryReader) ->
 
 
 def _lines(item: AppointmentHistoryItem) -> list[str]:
-    status_icon, status_label = APPOINTMENT_STATUS_LABELS.get(item.status, ("🟡", "等待确认"))
+    status_icon, status_label = {"pending": ("🟡", "待顾问确认"), "confirmed": ("🟢", "看房已确认")}.get(item.status, ("🟡", "待顾问确认"))
     mode = APPOINTMENT_MODE_LABELS.get(item.viewing_mode, item.viewing_mode or "待确认")
-    mode_icon = "🎥" if item.viewing_mode == "video" else "🚶"
     return [
-        f"{status_icon} <b>{he(status_label)}</b>",
-        f"🏠 <b>{he(item.subject)}</b>",
-        f"📅 {he(_date_compact(item.appointment_date))} · {he(_time_compact(item.appointment_time))}",
-        f"{mode_icon} {he(mode)}",
-        f"🆔 {he(item.public_listing_id)}",
+        f"<b>{he(item.subject)}</b>",
+        f"{he(_date_compact(item.appointment_date))} · {he(_time_compact(item.appointment_time))} · {he(mode)}",
+        f"{status_icon} {he(status_label)}",
+        he(item.public_listing_id),
     ]
 
 
@@ -181,12 +179,13 @@ class AppointmentHistoryService:
         self.inventory = inventory
 
     def build(self, user_id: int, *, now: datetime | None = None) -> AppointmentHistoryView:
-        records = tuple(sorted(self.reader.list_for_user(user_id, limit=20), key=_sort_key, reverse=True))
+        records = tuple(sorted(self.reader.list_for_user(user_id, limit=20), key=_sort_key))
         if not records:
             return AppointmentHistoryView(
                 text=(
-                    "📅 <b>目前还没有看房预约</b>\n\n"
-                    "看到喜欢的房源，点击「预约看房」就可以提交。"
+                    "<b>我的预约</b>\n\n"
+                    "目前没有待进行的看房预约。\n"
+                    "您可以继续找房，看到合适的房源后直接预约。"
                 ),
                 items=(),
                 history_count=0,
@@ -195,17 +194,23 @@ class AppointmentHistoryService:
         local_now = now or datetime.now(ZoneInfo("Asia/Phnom_Penh"))
         upcoming_records = tuple(record for record in records if _is_upcoming(record, now=local_now))
         history_records = tuple(record for record in records if record not in upcoming_records)
+        if not upcoming_records:
+            return AppointmentHistoryView(
+                text=(
+                    "<b>我的预约</b>\n\n"
+                    "目前没有待进行的看房预约。\n"
+                    "您可以继续找房，看到合适的房源后直接预约。"
+                ),
+                items=(),
+                history_count=len(history_records),
+            )
         items = tuple(_item(record, self.inventory) for record in upcoming_records[:2])
 
-        parts = ["📅 <b>我的预约</b>", ""]
+        parts = ["<b>我的预约</b>", ""]
         for index, item in enumerate(items):
             parts.extend(_lines(item))
             if index < len(items) - 1:
-                parts.extend(["", "──────────", ""])
-        if history_records:
-            if items:
                 parts.append("")
-            parts.append(f"📁 历史预约 · {len(history_records)} 条")
         return AppointmentHistoryView(
             text="\n".join(parts),
             items=items,

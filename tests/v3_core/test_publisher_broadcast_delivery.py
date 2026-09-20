@@ -46,6 +46,10 @@ def _build(tmp_path: Path):
         channel_chat_id="-1001234567890",
         timezone_name="Asia/Phnom_Penh",
     )
+    # Daily-broadcast tests must not depend on the real wall clock hitting the
+    # independently enabled 18:30 marketing scheduler. Marketing-specific tests
+    # explicitly exercise that service without requiring its scheduler to run.
+    controller.marketing.set_enabled(False)
     return db, service, controller
 
 

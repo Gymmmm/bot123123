@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Awaitable, Callable
 
 from dotenv import load_dotenv
-from telegram import BotCommand, BotCommandScopeChat
+from telegram import BotCommand, BotCommandScopeAllPrivateChats, BotCommandScopeChat, ReplyKeyboardRemove
 from telegram.constants import ParseMode
 from telegram.ext import (
     Application,
@@ -34,6 +34,7 @@ from .channel_status_sync import V3AppointmentChannelSynchronizer
 from .contact_effects import ContactEffectExecutor
 from .home_views import build_home_view
 from .listing_contact import ListingContactEffectExecutor
+from .legacy_routes import legacy_home_action, legacy_reply_text_action, legacy_start_payload
 from .runtime import UserBotReadRuntime, build_read_runtime
 from .service_effects import ServiceEffectExecutor
 from .telegram_assurance_handler import handle_v3_assurance_callback
@@ -41,13 +42,57 @@ from .telegram_home_handler import handle_v3_home_callback
 from .telegram_home_ui import build_home_keyboard
 from .telegram_keyword_search_handler import handle_v3_keyword_search_text
 from .telegram_listing_callback import handle_v3_listing_callback
-from .telegram_service_handler import handle_v3_service_callback, handle_v3_service_text
+from .telegram_service_handler import handle_v3_service_callback, handle_v3_service_media, handle_v3_service_text
 from .telegram_start_handler import handle_v3_start
 from .telegram_transition_action_handler import handle_v3_transition_action
 from .telegram_transition_text_handler import handle_v3_transition_text
 from .transition_runtime import UserBotTransitionRuntime, build_transition_runtime
 
 logger = logging.getLogger(__name__)
+
+
+_REPLY_KEYBOARD_REMOVED_KEY = "v3_reply_keyboard_removed"
+
+
+def public_command_menu() -> tuple[BotCommand, ...]:
+    return (
+        BotCommand("start", "回到首页"),
+        BotCommand("find", "开始找房"),
+        BotCommand("appointments", "我的预约"),
+        BotCommand("service", "侨联服务"),
+    )
+
+
+def admin_command_menu() -> tuple[BotCommand, ...]:
+    return public_command_menu() + (
+        BotCommand("admin", "管理后台"),
+        BotCommand("contracts", "租客与合同"),
+    )
+
+
+async def remove_legacy_reply_keyboard(update: Any, context: Any) -> bool:
+    """Remove the retired persistent reply keyboard once per active user session."""
+    user_data = getattr(context, "user_data", None)
+    if isinstance(user_data, dict) and user_data.get(_REPLY_KEYBOARD_REMOVED_KEY):
+        return False
+    message = getattr(update, "effective_message", None)
+    if message is None or not callable(getattr(message, "reply_text", None)):
+        return False
+    notice = await message.reply_text(
+        "菜单已更新",
+        reply_markup=ReplyKeyboardRemove(),
+        disable_notification=True,
+    )
+    if isinstance(user_data, dict):
+        user_data[_REPLY_KEYBOARD_REMOVED_KEY] = True
+    delete = getattr(notice, "delete", None)
+    if callable(delete):
+        try:
+            await delete()
+        except Exception:
+            logger.debug("Could not delete reply-keyboard removal notice", exc_info=True)
+    return True
+
 
 
 @dataclass(frozen=True)
@@ -183,17 +228,17 @@ def build_v3_user_bot_application(
     runtime_state = RuntimeStateRepository(config.db_path)
 
     async def configure_command_menu(application: Application) -> None:
-        await application.bot.set_my_commands([BotCommand("start", "打开侨联小管家")])
-        admin_commands = [
-            BotCommand("start", "打开侨联小管家"),
-            BotCommand("admin", "管理后台"),
-            BotCommand("contracts", "租客与合同"),
-        ]
+        public_commands = list(public_command_menu())
+        private_scope = BotCommandScopeAllPrivateChats()
+        await application.bot.set_my_commands(public_commands)
+        await application.bot.set_my_commands(public_commands, language_code="zh")
+        await application.bot.set_my_commands(public_commands, scope=private_scope)
+        await application.bot.set_my_commands(public_commands, scope=private_scope, language_code="zh")
+        admin_commands = list(admin_command_menu())
         for admin_id in sorted(set(admin_command_ids or config.admin_ids)):
-            await application.bot.set_my_commands(
-                admin_commands,
-                scope=BotCommandScopeChat(chat_id=admin_id),
-            )
+            scope = BotCommandScopeChat(chat_id=admin_id)
+            await application.bot.set_my_commands(admin_commands, scope=scope)
+            await application.bot.set_my_commands(admin_commands, scope=scope, language_code="zh")
         runtime_state.heartbeat("user", state="running", event=True)
 
     app = (
@@ -268,24 +313,85 @@ def build_v3_user_bot_application(
         if raw.startswith(("adminlead:", "adminrepair:")) and admin_workflow_callback_handler is not None:
             await admin_workflow_callback_handler(update, context, query, raw, user)
 
+    async def _run_start_payload(update, context, payload: str = ""):
+        previous_args = tuple(getattr(context, "args", None) or ())
+        context.args = [payload] if payload else []
+        try:
+            await handle_v3_start(
+                update,
+                context,
+                listings=deps.read.listings,
+                transition_views=deps.transition.views,
+                channel_url=config.channel_url,
+                search_executor=deps.transition.searches,
+                appointment_history=deps.transition.appointment_history,
+                tenant_service=deps.transition.tenant_service,
+                contact_effects=deps.contact_effects,
+                advisor_url=config.advisor_url,
+            )
+        finally:
+            context.args = list(previous_args)
+
     async def start(update, context):
         runtime_state.heartbeat("user", state="running", event=True)
-        await handle_v3_start(
+        await remove_legacy_reply_keyboard(update, context)
+        await _run_start_payload(update, context)
+
+    async def find(update, context):
+        runtime_state.heartbeat("user", state="running", event=True)
+        await remove_legacy_reply_keyboard(update, context)
+        await _run_start_payload(update, context, "find_home")
+
+    async def appointments(update, context):
+        runtime_state.heartbeat("user", state="running", event=True)
+        await remove_legacy_reply_keyboard(update, context)
+        await _run_start_payload(update, context, "appointments")
+
+    async def service(update, context):
+        runtime_state.heartbeat("user", state="running", event=True)
+        await remove_legacy_reply_keyboard(update, context)
+        await _run_start_payload(update, context, "service")
+
+    async def legacy_about(update, context):
+        runtime_state.heartbeat("user", state="running", event=True)
+        await remove_legacy_reply_keyboard(update, context)
+        await _run_start_payload(update, context, "assurance")
+
+    async def legacy_contact(update, context):
+        runtime_state.heartbeat("user", state="running", event=True)
+        await remove_legacy_reply_keyboard(update, context)
+        await _run_start_payload(update, context, "advisor")
+
+    async def legacy_help(update, context):
+        runtime_state.heartbeat("user", state="running", event=True)
+        await remove_legacy_reply_keyboard(update, context)
+        await _run_start_payload(update, context)
+
+    async def _legacy_callback(update, context, raw: str) -> bool:
+        action = legacy_home_action(raw)
+        if action is None:
+            return False
+        if action == "home":
+            await _render_home_callback(update, config)
+            return True
+        await handle_v3_home_callback(
             update,
             context,
-            listings=deps.read.listings,
-            transition_views=deps.transition.views,
-            channel_url=config.channel_url,
-            search_executor=deps.transition.searches,
             appointment_history=deps.transition.appointment_history,
+            search_views=deps.transition.views,
             contact_effects=deps.contact_effects,
             advisor_url=config.advisor_url,
+            action_override=action,
         )
+        return True
 
     async def callbacks(update, context):
         runtime_state.heartbeat("user", state="running", event=True)
+        await remove_legacy_reply_keyboard(update, context)
         query = getattr(update, "callback_query", None)
         raw = str(getattr(query, "data", "") or "") if query is not None else ""
+        if await _legacy_callback(update, context, raw):
+            return
         if raw == "v3u:t:home":
             await _render_home_callback(update, config)
             return
@@ -341,6 +447,12 @@ def build_v3_user_bot_application(
 
     async def text(update, context):
         runtime_state.heartbeat("user", state="running", event=True)
+        await remove_legacy_reply_keyboard(update, context)
+        message = getattr(update, "effective_message", None)
+        legacy_action = legacy_reply_text_action(getattr(message, "text", "") if message is not None else "")
+        if legacy_action is not None:
+            await _run_start_payload(update, context, legacy_start_payload(legacy_action))
+            return
         if is_admin(update) and admin_contract_text_handler is not None:
             admin_result = await admin_contract_text_handler(update, context)
             if admin_result is not None:
@@ -374,6 +486,19 @@ def build_v3_user_bot_application(
             lead_effects=deps.transition.lead_effects,
         )
 
+    async def media(update, context):
+        runtime_state.heartbeat("user", state="running", event=True)
+        await remove_legacy_reply_keyboard(update, context)
+        service = await handle_v3_service_media(
+            update,
+            context,
+            service=deps.transition.tenant_service,
+            effects=deps.service_effects,
+            advisor_url=config.advisor_url,
+        )
+        if service.handled:
+            return
+
     async def heartbeat(context):
         runtime_state.heartbeat("user", state="running")
 
@@ -382,6 +507,12 @@ def build_v3_user_bot_application(
         logger.exception("V3 User Bot update failed", exc_info=context.error)
 
     app.add_handler(CommandHandler("start", start), group=0)
+    app.add_handler(CommandHandler("find", find), group=0)
+    app.add_handler(CommandHandler("appointments", appointments), group=0)
+    app.add_handler(CommandHandler("service", service), group=0)
+    app.add_handler(CommandHandler("about", legacy_about), group=0)
+    app.add_handler(CommandHandler("contact", legacy_contact), group=0)
+    app.add_handler(CommandHandler("help", legacy_help), group=0)
     app.add_handler(CommandHandler("admin", admin), group=0)
     app.add_handler(CommandHandler("contracts", contracts), group=0)
     app.add_handler(CallbackQueryHandler(admin_callbacks, pattern=r"^adminq:"), group=0)
@@ -393,7 +524,15 @@ def build_v3_user_bot_application(
         group=0,
     )
     app.add_handler(CallbackQueryHandler(callbacks, pattern=r"^v3u:"), group=0)
+    app.add_handler(
+        CallbackQueryHandler(
+            callbacks,
+            pattern=r"^(?:hub:|listing:|service:|contract:|appointment_menu:|apdate:|aptime:|find|repair|renewal|termination|change_home|change:|advisor:|adviser:|home_brand$|home_smart_search$|menu_about$|menu_human$|menu_service$)",
+        ),
+        group=0,
+    )
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text), group=0)
+    app.add_handler(MessageHandler((filters.PHOTO | filters.VIDEO) & ~filters.COMMAND, media), group=0)
     app.add_error_handler(errors)
     if app.job_queue is not None:
         app.job_queue.run_repeating(heartbeat, interval=30, first=5, name="v3_user_runtime_heartbeat")
@@ -411,6 +550,9 @@ def run_v3_user_bot(
 
 __all__ = [
     "V3UserBotConfig",
+    "admin_command_menu",
+    "public_command_menu",
+    "remove_legacy_reply_keyboard",
     "V3UserBotDependencies",
     "build_v3_user_bot_application",
     "build_v3_user_bot_dependencies",

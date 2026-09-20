@@ -90,25 +90,13 @@ def test_search_card_preserves_fixed_sha_copy_and_uses_frozen_cover(tmp_path):
 
     card = build_search_card((first, second), 0)
 
-    assert card.text == (
-        "🏠 <b>富力城｜2房1厅</b>\n"
-        "💰 <b>$800/月</b>\n"
-        "\n"
-        "📍 BKK1\n"
-        "📐 95㎡ · 19楼\n"
-        "\n"
-        "🟢 当前可预约\n"
-        "第 1/2 套"
-    )
+    assert card.text == "<b>富力城 · 2房1厅</b>\n$800/月\n19楼\n🟢 当前可预约 · 1/2"
     assert card.photo_path == str(cover)
     assert _actions(card) == [
         ["previous", "next"],
-        ["details"],
-        ["book"],
-        ["consult"],
+        ["details", "book"],
         ["change_search"],
     ]
-    assert [item.label for row in card.action_rows for item in row if item.action == "details"] == ["📷 更多详情"]
 
 
 def test_search_card_navigation_wraps_by_public_listing_id():
@@ -164,9 +152,7 @@ def test_search_card_listing_actions_target_current_public_identity():
     actions = [item for row in card.action_rows for item in row]
 
     assert _actions(card) == [
-        ["details"],
-        ["book"],
-        ["consult"],
+        ["details", "book"],
         ["change_search"],
     ]
     for action in actions:
@@ -202,10 +188,11 @@ def test_live_reserved_status_changes_badge_without_changing_frozen_facts():
 
     card = build_search_card((view,), 0)
 
-    assert "富力城｜2房1厅" in card.text
+    assert "<b>富力城 · 2房1厅</b>" in card.text
     assert "$800/月" in card.text
-    assert "🟡 已有预约 · 仍可预约" in card.text
-    assert _actions(card)[1 if len(card.action_rows) > 4 else 1] == ["book"]
+    assert "19楼" in card.text
+    assert "🟡 已有预约，仍可预约" in card.text
+    assert _actions(card)[0] == ["details", "book"]
 
 
 def test_build_search_cards_builds_one_card_per_result():

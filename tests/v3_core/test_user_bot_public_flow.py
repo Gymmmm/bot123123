@@ -75,12 +75,10 @@ def test_details_payload_resolves_all_the_way_to_frozen_public_response():
     assert result.action == "details"
     assert result.public_listing_id == "QL-RF-A2B3"
     assert result.details is not None
+    assert "富力城" in result.details.text and "2房1厅" in result.details.text
     assert "🏢 金边优质房源出租" in result.details.text
-    assert "📌基本信息" in result.details.text
-    assert "富力城" in result.details.text
-    assert "2房1厅" in result.details.text
+    # details deeplink also carries merged flipper photos payload
     assert result.photos is not None
-    assert "🏢 金边优质房源出租" in result.photos.text
     assert result.book is None
 
 
@@ -96,8 +94,9 @@ def test_photos_payload_returns_frozen_existing_gallery_response(tmp_path):
     assert result.photos is not None
     assert result.photos.media_groups == ((str(photo),),)
     assert result.photos.photo_path == str(photo)
-    assert result.details is not None
-    assert "富力城" in result.photos.text
+    assert "📸 1/1" in result.photos.text
+    assert "基本信息" not in result.photos.text  # short caption
+    assert result.details is not None  # shared sectioned detail payload
     assert result.book is None
 
 
@@ -163,10 +162,8 @@ def test_rented_book_is_blocked_before_appointment_flow_is_created():
         actions = [action for row in result.details.action_rows for action in row]
         labels = [action.label for action in actions]
         assert "📅 预约看房" not in labels
-        assert any(label.endswith("看相近房源") for label in labels)
-        similar = next(action for action in actions if action.label.endswith("看相近房源"))
-        assert similar.action == "similar"
-        assert similar.target_public_listing_id == "QL-RF-A2B3"
+        assert "💬 中文顾问" in labels
+        assert "更多实拍" not in labels
 
 
 def test_direct_action_rejects_invalid_identity_and_non_public_action():

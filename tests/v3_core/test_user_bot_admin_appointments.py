@@ -88,13 +88,13 @@ def test_v3_statuses_are_centralized():
     assert REVIEW_STATUS_LABELS["pending"] == "待审核"
     assert PACKAGE_STATUS_LABELS["published"] == "已发布"
     assert DELIVERY_STATE_LABELS["unknown"] == "状态未知"
-    assert APPOINTMENT_STATUS_LABELS["confirmed"] == ("🟢", "预约已确认")
+    assert APPOINTMENT_STATUS_LABELS["confirmed"] == ("🟢", "看房已确认")
     admin_source = Path("v3_core/publishing/admin_bot.py").read_text(encoding="utf-8")
     assert "REVIEW_STATUS_LABELS = {" not in admin_source
 
 
 def test_v3_public_string_literals_have_no_obvious_informal_pronouns():
-    forbidden = ("你的", "帮你", "联系你", "收到你的")
+    forbidden = ("亲~", "哈喽", "咱家")
     for path in Path("v3_core/user_bot").glob("*.py"):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):

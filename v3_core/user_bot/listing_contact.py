@@ -69,21 +69,16 @@ def build_listing_contact_view(
         if details.monthly_rent_usd is not None and int(details.monthly_rent_usd) > 0
         else ""
     )
+    identity = "｜".join(part for part in (subject, price) if part)
     lines = [
-        "💬 <b>咨询这套房</b>",
+        "<b>咨询这套</b>",
         "",
-        f"🏠 <b>{he(subject)}</b>",
+        he(identity),
+        he(intent.public_listing_id),
+        "",
+        "这套房的信息已经带上。",
+        "直接说想确认的事情即可。",
     ]
-    if price:
-        lines.append(f"💵 <b>{he(price)}</b>")
-    lines.extend(
-        [
-            f"🆔 {he(intent.public_listing_id)}",
-            "",
-            "这套房的信息已经带上，不用重新说明。",
-            "可以直接问价格、费用、房态或看房时间。",
-        ]
-    )
     return ListingContactView(
         text="\n".join(lines),
         advisor_url=str(advisor_url or "").strip(),

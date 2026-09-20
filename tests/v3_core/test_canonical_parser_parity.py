@@ -20,6 +20,12 @@ CASES = [
 def _assert_same(raw: str, **kwargs):
     legacy = legacy_canonicalize_source(raw, **kwargs)
     v3 = v3_canonicalize_source(raw, **kwargs)
+    # V3 intentionally advances parser_revision when taxonomy/parser behavior
+    # changes. The revision participates in the canonical hash, so parity locks
+    # business facts while allowing those two revision metadata fields to differ.
+    for payload in (legacy, v3):
+        payload.pop("parser_revision", None)
+        payload.pop("canonical_facts_hash", None)
     assert v3 == legacy
 
 

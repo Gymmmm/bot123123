@@ -11,7 +11,7 @@ from .appointment_history import AppointmentHistoryService, AppointmentHistoryVi
 from .assurance_views import build_assurance_home_view
 from .contact_effects import ContactEffectExecutor, ContactEffectResult
 from .home_callbacks import HomeAction, parse_home_callback
-from .home_views import build_about_view, build_appointment_history_home_view, build_booking_view, build_contact_view
+from .home_views import build_appointment_history_home_view, build_booking_view, build_contact_view
 from .lead_service import LeadUser
 from .service_flow import TenantService
 from .service_product_views import service_home_view
@@ -98,15 +98,16 @@ async def handle_v3_home_callback(
     search_views: TransitionViewService | None = None,
     contact_effects: ContactEffectExecutor | None = None,
     advisor_url: str = "",
+    action_override: HomeAction | None = None,
 ) -> TelegramHomeOutcome:
     query = getattr(update, "callback_query", None)
     raw = str(getattr(query, "data", "") or "") if query is not None else ""
-    callback = parse_home_callback(raw)
-    if query is None or callback is None:
+    callback = parse_home_callback(raw) if action_override is None else None
+    if query is None or (callback is None and action_override is None):
         return TelegramHomeOutcome(handled=False)
 
     await query.answer()
-    action = callback.action
+    action = action_override or callback.action
 
     if action == "search":
         if search_views is None:
@@ -117,7 +118,14 @@ async def handle_v3_home_callback(
         plan = _search_entry_plan()
         view = search_views.build(plan)
         mutation = build_transition_session(plan)
-        await _edit_transition_view(query, view)
+        message = getattr(query, "message", None)
+        if message is None:
+            raise ValueError("telegram_home_message_missing")
+        await message.reply_text(
+            view.text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=build_transition_keyboard(view),
+        )
         apply_session_mutation(user_data, mutation)
         return TelegramHomeOutcome(handled=True, action=action, rendered=True)
 
@@ -128,24 +136,32 @@ async def handle_v3_home_callback(
     if action == "appointments":
         user = _lead_user(update)
         history = appointment_history.build(user.user_id)
-        await _edit_home_view(query, build_appointment_history_home_view(history))
+        view = build_appointment_history_home_view(history)
+        message = getattr(query, "message", None)
+        if message is None:
+            raise ValueError("telegram_home_message_missing")
+        await message.reply_text(
+            view.text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=build_home_keyboard(view),
+        )
         return TelegramHomeOutcome(True, action, True, appointment_history=history)
 
-    if action == "about":
-        await _edit_home_view(query, build_about_view(advisor_url=advisor_url))
-        return TelegramHomeOutcome(handled=True, action=action, rendered=True)
-
-    if action == "rental":
+    if action in {"about", "rental"}:
         await render_assurance_view(query, build_assurance_home_view(), advisor_url=advisor_url)
         return TelegramHomeOutcome(handled=True, action=action, rendered=True)
 
     if action == "service":
-        tenant_service = _tenant_service_from_history(appointment_history)
-        if tenant_service is None:
-            await render_service_view(query, service_home_view(), advisor_url=advisor_url)
-        else:
-            user = _lead_user(update)
-            await render_service_view(query, tenant_home_view(tenant_service, user.user_id), advisor_url=advisor_url)
+        view = service_home_view()
+        message = getattr(query, "message", None)
+        if message is None:
+            raise ValueError("telegram_home_message_missing")
+        from .telegram_service_handler import build_service_keyboard
+        await message.reply_text(
+            view.text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=build_service_keyboard(view, advisor_url=advisor_url),
+        )
         return TelegramHomeOutcome(handled=True, action=action, rendered=True)
 
     if action == "local":

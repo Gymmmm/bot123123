@@ -15,14 +15,16 @@ from v3_core.user_bot.admin_appointments import (
     build_admin_appointment_detail_text,
 )
 from v3_core.user_bot.home_views import build_contact_view, build_home_view
-from v3_core.user_bot.listing_responses import build_details_response
+from v3_core.user_bot.listing_responses import SemanticAction, build_details_response
 from v3_core.user_bot.public_inventory import PublishedListingView
 from v3_core.user_bot.search_no_match_view import build_search_no_match_view
 from v3_core.user_bot.search_query import SearchCriteria
 from v3_core.user_bot.source_display import source_display_label
 from v3_core.user_bot.telegram_home_ui import encode_home_choice
 from v3_core.user_bot.telegram_listing_callback import _render_contact
+from v3_core.user_bot.telegram_navigation import polish_listing_keyboard
 from v3_core.user_bot.telegram_service_handler import _rfcity_category_product_view
+from v3_core.user_bot.telegram_ui import build_action_keyboard
 from v3_core.user_bot.transition_actions import SearchSubmitIntent
 
 
@@ -52,12 +54,13 @@ def _button_labels(markup):
 def test_channel_keyboard_booking_follows_inventory_status(status, has_book):
     labels = _button_labels(build_channel_keyboard(dict(ACTIONS), inventory_status=status))
     assert ("📅 预约看房" in labels) is has_book
-    assert ("📷 更多详情" in labels) is has_book
+    assert ("📷 房源详情" in labels) is has_book
     assert "📸 更多实拍" not in labels
-    assert ("🏠 更多房源" in labels) is (not has_book)
-    assert ("🔍 智能找房" in labels) is (not has_book)
-    assert "💬 咨询顾问" in labels
+    assert ("🏠 帮我找房" in labels) is (not has_book)
+    assert ("🔎 看看房源" in labels) is (not has_book)
+    assert "💬 中文顾问" in labels
     assert "🔍 更多房源" not in labels
+    assert "📷 更多详情" not in labels
 
 
 def test_channel_reserved_status_uses_locked_user_visible_semantics():
@@ -66,7 +69,7 @@ def test_channel_reserved_status_uses_locked_user_visible_semantics():
         offer={"offer_type": "rent", "monthly_rent_usd": 680},
         public_listing_id="QL-RF-A2B3",
     )
-    assert "🟡 已有预约 · 仍可预约" in caption
+    assert "🟡 已有预约，仍可预约" in caption
     assert "🟢 当前可预约" not in caption
 
 
@@ -153,7 +156,7 @@ def test_no_match_page_has_existing_contact_flow_action():
     )
     view = build_search_no_match_view(intent)
     choices = [choice for row in view.rows for choice in row]
-    contact = next(choice for choice in choices if choice.label == "💬 中文顾问")
+    contact = next(choice for choice in choices if choice.label == "中文顾问")
     assert contact.kind == "home"
     assert contact.value == "contact"
 
@@ -178,16 +181,15 @@ def _published_view() -> PublishedListingView:
 
 def test_details_labels_public_id_as_real_photo_reference():
     text = build_details_response(_published_view()).text
+    assert "富力城" in text and "1房" in text
+    assert "$680" in text
+    assert "QL-RF-A2B3" in text and "🆔" not in text
     assert "🏢 金边优质房源出租" in text
-    assert "📌基本信息  房源编号：QL-RF-A2B3" in text
-    assert "・项目区域：富力城" in text
-    assert "・户型格局：1房" in text
-    assert "・月租金额：$680 / 月" in text
 
 
 def test_rfcity_category_returns_to_rfcity_navigation():
     view = _rfcity_category_product_view("restaurant")
-    assert view.rows[-1][0].label == "⬅️ 返回富力导航"
+    assert view.rows[-1][0].label == "返回富力导航"
     assert view.rows[-1][0].callback_data == "v3u:service:rfcity"
 
 
@@ -195,17 +197,31 @@ def test_missing_channel_url_does_not_create_channel_button():
     view = build_home_view(channel_url="")
     choices = [choice for row in view.rows for choice in row]
     assert all(choice.label != "📢 房源频道" for choice in choices)
-    assert any(choice.label == "💬 中文顾问" for choice in choices)
+    assert any(choice.label == "中文顾问" for choice in choices)
 
 
 def test_missing_advisor_url_uses_internal_contact_callback_not_dead_url():
     view = build_contact_view(advisor_url="")
     first = view.rows[0][0]
-    assert first.label == "💬 中文顾问"
+    assert first.label == "中文顾问"
     assert first.url == ""
     button = encode_home_choice(first)
     assert button.url is None
     assert button.callback_data == "v3u:home:contact"
+
+
+def test_listing_consult_keeps_callback_so_listing_lead_is_recorded():
+    markup = build_action_keyboard(
+        ((SemanticAction("💬 问这套房", "consult", "QL-RF-A2B3"),),)
+    )
+    polished = polish_listing_keyboard(
+        markup,
+        advisor_url="https://t.me/advisor",
+        listing_summary="富力城｜一房｜$680/月",
+    )
+    button = polished.inline_keyboard[0][0]
+    assert button.url is None
+    assert button.callback_data == "v3u:listing:consult:QL-RF-A2B3"
 
 
 class _FakeContactQuery:

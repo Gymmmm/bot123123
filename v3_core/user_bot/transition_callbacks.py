@@ -1,10 +1,4 @@
-"""Explicit callback codec for side-effect-free V3 transition views.
-
-Transition views never emit fixed-SHA callback namespaces such as ``apdate:``
-or ``findbudget:``. Choices that already have a canonical V3 callback reuse it
-(listing details and change-search); the remaining guided-flow choices live
-under the compact ``v3u:t:`` namespace.
-"""
+"""Explicit callback codec for side-effect-free V3 transition views."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -37,6 +31,8 @@ _FLAG_KINDS = frozenset(
         "appointment_other_date",
         "appointment_other_time",
         "appointment_back_date",
+        "appointment_back_mode",
+        "appointment_exit",
         "appointment_submit",
         "appointment_back_time",
         "home",
@@ -44,7 +40,6 @@ _FLAG_KINDS = frozenset(
         "search_area",
         "search_budget",
         "search_layout",
-        "search_available",
         "area_other",
     }
 )
@@ -95,10 +90,11 @@ def _validate_value(kind: str, value: object) -> str:
 
 
 def encode_transition_choice(choice: TransitionChoice) -> str:
-    """Encode one transition choice without reviving legacy callback formats."""
     kind = str(choice.kind or "").strip()
     if kind == "listing_details":
         return encode_listing_callback("details", choice.public_listing_id)
+    if kind == "listing_consult":
+        return encode_listing_callback("consult", choice.public_listing_id)
     if kind == "change_search":
         return encode_change_search_callback()
     if kind == "home":

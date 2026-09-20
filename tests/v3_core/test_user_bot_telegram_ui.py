@@ -90,13 +90,9 @@ def test_search_card_keyboard_encodes_navigation_with_public_ids():
     ]
     assert rows[1] == [
         "v3u:listing:details:QL-RF-A2B3",
+        "v3u:listing:book:QL-RF-A2B3",
     ]
-    assert [[button.text for button in row] for row in markup.inline_keyboard][1] == [
-        "📷 更多详情",
-    ]
-    assert rows[2] == ["v3u:listing:book:QL-RF-A2B3"]
-    assert rows[3] == ["v3u:listing:consult:QL-RF-A2B3"]
-    assert rows[4] == ["v3u:change_search"]
+    assert rows[2] == ["v3u:change_search"]
     assert "LST_" not in repr(rows)
 
 

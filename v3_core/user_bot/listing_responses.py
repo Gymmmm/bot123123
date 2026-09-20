@@ -1,7 +1,8 @@
 """Telegram-neutral public listing responses for the V3 User Bot.
 
-Merged listing view: one entry opens detail copy + a single photo flipper
-(上一张 / 下一张), never a multi-photo media-group dump.
+Merged listing view: one entry opens a single-photo flipper (上一张 / 下一张)
+with a SHORT photo caption. Full sectioned detail is available as a separate
+text payload — never dumped onto the photo caption (keeps image + buttons close).
 """
 from __future__ import annotations
 
@@ -46,7 +47,7 @@ class PublicDetailsResponse:
 
 @dataclass(frozen=True)
 class PublicPhotosResponse:
-    """Single-photo flipper payload (detail caption + one current frame)."""
+    """Single-photo flipper payload (short caption + one current frame)."""
 
     media_groups: tuple[tuple[str, ...], ...]
     text: str
@@ -55,6 +56,7 @@ class PublicPhotosResponse:
     photo_path: str = ""
     photo_index: int = 0
     photo_total: int = 0
+    detail_text: str = ""
 
     @property
     def has_media(self) -> bool:
@@ -103,12 +105,12 @@ def _details_actions(
         return (
             (
                 SemanticAction("📅 预约看房", "book", target),
-                SemanticAction("💬 问这套房", "consult", target),
+                SemanticAction("💬 中文顾问", "consult", target),
             ),
             (SemanticAction("🔍 看相近房源", "similar", target),),
         )
     return (
-        (SemanticAction("💬 问这套房", "consult", target),),
+        (SemanticAction("💬 中文顾问", "consult", target),),
         (SemanticAction("🔍 看相近房源", "similar", target),),
     )
 
@@ -147,14 +149,13 @@ def _photo_actions(
         rows.append(
             (
                 SemanticAction("📅 预约看房", "book", target),
-                SemanticAction("💬 问这套房", "consult", target),
+                SemanticAction("💬 中文顾问", "consult", target),
             )
         )
     else:
-        rows.append((SemanticAction("💬 问这套房", "consult", target),))
+        rows.append((SemanticAction("💬 中文顾问", "consult", target),))
     rows.append((SemanticAction("🔍 看相近房源", "similar", target),))
     return tuple(rows)
-
 
 
 _DETAIL_DIVIDER = "━━━━━━━━━━━━━━━"
@@ -210,20 +211,12 @@ def _detail_status_line(details) -> str:
 
 
 def _adviser_copy_for_view(view: PublishedListingView) -> str:
-    details = build_public_listing_details(view)
-    frozen = str(details.adviser_copy or "").strip()
-    if frozen:
-        return frozen
+    """Publisher-frozen copy only; respects adviser_copy_source=hidden."""
     return adviser_notes_for_view(view, max_points=2, allow_empty=True).strip()
 
 
-def build_detail_caption(
-    view: PublishedListingView,
-    *,
-    photo_index: int | None = None,
-    photo_total: int | None = None,
-) -> str:
-    """Canonical merged「📷 更多详情」/ channel-detail caption body."""
+def build_detail_text(view: PublishedListingView) -> str:
+    """Full sectioned listing detail (separate text message; NOT photo caption)."""
     details = build_public_listing_details(view)
     floor = display_floor(details.floor)
     size = _format_size(details.size_sqm)
@@ -234,11 +227,6 @@ def build_detail_caption(
     )
 
     lines: list[str] = [_DETAIL_DIVIDER, _DETAIL_TITLE, _DETAIL_DIVIDER]
-
-    total = int(photo_total or 0)
-    if total > 0 and photo_index is not None:
-        index = max(0, int(photo_index)) % total
-        lines.append(f"📸 {index + 1}/{total}")
 
     basic_header = "📌基本信息"
     if details.public_listing_id:
@@ -288,15 +276,31 @@ def build_detail_caption(
     return "\n".join(lines).strip()
 
 
-def _detail_body_lines(view: PublishedListingView) -> list[str]:
-    """Compatibility wrapper — prefer ``build_detail_caption``."""
-    return build_detail_caption(view).splitlines()
+def build_photo_caption(
+    view: PublishedListingView,
+    *,
+    photo_index: int = 0,
+    photo_total: int = 0,
+) -> str:
+    """SHORT photo caption: project · layout · rent · 📸 N/M."""
+    details = build_public_listing_details(view)
+    project = str(details.project_name or "").strip()
+    layout = str(details.layout or "").strip()
+    rent = _format_price(details.monthly_rent_usd)
+    head = " · ".join(part for part in (project, layout, rent) if part)
+    if not head:
+        head = str(details.location or details.public_listing_id or "房源").strip()
+    total = max(0, int(photo_total or 0))
+    if total > 0:
+        index = max(0, int(photo_index or 0)) % total
+        return f"{he(head)} · 📸 {index + 1}/{total}"
+    return he(head)
 
 
 def build_details_response(view: PublishedListingView) -> PublicDetailsResponse:
     details = build_public_listing_details(view)
     return PublicDetailsResponse(
-        text=build_detail_caption(view),
+        text=build_detail_text(view),
         listing_summary=listing_summary_bits(
             project_name=details.project_name,
             layout=details.layout,
@@ -310,14 +314,42 @@ def build_details_response(view: PublishedListingView) -> PublicDetailsResponse:
     )
 
 
-def _existing_gallery(paths: tuple[str, ...]) -> tuple[str, ...]:
+def _frozen_cover_path(view: PublishedListingView) -> str:
+    """Resolve the listing cover file for flipper index 1/N."""
+    package = getattr(view, "package", {}) or {}
+    candidate = str(package.get("cover_path") or "").strip()
+    if candidate and Path(candidate).is_file():
+        return candidate
+    # Fall back to a gallery asset named cover.* if present.
+    for raw in getattr(view, "gallery", ()) or ():
+        path = str(raw or "").strip()
+        if not path:
+            continue
+        if Path(path).name.lower() in {"cover.jpg", "cover.jpeg", "cover.png"}:
+            if Path(path).is_file():
+                return path
+    return ""
+
+
+def _flipper_photo_paths(view: PublishedListingView) -> tuple[str, ...]:
+    """Cover first, then remaining real/gallery photos (deduped).
+
+    Product lock: 📷 房源详情 opens at 📸 1/N = cover, then gallery shots.
+    """
     output: list[str] = []
     seen: set[str] = set()
-    for raw in paths:
+
+    cover = _frozen_cover_path(view)
+    if cover:
+        output.append(cover)
+        seen.add(cover)
+
+    for raw in getattr(view, "gallery", ()) or ():
         path = str(raw or "").strip()
         if not path or path in seen:
             continue
-        if Path(path).name.lower() in {"cover.jpg", "cover.jpeg", "cover.png"}:
+        # Skip cover-named assets once cover is already first.
+        if cover and Path(path).name.lower() in {"cover.jpg", "cover.jpeg", "cover.png"}:
             continue
         if not Path(path).is_file():
             continue
@@ -326,42 +358,34 @@ def _existing_gallery(paths: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(output)
 
 
-def _clip_caption(text: str, limit: int = 1024) -> str:
-    clean = str(text or "").strip()
-    if len(clean) <= limit:
-        return clean
-    return clean[: max(0, limit - 1)].rstrip() + "…"
-
-
 def build_photos_response(
     view: PublishedListingView,
     *,
     offset: int = 0,
     page_size: int | None = None,
 ) -> PublicPhotosResponse:
-    """Merged detail + one-photo flipper (上一张 / 下一张).
+    """Merged one-photo flipper with SHORT caption (上一张 / 下一张).
 
-    ``offset`` is the 0-based photo index. ``page_size`` is ignored (kept for
-    call-site compatibility after dropping progressive multi-photo pages).
+    Photo 1/N is always the listing cover when available; gallery follows.
+    ``page_size`` is ignored (kept for call-site compatibility).
     """
-    del page_size  # progressive multi-photo pages removed
+    del page_size
     details = build_public_listing_details(view)
-    photos = _existing_gallery(details.gallery)
+    photos = _flipper_photo_paths(view)
     total = len(photos)
     if total:
         index = max(0, int(offset or 0)) % total
         current = photos[index]
         groups = ((current,),)
-        caption = build_detail_caption(view, photo_index=index, photo_total=total)
     else:
         index = 0
         current = ""
         groups = ()
-        caption = build_detail_caption(view)
 
     return PublicPhotosResponse(
         media_groups=groups,
-        text=_clip_caption(caption),
+        text=build_photo_caption(view, photo_index=index, photo_total=total),
+        detail_text=build_detail_text(view),
         photo_path=current,
         photo_index=index,
         photo_total=total,
@@ -380,14 +404,14 @@ def build_photos_response(
     )
 
 
-
 __all__ = [
     "InternalListingAction",
     "PublicDetailsResponse",
     "PublicPhotosResponse",
     "SemanticAction",
-    "build_detail_caption",
+    "build_detail_text",
     "build_details_response",
+    "build_photo_caption",
     "build_photos_response",
     "listing_summary_bits",
 ]

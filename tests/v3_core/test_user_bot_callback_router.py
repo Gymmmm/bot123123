@@ -14,7 +14,7 @@ class ListingFlowStub:
         self.calls = []
 
     def resolve_action(self, public_listing_id, action, *, source="listing_callback", photo_offset=0):
-        self.calls.append((public_listing_id, action, source, int(photo_offset or 0)))
+        self.calls.append((public_listing_id, action, source))
         return self.result
 
 
@@ -108,7 +108,7 @@ def test_details_callback_delegates_to_shared_listing_flow_with_callback_source(
     assert dispatched.ok
     assert dispatched.action == "details"
     assert dispatched.listing is result
-    assert listing.calls == [("QL-RF-A2B3", "details", "listing_callback", 0)]
+    assert listing.calls == [("QL-RF-A2B3", "details", "listing_callback")]
     assert session.calls == []
     assert consult is not None and consult.calls == []
     assert similar is not None and similar.calls == []
@@ -121,7 +121,7 @@ def test_book_callback_returns_book_intent_without_executing_appointment():
     assert dispatched.ok
     assert dispatched.listing is not None and dispatched.listing.book is not None
     assert dispatched.listing.book.source == "listing_callback"
-    assert listing.calls == [("QL-RF-A2B3", "book", "listing_callback", 0)]
+    assert listing.calls == [("QL-RF-A2B3", "book", "listing_callback")]
 
 
 def test_consult_callback_returns_pure_intent_even_for_rented_published_listing():
@@ -175,7 +175,7 @@ def test_listing_callbacks_preserve_explicit_channel_source_across_actions():
     router.dispatch("v3u:listing:details:QL-RF-A2B3", source="channel_listing")
     router.dispatch("v3u:listing:consult:QL-RF-A2B3", source="channel_listing")
     router.dispatch("v3u:listing:similar:QL-RF-A2B3", source="channel_listing")
-    assert listing.calls == [("QL-RF-A2B3", "details", "channel_listing", 0)]
+    assert listing.calls == [("QL-RF-A2B3", "details", "channel_listing")]
     assert consult is not None and consult.calls == [("QL-RF-A2B3", "channel_listing", "")]
     assert similar is not None and similar.calls == [("QL-RF-A2B3", "channel_listing")]
 
@@ -185,7 +185,7 @@ def test_listing_book_callback_passes_search_result_source_to_flow():
     router, listing, _, _, _ = _router(listing_result=result)
     dispatched = router.dispatch("v3u:listing:book:QL-RF-A2B3", source="search_result")
     assert dispatched.ok
-    assert listing.calls == [("QL-RF-A2B3", "book", "search_result", 0)]
+    assert listing.calls == [("QL-RF-A2B3", "book", "search_result")]
 
 
 def test_missing_consult_or_similar_listing_preserves_not_found():

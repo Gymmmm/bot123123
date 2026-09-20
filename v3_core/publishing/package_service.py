@@ -14,6 +14,20 @@ from v3_core.storage.inventory_repository import InventoryRepository
 from .package_store import FrozenPackage, FrozenPackageStore
 
 
+def _publisher_adviser_facts(facts: dict[str, Any]) -> dict[str, Any]:
+    """Return verified facts suitable for Publisher-side judgement.
+
+    Generic fields are allowed as context so several facts can be composed into
+    one useful observation. The adviser engine suppresses generic single-field
+    boilerplate while this marker is present. Property type alone still never
+    creates adviser copy.
+    """
+    result = verified_canonical_adviser_facts(dict(facts or {}))
+    result["property_type"] = ""
+    result["_publisher_adviser_mode"] = "composite"
+    return result
+
+
 class PackageBuildService:
     def __init__(
         self,
@@ -41,6 +55,8 @@ class PackageBuildService:
         cover_path: str,
         gallery: list[str],
         source_identity: dict[str, Any] | None = None,
+        adviser_copy_override: str | None = None,
+        inventory_status_override: str | None = None,
     ) -> FrozenPackage:
         listing = self.reader.listing(listing_id)
         offer = self.reader.offer(offer_id)
@@ -57,18 +73,26 @@ class PackageBuildService:
         facts = dict(canonical["facts"])
         public_id = str(listing.get("public_listing_id") or "")
         adviser_seed = public_id or str(listing_id)
-        adviser_copy = generate_adviser_text(
-            verified_canonical_adviser_facts(facts),
-            seed=adviser_seed,
-            max_points=2,
-            allow_fallback=False,
-        )
+        if adviser_copy_override is None:
+            adviser_copy = generate_adviser_text(
+                _publisher_adviser_facts(facts),
+                seed=adviser_seed,
+                max_points=2,
+                allow_fallback=False,
+            )
+            adviser_copy_source = "auto"
+        else:
+            adviser_copy = str(adviser_copy_override).strip()
+            adviser_copy_source = "hidden" if not adviser_copy else "manual"
 
+        frozen_status = str(
+            inventory_status_override or listing.get("inventory_status") or "active"
+        ).strip().lower()
         caption = render_channel_caption(
             listing=listing,
             offer=offer,
             public_listing_id=public_id,
-            status=str(listing.get("inventory_status") or "active"),
+            status=frozen_status,
             adviser_note=adviser_copy,
         )
         rent = offer.get("monthly_rent_usd")
@@ -104,19 +128,15 @@ class PackageBuildService:
             "offer_id": str(offer_id),
             "canonical_record_id": str(canonical["canonical_record_id"]),
             "canonical_facts_hash": str(canonical["facts_hash"]),
-            # Freeze the complete canonical evidence used to build this public
-            # product. User Bot detail/adviser copy must never reach back into a
-            # later canonical row and silently change what an existing channel
-            # publication means.
             "canonical_facts": facts,
-            # Freeze the exact public wording as well.  The User Bot reads this
-            # copy from the package so channel, preview and detail stay identical.
             "adviser_copy": adviser_copy,
-            "adviser_copy_version": "v1_production",
+            "adviser_copy_version": "v1_publisher_authoritative",
+            "adviser_copy_source": adviser_copy_source,
             "adviser_seed": adviser_seed,
             "listing": {
-                key: listing.get(key)
-                for key in (
+                **{
+                    key: listing.get(key)
+                    for key in (
                     "project_name",
                     "project_alias",
                     "project_brand",
@@ -132,8 +152,10 @@ class PackageBuildService:
                     "bathrooms",
                     "size_sqm",
                     "floor",
-                    "inventory_status",
-                )
+                        "inventory_status",
+                    )
+                },
+                "inventory_status": frozen_status,
             },
             "offer": {
                 key: offer.get(key)
@@ -216,4 +238,4 @@ class PackageApprovalService:
         return approved
 
 
-__all__ = ["PackageApprovalService", "PackageBuildService"]
+__all__ = ["PackageApprovalService", "PackageBuildService", "_publisher_adviser_facts"]

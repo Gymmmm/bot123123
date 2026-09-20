@@ -50,22 +50,20 @@ def _service(tmp_path, *, with_binding=True, unknowns=False):
     return db, TenantService(SQLiteTenantServiceRepository(db))
 
 
-def test_unbound_tenant_home_exposes_public_actions_only(tmp_path):
-    _, service = _service(tmp_path, with_binding=False)
-    view = tenant_home_view(service, 123)
-    labels = [choice.label for row in view.rows for choice in row]
-    assert labels == ["📄 租赁服务", "🔍 开始找房", "💬 中文顾问", "🏠 返回首页"]
-    forbidden = ("租约", "报修", "物业", "续租", "退租")
-    assert not any(any(word in label for word in forbidden) for label in labels)
+def test_tenant_home_is_public_with_or_without_binding(tmp_path):
+    _, unbound = _service(tmp_path, with_binding=False)
+    unbound_view = tenant_home_view(unbound, 123)
+    unbound_labels = [choice.label for row in unbound_view.rows for choice in row]
+    assert unbound_labels == [
+        "我的租约", "入住管家", "安心租房", "周边生活",
+        "中文顾问", "返回首页",
+    ]
 
-
-def test_active_tenant_home_exposes_current_tenant_actions(tmp_path):
-    _, service = _service(tmp_path)
-    view = tenant_home_view(service, 123)
-    labels = [choice.label for row in view.rows for choice in row]
-    for label in ("📋 我的租约", "🔧 报修", "🏢 物业协调", "🔄 续租", "🚪 退租"):
-        assert label in labels
-    assert "我想换房" not in " ".join(labels)
+    other = tmp_path / "bound"
+    other.mkdir()
+    _, bound = _service(other, with_binding=True)
+    bound_view = tenant_home_view(bound, 123)
+    assert bound_view == unbound_view
 
 
 def test_lease_unknown_values_are_never_rendered_as_null_or_1970(tmp_path):

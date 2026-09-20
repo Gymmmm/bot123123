@@ -126,6 +126,21 @@ async def handle_v3_transition_text(
             apply_session_mutation(user_data, result.mutation)
         return TelegramTransitionTextOutcome(handled=True, result=result)
 
+    if result.next_step == "search_layout":
+        preview = deepcopy(user_data)
+        if result.mutation is not None:
+            apply_session_mutation(preview, result.mutation)
+        pref = preview.get(SEARCH_PREF_SESSION_KEY)
+        area_display = ""
+        budget_label = ""
+        if isinstance(pref, dict):
+            area_display = str(pref.get("area_display") or "").strip()
+            budget_label = str(pref.get("budget_label") or "").strip()
+        await _reply_view(message, views.search_layout(area_display, budget_label))
+        if result.mutation is not None:
+            apply_session_mutation(user_data, result.mutation)
+        return TelegramTransitionTextOutcome(handled=True, result=result)
+
     # TransitionTextActionService historically names a ready custom-time draft
     # appointment_submit. Issue #25 requires one confirmation screen first.
     # Keep the existing pure service/session contract and move persistence behind

@@ -18,7 +18,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  DEPLOY_BRANCH: codex/v3-core-extraction-20260908
+  DEPLOY_SHA: c378e00eff300a4b1c62c3b7ec1a661a360b346a
   PROD_HOST: 50.114.74.120
   PROD_PORT: '22'
   PROD_SSH_USER: root
@@ -31,17 +31,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Checkout approved V3 branch
+      - name: Checkout approved immutable SHA
         uses: actions/checkout@v4
         with:
-          ref: ${{ env.DEPLOY_BRANCH }}
+          ref: ${{ env.DEPLOY_SHA }}
           fetch-depth: 0
 
-      - name: Verify branch and capture immutable SHA
+      - name: Verify immutable SHA
         run: |
           set -Eeuo pipefail
-          test "$GITHUB_REF_NAME" = "$DEPLOY_BRANCH"
           CANDIDATE_SHA=$(git rev-parse HEAD)
+          test "$CANDIDATE_SHA" = "$DEPLOY_SHA"
           echo "CANDIDATE_SHA=$CANDIDATE_SHA" >> "$GITHUB_ENV"
 
       - uses: actions/setup-python@v5

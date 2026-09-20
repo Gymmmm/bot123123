@@ -1,22 +1,13 @@
-"""Telegram-neutral search result cards for published V3 rent inventory.
-
-Card copy consumes only ``PublishedListingView`` objects. Public facts and cover
-selection come from the frozen publication package; only current availability
-comes from live inventory. No legacy listing/media lookup is permitted here.
-"""
+"""Telegram-neutral search result cards for published V3 rent inventory."""
 from __future__ import annotations
-
 from dataclasses import dataclass
 from html import escape as he
 from pathlib import Path
 from typing import Iterable
-
 from v3_core.publishing.formatting import display_floor
-
 from .listing_presenter import build_public_listing_details
 from .listing_responses import SemanticAction
 from .public_inventory import PublishedListingView
-
 
 @dataclass(frozen=True)
 class SearchCardResponse:
@@ -27,140 +18,71 @@ class SearchCardResponse:
     index: int
     total: int
 
-
-def _format_price(value: int | None) -> str:
-    return f"${int(value):,}/月" if value is not None and int(value) > 0 else "价格待确认"
-
-
-def _format_size(value: float | None) -> str:
-    if value is None or value <= 0:
-        return ""
-    numeric = int(value) if float(value).is_integer() else value
-    return f"{numeric}㎡"
-
-
 def _frozen_cover(view: PublishedListingView) -> str:
-    candidate = str(view.package.get("cover_path") or "").strip()
-    return candidate if candidate and Path(candidate).is_file() else ""
+    candidate=str(view.package.get("cover_path") or "").strip()
+    if candidate and Path(candidate).is_file():
+        return candidate
+    for raw in getattr(view,"gallery",()):
+        path=str(raw or "").strip()
+        if path and Path(path).is_file():
+            return path
+    return ""
 
-
-def _card_actions(
-    views: tuple[PublishedListingView, ...],
-    *,
-    index: int,
-    bookable: bool,
-) -> tuple[tuple[SemanticAction, ...], ...]:
-    current = views[index]
-    current_public_id = current.public_listing_id
-    rows: list[tuple[SemanticAction, ...]] = []
-    total = len(views)
-
+def _card_actions(views: tuple[PublishedListingView, ...], *, index: int, bookable: bool) -> tuple[tuple[SemanticAction, ...], ...]:
+    current=views[index]
+    target=current.public_listing_id
+    rows=[]
+    total=len(views)
     if total > 1:
-        previous_index = (index - 1) % total
-        next_index = (index + 1) % total
-        rows.append(
-            (
-                SemanticAction(
-                    "⬅️ 上一套",
-                    "previous",
-                    target_public_listing_id=views[previous_index].public_listing_id,
-                    target_index=previous_index,
-                ),
-                SemanticAction(
-                    "下一套 ➡️",
-                    "next",
-                    target_public_listing_id=views[next_index].public_listing_id,
-                    target_index=next_index,
-                ),
-            )
-        )
-
-    rows.append(
-        (
-            SemanticAction(
-                "📷 更多详情",
-                "details",
-                target_public_listing_id=current_public_id,
-            ),
-        )
-    )
+        prev_i=(index-1)%total
+        next_i=(index+1)%total
+        rows.append((
+            SemanticAction("上一套","previous",views[prev_i].public_listing_id,prev_i),
+            SemanticAction("下一套","next",views[next_i].public_listing_id,next_i),
+        ))
     if bookable:
-        rows.append(
-            (
-                SemanticAction(
-                    "📅 预约看房",
-                    "book",
-                    target_public_listing_id=current_public_id,
-                ),
-            )
-        )
-    rows.append(
-        (
-            SemanticAction(
-                "💬 联系中文顾问",
-                "consult",
-                target_public_listing_id=current_public_id,
-            ),
-        )
-    )
-    rows.append((SemanticAction("✏️ 调整条件", "change_search"),))
+        rows.append((SemanticAction("📷 房源详情","details",target),SemanticAction("📅 预约看房","book",target)))
+    else:
+        rows.append((SemanticAction("📷 房源详情","details",target),))
+    rows.append((SemanticAction("换条件","change_search"),))
     return tuple(rows)
 
-
-def build_search_card(
-    views: Iterable[PublishedListingView],
-    index: int,
-) -> SearchCardResponse:
-    items = tuple(views)
+def build_search_card(views: Iterable[PublishedListingView], index: int) -> SearchCardResponse:
+    items=tuple(views)
     if not items:
         raise ValueError("search_card_requires_results")
-    position = int(index) % len(items)
-    view = items[position]
-    details = build_public_listing_details(view)
-
-    project = details.project_name or details.location or "金边"
-    layout = details.layout or details.property_type or "房源"
-    price = _format_price(details.monthly_rent_usd)
-    size = _format_size(details.size_sqm)
-    floor = display_floor(details.floor)
-
-    lines = [
-        f"🏠 <b>{he(project)}｜{he(layout)}</b>",
-        f"💰 <b>{he(price)}</b>",
-        "",
-    ]
-    if details.location:
-        lines.append(f"📍 {he(details.location)}")
-    house_bits = [value for value in (size, floor) if value]
-    if house_bits:
-        lines.append(f"📐 {he(' · '.join(house_bits))}")
-    lines.extend(
-        [
-            "",
-            f"{details.status_icon} {he(details.status_label)}",
-            f"第 {position + 1}/{len(items)} 套",
-        ]
+    position=int(index)%len(items)
+    view=items[position]
+    details=build_public_listing_details(view)
+    floor=display_floor(details.floor)
+    subject=" · ".join(
+        v for v in (
+            str(details.project_name or "").strip(),
+            str(details.layout or "").strip(),
+        ) if v
+    ) or str(details.location or "").strip() or details.public_listing_id
+    rent=(
+        f"${int(details.monthly_rent_usd):,}/月"
+        if details.monthly_rent_usd is not None and int(details.monthly_rent_usd)>0
+        else ""
     )
-
+    lines=[f"<b>{he(subject)}</b>"]
+    if rent:
+        lines.append(he(rent))
+    if floor:
+        lines.append(he(floor))
+    lines.append(f"{details.status_icon} {he(details.status_label)} · {position+1}/{len(items)}")
     return SearchCardResponse(
         public_listing_id=details.public_listing_id,
         text="\n".join(lines),
         photo_path=_frozen_cover(view),
-        action_rows=_card_actions(items, index=position, bookable=details.bookable),
+        action_rows=_card_actions(items,index=position,bookable=details.bookable),
         index=position,
         total=len(items),
     )
 
+def build_search_cards(views: Iterable[PublishedListingView]) -> tuple[SearchCardResponse, ...]:
+    items=tuple(views)
+    return tuple(build_search_card(items,index) for index in range(len(items)))
 
-def build_search_cards(
-    views: Iterable[PublishedListingView],
-) -> tuple[SearchCardResponse, ...]:
-    items = tuple(views)
-    return tuple(build_search_card(items, index) for index in range(len(items)))
-
-
-__all__ = [
-    "SearchCardResponse",
-    "build_search_card",
-    "build_search_cards",
-]
+__all__=["SearchCardResponse","build_search_card","build_search_cards"]

@@ -19,9 +19,7 @@ logger = logging.getLogger(__name__)
 APPOINTMENT_LOCK_COUNT = 5
 _ACTIVE_APPOINTMENT_STATUSES = ("pending", "assigned", "contacted", "confirmed")
 
-_STATUS_RE = re.compile(
-    r"(?m)^[🟢🟡🔵🔴⚫]️?\s*(?:房源状态｜)?[^\n]*"
-)
+_STATUS_RE = re.compile(r"(?m)^[🟢🟡🔵🔴⚫]️?\s*(?:房源状态｜)?[^\n]*")
 _PUBLIC_ID_RE = re.compile(r"\b(?:QL-[A-HJ-NP-Z2-9]{6}|QC\d{3,8})\b", re.I)
 
 
@@ -33,17 +31,7 @@ def _active_appointment_count(conn: sqlite3.Connection, listing_id: str) -> int:
     return int(row[0] if row else 0)
 
 
-def _apply_appointment_lock(
-    conn: sqlite3.Connection,
-    listing_id: str,
-    status: str,
-    appointment_count: int,
-) -> str:
-    """Derive the bookable channel state from active appointment count.
-
-    Terminal/manual hold states stay authoritative. For a bookable listing the
-    public state is deterministic: 0 -> active, 1-4 -> reserved, >=5 -> pending.
-    """
+def _apply_appointment_lock(conn: sqlite3.Connection, listing_id: str, status: str, appointment_count: int) -> str:
     status = str(status or "").strip().lower()
     if status in {"rented", "inactive", "offline"}:
         return status
@@ -51,18 +39,10 @@ def _apply_appointment_lock(
         return status
     if status not in {"active", "reserved", "pending"}:
         return status or "pending"
-
-    if appointment_count >= APPOINTMENT_LOCK_COUNT:
-        target = "pending"
-    elif appointment_count >= 1:
-        target = "reserved"
-    else:
-        target = "active"
-
+    target = "pending" if appointment_count >= APPOINTMENT_LOCK_COUNT else ("reserved" if appointment_count >= 1 else "active")
     if target != status:
         conn.execute(
-            "UPDATE listings SET status=?, updated_at=datetime('now','localtime') "
-            "WHERE listing_id=? AND status IN ('active','reserved','pending')",
+            "UPDATE listings SET status=?, updated_at=datetime('now','localtime') WHERE listing_id=? AND status IN ('active','reserved','pending')",
             (target, listing_id),
         )
     return target
@@ -82,18 +62,12 @@ def _status_label(status: str, appointment_count: int = 0) -> str:
     }.get(status, "🔵 房态待确认")
 
 
-def _caption_with_status(
-    caption: str,
-    status: str,
-    appointment_count: int = 0,
-    listing_id: str = "",
-) -> str:
+def _caption_with_status(caption: str, status: str, appointment_count: int = 0, listing_id: str = "") -> str:
     raw = str(caption or "").strip()
     label = _status_label(status, appointment_count)
     found = _PUBLIC_ID_RE.search(raw)
     qc = found.group(0).upper() if found else public_qc_code(listing_id)
     status_line = f"{label}　{qc}" if qc else label
-
     if _STATUS_RE.search(raw):
         replaced = False
         lines: list[str] = []
@@ -106,7 +80,6 @@ def _caption_with_status(
             else:
                 lines.append(line)
         return "\n".join(lines).strip()[:1024]
-
     lines = raw.splitlines()
     tag_index = next((i for i, line in enumerate(lines) if line.lstrip().startswith("#")), len(lines))
     before = lines[:tag_index]
@@ -121,18 +94,12 @@ def _caption_with_status(
 
 def _keyboard(username: str, token: str, listing_id: str, status: str) -> InlineKeyboardMarkup:
     _ = token
-    details = InlineKeyboardButton(
-        "🏠 房源详情", url=channel_action_url(username, listing_id, "details")
-    )
-    photos = InlineKeyboardButton(
-        "📸 更多实拍", url=channel_action_url(username, listing_id, "photos")
-    )
+    details = InlineKeyboardButton("📋 租赁详情", url=channel_action_url(username, listing_id, "details"))
+    photos = InlineKeyboardButton("📸 更多实拍", url=channel_action_url(username, listing_id, "photos"))
     if status in {"active", "reserved"}:
         return InlineKeyboardMarkup([
             [details, photos],
-            [InlineKeyboardButton(
-                "📅 预约看房", url=channel_action_url(username, listing_id, "book")
-            )],
+            [InlineKeyboardButton("📅 预约看房", url=channel_action_url(username, listing_id, "book"))],
         ])
     return InlineKeyboardMarkup([[details, photos]])
 
@@ -162,18 +129,8 @@ async def sync_channel_listing_status(listing_id: str) -> bool:
                 return False
             message_id = int(row["channel_message_id"])
             appointment_count = _active_appointment_count(conn, listing_id)
-            status = _apply_appointment_lock(
-                conn,
-                listing_id,
-                str(row["status"] or "pending").strip().lower(),
-                appointment_count,
-            )
-            caption = _caption_with_status(
-                str(row["post_text"] or ""),
-                status,
-                appointment_count,
-                listing_id,
-            )
+            status = _apply_appointment_lock(conn, listing_id, str(row["status"] or "pending").strip().lower(), appointment_count)
+            caption = _caption_with_status(str(row["post_text"] or ""), status, appointment_count, listing_id)
             markup = _keyboard(username, str(row["public_token"] or ""), listing_id, status)
             await Bot(token=token).edit_message_caption(
                 chat_id=channel_id,
@@ -182,10 +139,7 @@ async def sync_channel_listing_status(listing_id: str) -> bool:
                 parse_mode="HTML",
                 reply_markup=markup,
             )
-            conn.execute(
-                "UPDATE posts SET post_text=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
-                (caption, int(row["post_row_id"])),
-            )
+            conn.execute("UPDATE posts SET post_text=?, updated_at=CURRENT_TIMESTAMP WHERE id=?", (caption, int(row["post_row_id"])))
         return True
     except Exception:
         logger.exception("频道房态同步失败: listing_id=%s", listing_id)

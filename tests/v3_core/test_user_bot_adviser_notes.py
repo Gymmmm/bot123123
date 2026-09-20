@@ -4,38 +4,41 @@ import json
 
 import pytest
 
-from v3_core.user_bot.adviser_notes import (
-    adviser_notes_for_view,
-    frozen_adviser_evidence,
-    generate_adviser_notes,
-)
+from v3_core.user_bot.adviser_notes import adviser_notes_for_view
+from v3_core.user_bot.listing_responses import build_details_response
 from v3_core.user_bot.public_inventory import PublishedListingView
 
 
-def _view(*, canonical_facts=None, listing=None, offer=None):
-    canonical = {} if canonical_facts is None else dict(canonical_facts)
-    frozen_listing = {
-        "project_name": "富力城",
-        "public_location_display": "富力城",
-        "property_type": "公寓",
-        **dict(listing or {}),
-    }
-    frozen_offer = {
-        "offer_type": "rent",
-        "monthly_rent_usd": 800,
-        "publication_policy": "telegram_rent",
-        **dict(offer or {}),
-    }
+def _view(
+    *,
+    adviser_copy: object = None,
+    adviser_copy_source: object = None,
+    include_copy: bool = True,
+    canonical_facts: dict | None = None,
+    listing: dict | None = None,
+) -> PublishedListingView:
     snapshot = {
         "schema": "v3_publication_snapshot.v1",
         "listing_id": "LST_1",
         "public_listing_id": "QL-RF-A2B3",
         "offer_id": "OFF_1",
-        "canonical_facts_hash": "hash-1",
-        "canonical_facts": canonical,
-        "listing": frozen_listing,
-        "offer": frozen_offer,
+        "canonical_facts": dict(canonical_facts or {}),
+        "listing": {
+            "project_name": "富力城",
+            "public_location_display": "富力城",
+            "property_type": "公寓",
+            **dict(listing or {}),
+        },
+        "offer": {
+            "offer_type": "rent",
+            "monthly_rent_usd": 800,
+            "publication_policy": "telegram_rent",
+        },
     }
+    if include_copy:
+        snapshot["adviser_copy"] = adviser_copy
+    if adviser_copy_source is not None:
+        snapshot["adviser_copy_source"] = adviser_copy_source
     return PublishedListingView(
         listing={
             "listing_id": "LST_1",
@@ -49,74 +52,61 @@ def _view(*, canonical_facts=None, listing=None, offer=None):
             "publication_policy": "telegram_rent",
         },
         publication={"instance_id": "PUB_1"},
-        package={
-            "snapshot_json": json.dumps(snapshot, ensure_ascii=False),
-            "gallery_json": '["/frozen/01.jpg"]',
-        },
+        package={"snapshot_json": json.dumps(snapshot, ensure_ascii=False)},
     )
 
 
-def test_legacy_freeform_evidence_stays_silent_without_canonical_facts():
-    evidence = {
-        "area": "BKK1",
-        "project": "富力城",
-        "property_type": "公寓",
-        "size_sqm": "95",
-        "floor": "19",
-        "price": "800",
-        "management_fee": "包含",
-    }
-    assert generate_adviser_notes(evidence, max_points=3) == ""
+@pytest.mark.parametrize("source", ["auto", "manual"])
+def test_publisher_copy_is_returned_and_rendered_verbatim(source):
+    frozen = "第一句由 Publisher 冻结。\n第二句顺序保持不变。"
+    view = _view(adviser_copy=frozen, adviser_copy_source=source)
+    assert adviser_notes_for_view(view) == frozen
+    text = build_details_response(view).text
+    assert "💬 侨联说" in text
+    assert "<b>侨联说</b>" not in text
+    assert frozen.splitlines()[0] in text
+    assert frozen.splitlines()[1] in text
+    assert "<blockquote>" not in text
+    assert "• 第一句" not in text
 
 
-def test_legacy_highlights_stay_silent_without_canonical_facts():
-    evidence = {
-        "property_type": "公寓",
-        "size_sqm": "95",
-        "floor": "19",
-        "highlights": ["一周两次保洁", "灭虫"],
-    }
-    assert generate_adviser_notes(evidence) == ""
-
-
-def test_frozen_safe_included_list_is_preserved_as_canonical_evidence():
-    view = _view(canonical_facts={"included": ["物业费", "Wi-Fi"]})
-    evidence = frozen_adviser_evidence(view)
-    assert evidence["canonical_facts"]["included"] == ["物业费", "Wi-Fi"]
-
-
-def test_amenity_presence_never_becomes_fee_inclusion():
-    view = _view(canonical_facts={"amenities": ["游泳池", "健身房"]})
-    evidence = frozen_adviser_evidence(view)
-    assert "management_fee" not in evidence
-    assert "internet_fee" not in evidence
-
-
-def test_frozen_highlights_without_supported_signal_stay_silent():
-    view = _view(
-        canonical_facts={"highlights": ["采光好", "钥匙已备"]},
-        listing={"public_location_display": "BKK1"},
-    )
+def test_hidden_source_never_displays_even_when_copy_exists():
+    view = _view(adviser_copy="这段不能公开", adviser_copy_source="hidden")
     assert adviser_notes_for_view(view) == ""
+    assert "侨联说" not in build_details_response(view).text
+    assert "这段不能公开" not in build_details_response(view).text
 
 
-def test_older_package_with_frozen_signals_uses_shared_adviser_engine():
-    view = _view(
-        canonical_facts={
-            "adviser_signals": ["cleaning_2x", "management_wifi"],
-        }
-    )
-    text = adviser_notes_for_view(view, max_points=2)
-    assert "两次" in text
-    assert "物业" in text
-    assert ("网费" in text) or ("网络" in text)
-    assert "位置标注" not in text
+@pytest.mark.parametrize("copy", [None, "", "   "])
+def test_empty_or_missing_copy_hides_entire_section(copy):
+    view = _view(adviser_copy=copy, include_copy=copy is not None)
+    assert adviser_notes_for_view(view) == ("" if copy is None else str(copy))
+    assert "侨联说" not in build_details_response(view).text
 
 
-def test_missing_frozen_canonical_facts_is_blocked_instead_of_falling_back_live():
-    view = _view(canonical_facts={})
-    snapshot = view.snapshot
-    snapshot.pop("canonical_facts")
-    view.package["snapshot_json"] = json.dumps(snapshot, ensure_ascii=False)
-    with pytest.raises(ValueError, match="frozen_canonical_facts_missing"):
-        adviser_notes_for_view(view)
+@pytest.mark.parametrize(
+    "facts,listing",
+    [
+        ({"included": ["物业费", "Wi-Fi"]}, {}),
+        ({"amenities": ["泳池", "健身房"]}, {}),
+        ({"adviser_signals": ["management_wifi", "high_floor"]}, {"floor": "39"}),
+        ({}, {"property_type": "别墅", "floor": "28"}),
+    ],
+)
+def test_listing_facts_never_generate_user_bot_adviser_copy(facts, listing):
+    view = _view(include_copy=False, canonical_facts=facts, listing=listing)
+    assert adviser_notes_for_view(view) == ""
+    assert "侨联说" not in build_details_response(view).text
+
+
+def test_other_details_and_actions_remain_present_with_authoritative_copy():
+    view = _view(adviser_copy="已冻结建议。", adviser_copy_source="auto")
+    response = build_details_response(view)
+    assert "💬 侨联说" in response.text
+    assert "已冻结建议。" in response.text
+    assert "富力城" in response.text
+    assert "$800" in response.text
+    assert "🟢 房源状态：随时可预约看房" in response.text
+    labels = [action.label for row in response.action_rows for action in row]
+    assert "📅 预约看房" in labels
+    assert "💬 中文顾问" in labels

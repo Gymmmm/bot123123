@@ -29,6 +29,7 @@ TextNextStep = Literal[
     "appointment_time",
     "appointment_submit",
     "search_budget",
+    "search_layout",
     "search_submit",
 ]
 
@@ -253,6 +254,23 @@ class TransitionTextActionService:
                 )
             pref = dict(raw_pref)
             intent = _search_submit_from_text(value, pref, budget_min, budget_max)
+            if str(pref.get("source") or "").strip() != "similar_listing":
+                pref.update(
+                    {
+                        "budget_min": budget_min,
+                        "budget_max": budget_max,
+                        "budget_label": intent.budget_label,
+                        "touch_payload": intent.touch_payload,
+                    }
+                )
+                return TransitionTextActionResult(
+                    status="ok",
+                    next_step="search_layout",
+                    mutation=SessionMutationPlan(
+                        set_values={SEARCH_PREF_SESSION_KEY: pref},
+                        delete_keys=(SEARCH_AWAITING_AREA_KEY, SEARCH_AWAITING_BUDGET_KEY),
+                    ),
+                )
             return TransitionTextActionResult(
                 status="ok",
                 next_step="search_submit",

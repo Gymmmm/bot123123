@@ -179,12 +179,24 @@ class TransitionActionService:
             "appointment_time",
             "appointment_other_time",
             "appointment_back_date",
+            "appointment_back_mode",
         }:
             draft = _load_appointment(session)
             if draft is None:
                 return TransitionActionResult(
                     status="expired",
                     reason="appointment_session_expired",
+                )
+
+            if kind == "appointment_back_mode":
+                return TransitionActionResult(
+                    status="ok",
+                    next_step="appointment_mode",
+                    appointment=draft,
+                    mutation=SessionMutationPlan(
+                        set_values={APPOINTMENT_SESSION_KEY: _appointment_values(draft)},
+                        delete_keys=(APPOINTMENT_AWAITING_DATE_KEY, APPOINTMENT_AWAITING_TIME_KEY),
+                    ),
                 )
 
             if kind == "appointment_mode":
@@ -338,7 +350,10 @@ class TransitionActionService:
                 status="ok",
                 next_step="navigation",
                 navigation="search_layout",
-                mutation=SessionMutationPlan(set_values={}),
+                mutation=SessionMutationPlan(
+                    set_values={SEARCH_PREF_SESSION_KEY: _fresh_search_pref("home_layout")},
+                    delete_keys=(SEARCH_AWAITING_AREA_KEY, SEARCH_AWAITING_BUDGET_KEY),
+                ),
             )
 
         if kind == "layout_choice":
@@ -346,40 +361,39 @@ class TransitionActionService:
                 display, room_type, property_type = layout_selection(callback.value)
             except ValueError:
                 return TransitionActionResult(status="invalid", reason="invalid_layout_choice")
+            pref = _search_pref(session) or _fresh_search_pref("home_layout")
+            location_keys = tuple(
+                str(value).strip()
+                for value in (pref.get("location_keys") or ())
+                if str(value or "").strip()
+            )
+            budget_min = pref.get("budget_min")
+            budget_max = pref.get("budget_max")
             criteria = SearchCriteria(
-                property_type=property_type,
+                property_type=property_type or _goal_property_type(pref.get("goal")),
+                location_keys=location_keys,
+                budget_min=int(budget_min) if budget_min is not None else None,
+                budget_max=int(budget_max) if budget_max is not None else None,
                 room_type=room_type,
                 raw_text=room_type,
             )
-            return TransitionActionResult(
-                status="ok",
-                next_step="search_submit",
-                search=SearchSubmitIntent(
-                    criteria=criteria,
-                    source="home_layout",
-                    goal=display,
-                    area_display="",
-                    budget_label="",
-                    touch_payload={"room_type": room_type},
-                ),
-                mutation=SessionMutationPlan(
-                    set_values={LAST_SEARCH_PREF_KEY: _last_pref(criteria)},
-                    delete_keys=(SEARCH_PREF_SESSION_KEY, SEARCH_AWAITING_AREA_KEY, SEARCH_AWAITING_BUDGET_KEY),
-                ),
+            touch_payload = (
+                dict(pref.get("touch_payload") or {})
+                if isinstance(pref.get("touch_payload"), Mapping)
+                else {}
             )
-
-        if kind == "search_available":
-            criteria = SearchCriteria(raw_text="")
+            if room_type:
+                touch_payload["room_type"] = room_type
             return TransitionActionResult(
                 status="ok",
                 next_step="search_submit",
                 search=SearchSubmitIntent(
                     criteria=criteria,
-                    source="home_available",
-                    goal="any",
-                    area_display="",
-                    budget_label="",
-                    touch_payload={"current_available": True},
+                    source=str(pref.get("source") or "home_layout").strip(),
+                    goal=display if room_type else str(pref.get("goal") or "any").strip(),
+                    area_display=str(pref.get("area_display") or "").strip(),
+                    budget_label=str(pref.get("budget_label") or "").strip(),
+                    touch_payload=touch_payload,
                 ),
                 mutation=SessionMutationPlan(
                     set_values={LAST_SEARCH_PREF_KEY: _last_pref(criteria)},
@@ -422,6 +436,24 @@ class TransitionActionService:
                 if isinstance(pref.get("touch_payload"), Mapping)
                 else {}
             )
+            if source != "similar_listing":
+                updated_pref = dict(pref)
+                updated_pref.update(
+                    {
+                        "budget_min": budget_min,
+                        "budget_max": budget_max,
+                        "budget_label": budget_label,
+                    }
+                )
+                return TransitionActionResult(
+                    status="ok",
+                    next_step="navigation",
+                    navigation="search_layout",
+                    mutation=SessionMutationPlan(
+                        set_values={SEARCH_PREF_SESSION_KEY: updated_pref},
+                        delete_keys=(SEARCH_AWAITING_AREA_KEY, SEARCH_AWAITING_BUDGET_KEY),
+                    ),
+                )
             return TransitionActionResult(
                 status="ok",
                 next_step="search_submit",

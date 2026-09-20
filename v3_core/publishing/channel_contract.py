@@ -15,12 +15,12 @@ from .public_ids import normalize_public_id
 
 CHANNEL_ACTION_ORDER = ("details", "photos", "book", "consult")
 CHANNEL_CTA_LABELS = {
-    "details": "📷 更多详情",
-    "photos": "📸 更多实拍",
+    "details": "📷 房源详情",
+    "photos": "📸 更多实拍",  # kept for package/compat; not shown on channel keyboard
     "book": "📅 预约看房",
-    "consult": "💬 咨询顾问",
-    "find": "🔍 智能找房",
-    "more": "🏠 更多房源",
+    "consult": "💬 中文顾问",
+    "find": "🏠 帮我找房",
+    "more": "🔎 看看房源",
 }
 
 _ACTION_SUFFIX = {
@@ -114,8 +114,15 @@ def official_channel_cta_keys(inventory_status: object = "active") -> tuple[str,
     status = str(inventory_status or "").strip().lower()
     if inventory_status_bookable(status):
         return ("details", "book", "consult")
-    # pending / rented / offline / inactive: no listing-details CTA
-    return ("consult", "find", "more")
+    if status == "pending":
+        return ("consult", "find", "more")
+    # rented / offline / inactive
+    return ("find", "more", "consult")
+
+
+def _bot_from_details_url(details_url: str) -> str:
+    details = urlparse(details_url)
+    return details.path.strip("/")
 
 
 def official_channel_button_spec(
@@ -123,33 +130,57 @@ def official_channel_button_spec(
     *,
     inventory_status: object = "active",
 ) -> tuple[tuple[tuple[str, str], ...], ...]:
-    """Return keyboard rows as ``((label, url), ...)`` for publish and sync."""
+    """Return keyboard rows as ``((label, url), ...)`` for publish and sync.
+
+    Locked product matrix (2026-09-20):
+    - bookable active/reserved:
+        Row1: [📷 房源详情] [📅 预约看房]
+        Row2: [💬 中文顾问]
+    - pending:
+        Row1: [💬 中文顾问]
+        Row2: [🏠 帮我找房] [🔎 看看房源]
+    - rented / offline / inactive:
+        Row1: [🏠 帮我找房] [🔎 看看房源]
+        Row2: [💬 中文顾问]
+    """
     verified = official_channel_action_identity(actions)
     status = str(inventory_status or "").strip().lower()
     has_consult = "consult" in verified
-    # Bookable: details (merged flipper) + book + consult.
-    # photos URL stays in the package for backward-compat deeplinks.
+
     if inventory_status_bookable(status):
         rows: list[tuple[tuple[str, str], ...]] = [
-            ((CHANNEL_CTA_LABELS["details"], verified["details"]),),
-            ((CHANNEL_CTA_LABELS["book"], verified["book"]),),
+            (
+                (CHANNEL_CTA_LABELS["details"], verified["details"]),
+                (CHANNEL_CTA_LABELS["book"], verified["book"]),
+            ),
         ]
         if has_consult:
             rows.append(((CHANNEL_CTA_LABELS["consult"], verified["consult"]),))
         return tuple(rows)
 
-    # Non-bookable pending/rented/offline/inactive: NO details CTA.
-    # find_home starts guided search; latest keeps more-listings pattern.
-    details = urlparse(verified["details"])
-    bot = details.path.strip("/")
+    bot = _bot_from_details_url(verified["details"])
     find_url = f"https://t.me/{bot}?start=find_home"
     more_url = f"https://t.me/{bot}?start=latest"
-    row: list[tuple[str, str]] = []
-    if has_consult:
-        row.append((CHANNEL_CTA_LABELS["consult"], verified["consult"]))
-    row.append((CHANNEL_CTA_LABELS["find"], find_url))
-    row.append((CHANNEL_CTA_LABELS["more"], more_url))
-    return tuple(tuple(row[i:i + 2]) for i in range(0, len(row), 2))
+    find_btn = (CHANNEL_CTA_LABELS["find"], find_url)
+    more_btn = (CHANNEL_CTA_LABELS["more"], more_url)
+    consult_btn = (
+        (CHANNEL_CTA_LABELS["consult"], verified["consult"])
+        if has_consult
+        else None
+    )
+
+    if status == "pending":
+        rows = []
+        if consult_btn is not None:
+            rows.append((consult_btn,))
+        rows.append((find_btn, more_btn))
+        return tuple(rows)
+
+    # rented / offline / inactive (and any other non-bookable)
+    rows = [(find_btn, more_btn)]
+    if consult_btn is not None:
+        rows.append((consult_btn,))
+    return tuple(rows)
 
 
 def official_channel_action_identity(actions: dict[str, str]) -> dict[str, str]:

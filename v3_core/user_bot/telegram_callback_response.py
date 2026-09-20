@@ -38,6 +38,7 @@ class TelegramCallbackResponse:
     text: str = ""
     photo_path: str = ""
     media_groups: tuple[tuple[str, ...], ...] = ()
+    detail_text: str = ""
     keyboard: InlineKeyboardMarkup | None = None
     transition: TransitionAction | None = None
     book_intent: PublicBookIntent | None = None
@@ -101,6 +102,7 @@ def adapt_callback_response(
                     text=photos.text,
                     photo_path=photo_path,
                     media_groups=photos.media_groups if photos.has_media else (),
+                    detail_text=str(getattr(photos, "detail_text", "") or ""),
                     keyboard=build_action_keyboard(photos.action_rows),
                     listing_summary=str(getattr(photos, "listing_summary", "") or ""),
                 )

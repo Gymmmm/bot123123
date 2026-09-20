@@ -23,7 +23,9 @@ from .telegram_home_ui import build_home_keyboard
 from .telegram_navigation import advisor_handoff_url, polish_listing_keyboard
 from .telegram_search_results import present_search_flow_result
 from .service_product_views import service_home_view
+from .service_flow import TenantService
 from .telegram_service_handler import build_service_keyboard
+from .tenant_v1 import tenant_home_view
 from .telegram_transition_ui import build_transition_keyboard
 from .telegram_ui import build_action_keyboard
 from .transition_actions import SearchSubmitIntent
@@ -88,12 +90,14 @@ def _search_entry_plan() -> TransitionPlan:
 
 
 def _listing_keyboard(result, *, advisor_url: str = "", channel_url: str = ""):
+    if not result.action_rows:
+        return None
     return polish_listing_keyboard(
         build_action_keyboard(result.action_rows),
         advisor_url=advisor_url,
         channel_url=channel_url,
         listing_summary=str(getattr(result, "listing_summary", "") or ""),
-        add_home=True,
+        add_home=False,
         add_channel=True,
     )
 
@@ -119,7 +123,7 @@ async def _render_details(
 async def _render_photos(
     update: Any,
     context: Any,
-    result: PublicListingFlowResult,
+    result,
     *,
     advisor_url: str = "",
     channel_url: str = "",
@@ -146,28 +150,34 @@ async def _render_photos(
                 parse_mode=ParseMode.HTML,
                 reply_markup=keyboard,
             )
-        return
-    await context.bot.send_message(
-        chat_id=chat_id,
-        text=photos.text,
-        parse_mode=ParseMode.HTML,
-        reply_markup=keyboard,
-    )
+    else:
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=photos.text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=keyboard,
+        )
+    detail = str(getattr(photos, "detail_text", "") or "").strip()
+    if detail:
+        await context.bot.send_message(
+            chat_id=chat_id, text=detail, parse_mode=ParseMode.HTML
+        )
+
 
 
 def _support_keyboard(*, advisor_url: str = "", channel_url: str = "") -> InlineKeyboardMarkup:
     rows = [
-        [InlineKeyboardButton("🔍 智能找房", callback_data="v3u:home:search")],
+        [InlineKeyboardButton("🔍 开始找房", callback_data="v3u:home:search")],
     ]
     clean_advisor = str(advisor_url or "").strip()
     if clean_advisor:
-        rows.append([InlineKeyboardButton("💬 顾问帮我找", url=advisor_handoff_url(clean_advisor))])
+        rows.append([InlineKeyboardButton("💬 中文顾问", url=advisor_handoff_url(clean_advisor))])
     else:
-        rows.append([InlineKeyboardButton("💬 顾问帮我找", callback_data="v3u:home:contact")])
+        rows.append([InlineKeyboardButton("💬 中文顾问", callback_data="v3u:home:contact")])
     clean_channel = str(channel_url or "").strip()
     if clean_channel:
-        rows.append([InlineKeyboardButton("🏠 最新房源", url=clean_channel)])
-    rows.append([InlineKeyboardButton("🏠 返回首页", callback_data="v3u:t:home")])
+        rows.append([InlineKeyboardButton("📢 最新房源", url=clean_channel)])
+    rows.append([InlineKeyboardButton("⬅️ 回首页", callback_data="v3u:t:home")])
     return InlineKeyboardMarkup(rows)
 
 
@@ -175,7 +185,7 @@ async def _render_invalid_link(
     message: Any, *, advisor_url: str = "", channel_url: str = ""
 ) -> None:
     await message.reply_text(
-        "这个链接已经失效或房源信息已更新。\n\n可以重新找房，或让顾问继续帮您找。",
+        "这套房的入口已经失效，或信息刚刚更新过。\n\n可以重新找房，或让顾问按你的条件接着看。",
         parse_mode=ParseMode.HTML,
         reply_markup=_support_keyboard(
             advisor_url=advisor_url, channel_url=channel_url
@@ -190,7 +200,10 @@ async def _render_unbookable(
     advisor_url: str = "",
     channel_url: str = "",
 ) -> None:
-    await message.reply_text("这套房暂时不能预约。可以继续看相近房源，或让顾问帮您确认其他选择。", parse_mode=ParseMode.HTML)
+    await message.reply_text(
+        "这套房现在暂时不能预约。\n\n可以先看详情，或让顾问帮你看别的选择。",
+        parse_mode=ParseMode.HTML,
+    )
     if getattr(result, "details", None) is not None:
         await _render_details(
             message, result, advisor_url=advisor_url, channel_url=channel_url
@@ -224,6 +237,7 @@ async def _handle_broadcast_shortcut(
     transition_views: TransitionViewService,
     search_executor: SearchSubmitExecutor | None,
     appointment_history: AppointmentHistoryService | None,
+    tenant_service: TenantService | None,
     contact_effects: ContactEffectExecutor | None,
     advisor_url: str,
     channel_url: str,
@@ -305,6 +319,7 @@ async def handle_v3_start(
     channel_url: str = "",
     search_executor: SearchSubmitExecutor | None = None,
     appointment_history: AppointmentHistoryService | None = None,
+    tenant_service: TenantService | None = None,
     contact_effects: ContactEffectExecutor | None = None,
     advisor_url: str = "",
 ) -> TelegramStartOutcome:
@@ -330,6 +345,7 @@ async def handle_v3_start(
         transition_views=transition_views,
         search_executor=search_executor,
         appointment_history=appointment_history,
+        tenant_service=tenant_service,
         contact_effects=contact_effects,
         advisor_url=advisor_url,
         channel_url=channel_url,

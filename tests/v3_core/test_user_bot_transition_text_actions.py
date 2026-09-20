@@ -153,6 +153,29 @@ def test_custom_budget_success_returns_search_intent_and_public_only_last_pref()
     assert SEARCH_AWAITING_BUDGET_KEY in result.mutation.delete_keys
 
 
+def test_home_custom_budget_advances_to_layout_and_keeps_selected_filters():
+    session = {
+        SEARCH_AWAITING_BUDGET_KEY: True,
+        SEARCH_PREF_SESSION_KEY: {
+            "source": "home_area",
+            "goal": "any",
+            "location_keys": ["BKK1"],
+            "area_display": "BKK1",
+            "touch_payload": {},
+        },
+    }
+
+    result = TransitionTextActionService().apply("600-900", session)
+
+    assert result.ok and result.next_step == "search_layout"
+    assert result.search is None and result.mutation is not None
+    pref = result.mutation.set_values[SEARCH_PREF_SESSION_KEY]
+    assert pref["location_keys"] == ["BKK1"]
+    assert pref["budget_min"] == 600
+    assert pref["budget_max"] == 900
+    assert pref["budget_label"] == "600-900 USD/月"
+
+
 def test_custom_budget_failure_keeps_waiting_state_for_retry():
     session = {
         SEARCH_AWAITING_BUDGET_KEY: True,

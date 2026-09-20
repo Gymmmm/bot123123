@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from v3_core.user_bot.assurance_views import assurance_asset_bundle, build_assurance_home_view
-from v3_core.user_bot.telegram_assurance_handler import handle_v3_assurance_callback
+from v3_core.user_bot.telegram_assurance_handler import build_assurance_keyboard, handle_v3_assurance_callback
 
 
 class FakeMessage:
@@ -53,21 +53,25 @@ def test_rental_service_home_is_public_content_center_with_final_labels():
     view = build_assurance_home_view()
     callbacks = [choice.callback_data for row in view.rows for choice in row if choice.callback_data]
     assert callbacks == [
-        "v3u:assure:signing",
         "v3u:assure:handover",
-        "v3u:assure:deposit",
+        "v3u:home:search",
         "v3u:home:contact",
         "v3u:t:home",
     ]
     labels = [choice.label for row in view.rows for choice in row]
     assert labels == [
-        "📝 签约前确认",
-        "📸 入住交接留档",
-        "🔐 押金与退租",
-        "💬 中文顾问",
-        "🏠 返回首页",
+        "入住交接留档",
+        "开始找房",
+        "中文顾问",
+        "返回首页",
     ]
-    assert "租赁服务指南" not in view.text
+    assert "租到房，不代表服务就结束了" in view.text
+    assert "入住时" in view.text
+    assert "房屋、表计、家具家电拍照留档" in view.text
+
+    markup = build_assurance_keyboard(view, advisor_url="https://t.me/advisor")
+    contact = markup.inline_keyboard[1][1]
+    assert contact.callback_data == "v3u:home:contact"
 
 
 def test_assurance_asset_bundle_uses_existing_locked_pdf_paths(tmp_path):
@@ -98,6 +102,25 @@ async def test_explicit_download_click_sends_only_requested_pdf(tmp_path):
     outcome = await handle_v3_assurance_callback(_update(query), _context(FakeBot(calls)), repo_root=tmp_path)
     assert outcome.handled and outcome.assets_sent and not outcome.rendered
     assert [call[0] for call in calls] == ["answer", "document"]
+
+
+@pytest.mark.asyncio
+async def test_tenant_deposit_returns_to_terminate_flow(tmp_path):
+    calls = []
+    query = FakeQuery("v3u:assure:deposit_tenant", calls)
+    outcome = await handle_v3_assurance_callback(
+        _update(query), _context(FakeBot(calls)), repo_root=tmp_path
+    )
+    assert outcome.handled and outcome.rendered
+    markup = calls[-1][2]
+    callbacks = [
+        button.callback_data
+        for row in markup.inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
+    assert "v3u:service:tenant_terminate" in callbacks
+    assert "v3u:home:rental" not in callbacks
 
 
 @pytest.mark.asyncio

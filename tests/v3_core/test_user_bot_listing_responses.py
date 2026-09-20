@@ -3,8 +3,9 @@ from __future__ import annotations
 import json
 
 from v3_core.user_bot.listing_responses import (
-    build_detail_caption,
+    build_detail_text,
     build_details_response,
+    build_photo_caption,
     build_photos_response,
 )
 from v3_core.user_bot.public_inventory import PublishedListingView
@@ -72,7 +73,7 @@ def _labels(rows):
     return [[item.label for item in row] for row in rows]
 
 
-def test_detail_caption_matches_locked_listing_copy_shape():
+def test_detail_text_matches_locked_sectioned_copy_shape():
     view = _view(
         canonical_facts={
             "management_fee": "含物业费",
@@ -84,7 +85,7 @@ def test_detail_caption_matches_locked_listing_copy_shape():
         adviser_copy="采光面宽，适合长期住。\n楼下配套成熟。",
     )
 
-    text = build_detail_caption(view)
+    text = build_detail_text(view)
 
     assert text.startswith("━━━━━━━━━━━━━━━\n🏢 金边优质房源出租\n━━━━━━━━━━━━━━━")
     assert "📌基本信息  房源编号：QL-RF-A2B3" in text
@@ -107,7 +108,7 @@ def test_detail_caption_matches_locked_listing_copy_shape():
     assert "钥匙已备" not in text
 
 
-def test_detail_caption_omits_missing_bullets_and_adviser_without_copy():
+def test_detail_text_omits_missing_bullets_and_adviser_without_copy():
     view = _view(canonical_facts={"highlights": ["采光好", "钥匙已备"]})
 
     response = build_details_response(view)
@@ -124,7 +125,7 @@ def test_detail_caption_omits_missing_bullets_and_adviser_without_copy():
     assert "🟢 房源状态：随时可预约看房" in text
     assert _actions(response.action_rows) == [["book", "consult"], ["similar"]]
     assert _labels(response.action_rows) == [
-        ["📅 预约看房", "💬 问这套房"],
+        ["📅 预约看房", "💬 中文顾问"],
         ["🔍 看相近房源"],
     ]
 
@@ -137,12 +138,21 @@ def test_details_response_uses_live_rented_state_but_keeps_frozen_public_facts()
     assert "🔴 房源状态：已租出" in response.text
     assert _actions(response.action_rows) == [["consult"], ["similar"]]
     assert _labels(response.action_rows) == [
-        ["💬 问这套房"],
+        ["💬 中文顾问"],
         ["🔍 看相近房源"],
     ]
 
 
-def test_photos_response_single_flipper_with_detail_caption(tmp_path):
+def test_photo_caption_is_short_not_sectioned():
+    view = _view()
+    caption = build_photo_caption(view, photo_index=0, photo_total=3)
+    assert caption == "富力城 · 2房1厅 · $800/月 · 📸 1/3"
+    assert "基本信息" not in caption
+    assert "金边优质房源出租" not in caption
+    assert "侨联说" not in caption
+
+
+def test_photos_response_single_flipper_with_short_caption(tmp_path):
     files = []
     for index in range(12):
         path = tmp_path / f"room-{index}.jpg"
@@ -155,66 +165,74 @@ def test_photos_response_single_flipper_with_detail_caption(tmp_path):
     first = build_photos_response(_view(gallery=gallery))
 
     assert first.has_media
-    assert first.photo_path == files[0]
+    # LOCK: index 1/N is the listing COVER, then gallery rooms.
+    assert first.photo_path == str(cover)
     assert first.photo_index == 0
-    assert first.photo_total == 12
-    assert first.media_groups == ((files[0],),)
-    assert "🏢 金边优质房源出租" in first.text
-    assert "📸 1/12" in first.text
+    assert first.photo_total == 13  # cover + 12 unique rooms
+    assert first.media_groups == ((str(cover),),)
+    # SHORT caption on the photo
+    assert first.text == "富力城 · 2房1厅 · $800/月 · 📸 1/13"
+    assert "🏢 金边优质房源出租" not in first.text
+    assert "基本信息" not in first.text
     assert "📋" not in first.text
     assert "租赁详情" not in first.text
-    assert "富力城 · BKK1" in first.text
-    assert "$800 / 月" in first.text
-    assert "QL-RF-A2B3" in first.text
     assert "再看更多" not in first.text
+    # Full sectioned detail lives on detail_text (separate message)
+    assert "🏢 金边优质房源出租" in first.detail_text
+    assert "QL-RF-A2B3" in first.detail_text
     assert _actions(first.action_rows) == [["photos", "photos"], ["book", "consult"], ["similar"]]
     assert _labels(first.action_rows) == [
         ["⬅️ 上一张", "下一张 ➡️"],
-        ["📅 预约看房", "💬 问这套房"],
+        ["📅 预约看房", "💬 中文顾问"],
         ["🔍 看相近房源"],
     ]
     prev_btn, next_btn = first.action_rows[0]
-    assert prev_btn.target_index == 11
+    assert prev_btn.target_index == 12
     assert next_btn.target_index == 1
 
     second = build_photos_response(_view(gallery=gallery), offset=1)
-    assert second.photo_path == files[1]
-    assert "📸 2/12" in second.text
+    assert second.photo_path == files[0]
+    assert second.text.endswith("📸 2/13")
     assert second.action_rows[0][0].target_index == 0
     assert second.action_rows[0][1].target_index == 2
 
-    last = build_photos_response(_view(gallery=gallery), offset=11)
+    last = build_photos_response(_view(gallery=gallery), offset=12)
     assert last.photo_path == files[11]
-    assert "📸 12/12" in last.text
+    assert last.text.endswith("📸 13/13")
     assert last.action_rows[0][1].target_index == 0
 
 
-def test_photos_response_drops_missing_files_and_keeps_detail_fallback(tmp_path):
+def test_photos_response_drops_missing_files_and_keeps_short_fallback(tmp_path):
     missing = tmp_path / "missing.jpg"
     response = build_photos_response(_view(gallery=[str(missing)]))
 
     assert not response.has_media
     assert response.media_groups == ()
     assert response.photo_path == ""
-    assert "🏢 金边优质房源出租" in response.text
+    assert response.text == "富力城 · 2房1厅 · $800/月"
     assert "📸 " not in response.text
-    assert "富力城 · BKK1" in response.text
-    assert _labels(response.action_rows) == [
-        ["📅 预约看房", "💬 问这套房"],
-        ["🔍 看相近房源"],
-    ]
+    assert "🏢 金边优质房源出租" in response.detail_text
 
 
-def test_rented_photos_response_keeps_contact_but_removes_book(tmp_path):
-    photo = tmp_path / "room.jpg"
-    photo.write_bytes(b"room")
-    response = build_photos_response(
-        _view(status="rented", offer_status="inactive", gallery=[str(photo)])
+def test_flipper_starts_on_package_cover_path(tmp_path):
+    cover = tmp_path / "frozen-cover.png"
+    cover.write_bytes(b"COVER")
+    room = tmp_path / "living.jpg"
+    room.write_bytes(b"room")
+    view = _view(gallery=[str(room)])
+    # Inject package cover_path
+    package = dict(view.package)
+    package["cover_path"] = str(cover)
+    view = PublishedListingView(
+        listing=view.listing,
+        offer=view.offer,
+        publication=view.publication,
+        package=package,
     )
-
-    assert _actions(response.action_rows) == [["consult"], ["similar"]]
-    assert _labels(response.action_rows) == [
-        ["💬 问这套房"],
-        ["🔍 看相近房源"],
-    ]
-    assert "🔴 房源状态：已租出" in response.text
+    response = build_photos_response(view)
+    assert response.photo_path == str(cover)
+    assert response.photo_total == 2
+    assert response.text.endswith("📸 1/2")
+    second = build_photos_response(view, offset=1)
+    assert second.photo_path == str(room)
+    assert second.text.endswith("📸 2/2")

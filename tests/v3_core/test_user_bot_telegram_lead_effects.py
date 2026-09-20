@@ -128,13 +128,16 @@ def _context(user_data):
 
 @pytest.mark.asyncio
 async def test_search_records_lead_only_after_successful_telegram_presentation():
-    query = FakeQuery("v3u:t:budget_choice:b2")
+    query = FakeQuery("v3u:t:layout_choice:2br")
     user_data = {
         SEARCH_PREF_SESSION_KEY: {
             "source": "user_search",
             "goal": "any",
             "location_keys": ["BKK1"],
             "area_display": "BKK1",
+            "budget_min": 400,
+            "budget_max": 600,
+            "budget_label": "$400–600",
             "touch_payload": {},
         }
     }
@@ -156,6 +159,9 @@ async def test_search_records_lead_only_after_successful_telegram_presentation()
     assert user.user_id == 123
     assert user.username == "alice"
     assert intent.criteria.location_keys == ("BKK1",)
+    assert intent.criteria.budget_min == 400
+    assert intent.criteria.budget_max == 600
+    assert intent.criteria.room_type == "2房"
     assert SEARCH_PREF_SESSION_KEY not in user_data
 
 

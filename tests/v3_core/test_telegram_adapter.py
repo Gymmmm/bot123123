@@ -66,17 +66,16 @@ def _command(tmp_path):
     )
 
 
-def test_bookable_keyboard_contract_is_one_per_row_and_ordered():
+def test_bookable_keyboard_contract_is_locked_matrix_and_ordered():
     keyboard = build_channel_keyboard(dict(ACTIONS))
     rows = keyboard.inline_keyboard
     assert [[button.text for button in row] for row in rows] == [
-        ["📷 更多详情"],
-        ["📅 预约看房"],
-        ["💬 咨询顾问"],
+        ["📷 房源详情", "📅 预约看房"],
+        ["💬 中文顾问"],
     ]
     assert rows[0][0].url == ACTIONS["details"]
-    assert rows[1][0].url == ACTIONS["book"]
-    assert rows[2][0].url == ACTIONS["consult"]
+    assert rows[0][1].url == ACTIONS["book"]
+    assert rows[1][0].url == ACTIONS["consult"]
 
 
 @pytest.mark.asyncio
@@ -89,7 +88,7 @@ async def test_adapter_sends_only_one_cover_and_returns_durable_receipt(tmp_path
     call = bot.calls[0]
     assert call["chat_id"] == "-100123"
     assert call["caption"].startswith("🏠")
-    assert len(call["reply_markup"].inline_keyboard) == 3
+    assert len(call["reply_markup"].inline_keyboard) == 2
     assert receipt["media_message_ids"] == ["777"]
     assert receipt["caption_message_id"] == "777"
     assert receipt["button_message_id"] == "777"
