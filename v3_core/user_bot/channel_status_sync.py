@@ -172,7 +172,7 @@ class V3AppointmentChannelSynchronizer:
             if row is None:
                 return ChannelStatusSyncResult(clean, attempted=False, synced=False, error="published_instance_not_found")
             previous = str(row.get("inventory_status") or "").strip().lower()
-            target = derive_appointment_inventory_status(previous, active_count)
+            target = previous
             public_id = str(row.get("public_listing_id") or "").strip()
             caption = caption_with_appointment_status(
                 str(row.get("post_text") or ""),
@@ -197,11 +197,21 @@ class V3AppointmentChannelSynchronizer:
             )
             with self._connect() as conn:
                 conn.execute("BEGIN IMMEDIATE")
-                if target != previous:
-                    conn.execute(
-                        "UPDATE listings_v3 SET inventory_status=?,updated_at=CURRENT_TIMESTAMP WHERE listing_id=?",
-                        (target, clean),
-                    )
+                current_row = conn.execute(
+                    "SELECT inventory_status FROM listings_v3 WHERE listing_id=?",
+                    (clean,),
+                ).fetchone()
+                target = (
+                    str(current_row["inventory_status"] or "").strip().lower()
+                    if current_row is not None
+                    else previous
+                )
+                caption = caption_with_appointment_status(
+                    str(row.get("post_text") or ""),
+                    status=target,
+                    active_count=active_count,
+                    public_listing_id=public_id,
+                )
                 conn.execute(
                     "UPDATE publication_instances SET post_text=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
                     (caption, int(row["publication_row_id"])),
