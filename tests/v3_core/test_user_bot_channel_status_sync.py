@@ -16,14 +16,15 @@ class FakeBot:
         self.calls.append(kwargs)
 
 
-def _seed(db_path, *, appointment_count=5):
+def _seed(db_path, *, appointment_count=5, inventory_status="reserved"):
     initialize_v3_storage(db_path)
     with sqlite3.connect(db_path) as conn:
         conn.execute(
             """INSERT INTO listings_v3
                (listing_id,public_listing_id,canonical_record_id,canonical_facts_hash,
                 canonical_facts_schema,inventory_status)
-               VALUES ('l_1','QL-RF-A2B3','cr_1','hash','v3','reserved')"""
+               VALUES ('l_1','QL-RF-A2B3','cr_1','hash','v3',?)""",
+            (inventory_status,),
         )
         conn.execute(
             """INSERT INTO publication_instances
@@ -65,13 +66,13 @@ async def test_sync_edits_only_latest_exact_publication_message_and_locks_at_fiv
     assert result.synced
     assert result.channel_chat_id == "-100123"
     assert result.channel_message_id == "222"
-    assert result.next_status == "pending"
+    assert result.next_status == "reserved"
     assert result.active_appointment_count == 5
     assert len(fake.calls) == 1
     call = fake.calls[0]
     assert call["chat_id"] == "-100123"
     assert call["message_id"] == 222
-    assert "⚪ 暂不可预约" in call["caption"]
+    assert "🟡" in call["caption"]
     buttons = [button.text for row in call["reply_markup"].inline_keyboard for button in row]
     assert buttons == ["💬 中文顾问", "🏠 帮我找房", "🔎 看看房源"]
 
@@ -85,6 +86,56 @@ async def test_sync_edits_only_latest_exact_publication_message_and_locks_at_fiv
         old = conn.execute(
             "SELECT post_text FROM publication_instances WHERE instance_id='PUB_OLD'"
         ).fetchone()[0]
-    assert status == "pending"
-    assert "⚪ 暂不可预约" in newest
+    assert status == "reserved"
+    assert "🟡" in newest
     assert "⚪ 暂不可预约" not in old
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", ["offline", "rented", "inactive"])
+async def test_sync_never_reopens_terminal_inventory_status(tmp_path, status):
+    db_path = tmp_path / f"{status}.db"
+    _seed(db_path, appointment_count=5, inventory_status=status)
+    fake = FakeBot()
+    sync = V3AppointmentChannelSynchronizer(
+        db_path,
+        publisher_bot_token="publisher-token",
+        user_bot_username="qiaolian_rent_bot",
+        advisor_url="https://t.me/qiaolian_advisor",
+        bot_factory=lambda token: fake,
+    )
+
+    result = await sync.sync("l_1")
+
+    assert result.synced
+    assert result.next_status == status
+    with sqlite3.connect(db_path) as conn:
+        durable = conn.execute(
+            "SELECT inventory_status FROM listings_v3 WHERE listing_id='l_1'"
+        ).fetchone()[0]
+    assert durable == status
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", ["active", "reserved"])
+async def test_sync_projects_bookable_status_without_mutating_inventory(tmp_path, status):
+    db_path = tmp_path / f"{status}.db"
+    _seed(db_path, appointment_count=5, inventory_status=status)
+    fake = FakeBot()
+    sync = V3AppointmentChannelSynchronizer(
+        db_path,
+        publisher_bot_token="publisher-token",
+        user_bot_username="qiaolian_rent_bot",
+        advisor_url="https://t.me/qiaolian_advisor",
+        bot_factory=lambda token: fake,
+    )
+
+    result = await sync.sync("l_1")
+
+    assert result.synced
+    assert result.next_status == status
+    with sqlite3.connect(db_path) as conn:
+        durable = conn.execute(
+            "SELECT inventory_status FROM listings_v3 WHERE listing_id='l_1'"
+        ).fetchone()[0]
+    assert durable == status
