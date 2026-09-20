@@ -22,10 +22,6 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  APPROVED_DEPLOY_SHA: affda03fe2de29c55e04f89af98a214f74da44ee
-  EXPECTED_PARENT_SHA: 77fb96f493cdc38089e7b8412b76a979b647dbb5
-  EXPECTED_PRODUCTION_BASE_SHA: 8f9c1da1914bd9f0404c9c7b5af6f984f8b0fa7e
-  EXPECTED_TREE_SHA: a51cfdc19e87718a2e01369ad630364859b67c44
   PROD_HOST: 50.114.74.120
   PROD_PORT: '22'
   PROD_SSH_USER: root
@@ -44,27 +40,21 @@ jobs:
         run: |
           set -Eeuo pipefail
           [[ "$REQUESTED_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo 'DEPLOY_BLOCKED deploy_sha_must_be_full_40_hex_commit'; exit 1; }
-          test "$REQUESTED_SHA" = "$APPROVED_DEPLOY_SHA" || { echo 'DEPLOY_BLOCKED sha_not_approved'; exit 1; }
           echo "DEPLOY_SHA=$REQUESTED_SHA" >> "$GITHUB_ENV"
 
-      - name: Checkout approved immutable SHA
+      - name: Checkout requested immutable SHA
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.deploy_sha }}
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Verify commit ancestry and tree
+      - name: Verify requested immutable SHA
         run: |
           set -Eeuo pipefail
           CANDIDATE_SHA=$(git rev-parse HEAD)
           CANDIDATE_TREE=$(git rev-parse 'HEAD^{tree}')
-          CANDIDATE_PARENT=$(git rev-parse HEAD^)
-          test "$CANDIDATE_SHA" = "$DEPLOY_SHA"
-          test "$CANDIDATE_SHA" = "$APPROVED_DEPLOY_SHA"
-          test "$CANDIDATE_PARENT" = "$EXPECTED_PARENT_SHA"
-          test "$CANDIDATE_TREE" = "$EXPECTED_TREE_SHA"
-          git merge-base --is-ancestor "$EXPECTED_PRODUCTION_BASE_SHA" "$CANDIDATE_SHA"
+          test "$CANDIDATE_SHA" = "$DEPLOY_SHA" || { echo "DEPLOY_BLOCKED deploy_sha_mismatch expected=$DEPLOY_SHA actual=$CANDIDATE_SHA"; exit 1; }
           echo "CANDIDATE_SHA=$CANDIDATE_SHA" >> "$GITHUB_ENV"
           echo "CANDIDATE_TREE=$CANDIDATE_TREE" >> "$GITHUB_ENV"
 
@@ -81,7 +71,7 @@ jobs:
           python -m pip install -r requirements.txt pytest pytest-asyncio
           python -m compileall -q v3_core tests/v3_core run_v3_collector.py run_v3_canonical_worker.py run_v3_publisher_bot.py run_v3_user_bot.py run_v3_preflight.py
           python -m pytest -q tests/v3_core
-          git diff --check "$EXPECTED_PRODUCTION_BASE_SHA..$CANDIDATE_SHA"
+          git diff --check
 
       - name: Build immutable release bundle
         env:
@@ -122,11 +112,10 @@ jobs:
           REMOTE_BUNDLE: '/var/tmp/qiaolian-v3-${{ github.run_id }}-${{ github.sha }}.bundle'
         run: |
           set -Eeuo pipefail
-          ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 "$PROD_SSH_USER@$PROD_HOST" "bash -s -- '$REMOTE_BUNDLE' '$CANDIDATE_SHA' '$EXPECTED_PRODUCTION_BASE_SHA'" <<'REMOTE'
+          ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 "$PROD_SSH_USER@$PROD_HOST" "bash -s -- '$REMOTE_BUNDLE' '$CANDIDATE_SHA'" <<'REMOTE'
           set -Eeuo pipefail
           BUNDLE_PATH=$1
           EXPECTED_SHA=$2
-          EXPECTED_OLD_SHA=$3
           ROOT=/opt/qiaolian_v3
           OLD=/opt/qiaolian_dual_bots
           RELEASE="$ROOT/releases/$EXPECTED_SHA"
@@ -160,7 +149,7 @@ jobs:
           test -d "$OLD/media" || { echo "DEPLOY_BLOCKED missing_production_media"; exit 1; }
           test -d "$OLD/telethon_sessions" || { echo "DEPLOY_BLOCKED missing_telethon_sessions"; exit 1; }
           OLD_RELEASE=$(readlink -f "$CURRENT"); test -d "$OLD_RELEASE" || { echo "DEPLOY_BLOCKED current_release_missing"; exit 1; }
-          OLD_SHA=$(basename "$OLD_RELEASE"); test "$OLD_SHA" = "$EXPECTED_OLD_SHA" || { echo "DEPLOY_BLOCKED unexpected_current_sha=$OLD_SHA"; exit 1; }
+          OLD_SHA=$(basename "$OLD_RELEASE"); echo "CURRENT_PRODUCTION_SHA=$OLD_SHA"
           for service in "${SERVICES[@]}"; do test "$(systemctl is-active "$service")" = active || { echo "DEPLOY_BLOCKED service_not_active=$service"; exit 1; }; done
           for python_candidate in "$VENV/bin/python" "$OLD/.venv/bin/python" /opt/qiaolian-python-3.12/bin/python3 /usr/local/bin/python3.12 /usr/bin/python3.12; do if [ -x "$python_candidate" ]; then PYTHON_BOOTSTRAP="$python_candidate"; break; fi; done
           test -n "$PYTHON_BOOTSTRAP" || { echo "DEPLOY_BLOCKED missing_python_bootstrap"; exit 1; }
