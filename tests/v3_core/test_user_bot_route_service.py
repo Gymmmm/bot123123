@@ -86,12 +86,11 @@ def test_rented_listing_blocks_book_but_keeps_details_and_photos():
     assert book.reason == "listing_not_bookable"
 
 
-def test_missing_frozen_gallery_blocks_photos_without_blocking_details_or_book():
+def test_missing_frozen_gallery_still_allows_photos_alias_to_merged_details():
     service = PublicRouteService(FakeInventory(_view(gallery=False)))
 
     photos = service.resolve(f"property_{PUBLIC_ID}_photos")
 
-    assert photos.status == "blocked"
-    assert photos.reason == "frozen_gallery_unavailable"
+    assert photos.ok
     assert service.resolve(f"property_{PUBLIC_ID}_details").ok
     assert service.resolve(f"property_{PUBLIC_ID}_book").ok

@@ -279,7 +279,7 @@ async def _notify_user_status(
     if public_id:
         if status == "cancelled":
             rows.append([InlineKeyboardButton("📅 重新预约", callback_data=encode_listing_callback("book", public_id))])
-        rows.append([InlineKeyboardButton("🏠 租赁详情", callback_data=encode_listing_callback("details", public_id))])
+        rows.append([InlineKeyboardButton("📷 更多详情", callback_data=encode_listing_callback("details", public_id))])
     clean_advisor = str(advisor_url or "").strip()
     if clean_advisor:
         rows.append([

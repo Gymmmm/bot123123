@@ -26,6 +26,30 @@ def test_listing_callback_round_trip_uses_public_identity_only():
     assert len(raw.encode("utf-8")) <= 64
 
 
+def test_photos_callback_optional_index_round_trip_keeps_listing_context():
+    first = encode_listing_callback("photos", "QL-RF-A2B3")
+    assert first == "v3u:listing:photos:QL-RF-A2B3"
+    assert parse_callback(first).target_index is None
+
+    more = encode_listing_callback("photos", "QL-RF-A2B3", photo_offset=4)
+    assert more == "v3u:listing:photos:QL-RF-A2B3:4"
+    parsed = parse_callback(more)
+    assert parsed is not None
+    assert parsed.kind == "listing"
+    assert parsed.action == "photos"
+    assert parsed.public_listing_id == "QL-RF-A2B3"
+    assert parsed.target_index == 4
+    assert len(more.encode("utf-8")) <= 64
+
+    semantic = SemanticAction(
+        "下一张 ➡️",
+        "photos",
+        target_public_listing_id="QL-RF-A2B3",
+        target_index=8,
+    )
+    assert encode_semantic_action(semantic) == "v3u:listing:photos:QL-RF-A2B3:8"
+
+
 def test_all_supported_listing_actions_are_explicit_and_round_trip():
     for action in ("details", "photos", "book", "consult", "similar"):
         raw = encode_listing_callback(action, "QL-RF-A2B3")

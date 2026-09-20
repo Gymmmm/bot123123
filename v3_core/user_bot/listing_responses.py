@@ -211,10 +211,7 @@ def _detail_status_line(details) -> str:
 
 
 def _adviser_copy_for_view(view: PublishedListingView) -> str:
-    details = build_public_listing_details(view)
-    frozen = str(details.adviser_copy or "").strip()
-    if frozen:
-        return frozen
+    """Publisher-frozen copy only; respects adviser_copy_source=hidden."""
     return adviser_notes_for_view(view, max_points=2, allow_empty=True).strip()
 
 
