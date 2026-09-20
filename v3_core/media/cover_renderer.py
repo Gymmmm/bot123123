@@ -64,6 +64,14 @@ class CoverRenderData:
             "H1": str(self.highlight_1 or ""),
             "H2": str(self.highlight_2 or ""),
             "H3": str(self.highlight_3 or ""),
+            "HIGHLIGHTS": " · ".join(
+                part for part in (
+                    str(self.highlight_1 or "").strip(),
+                    str(self.highlight_2 or "").strip(),
+                    str(self.highlight_3 or "").strip(),
+                )
+                if part
+            ),
         }
 
 

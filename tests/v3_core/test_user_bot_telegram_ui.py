@@ -69,10 +69,9 @@ def test_details_keyboard_is_encoded_from_public_listing_identity():
     assert _callback_rows(markup) == [
         [
             "v3u:listing:book:QL-RF-A2B3",
-                "v3u:listing:consult:QL-RF-A2B3",
-            ],
-            ["v3u:listing:photos:QL-RF-A2B3"],
-            ["v3u:listing:similar:QL-RF-A2B3"],
+            "v3u:listing:consult:QL-RF-A2B3",
+        ],
+        ["v3u:listing:similar:QL-RF-A2B3"],
     ]
     assert "LST_1" not in repr(_callback_rows(markup))
 
@@ -91,7 +90,9 @@ def test_search_card_keyboard_encodes_navigation_with_public_ids():
     ]
     assert rows[1] == [
         "v3u:listing:details:QL-RF-A2B3",
-        "v3u:listing:photos:QL-RF-A2B3",
+    ]
+    assert [[button.text for button in row] for row in markup.inline_keyboard][1] == [
+        "📷 更多详情",
     ]
     assert rows[2] == ["v3u:listing:book:QL-RF-A2B3"]
     assert rows[3] == ["v3u:listing:consult:QL-RF-A2B3"]

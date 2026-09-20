@@ -1,8 +1,9 @@
 """V3 media ranking core extracted from production photo_ranker.
 
 The clean runtime path needs only path ranking plus perceptual-hash helpers.
-Legacy folder/report helpers remain in the provenance copy
-``photo_ranker.py`` until migration tools are retired.
+Cover pick folds prior ``cover_selector_v1`` heuristics: prefer living / kitchen /
+exterior; soft-penalize watermark/contact-heavy and toilet frames; keep blur /
+overexposure hard rejects. Legacy folder helpers remain in ``photo_ranker.py``.
 """
 from __future__ import annotations
 
@@ -123,6 +124,125 @@ def _color(img) -> float:
     return max(0.0, 100.0 - abs(saturation - 75.0))
 
 
+def _text_band_score(img) -> dict[str, float]:
+    """Glyph-blob text/contact density in bottom & corners (no OCR)."""
+    h, w = img.shape[:2]
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    def band_textiness(y0: int, y1: int, x0: int, x1: int) -> float:
+        roi = gray[y0:y1, x0:x1]
+        if roi.size == 0:
+            return 0.0
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+        grad = cv2.morphologyEx(roi, cv2.MORPH_GRADIENT, kernel)
+        thr = (grad > 45).astype(np.uint8) * 255
+        nlab, _, stats, _ = cv2.connectedComponentsWithStats(thr, 8)
+        glyphs = 0
+        for i in range(1, nlab):
+            area = stats[i, cv2.CC_STAT_AREA]
+            ww = stats[i, cv2.CC_STAT_WIDTH]
+            hh = stats[i, cv2.CC_STAT_HEIGHT]
+            if 15 < area < 900 and 2 <= hh <= 42 and 2 <= ww <= 140:
+                glyphs += 1
+        area_norm = max(1.0, roi.size / 4000.0)
+        return min(1.0, glyphs / area_norm / 3.0)
+
+    bottom = band_textiness(int(h * 0.88), h, 0, w)
+    top = band_textiness(0, int(h * 0.12), 0, w)
+    corners = [
+        band_textiness(0, int(h * 0.14), 0, int(w * 0.28)),
+        band_textiness(0, int(h * 0.14), int(w * 0.72), w),
+        band_textiness(int(h * 0.86), h, 0, int(w * 0.28)),
+        band_textiness(int(h * 0.86), h, int(w * 0.72), w),
+    ]
+    corner_max = max(corners) if corners else 0.0
+    heavy = max(bottom, corner_max, top * 0.8)
+    return {
+        "bottom_text": round(bottom, 3),
+        "top_text": round(top, 3),
+        "corner_text_max": round(corner_max, 3),
+        "text_heavy": round(heavy, 3),
+    }
+
+
+def _room_heuristic(img) -> dict[str, Any]:
+    """Cheap room-type hints: prefer living / kitchen / exterior over toilet.
+
+    Color/structure heuristics only — not a trained classifier. Living vs bedroom
+    often share the same pool; kitchen gets a mild positive (user cover pick lock).
+    """
+    h, w = img.shape[:2]
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+    bright = float(np.mean(gray > 210))
+    very_white = float(np.mean((rgb[:, :, 0] > 200) & (rgb[:, :, 1] > 200) & (rgb[:, :, 2] > 200)))
+    lower_white = float(np.mean(gray[int(h * 0.45) :, :] > 205))
+    toilet_score = min(1.0, bright * 0.4 + very_white * 0.4 + lower_white * 0.6)
+
+    warm = (
+        (hsv[:, :, 0] < 35)
+        & (hsv[:, :, 1] > 40)
+        & (hsv[:, :, 2] > 60)
+        & (hsv[:, :, 2] < 220)
+    )
+    warm_frac = float(np.mean(warm))
+    edges = cv2.Canny(gray, 50, 120)
+    mid = edges[int(h * 0.25) : int(h * 0.75), :]
+    sobely = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)
+    horiz = float(np.mean(np.abs(sobely) > 40))
+    kitchen_score = min(1.0, warm_frac * 1.5 + horiz * 0.8 + float(mid.mean() / 255) * 0.5)
+
+    top = hsv[: int(h * 0.28), :, :]
+    blue = (top[:, :, 0] > 90) & (top[:, :, 0] < 135) & (top[:, :, 1] > 40) & (top[:, :, 2] > 80)
+    blue_frac = float(np.mean(blue))
+    sat_mean = float(hsv[:, :, 1].mean())
+    exterior_score = min(1.0, blue_frac * 2.2 + (sat_mean / 120.0) * 0.25)
+
+    edge_d = float(edges.mean() / 255.0)
+    mean_b = float(gray.mean())
+    living_score = 0.0
+    if 55 < mean_b < 190 and 0.02 < edge_d < 0.18 and toilet_score < 0.55:
+        living_score = max(
+            0.0,
+            min(
+                1.0,
+                0.35
+                + (1.0 - abs(mean_b - 125) / 125.0) * 0.35
+                + min(edge_d / 0.08, 1.0) * 0.3
+                - toilet_score * 0.4
+                - exterior_score * 0.15,
+            ),
+        )
+
+    bedroom_score = living_score * 0.85
+    if sat_mean < 55 and living_score > 0.25:
+        bedroom_score = min(1.0, bedroom_score + 0.1)
+
+    scores: dict[str, Any] = {
+        "toilet": round(float(toilet_score), 3),
+        "kitchen": round(float(kitchen_score), 3),
+        "exterior": round(float(exterior_score), 3),
+        "living": round(float(living_score), 3),
+        "bedroom": round(float(max(0.0, bedroom_score)), 3),
+    }
+    preferred = max(
+        [
+            ("living", scores["living"]),
+            ("kitchen", scores["kitchen"]),
+            ("exterior", scores["exterior"]),
+            ("bedroom", scores["bedroom"]),
+        ],
+        key=lambda x: x[1],
+    )
+    label = preferred[0]
+    if scores["toilet"] > preferred[1] + 0.08 and scores["toilet"] > 0.45:
+        label = "toilet"
+    scores["label"] = label
+    return scores
+
+
 def _cv_metrics(path: Path) -> dict[str, Any] | None:
     img = _read_cv(path)
     if img is None:
@@ -148,6 +268,26 @@ def _cv_metrics(path: Path) -> dict[str, Any] | None:
     elif exposure < 45:
         rejected, reason = True, "bad_exposure"
 
+    text = _text_band_score(img)
+    room = _room_heuristic(img)
+    label = str(room.get("label") or "")
+    # Cover pick lock: prefer living / kitchen / exterior; soft-penalize toilet + text-heavy.
+    if label in ("living", "exterior"):
+        room_bonus = 8.0 + 4.0 * float(room.get(label) or 0)
+    elif label == "kitchen":
+        room_bonus = 5.0 + 3.0 * float(room.get("kitchen") or 0)
+    elif label == "bedroom":
+        room_bonus = 3.5 + 2.0 * float(room.get("bedroom") or 0)
+    elif label == "toilet":
+        room_bonus = -14.0 - 8.0 * float(room.get("toilet") or 0)
+    else:
+        room_bonus = 0.0
+    text_penalty = float(text.get("text_heavy") or 0) * 18.0
+    soft_reject = bool(
+        float(text.get("text_heavy") or 0) >= 0.55
+        or (label == "toilet" and float(room.get("toilet") or 0) > 0.6)
+    )
+
     total = (
         sharpness * 0.20
         + brightness * 0.12
@@ -157,11 +297,15 @@ def _cv_metrics(path: Path) -> dict[str, Any] | None:
         + orientation * 0.22
         + space * 0.11
         + color * 0.05
+        + room_bonus
+        - text_penalty
     )
     if ratio < 0.90:
         total -= 18
     if ratio > 2.0:
         total -= 6
+    if soft_reject:
+        total -= 12
     if rejected:
         total -= 50
 
@@ -169,6 +313,12 @@ def _cv_metrics(path: Path) -> dict[str, Any] | None:
         "score": round(max(total, 0.0), 2),
         "reject": rejected,
         "reason": reason,
+        "soft_reject": soft_reject,
+        "room_label": label,
+        "room": room,
+        "text": text,
+        "room_bonus": round(room_bonus, 2),
+        "text_penalty": round(text_penalty, 2),
         "sharpness": round(sharpness, 2),
         "brightness": round(brightness, 2),
         "contrast": round(contrast, 2),
@@ -226,8 +376,14 @@ def rank_photo_paths(paths: Iterable[str | Path]) -> list[dict[str, Any]]:
     def sort_key(item: dict[str, Any]) -> tuple:
         ratio = float(item.get("ratio") or 0)
         landscape = ratio >= 1.05
+        label = str(item.get("room_label") or "")
+        preferred_room = 1 if label in {"living", "kitchen", "exterior"} else (
+            0 if label == "bedroom" else -1
+        )
         return (
             0 if item.get("reject") else 1,
+            0 if item.get("soft_reject") else 1,
+            preferred_room,
             1 if landscape else 0,
             float(item.get("orientation") or 0),
             float(item.get("sharpness") or 0),

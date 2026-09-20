@@ -103,11 +103,12 @@ def test_search_card_preserves_fixed_sha_copy_and_uses_frozen_cover(tmp_path):
     assert card.photo_path == str(cover)
     assert _actions(card) == [
         ["previous", "next"],
-        ["details", "photos"],
+        ["details"],
         ["book"],
         ["consult"],
         ["change_search"],
     ]
+    assert [item.label for row in card.action_rows for item in row if item.action == "details"] == ["📷 更多详情"]
 
 
 def test_search_card_navigation_wraps_by_public_listing_id():
@@ -163,7 +164,7 @@ def test_search_card_listing_actions_target_current_public_identity():
     actions = [item for row in card.action_rows for item in row]
 
     assert _actions(card) == [
-        ["details", "photos"],
+        ["details"],
         ["book"],
         ["consult"],
         ["change_search"],

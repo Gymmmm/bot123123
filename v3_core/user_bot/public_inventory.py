@@ -83,7 +83,9 @@ class PublishedListingView:
         if clean in {"details", "consult"}:
             return True
         if clean == "photos":
-            return bool(self.gallery)
+            # Photos deeplink aliases to the merged detail+flipper view even when
+            # the frozen gallery is empty (text-only fallback).
+            return True
         return False
 
 

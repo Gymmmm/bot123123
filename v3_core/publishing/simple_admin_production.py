@@ -188,7 +188,7 @@ class ProductionSimplePublisherAdminController(SimplePublisherAdminController):
             rows.append(
                 [
                     InlineKeyboardButton(
-                        "🏠 查看租赁详情",
+                        "📷 更多详情",
                         url=f"https://t.me/{self.user_bot_username}?start=property_{public_id}_details",
                     )
                 ]

@@ -45,14 +45,61 @@ def view(facts):
         publication={}, package={"snapshot_json": json.dumps(snapshot)})
 
 
-@pytest.mark.parametrize("signals,count", [([], 0), (["pet_allowed"], 1),
-    (["pet_allowed", "cleaning_2x"], 2)])
-def test_rental_details_section_and_bullets(signals, count):
-    listing = view({"adviser_signals": signals})
+def test_rental_details_prefers_frozen_adviser_copy_plain_heading():
+    """Merged caption: plain 💬 侨联说 + frozen adviser_copy (not bold / not generated bullets)."""
+    listing = view({"adviser_signals": ["pet_allowed", "cleaning_2x"]})
     text = build_details_response(listing).text
-    assert ("💬 <b>侨联说</b>" in text) == bool(count)
-    assert sum(line.startswith("• ") for line in text.splitlines()) == count
+    assert "💬 侨联说" in text
+    assert "💬 <b>侨联说</b>" not in text
+    assert "旧的物业网费兜底话术" in text
+    assert "暂无建议" not in text
+    # generated signal bullets are not injected when frozen copy wins
+    assert "• " not in text
+
+
+def test_rental_details_falls_back_to_generated_notes_without_frozen_copy():
+    snapshot = {
+        "schema": "v3_publication_snapshot.v1",
+        "listing_id": "LST_1",
+        "public_listing_id": "QL-RF-A2B3",
+        "canonical_facts": {"adviser_signals": ["pet_allowed"]},
+        "listing": {"project_name": "富力城", "property_type": "公寓"},
+        "offer": {"offer_type": "rent", "monthly_rent_usd": 800},
+        "adviser_copy": "",
+        "canonical_facts_hash": "old",
+    }
+    listing = PublishedListingView(
+        listing={"listing_id": "LST_1", "public_listing_id": "QL-RF-A2B3", "inventory_status": "active"},
+        offer={"offer_type": "rent", "offer_status": "active", "publication_policy": "telegram_rent"},
+        publication={},
+        package={"snapshot_json": json.dumps(snapshot)},
+    )
+    text = build_details_response(listing).text
+    assert "💬 侨联说" in text
+    assert "💬 <b>侨联说</b>" not in text
     assert "旧的物业" not in text
+    assert adviser_notes_for_view(listing) in text
+
+
+def test_rental_details_omits_adviser_section_when_empty():
+    snapshot = {
+        "schema": "v3_publication_snapshot.v1",
+        "listing_id": "LST_1",
+        "public_listing_id": "QL-RF-A2B3",
+        "canonical_facts": {"adviser_signals": []},
+        "listing": {"project_name": "富力城", "property_type": "公寓"},
+        "offer": {"offer_type": "rent", "monthly_rent_usd": 800},
+        "adviser_copy": "",
+        "canonical_facts_hash": "old",
+    }
+    listing = PublishedListingView(
+        listing={"listing_id": "LST_1", "public_listing_id": "QL-RF-A2B3", "inventory_status": "active"},
+        offer={"offer_type": "rent", "offer_status": "active", "publication_policy": "telegram_rent"},
+        publication={},
+        package={"snapshot_json": json.dumps(snapshot)},
+    )
+    text = build_details_response(listing).text
+    assert "💬 侨联说" not in text
     assert "暂无建议" not in text
 
 

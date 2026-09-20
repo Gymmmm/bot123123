@@ -28,14 +28,19 @@ LOGO_MAX_PHOTO_HEIGHT_RATIO = 0.22
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 
 ROOT = Path(__file__).resolve().parent
+CLASSIC_BLUE_LOGO = ROOT / "assets" / "qiaolian_corner_classic_blue.png"
 RIGHT_PRICE_LOGO = ROOT / "assets" / "qiaolian_corner_right_price.png"
 BLACK_GOLD_LOGO = ROOT / "assets" / "qiaolian_corner_black_gold.png"
 DEFAULT_LOGO_CANDIDATES = (
     RIGHT_PRICE_LOGO,
+    CLASSIC_BLUE_LOGO,
     ROOT / "assets" / "qiaolian_logo_white.png",
     ROOT / "assets" / "brand" / "qiaolian_corner_mark_120x40.png",
 )
 _BLACK_GOLD_STYLE_KEYS = frozenset({"black_gold", "villa_premium", "dark_glass"})
+_CLASSIC_BLUE_STYLE_KEYS = frozenset(
+    {"classic_blue", "classic", "left_info", "minimal", "minimal_white", "blue_banner", "premium_4image"}
+)
 NOTO_FONT_CANDIDATES = (
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
     "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc",
@@ -54,12 +59,16 @@ def detect_orientation(width: int, height: int) -> str:
 
 
 def enhance_property_photo(image: Image.Image) -> Image.Image:
-    """Light factual enhancement only; never alter geometry or scene contents."""
-    image = ImageOps.autocontrast(image, cutoff=0.5)
-    image = ImageEnhance.Brightness(image).enhance(1.035)
-    image = ImageEnhance.Contrast(image).enhance(1.045)
-    image = ImageEnhance.Color(image).enhance(1.035)
-    return image.filter(ImageFilter.UnsharpMask(radius=1.2, percent=65, threshold=4))
+    """Mild production enhance only — subtle lift, no heavy sharpen/saturate.
+
+    Geometry and scene contents stay untouched. Safe default for gallery / scrub
+    derivatives; skip when callers pass enhance=False.
+    """
+    image = ImageOps.autocontrast(image, cutoff=0.4)
+    image = ImageEnhance.Brightness(image).enhance(1.025)
+    image = ImageEnhance.Contrast(image).enhance(1.03)
+    image = ImageEnhance.Color(image).enhance(1.02)
+    return image.filter(ImageFilter.UnsharpMask(radius=1.0, percent=40, threshold=5))
 
 
 def apply_logo_opacity(logo: Image.Image, opacity: float = LOGO_OPACITY) -> Image.Image:
@@ -134,10 +143,26 @@ def _fallback_brand_logo(canvas_width: int) -> Image.Image:
 
 
 def resolve_gallery_logo_path(cover_style: str | None) -> Path | None:
-    """Map cover style to the matching gallery corner mark asset."""
+    """Map cover style to the matching gallery corner mark asset.
+
+    classic_blue → white/brand-matched text mark (no blue plate)
+    right_price  → white text mark
+    black_gold   → champagne gold mark
+    """
     key = str(cover_style or "").strip().lower()
-    path = BLACK_GOLD_LOGO if key in _BLACK_GOLD_STYLE_KEYS else RIGHT_PRICE_LOGO
-    return path if path.is_file() else None
+    if key in _BLACK_GOLD_STYLE_KEYS:
+        path = BLACK_GOLD_LOGO
+    elif key in _CLASSIC_BLUE_STYLE_KEYS:
+        path = CLASSIC_BLUE_LOGO
+    else:
+        path = RIGHT_PRICE_LOGO
+    if path.is_file():
+        return path
+    # Fallbacks keep gallery branding available if one asset is missing.
+    for candidate in (RIGHT_PRICE_LOGO, CLASSIC_BLUE_LOGO, BLACK_GOLD_LOGO):
+        if candidate.is_file():
+            return candidate
+    return None
 
 
 def resolve_logo(logo_path: str | Path | None, canvas_width: int) -> Image.Image:

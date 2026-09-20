@@ -78,13 +78,8 @@ def _card_actions(
     rows.append(
         (
             SemanticAction(
-                "🏠 租赁详情",
+                "📷 更多详情",
                 "details",
-                target_public_listing_id=current_public_id,
-            ),
-            SemanticAction(
-                "📸 更多实拍",
-                "photos",
                 target_public_listing_id=current_public_id,
             ),
         )

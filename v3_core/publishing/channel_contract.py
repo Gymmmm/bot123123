@@ -15,7 +15,7 @@ from .public_ids import normalize_public_id
 
 CHANNEL_ACTION_ORDER = ("details", "photos", "book", "consult")
 CHANNEL_CTA_LABELS = {
-    "details": "📋 租赁详情",
+    "details": "📷 更多详情",
     "photos": "📸 更多实拍",
     "book": "📅 预约看房",
     "consult": "💬 咨询顾问",
@@ -112,10 +112,10 @@ def official_channel_action_urls(
 def official_channel_cta_keys(inventory_status: object = "active") -> tuple[str, ...]:
     status = str(inventory_status or "").strip().lower()
     if inventory_status_bookable(status):
-        return ("details", "photos", "book")
+        return ("details", "book")
     if status in {"rented", "inactive", "offline"}:
         return ("details", "more", "consult")
-    return ("details", "photos", "consult")
+    return ("details", "consult")
 
 
 def official_channel_button_spec(
@@ -127,10 +127,11 @@ def official_channel_button_spec(
     verified = official_channel_action_identity(actions)
     status = str(inventory_status or "").strip().lower()
     has_consult = "consult" in verified
+    # One primary entry (details deeplink opens merged detail+photo flipper).
+    # photos URL stays in the package for backward-compat deeplinks.
     if inventory_status_bookable(status):
         return ((
             (CHANNEL_CTA_LABELS["details"], verified["details"]),
-            (CHANNEL_CTA_LABELS["photos"], verified["photos"]),
         ), (
             (CHANNEL_CTA_LABELS["book"], verified["book"]),
         ))
@@ -147,7 +148,6 @@ def official_channel_button_spec(
 
     row = [
         (CHANNEL_CTA_LABELS["details"], verified["details"]),
-        (CHANNEL_CTA_LABELS["photos"], verified["photos"]),
     ]
     if has_consult:
         row.append((CHANNEL_CTA_LABELS["consult"], verified["consult"]))

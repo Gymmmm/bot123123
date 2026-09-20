@@ -53,7 +53,6 @@ async def _render_contact(query: Any, *, text: str, public_listing_id: str, advi
         [contact_button],
         [
             InlineKeyboardButton("📅 预约看房", callback_data=encode_listing_callback("book", public_listing_id)),
-            InlineKeyboardButton("📸 更多实拍", callback_data=encode_listing_callback("photos", public_listing_id)),
         ],
         [
             InlineKeyboardButton("⬅️ 返回这套房", callback_data=encode_listing_callback("details", public_listing_id)),
