@@ -313,9 +313,10 @@ def build_v3_user_bot_application(
         if raw.startswith(("adminlead:", "adminrepair:")) and admin_workflow_callback_handler is not None:
             await admin_workflow_callback_handler(update, context, query, raw, user)
 
-    async def _run_start_payload(update, context, payload: str = ""):
+    async def _run_start_payload(update, context, payload: str | None = None):
         previous_args = tuple(getattr(context, "args", None) or ())
-        context.args = [payload] if payload else []
+        if payload is not None:
+            context.args = [payload] if payload else []
         try:
             await handle_v3_start(
                 update,
@@ -365,7 +366,7 @@ def build_v3_user_bot_application(
     async def legacy_help(update, context):
         runtime_state.heartbeat("user", state="running", event=True)
         await remove_legacy_reply_keyboard(update, context)
-        await _run_start_payload(update, context)
+        await _run_start_payload(update, context, "")
 
     async def _legacy_callback(update, context, raw: str) -> bool:
         action = legacy_home_action(raw)
