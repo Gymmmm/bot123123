@@ -139,3 +139,60 @@ async def test_sync_projects_bookable_status_without_mutating_inventory(tmp_path
             "SELECT inventory_status FROM listings_v3 WHERE listing_id='l_1'"
         ).fetchone()[0]
     assert durable == status
+
+
+
+@pytest.mark.asyncio
+async def test_sync_refreshes_durable_status_immediately_before_telegram_edit(tmp_path):
+    db_path = tmp_path / "race.db"
+    _seed(db_path, appointment_count=0, inventory_status="active")
+    fake = FakeBot()
+    sync = V3AppointmentChannelSynchronizer(
+        db_path,
+        publisher_bot_token="publisher-token",
+        user_bot_username="qiaolian_rent_bot",
+        advisor_url="https://t.me/qiaolian_advisor",
+        bot_factory=lambda token: fake,
+    )
+
+    original_snapshot = sync._snapshot
+
+    def stale_snapshot_then_offline(listing_id):
+        row, count = original_snapshot(listing_id)
+        assert row["inventory_status"] == "active"
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                "UPDATE listings_v3 SET inventory_status='offline' WHERE listing_id=?",
+                (listing_id,),
+            )
+            conn.commit()
+        return row, count
+
+    sync._snapshot = stale_snapshot_then_offline
+
+    result = await sync.sync("l_1")
+
+    assert result.synced
+    assert result.previous_status == "active"
+    assert result.next_status == "offline"
+    assert len(fake.calls) == 1
+    call = fake.calls[0]
+    labels = [
+        button.text
+        for row in call["reply_markup"].inline_keyboard
+        for button in row
+    ]
+    assert "📅 预约看房" not in labels
+    assert "⚫" in call["caption"]
+    with sqlite3.connect(db_path) as conn:
+        durable = conn.execute(
+            "SELECT inventory_status FROM listings_v3 WHERE listing_id='l_1'"
+        ).fetchone()[0]
+    assert durable == "offline"
+
+
+def test_channel_sync_source_never_updates_listing_inventory():
+    import inspect
+
+    source = inspect.getsource(V3AppointmentChannelSynchronizer.sync)
+    assert "UPDATE listings_v3 SET inventory_status" not in source
