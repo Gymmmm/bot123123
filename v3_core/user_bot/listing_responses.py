@@ -314,47 +314,175 @@ def build_details_response(view: PublishedListingView) -> PublicDetailsResponse:
     )
 
 
-def _frozen_cover_path(view: PublishedListingView) -> str:
-    """Resolve the listing cover file for flipper index 1/N."""
+def _existing_file(path: object) -> str:
+    """Return resolved path string when ``path`` points at a real file."""
+    raw = str(path or "").strip()
+    if not raw:
+        return ""
+    candidate = Path(raw).expanduser()
+    try:
+        if candidate.is_file():
+            return str(candidate.resolve())
+    except OSError:
+        return ""
+    return ""
+
+
+def _cover_search_roots(view: PublishedListingView) -> list[Path]:
+    """Infer media roots (covers_v3 / media) from package + gallery paths."""
+    roots: list[Path] = []
+    seen: set[str] = set()
+
+    def _add(path: Path) -> None:
+        try:
+            resolved = path.expanduser().resolve()
+        except OSError:
+            return
+        key = str(resolved)
+        if key in seen:
+            return
+        seen.add(key)
+        roots.append(resolved)
+
     package = getattr(view, "package", {}) or {}
-    candidate = str(package.get("cover_path") or "").strip()
-    if candidate and Path(candidate).is_file():
-        return candidate
-    # Fall back to a gallery asset named cover.* if present.
+    explicit = str(package.get("cover_path") or "").strip()
+    if explicit:
+        parent = Path(explicit).expanduser().parent
+        _add(parent)
+        _add(parent.parent)
+
+    for raw in getattr(view, "gallery", ()) or ():
+        gallery_path = Path(str(raw or "").strip())
+        if not str(gallery_path):
+            continue
+        parent = gallery_path.expanduser().parent
+        _add(parent)
+        # prepared_v3/<id>/gallery -> prepared_v3/<id> -> media -> covers_v3
+        for up in list(parent.parents)[:5]:
+            _add(up)
+            _add(up / "covers_v3")
+            if up.name in {"gallery", "prepared_v3", "media"}:
+                _add(up.parent / "covers_v3")
+                _add(up.parent.parent / "covers_v3")
+    return roots
+
+
+def _looks_like_rendered_cover(path: Path, *, public_id: str, style: str) -> bool:
+    name = path.name.lower()
+    parts_lower = {part.lower() for part in path.parts}
+    if "covers_v3" in parts_lower or (path.parent.name.lower() == "covers"):
+        return True
+    pid = public_id.lower()
+    if pid and pid in name:
+        if style and style.lower() in name:
+            return True
+        if name.startswith(pid.lower() + "_") and path.suffix.lower() in {
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".webp",
+        }:
+            return True
+    if name in {"cover.jpg", "cover.jpeg", "cover.png", "cover.webp"}:
+        return True
+    return False
+
+
+def _frozen_cover_path(view: PublishedListingView) -> str:
+    """Resolve the listing COVER RENDER file for flipper index 1/N.
+
+    Prefer the frozen package ``cover_path`` when the file exists. If that path is
+    empty/stale at runtime (common when gallery derivatives are mounted but the
+    recorded cover absolute path is not), rediscover the rendered cover under
+    nearby ``covers_v3`` roots using public id + cover_style. Never fall back to
+    a random gallery room shot here — gallery ordering is handled by the
+    flipper builder after cover resolution.
+    """
+    package = getattr(view, "package", {}) or {}
+    public_id = str(
+        getattr(view, "public_listing_id", "")
+        or package.get("public_listing_id")
+        or ""
+    ).strip()
+    style = str(package.get("cover_style") or "").strip()
+
+    explicit = _existing_file(package.get("cover_path"))
+    if explicit and _looks_like_rendered_cover(
+        Path(explicit), public_id=public_id, style=style
+    ):
+        return explicit
+    # Explicit path exists but looks like a raw/source still usable as placeholder
+    # only when no rendered cover can be rediscovered below.
+    explicit_fallback = explicit
+
+    candidates: list[str] = []
+    if public_id and style:
+        for root in _cover_search_roots(view):
+            for suffix in (".png", ".jpg", ".jpeg", ".webp"):
+                candidates.append(str(root / f"{public_id}_{style}{suffix}"))
+    if public_id:
+        for root in _cover_search_roots(view):
+            try:
+                if not root.is_dir():
+                    continue
+                for child in root.iterdir():
+                    if not child.is_file():
+                        continue
+                    if _looks_like_rendered_cover(child, public_id=public_id, style=style):
+                        candidates.append(str(child))
+            except OSError:
+                continue
+
     for raw in getattr(view, "gallery", ()) or ():
         path = str(raw or "").strip()
         if not path:
             continue
-        if Path(path).name.lower() in {"cover.jpg", "cover.jpeg", "cover.png"}:
-            if Path(path).is_file():
-                return path
-    return ""
+        if Path(path).name.lower() in {"cover.jpg", "cover.jpeg", "cover.png", "cover.webp"}:
+            candidates.append(path)
+
+    for candidate in candidates:
+        found = _existing_file(candidate)
+        if found:
+            return found
+
+    return explicit_fallback or ""
 
 
 def _flipper_photo_paths(view: PublishedListingView) -> tuple[str, ...]:
-    """Cover first, then remaining real/gallery photos (deduped).
+    """Cover first, then remaining real/gallery photos (deduped by resolved path).
 
-    Product lock: 📷 房源详情 opens at 📸 1/N = cover, then gallery shots.
+    Product lock: 📷 房源详情 opens at 📸 1/N = cover render, then gallery shots.
     """
     output: list[str] = []
     seen: set[str] = set()
 
+    def _append(path: str) -> None:
+        existing = _existing_file(path)
+        if not existing:
+            return
+        key = existing
+        if key in seen:
+            return
+        seen.add(key)
+        output.append(existing)
+
     cover = _frozen_cover_path(view)
     if cover:
-        output.append(cover)
-        seen.add(cover)
+        _append(cover)
 
     for raw in getattr(view, "gallery", ()) or ():
         path = str(raw or "").strip()
-        if not path or path in seen:
+        if not path:
             continue
         # Skip cover-named assets once cover is already first.
-        if cover and Path(path).name.lower() in {"cover.jpg", "cover.jpeg", "cover.png"}:
+        if cover and Path(path).name.lower() in {
+            "cover.jpg",
+            "cover.jpeg",
+            "cover.png",
+            "cover.webp",
+        }:
             continue
-        if not Path(path).is_file():
-            continue
-        output.append(path)
-        seen.add(path)
+        _append(path)
     return tuple(output)
 
 
@@ -404,11 +532,14 @@ def build_photos_response(
     )
 
 
+build_detail_caption = build_detail_text  # product alias used by open-details copy locks
+
 __all__ = [
     "InternalListingAction",
     "PublicDetailsResponse",
     "PublicPhotosResponse",
     "SemanticAction",
+    "build_detail_caption",
     "build_detail_text",
     "build_details_response",
     "build_photo_caption",

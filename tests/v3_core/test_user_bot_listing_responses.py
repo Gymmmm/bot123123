@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 from v3_core.user_bot.listing_responses import (
+    build_detail_caption,
     build_detail_text,
     build_details_response,
     build_photo_caption,
@@ -236,3 +237,49 @@ def test_flipper_starts_on_package_cover_path(tmp_path):
     second = build_photos_response(view, offset=1)
     assert second.photo_path == str(room)
     assert second.text.endswith("📸 2/2")
+
+
+def test_flipper_recovers_rendered_cover_when_package_path_stale(tmp_path):
+    """Runtime often has gallery files but a stale absolute cover_path.
+
+    Flipper 1/N must still open on the rendered cover under covers_v3, not gallery[0].
+    """
+    public_id = "QL-RF-A2B3"
+    style = "classic_blue"
+    media_root = tmp_path / "media"
+    covers = media_root / "covers_v3"
+    gallery_dir = media_root / "prepared_v3" / "42" / "gallery"
+    covers.mkdir(parents=True)
+    gallery_dir.mkdir(parents=True)
+
+    rendered = covers / f"{public_id}_{style}.png"
+    rendered.write_bytes(b"RENDERED_COVER")
+    room = gallery_dir / "classic_blue_abc_gallery.jpg"
+    room.write_bytes(b"room")
+
+    stale = tmp_path / "missing-elsewhere" / "old-cover.png"  # does not exist
+    view = _view(gallery=[str(room)])
+    package = dict(view.package)
+    package["cover_path"] = str(stale)
+    package["cover_style"] = style
+    view = PublishedListingView(
+        listing=view.listing,
+        offer=view.offer,
+        publication=view.publication,
+        package=package,
+    )
+
+    response = build_photos_response(view)
+    assert response.photo_path == str(rendered.resolve())
+    assert response.photo_total == 2
+    assert response.text.endswith("📸 1/2")
+    second = build_photos_response(view, offset=1)
+    assert second.photo_path == str(room.resolve())
+
+
+def test_build_detail_caption_alias_matches_sectioned_body():
+    assert build_detail_caption is build_detail_text
+    text = build_detail_caption(_view())
+    assert "🏢 金边优质房源出租" in text
+    assert "QL-RF-A2B3" in text
+

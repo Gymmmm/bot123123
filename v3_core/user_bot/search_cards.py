@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Iterable
 from v3_core.publishing.formatting import display_floor
 from .listing_presenter import build_public_listing_details
-from .listing_responses import SemanticAction
+from .listing_responses import SemanticAction, _frozen_cover_path
 from .public_inventory import PublishedListingView
 
 @dataclass(frozen=True)
@@ -19,13 +19,14 @@ class SearchCardResponse:
     total: int
 
 def _frozen_cover(view: PublishedListingView) -> str:
-    candidate=str(view.package.get("cover_path") or "").strip()
-    if candidate and Path(candidate).is_file():
-        return candidate
-    for raw in getattr(view,"gallery",()):
-        path=str(raw or "").strip()
-        if path and Path(path).is_file():
-            return path
+    """Prefer rendered cover; fall back to first readable gallery frame."""
+    cover = _frozen_cover_path(view)
+    if cover:
+        return cover
+    for raw in getattr(view, "gallery", ()) or ():
+        path = str(raw or "").strip()
+        if path and Path(path).expanduser().is_file():
+            return str(Path(path).expanduser().resolve())
     return ""
 
 def _card_actions(views: tuple[PublishedListingView, ...], *, index: int, bookable: bool) -> tuple[tuple[SemanticAction, ...], ...]:
