@@ -55,6 +55,7 @@ class PublicListingFlowService:
         *,
         source: str,
         start_payload: str,
+        photo_offset: int = 0,
     ) -> PublicListingFlowResult:
         clean_source = str(source or "").strip()
         route = decision.route
@@ -86,21 +87,26 @@ class PublicListingFlowService:
             )
 
         view = decision.view
-        if route.action == "details":
-            return PublicListingFlowResult(
-                status="ok",
-                action="details",
-                public_listing_id=public_id,
-                source=clean_source,
-                details=build_details_response(view),
-            )
-        if route.action == "photos":
+        if route.action in {"details", "photos"}:
+            # Both deeplinks open the same merged detail + single-photo flipper.
+            merged = build_photos_response(view, offset=int(photo_offset or 0))
+            details = build_details_response(view)
+            if route.action == "details":
+                return PublicListingFlowResult(
+                    status="ok",
+                    action="details",
+                    public_listing_id=public_id,
+                    source=clean_source,
+                    details=details,
+                    photos=merged,
+                )
             return PublicListingFlowResult(
                 status="ok",
                 action="photos",
                 public_listing_id=public_id,
                 source=clean_source,
-                photos=build_photos_response(view),
+                details=details,
+                photos=merged,
             )
         if route.action == "book":
             return PublicListingFlowResult(
@@ -137,11 +143,13 @@ class PublicListingFlowService:
         action: object,
         *,
         source: str = "listing_callback",
+        photo_offset: int = 0,
     ) -> PublicListingFlowResult:
         return self._render(
             self.routes.resolve_action(public_listing_id, action),
             source=source,
             start_payload="",
+            photo_offset=int(photo_offset or 0),
         )
 
 

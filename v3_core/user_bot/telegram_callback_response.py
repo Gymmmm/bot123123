@@ -38,6 +38,7 @@ class TelegramCallbackResponse:
     text: str = ""
     photo_path: str = ""
     media_groups: tuple[tuple[str, ...], ...] = ()
+    detail_text: str = ""
     keyboard: InlineKeyboardMarkup | None = None
     transition: TransitionAction | None = None
     book_intent: PublicBookIntent | None = None
@@ -89,7 +90,22 @@ def adapt_callback_response(
         listing = dispatched.listing
         if listing is None:
             raise ValueError("successful_listing_dispatch_missing_result")
-        if dispatched.action == "details":
+        if dispatched.action in {"details", "photos"}:
+            photos = listing.photos
+            if photos is not None and (photos.has_media or dispatched.action == "photos"):
+                photo_path = str(getattr(photos, "photo_path", "") or "").strip()
+                if not photo_path and photos.media_groups:
+                    photo_path = str(photos.media_groups[0][0] or "").strip()
+                return TelegramCallbackResponse(
+                    kind="photos",
+                    status="ok",
+                    text=photos.text,
+                    photo_path=photo_path,
+                    media_groups=photos.media_groups if photos.has_media else (),
+                    detail_text=str(getattr(photos, "detail_text", "") or ""),
+                    keyboard=build_action_keyboard(photos.action_rows),
+                    listing_summary=str(getattr(photos, "listing_summary", "") or ""),
+                )
             if listing.details is None:
                 raise ValueError("successful_details_dispatch_missing_response")
             return TelegramCallbackResponse(
@@ -98,17 +114,6 @@ def adapt_callback_response(
                 text=listing.details.text,
                 keyboard=build_action_keyboard(listing.details.action_rows),
                 listing_summary=str(getattr(listing.details, "listing_summary", "") or ""),
-            )
-        if dispatched.action == "photos":
-            if listing.photos is None:
-                raise ValueError("successful_photos_dispatch_missing_response")
-            return TelegramCallbackResponse(
-                kind="photos",
-                status="ok",
-                text=listing.photos.text,
-                media_groups=listing.photos.media_groups,
-                keyboard=build_action_keyboard(listing.photos.action_rows),
-                listing_summary=str(getattr(listing.photos, "listing_summary", "") or ""),
             )
         if listing.book is None:
             raise ValueError("successful_book_dispatch_missing_intent")

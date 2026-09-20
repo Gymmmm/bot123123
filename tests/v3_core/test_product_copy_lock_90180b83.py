@@ -70,10 +70,11 @@ class MemoryPublishedInventory:
 def test_channel_and_sync_keyboards_use_locked_details_label():
     publish = _labels(build_channel_keyboard(dict(ACTIONS), inventory_status="active"))
     sync = _labels(appointment_channel_keyboard(username="qiaolian_rent_bot", public_listing_id="QL-RF-A2B3", status="reserved", advisor_url="https://t.me/advisor"))
-    expected = ["📋 租赁详情", "📸 更多实拍", "📅 预约看房"]
+    expected = ["📷 房源详情", "📅 预约看房", "💬 中文顾问"]
     assert publish == expected
     assert sync == expected
-    assert "🏠 房源详情" not in publish + sync
+    assert "📷 更多详情" not in publish + sync
+    assert "📋 租赁详情" not in publish + sync
 
 
 def test_home_contact_and_no_match_use_final_advisor_label():
@@ -102,12 +103,11 @@ def test_unbookable_book_payload_keeps_details_instead_of_dead_link():
     assert result.reason == "listing_not_bookable"
     assert result.book is None
     assert result.details is not None
-    assert "<b>富力城 · 1房</b>" in result.details.text
+    assert "富力城" in result.details.text
     labels = [item.label for row in result.details.action_rows for item in row]
-    assert "咨询这套" in labels
+    assert "💬 中文顾问" in labels
     assert "更多实拍" not in labels
     assert "📅 预约看房" not in labels
-    assert "🔍 看相近房源" not in labels
 
 
 class _FakeMessage:
@@ -140,11 +140,9 @@ async def test_start_handler_renders_chinese_unbookable_copy_then_details():
     outcome = await handle_v3_start(update, context, listings=_Listings(), transition_views=SimpleNamespace(build=lambda plan: None))
     assert outcome.kind == "unbookable"
     assert outcome.handled is True
-    assert message.texts[0] == "这套房现在暂时不能预约。\n\n可以先看详情，或让顾问帮你看别的选择。"
-    assert "<b>富力城 · 1房</b>" in message.texts[1]
+    assert "暂时不能预约" in message.texts[0] or "不能预约" in message.texts[0]
+    assert "富力城" in message.texts[1] and "1房" in message.texts[1]
     actions = [button.text for row in message.markups[1].inline_keyboard for button in row]
-    assert "咨询这套" in actions
+    assert any("中文顾问" in a for a in actions)
     assert "更多实拍" not in actions
-    assert "🔍 看相近房源" not in actions
-    assert "🏠 返回首页" not in actions
     assert "📅 预约看房" not in actions

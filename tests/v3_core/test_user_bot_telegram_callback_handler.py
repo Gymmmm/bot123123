@@ -174,14 +174,25 @@ async def test_photos_send_frozen_media_then_action_message(tmp_path):
             action="photos",
             public_listing_id="QL-RF-A2B3",
             photos=PublicPhotosResponse(
-                media_groups=((str(one),), (str(two), str(three))),
-                text="photos",
+                media_groups=((str(one),),),
+                text="富力城 · 2房1厅 · $800/月 · 📸 1/3",
+                photo_path=str(one),
+                photo_index=0,
+                photo_total=3,
+                detail_text="🏢 金边优质房源出租",
                 action_rows=(
                     (
                         SemanticAction(
-                            "🏠 房源详情",
-                            "details",
+                            "⬅️ 上一张",
+                            "photos",
                             target_public_listing_id="QL-RF-A2B3",
+                            target_index=2,
+                        ),
+                        SemanticAction(
+                            "下一张 ➡️",
+                            "photos",
+                            target_public_listing_id="QL-RF-A2B3",
+                            target_index=1,
                         ),
                     ),
                 ),
@@ -196,11 +207,13 @@ async def test_photos_send_frozen_media_then_action_message(tmp_path):
 
     assert outcome.handled and outcome.response is not None
     assert outcome.response.kind == "photos"
+    # One photo + short caption/keyboard, then optional separate detail text.
     assert [call[0] for call in context.bot.calls] == [
         "send_photo",
-        "send_media_group",
         "send_message",
     ]
+    assert "📸 1/3" in context.bot.calls[0][1]["caption"]
+    assert context.bot.calls[1][1]["text"] == "🏢 金边优质房源出租"
     assert [call[0] for call in query.calls] == ["answer"]
 
 

@@ -1,11 +1,11 @@
 """Prepare immutable derived media for V3 publication packaging.
 
 Raw source evidence is never modified. Publication media first goes through the
-conservative source-mark scrubber, then the existing production dedupe / quality
-ranking / cover selection contract runs on derived files. If a scrub would edit
-more than the safety budget, an untouched derived copy is used instead of
-blocking the listing or damaging the photo. Cover rendering remains owned by
-``CoverRenderService`` and is intentionally unchanged.
+conservative source-mark scrubber (prefer bottom-crop for slogan/contact bands;
+abandon scrub when coverage exceeds the safety budget), then dedupe / quality
+ranking / cover selection runs on derived files. Gallery derivatives get a mild
+enhance + cover-style corner mark. Cover rendering remains owned by
+``CoverRenderService``.
 """
 from __future__ import annotations
 
@@ -22,8 +22,8 @@ from .source_scrub import scrub_file
 
 
 MAX_SCRUB_COVERAGE = 0.08
-SCRUB_REVISION = "source_scrub_v1"
-GALLERY_BRAND_REVISION = "qiaolian_gallery_logo_v2_cover_match"
+SCRUB_REVISION = "source_scrub_v2_crop_mild_enhance_20260920"
+GALLERY_BRAND_REVISION = "qiaolian_gallery_logo_v4_three_style_20260920"
 
 
 @dataclass(frozen=True)
@@ -69,10 +69,20 @@ class MediaPreparationService:
 
     @staticmethod
     def _gallery_style_key(cover_style: str | None) -> str:
-        """Stable cache key: black_gold vs default right_price mark."""
+        """Stable cache key per cover mark: classic_blue / right_price / black_gold."""
         key = str(cover_style or "").strip().lower()
         if key in {"black_gold", "villa_premium", "dark_glass"}:
             return "black_gold"
+        if key in {
+            "classic_blue",
+            "classic",
+            "left_info",
+            "minimal",
+            "minimal_white",
+            "blue_banner",
+            "premium_4image",
+        }:
+            return "classic_blue"
         return "right_price"
 
     @classmethod
@@ -97,7 +107,7 @@ class MediaPreparationService:
         Cover rendering intentionally keeps using the clean selected source.  The
         returned files are only for the public ``更多实拍`` gallery, preventing a
         second brand mark from appearing underneath the cover template.
-        Gallery corner marks follow the listing cover brand (日常白 / 黑金香槟金).
+        Gallery corner marks follow the listing cover brand (经典蓝白标 / 日常白 / 黑金香槟金).
         """
         target_dir = self.prepared_dir / str(int(source_post_id)) / "gallery"
         target_dir.mkdir(parents=True, exist_ok=True)
@@ -116,7 +126,7 @@ class MediaPreparationService:
                     logo_path=resolve_gallery_logo_path(cover_style),
                     logo_position="top_left",
                     add_logo=True,
-                    enhance=False,
+                    enhance=True,  # mild enhance_property_photo only
                     cover_style=cover_style,
                 )
             branded.append(str(target.resolve()))
@@ -146,7 +156,7 @@ class MediaPreparationService:
                 if dst.is_file():
                     chosen = dst
                 else:
-                    info = scrub_file(src, dst, prefer_crop=False)
+                    info = scrub_file(src, dst, prefer_crop=True)
                     actual = info.get("inpaint_coverage")
                     coverage = float(actual if actual is not None else info.get("coverage") or 0.0)
                     if coverage <= MAX_SCRUB_COVERAGE:
@@ -185,7 +195,7 @@ class MediaPreparationService:
         manual_clean = ""
         if manual_cover_path:
             manual_raw = str(Path(manual_cover_path).expanduser().resolve())
-            manual_clean = manual_raw if manual_raw in cleaned_paths else raw_to_clean.get(manual_raw, "")
+            manual_clean = raw_to_clean.get(manual_raw, "")
 
         selected = select_publication_media(
             cleaned_paths,

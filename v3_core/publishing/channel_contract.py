@@ -15,11 +15,12 @@ from .public_ids import normalize_public_id
 
 CHANNEL_ACTION_ORDER = ("details", "photos", "book", "consult")
 CHANNEL_CTA_LABELS = {
-    "details": "📋 租赁详情",
-    "photos": "📸 更多实拍",
+    "details": "📷 房源详情",
+    "photos": "📸 更多实拍",  # kept for package/compat; not shown on channel keyboard
     "book": "📅 预约看房",
-    "consult": "💬 咨询顾问",
-    "more": "🔍 更多房源",
+    "consult": "💬 中文顾问",
+    "find": "🏠 帮我找房",
+    "more": "🔎 看看房源",
 }
 
 _ACTION_SUFFIX = {
@@ -112,10 +113,16 @@ def official_channel_action_urls(
 def official_channel_cta_keys(inventory_status: object = "active") -> tuple[str, ...]:
     status = str(inventory_status or "").strip().lower()
     if inventory_status_bookable(status):
-        return ("details", "photos", "book")
-    if status in {"rented", "inactive", "offline"}:
-        return ("details", "more", "consult")
-    return ("details", "photos", "consult")
+        return ("details", "book", "consult")
+    if status == "pending":
+        return ("consult", "find", "more")
+    # rented / offline / inactive
+    return ("find", "more", "consult")
+
+
+def _bot_from_details_url(details_url: str) -> str:
+    details = urlparse(details_url)
+    return details.path.strip("/")
 
 
 def official_channel_button_spec(
@@ -123,35 +130,57 @@ def official_channel_button_spec(
     *,
     inventory_status: object = "active",
 ) -> tuple[tuple[tuple[str, str], ...], ...]:
-    """Return keyboard rows as ``((label, url), ...)`` for publish and sync."""
+    """Return keyboard rows as ``((label, url), ...)`` for publish and sync.
+
+    Locked product matrix (2026-09-20):
+    - bookable active/reserved:
+        Row1: [📷 房源详情] [📅 预约看房]
+        Row2: [💬 中文顾问]
+    - pending:
+        Row1: [💬 中文顾问]
+        Row2: [🏠 帮我找房] [🔎 看看房源]
+    - rented / offline / inactive:
+        Row1: [🏠 帮我找房] [🔎 看看房源]
+        Row2: [💬 中文顾问]
+    """
     verified = official_channel_action_identity(actions)
     status = str(inventory_status or "").strip().lower()
     has_consult = "consult" in verified
+
     if inventory_status_bookable(status):
-        return ((
-            (CHANNEL_CTA_LABELS["details"], verified["details"]),
-            (CHANNEL_CTA_LABELS["photos"], verified["photos"]),
-        ), (
-            (CHANNEL_CTA_LABELS["book"], verified["book"]),
-        ))
-    if status in {"rented", "inactive", "offline"}:
-        details = urlparse(verified["details"])
-        more_url = f"https://t.me/{details.path.strip('/')}?start=latest"
-        row = [
-            (CHANNEL_CTA_LABELS["details"], verified["details"]),
-            (CHANNEL_CTA_LABELS["more"], more_url),
+        rows: list[tuple[tuple[str, str], ...]] = [
+            (
+                (CHANNEL_CTA_LABELS["details"], verified["details"]),
+                (CHANNEL_CTA_LABELS["book"], verified["book"]),
+            ),
         ]
         if has_consult:
-            row.append((CHANNEL_CTA_LABELS["consult"], verified["consult"]))
-        return tuple(tuple(row[i:i + 2]) for i in range(0, len(row), 2))
+            rows.append(((CHANNEL_CTA_LABELS["consult"], verified["consult"]),))
+        return tuple(rows)
 
-    row = [
-        (CHANNEL_CTA_LABELS["details"], verified["details"]),
-        (CHANNEL_CTA_LABELS["photos"], verified["photos"]),
-    ]
-    if has_consult:
-        row.append((CHANNEL_CTA_LABELS["consult"], verified["consult"]))
-    return tuple(tuple(row[i:i + 2]) for i in range(0, len(row), 2))
+    bot = _bot_from_details_url(verified["details"])
+    find_url = f"https://t.me/{bot}?start=find_home"
+    more_url = f"https://t.me/{bot}?start=latest"
+    find_btn = (CHANNEL_CTA_LABELS["find"], find_url)
+    more_btn = (CHANNEL_CTA_LABELS["more"], more_url)
+    consult_btn = (
+        (CHANNEL_CTA_LABELS["consult"], verified["consult"])
+        if has_consult
+        else None
+    )
+
+    if status == "pending":
+        rows = []
+        if consult_btn is not None:
+            rows.append((consult_btn,))
+        rows.append((find_btn, more_btn))
+        return tuple(rows)
+
+    # rented / offline / inactive (and any other non-bookable)
+    rows = [(find_btn, more_btn)]
+    if consult_btn is not None:
+        rows.append((consult_btn,))
+    return tuple(rows)
 
 
 def official_channel_action_identity(actions: dict[str, str]) -> dict[str, str]:

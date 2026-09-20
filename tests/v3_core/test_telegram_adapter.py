@@ -66,13 +66,16 @@ def _command(tmp_path):
     )
 
 
-def test_bookable_keyboard_contract_is_two_per_row_and_ordered():
+def test_bookable_keyboard_contract_is_locked_matrix_and_ordered():
     keyboard = build_channel_keyboard(dict(ACTIONS))
     rows = keyboard.inline_keyboard
-    assert [[button.text for button in row] for row in rows] == [["📋 租赁详情", "📸 更多实拍"], ["📅 预约看房"]]
+    assert [[button.text for button in row] for row in rows] == [
+        ["📷 房源详情", "📅 预约看房"],
+        ["💬 中文顾问"],
+    ]
     assert rows[0][0].url == ACTIONS["details"]
-    assert rows[0][1].url == ACTIONS["photos"]
-    assert rows[1][0].url == ACTIONS["book"]
+    assert rows[0][1].url == ACTIONS["book"]
+    assert rows[1][0].url == ACTIONS["consult"]
 
 
 @pytest.mark.asyncio

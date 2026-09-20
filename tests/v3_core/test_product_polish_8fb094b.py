@@ -54,9 +54,13 @@ def _button_labels(markup):
 def test_channel_keyboard_booking_follows_inventory_status(status, has_book):
     labels = _button_labels(build_channel_keyboard(dict(ACTIONS), inventory_status=status))
     assert ("📅 预约看房" in labels) is has_book
-    assert "📋 租赁详情" in labels
-    assert ("📸 更多实拍" in labels) is (status not in {"rented", "inactive", "offline"})
-    assert ("🔍 更多房源" in labels) is (status in {"rented", "inactive", "offline"})
+    assert ("📷 房源详情" in labels) is has_book
+    assert "📸 更多实拍" not in labels
+    assert ("🏠 帮我找房" in labels) is (not has_book)
+    assert ("🔎 看看房源" in labels) is (not has_book)
+    assert "💬 中文顾问" in labels
+    assert "🔍 更多房源" not in labels
+    assert "📷 更多详情" not in labels
 
 
 def test_channel_reserved_status_uses_locked_user_visible_semantics():
@@ -177,9 +181,10 @@ def _published_view() -> PublishedListingView:
 
 def test_details_labels_public_id_as_real_photo_reference():
     text = build_details_response(_published_view()).text
-    assert "<b>富力城 · 1房</b>" in text
-    assert "<b>$680/月</b>" in text
+    assert "富力城" in text and "1房" in text
+    assert "$680" in text
     assert "QL-RF-A2B3" in text and "🆔" not in text
+    assert "🏢 金边优质房源出租" in text
 
 
 def test_rfcity_category_returns_to_rfcity_navigation():

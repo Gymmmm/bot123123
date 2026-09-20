@@ -100,14 +100,15 @@ def test_channel_ctas_and_sync_contract_share_one_real_listing():
     )
     rows = official_channel_button_spec(urls, inventory_status="active")
     assert CHANNEL_CTA_LABELS == {
-        "details": "📋 租赁详情",
+        "details": "📷 房源详情",
         "photos": "📸 更多实拍",
         "book": "📅 预约看房",
-        "consult": "💬 咨询顾问",
-        "more": "🔍 更多房源",
+        "consult": "💬 中文顾问",
+        "find": "🏠 帮我找房",
+        "more": "🔎 看看房源",
     }
     assert [[label for label, _ in row] for row in rows] == [
-        ["📋 租赁详情", "📸 更多实拍"], ["📅 预约看房"],
+        ["📷 房源详情", "📅 预约看房"], ["💬 中文顾问"],
     ]
     assert all(f"property_{PUBLIC_ID}_" in urls[key] for key in ("details", "photos", "book"))
     assert PUBLIC_ID in urls["consult"]
@@ -116,29 +117,38 @@ def test_channel_ctas_and_sync_contract_share_one_real_listing():
     assert synced == rows
     unbookable = official_channel_button_spec(urls, inventory_status="pending")
     assert [[label for label, _ in row] for row in unbookable] == [
-        ["📋 租赁详情", "📸 更多实拍"], ["💬 咨询顾问"],
+        ["💬 中文顾问"], ["🏠 帮我找房", "🔎 看看房源"],
     ]
     rented = official_channel_button_spec(urls, inventory_status="rented")
     assert [[label for label, _ in row] for row in rented] == [
-        ["📋 租赁详情", "🔍 更多房源"], ["💬 咨询顾问"],
+        ["🏠 帮我找房", "🔎 看看房源"], ["💬 中文顾问"],
     ]
+    assert rented[0][0][1] == "https://t.me/QiaoLianBot?start=find_home"
     assert rented[0][1][1] == "https://t.me/QiaoLianBot?start=latest"
+    offline = official_channel_button_spec(urls, inventory_status="offline")
+    assert [[label for label, _ in row] for row in offline] == [
+        ["🏠 帮我找房", "🔎 看看房源"], ["💬 中文顾问"],
+    ]
+    assert "📷 房源详情" not in [label for row in offline for label, _ in row]
 
 
 def test_details_and_photos_contract_has_real_fields_three_entries_and_no_internal_id():
     view = _published(bookable=True)
     details = build_details_response(view)
     labels = _labels(details.action_rows)
-    assert labels == ["房源详情", "预约看房", "咨询这套"] if False else ["预约看房", "咨询这套"]
-    assert "富力城" in details.text and "$680/月" in details.text
+    assert "📅 预约看房" in labels and "💬 中文顾问" in labels
+    assert "富力城" in details.text
     assert PUBLIC_ID in details.text
     assert "LST_INTERNAL_1" not in details.text
     assert not any(token in details.text.lower() for token in ("none", "null", "unknown"))
 
     photos = build_photos_response(view)
     photo_labels = _labels(photos.action_rows)
-    assert photo_labels == ["返回房源详情"]
+    assert "💬 中文顾问" in photo_labels
+    assert "返回房源详情" not in photo_labels
     assert "LST_INTERNAL_1" not in photos.text
+    # Photo caption stays short
+    assert "基本信息" not in photos.text
 
 
 def test_contact_entries_have_real_callbacks_when_external_config_is_missing():

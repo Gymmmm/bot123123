@@ -77,18 +77,69 @@ async def _render_details(query: Any, response: TelegramCallbackResponse) -> Non
     await query.edit_message_text(response.text, parse_mode=ParseMode.HTML, reply_markup=response.keyboard)
 
 
-async def _render_photos(update: Any, context: Any, response: TelegramCallbackResponse) -> None:
+async def _render_photos(
+    update: Any,
+    context: Any,
+    response: TelegramCallbackResponse,
+    *,
+    query: Any | None = None,
+) -> None:
+    """Render one photo + short caption; flip in place via editMessageMedia.
+
+    Full sectioned detail (if present) is sent as a separate text message on
+    first open only — never as the photo caption.
+    """
     chat_id = _chat_id(update)
     bot = context.bot
-    for group in response.media_groups:
-        if len(group) == 1:
-            path = Path(group[0])
-            with path.open("rb") as handle:
-                await bot.send_photo(chat_id=chat_id, photo=handle)
-            continue
-        media = [InputMediaPhoto(media=Path(raw).read_bytes()) for raw in group]
-        await bot.send_media_group(chat_id=chat_id, media=media)
-    await bot.send_message(chat_id=chat_id, text=response.text, parse_mode=ParseMode.HTML, reply_markup=response.keyboard)
+    photo_path = str(getattr(response, "photo_path", "") or "").strip()
+    if not photo_path and response.media_groups:
+        first = response.media_groups[0]
+        if first:
+            photo_path = str(first[0] or "").strip()
+    path = Path(photo_path) if photo_path else None
+    if path is not None and not path.is_file():
+        path = None
+
+    message = getattr(query, "message", None) if query is not None else None
+    has_photo = bool(getattr(message, "photo", None))
+    flipping = bool(query is not None and has_photo)
+
+    if query is not None and has_photo and path is not None:
+        await query.edit_message_media(
+            media=InputMediaPhoto(
+                media=path.read_bytes(),
+                caption=response.text,
+                parse_mode=ParseMode.HTML,
+            ),
+            reply_markup=response.keyboard,
+        )
+        return
+    if query is not None and has_photo and path is None:
+        await query.edit_message_caption(
+            caption=response.text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=response.keyboard,
+        )
+        return
+    if path is not None:
+        with path.open("rb") as handle:
+            await bot.send_photo(
+                chat_id=chat_id,
+                photo=handle,
+                caption=response.text,
+                parse_mode=ParseMode.HTML,
+                reply_markup=response.keyboard,
+            )
+    else:
+        await bot.send_message(
+            chat_id=chat_id,
+            text=response.text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=response.keyboard,
+        )
+    detail = str(getattr(response, "detail_text", "") or "").strip()
+    if detail and not flipping:
+        await bot.send_message(chat_id=chat_id, text=detail, parse_mode=ParseMode.HTML)
 
 
 async def _render_transition_view(query: Any, view: TransitionView) -> None:
@@ -203,7 +254,7 @@ async def handle_v3_callback(
     if response.kind in {"details", "photos", "card"}:
         back_to_search_callback = ""
         callback = dispatched.callback
-        if response.kind == "details" and callback is not None:
+        if response.kind in {"details", "photos"} and callback is not None:
             public_id = str(getattr(callback, "public_listing_id", "") or "").strip()
             if public_id and public_id in session_ids:
                 back_to_search_callback = encode_card_callback(
@@ -217,8 +268,8 @@ async def handle_v3_callback(
                 channel_url=channel_url,
                 back_to_search_callback=back_to_search_callback,
                 listing_summary=str(getattr(response, "listing_summary", "") or ""),
-                add_home=response.kind == "details",
-                add_channel=response.kind == "details",
+                add_home=response.kind in {"details", "photos"},
+                add_channel=response.kind in {"details", "photos"},
             ),
         )
     await query.answer()
@@ -227,8 +278,12 @@ async def handle_v3_callback(
         await _render_details(query, response)
         _set_listing_touchpoint(context, "listing_details")
     elif response.kind == "photos":
-        await _render_photos(update, context, response)
-        _set_listing_touchpoint(context, "listing_photos")
+        await _render_photos(update, context, response, query=query)
+        action = str(getattr(dispatched, "action", "") or "")
+        _set_listing_touchpoint(
+            context,
+            "listing_details" if action == "details" else "listing_photos",
+        )
     elif response.kind == "card":
         await render_search_card_response(update, context, response, query=query)
     elif response.kind == "transition" and response.transition in {"book", "similar", "change_search"} and transition_views is not None:

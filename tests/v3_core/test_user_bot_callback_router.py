@@ -13,7 +13,7 @@ class ListingFlowStub:
         self.result = result or PublicListingFlowResult(status="ok", action="details", public_listing_id="QL-RF-A2B3")
         self.calls = []
 
-    def resolve_action(self, public_listing_id, action, *, source="listing_callback"):
+    def resolve_action(self, public_listing_id, action, *, source="listing_callback", photo_offset=0):
         self.calls.append((public_listing_id, action, source))
         return self.result
 
