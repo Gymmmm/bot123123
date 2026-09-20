@@ -39,6 +39,7 @@ class TelegramCallbackResponse:
     photo_path: str = ""
     media_groups: tuple[tuple[str, ...], ...] = ()
     detail_text: str = ""
+    send_detail: bool = False
     keyboard: InlineKeyboardMarkup | None = None
     transition: TransitionAction | None = None
     book_intent: PublicBookIntent | None = None
@@ -103,6 +104,9 @@ def adapt_callback_response(
                     photo_path=photo_path,
                     media_groups=photos.media_groups if photos.has_media else (),
                     detail_text=str(getattr(photos, "detail_text", "") or ""),
+                    # Open 📷 房源详情 must send sectioned body as its own bubble.
+                    # Photo flipper navigation (action=photos) must not re-send it.
+                    send_detail=dispatched.action == "details",
                     keyboard=build_action_keyboard(photos.action_rows),
                     listing_summary=str(getattr(photos, "listing_summary", "") or ""),
                 )

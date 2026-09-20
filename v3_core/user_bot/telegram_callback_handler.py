@@ -86,8 +86,10 @@ async def _render_photos(
 ) -> None:
     """Render one photo + short caption; flip in place via editMessageMedia.
 
-    Full sectioned detail (if present) is sent as a separate text message on
-    first open only — never as the photo caption.
+    Full sectioned detail (build_detail_caption / detail_text) is sent as a
+    separate text bubble when ``response.send_detail`` is set — typically the
+    📷 房源详情 open path. Flipper prev/next must not re-send that bubble, even
+    though those edits also land on a photo message.
     """
     chat_id = _chat_id(update)
     bot = context.bot
@@ -102,7 +104,7 @@ async def _render_photos(
 
     message = getattr(query, "message", None) if query is not None else None
     has_photo = bool(getattr(message, "photo", None))
-    flipping = bool(query is not None and has_photo)
+    edited_in_place = False
 
     if query is not None and has_photo and path is not None:
         await query.edit_message_media(
@@ -113,15 +115,15 @@ async def _render_photos(
             ),
             reply_markup=response.keyboard,
         )
-        return
-    if query is not None and has_photo and path is None:
+        edited_in_place = True
+    elif query is not None and has_photo and path is None:
         await query.edit_message_caption(
             caption=response.text,
             parse_mode=ParseMode.HTML,
             reply_markup=response.keyboard,
         )
-        return
-    if path is not None:
+        edited_in_place = True
+    elif path is not None:
         with path.open("rb") as handle:
             await bot.send_photo(
                 chat_id=chat_id,
@@ -137,8 +139,12 @@ async def _render_photos(
             parse_mode=ParseMode.HTML,
             reply_markup=response.keyboard,
         )
+
     detail = str(getattr(response, "detail_text", "") or "").strip()
-    if detail and not flipping:
+    # Send sectioned detail when opening 房源详情 (send_detail), or on the first
+    # fresh photo/text delivery. Never re-send while flipping via editMessageMedia.
+    should_send_detail = bool(getattr(response, "send_detail", False)) or not edited_in_place
+    if detail and should_send_detail:
         await bot.send_message(chat_id=chat_id, text=detail, parse_mode=ParseMode.HTML)
 
 

@@ -357,3 +357,97 @@ async def test_expired_listing_or_card_action_shows_visible_alert():
     assert query.calls[0][1] == ("搜索结果已更新，请重新查找。",)
     assert query.calls[0][2] == {"show_alert": True}
     assert context.bot.calls == []
+
+
+
+def test_details_from_photo_card_edits_media_and_sends_detail_bubble(tmp_path):
+    """Opening 📷 房源详情 from a search card must edit media AND send sectioned detail."""
+    import asyncio
+
+    cover = tmp_path / "cover.png"
+    cover.write_bytes(b"COVER")
+    result = CallbackDispatchResult(
+        status="ok",
+        callback=parse_callback("v3u:listing:details:QL-RF-A2B3"),
+        action="details",
+        listing=PublicListingFlowResult(
+            status="ok",
+            action="details",
+            public_listing_id="QL-RF-A2B3",
+            photos=PublicPhotosResponse(
+                media_groups=((str(cover),),),
+                text="富力城 · 2房1厅 · $800/月 · 📸 1/2",
+                photo_path=str(cover),
+                photo_index=0,
+                photo_total=2,
+                detail_text="🏢 金边优质房源出租\n📌基本信息  房源编号：QL-RF-A2B3",
+                action_rows=(
+                    (
+                        SemanticAction(
+                            "📅 预约看房",
+                            "book",
+                            target_public_listing_id="QL-RF-A2B3",
+                        ),
+                    ),
+                ),
+            ),
+            details=PublicDetailsResponse(
+                text="details-fallback",
+                action_rows=(),
+            ),
+        ),
+    )
+    query = FakeQuery("v3u:listing:details:QL-RF-A2B3", has_photo=True)
+    router = RouterStub(result)
+    context = _context()
+
+    outcome = asyncio.run(handle_v3_callback(_update(query), context, router=router))
+    assert outcome.handled and outcome.response is not None
+    assert outcome.response.send_detail is True
+    assert [call[0] for call in query.calls] == ["answer", "edit_media"]
+    assert [call[0] for call in context.bot.calls] == ["send_message"]
+    assert "🏢 金边优质房源出租" in context.bot.calls[0][1]["text"]
+
+
+def test_photo_flip_edits_media_without_resending_detail(tmp_path):
+    import asyncio
+
+    frame = tmp_path / "2.jpg"
+    frame.write_bytes(b"two")
+    result = CallbackDispatchResult(
+        status="ok",
+        callback=parse_callback("v3u:listing:photos:QL-RF-A2B3:1"),
+        action="photos",
+        listing=PublicListingFlowResult(
+            status="ok",
+            action="photos",
+            public_listing_id="QL-RF-A2B3",
+            photos=PublicPhotosResponse(
+                media_groups=((str(frame),),),
+                text="富力城 · 2房1厅 · $800/月 · 📸 2/3",
+                photo_path=str(frame),
+                photo_index=1,
+                photo_total=3,
+                detail_text="🏢 金边优质房源出租",
+                action_rows=(
+                    (
+                        SemanticAction(
+                            "📅 预约看房",
+                            "book",
+                            target_public_listing_id="QL-RF-A2B3",
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    )
+    query = FakeQuery("v3u:listing:photos:QL-RF-A2B3:1", has_photo=True)
+    context = _context()
+
+    outcome = asyncio.run(
+        handle_v3_callback(_update(query), context, router=RouterStub(result))
+    )
+    assert outcome.handled and outcome.response is not None
+    assert outcome.response.send_detail is False
+    assert [call[0] for call in query.calls] == ["answer", "edit_media"]
+    assert context.bot.calls == []
