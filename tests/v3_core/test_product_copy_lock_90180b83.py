@@ -70,7 +70,7 @@ class MemoryPublishedInventory:
 def test_channel_and_sync_keyboards_use_locked_details_label():
     publish = _labels(build_channel_keyboard(dict(ACTIONS), inventory_status="active"))
     sync = _labels(appointment_channel_keyboard(username="qiaolian_rent_bot", public_listing_id="QL-RF-A2B3", status="reserved", advisor_url="https://t.me/advisor"))
-    expected = ["📋 租赁详情", "📅 预约看房"]
+    expected = ["📷 更多详情", "📅 预约看房"]
     assert publish == expected
     assert sync == expected
     assert "🏠 房源详情" not in publish + sync

@@ -108,6 +108,7 @@ def test_search_card_preserves_fixed_sha_copy_and_uses_frozen_cover(tmp_path):
         ["consult"],
         ["change_search"],
     ]
+    assert [item.label for row in card.action_rows for item in row if item.action == "details"] == ["📷 更多详情"]
 
 
 def test_search_card_navigation_wraps_by_public_listing_id():

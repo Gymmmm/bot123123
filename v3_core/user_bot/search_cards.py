@@ -78,7 +78,7 @@ def _card_actions(
     rows.append(
         (
             SemanticAction(
-                "🏠 看房源",
+                "📷 更多详情",
                 "details",
                 target_public_listing_id=current_public_id,
             ),

@@ -69,7 +69,7 @@ def _command(tmp_path):
 def test_bookable_keyboard_contract_is_two_per_row_and_ordered():
     keyboard = build_channel_keyboard(dict(ACTIONS))
     rows = keyboard.inline_keyboard
-    assert [[button.text for button in row] for row in rows] == [["📋 租赁详情"], ["📅 预约看房"]]
+    assert [[button.text for button in row] for row in rows] == [["📷 更多详情"], ["📅 预约看房"]]
     assert rows[0][0].url == ACTIONS["details"]
     assert rows[1][0].url == ACTIONS["book"]
 
