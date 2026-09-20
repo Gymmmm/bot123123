@@ -46,6 +46,11 @@ class PublicListingDetails:
     status_icon: str
     status_label: str
     bookable: bool
+    management_fee: str
+    water_rate: str
+    electric_rate: str
+    building_amenities: str
+    adviser_copy: str
     gallery: tuple[str, ...]
 
     @property
@@ -78,6 +83,23 @@ def _optional_float(value: object) -> float | None:
         return None
 
 
+
+def _canonical_facts(snapshot: dict) -> dict:
+    raw = snapshot.get("canonical_facts")
+    return dict(raw) if isinstance(raw, dict) else {}
+
+
+def _join_amenities(value: object) -> str:
+    if isinstance(value, (list, tuple)):
+        parts = [_visible_text(item) for item in value]
+        return "、".join(part for part in parts if part)
+    return _visible_text(value)
+
+
+def _frozen_adviser_copy(snapshot: dict) -> str:
+    return _visible_text(snapshot.get("adviser_copy"))
+
+
 def build_public_listing_details(view: PublishedListingView) -> PublicListingDetails:
     snapshot = view.snapshot
     if str(snapshot.get("schema") or "") != "v3_publication_snapshot.v1":
@@ -85,6 +107,8 @@ def build_public_listing_details(view: PublishedListingView) -> PublicListingDet
 
     listing = view.frozen_listing
     offer = view.frozen_offer
+    facts = _canonical_facts(snapshot)
+    adviser_copy = _frozen_adviser_copy(snapshot)
     project = _visible_text(listing.get("project_name"))
     property_type = _visible_text(listing.get("property_type"))
     raw_layout = _visible_text(listing.get("layout"))
@@ -113,6 +137,11 @@ def build_public_listing_details(view: PublishedListingView) -> PublicListingDet
         status_icon=status_icon,
         status_label=status_label,
         bookable=view.bookable,
+        management_fee=_visible_text(facts.get("management_fee")),
+        water_rate=_visible_text(facts.get("water_rate")),
+        electric_rate=_visible_text(facts.get("electric_rate")),
+        building_amenities=_join_amenities(facts.get("amenities")),
+        adviser_copy=adviser_copy,
         gallery=view.gallery,
     )
 

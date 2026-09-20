@@ -3,13 +3,21 @@ from __future__ import annotations
 import json
 
 from v3_core.user_bot.listing_responses import (
+    build_detail_caption,
     build_details_response,
     build_photos_response,
 )
 from v3_core.user_bot.public_inventory import PublishedListingView
 
 
-def _view(*, status="active", offer_status="active", gallery=(), canonical_facts=None):
+def _view(
+    *,
+    status="active",
+    offer_status="active",
+    gallery=(),
+    canonical_facts=None,
+    adviser_copy="",
+):
     snapshot = {
         "schema": "v3_publication_snapshot.v1",
         "listing_id": "LST_1",
@@ -18,6 +26,7 @@ def _view(*, status="active", offer_status="active", gallery=(), canonical_facts
         "canonical_record_id": "CAN_1",
         "canonical_facts_hash": "hash-1",
         "canonical_facts": dict(canonical_facts or {}),
+        "adviser_copy": adviser_copy,
         "listing": {
             "project_name": "富力城",
             "property_type": "公寓",
@@ -63,23 +72,56 @@ def _labels(rows):
     return [[item.label for item in row] for row in rows]
 
 
-def test_details_response_omits_adviser_section_without_supported_signal():
+def test_detail_caption_matches_locked_listing_copy_shape():
+    view = _view(
+        canonical_facts={
+            "management_fee": "含物业费",
+            "water_rate": "按表",
+            "electric_rate": "0.25$/度",
+            "amenities": ["泳池", "健身房"],
+            "highlights": ["采光好", "钥匙已备"],
+        },
+        adviser_copy="采光面宽，适合长期住。\n楼下配套成熟。",
+    )
+
+    text = build_detail_caption(view)
+
+    assert text.startswith("━━━━━━━━━━━━━━━\n🏢 金边优质房源出租\n━━━━━━━━━━━━━━━")
+    assert "📌基本信息  房源编号：QL-RF-A2B3" in text
+    assert "・项目区域：富力城 · BKK1" in text
+    assert "・户型格局：2房1厅" in text
+    assert "・楼层类型：19楼" in text
+    assert "・房屋面积：95㎡" in text
+    assert "💰 租金与付款" in text
+    assert "・月租金额：$800 / 月" in text
+    assert "・押付方式：押1付1" in text
+    assert "・起租租期：1年" in text
+    assert "🧾 费用与配套" in text
+    assert "・物业管理：含物业费" in text
+    assert "・水电费用：水 按表 / 电 0.25$/度" in text
+    assert "・大楼配套：泳池、健身房" in text
+    assert "💬 侨联说" in text
+    assert "采光面宽，适合长期住。" in text
+    assert "楼下配套成熟。" in text
+    assert text.strip().endswith("🟢 房源状态：随时可预约看房")
+    assert "钥匙已备" not in text
+
+
+def test_detail_caption_omits_missing_bullets_and_adviser_without_copy():
     view = _view(canonical_facts={"highlights": ["采光好", "钥匙已备"]})
 
     response = build_details_response(view)
+    text = response.text
 
-    assert response.text == (
-        "📋 <b>租赁详情</b>\n"
-        "\n"
-        "🏠 <b>富力城｜2房1厅</b>\n"
-        "💵 <b>$800/月</b>\n"
-        "\n"
-        "📍 BKK1\n"
-        "📐 95㎡｜19楼\n"
-        "🔑 押1付1 · 1年\n"
-        "🟢 房态：当前可预约\n"
-        "🆔 QL-RF-A2B3"
-    )
+    assert "🏢 金边优质房源出租" in text
+    assert "📌基本信息  房源编号：QL-RF-A2B3" in text
+    assert "・月租金额：$800 / 月" in text
+    assert "🧾 费用与配套" not in text
+    assert "物业管理" not in text
+    assert "水电费用" not in text
+    assert "大楼配套" not in text
+    assert "💬 侨联说" not in text
+    assert "🟢 房源状态：随时可预约看房" in text
     assert _actions(response.action_rows) == [["book", "consult"], ["similar"]]
     assert _labels(response.action_rows) == [
         ["📅 预约看房", "💬 问这套房"],
@@ -91,8 +133,8 @@ def test_details_response_uses_live_rented_state_but_keeps_frozen_public_facts()
     view = _view(status="rented", offer_status="inactive")
     response = build_details_response(view)
 
-    assert "💵 <b>$800/月</b>" in response.text
-    assert "🔴 房态：已租出" in response.text
+    assert "・月租金额：$800 / 月" in response.text
+    assert "🔴 房源状态：已租出" in response.text
     assert _actions(response.action_rows) == [["consult"], ["similar"]]
     assert _labels(response.action_rows) == [
         ["💬 问这套房"],
@@ -117,9 +159,12 @@ def test_photos_response_single_flipper_with_detail_caption(tmp_path):
     assert first.photo_index == 0
     assert first.photo_total == 12
     assert first.media_groups == ((files[0],),)
-    assert "📋 <b>租赁详情</b> · 📸 1/12" in first.text
-    assert "富力城｜2房1厅" in first.text
-    assert "$800" in first.text
+    assert "🏢 金边优质房源出租" in first.text
+    assert "📸 1/12" in first.text
+    assert "📋" not in first.text
+    assert "租赁详情" not in first.text
+    assert "富力城 · BKK1" in first.text
+    assert "$800 / 月" in first.text
     assert "QL-RF-A2B3" in first.text
     assert "再看更多" not in first.text
     assert _actions(first.action_rows) == [["photos", "photos"], ["book", "consult"], ["similar"]]
@@ -151,8 +196,9 @@ def test_photos_response_drops_missing_files_and_keeps_detail_fallback(tmp_path)
     assert not response.has_media
     assert response.media_groups == ()
     assert response.photo_path == ""
-    assert "📋 <b>租赁详情</b>" in response.text
-    assert "富力城｜2房1厅" in response.text
+    assert "🏢 金边优质房源出租" in response.text
+    assert "📸 " not in response.text
+    assert "富力城 · BKK1" in response.text
     assert _labels(response.action_rows) == [
         ["📅 预约看房", "💬 问这套房"],
         ["🔍 看相近房源"],
@@ -171,3 +217,4 @@ def test_rented_photos_response_keeps_contact_but_removes_book(tmp_path):
         ["💬 问这套房"],
         ["🔍 看相近房源"],
     ]
+    assert "🔴 房源状态：已租出" in response.text

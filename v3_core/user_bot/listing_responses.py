@@ -156,46 +156,147 @@ def _photo_actions(
     return tuple(rows)
 
 
-def _detail_body_lines(view: PublishedListingView) -> list[str]:
+
+_DETAIL_DIVIDER = "━━━━━━━━━━━━━━━"
+_DETAIL_TITLE = "🏢 金边优质房源出租"
+
+
+def _bullet(label: str, value: object) -> str | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    return f"・{label}：{he(text)}"
+
+
+def _section(title: str, bullets: list[str]) -> list[str]:
+    if not bullets:
+        return []
+    return [title, *bullets]
+
+
+def _utilities_line(*, water: str, electric: str) -> str:
+    parts: list[str] = []
+    if water:
+        parts.append(f"水 {water}")
+    if electric:
+        parts.append(f"电 {electric}")
+    return " / ".join(parts)
+
+
+def _project_area(details) -> str:
+    project = str(details.project_name or "").strip()
+    location = str(details.location or "").strip()
+    if project and location and project != location:
+        return f"{project} · {location}"
+    return project or location
+
+
+def _detail_rent_line(value: int | None) -> str:
+    if value is None or int(value) <= 0:
+        return ""
+    return f"${int(value):,} / 月"
+
+
+def _detail_status_line(details) -> str:
+    if details.bookable:
+        return "🟢 房源状态：随时可预约看房"
+    status = str(details.inventory_status or "").strip().lower()
+    if status in {"rented", "leased"}:
+        return "🔴 房源状态：已租出"
+    if status in {"inactive", "offline"}:
+        return "⚫ 房源状态：已下架"
+    label = str(details.status_label or "").strip() or "待确认"
+    return f"{details.status_icon} 房源状态：{he(label)}"
+
+
+def _adviser_copy_for_view(view: PublishedListingView) -> str:
     details = build_public_listing_details(view)
-    price = _format_price(details.monthly_rent_usd)
-    size = _format_size(details.size_sqm)
+    frozen = str(details.adviser_copy or "").strip()
+    if frozen:
+        return frozen
+    return adviser_notes_for_view(view, max_points=2, allow_empty=True).strip()
+
+
+def build_detail_caption(
+    view: PublishedListingView,
+    *,
+    photo_index: int | None = None,
+    photo_total: int | None = None,
+) -> str:
+    """Canonical merged「📷 更多详情」/ channel-detail caption body."""
+    details = build_public_listing_details(view)
     floor = display_floor(details.floor)
+    size = _format_size(details.size_sqm)
+    rent = _detail_rent_line(details.monthly_rent_usd)
+    utilities = _utilities_line(
+        water=str(details.water_rate or "").strip(),
+        electric=str(details.electric_rate or "").strip(),
+    )
 
-    lines: list[str] = []
-    if details.subject:
-        lines.append(f"🏠 <b>{he(details.subject)}</b>")
-    elif details.location:
-        lines.append(f"🏠 <b>{he(details.location)}</b>")
-    if price:
-        lines.extend([f"💵 <b>{he(price)}</b>", ""])
-    if details.location and details.location != details.project_name:
-        lines.append(f"📍 {he(details.location)}")
-    detail_parts: list[str] = []
-    if size:
-        detail_parts.append(size)
-    if floor:
-        detail_parts.append(floor)
-    if detail_parts:
-        lines.append(f"📐 {'｜'.join(he(item) for item in detail_parts)}")
-    if details.lease_summary:
-        lines.append(f"🔑 {he(details.lease_summary)}")
-    lines.append(f"{details.status_icon} 房态：{he(details.status_label)}")
+    lines: list[str] = [_DETAIL_DIVIDER, _DETAIL_TITLE, _DETAIL_DIVIDER]
+
+    total = int(photo_total or 0)
+    if total > 0 and photo_index is not None:
+        index = max(0, int(photo_index)) % total
+        lines.append(f"📸 {index + 1}/{total}")
+
+    basic_header = "📌基本信息"
     if details.public_listing_id:
-        lines.append(f"🆔 {he(details.public_listing_id)}")
+        basic_header = f"📌基本信息  房源编号：{he(details.public_listing_id)}"
+    basic_bullets = [
+        bullet
+        for bullet in (
+            _bullet("项目区域", _project_area(details)),
+            _bullet("户型格局", details.layout),
+            _bullet("楼层类型", floor),
+            _bullet("房屋面积", size),
+        )
+        if bullet
+    ]
+    if details.public_listing_id or basic_bullets:
+        section = _section(basic_header, basic_bullets)
+        lines.extend(section if section else [basic_header])
 
-    notes = adviser_notes_for_view(view, max_points=2, allow_empty=True).strip()
+    rent_bullets = [
+        bullet
+        for bullet in (
+            _bullet("月租金额", rent),
+            _bullet("押付方式", details.deposit_terms),
+            _bullet("起租租期", details.contract_term),
+        )
+        if bullet
+    ]
+    lines.extend(_section("💰 租金与付款", rent_bullets))
+
+    fee_bullets = [
+        bullet
+        for bullet in (
+            _bullet("物业管理", details.management_fee),
+            _bullet("水电费用", utilities),
+            _bullet("大楼配套", details.building_amenities),
+        )
+        if bullet
+    ]
+    lines.extend(_section("🧾 费用与配套", fee_bullets))
+
+    notes = _adviser_copy_for_view(view)
     if notes:
-        safe_notes = "\n".join("• " + he(line) for line in notes.splitlines() if line.strip())
-        lines.extend(["", "💬 <b>侨联说</b>", safe_notes])
-    return lines
+        safe_notes = "\n".join(he(line) for line in notes.splitlines() if line.strip())
+        lines.extend(["", "💬 侨联说", safe_notes])
+
+    lines.extend(["", _detail_status_line(details)])
+    return "\n".join(lines).strip()
+
+
+def _detail_body_lines(view: PublishedListingView) -> list[str]:
+    """Compatibility wrapper — prefer ``build_detail_caption``."""
+    return build_detail_caption(view).splitlines()
 
 
 def build_details_response(view: PublishedListingView) -> PublicDetailsResponse:
     details = build_public_listing_details(view)
-    lines = ["📋 <b>租赁详情</b>", ""] + _detail_body_lines(view)
     return PublicDetailsResponse(
-        text="\n".join(lines),
+        text=build_detail_caption(view),
         listing_summary=listing_summary_bits(
             project_name=details.project_name,
             layout=details.layout,
@@ -251,19 +352,16 @@ def build_photos_response(
         index = max(0, int(offset or 0)) % total
         current = photos[index]
         groups = ((current,),)
-        header = f"📋 <b>租赁详情</b> · 📸 {index + 1}/{total}"
+        caption = build_detail_caption(view, photo_index=index, photo_total=total)
     else:
         index = 0
         current = ""
         groups = ()
-        header = "📋 <b>租赁详情</b>"
-
-    body = _detail_body_lines(view)
-    text = _clip_caption("\n".join([header, ""] + body))
+        caption = build_detail_caption(view)
 
     return PublicPhotosResponse(
         media_groups=groups,
-        text=text,
+        text=_clip_caption(caption),
         photo_path=current,
         photo_index=index,
         photo_total=total,
@@ -282,11 +380,13 @@ def build_photos_response(
     )
 
 
+
 __all__ = [
     "InternalListingAction",
     "PublicDetailsResponse",
     "PublicPhotosResponse",
     "SemanticAction",
+    "build_detail_caption",
     "build_details_response",
     "build_photos_response",
     "listing_summary_bits",
