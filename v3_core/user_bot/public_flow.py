@@ -55,6 +55,7 @@ class PublicListingFlowService:
         *,
         source: str,
         start_payload: str,
+        photo_offset: int = 0,
     ) -> PublicListingFlowResult:
         clean_source = str(source or "").strip()
         route = decision.route
@@ -100,7 +101,7 @@ class PublicListingFlowService:
                 action="photos",
                 public_listing_id=public_id,
                 source=clean_source,
-                photos=build_photos_response(view),
+                photos=build_photos_response(view, offset=int(photo_offset or 0)),
             )
         if route.action == "book":
             return PublicListingFlowResult(
@@ -137,11 +138,13 @@ class PublicListingFlowService:
         action: object,
         *,
         source: str = "listing_callback",
+        photo_offset: int = 0,
     ) -> PublicListingFlowResult:
         return self._render(
             self.routes.resolve_action(public_listing_id, action),
             source=source,
             start_payload="",
+            photo_offset=int(photo_offset or 0),
         )
 
 

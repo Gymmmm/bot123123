@@ -100,7 +100,17 @@ class CallbackRouter:
             if callback.action not in {"details", "photos", "book"}:
                 return CallbackDispatchResult(status="unsupported", callback=callback, action=callback.action, reason="unsupported_not_wired")
 
-            listing = self.listings.resolve_action(callback.public_listing_id, callback.action, source=clean_source)
+            photo_offset = (
+                int(callback.target_index or 0)
+                if callback.action == "photos" and callback.target_index is not None
+                else 0
+            )
+            listing = self.listings.resolve_action(
+                callback.public_listing_id,
+                callback.action,
+                source=clean_source,
+                photo_offset=photo_offset,
+            )
             if listing.ok:
                 return CallbackDispatchResult(status="ok", callback=callback, action=callback.action, listing=listing)
             if listing.status == "not_found":

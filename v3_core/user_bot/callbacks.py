@@ -40,11 +40,23 @@ def _public_id(value: object) -> str:
     return public_id
 
 
-def encode_listing_callback(action: str, public_listing_id: object) -> str:
+def encode_listing_callback(
+    action: str,
+    public_listing_id: object,
+    *,
+    photo_offset: int | None = None,
+) -> str:
     clean_action = str(action or "").strip().lower()
     if clean_action not in _LISTING_ACTIONS:
         raise ValueError("unsupported_listing_callback_action")
-    return f"{PREFIX}:listing:{clean_action}:{_public_id(public_listing_id)}"
+    base = f"{PREFIX}:listing:{clean_action}:{_public_id(public_listing_id)}"
+    if clean_action == "photos" and photo_offset is not None:
+        offset = int(photo_offset)
+        if offset < 0:
+            raise ValueError("invalid_photo_offset")
+        if offset > 0:
+            return f"{base}:{offset}"
+    return base
 
 
 def encode_card_callback(target_index: int, public_listing_id: object) -> str:
@@ -67,7 +79,14 @@ def encode_semantic_action(action: SemanticAction) -> str:
     if clean == "change_search":
         return encode_change_search_callback()
     if clean in _LISTING_ACTIONS:
-        return encode_listing_callback(clean, action.target_public_listing_id)
+        photo_offset = None
+        if clean == "photos" and action.target_index is not None:
+            photo_offset = int(action.target_index)
+        return encode_listing_callback(
+            clean,
+            action.target_public_listing_id,
+            photo_offset=photo_offset,
+        )
     raise ValueError("unsupported_semantic_action")
 
 
@@ -86,6 +105,22 @@ def parse_callback(value: object) -> UserBotCallback | None:
             kind="listing",
             action=action,
             public_listing_id=public_id,
+        )
+
+    # Progressive gallery: v3u:listing:photos:{public_id}:{offset}
+    if len(parts) == 5 and parts[:2] == [PREFIX, "listing"] and parts[2].strip().lower() == "photos":
+        public_id = normalize_public_id(parts[3])
+        try:
+            offset = int(parts[4])
+        except (TypeError, ValueError):
+            return None
+        if public_id is None or offset < 0:
+            return None
+        return UserBotCallback(
+            kind="listing",
+            action="photos",
+            public_listing_id=public_id,
+            target_index=offset,
         )
 
     if len(parts) == 4 and parts[:2] == [PREFIX, "card"]:

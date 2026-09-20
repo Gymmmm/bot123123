@@ -101,7 +101,7 @@ def test_details_response_uses_live_rented_state_but_keeps_frozen_public_facts()
     ]
 
 
-def test_photos_response_chunks_existing_frozen_gallery_by_ten(tmp_path):
+def test_photos_response_progressive_first_page_then_more_button(tmp_path):
     files = []
     for index in range(12):
         path = tmp_path / f"room-{index}.jpg"
@@ -111,23 +111,37 @@ def test_photos_response_chunks_existing_frozen_gallery_by_ten(tmp_path):
     cover.write_bytes(b"cover")
     gallery = [str(cover), *files, files[0]]
 
-    response = build_photos_response(_view(gallery=gallery))
+    first = build_photos_response(_view(gallery=gallery))
 
-    assert response.has_media
-    assert tuple(len(group) for group in response.media_groups) == (10, 2)
-    flattened = [item for group in response.media_groups for item in group]
-    assert flattened == files
-    assert response.text == "📸 <b>以上是这套房目前保存的现场实拍。</b>"
-    assert "QL-RF-A2B3" not in response.text
-    assert "富力城" not in response.text
-    assert "$800" not in response.text
-    assert "BKK1" not in response.text
-    assert _actions(response.action_rows) == [["book", "consult"], ["details"], ["similar"]]
-    assert _labels(response.action_rows) == [
+    assert first.has_media
+    assert tuple(len(group) for group in first.media_groups) == (4,)
+    assert list(first.media_groups[0]) == files[:4]
+    assert "还可以继续看更多" in first.text
+    assert "QL-RF-A2B3" not in first.text
+    assert "富力城" not in first.text
+    assert "$800" not in first.text
+    assert "BKK1" not in first.text
+    assert _actions(first.action_rows) == [["photos"], ["book", "consult"], ["details"], ["similar"]]
+    assert _labels(first.action_rows) == [
+        ["📸 再看更多实拍"],
         ["📅 预约看房", "💬 问这套房"],
         ["📋 租赁详情"],
         ["🔍 看相近房源"],
     ]
+    more = first.action_rows[0][0]
+    assert more.target_public_listing_id == "QL-RF-A2B3"
+    assert more.target_index == 4
+
+    second = build_photos_response(_view(gallery=gallery), offset=4)
+    assert list(second.media_groups[0]) == files[4:8]
+    assert second.action_rows[0][0].action == "photos"
+    assert second.action_rows[0][0].target_index == 8
+
+    last = build_photos_response(_view(gallery=gallery), offset=8)
+    assert list(last.media_groups[0]) == files[8:12]
+    assert "再看更多实拍" not in _labels(last.action_rows)[0]
+    assert last.text == "📸 <b>这套房源目前的实拍已经全部显示。</b>"
+    assert _actions(last.action_rows) == [["book", "consult"], ["details"], ["similar"]]
 
 
 def test_photos_response_drops_missing_files_and_uses_locked_fallback_text(tmp_path):
