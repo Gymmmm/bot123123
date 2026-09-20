@@ -172,46 +172,44 @@ class V3AppointmentChannelSynchronizer:
             if row is None:
                 return ChannelStatusSyncResult(clean, attempted=False, synced=False, error="published_instance_not_found")
             previous = str(row.get("inventory_status") or "").strip().lower()
-            target = previous
             public_id = str(row.get("public_listing_id") or "").strip()
+            chat_id = str(row.get("channel_chat_id") or "").strip()
+            message_id = int(str(row.get("channel_message_id") or "0"))
+
+            # Refresh durable inventory immediately before Telegram I/O so a
+            # status change after _snapshot() is reflected in the projection.
+            with self._connect() as conn:
+                current_row = conn.execute(
+                    "SELECT inventory_status FROM listings_v3 WHERE listing_id=?",
+                    (clean,),
+                ).fetchone()
+            target = (
+                str(current_row["inventory_status"] or "").strip().lower()
+                if current_row is not None
+                else previous
+            )
             caption = caption_with_appointment_status(
                 str(row.get("post_text") or ""),
                 status=target,
                 active_count=active_count,
                 public_listing_id=public_id,
             )
-            chat_id = str(row.get("channel_chat_id") or "").strip()
-            message_id = int(str(row.get("channel_message_id") or "0"))
+            keyboard = appointment_channel_keyboard(
+                username=self.user_bot_username,
+                public_listing_id=public_id,
+                status=target,
+                advisor_url=self.advisor_url,
+            )
             bot = self.bot_factory(self.publisher_bot_token)
             await bot.edit_message_caption(
                 chat_id=chat_id,
                 message_id=message_id,
                 caption=caption,
                 parse_mode="HTML",
-                reply_markup=appointment_channel_keyboard(
-                    username=self.user_bot_username,
-                    public_listing_id=public_id,
-                    status=target,
-                    advisor_url=self.advisor_url,
-                ),
+                reply_markup=keyboard,
             )
             with self._connect() as conn:
                 conn.execute("BEGIN IMMEDIATE")
-                current_row = conn.execute(
-                    "SELECT inventory_status FROM listings_v3 WHERE listing_id=?",
-                    (clean,),
-                ).fetchone()
-                target = (
-                    str(current_row["inventory_status"] or "").strip().lower()
-                    if current_row is not None
-                    else previous
-                )
-                caption = caption_with_appointment_status(
-                    str(row.get("post_text") or ""),
-                    status=target,
-                    active_count=active_count,
-                    public_listing_id=public_id,
-                )
                 conn.execute(
                     "UPDATE publication_instances SET post_text=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
                     (caption, int(row["publication_row_id"])),
