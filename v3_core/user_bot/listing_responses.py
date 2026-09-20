@@ -398,9 +398,7 @@ def _frozen_cover_path(view: PublishedListingView) -> str:
     style = str(package.get("cover_style") or "").strip()
 
     explicit = _existing_file(package.get("cover_path"))
-    if explicit and _looks_like_rendered_cover(
-        Path(explicit), public_id=public_id, style=style
-    ):
+    if explicit:
         return explicit
 
     candidates: list[str] = []
