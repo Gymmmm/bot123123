@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1600">
+<title>侨联封面 · 极简实拍渐变版</title>
+<style>
+  /* 字体：全 Noto Sans SC（与其它正式封面一致） */
+  @font-face {
+    font-family: "Noto Sans SC";
+    src: local("Noto Sans SC"), local("Noto Sans CJK SC");
+    font-weight: 700;
+    font-display: block;
+  }
+  @font-face {
+    font-family: "Noto Sans SC";
+    src: local("Noto Sans SC"), local("Noto Sans CJK SC");
+    font-weight: 400;
+    font-display: block;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 1600px;
+    height: 1200px;
+    overflow: hidden;
+    background: #111;
+  }
+
+  .poster {
+    position: relative;
+    width: 1600px;
+    height: 1200px;
+    overflow: hidden;
+    font-family: "Noto Sans SC", "Noto Sans CJK SC", sans-serif;
+    color: #fff;
+  }
+
+  .bg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    filter: saturate(1.04) contrast(1.03);
+  }
+
+  /* 底部淡黑渐变：照片为主，不挡房 */
+  .bottomShade {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 42%;
+    background: linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0) 0%,
+      rgba(0, 0, 0, 0.18) 35%,
+      rgba(0, 0, 0, 0.58) 72%,
+      rgba(0, 0, 0, 0.78) 100%
+    );
+    pointer-events: none;
+  }
+
+  /* 左上轻阴影，保证品牌可读 */
+  .topShade {
+    position: absolute;
+    left: 0; top: 0;
+    width: 48%;
+    height: 28%;
+    background: linear-gradient(
+      135deg,
+      rgba(0, 0, 0, 0.42) 0%,
+      rgba(0, 0, 0, 0.12) 55%,
+      rgba(0, 0, 0, 0) 100%
+    );
+    pointer-events: none;
+  }
+
+  .brand {
+    position: absolute;
+    left: 48px;
+    top: 42px;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0,0,0,.55), 0 2px 12px rgba(0,0,0,.35);
+  }
+  .brand .cn {
+    font-weight: 700;
+    font-size: 52px;
+    letter-spacing: 0.06em;
+    line-height: 1;
+  }
+  .brand .en {
+    font-weight: 700;
+    font-size: 16px;
+    opacity: 0.92;
+    margin-top: 10px;
+    letter-spacing: 0.18em;
+  }
+
+  /* 右下信息：标题 + 大价格，直印白字 */
+  .infoBlock {
+    position: absolute;
+    right: 52px;
+    bottom: 56px;
+    max-width: 920px;
+    text-align: right;
+  }
+  .titleLine {
+    font-weight: 700;
+    font-size: 52px;
+    line-height: 1.15;
+    color: rgba(245, 245, 245, 0.94);
+    text-shadow: 0 2px 14px rgba(0,0,0,.45);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .titleLine .sep {
+    opacity: 0.55;
+    margin: 0 10px;
+    font-weight: 400;
+  }
+  .priceLine {
+    margin-top: 10px;
+    font-weight: 700;
+    font-size: 92px;
+    line-height: 1.05;
+    color: rgba(255, 255, 255, 0.98);
+    text-shadow: 0 2px 18px rgba(0,0,0,.5);
+    white-space: nowrap;
+  }
+
+  /* 左下轻量 meta（可空隐藏） */
+  .meta {
+    position: absolute;
+    left: 48px;
+    bottom: 56px;
+    max-width: 560px;
+    font-weight: 400;
+    font-size: 28px;
+    line-height: 1.55;
+    color: rgba(235, 235, 235, 0.88);
+    text-shadow: 0 1px 8px rgba(0,0,0,.4);
+  }
+  .meta .row { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .meta b { font-weight: 700; }
+</style>
+</head>
+<body>
+  <div class="poster" id="poster">
+    <img class="bg" id="bg" src="{{BG_SRC}}" alt="">
+    <div class="topShade"></div>
+    <div class="bottomShade"></div>
+
+    <div class="brand">
+      <div class="cn">侨联地产</div>
+      <div class="en">QIAO LIAN</div>
+    </div>
+
+    <div class="meta">
+      <div class="row" data-field="area">📍 <b id="area">{{AREA}}</b><span id="t3" style="display:none">{{AREA}}</span></div>
+      <div class="row" data-fields="size,floor">
+        <span data-field="size">📐 <b id="size">{{SIZE}}</b><span id="t4" style="display:none">{{SIZE}}</span></span>
+        <span data-field="floor"> ｜ 🏢 <b id="floor">{{FLOOR}}</b><span id="t5" style="display:none">{{FLOOR}}</span></span>
+      </div>
+      <div class="row" data-fields="h1,h2,h3">
+        ✨
+        <span data-field="h1" id="h1">{{H1}}</span><span id="t7" style="display:none">{{H1}}</span>
+        <span data-field="h2"> · <span id="h2">{{H2}}</span></span><span id="t8" style="display:none">{{H2}}</span>
+        <span data-field="h3"> · <span id="h3">{{H3}}</span></span><span id="t9" style="display:none">{{H3}}</span>
+      </div>
+    </div>
+
+    <div class="infoBlock">
+      <div class="titleLine" data-autofit="36">
+        <span id="project" class="title">{{PROJECT}}</span><span id="t1" style="display:none">{{PROJECT}}</span>
+        <span class="layout-part" data-field="layout"><span class="sep">·</span><span id="layout">{{LAYOUT}}</span></span>
+        <span id="t2" style="display:none">{{LAYOUT}}</span>
+      </div>
+      <div class="priceLine" id="price_line" data-autofit="48">{{PRICE_LINE}}</div>
+      <span id="t6" style="display:none">{{PRICE_LINE}}</span>
+    </div>
+  </div>
+</body>
+</html>

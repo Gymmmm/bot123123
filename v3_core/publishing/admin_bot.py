@@ -473,10 +473,13 @@ class PublisherAdminBot:
         return InlineKeyboardMarkup(
             [
                 [
+                    InlineKeyboardButton("极简实拍渐变", callback_data=f"v3b|premium_photo|{review_id}"),
                     InlineKeyboardButton("经典蓝卡", callback_data=f"v3b|classic_blue|{review_id}"),
-                    InlineKeyboardButton("右侧价格牌", callback_data=f"v3b|right_price|{review_id}"),
                 ],
-                [InlineKeyboardButton("黑金高级感", callback_data=f"v3b|black_gold|{review_id}")],
+                [
+                    InlineKeyboardButton("右侧价格牌", callback_data=f"v3b|right_price|{review_id}"),
+                    InlineKeyboardButton("黑金高级感", callback_data=f"v3b|black_gold|{review_id}"),
+                ],
                 [InlineKeyboardButton("⬅️ 封面 / 实拍", callback_data=f"v3media|{review_id}")],
             ]
         )

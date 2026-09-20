@@ -151,9 +151,9 @@ def classify(*, source_type: str, source_name: str, property_type: str,
     """Return stable listing metadata and the launch-default cover.
 
     Launch contract:
-      - ordinary still listings -> classic blue
+      - ordinary still listings -> premium photo (极简实拍渐变)
       - villa / townhouse / monthly rent >= 1200 -> black gold
-      - right-price remains operator-selectable only; it is never auto-routed
+      - right-price / classic-blue remain operator-selectable; not auto-routed
       - video keeps the dedicated vertical template
 
     Property classification never changes just because the visual template does.
@@ -183,7 +183,7 @@ def classify(*, source_type: str, source_name: str, property_type: str,
     # `highlights` and `is_special` remain accepted for compatibility, but they
     # do not silently switch the visual style. Right-price is manual-only.
     _ = (highlights, is_special)
-    cover_template = "black_gold" if (is_villa or is_townhouse or numeric_price >= 1200) else "classic_blue"
+    cover_template = "black_gold" if (is_villa or is_townhouse or numeric_price >= 1200) else "premium_photo"
     return {
         "source_type": normalized_source,
         "listing_type": listing_type,

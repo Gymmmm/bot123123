@@ -157,13 +157,14 @@ def test_homepage_has_exactly_seven_operator_entries():
 
 
 def test_default_cover_style_policy():
-    assert recommended_cover_style("公寓") == "right_price"
-    assert recommended_cover_style("排屋") == "right_price"
+    assert recommended_cover_style("公寓") == "premium_photo"
+    assert recommended_cover_style("排屋") == "premium_photo"
     assert recommended_cover_style("别墅") == "black_gold"
     assert recommended_cover_style("Villa") == "black_gold"
     assert "classic_blue" in FINAL_COVER_STYLES
     assert "right_price" in FINAL_COVER_STYLES
     assert "black_gold" in FINAL_COVER_STYLES
+    assert "premium_photo" in FINAL_COVER_STYLES
     assert "white" not in FINAL_COVER_STYLES
 
 

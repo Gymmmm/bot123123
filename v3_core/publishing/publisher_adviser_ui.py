@@ -353,6 +353,7 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
                 await query.message.reply_text(
                     "选择封面模板：",
                     reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("极简实拍渐变", callback_data="v3smp|manual_style|premium_photo")],
                         [InlineKeyboardButton("右侧价格牌", callback_data="v3smp|manual_style|right_price")],
                         [InlineKeyboardButton("黑金模板", callback_data="v3smp|manual_style|black_gold")],
                         [InlineKeyboardButton("经典蓝卡", callback_data="v3smp|manual_style|classic_blue")],

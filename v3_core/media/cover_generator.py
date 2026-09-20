@@ -115,7 +115,7 @@ def generate_cover(
 ) -> str:
     """Generate one 1200x900 listing cover using Pillow only."""
     style = str(style or "right_price").strip().lower()
-    if style not in {"classic_blue", "right_price", "black_gold"}:
+    if style not in {"classic_blue", "right_price", "black_gold", "premium_photo"}:
         style = "right_price"
     source = Path(source_image).expanduser().resolve()
     output = Path(output_path).expanduser().resolve()
@@ -179,6 +179,38 @@ def generate_cover(
         draw.rounded_rectangle(card, radius=28, fill=(14,14,14,225), outline=gold, width=3)
         draw.text((805, 704), price_label, fill=(219,194,142), font=_font(26, bold=True))
         draw.text((805, 752), price, fill=gold, font=_font(50, bold=True))
+    elif style == "premium_photo":
+        # Photo-first: soft bottom gradient + white type (matches HTML 13_ template).
+        shade = Image.new("RGBA", (target_width, target_height), (0, 0, 0, 0))
+        sd = ImageDraw.Draw(shade)
+        band = int(target_height * 0.42)
+        for y in range(band):
+            progress = y / max(1, band - 1)
+            alpha = int(200 * (progress ** 1.6))
+            sd.line([(0, target_height - band + y), (target_width, target_height - band + y)], fill=(0, 0, 0, alpha))
+        for y in range(int(target_height * 0.22)):
+            progress = 1 - (y / max(1, int(target_height * 0.22) - 1))
+            alpha = int(90 * (progress ** 1.4))
+            sd.line([(0, y), (int(target_width * 0.55), y)], fill=(0, 0, 0, alpha))
+        canvas = Image.alpha_composite(bg, shade)
+        draw = ImageDraw.Draw(canvas)
+        draw.text((48, 40), "侨联地产", fill="white", font=_font(44, bold=True))
+        draw.text((50, 94), "QIAO LIAN", fill=(230, 230, 230), font=_font(16, bold=True))
+        meta_bits = [p for p in (location, str(data.size or "").strip(), str(data.floor or "").strip()) if p]
+        if meta_bits:
+            draw.text((48, target_height - 150), "  ·  ".join(meta_bits), fill=(235, 235, 235), font=_font(24))
+        highlights = " · ".join(
+            part for part in (str(data.highlight_1 or "").strip(), str(data.highlight_2 or "").strip(), str(data.highlight_3 or "").strip()) if part
+        )
+        if highlights:
+            draw.text((48, target_height - 110), highlights, fill=(235, 235, 235), font=_font(22))
+        right_title = title if not tag else f"{title} · {tag}"
+        title_font = _font(40, bold=True)
+        price_font = _font(64, bold=True)
+        tb = title_font.getbbox(right_title)
+        pb = price_font.getbbox(price)
+        draw.text((target_width - 52 - (tb[2] - tb[0]), target_height - 150), right_title, fill=(245, 245, 245), font=title_font)
+        draw.text((target_width - 52 - (pb[2] - pb[0]), target_height - 100), price, fill="white", font=price_font)
     else:
         mask = Image.new("RGBA", (target_width, target_height), (0, 0, 0, 0))
         mask_draw = ImageDraw.Draw(mask)
