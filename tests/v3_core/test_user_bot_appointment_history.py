@@ -131,8 +131,8 @@ def test_history_shows_only_two_upcoming_and_counts_terminal_or_past_rows(tmp_pa
 
     assert [item.appointment_id for item in view.items] == [1, 2]
     assert view.history_count == 2
-    assert "当前状态：🟡 待顾问确认" in view.text
-    assert "看房方式：实时视频看房" in view.text
+    assert "🟡 待顾问确认" in view.text
+    assert "实时视频看房" in view.text
     assert PUBLIC_ID in view.text
     assert "LST_PRIVATE_1" not in view.text
 

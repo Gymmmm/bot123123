@@ -29,11 +29,11 @@ def test_home_is_final_minimal_surface():
 def test_contact_handoff_and_appointment_history_navigation_are_plain_text():
     contact = build_contact_view(advisor_url="https://t.me/advisor")
     markup = build_home_keyboard(contact)
-    assert contact.rows[0][0].label == "打开中文顾问"
+    assert contact.rows[0][0].label == "中文顾问"
     assert markup.inline_keyboard[0][0].url.startswith("https://t.me/advisor?text=")
     assert _callbacks(markup) == ["v3u:home:search", "v3u:t:home"]
 
     history = AppointmentHistoryView(text="<b>我的预约</b>", items=(), history_count=0)
     appointment = build_appointment_history_home_view(history)
     labels = [b.text for row in build_home_keyboard(appointment).inline_keyboard for b in row]
-    assert labels == ["联系中文顾问", "开始找房", "回首页"]
+    assert labels == ["中文顾问", "开始找房", "返回首页"]

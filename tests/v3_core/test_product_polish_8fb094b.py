@@ -152,7 +152,7 @@ def test_no_match_page_has_existing_contact_flow_action():
     )
     view = build_search_no_match_view(intent)
     choices = [choice for row in view.rows for choice in row]
-    contact = next(choice for choice in choices if choice.label == "💬 中文顾问")
+    contact = next(choice for choice in choices if choice.label == "中文顾问")
     assert contact.kind == "home"
     assert contact.value == "contact"
 

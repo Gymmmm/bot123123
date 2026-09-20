@@ -102,10 +102,10 @@ def polish_listing_keyboard(
         rows.append([InlineKeyboardButton("返回房源", callback_data=back_search)])
         existing_labels.add("返回房源")
     clean_channel = str(channel_url or "").strip()
-    if add_channel and clean_channel and not back_search and "回频道看房源" not in existing_labels:
-        rows.append([InlineKeyboardButton("回频道看房源", url=clean_channel)])
-    if add_home and not back_search and not add_channel and "回首页" not in existing_labels:
-        rows.append([InlineKeyboardButton("回首页", callback_data=_HOME_CALLBACK)])
+    if add_channel and clean_channel and not back_search and "返回频道" not in existing_labels:
+        rows.append([InlineKeyboardButton("返回频道", url=clean_channel)])
+    if add_home and not back_search and not add_channel and "返回首页" not in existing_labels:
+        rows.append([InlineKeyboardButton("返回首页", callback_data=_HOME_CALLBACK)])
     return InlineKeyboardMarkup(rows) if rows else None
 
 

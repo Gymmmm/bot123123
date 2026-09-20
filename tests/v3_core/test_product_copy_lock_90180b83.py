@@ -90,9 +90,9 @@ def test_home_contact_and_no_match_use_final_advisor_label():
     no_match = [choice.label for row in build_search_no_match_view(intent).rows for choice in row]
     assert "中文顾问" in home
     assert "中文顾问" in contact
-    assert "💬 中文顾问" in no_match
-    assert "💬 联系我们" not in home + contact + no_match
-    assert "💬 顾问帮我找" not in home + contact + no_match
+    assert "中文顾问" in no_match
+    assert "联系我们" not in home + contact + no_match
+    assert "顾问帮我找" not in home + contact + no_match
 
 
 def test_unbookable_book_payload_keeps_details_instead_of_dead_link():

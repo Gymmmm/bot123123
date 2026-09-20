@@ -49,7 +49,7 @@ def test_service_hub_is_public_and_does_not_require_binding():
     labels = _labels(view)
     assert labels == [
         "我的租约", "入住管家", "安心租房", "周边生活",
-        "中文顾问", "回首页",
+        "中文顾问", "返回首页",
     ]
     callbacks = _callbacks(view)
     assert callbacks == [
@@ -65,7 +65,7 @@ def test_rental_service_is_public_parent_content_center():
     assert "租到房，不代表服务就结束了" in view.text
     assert "入住时" in view.text
     assert "房屋、表计、家具家电拍照留档" in view.text
-    assert _labels(view) == ["📋 入住交接留档", "🔍 开始找房", "💬 中文顾问", "⬅️ 回首页"]
+    assert _labels(view) == ["入住交接留档", "开始找房", "中文顾问", "返回首页"]
     assert _callbacks(view) == [
         "v3u:assure:handover", "v3u:home:search", "v3u:home:contact", "v3u:t:home",
     ]

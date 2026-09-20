@@ -20,9 +20,9 @@ class HomeView:
     rows: tuple[tuple[HomeChoice, ...], ...]
 
 WELCOME_TEXT = (
-    "<b>侨联地产｜金边中文租房服务</b>\n\n"
-    "在金边找房，可以直接说区域、预算和户型。\n"
-    "看中房源可以预约看房；租到房以后，住房方面有事也可以继续找侨联。"
+    "<b>侨联地产｜金边中文租房</b>\n\n"
+    "按区域、预算、户型找房；看中后可直接预约看房。\n"
+    "入住后的租约、报修和物业事项，也可以继续找侨联。"
 )
 ABOUT_TEXT = (
     "<b>安心租房</b>\n\n"
@@ -51,18 +51,18 @@ def build_home_view(*, channel_url: str = "", advisor_url: str = "") -> HomeView
     return HomeView("home",WELCOME_TEXT,tuple(rows))
 
 def build_about_view(*, advisor_url: str = "") -> HomeView:
-    return HomeView("about",ABOUT_TEXT,((HomeChoice("开始找房","search"),HomeChoice("中文顾问","contact")),(HomeChoice("回首页","root"),)))
+    return HomeView("about",ABOUT_TEXT,((HomeChoice("开始找房","search"),HomeChoice("中文顾问","contact")),(HomeChoice("返回首页","root"),)))
 
 def build_booking_view(*, advisor_url: str = "") -> HomeView:
-    return HomeView("book",BOOK_TEXT,((HomeChoice("开始找房","search"),HomeChoice("我的预约","appointments")),(HomeChoice("中文顾问","contact"),),(HomeChoice("回首页","root"),)))
+    return HomeView("book",BOOK_TEXT,((HomeChoice("开始找房","search"),HomeChoice("我的预约","appointments")),(HomeChoice("中文顾问","contact"),),(HomeChoice("返回首页","root"),)))
 
 def build_contact_view(*, advisor_url: str = "") -> HomeView:
     advisor=advisor_handoff_url(advisor_url)
-    first=HomeChoice("打开中文顾问","contact",url=advisor) if advisor else HomeChoice("中文顾问","contact")
-    return HomeView("contact",CONTACT_TEXT,((first,),(HomeChoice("开始找房","search"),),(HomeChoice("回首页","root"),)))
+    first=HomeChoice("中文顾问","contact",url=advisor) if advisor else HomeChoice("中文顾问","contact")
+    return HomeView("contact",CONTACT_TEXT,((first,),(HomeChoice("开始找房","search"),),(HomeChoice("返回首页","root"),)))
 
 def build_appointment_history_home_view(history: AppointmentHistoryView) -> HomeView:
     find_label="开始找房" if history.history_count == 0 and not history.items else "继续找房"
-    return HomeView("appointments",history.text,((HomeChoice("联系中文顾问","contact"),HomeChoice(find_label,"search")),(HomeChoice("回首页","root"),)))
+    return HomeView("appointments",history.text,((HomeChoice("中文顾问","contact"),HomeChoice(find_label,"search")),(HomeChoice("返回首页","root"),)))
 
 __all__=["ABOUT_TEXT","BOOK_TEXT","CONTACT_TEXT","HomeChoice","HomeChoiceKind","HomeView","WELCOME_TEXT","build_about_view","build_appointment_history_home_view","build_booking_view","build_contact_view","build_home_view"]

@@ -56,8 +56,8 @@ def test_search_entry_is_final_direct_filter_panel():
     service=TransitionViewService(InventoryStub(None))
     plan=TransitionPlan(kind="change_search",next_step="search_entry",effects=("render_search_entry",),change_search=ChangeSearchTransition())
     view=service.build(plan)
-    assert _labels(view)==["选择区域","选择预算","选择户型","不知道怎么选？问顾问","我的预约","回首页"]
-    assert "BKK1 两房 800 美金以内" in view.text
+    assert _labels(view)==["选择区域","选择预算","选择户型","中文顾问","返回首页"]
+    assert "BKK1 两房，预算 $800" in view.text
 
 def test_similar_returns_to_same_search_panel():
     service=TransitionViewService(InventoryStub(None))

@@ -99,13 +99,17 @@ def _details_actions(*,bookable:bool,public_listing_id:str,has_gallery:bool)->tu
     rows.append((SemanticAction("咨询这套","consult",target),))
     return tuple(rows)
 
-def _photo_actions(*,bookable:bool,public_listing_id:str)->tuple[tuple[SemanticAction,...],...]:
+def _photo_actions(*,bookable:bool,public_listing_id:str,has_media:bool)->tuple[tuple[SemanticAction,...],...]:
     target=str(public_listing_id or "").strip()
-    row=[]
-    if bookable:
-        row.append(SemanticAction("预约看房","book",target))
-    row.append(SemanticAction("咨询这套","consult",target))
-    return (tuple(row),)
+    rows=[]
+    if has_media:
+        row=[]
+        if bookable:
+            row.append(SemanticAction("预约看房","book",target))
+        row.append(SemanticAction("咨询这套","consult",target))
+        rows.append(tuple(row))
+    rows.append((SemanticAction("返回房源详情","details",target),))
+    return tuple(rows)
 
 def build_details_response(view:PublishedListingView)->PublicDetailsResponse:
     details=build_public_listing_details(view)
@@ -154,7 +158,7 @@ def build_photos_response(view:PublishedListingView)->PublicPhotosResponse:
         media_groups=_media_groups(photos),
         text=text,
         listing_summary=listing_summary_bits(project_name=details.project_name,layout=details.layout,monthly_rent_usd=details.monthly_rent_usd,location=details.location),
-        action_rows=_photo_actions(bookable=details.bookable,public_listing_id=details.public_listing_id) if photos else (),
+        action_rows=_photo_actions(bookable=details.bookable,public_listing_id=details.public_listing_id,has_media=bool(photos)),
     )
 
 __all__=["InternalListingAction","PublicDetailsResponse","PublicPhotosResponse","SemanticAction","build_details_response","build_photos_response","listing_summary_bits"]

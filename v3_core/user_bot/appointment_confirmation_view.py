@@ -29,7 +29,13 @@ def build_appointment_confirmation_view(draft: PublicAppointmentDraft, inventory
     details=build_public_listing_details(published)
     subject=details.subject or details.location or "这套房"
     mode="视频代看" if draft.mode=="video" else "实地看房"
-    lines=["<b>确认预约信息</b>","",f"<b>{he(subject)}</b>",mode,f"{he(_date_display(draft.date))} · {he(_time_display(draft.time))}","",he(draft.public_listing_id)]
+    lines=[
+        "<b>确认预约</b>","",
+        f"<b>{he(subject)}</b>",
+        f"{he(mode)} · {he(_date_display(draft.date))} · {he(_time_display(draft.time))}",
+        "",
+        he(draft.public_listing_id),
+    ]
     return TransitionView(
         kind="appointment_confirmation",
         text="\n".join(lines),

@@ -189,15 +189,13 @@ def service_home_view() -> ServiceView:
         kind="service_home",
         text=(
             "<b>侨联服务</b>\n\n"
-            "租房不只是找房和签约。入住后的房屋与物业事项、租约查看、"
-            "交接留档以及周边生活，都可以从这里继续找侨联。\n\n"
-            "请选择您需要了解或处理的服务事项。"
+            "租约、入住后的房屋与物业事项，以及周边生活，都可以从这里处理或咨询。"
         ),
         rows=(
             (ServiceChoice("我的租约", "v3u:service:tenant_lease"), ServiceChoice("入住管家", "v3u:service:concierge")),
             (ServiceChoice("安心租房", "v3u:home:rental"), ServiceChoice("周边生活", "v3u:service:local")),
             (ServiceChoice("中文顾问", "v3u:home:contact"),),
-            (ServiceChoice("回首页", "v3u:t:home"),),
+            (ServiceChoice("返回首页", "v3u:t:home"),),
         ),
     )
 
@@ -207,8 +205,7 @@ def concierge_home_view() -> ServiceView:
         kind="concierge_home",
         text=(
             "<b>入住管家</b>\n\n"
-            "住进去以后，报修、物业、水电网络这些日常事务难免会碰到。\n\n"
-            "把情况从这里告知侨联，Bot 先帮您整理好信息，需要继续处理时再交给中文顾问对接。"
+            "报修、物业、水电、搬家、保洁、网络等住房事项，可以从这里提交或转给中文顾问。"
         ),
         rows=(
             (ServiceChoice("房屋报修", "v3u:service:repair"), ServiceChoice("物业协调", "v3u:service:property")),

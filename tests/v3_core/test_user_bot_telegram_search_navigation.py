@@ -151,7 +151,7 @@ async def test_area_choice_renders_budget_with_canonical_location_after_edit():
 
     assert outcome.handled and outcome.result is not None
     assert outcome.result.navigation == "search_budget"
-    assert "已选：BKK1" in query.calls[-1][1][0]
+    assert "已选区域：BKK1" in query.calls[-1][1][0]
     assert user_data[SEARCH_PREF_SESSION_KEY]["location_keys"] == ["BKK1"]
     assert user_data[SEARCH_PREF_SESSION_KEY]["area_display"] == "BKK1（市中心）"
     callbacks = _callbacks(query)
@@ -283,6 +283,5 @@ async def test_retired_current_available_redirects_to_search_entry_without_searc
         "v3u:t:search_budget",
         "v3u:t:search_layout",
         "v3u:home:contact",
-        "v3u:home:appointments",
         "v3u:t:home",
     ]

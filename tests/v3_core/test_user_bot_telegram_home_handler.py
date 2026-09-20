@@ -79,7 +79,7 @@ async def test_search_home_creates_independent_search_panel_then_sets_session():
     callbacks=[b.callback_data for row in message.calls[0][2]["reply_markup"].inline_keyboard for b in row]
     assert callbacks==[
         "v3u:t:search_area","v3u:t:search_budget","v3u:t:search_layout",
-        "v3u:home:contact","v3u:home:appointments","v3u:t:home",
+        "v3u:home:contact","v3u:t:home",
     ]
     assert context.user_data[AWAITING_KEYWORD_SESSION_KEY]=={"source":"user_search"}
     assert context.user_data[SEARCH_PREF_SESSION_KEY]["source"]=="user_search"
@@ -106,7 +106,7 @@ async def test_appointments_create_independent_surface():
     assert [c[0] for c in query.calls]==["answer"]
     assert "QL-RF-A2B3" in message.calls[-1][1]
     labels=[b.text for row in message.calls[-1][2]["reply_markup"].inline_keyboard for b in row]
-    assert labels==["联系中文顾问","开始找房","回首页"]
+    assert labels==["中文顾问","开始找房","返回首页"]
 
 
 @pytest.mark.asyncio
@@ -117,7 +117,7 @@ async def test_service_home_creates_independent_surface():
     assert outcome.handled and outcome.rendered
     assert "侨联服务" in message.calls[-1][1]
     labels=[b.text for row in message.calls[-1][2]["reply_markup"].inline_keyboard for b in row]
-    assert labels==["我的租约","入住管家","安心租房","周边生活","中文顾问","回首页"]
+    assert labels==["我的租约","入住管家","安心租房","周边生活","中文顾问","返回首页"]
 
 
 @pytest.mark.asyncio

@@ -120,8 +120,7 @@ def _appointment_date_view(draft: PublicAppointmentDraft, inventory: PublicInven
         kind="appointment_date",
         text=(
             "<b>选择看房日期</b>\n\n"
-            f"{he(subject)}\n"
-            "请选择方便看房的日期。"
+            f"{he(subject)}"
         ),
         rows=(
             (TransitionChoice(f"今天 ({today.month}月{today.day}日)", "appointment_date", today_value),),
@@ -141,8 +140,7 @@ def _appointment_time_view(draft: PublicAppointmentDraft, inventory: PublicInven
         kind="appointment_time",
         text=(
             "<b>选择看房时间</b>\n\n"
-            f"已选日期：{he(_date_display(draft.date))}\n"
-            "请选择方便的时间段。"
+            f"已选：{he(_date_display(draft.date))}"
         ),
         rows=(
             (TransitionChoice("上午 09:00–12:00", "appointment_time", "am"),),
@@ -184,7 +182,7 @@ def budget_bounds(code: object) -> tuple[str, int | None, int | None]:
 
 def _search_budget_view(area_display: str = "", *, back_label: str = "⬅️ 返回找房") -> TransitionView:
     clean_area = str(area_display or "").strip()
-    area_line = f"\n已选：{he(clean_area)}" if clean_area else ""
+    area_line = f"\n已选区域：{he(clean_area)}" if clean_area else ""
     choices = tuple(
         TransitionChoice(label, "budget_choice", code, budget_min=budget_min, budget_max=budget_max)
         for code, label, budget_min, budget_max in _BUDGET_OPTIONS
@@ -196,7 +194,7 @@ def _search_budget_view(area_display: str = "", *, back_label: str = "⬅️ 返
         (TransitionChoice("自己输入", "budget_custom"),),
         (TransitionChoice("返回找房", "change_search"),),
     )
-    return TransitionView(kind="search_budget", text=f"<b>选择预算</b>\n\n单位：美元 / 月{area_line}", rows=rows)
+    return TransitionView(kind="search_budget", text=f"<b>选择预算</b>{area_line}\n\n美元 / 月", rows=rows)
 
 
 def _search_area_view() -> TransitionView:
@@ -212,12 +210,12 @@ def _search_area_view() -> TransitionView:
         (TransitionChoice("其他位置", "area_other"),),
         (TransitionChoice("返回找房", "change_search"),),
     )
-    return TransitionView(kind="search_area", text="<b>选择区域</b>\n\n请选择大概的找房区域。", rows=rows)
+    return TransitionView(kind="search_area", text="<b>选择区域</b>\n\n请选择找房区域。", rows=rows)
 
 
 def _search_layout_view(area_display: str = "", budget_label: str = "") -> TransitionView:
     choices = tuple(TransitionChoice(label, "layout_choice", code) for code, label in LAYOUT_OPTIONS)
-    selected = "｜".join(
+    selected = " · ".join(
         value for value in (str(area_display or "").strip(), str(budget_label or "").strip()) if value
     )
     selected_line = f"\n\n已选：{he(selected)}" if selected else ""
@@ -238,11 +236,8 @@ def _similar_view(plan: TransitionPlan) -> TransitionView:
 
 _SEARCH_ENTRY_TEXT = (
     "<b>开始找房</b>\n\n"
-    "请输入您的找房需求，例如：\n\n"
-    "<b>BKK1 两房 800 美金以内</b>\n"
-    "<b>钻石岛一房</b>\n"
-    "<b>500 美金以内单间</b>\n\n"
-    "也可以直接选择条件筛选房源。"
+    "直接发需求，例如：<b>BKK1 两房，预算 $800</b>\n"
+    "也可以按条件筛选。"
 )
 
 
@@ -250,9 +245,8 @@ def _search_entry_view() -> TransitionView:
     rows = (
         (TransitionChoice("选择区域", "search_area"), TransitionChoice("选择预算", "search_budget")),
         (TransitionChoice("选择户型", "search_layout"),),
-        (TransitionChoice("不知道怎么选？问顾问", "home", "contact"),),
-        (TransitionChoice("我的预约", "home", "appointments"),),
-        (TransitionChoice("回首页", "home"),),
+        (TransitionChoice("中文顾问", "home", "contact"),),
+        (TransitionChoice("返回首页", "home"),),
     )
     return TransitionView(kind="search_entry", text=_SEARCH_ENTRY_TEXT, rows=rows)
 

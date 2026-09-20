@@ -200,7 +200,7 @@ def test_public_service_home_matches_frozen_product():
     assert "<b>侨联服务</b>" in view.text
     assert labels == [
         "我的租约", "入住管家", "安心租房", "周边生活",
-        "中文顾问", "回首页",
+        "中文顾问", "返回首页",
     ]
     assert callbacks == [
         "v3u:service:tenant_lease", "v3u:service:concierge",

@@ -162,9 +162,8 @@ def _lines(item: AppointmentHistoryItem) -> list[str]:
     mode = APPOINTMENT_MODE_LABELS.get(item.viewing_mode, item.viewing_mode or "待确认")
     return [
         f"<b>{he(item.subject)}</b>",
-        f"看房时间：{he(_date_compact(item.appointment_date))} · {he(_time_compact(item.appointment_time))}",
-        f"看房方式：{he(mode)}",
-        f"当前状态：{status_icon} {he(status_label)}",
+        f"{he(_date_compact(item.appointment_date))} · {he(_time_compact(item.appointment_time))} · {he(mode)}",
+        f"{status_icon} {he(status_label)}",
         he(item.public_listing_id),
     ]
 

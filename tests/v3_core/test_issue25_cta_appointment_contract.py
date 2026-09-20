@@ -137,7 +137,7 @@ def test_details_and_photos_contract_has_real_fields_three_entries_and_no_intern
 
     photos = build_photos_response(view)
     photo_labels = _labels(photos.action_rows)
-    assert photo_labels == []
+    assert photo_labels == ["返回房源详情"]
     assert "LST_INTERNAL_1" not in photos.text
 
 
@@ -155,7 +155,7 @@ def test_contact_entries_have_real_callbacks_when_external_config_is_missing():
         touch_payload={},
     )
     no_match = build_search_no_match_view(intent)
-    contact = next(choice for row in no_match.rows for choice in row if choice.label == "💬 中文顾问")
+    contact = next(choice for row in no_match.rows for choice in row if choice.label == "中文顾问")
     assert contact.kind == "home" and contact.value == "contact"
 
 

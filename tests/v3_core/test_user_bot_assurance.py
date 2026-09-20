@@ -60,10 +60,10 @@ def test_rental_service_home_is_public_content_center_with_final_labels():
     ]
     labels = [choice.label for row in view.rows for choice in row]
     assert labels == [
-        "📋 入住交接留档",
-        "🔍 开始找房",
-        "💬 中文顾问",
-        "⬅️ 回首页",
+        "入住交接留档",
+        "开始找房",
+        "中文顾问",
+        "返回首页",
     ]
     assert "租到房，不代表服务就结束了" in view.text
     assert "入住时" in view.text

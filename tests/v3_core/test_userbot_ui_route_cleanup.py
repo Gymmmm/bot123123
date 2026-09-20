@@ -91,7 +91,7 @@ def test_property_advisor_view_keeps_public_ql_context(monkeypatch):
     view = build_listing_contact_view(intent, _Inventory(), advisor_url="https://t.me/advisor")
     assert "QL-RF-A2B3" in view.text
     assert "l_" not in view.text.lower()
-    assert "问这套房" in view.text
+    assert "咨询这套" in view.text
 
 
 @pytest.mark.asyncio
@@ -103,16 +103,16 @@ async def test_property_advisor_buttons_are_only_handoff_and_return():
     await _render_contact(query, text="QL-RF-A2B3", public_listing_id="QL-RF-A2B3", advisor_url="https://t.me/advisor")
     labels = [button.text for row in query.markup.inline_keyboard for button in row]
     callbacks = [button.callback_data for row in query.markup.inline_keyboard for button in row if button.callback_data]
-    assert labels == ["💬 打开中文顾问", "⬅️ 返回这套房"]
+    assert labels == ["中文顾问", "返回房源详情"]
     assert callbacks == ["v3u:listing:details:QL-RF-A2B3"]
-    assert all(term not in labels for term in ("📅 预约看房", "📸 更多实拍", "🔍 继续找房"))
+    assert all(term not in labels for term in ("预约看房", "更多实拍", "继续找房"))
 
 
 def test_aftercare_and_public_resident_buttons_stay_frozen():
-    assert _labels(build_assurance_home_view()) == ["📋 入住交接留档", "🔍 开始找房", "💬 中文顾问", "⬅️ 回首页"]
+    assert _labels(build_assurance_home_view()) == ["入住交接留档", "开始找房", "中文顾问", "返回首页"]
     expected = [
         "我的租约", "入住管家", "安心租房", "周边生活",
-        "中文顾问", "回首页",
+        "中文顾问", "返回首页",
     ]
     assert _labels(service_home_view()) == expected
     class Service:
@@ -136,10 +136,10 @@ def test_search_card_order_and_public_identity(monkeypatch):
 def test_public_service_buttons_use_generic_chinese_advisor_name():
     for view in (property_view(), repair_home_view(), nearby_view()):
         labels = _labels(view)
-        assert "💬 联系顾问" not in labels
+        assert "联系顾问" not in labels
         assert all("联系我们" not in label for label in labels)
         if any("顾问" in label for label in labels):
-            assert "💬 中文顾问" in labels
+            assert "中文顾问" in labels
 
 
 def test_legacy_reply_button_texts_have_explicit_frozen_destinations():

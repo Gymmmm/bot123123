@@ -77,7 +77,7 @@ async def test_custom_area_reply_renders_budget_then_advances_canonical_pref():
     assert user_data[SEARCH_PREF_SESSION_KEY]["area_display"] == "BKK1"
     rendered = message.calls[-1][1][0]
     assert "选择预算" in rendered
-    assert "已选：BKK1" in rendered
+    assert "已选区域：BKK1" in rendered
     markup = message.calls[-1][2]["reply_markup"]
     callbacks = [button.callback_data for row in markup.inline_keyboard for button in row]
     assert "v3u:t:budget_choice:b2" in callbacks

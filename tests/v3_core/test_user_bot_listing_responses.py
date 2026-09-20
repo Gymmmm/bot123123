@@ -65,12 +65,12 @@ def test_gallery_deduplicates_cover_and_splits_without_one_item_album(tmp_path):
     assert [x for g in response.media_groups for x in g] == files[1:]
     assert "更多实拍" in response.text
     assert "QL-RF-A2B3" not in response.text
-    assert _labels(response.action_rows) == [["预约看房", "咨询这套"]]
+    assert _labels(response.action_rows) == [["预约看房", "咨询这套"], ["返回房源详情"]]
 
 
 def test_gallery_missing_media_has_no_fake_actions(tmp_path):
     missing=tmp_path/"missing.jpg"
     response=build_photos_response(_view(gallery=[str(missing)]))
     assert response.media_groups == ()
-    assert response.action_rows == ()
+    assert _labels(response.action_rows) == [["返回房源详情"]]
     assert "暂无更多实拍图片" in response.text

@@ -14,17 +14,17 @@ def _labels(view):
 def test_home_matches_final_service_surface():
     view = build_home_view(channel_url="https://t.me/example")
     assert _labels(view) == ["开始找房", "最新房源", "中文顾问", "侨联服务"]
-    assert "金边中文租房服务" in view.text
+    assert "金边中文租房" in view.text
     assert all(icon not in repr(view.rows) for icon in ("🔍", "📅", "💬", "🛠", "🛡"))
 
 
 def test_search_entry_is_direct_filter_panel():
     view = TransitionViewService.search_entry()
     assert "开始找房" in view.text
-    assert "BKK1 两房 800 美金以内" in view.text
+    assert "BKK1 两房，预算 $800" in view.text
     assert _labels(view) == [
         "选择区域", "选择预算", "选择户型",
-        "不知道怎么选？问顾问", "我的预约", "回首页",
+        "中文顾问", "返回首页",
     ]
 
 
@@ -39,7 +39,7 @@ def test_listing_surface_source_contains_final_first_layer_actions():
 def test_service_hubs_match_final_layouts():
     assert _labels(service_home_view()) == [
         "我的租约", "入住管家", "安心租房", "周边生活",
-        "中文顾问", "回首页",
+        "中文顾问", "返回首页",
     ]
     assert _labels(concierge_home_view()) == [
         "房屋报修", "物业协调", "水电缴费协助", "搬家协助",

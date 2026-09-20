@@ -28,7 +28,7 @@ def _public_rows() -> tuple[tuple[ServiceChoice, ...], ...]:
     return (
         (ServiceChoice("中文顾问", "v3u:home:contact"),),
         (ServiceChoice("侨联服务", "v3u:home:service"), ServiceChoice("开始找房", "v3u:home:search")),
-        (ServiceChoice("回首页", "v3u:t:home"),),
+        (ServiceChoice("返回首页", "v3u:t:home"),),
     )
 
 
@@ -111,7 +111,7 @@ def guide_view(service: TenantService, user_id: int) -> ServiceView:
     return ServiceView(
         "tenant_guide_updated",
         "<b>侨联服务</b>\n\n请从侨联服务查看入住之后可以继续使用的服务。",
-        ((ServiceChoice("侨联服务", "v3u:home:service"),), (ServiceChoice("回首页", "v3u:t:home"),)),
+        ((ServiceChoice("侨联服务", "v3u:home:service"),), (ServiceChoice("返回首页", "v3u:t:home"),)),
     )
 
 
