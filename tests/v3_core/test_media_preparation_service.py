@@ -73,7 +73,7 @@ def test_media_preparation_scrubs_to_derived_files_before_selection(tmp_path):
     assert all(prepared_dir in Path(path).parents for path in prepared.gallery_paths)
     assert all(Path(path).parent.name == "gallery" for path in prepared.gallery_paths)
     assert all(Path(path).name.endswith("_gallery.jpg") for path in prepared.gallery_paths)
-    assert prepared.source_identity["gallery_brand_revision"] == "qiaolian_gallery_logo_v3_cover_match_20260920"
+    assert prepared.source_identity["gallery_brand_revision"] == "qiaolian_gallery_logo_v4_three_style_20260920"
     assert all(str(Path(path).resolve()) not in prepared.gallery_paths for path in paths)
     assert [_sha(path) for path in paths] == before
 
@@ -114,20 +114,27 @@ def test_scrub_over_eight_percent_falls_back_to_untouched_derived_copy(tmp_path,
     assert [_sha(path) for path in paths] == before
 
 
-def test_resolve_gallery_logo_path_maps_black_gold_separately():
+def test_resolve_gallery_logo_path_maps_three_cover_styles():
     from v3_core.media.photo_formatter import (
         BLACK_GOLD_LOGO,
+        CLASSIC_BLUE_LOGO,
         RIGHT_PRICE_LOGO,
         resolve_gallery_logo_path,
     )
 
     right = resolve_gallery_logo_path(None)
+    classic = resolve_gallery_logo_path("classic_blue")
     gold = resolve_gallery_logo_path("black_gold")
     alias = resolve_gallery_logo_path("villa_premium")
     assert right == RIGHT_PRICE_LOGO
+    assert classic == CLASSIC_BLUE_LOGO
     assert gold == BLACK_GOLD_LOGO
     assert alias == BLACK_GOLD_LOGO
+    assert classic != right
     assert gold != right
+    assert CLASSIC_BLUE_LOGO.is_file()
+    assert RIGHT_PRICE_LOGO.is_file()
+    assert BLACK_GOLD_LOGO.is_file()
 
 
 def test_prepare_black_gold_uses_style_keyed_gallery_filenames(tmp_path):
@@ -139,3 +146,14 @@ def test_prepare_black_gold_uses_style_keyed_gallery_filenames(tmp_path):
 
     assert prepared.source_identity["gallery_cover_style"] == "black_gold"
     assert all("black_gold_" in Path(path).name for path in prepared.gallery_paths)
+
+
+def test_prepare_classic_blue_uses_style_keyed_gallery_filenames(tmp_path):
+    db, source_id, paths = _source(tmp_path, "blue")
+    prepared_dir = tmp_path / "prepared-blue"
+    prepared = MediaPreparationService(
+        SourceReader(str(db)), prepared_dir=prepared_dir
+    ).prepare(source_post_id=source_id, cover_style="classic_blue")
+
+    assert prepared.source_identity["gallery_cover_style"] == "classic_blue"
+    assert all("classic_blue_" in Path(path).name for path in prepared.gallery_paths)

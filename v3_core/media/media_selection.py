@@ -30,9 +30,10 @@ def select_publication_media(
     """Return one cover source plus a source-ordered usable gallery.
 
     Exact and near duplicates keep the first source occurrence. Severe rejects
-    are removed from the gallery. A manually selected cover is honoured only
-    when it survives those safety gates; otherwise the best ranked usable photo
-    is selected automatically.
+    are removed from the gallery. Cover auto-pick prefers living / kitchen /
+    exterior frames and soft-penalizes watermark/contact-heavy or toilet-like
+    shots (see ``ranker.rank_photo_paths``). A manually selected cover is
+    honoured only when it survives safety gates.
     """
     source_paths: list[Path] = []
     for raw in paths:
@@ -102,7 +103,7 @@ def select_publication_media(
         "ranking": ranking,
         "source_count": len(source_paths),
         "usable_count": len(gallery),
-        "policy": "source_order_after_dedup_and_severe_reject",
+        "policy": "source_order_after_dedup_severe_reject_cover_prefer_living_kitchen_exterior",
     }
 
 
