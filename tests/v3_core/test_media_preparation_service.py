@@ -73,7 +73,7 @@ def test_media_preparation_scrubs_to_derived_files_before_selection(tmp_path):
     assert all(prepared_dir in Path(path).parents for path in prepared.gallery_paths)
     assert all(Path(path).parent.name == "gallery" for path in prepared.gallery_paths)
     assert all(Path(path).name.endswith("_gallery.jpg") for path in prepared.gallery_paths)
-    assert prepared.source_identity["gallery_brand_revision"] == "qiaolian_gallery_logo_v2_cover_match"
+    assert prepared.source_identity["gallery_brand_revision"] == "qiaolian_gallery_logo_v3_cover_match_20260920"
     assert all(str(Path(path).resolve()) not in prepared.gallery_paths for path in paths)
     assert [_sha(path) for path in paths] == before
 

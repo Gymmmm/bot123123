@@ -23,7 +23,7 @@ from .source_scrub import scrub_file
 
 MAX_SCRUB_COVERAGE = 0.08
 SCRUB_REVISION = "source_scrub_v1"
-GALLERY_BRAND_REVISION = "qiaolian_gallery_logo_v2_cover_match"
+GALLERY_BRAND_REVISION = "qiaolian_gallery_logo_v3_cover_match_20260920"
 
 
 @dataclass(frozen=True)
