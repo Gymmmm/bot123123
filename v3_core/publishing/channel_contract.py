@@ -19,7 +19,8 @@ CHANNEL_CTA_LABELS = {
     "photos": "📸 更多实拍",
     "book": "📅 预约看房",
     "consult": "💬 咨询顾问",
-    "more": "🔍 更多房源",
+    "find": "🔍 智能找房",
+    "more": "🏠 更多房源",
 }
 
 _ACTION_SUFFIX = {
@@ -112,10 +113,9 @@ def official_channel_action_urls(
 def official_channel_cta_keys(inventory_status: object = "active") -> tuple[str, ...]:
     status = str(inventory_status or "").strip().lower()
     if inventory_status_bookable(status):
-        return ("details", "book")
-    if status in {"rented", "inactive", "offline"}:
-        return ("details", "more", "consult")
-    return ("details", "consult")
+        return ("details", "book", "consult")
+    # pending / rented / offline / inactive: no listing-details CTA
+    return ("consult", "find", "more")
 
 
 def official_channel_button_spec(
@@ -127,30 +127,28 @@ def official_channel_button_spec(
     verified = official_channel_action_identity(actions)
     status = str(inventory_status or "").strip().lower()
     has_consult = "consult" in verified
-    # One primary entry (details deeplink opens merged detail+photo flipper).
+    # Bookable: details (merged flipper) + book + consult.
     # photos URL stays in the package for backward-compat deeplinks.
     if inventory_status_bookable(status):
-        return ((
-            (CHANNEL_CTA_LABELS["details"], verified["details"]),
-        ), (
-            (CHANNEL_CTA_LABELS["book"], verified["book"]),
-        ))
-    if status in {"rented", "inactive", "offline"}:
-        details = urlparse(verified["details"])
-        more_url = f"https://t.me/{details.path.strip('/')}?start=latest"
-        row = [
-            (CHANNEL_CTA_LABELS["details"], verified["details"]),
-            (CHANNEL_CTA_LABELS["more"], more_url),
+        rows: list[tuple[tuple[str, str], ...]] = [
+            ((CHANNEL_CTA_LABELS["details"], verified["details"]),),
+            ((CHANNEL_CTA_LABELS["book"], verified["book"]),),
         ]
         if has_consult:
-            row.append((CHANNEL_CTA_LABELS["consult"], verified["consult"]))
-        return tuple(tuple(row[i:i + 2]) for i in range(0, len(row), 2))
+            rows.append(((CHANNEL_CTA_LABELS["consult"], verified["consult"]),))
+        return tuple(rows)
 
-    row = [
-        (CHANNEL_CTA_LABELS["details"], verified["details"]),
-    ]
+    # Non-bookable pending/rented/offline/inactive: NO details CTA.
+    # find_home starts guided search; latest keeps more-listings pattern.
+    details = urlparse(verified["details"])
+    bot = details.path.strip("/")
+    find_url = f"https://t.me/{bot}?start=find_home"
+    more_url = f"https://t.me/{bot}?start=latest"
+    row: list[tuple[str, str]] = []
     if has_consult:
         row.append((CHANNEL_CTA_LABELS["consult"], verified["consult"]))
+    row.append((CHANNEL_CTA_LABELS["find"], find_url))
+    row.append((CHANNEL_CTA_LABELS["more"], more_url))
     return tuple(tuple(row[i:i + 2]) for i in range(0, len(row), 2))
 
 
