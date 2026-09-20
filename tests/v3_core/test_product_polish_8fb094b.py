@@ -52,9 +52,12 @@ def _button_labels(markup):
 def test_channel_keyboard_booking_follows_inventory_status(status, has_book):
     labels = _button_labels(build_channel_keyboard(dict(ACTIONS), inventory_status=status))
     assert ("📅 预约看房" in labels) is has_book
-    assert "📷 更多详情" in labels
+    assert ("📷 更多详情" in labels) is has_book
     assert "📸 更多实拍" not in labels
-    assert ("🔍 更多房源" in labels) is (status in {"rented", "inactive", "offline"})
+    assert ("🏠 更多房源" in labels) is (not has_book)
+    assert ("🔍 智能找房" in labels) is (not has_book)
+    assert "💬 咨询顾问" in labels
+    assert "🔍 更多房源" not in labels
 
 
 def test_channel_reserved_status_uses_locked_user_visible_semantics():
