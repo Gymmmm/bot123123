@@ -282,3 +282,67 @@ def test_build_detail_caption_alias_matches_sectioned_body():
     text = build_detail_caption(_view())
     assert "🏢 金边优质房源出租" in text
     assert "QL-RF-A2B3" in text
+
+
+def _with_package(view, **changes):
+    package = dict(view.package)
+    package.update(changes)
+    return PublishedListingView(
+        listing=view.listing,
+        offer=view.offer,
+        publication=view.publication,
+        package=package,
+    )
+
+
+def test_cover_fallback_never_crosses_public_listing_ids(tmp_path):
+    media = tmp_path / "media"
+    covers = media / "covers_v3"
+    gallery_dir = media / "prepared_v3" / "1" / "gallery"
+    covers.mkdir(parents=True)
+    gallery_dir.mkdir(parents=True)
+    wrong = covers / "QL-RF-B9C8_classic_blue.png"
+    wrong.write_bytes(b"WRONG")
+    gallery = gallery_dir / "room.jpg"
+    gallery.write_bytes(b"ROOM")
+    view = _with_package(
+        _view(gallery=[str(gallery)]),
+        cover_path=str(tmp_path / "stale.png"),
+        cover_style="classic_blue",
+    )
+    response = build_photos_response(view)
+    assert response.photo_path == str(gallery.resolve())
+    assert str(wrong.resolve()) not in response.media_groups[0]
+
+
+def test_stale_cover_path_recovers_current_listing_exact_rendered_cover(tmp_path):
+    public_id = "QL-RF-A2B3"
+    media = tmp_path / "media"
+    covers = media / "covers_v3"
+    gallery_dir = media / "prepared_v3" / "1" / "gallery"
+    covers.mkdir(parents=True)
+    gallery_dir.mkdir(parents=True)
+    rendered = covers / f"{public_id}_classic_blue.png"
+    rendered.write_bytes(b"RIGHT")
+    (covers / "QL-RF-B9C8_classic_blue.png").write_bytes(b"WRONG")
+    room = gallery_dir / "room.jpg"
+    room.write_bytes(b"ROOM")
+    view = _with_package(
+        _view(gallery=[str(room)]),
+        cover_path=str(tmp_path / "stale.png"),
+        cover_style="classic_blue",
+    )
+    response = build_photos_response(view)
+    assert response.photo_path == str(rendered.resolve())
+
+
+def test_no_rendered_cover_falls_back_only_to_current_listing_gallery(tmp_path):
+    gallery = tmp_path / "current-room.jpg"
+    gallery.write_bytes(b"ROOM")
+    view = _with_package(
+        _view(gallery=[str(gallery)]),
+        cover_path=str(tmp_path / "missing.png"),
+        cover_style="classic_blue",
+    )
+    response = build_photos_response(view)
+    assert response.photo_path == str(gallery.resolve())
