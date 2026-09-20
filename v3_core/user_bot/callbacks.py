@@ -107,7 +107,7 @@ def parse_callback(value: object) -> UserBotCallback | None:
             public_listing_id=public_id,
         )
 
-    # Progressive gallery: v3u:listing:photos:{public_id}:{offset}
+    # Photo flipper index: v3u:listing:photos:{public_id}:{index}
     if len(parts) == 5 and parts[:2] == [PREFIX, "listing"] and parts[2].strip().lower() == "photos":
         public_id = normalize_public_id(parts[3])
         try:

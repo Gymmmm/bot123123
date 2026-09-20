@@ -1,9 +1,7 @@
 """Telegram-neutral public listing responses for the V3 User Bot.
 
-The renderer preserves the locked production details/photos presentation while
-consuming only a durably published V3 view. Telegram adapters later translate
-semantic actions/media groups into framework objects; they do not re-decide
-business state.
+Merged listing view: one entry opens detail copy + a single photo flipper
+(上一张 / 下一张), never a multi-photo media-group dump.
 """
 from __future__ import annotations
 
@@ -48,14 +46,19 @@ class PublicDetailsResponse:
 
 @dataclass(frozen=True)
 class PublicPhotosResponse:
+    """Single-photo flipper payload (detail caption + one current frame)."""
+
     media_groups: tuple[tuple[str, ...], ...]
     text: str
     action_rows: tuple[tuple[SemanticAction, ...], ...]
     listing_summary: str = ""
+    photo_path: str = ""
+    photo_index: int = 0
+    photo_total: int = 0
 
     @property
     def has_media(self) -> bool:
-        return bool(self.media_groups)
+        return bool(self.photo_path) or bool(self.media_groups)
 
 
 def _format_price(value: int | None) -> str:
@@ -94,6 +97,7 @@ def _details_actions(
     bookable: bool,
     public_listing_id: str,
 ) -> tuple[tuple[SemanticAction, ...], ...]:
+    """Text-only fallback actions (no separate 更多实拍 — merged into primary CTA)."""
     target = str(public_listing_id or "").strip()
     if bookable:
         return (
@@ -101,38 +105,41 @@ def _details_actions(
                 SemanticAction("📅 预约看房", "book", target),
                 SemanticAction("💬 问这套房", "consult", target),
             ),
-            (SemanticAction("📸 更多实拍", "photos", target),),
             (SemanticAction("🔍 看相近房源", "similar", target),),
         )
     return (
-        (
-            SemanticAction("📸 更多实拍", "photos", target),
-            SemanticAction("💬 问这套房", "consult", target),
-        ),
+        (SemanticAction("💬 问这套房", "consult", target),),
         (SemanticAction("🔍 看相近房源", "similar", target),),
     )
-
-
-# Progressive gallery: first page ~4 photos, then 「再看更多实拍」 for the rest.
-PHOTO_PAGE_SIZE = 4
 
 
 def _photo_actions(
     *,
     bookable: bool,
     public_listing_id: str,
-    next_offset: int | None = None,
+    photo_index: int = 0,
+    photo_total: int = 0,
 ) -> tuple[tuple[SemanticAction, ...], ...]:
     target = str(public_listing_id or "").strip()
     rows: list[tuple[SemanticAction, ...]] = []
-    if next_offset is not None and next_offset >= 0:
+    total = max(0, int(photo_total or 0))
+    index = max(0, int(photo_index or 0))
+    if total > 1:
+        prev_index = (index - 1) % total
+        next_index = (index + 1) % total
         rows.append(
             (
                 SemanticAction(
-                    "📸 再看更多实拍",
+                    "⬅️ 上一张",
                     "photos",
                     target,
-                    target_index=int(next_offset),
+                    target_index=prev_index,
+                ),
+                SemanticAction(
+                    "下一张 ➡️",
+                    "photos",
+                    target,
+                    target_index=next_index,
                 ),
             )
         )
@@ -143,25 +150,19 @@ def _photo_actions(
                 SemanticAction("💬 问这套房", "consult", target),
             )
         )
-        rows.append((SemanticAction("📋 租赁详情", "details", target),))
     else:
-        rows.append(
-            (
-                SemanticAction("📋 租赁详情", "details", target),
-                SemanticAction("💬 问这套房", "consult", target),
-            )
-        )
+        rows.append((SemanticAction("💬 问这套房", "consult", target),))
     rows.append((SemanticAction("🔍 看相近房源", "similar", target),))
     return tuple(rows)
 
 
-def build_details_response(view: PublishedListingView) -> PublicDetailsResponse:
+def _detail_body_lines(view: PublishedListingView) -> list[str]:
     details = build_public_listing_details(view)
     price = _format_price(details.monthly_rent_usd)
     size = _format_size(details.size_sqm)
     floor = display_floor(details.floor)
 
-    lines = ["📋 <b>租赁详情</b>", ""]
+    lines: list[str] = []
     if details.subject:
         lines.append(f"🏠 <b>{he(details.subject)}</b>")
     elif details.location:
@@ -187,7 +188,12 @@ def build_details_response(view: PublishedListingView) -> PublicDetailsResponse:
     if notes:
         safe_notes = "\n".join("• " + he(line) for line in notes.splitlines() if line.strip())
         lines.extend(["", "💬 <b>侨联说</b>", safe_notes])
+    return lines
 
+
+def build_details_response(view: PublishedListingView) -> PublicDetailsResponse:
+    details = build_public_listing_details(view)
+    lines = ["📋 <b>租赁详情</b>", ""] + _detail_body_lines(view)
     return PublicDetailsResponse(
         text="\n".join(lines),
         listing_summary=listing_summary_bits(
@@ -219,41 +225,48 @@ def _existing_gallery(paths: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(output)
 
 
+def _clip_caption(text: str, limit: int = 1024) -> str:
+    clean = str(text or "").strip()
+    if len(clean) <= limit:
+        return clean
+    return clean[: max(0, limit - 1)].rstrip() + "…"
+
+
 def build_photos_response(
     view: PublishedListingView,
     *,
     offset: int = 0,
-    page_size: int = PHOTO_PAGE_SIZE,
+    page_size: int | None = None,
 ) -> PublicPhotosResponse:
-    """Return one progressive gallery page for the same listing.
+    """Merged detail + one-photo flipper (上一张 / 下一张).
 
-    First open (offset=0) shows up to ``page_size`` photos. Remaining frames are
-    revealed on demand via 「再看更多实拍」 (same public_listing_id + next offset).
-    Channel deeplink and detail CTA share this path — never blast the full album.
+    ``offset`` is the 0-based photo index. ``page_size`` is ignored (kept for
+    call-site compatibility after dropping progressive multi-photo pages).
     """
+    del page_size  # progressive multi-photo pages removed
     details = build_public_listing_details(view)
     photos = _existing_gallery(details.gallery)
-    start = max(0, int(offset or 0))
-    size = max(1, int(page_size or PHOTO_PAGE_SIZE))
-    page = photos[start : start + size]
-    remaining = len(photos) - (start + len(page))
-    next_offset = (start + len(page)) if remaining > 0 and page else None
-
-    if page:
-        groups = (tuple(page),)
-        if next_offset is not None:
-            text = "📸 <b>以上是这套房的现场实拍。</b>\n还可以继续看更多。"
-        elif start > 0:
-            text = "📸 <b>这套房源目前的实拍已经全部显示。</b>"
-        else:
-            text = "📸 <b>以上是这套房目前保存的现场实拍。</b>"
+    total = len(photos)
+    if total:
+        index = max(0, int(offset or 0)) % total
+        current = photos[index]
+        groups = ((current,),)
+        header = f"📋 <b>租赁详情</b> · 📸 {index + 1}/{total}"
     else:
+        index = 0
+        current = ""
         groups = ()
-        text = "📸 <b>这套房源目前的实拍已经全部显示。</b>"
+        header = "📋 <b>租赁详情</b>"
+
+    body = _detail_body_lines(view)
+    text = _clip_caption("\n".join([header, ""] + body))
 
     return PublicPhotosResponse(
         media_groups=groups,
         text=text,
+        photo_path=current,
+        photo_index=index,
+        photo_total=total,
         listing_summary=listing_summary_bits(
             project_name=details.project_name,
             layout=details.layout,
@@ -263,13 +276,13 @@ def build_photos_response(
         action_rows=_photo_actions(
             bookable=details.bookable,
             public_listing_id=details.public_listing_id,
-            next_offset=next_offset,
+            photo_index=index,
+            photo_total=total,
         ),
     )
 
 
 __all__ = [
-    "PHOTO_PAGE_SIZE",
     "InternalListingAction",
     "PublicDetailsResponse",
     "PublicPhotosResponse",

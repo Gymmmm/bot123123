@@ -70,7 +70,7 @@ class MemoryPublishedInventory:
 def test_channel_and_sync_keyboards_use_locked_details_label():
     publish = _labels(build_channel_keyboard(dict(ACTIONS), inventory_status="active"))
     sync = _labels(appointment_channel_keyboard(username="qiaolian_rent_bot", public_listing_id="QL-RF-A2B3", status="reserved", advisor_url="https://t.me/advisor"))
-    expected = ["📋 租赁详情", "📸 更多实拍", "📅 预约看房"]
+    expected = ["📋 租赁详情", "📅 预约看房"]
     assert publish == expected
     assert sync == expected
     assert "🏠 房源详情" not in publish + sync
@@ -103,8 +103,7 @@ def test_unbookable_book_payload_keeps_details_instead_of_dead_link():
     assert result.book is None
     assert result.details is not None
     assert "🏠 <b>富力城｜1房</b>" in result.details.text
-    assert result.details.action_rows[0][0].label == "📸 更多实拍"
-    assert result.details.action_rows[0][1].label == "💬 问这套房"
+    assert result.details.action_rows[0][0].label == "💬 问这套房"
 
 
 class _FakeMessage:
@@ -140,4 +139,4 @@ async def test_start_handler_renders_chinese_unbookable_copy_then_details():
     assert message.texts[0] == "这套房暂时不能预约。可以继续看相近房源，或让顾问帮您确认其他选择。"
     assert "🏠 <b>富力城｜1房</b>" in message.texts[1]
     actions = [button.text for row in message.markups[1].inline_keyboard for button in row]
-    assert actions == ["📸 更多实拍", "💬 问这套房", "🔍 看相近房源", "🏠 返回首页"]
+    assert actions == ["💬 问这套房", "🔍 看相近房源", "🏠 返回首页"]

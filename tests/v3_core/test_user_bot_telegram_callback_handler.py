@@ -160,12 +160,9 @@ async def test_details_from_search_session_offer_one_tap_return_to_same_card():
 
 
 @pytest.mark.asyncio
-async def test_photos_send_frozen_media_then_action_message(tmp_path):
+async def test_photos_send_single_frame_with_caption_not_media_group(tmp_path):
     one = tmp_path / "1.jpg"
-    two = tmp_path / "2.jpg"
-    three = tmp_path / "3.jpg"
-    for path in (one, two, three):
-        path.write_bytes(path.name.encode())
+    one.write_bytes(b"one")
     result = CallbackDispatchResult(
         status="ok",
         action="photos",
@@ -174,14 +171,24 @@ async def test_photos_send_frozen_media_then_action_message(tmp_path):
             action="photos",
             public_listing_id="QL-RF-A2B3",
             photos=PublicPhotosResponse(
-                media_groups=((str(one),), (str(two), str(three))),
+                media_groups=((str(one),),),
                 text="photos",
+                photo_path=str(one),
+                photo_index=0,
+                photo_total=3,
                 action_rows=(
                     (
                         SemanticAction(
-                            "🏠 房源详情",
-                            "details",
+                            "⬅️ 上一张",
+                            "photos",
                             target_public_listing_id="QL-RF-A2B3",
+                            target_index=2,
+                        ),
+                        SemanticAction(
+                            "下一张 ➡️",
+                            "photos",
+                            target_public_listing_id="QL-RF-A2B3",
+                            target_index=1,
                         ),
                     ),
                 ),
@@ -196,12 +203,52 @@ async def test_photos_send_frozen_media_then_action_message(tmp_path):
 
     assert outcome.handled and outcome.response is not None
     assert outcome.response.kind == "photos"
-    assert [call[0] for call in context.bot.calls] == [
-        "send_photo",
-        "send_media_group",
-        "send_message",
-    ]
+    assert [call[0] for call in context.bot.calls] == ["send_photo"]
+    assert context.bot.calls[0][1]["caption"] == "photos"
     assert [call[0] for call in query.calls] == ["answer"]
+
+
+@pytest.mark.asyncio
+async def test_photos_flip_edits_media_in_place(tmp_path):
+    one = tmp_path / "1.jpg"
+    two = tmp_path / "2.jpg"
+    one.write_bytes(b"one")
+    two.write_bytes(b"two")
+    result = CallbackDispatchResult(
+        status="ok",
+        action="photos",
+        listing=PublicListingFlowResult(
+            status="ok",
+            action="photos",
+            public_listing_id="QL-RF-A2B3",
+            photos=PublicPhotosResponse(
+                media_groups=((str(two),),),
+                text="📸 2/2",
+                photo_path=str(two),
+                photo_index=1,
+                photo_total=2,
+                action_rows=(
+                    (
+                        SemanticAction(
+                            "⬅️ 上一张",
+                            "photos",
+                            target_public_listing_id="QL-RF-A2B3",
+                            target_index=0,
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    )
+    query = FakeQuery("v3u:listing:photos:QL-RF-A2B3:1", has_photo=True)
+    router = RouterStub(result)
+    context = _context()
+
+    outcome = await handle_v3_callback(_update(query), context, router=router)
+
+    assert outcome.handled
+    assert [call[0] for call in query.calls] == ["answer", "edit_media"]
+    assert context.bot.calls == []
 
 
 @pytest.mark.asyncio

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 
 from .appointment_history import AppointmentHistoryService
@@ -127,20 +127,31 @@ async def _render_photos(
     if result.photos is None:
         raise ValueError("start_photos_result_missing_response")
     chat_id = _chat_id(update)
-    for group in result.photos.media_groups:
-        if len(group) == 1:
-            with Path(group[0]).open("rb") as handle:
-                await context.bot.send_photo(chat_id=chat_id, photo=handle)
-            continue
-        media = [InputMediaPhoto(media=Path(raw).read_bytes()) for raw in group]
-        await context.bot.send_media_group(chat_id=chat_id, media=media)
+    photos = result.photos
+    keyboard = _listing_keyboard(
+        photos, advisor_url=advisor_url, channel_url=channel_url
+    )
+    photo_path = str(getattr(photos, "photo_path", "") or "").strip()
+    if not photo_path and photos.media_groups:
+        first = photos.media_groups[0]
+        if first:
+            photo_path = str(first[0] or "").strip()
+    path = Path(photo_path) if photo_path else None
+    if path is not None and path.is_file():
+        with path.open("rb") as handle:
+            await context.bot.send_photo(
+                chat_id=chat_id,
+                photo=handle,
+                caption=photos.text,
+                parse_mode=ParseMode.HTML,
+                reply_markup=keyboard,
+            )
+        return
     await context.bot.send_message(
         chat_id=chat_id,
-        text=result.photos.text,
+        text=photos.text,
         parse_mode=ParseMode.HTML,
-        reply_markup=_listing_keyboard(
-            result.photos, advisor_url=advisor_url, channel_url=channel_url
-        ),
+        reply_markup=keyboard,
     )
 
 
@@ -342,12 +353,22 @@ async def handle_v3_start(
         )
         return TelegramStartOutcome(handled=True, kind="invalid_link", payload=payload, result=result if isinstance(result, PublicListingFlowResult) else None)
 
-    if result.action == "details":
-        await _render_details(
-            message, result, advisor_url=advisor_url, channel_url=channel_url
-        )
-        return TelegramStartOutcome(True, "details", payload, result)
-    if result.action == "photos":
+    if result.action in {"details", "photos"}:
+        # Prefer merged photo+detail flipper when a frame exists.
+        if getattr(result, "photos", None) is not None and result.photos.has_media:
+            await _render_photos(
+                update,
+                context,
+                result,
+                advisor_url=advisor_url,
+                channel_url=channel_url,
+            )
+            return TelegramStartOutcome(True, result.action, payload, result)
+        if result.action == "details":
+            await _render_details(
+                message, result, advisor_url=advisor_url, channel_url=channel_url
+            )
+            return TelegramStartOutcome(True, "details", payload, result)
         await _render_photos(
             update,
             context,

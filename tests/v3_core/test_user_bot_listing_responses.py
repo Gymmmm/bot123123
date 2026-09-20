@@ -80,10 +80,9 @@ def test_details_response_omits_adviser_section_without_supported_signal():
         "🟢 房态：当前可预约\n"
         "🆔 QL-RF-A2B3"
     )
-    assert _actions(response.action_rows) == [["book", "consult"], ["photos"], ["similar"]]
+    assert _actions(response.action_rows) == [["book", "consult"], ["similar"]]
     assert _labels(response.action_rows) == [
         ["📅 预约看房", "💬 问这套房"],
-        ["📸 更多实拍"],
         ["🔍 看相近房源"],
     ]
 
@@ -94,14 +93,14 @@ def test_details_response_uses_live_rented_state_but_keeps_frozen_public_facts()
 
     assert "💵 <b>$800/月</b>" in response.text
     assert "🔴 房态：已租出" in response.text
-    assert _actions(response.action_rows) == [["photos", "consult"], ["similar"]]
+    assert _actions(response.action_rows) == [["consult"], ["similar"]]
     assert _labels(response.action_rows) == [
-        ["📸 更多实拍", "💬 问这套房"],
+        ["💬 问这套房"],
         ["🔍 看相近房源"],
     ]
 
 
-def test_photos_response_progressive_first_page_then_more_button(tmp_path):
+def test_photos_response_single_flipper_with_detail_caption(tmp_path):
     files = []
     for index in range(12):
         path = tmp_path / f"room-{index}.jpg"
@@ -114,59 +113,61 @@ def test_photos_response_progressive_first_page_then_more_button(tmp_path):
     first = build_photos_response(_view(gallery=gallery))
 
     assert first.has_media
-    assert tuple(len(group) for group in first.media_groups) == (4,)
-    assert list(first.media_groups[0]) == files[:4]
-    assert "还可以继续看更多" in first.text
-    assert "QL-RF-A2B3" not in first.text
-    assert "富力城" not in first.text
-    assert "$800" not in first.text
-    assert "BKK1" not in first.text
-    assert _actions(first.action_rows) == [["photos"], ["book", "consult"], ["details"], ["similar"]]
+    assert first.photo_path == files[0]
+    assert first.photo_index == 0
+    assert first.photo_total == 12
+    assert first.media_groups == ((files[0],),)
+    assert "📋 <b>租赁详情</b> · 📸 1/12" in first.text
+    assert "富力城｜2房1厅" in first.text
+    assert "$800" in first.text
+    assert "QL-RF-A2B3" in first.text
+    assert "再看更多" not in first.text
+    assert _actions(first.action_rows) == [["photos", "photos"], ["book", "consult"], ["similar"]]
     assert _labels(first.action_rows) == [
-        ["📸 再看更多实拍"],
+        ["⬅️ 上一张", "下一张 ➡️"],
         ["📅 预约看房", "💬 问这套房"],
-        ["📋 租赁详情"],
         ["🔍 看相近房源"],
     ]
-    more = first.action_rows[0][0]
-    assert more.target_public_listing_id == "QL-RF-A2B3"
-    assert more.target_index == 4
+    prev_btn, next_btn = first.action_rows[0]
+    assert prev_btn.target_index == 11
+    assert next_btn.target_index == 1
 
-    second = build_photos_response(_view(gallery=gallery), offset=4)
-    assert list(second.media_groups[0]) == files[4:8]
-    assert second.action_rows[0][0].action == "photos"
-    assert second.action_rows[0][0].target_index == 8
+    second = build_photos_response(_view(gallery=gallery), offset=1)
+    assert second.photo_path == files[1]
+    assert "📸 2/12" in second.text
+    assert second.action_rows[0][0].target_index == 0
+    assert second.action_rows[0][1].target_index == 2
 
-    last = build_photos_response(_view(gallery=gallery), offset=8)
-    assert list(last.media_groups[0]) == files[8:12]
-    assert "再看更多实拍" not in _labels(last.action_rows)[0]
-    assert last.text == "📸 <b>这套房源目前的实拍已经全部显示。</b>"
-    assert _actions(last.action_rows) == [["book", "consult"], ["details"], ["similar"]]
+    last = build_photos_response(_view(gallery=gallery), offset=11)
+    assert last.photo_path == files[11]
+    assert "📸 12/12" in last.text
+    assert last.action_rows[0][1].target_index == 0
 
 
-def test_photos_response_drops_missing_files_and_uses_locked_fallback_text(tmp_path):
+def test_photos_response_drops_missing_files_and_keeps_detail_fallback(tmp_path):
     missing = tmp_path / "missing.jpg"
     response = build_photos_response(_view(gallery=[str(missing)]))
 
     assert not response.has_media
     assert response.media_groups == ()
-    assert response.text == "📸 <b>这套房源目前的实拍已经全部显示。</b>"
+    assert response.photo_path == ""
+    assert "📋 <b>租赁详情</b>" in response.text
+    assert "富力城｜2房1厅" in response.text
     assert _labels(response.action_rows) == [
         ["📅 预约看房", "💬 问这套房"],
-        ["📋 租赁详情"],
         ["🔍 看相近房源"],
     ]
 
 
-def test_rented_photos_response_keeps_details_and_contact_but_removes_book(tmp_path):
+def test_rented_photos_response_keeps_contact_but_removes_book(tmp_path):
     photo = tmp_path / "room.jpg"
     photo.write_bytes(b"room")
     response = build_photos_response(
         _view(status="rented", offer_status="inactive", gallery=[str(photo)])
     )
 
-    assert _actions(response.action_rows) == [["details", "consult"], ["similar"]]
+    assert _actions(response.action_rows) == [["consult"], ["similar"]]
     assert _labels(response.action_rows) == [
-        ["📋 租赁详情", "💬 问这套房"],
+        ["💬 问这套房"],
         ["🔍 看相近房源"],
     ]

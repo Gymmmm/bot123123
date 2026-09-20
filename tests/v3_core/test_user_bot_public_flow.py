@@ -77,7 +77,8 @@ def test_details_payload_resolves_all_the_way_to_frozen_public_response():
     assert result.details is not None
     assert "📋 <b>租赁详情</b>" in result.details.text
     assert "富力城｜2房1厅" in result.details.text
-    assert result.photos is None
+    assert result.photos is not None
+    assert "📋 <b>租赁详情</b>" in result.photos.text
     assert result.book is None
 
 
@@ -92,7 +93,9 @@ def test_photos_payload_returns_frozen_existing_gallery_response(tmp_path):
     assert result.action == "photos"
     assert result.photos is not None
     assert result.photos.media_groups == ((str(photo),),)
-    assert result.details is None
+    assert result.photos.photo_path == str(photo)
+    assert result.details is not None
+    assert "富力城" in result.photos.text
     assert result.book is None
 
 

@@ -26,7 +26,7 @@ def test_listing_callback_round_trip_uses_public_identity_only():
     assert len(raw.encode("utf-8")) <= 64
 
 
-def test_photos_callback_optional_offset_round_trip_keeps_listing_context():
+def test_photos_callback_optional_index_round_trip_keeps_listing_context():
     first = encode_listing_callback("photos", "QL-RF-A2B3")
     assert first == "v3u:listing:photos:QL-RF-A2B3"
     assert parse_callback(first).target_index is None
@@ -42,7 +42,7 @@ def test_photos_callback_optional_offset_round_trip_keeps_listing_context():
     assert len(more.encode("utf-8")) <= 64
 
     semantic = SemanticAction(
-        "📸 再看更多实拍",
+        "下一张 ➡️",
         "photos",
         target_public_listing_id="QL-RF-A2B3",
         target_index=8,

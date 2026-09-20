@@ -87,21 +87,26 @@ class PublicListingFlowService:
             )
 
         view = decision.view
-        if route.action == "details":
-            return PublicListingFlowResult(
-                status="ok",
-                action="details",
-                public_listing_id=public_id,
-                source=clean_source,
-                details=build_details_response(view),
-            )
-        if route.action == "photos":
+        if route.action in {"details", "photos"}:
+            # Both deeplinks open the same merged detail + single-photo flipper.
+            merged = build_photos_response(view, offset=int(photo_offset or 0))
+            details = build_details_response(view)
+            if route.action == "details":
+                return PublicListingFlowResult(
+                    status="ok",
+                    action="details",
+                    public_listing_id=public_id,
+                    source=clean_source,
+                    details=details,
+                    photos=merged,
+                )
             return PublicListingFlowResult(
                 status="ok",
                 action="photos",
                 public_listing_id=public_id,
                 source=clean_source,
-                photos=build_photos_response(view, offset=int(photo_offset or 0)),
+                details=details,
+                photos=merged,
             )
         if route.action == "book":
             return PublicListingFlowResult(
