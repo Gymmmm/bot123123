@@ -115,7 +115,8 @@ def test_rented_listing_keeps_details_photos_and_consult_but_blocks_book(tmp_pat
     assert not view.action_allowed("book")
 
 
-def test_photos_requires_frozen_package_gallery(tmp_path):
+def test_photos_aliases_to_merged_details_even_without_gallery(tmp_path):
+    """Photos deeplink aliases to merged detail+flipper; empty gallery still allowed."""
     db = tmp_path / "v3.db"
     initialize_v3_storage(db)
     _seed_published_rent(db, gallery=False)
@@ -124,7 +125,7 @@ def test_photos_requires_frozen_package_gallery(tmp_path):
 
     assert view is not None
     assert view.action_allowed("details")
-    assert not view.action_allowed("photos")
+    assert view.action_allowed("photos")
     assert view.action_allowed("book")
     assert view.action_allowed("consult")
 

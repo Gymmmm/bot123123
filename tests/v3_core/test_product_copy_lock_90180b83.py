@@ -102,7 +102,10 @@ def test_unbookable_book_payload_keeps_details_instead_of_dead_link():
     assert result.reason == "listing_not_bookable"
     assert result.book is None
     assert result.details is not None
-    assert "🏠 <b>富力城｜1房</b>" in result.details.text
+    assert "🏢 金边优质房源出租" in result.details.text
+    assert "・项目区域：富力城" in result.details.text
+    assert "・户型格局：1房" in result.details.text
+    assert "🔴 房源状态：已租出" in result.details.text
     assert result.details.action_rows[0][0].label == "💬 问这套房"
 
 
@@ -137,6 +140,8 @@ async def test_start_handler_renders_chinese_unbookable_copy_then_details():
     assert outcome.kind == "unbookable"
     assert outcome.handled is True
     assert message.texts[0] == "这套房暂时不能预约。可以继续看相近房源，或让顾问帮您确认其他选择。"
-    assert "🏠 <b>富力城｜1房</b>" in message.texts[1]
+    assert "🏢 金边优质房源出租" in message.texts[1]
+    assert "・项目区域：富力城" in message.texts[1]
+    assert "・户型格局：1房" in message.texts[1]
     actions = [button.text for row in message.markups[1].inline_keyboard for button in row]
     assert actions == ["💬 问这套房", "🔍 看相近房源", "🏠 返回首页"]

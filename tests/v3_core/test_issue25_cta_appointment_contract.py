@@ -130,7 +130,7 @@ def test_details_and_photos_contract_has_real_fields_three_entries_and_no_intern
     details = build_details_response(view)
     labels = _labels(details.action_rows)
     assert labels == ["📅 预约看房", "💬 问这套房", "🔍 看相近房源"]
-    assert "富力城" in details.text and "$680/月" in details.text
+    assert "富力城" in details.text and "$680 / 月" in details.text
     assert PUBLIC_ID in details.text
     assert "LST_INTERNAL_1" not in details.text
     assert not any(token in details.text.lower() for token in ("none", "null", "unknown"))
