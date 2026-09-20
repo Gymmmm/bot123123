@@ -183,7 +183,7 @@ async def test_sync_refreshes_durable_status_immediately_before_telegram_edit(tm
         for button in row
     ]
     assert "📅 预约看房" not in labels
-    assert "⚫" in call["caption"]
+    assert "⚪ 暂不可预约" in call["caption"]
     with sqlite3.connect(db_path) as conn:
         durable = conn.execute(
             "SELECT inventory_status FROM listings_v3 WHERE listing_id='l_1'"
