@@ -89,7 +89,8 @@ def test_detail_text_matches_locked_sectioned_copy_shape():
     text = build_detail_text(view)
 
     assert text.startswith("━━━━━━━━━━━━━━━\n🏢 金边优质房源出租\n━━━━━━━━━━━━━━━")
-    assert "📌基本信息" in text\n    assert "QL-RF-A2B3" not in text
+    assert "📌基本信息" in text
+    assert "QL-RF-A2B3" not in text
     assert "・项目区域：富力城 · BKK1" in text
     assert "・户型格局：2房1厅" in text
     assert "・楼层类型：19楼" in text
@@ -116,7 +117,8 @@ def test_detail_text_omits_missing_bullets_and_adviser_without_copy():
     text = response.text
 
     assert "🏢 金边优质房源出租" in text
-    assert "📌基本信息" in text\n    assert "QL-RF-A2B3" not in text
+    assert "📌基本信息" in text
+    assert "QL-RF-A2B3" not in text
     assert "・月租金额：$800 / 月" in text
     assert "🧾 费用与配套" not in text
     assert "物业管理" not in text
