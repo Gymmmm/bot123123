@@ -118,7 +118,7 @@ def build_search_card(views: Iterable[PublishedListingView], index: int) -> Sear
     management = str(getattr(details, "management_fee", "") or "").strip()
     advisor = _advisor_username()
 
-    title = " · ".join(v for v in (getattr(details, "public_listing_id", ""), area, layout, rent) if v)
+    title = " · ".join(v for v in (area, layout, rent) if v) or "房源"
     lines = [f"💰 <b>{he(title)}</b>"]
     first = f"{he(payment)}｜预计首付 <b>${int(first_payment):,}</b>" if first_payment else he(payment)
     if first:
