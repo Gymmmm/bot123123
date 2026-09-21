@@ -6,6 +6,7 @@ from v3_core.publishing.channel_contract import (
     channel_action_url,
     channel_actions,
     channel_start_payload,
+    sanitize_publisher_text,
 )
 from v3_core.publishing.formatting import display_floor, display_layout
 from v3_core.publishing.public_ids import (
@@ -47,3 +48,36 @@ def test_channel_contract_is_only_details_photos_book():
         channel_start_payload(public_id, "advisor")
     with pytest.raises(ValueError, match="invalid_public_listing_id"):
         channel_start_payload("l_350", "details")
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("正常文案。a", "正常文案。"),
+        ("正常文案。c", "正常文案。"),
+        ("正常文案。a'a", "正常文案。"),
+        ("正常文案。a’a", "正常文案。"),
+        ("正常文案。ac", "正常文案。"),
+        ("正常文案。  ", "正常文案。"),
+    ],
+)
+def test_sanitize_publisher_text_removes_known_trailing_debug_tokens(value, expected):
+    assert sanitize_publisher_text(value) == expected
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "正常文案。",
+        "正常文案 ABC",
+        "Apartment C",
+        "价格为 500 USD/月",
+    ],
+)
+def test_sanitize_publisher_text_preserves_normal_copy(value):
+    assert sanitize_publisher_text(value) == value
+
+
+@pytest.mark.parametrize("value", ["a", "A", "c", "C", "a'a", "a’a", "  a  ", None, ""])
+def test_sanitize_publisher_text_turns_pure_debug_tokens_empty(value):
+    assert sanitize_publisher_text(value) == ""
