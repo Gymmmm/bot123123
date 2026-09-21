@@ -34,7 +34,6 @@ def build_appointment_confirmation_view(draft: PublicAppointmentDraft, inventory
         f"<b>{he(subject)}</b>",
         f"{he(mode)} · {he(_date_display(draft.date))} · {he(_time_display(draft.time))}",
         "",
-        he(draft.public_listing_id),
     ]
     return TransitionView(
         kind="appointment_confirmation",
