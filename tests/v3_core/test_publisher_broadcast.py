@@ -61,6 +61,19 @@ def test_marketing_template_button_metadata_matches_locked_v1_ctas():
     assert {template.key: template.buttons for template in MARKETING_TEMPLATES} == expected
 
 
+def test_weekly_marketing_copy_matches_locked_v1():
+    expected = {
+        "mon": "📮 <b>侨联周承诺 · 周一</b>\n🔒 <b>真实房源承诺</b>\n• 顾问实地核实\n• 实拍不用网图\n• 费用提前问清\n• 已租及时下架\n到场不符，侨联负责沟通。",
+        "tue": "📮 <b>侨联周承诺 · 周二</b>\n🔒 <b>押金保障承诺</b>\n入住前｜全屋拍照存档\n租期中｜维修争议介入协调\n退租时｜对照档案陪同核查\n有纠纷｜帮您与房东沟通\n六年，这个承诺没破过。",
+        "wed": "📮 <b>侨联周承诺 · 周三</b>\n💡 <b>租房隐性成本清单</b>\n每套都会问清：\n• 水电：按表 / 固定？\n• 网络：含 / 自装？\n• 物业：房东 / 租客？\n• 停车：含 / 另收？\n• 门禁卡：押金？\n找房时每套都注明。",
+        "thu": "📮 <b>侨联周承诺 · 周四</b>\n📹 <b>视频实拍代看</b>\n人不在金边，或没时间跑现场？\n提前告诉我们你在意什么：\n噪音大不大、外卖能不能上楼、\n家电新不新、采光好不好……\n约个时间，顾问替您到现场，\n开实时视频，想看哪就看哪，\n这些细节，我们替您现场把关。",
+        "fri": "📮 <b>侨联周承诺 · 周五</b>\n🈚 <b>无中介费承诺</b>\n通过侨联租房：\n• 不向租客收中介费\n• 租金直接与房东签\n• 费用明细提前列清\n我们赚服务费，不赚信息差。",
+        "sat": "📮 <b>侨联周承诺 · 周六</b>\n🏆 <b>六年本地服务承诺</b>\n金边本地6年：\n• 真实房源，实拍更新\n• 中文顾问，全程跟进\n• 视频代看，人不到也能选\n• 入住售后，租期内继续管\n六年，这个承诺没破过。",
+        "sun": "📮 <b>侨联周承诺 · 周日</b>\n🛡️ <b>入住售后承诺</b>\n签约不是结束，入住才是开始：\n• 报修：工单登记，快速响应\n• 物业：代您沟通，不用自己跑\n• 水电：缴费协助，避免停水停电\n• 搬家保洁网络：需要就找侨联\n租期内，有问题都能找到人。",
+    }
+    assert {template.key: template.body for template in MARKETING_TEMPLATES} == expected
+
+
 def test_marketing_runtime_button_rows_and_urls_match_locked_v1(tmp_path, monkeypatch):
     db = tmp_path / "marketing.db"
     initialize_v3_storage(db)
