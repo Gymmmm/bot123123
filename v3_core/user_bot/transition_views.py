@@ -236,18 +236,26 @@ def _similar_view(plan: TransitionPlan) -> TransitionView:
 
 
 _SEARCH_ENTRY_TEXT = (
-    "<b>开始找房</b>\n\n"
-    "直接发需求，例如：<b>BKK1 两房，预算 $800</b>\n"
-    "也可以按条件筛选。"
+    "🔍 <b>想找什么样的房子？</b>\n\n"
+    "直接发需求就可以，例如：\n"
+    "<code>BKK1 一房，预算 $600</code>\n"
+    "<code>富力城两房，要能做饭</code>\n"
+    "<code>钻石岛公寓，想看实拍</code>\n\n"
+    "也可以按条件筛选："
 )
 
 
 def _search_entry_view() -> TransitionView:
     rows = (
-        (TransitionChoice("选择区域", "search_area"), TransitionChoice("选择预算", "search_budget")),
-        (TransitionChoice("选择户型", "search_layout"),),
-        (TransitionChoice("中文顾问", "home", "contact"),),
-        (TransitionChoice("返回首页", "home"),),
+        (
+            TransitionChoice("📍 按区域", "search_area"),
+            TransitionChoice("💰 按预算", "search_budget"),
+        ),
+        (
+            TransitionChoice("🏠 按户型", "search_layout"),
+            TransitionChoice("💬 中文顾问", "home", "contact"),
+        ),
+        (TransitionChoice("⬅️ 返回首页", "home"),),
     )
     return TransitionView(kind="search_entry", text=_SEARCH_ENTRY_TEXT, rows=rows)
 
