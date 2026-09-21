@@ -105,7 +105,7 @@ def _appointment_mode_view(draft: PublicAppointmentDraft, inventory: PublicInven
                 TransitionChoice("实地看房", "appointment_mode", "offline"),
                 TransitionChoice("视频代看", "appointment_mode", "video"),
             ),
-            (TransitionChoice("⬅️ 返回房源", "appointment_exit"),),
+            (TransitionChoice("⬅️ 返回房源", "listing_details", public_listing_id=draft.public_listing_id),),
         ),
     )
 
