@@ -78,4 +78,3 @@ def test_pending_keyboard_still_hides_booking_for_normal_non_manual_send():
     assert "📅 预约看房" not in labels
     assert "📷 房源详情" not in labels
     assert labels == ["🔎 更多房源", "💬 中文顾问"]
-
