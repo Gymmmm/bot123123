@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - ops/deploy-v1-final-79977c4d-20260921
+  pull_request:
+    branches:
+      - ops/deploy-v1-final-79977c4d-20260921
   workflow_dispatch:
     inputs:
       confirm:
@@ -30,7 +33,7 @@ env:
 
 jobs:
   verify-and-deploy:
-    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.confirm == 'DEPLOY')
+    if: github.event_name == 'push' || github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.confirm == 'DEPLOY')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
