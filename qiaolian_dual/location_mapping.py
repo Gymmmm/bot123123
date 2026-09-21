@@ -41,7 +41,7 @@ AREA_KEY_BY_SLUG = {slug: key for _display, slug, key in AREA_SLUG_TABLE}
 
 def resolve_area_slug(value: str) -> str:
     """Resolve one locked ASCII Area slug to the existing canonical location key."""
-    slug = clean_text(value).lower()
+    slug = str(value or "").strip().lower()
     return AREA_KEY_BY_SLUG.get(slug, "")
 
 PRIMARY_LOCATION_KEYS = (
