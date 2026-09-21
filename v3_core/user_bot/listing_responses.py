@@ -199,9 +199,11 @@ def _detail_rent_line(value: int | None) -> str:
 
 
 def _detail_status_line(details) -> str:
-    if details.bookable:
-        return "🟢 房源状态：随时可预约看房"
     status = str(details.inventory_status or "").strip().lower()
+    if status == "reserved":
+        return "🟡 房源状态：已有预约，仍可预约"
+    if status == "active":
+        return "🟢 房源状态：当前可预约"
     if status in {"rented", "leased"}:
         return "🔴 房源状态：已租出"
     if status in {"inactive", "offline"}:
@@ -229,8 +231,6 @@ def build_detail_text(view: PublishedListingView) -> str:
     lines: list[str] = [_DETAIL_DIVIDER, _DETAIL_TITLE, _DETAIL_DIVIDER]
 
     basic_header = "📌基本信息"
-    if details.public_listing_id:
-        basic_header = f"📌基本信息  房源编号：{he(details.public_listing_id)}"
     basic_bullets = [
         bullet
         for bullet in (
@@ -241,9 +241,8 @@ def build_detail_text(view: PublishedListingView) -> str:
         )
         if bullet
     ]
-    if details.public_listing_id or basic_bullets:
-        section = _section(basic_header, basic_bullets)
-        lines.extend(section if section else [basic_header])
+    if basic_bullets:
+        lines.extend(_section(basic_header, basic_bullets))
 
     rent_bullets = [
         bullet
@@ -289,7 +288,7 @@ def build_photo_caption(
     rent = _format_price(details.monthly_rent_usd)
     head = " · ".join(part for part in (project, layout, rent) if part)
     if not head:
-        head = str(details.location or details.public_listing_id or "房源").strip()
+        head = str(details.location or "房源").strip()
     total = max(0, int(photo_total or 0))
     if total > 0:
         index = max(0, int(photo_index or 0)) % total
