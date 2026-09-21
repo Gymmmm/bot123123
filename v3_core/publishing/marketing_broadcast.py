@@ -177,7 +177,7 @@ class MarketingBroadcastService:
         service = BroadcastButton("🛎️ 侨联服务", channel_general_action_url(self.user_bot_username, "service"))
         latest = BroadcastButton("📢 最新房源", f"https://t.me/{channel_username}") if channel_username and not channel_username.startswith("-") else None
         locked = {
-            "mon": ((find, advisor), *((latest,),) if latest else ()),
+            "mon": ((find, advisor), (latest,)) if latest else ((find, advisor),),
             "tue": ((advisor, service), (find,)),
             "wed": ((find, advisor),),
             "thu": ((advisor, find),),
