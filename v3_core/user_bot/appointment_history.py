@@ -140,9 +140,9 @@ def _is_upcoming(record: AppointmentHistoryRecord, *, now: datetime) -> bool:
 def _subject(record: AppointmentHistoryRecord, inventory: PublicInventoryReader) -> str:
     view = inventory.resolve(record.public_listing_id)
     if view is None:
-        return record.public_listing_id
+        return "这套房"
     details = build_public_listing_details(view)
-    return details.subject or details.location or record.public_listing_id
+    return details.subject or details.location or "这套房"
 
 
 def _item(record: AppointmentHistoryRecord, inventory: PublicInventoryReader) -> AppointmentHistoryItem:
@@ -164,7 +164,6 @@ def _lines(item: AppointmentHistoryItem) -> list[str]:
         f"<b>{he(item.subject)}</b>",
         f"{he(_date_compact(item.appointment_date))} · {he(_time_compact(item.appointment_time))} · {he(mode)}",
         f"{status_icon} {he(status_label)}",
-        he(item.public_listing_id),
     ]
 
 
@@ -179,7 +178,7 @@ class AppointmentHistoryService:
         self.inventory = inventory
 
     def build(self, user_id: int, *, now: datetime | None = None) -> AppointmentHistoryView:
-        records = tuple(sorted(self.reader.list_for_user(user_id, limit=20), key=_sort_key))
+        records = self.reader.list_for_user(user_id, limit=20)
         if not records:
             return AppointmentHistoryView(
                 text=(
@@ -211,6 +210,8 @@ class AppointmentHistoryService:
             parts.extend(_lines(item))
             if index < len(items) - 1:
                 parts.append("")
+        if len(upcoming_records) > 2:
+            parts.extend(["", "更多预约记录请联系中文顾问。"])
         return AppointmentHistoryView(
             text="\n".join(parts),
             items=items,
