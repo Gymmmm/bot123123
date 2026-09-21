@@ -283,7 +283,7 @@ def test_build_detail_caption_alias_matches_sectioned_body():
     assert build_detail_caption is build_detail_text
     text = build_detail_caption(_view())
     assert "🏢 金边优质房源出租" in text
-    assert "QL-RF-A2B3" in text
+    assert "QL-RF-A2B3" not in text
 
 
 def _with_package(view, **changes):
