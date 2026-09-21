@@ -217,7 +217,7 @@ def test_missing_channel_url_does_not_create_channel_button():
     view = build_home_view(channel_url="")
     choices = [choice for row in view.rows for choice in row]
     assert all(choice.label != "📢 房源频道" for choice in choices)
-    assert any(choice.label == "中文顾问" for choice in choices)
+    assert any(choice.label == "💬 中文顾问" for choice in choices)
 
 
 def test_missing_advisor_url_uses_internal_contact_callback_not_dead_url():
