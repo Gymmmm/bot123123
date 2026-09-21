@@ -52,12 +52,12 @@ def _button_labels(markup):
     ],
 )
 def test_channel_keyboard_booking_follows_inventory_status(status, has_book):
-    labels = _button_labels(build_channel_keyboard(dict(ACTIONS), inventory_status=status))
+    labels = _button_labels(build_channel_keyboard(dict(ACTIONS), inventory_status=status, area="BKK1"))
     assert ("📅 预约看房" in labels) is has_book
     assert ("📷 房源详情" in labels) is has_book
     assert "📸 更多实拍" not in labels
     if status == "pending":
-        assert labels == ["🔎 看相近房源", "💬 中文顾问"]
+        assert labels == ["🔎 更多房源", "💬 中文顾问"]
     elif not has_book:
         assert labels == ["🏠 帮我找房", "🔎 更多房源", "💬 中文顾问"]
     assert "💬 中文顾问" in labels
@@ -260,3 +260,4 @@ async def test_listing_contact_missing_advisor_url_uses_existing_bot_contact_flo
     first = query.kwargs["reply_markup"].inline_keyboard[0][0]
     assert first.url is None
     assert first.callback_data == "v3u:home:contact"
+
