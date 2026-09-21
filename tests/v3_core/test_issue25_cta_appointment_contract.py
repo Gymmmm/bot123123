@@ -105,7 +105,7 @@ def test_channel_ctas_and_sync_contract_share_one_real_listing():
         "book": "📅 预约看房",
         "consult": "💬 中文顾问",
         "find": "🏠 帮我找房",
-        "more": "🔎 看看房源",
+        "more": "🔎 看相近房源",
         "similar": "🔎 看相近房源",
     }
     assert [[label for label, _ in row] for row in rows] == [
@@ -113,24 +113,24 @@ def test_channel_ctas_and_sync_contract_share_one_real_listing():
     ]
     assert all(f"property_{PUBLIC_ID}_" in urls[key] for key in ("details", "photos", "book"))
     assert PUBLIC_ID in urls["consult"]
-    assert "%EF%BC%88" in urls["consult"] or "桥牌" in urls["consult"] or "%E6%A1%A5%E7%89%8C" in urls["consult"]
+    assert f"property_{PUBLIC_ID}_contact__ch" in urls["consult"]
     synced = official_channel_button_spec(urls, inventory_status="reserved")
     assert synced == rows
     unbookable = official_channel_button_spec(urls, inventory_status="pending")
     assert [[label for label, _ in row] for row in unbookable] == [
         ["🔎 看相近房源", "💬 中文顾问"],
     ]
-    assert unbookable[0][0][1] == "https://t.me/QiaoLianBot?start=latest"
+    assert unbookable[0][0][1] == "https://t.me/QiaoLianBot?start=find"
     assert unbookable[0][1][1] == urls["consult"]
     rented = official_channel_button_spec(urls, inventory_status="rented")
     assert [[label for label, _ in row] for row in rented] == [
-        ["🏠 帮我找房", "🔎 看看房源"], ["💬 中文顾问"],
+        ["🔎 看相近房源", "💬 中文顾问"],
     ]
-    assert rented[0][0][1] == "https://t.me/QiaoLianBot?start=find_home"
-    assert rented[0][1][1] == "https://t.me/QiaoLianBot?start=latest"
+    assert rented[0][0][1] == "https://t.me/QiaoLianBot?start=find"
+    assert rented[0][1][1] == urls["consult"]
     offline = official_channel_button_spec(urls, inventory_status="offline")
     assert [[label for label, _ in row] for row in offline] == [
-        ["🏠 帮我找房", "🔎 看看房源"], ["💬 中文顾问"],
+        ["🔎 看相近房源", "💬 中文顾问"],
     ]
     assert "📷 房源详情" not in [label for row in offline for label, _ in row]
 
