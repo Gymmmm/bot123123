@@ -48,6 +48,11 @@ def _listing_source(context: Any) -> str:
     return str(data.get(LISTING_SOURCE_KEY) or "").strip() or "listing_callback"
 
 
+def _is_channel_source(value: object) -> bool:
+    source = str(value or "").strip().lower()
+    return source in {"channel", "channel_deeplink", "channel_listing"} or source.startswith("channel")
+
+
 def _listing_touchpoint(context: Any) -> str:
     data = getattr(context, "user_data", None)
     if not isinstance(data, dict):
@@ -275,7 +280,10 @@ async def handle_v3_callback(
                 back_to_search_callback=back_to_search_callback,
                 listing_summary=str(getattr(response, "listing_summary", "") or ""),
                 add_home=response.kind in {"details", "photos"},
-                add_channel=response.kind in {"details", "photos"},
+                add_channel=(
+                    response.kind in {"details", "photos"}
+                    and _is_channel_source(_listing_source(context))
+                ),
             ),
         )
     await query.answer()
