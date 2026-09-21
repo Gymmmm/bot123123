@@ -107,7 +107,7 @@ def channel_general_action_url(username: str, payload: object) -> str:
     value = str(payload or "").strip()
     if not user:
         raise ValueError("channel_username_missing")
-    if not value or not re.fullmatch(r"(?:find|service|more_[A-Za-z0-9_-]+)", value):
+    if not value or not re.fullmatch(r"(?:find|advisor|service|more_[A-Za-z0-9_-]+)", value):
         raise ValueError(f"unsupported_channel_general_payload:{payload}")
     return f"https://t.me/{user}?start={value}"
 
