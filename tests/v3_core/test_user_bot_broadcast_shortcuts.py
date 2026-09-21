@@ -159,7 +159,7 @@ async def test_appointments_shortcut_uses_real_appointment_history():
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("payload", "expected_kind", "expected_text"),
-    [("assurance", "broadcast_assurance", "租到房，不代表服务就结束了"), ("service", "broadcast_service", "侨联服务")],
+    [("assurance", "broadcast_assurance", "侨联地产｜金边中文租房"), ("service", "broadcast_service", "侨联服务")],
 )
 async def test_service_shortcuts_land_on_real_user_surfaces(payload, expected_kind, expected_text):
     message = FakeMessage()
@@ -170,7 +170,7 @@ async def test_service_shortcuts_land_on_real_user_surfaces(payload, expected_ki
     assert listings.calls == []
     assert expected_text in message.calls[-1][0][0]
     if payload == "assurance":
-        assert "入住时" in message.calls[-1][0][0]
+        assert "签约不是服务的结束。" in message.calls[-1][0][0]
         assert "关于侨联" not in message.calls[-1][0][0]
 
 
@@ -196,8 +196,7 @@ async def test_service_shortcut_ignores_binding_and_opens_public_service_home():
     assert "富力城 A3-1208" not in text
     assert callbacks == [
         "v3u:service:tenant_lease", "v3u:service:concierge",
-        "v3u:home:rental", "v3u:service:local",
-        "v3u:home:contact", "v3u:t:home",
+        "v3u:home:rental", "v3u:home:contact", "v3u:t:home",
     ]
 
 
