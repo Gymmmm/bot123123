@@ -30,18 +30,20 @@ def build_appointment_confirmation_view(draft: PublicAppointmentDraft, inventory
     subject=details.subject or details.location or "这套房"
     mode="视频代看" if draft.mode=="video" else "实地看房"
     lines=[
-        "<b>确认预约</b>","",
-        f"<b>{he(subject)}</b>",
-        f"{he(mode)} · {he(_date_display(draft.date))} · {he(_time_display(draft.time))}",
-        "",
+        "✅ <b>确认预约</b>",
+        f"房源｜{he(subject)}",
+        f"方式｜{he(mode)}",
+        f"日期｜{he(_date_display(draft.date))}",
+        f"时间｜{he(_time_display(draft.time))}",
+        "请确认以上信息。",
     ]
     return TransitionView(
         kind="appointment_confirmation",
         text="\n".join(lines),
         rows=(
-            (TransitionChoice("确认预约","appointment_submit"),),
-            (TransitionChoice("修改日期","appointment_back_date"),TransitionChoice("修改时间","appointment_back_time")),
-            (TransitionChoice("退出预约","appointment_exit"),),
+            (TransitionChoice("✅ 确认预约","appointment_submit"),),
+            (TransitionChoice("📅 修改日期","appointment_back_date"),TransitionChoice("🕐 修改时间","appointment_back_time")),
+            (TransitionChoice("⬅️ 退出预约","appointment_exit"),),
         ),
     )
 
