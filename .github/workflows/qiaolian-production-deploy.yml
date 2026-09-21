@@ -39,7 +39,7 @@ jobs:
     steps:
       - name: Validate requested immutable SHA
         env:
-          REQUESTED_SHA: '${{ github.event_name == 'push' && '79977c4d6c541d01fd36a549b1d2c554fe8c2e53' || inputs.deploy_sha }}'
+          REQUESTED_SHA: "${{ github.event_name == 'push' && '79977c4d6c541d01fd36a549b1d2c554fe8c2e53' || inputs.deploy_sha }}"
         run: |
           set -Eeuo pipefail
           [[ "$REQUESTED_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo 'DEPLOY_BLOCKED deploy_sha_must_be_full_40_hex_commit'; exit 1; }
@@ -48,7 +48,7 @@ jobs:
       - name: Checkout requested immutable SHA
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'push' && '79977c4d6c541d01fd36a549b1d2c554fe8c2e53' || inputs.deploy_sha }}
+          ref: "${{ github.event_name == 'push' && '79977c4d6c541d01fd36a549b1d2c554fe8c2e53' || inputs.deploy_sha }}"
           fetch-depth: 0
           persist-credentials: false
 
