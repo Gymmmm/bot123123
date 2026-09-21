@@ -141,8 +141,15 @@ async def test_round2_manual_status_sync_edits_exact_published_post_and_hides_bo
                 public_listing_id TEXT,
                 inventory_status TEXT
             );
+            CREATE TABLE publication_packages_v3(
+                package_id TEXT PRIMARY KEY,
+                listing_id TEXT,
+                snapshot_json TEXT,
+                actions_json TEXT
+            );
             CREATE TABLE publication_instances(
                 id INTEGER PRIMARY KEY,
+                package_id TEXT,
                 listing_id TEXT,
                 platform TEXT,
                 publish_status TEXT,
@@ -152,8 +159,13 @@ async def test_round2_manual_status_sync_edits_exact_published_post_and_hides_bo
                 updated_at TEXT
             );
             INSERT INTO listings_v3 VALUES ('l_1','QL-RF-A2B3','rented');
+            INSERT INTO publication_packages_v3 VALUES (
+                'pkg_1','l_1',
+                '{"listing_id":"l_1","public_listing_id":"QL-RF-A2B3"}',
+                '{"details":"https://t.me/qiaolian_rent_bot?start=property_QL-RF-A2B3_details","photos":"https://t.me/qiaolian_rent_bot?start=property_QL-RF-A2B3_photos","book":"https://t.me/qiaolian_rent_bot?start=property_QL-RF-A2B3_book"}'
+            );
             INSERT INTO publication_instances VALUES
-                (7,'l_1','telegram','published','-100123','456',
+                (7,'pkg_1','l_1','telegram','published','-100123','456',
                  '🏡 富力城｜2房\n\n💰 $800/月\n\n🟢 当前可预约　QL-RF-A2B3',
                  '2026-09-10 12:00:00');
             """
