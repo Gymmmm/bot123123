@@ -328,6 +328,7 @@ def build_v3_user_bot_application(
                 appointment_history=deps.transition.appointment_history,
                 tenant_service=deps.transition.tenant_service,
                 contact_effects=deps.contact_effects,
+                listing_contact_effects=deps.listing_contact_effects,
                 advisor_url=config.advisor_url,
             )
         finally:

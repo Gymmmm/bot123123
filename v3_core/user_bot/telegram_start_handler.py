@@ -11,8 +11,10 @@ from telegram.constants import ParseMode
 from .appointment_history import AppointmentHistoryService
 from .assurance_views import build_assurance_home_view
 from .contact_effects import ContactEffectExecutor
+from .deeplink import parse_channel_start_payload, parse_search_start_payload
 from .home_views import build_appointment_history_home_view, build_contact_view, build_home_view
 from .lead_service import LeadUser
+from .listing_contact import ListingContactEffectExecutor, build_listing_contact_view
 from .public_flow import PublicListingFlowResult, PublicListingFlowService
 from .search_no_match_view import build_search_no_match_view
 from .search_query import SearchCriteria
@@ -327,6 +329,115 @@ async def _handle_broadcast_shortcut(
     return TelegramStartOutcome(True, "broadcast_advisor", payload)
 
 
+async def _handle_public_search_start(
+    update: Any,
+    context: Any,
+    *,
+    payload: str,
+    transition_views: TransitionViewService,
+    search_executor: SearchSubmitExecutor | None,
+) -> TelegramStartOutcome | None:
+    route = parse_search_start_payload(payload)
+    if route is None:
+        return None
+    message = getattr(update, "effective_message", None)
+    user_data = getattr(context, "user_data", None)
+    if message is None or not isinstance(user_data, dict):
+        raise ValueError("public_search_start_missing_telegram_context")
+    if route.action == "find":
+        plan = TransitionPlan(
+            kind="change_search",
+            next_step="search_entry",
+            effects=("render_search_entry",),
+            change_search=ChangeSearchTransition(source="deeplink_find", goal="any"),
+        )
+        view = transition_views.build(plan)
+        await message.reply_text(
+            view.text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=build_transition_keyboard(view),
+        )
+        apply_session_mutation(user_data, build_transition_session(plan))
+        return TelegramStartOutcome(True, "find", payload)
+    if search_executor is None:
+        return TelegramStartOutcome(True, "more_unavailable", payload)
+    intent = SearchSubmitIntent(
+        criteria=SearchCriteria(location_keys=(route.location_key,)),
+        source="channel_more",
+        goal="any",
+        area_display=route.location_key,
+        budget_label="",
+        touch_payload={"area_slug": route.area_slug},
+    )
+    execution = search_executor.execute(intent, limit=5)
+    presentation = await present_search_flow_result(update, context, execution.result)
+    if presentation.status == "no_match":
+        view = build_search_no_match_view(intent)
+        await message.reply_text(
+            view.text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=build_transition_keyboard(view),
+        )
+    return TelegramStartOutcome(True, "more_area", payload)
+
+
+async def _handle_listing_contact_start(
+    update: Any,
+    context: Any,
+    *,
+    payload: str,
+    listings: PublicListingFlowService,
+    listing_contact_effects: ListingContactEffectExecutor | None,
+    advisor_url: str,
+) -> TelegramStartOutcome | None:
+    route = parse_channel_start_payload(payload)
+    if route is None or route.action != "contact":
+        return None
+    inventory = getattr(getattr(listings, "routes", None), "inventory", None)
+    if inventory is None:
+        return TelegramStartOutcome(True, "invalid_link", payload)
+    from .consult import ConsultService
+    resolved = ConsultService(inventory).resolve(
+        route.public_listing_id,
+        source=route.source,
+        touchpoint="channel_listing",
+    )
+    if not resolved.ok or resolved.intent is None:
+        return TelegramStartOutcome(True, "invalid_link", payload)
+    if listing_contact_effects is not None:
+        await listing_contact_effects.execute(
+            bot=getattr(context, "bot", None),
+            user=_lead_user(update),
+            intent=resolved.intent,
+        )
+    view = build_listing_contact_view(
+        resolved.intent,
+        inventory,
+        advisor_url=advisor_url,
+    )
+    direct = advisor_handoff_url(
+        advisor_url,
+        public_listing_id=view.public_listing_id,
+    )
+    rows = []
+    if direct:
+        rows.append([InlineKeyboardButton("💬 中文顾问", url=direct)])
+    from .callbacks import encode_listing_callback
+    rows.append(
+        [InlineKeyboardButton(
+            "⬅️ 返回房源详情",
+            callback_data=encode_listing_callback("details", view.public_listing_id),
+        )]
+    )
+    message = getattr(update, "effective_message", None)
+    await message.reply_text(
+        view.text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=InlineKeyboardMarkup(rows),
+    )
+    return TelegramStartOutcome(True, "contact", payload)
+
+
 async def handle_v3_start(
     update: Any,
     context: Any,
@@ -338,6 +449,7 @@ async def handle_v3_start(
     appointment_history: AppointmentHistoryService | None = None,
     tenant_service: TenantService | None = None,
     contact_effects: ContactEffectExecutor | None = None,
+    listing_contact_effects: ListingContactEffectExecutor | None = None,
     advisor_url: str = "",
 ) -> TelegramStartOutcome:
     message = getattr(update, "effective_message", None)
@@ -355,6 +467,27 @@ async def handle_v3_start(
         return TelegramStartOutcome(handled=True, kind="home")
 
     payload = str(args[0] or "").strip()
+    search_start = await _handle_public_search_start(
+        update,
+        context,
+        payload=payload,
+        transition_views=transition_views,
+        search_executor=search_executor,
+    )
+    if search_start is not None:
+        return search_start
+
+    contact_start = await _handle_listing_contact_start(
+        update,
+        context,
+        payload=payload,
+        listings=listings,
+        listing_contact_effects=listing_contact_effects,
+        advisor_url=advisor_url,
+    )
+    if contact_start is not None:
+        return contact_start
+
     broadcast = await _handle_broadcast_shortcut(
         update,
         context,

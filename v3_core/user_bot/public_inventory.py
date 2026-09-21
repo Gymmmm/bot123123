@@ -80,7 +80,7 @@ class PublishedListingView:
         clean = str(action or "").strip().lower()
         if clean == "book":
             return self.bookable
-        if clean in {"details", "consult"}:
+        if clean in {"details", "consult", "contact"}:
             return True
         if clean == "photos":
             # Photos deeplink aliases to the merged detail+flipper view even when

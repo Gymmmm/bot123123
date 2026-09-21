@@ -20,7 +20,7 @@ CHANNEL_CTA_LABELS = {
     "book": "📅 预约看房",
     "consult": "💬 中文顾问",
     "find": "🏠 帮我找房",
-    "more": "🔎 看看房源",
+    "more": "🔎 看相近房源",
     "similar": "🔎 看相近房源",
 }
 
@@ -29,6 +29,7 @@ _ACTION_SUFFIX = {
     "details": "details",
     "photos": "photos",
     "book": "book",
+    "contact": "contact",
 }
 _START_PAYLOAD_RE_PREFIX = "property_"
 _CHANNEL_SOURCE_CODE = "ch"
@@ -101,10 +102,11 @@ def official_channel_action_urls(
         )
         for action in ("details", "photos", "book")
     }
-    urls["consult"] = advisor_handoff_url(
-        advisor_url,
-        public_listing_id=public_listing_id,
-        listing_summary=listing_summary,
+    urls["consult"] = channel_action_url(
+        user,
+        public_listing_id,
+        "contact",
+        source_code=_CHANNEL_SOURCE_CODE,
     )
     if not urls["consult"]:
         raise ValueError("advisor_url_missing")
@@ -159,8 +161,8 @@ def official_channel_button_spec(
         return tuple(rows)
 
     bot = _bot_from_details_url(verified["details"])
-    find_url = f"https://t.me/{bot}?start=find_home"
-    more_url = f"https://t.me/{bot}?start=latest"
+    find_url = f"https://t.me/{bot}?start=find"
+    more_url = f"https://t.me/{bot}?start=find"
     find_btn = (CHANNEL_CTA_LABELS["find"], find_url)
     more_btn = (CHANNEL_CTA_LABELS["more"], more_url)
     consult_btn = (
@@ -177,10 +179,10 @@ def official_channel_button_spec(
         return (tuple(row),)
 
     # rented / offline / inactive (and any other non-bookable)
-    rows = [(find_btn, more_btn)]
+    row = [more_btn]
     if consult_btn is not None:
-        rows.append((consult_btn,))
-    return tuple(rows)
+        row.append(consult_btn)
+    return (tuple(row),)
 
 
 def official_channel_action_identity(actions: dict[str, str]) -> dict[str, str]:
@@ -211,12 +213,21 @@ def _consult_public_id_from_url(url: str) -> str:
     parsed = urlparse(str(url or "").strip())
     if parsed.scheme not in {"http", "https"} or parsed.netloc.lower() not in {"t.me", "www.t.me"}:
         raise ValueError("telegram_action_url_invalid")
+    payload = (parse_qs(parsed.query).get("start") or [""])[0]
+    if payload:
+        core_payload = payload.split("__", 1)[0]
+        suffix = "_contact"
+        if core_payload.startswith(_START_PAYLOAD_RE_PREFIX) and core_payload.lower().endswith(suffix):
+            raw_id = core_payload[len(_START_PAYLOAD_RE_PREFIX) : -len(suffix)]
+            public_id = normalize_public_id(raw_id)
+            if public_id:
+                return public_id
     message = (parse_qs(parsed.query).get("text") or [""])[0]
     for word in message.replace("：", " ").replace(":", " ").split():
         public_id = normalize_public_id(word.strip("，。,."))
         if public_id:
             return public_id
-    raise ValueError(f"invalid_public_listing_id:{message}")
+    raise ValueError(f"invalid_public_listing_id:{payload or message}")
 
 
 def _public_id_from_action_url(url: str, expected_action: str) -> str:
