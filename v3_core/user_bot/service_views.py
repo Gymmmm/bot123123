@@ -188,49 +188,42 @@ def service_home_view() -> ServiceView:
     return ServiceView(
         kind="service_home",
         text=(
-            "<b>侨联服务</b>\n\n"
-            "租约、入住后的房屋与物业事项，以及周边生活，都可以从这里处理或咨询。"
+            "🛎️ <b>侨联服务</b>\n"
+            "找房只是开始。签约、入住和住进去以后的事情，都可以继续找侨联。"
         ),
         rows=(
-            (ServiceChoice("我的租约", "v3u:service:tenant_lease"), ServiceChoice("入住管家", "v3u:service:concierge")),
-            (ServiceChoice("安心租房", "v3u:home:rental"), ServiceChoice("周边生活", "v3u:service:local")),
-            (ServiceChoice("中文顾问", "v3u:home:contact"),),
-            (ServiceChoice("返回首页", "v3u:t:home"),),
+            (ServiceChoice("📋 我的租约", "v3u:service:tenant_lease"), ServiceChoice("🛡️ 入住服务", "v3u:service:concierge")),
+            (ServiceChoice("🏠 安心租房", "v3u:home:rental"), ServiceChoice("💬 中文顾问", "v3u:home:contact")),
+            (ServiceChoice("⬅️ 返回首页", "v3u:t:home"),),
         ),
     )
-
 
 def concierge_home_view() -> ServiceView:
     return ServiceView(
         kind="concierge_home",
-        text=(
-            "<b>入住管家</b>\n\n"
-            "报修、物业、水电、搬家、保洁、网络等住房事项，可以从这里提交或转给中文顾问。"
-        ),
+        text="🛡️ <b>入住服务</b>\n签约不是服务的结束。",
         rows=(
-            (ServiceChoice("房屋报修", "v3u:service:repair"), ServiceChoice("物业协调", "v3u:service:property")),
-            (ServiceChoice("水电缴费协助", "v3u:service:utilities"), ServiceChoice("搬家协助", "v3u:service:moving")),
-            (ServiceChoice("保洁服务", "v3u:service:cleaning"), ServiceChoice("网络协助", "v3u:service:network_help")),
-            (ServiceChoice("其他住房问题", "v3u:service:general"),),
-            (ServiceChoice("返回侨联服务", "v3u:home:service"),),
+            (ServiceChoice("🔧 房屋报修", "v3u:service:repair"), ServiceChoice("🏢 物业协调", "v3u:service:coordination")),
+            (ServiceChoice("🔌 水电协助", "v3u:service:utilities"), ServiceChoice("🚚 搬家协助", "v3u:service:moving")),
+            (ServiceChoice("🧹 保洁服务", "v3u:service:cleaning"), ServiceChoice("🌐 网络协助", "v3u:service:network_help")),
+            (ServiceChoice("❓ 其他住房问题", "v3u:service:general"),),
+            (ServiceChoice("⬅️ 返回侨联服务", "v3u:home:service"),),
         ),
     )
-
 
 def repair_home_view() -> ServiceView:
     return ServiceView(
         kind="repair_home",
-        text="<b>房屋报修</b>\n\n请选择问题类型。",
+        text="🔧 <b>房屋报修</b>\n请选择问题类型。",
         rows=(
-            (ServiceChoice("空调状况", "v3u:service:issue:repair_ac"), ServiceChoice("热水漏水", "v3u:service:issue:repair_water")),
-            (ServiceChoice("灯具电路", "v3u:service:issue:repair_power"), ServiceChoice("门锁门禁", "v3u:service:issue:repair_door")),
-            (ServiceChoice("洗衣机", "v3u:service:issue:repair_washer"), ServiceChoice("冰箱", "v3u:service:issue:repair_fridge")),
-            (ServiceChoice("网络问题", "v3u:service:issue:repair_network"), ServiceChoice("家具损坏", "v3u:service:issue:repair_furniture")),
-            (ServiceChoice("其他问题", "v3u:service:issue:repair_other"),),
-            (ServiceChoice("退出报修", "v3u:service:repair_exit"),),
+            (ServiceChoice("❄️ 空调", "v3u:service:issue:repair_ac"), ServiceChoice("🚿 热水 / 漏水", "v3u:service:issue:repair_water")),
+            (ServiceChoice("💡 灯具 / 电路", "v3u:service:issue:repair_power"), ServiceChoice("🔐 门锁 / 门禁", "v3u:service:issue:repair_door")),
+            (ServiceChoice("🧺 洗衣机", "v3u:service:issue:repair_washer"), ServiceChoice("🧊 冰箱", "v3u:service:issue:repair_fridge")),
+            (ServiceChoice("🌐 网络", "v3u:service:issue:repair_network"), ServiceChoice("🪑 家具损坏", "v3u:service:issue:repair_furniture")),
+            (ServiceChoice("❓ 其他问题", "v3u:service:issue:repair_other"),),
+            (ServiceChoice("⬅️ 退出报修", "v3u:service:repair_exit"),),
         ),
     )
-
 
 def issue_prompt_view(draft: ServiceRequestDraft) -> ServiceView:
     return ServiceView(
