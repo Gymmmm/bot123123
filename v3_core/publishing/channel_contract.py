@@ -155,6 +155,8 @@ def official_channel_cta_keys(inventory_status: object = "active") -> tuple[str,
     status = str(inventory_status or "").strip().lower()
     if inventory_status_bookable(status):
         return ("details", "book", "consult")
+    if status in {"busy", "high_demand", "orange"}:
+        return ("details", "consult", "find")
     if status == "pending":
         return ("more", "consult")
     # rented / offline / inactive
