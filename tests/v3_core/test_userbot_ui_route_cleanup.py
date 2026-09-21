@@ -110,10 +110,10 @@ async def test_property_advisor_buttons_are_only_handoff_and_return():
 
 
 def test_aftercare_and_public_resident_buttons_stay_frozen():
-    assert _labels(build_assurance_home_view()) == ["入住交接留档", "开始找房", "中文顾问", "返回首页"]
+    assert _labels(build_assurance_home_view()) == ["🔍 开始找房", "💬 中文顾问", "⬅️ 返回首页"]
     expected = [
-        "我的租约", "入住管家", "安心租房", "周边生活",
-        "中文顾问", "返回首页",
+        "📋 我的租约", "🛡️ 入住服务", "🏠 安心租房",
+        "💬 中文顾问", "⬅️ 返回首页",
     ]
     assert _labels(service_home_view()) == expected
     class Service:
@@ -221,5 +221,6 @@ def test_legacy_contact_and_aftercare_destinations_render_new_names():
     assert "中文顾问" in contact.text
     assert "联系顾问" not in _labels(contact)
     rental = build_assurance_home_view()
-    assert "租到房，不代表服务就结束了" in rental.text
+    assert "侨联地产｜金边中文租房" in rental.text
+    assert "签约不是服务的结束。" in rental.text
     assert "关于侨联" not in rental.text
