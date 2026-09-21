@@ -250,4 +250,3 @@ __all__ = [
     "PublisherManualStatusSynchronizer",
     "caption_with_inventory_status",
 ]
-
