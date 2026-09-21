@@ -29,6 +29,9 @@ from .service_flow import TenantService
 from .telegram_service_handler import build_service_keyboard
 from .tenant_v1 import tenant_home_view
 from .telegram_transition_ui import build_transition_keyboard
+from .transition_session import APPOINTMENT_SESSION_KEY, SEARCH_PREF_SESSION_KEY
+from .callbacks import encode_listing_callback
+from .home_callbacks import encode_home_callback
 from .telegram_ui import build_action_keyboard
 from .transition_actions import SearchSubmitIntent
 from .transition_plan import BookTransition, ChangeSearchTransition, TransitionPlan
@@ -436,6 +439,133 @@ async def _handle_listing_contact_start(
         reply_markup=InlineKeyboardMarkup(rows),
     )
     return TelegramStartOutcome(True, "contact", payload)
+
+
+
+async def _handle_video_start(
+    update: Any,
+    context: Any,
+    *,
+    payload: str,
+    transition_views: TransitionViewService,
+    search_executor: SearchSubmitExecutor | None,
+    saved_search_pref: dict[str, Any] | None,
+) -> TelegramStartOutcome | None:
+    message = getattr(update, "effective_message", None)
+    user_data = getattr(context, "user_data", None)
+    if message is None or not isinstance(user_data, dict):
+        return None
+
+    if payload.startswith("book_video_"):
+        public_id = payload[len("book_video_"):].strip()
+        from .public_appointment import PublicAppointmentDraft
+        draft = PublicAppointmentDraft(public_listing_id=public_id, mode="video", source="video_deeplink")
+        view = transition_views.appointment_date(draft)
+        user_data[APPOINTMENT_SESSION_KEY] = {
+            "public_listing_id": draft.public_listing_id,
+            "mode": "video",
+            "date": "",
+            "time": "",
+            "source": draft.source,
+        }
+        await message.reply_text(view.text, parse_mode=ParseMode.HTML, reply_markup=build_transition_keyboard(view))
+        return TelegramStartOutcome(True, "book_video", payload)
+
+    if payload != "video":
+        return None
+
+    pref = dict(saved_search_pref or {})
+    location_keys = tuple(str(v) for v in (pref.get("location_keys") or ()) if str(v).strip())
+    budget_min = pref.get("budget_min")
+    budget_max = pref.get("budget_max")
+    room_type = str(pref.get("room_type") or "").strip()
+    area = str(pref.get("area_display") or "").strip() or "未填写"
+    budget = str(pref.get("budget_label") or "").strip()
+    if not budget:
+        if budget_min is not None and budget_max is not None:
+            budget = f"$" + str(int(budget_min)) + "–" + str(int(budget_max))
+        elif budget_max is not None:
+            budget = f"$" + str(int(budget_max)) + "以内"
+        elif budget_min is not None:
+            budget = f"$" + str(int(budget_min)) + "+"
+        else:
+            budget = "未填写"
+    layout = room_type or "未填写"
+
+    criteria = SearchCriteria(
+        location_keys=location_keys,
+        budget_min=budget_min,
+        budget_max=budget_max,
+        room_type=room_type,
+    )
+    cards = ()
+    mode = "strict"
+    if search_executor is not None:
+        execution = search_executor.execute(
+            SearchSubmitIntent(
+                criteria=criteria,
+                source="video_deeplink",
+                goal="any",
+                area_display=area if area != "未填写" else "",
+                budget_label=budget if budget != "未填写" else "",
+                touch_payload={"video": True},
+            ),
+            limit=2,
+        )
+        cards = execution.result.cards
+        mode = execution.result.mode
+        if not cards and criteria.has_filter:
+            relaxed = search_executor.flow.similar(criteria, limit=2)
+            cards = relaxed.cards
+            mode = relaxed.mode
+
+    lines = [
+        "🎥 可以，侨联可以先帮你视频代看。",
+        "适合这些情况：",
+        "✔ 人还没到金边",
+        "✔ 没时间一套套跑",
+        "✔ 想先确认房子真实情况",
+        "✔ 想看看周边环境",
+        "✔ 想提前了解家具家电状态",
+        "",
+        "正在为你从侨联房源库中匹配合适房源：",
+        f"区域：{area}",
+        f"预算：{budget}",
+        f"户型：{layout}",
+        "",
+        "已先为你匹配 1-2 套：",
+    ]
+    for index, card in enumerate(cards[:2], start=1):
+        published = transition_views.inventory.resolve(card.public_listing_id)
+        if published is None:
+            continue
+        details = build_public_listing_details(published)
+        price = ("$" + f"{int(details.monthly_rent_usd):,}") if details.monthly_rent_usd else "价格待确认"
+        lines.extend([
+            f"{index}. {details.location or '位置待确认'}｜{details.layout or '户型待确认'}｜{price}",
+            f"   房源编号：{details.public_listing_id}",
+        ])
+    lines.extend([
+        "",
+        "如果完全符合条件的房源较少，系统会先为你放宽条件匹配相近房源，顾问再继续人工精筛。",
+        "👇 你可以直接咨询房源，或安排视频代看",
+    ])
+
+    rows: list[list[InlineKeyboardButton]] = []
+    if cards:
+        first_id = cards[0].public_listing_id
+        rows.append([InlineKeyboardButton(f"💬 咨询 {first_id}", callback_data=encode_listing_callback("consult", first_id))])
+        user_data[APPOINTMENT_SESSION_KEY] = {
+            "public_listing_id": first_id,
+            "mode": "video",
+            "date": "",
+            "time": "",
+            "source": "video_deeplink",
+        }
+        rows.append([InlineKeyboardButton("📅 安排视频代看", callback_data="v3u:t:appointment_mode:video")])
+    rows.append([InlineKeyboardButton("🏠 查看更多房源", callback_data=encode_home_callback("search"))])
+    await message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(rows))
+    return TelegramStartOutcome(True, f"video_{mode}", payload)
 
 
 async def handle_v3_start(
