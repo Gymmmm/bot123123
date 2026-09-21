@@ -31,7 +31,6 @@ def build_appointment_success_view(draft: PublicAppointmentDraft, inventory: Pub
         f"<b>{he(subject)}</b>",
         f"{he(_date_display(draft.date))} · {he(_time_display(draft.time))} · {he(mode)}","",
         "预约信息已记录，具体看房时间以顾问后续确认结果为准。","",
-        he(draft.public_listing_id),
     ]
     return TransitionView(
         kind="appointment_success",
