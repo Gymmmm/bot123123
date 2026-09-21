@@ -32,18 +32,22 @@ def matches(data: str) -> bool:
 
 def rental_home_text() -> str:
     return (
-        '🛡 <b>侨联保障</b>\n\n'
-        '签约前核对费用；入住时把房屋、表计和物品状态留档；退租时按记录逐项核对。\n\n'
-        '发生问题时，侨联协助沟通。'
+        '🏠 <b>侨联地产｜金边中文租房</b>\n'
+        '⭐ 金边本地6年经验\n'
+        '📍 富力城｜炳发城｜BKK1｜钻石岛\n'
+        '💬 专业中文顾问\n'
+        '📸 真实房源｜实拍更新\n'
+        '📹 实地看房 / 视频代看\n'
+        '找房 · 看房 · 签约 · 入住 · 售后\n'
+        '签约不是服务的结束。'
     )
 
 def rental_home_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton('📋 入住交接', callback_data='hub:rental:handover'), InlineKeyboardButton('🔐 押金与退租', callback_data='hub:rental:deposit')],
-        [InlineKeyboardButton('🚚 搬家协助', callback_data='hub:rental:moving'), InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')],
+        [InlineKeyboardButton('🔍 开始找房', callback_data='home_smart_search')],
+        [InlineKeyboardButton('💬 中文顾问', callback_data='hub:advisor')],
+        [InlineKeyboardButton('⬅️ 返回首页', callback_data='home')],
     ])
-
-
 def handover_text() -> str:
     return (
         '🔐 <b>押金与入住留档</b>\n\n'
