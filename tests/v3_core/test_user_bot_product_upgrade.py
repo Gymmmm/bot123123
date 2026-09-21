@@ -48,26 +48,32 @@ def test_service_hub_is_public_and_does_not_require_binding():
     view = service_home_view()
     labels = _labels(view)
     assert labels == [
-        "我的租约", "入住管家", "安心租房", "周边生活",
-        "中文顾问", "返回首页",
+        "📋 我的租约", "🛡️ 入住服务", "🏠 安心租房",
+        "💬 中文顾问", "⬅️ 返回首页",
     ]
     callbacks = _callbacks(view)
     assert callbacks == [
         "v3u:service:tenant_lease", "v3u:service:concierge",
-        "v3u:home:rental", "v3u:service:local",
-        "v3u:home:contact", "v3u:t:home",
+        "v3u:home:rental", "v3u:home:contact", "v3u:t:home",
     ]
     assert "没有显示你的住房信息" not in view.text
 
 
 def test_rental_service_is_public_parent_content_center():
     view = build_assurance_home_view()
-    assert "租到房，不代表服务就结束了" in view.text
-    assert "入住时" in view.text
-    assert "房屋、表计、家具家电拍照留档" in view.text
-    assert _labels(view) == ["入住交接留档", "开始找房", "中文顾问", "返回首页"]
+    assert view.text == (
+        "🏠 <b>侨联地产｜金边中文租房</b>\n"
+        "⭐ 金边本地6年经验\n"
+        "📍 富力城｜炳发城｜BKK1｜钻石岛\n"
+        "💬 专业中文顾问\n"
+        "📸 真实房源｜实拍更新\n"
+        "📹 实地看房 / 视频代看\n"
+        "找房 · 看房 · 签约 · 入住 · 售后\n"
+        "签约不是服务的结束。"
+    )
+    assert _labels(view) == ["🔍 开始找房", "💬 中文顾问", "⬅️ 返回首页"]
     assert _callbacks(view) == [
-        "v3u:assure:handover", "v3u:home:search", "v3u:home:contact", "v3u:t:home",
+        "v3u:home:search", "v3u:home:contact", "v3u:t:home",
     ]
 
 
