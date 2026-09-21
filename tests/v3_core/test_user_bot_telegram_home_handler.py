@@ -117,7 +117,7 @@ async def test_service_home_creates_independent_surface():
     assert outcome.handled and outcome.rendered
     assert "侨联服务" in message.calls[-1][1]
     labels=[b.text for row in message.calls[-1][2]["reply_markup"].inline_keyboard for b in row]
-    assert labels==["我的租约","入住管家","安心租房","周边生活","中文顾问","返回首页"]
+    assert labels==["📋 我的租约","🛡️ 入住服务","🏠 安心租房","💬 中文顾问","⬅️ 返回首页"]
 
 
 @pytest.mark.asyncio
