@@ -55,8 +55,8 @@ def test_tenant_home_is_public_with_or_without_binding(tmp_path):
     unbound_view = tenant_home_view(unbound, 123)
     unbound_labels = [choice.label for row in unbound_view.rows for choice in row]
     assert unbound_labels == [
-        "我的租约", "入住管家", "安心租房", "周边生活",
-        "中文顾问", "返回首页",
+        "📋 我的租约", "🛡️ 入住服务", "🏠 安心租房",
+        "💬 中文顾问", "⬅️ 返回首页",
     ]
 
     other = tmp_path / "bound"
