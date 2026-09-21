@@ -21,8 +21,8 @@ CHANNEL_CTA_LABELS = {
     "book": "📅 预约看房",
     "consult": "💬 中文顾问",
     "find": "🏠 帮我找房",
-    "more": "🔎 看相近房源",
-    "similar": "🔎 看相近房源",
+    "more": "🔎 更多房源",
+    "similar": "🔎 更多房源",
 }
 
 _ACTION_SUFFIX = {
