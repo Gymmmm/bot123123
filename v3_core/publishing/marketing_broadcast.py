@@ -9,10 +9,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+import os
 import sqlite3
 from zoneinfo import ZoneInfo
 
 from .broadcast import BUTTON_KEYS, BroadcastButton, parse_hhmm
+from .channel_contract import channel_general_action_url
 
 KEY_ENABLED = "marketing_broadcast_enabled"
 KEY_TIME = "marketing_broadcast_time"
@@ -33,43 +35,43 @@ TEMPLATES = (
     MarketingTemplate(
         "mon",
         "🏠 本周找房",
-        "<b>🏠 这周准备在金边找房？</b>\n\n先别急着一套套看。\n\n把这 4 个条件先定下来：\n📍 想住哪里\n💰 月租预算\n🏠 几房\n📅 什么时候入住\n\n例如：\n\nBKK1｜2房｜$800以内｜月底入住\n\n条件越清楚，找房越快。\n\n👇 点「帮我找房」，直接告诉侨联你的需求。",
+        "📮 <b>侨联周承诺 · 周一</b>\n\n🔒 <b>真实房源承诺</b>\n\n先别急着一套套看。\n\n把这 4 个条件先定下来：\n📍 想住哪里\n💰 月租预算\n🏠 几房\n📅 什么时候入住\n\n例如：\n\nBKK1｜2房｜$800以内｜月底入住\n\n条件越清楚，找房越快。\n\n👇 点「帮我找房」，直接告诉侨联你的需求。",
         (("🔍 帮我找房", "find_home"), ("🏘 当前可约", "latest")),
     ),
     MarketingTemplate(
         "tue",
         "📋 看房准备",
-        "<b>📋 看房别只看装修和照片</b>\n\n到现场，建议重点检查：\n\n✓ 空调制冷\n✓ 热水和水压\n✓ 冰箱、洗衣机\n✓ 门锁和门禁\n✓ 手机信号 / 网络\n✓ 停车是否方便\n\n喜欢的房子，再把家具、墙面和现有损坏拍照留档。\n\n房子好不好住，现场检查比照片更重要。\n\n👇 准备看房？可以直接预约。",
+        "📮 <b>侨联周承诺 · 周二</b>\n\n🔒 <b>押金保障承诺</b>\n\n到现场，建议重点检查：\n\n✓ 空调制冷\n✓ 热水和水压\n✓ 冰箱、洗衣机\n✓ 门锁和门禁\n✓ 手机信号 / 网络\n✓ 停车是否方便\n\n喜欢的房子，再把家具、墙面和现有损坏拍照留档。\n\n房子好不好住，现场检查比照片更重要。\n\n👇 准备看房？可以直接预约。",
         (("🏘 选择房源预约", "latest"), ("🔍 继续找房", "find_home")),
     ),
     MarketingTemplate(
         "wed",
         "💰 租房预算",
-        "<b>💰 月租 $600，不代表每月只花 $600</b>\n\n找房时，建议一起确认：\n\n🏠 月租\n🔐 押金\n⚡ 电费\n💧 水费\n📶 网络\n🧾 管理费\n🚗 停车费\n\n尤其要问清楚：\n\n哪些包含在租金里？哪些需要另外付？\n\n👇 按你的真实预算找房，会比只看月租更准确。",
+        "📮 <b>侨联周承诺 · 周三</b>\n\n💡 <b>租房隐性成本清单</b>\n\n找房时，建议一起确认：\n\n🏠 月租\n🔐 押金\n⚡ 电费\n💧 水费\n📶 网络\n🧾 管理费\n🚗 停车费\n\n尤其要问清楚：\n\n哪些包含在租金里？哪些需要另外付？\n\n👇 按你的真实预算找房，会比只看月租更准确。",
         (("💰 按预算找房", "budget"), ("💬 联系中文顾问", "advisor")),
     ),
     MarketingTemplate(
         "thu",
         "🔍 房源怎么选",
-        "<b>🔍 两套房价格差不多，怎么选？</b>\n\n别只比装修。\n\n建议按这个顺序：\n\n① 位置｜通勤和生活方便吗？\n② 总预算｜水电管理费算进去了吗？\n③ 房屋状态｜设备实际怎么样？\n④ 租约｜押付、租期能接受吗？\n⑤ 配套｜停车、泳池、健身房真的需要吗？\n\n没有“最好”的房子，\n\n适合你的，才值得约看。\n\n👇 按自己的条件继续找。",
+        "📮 <b>侨联周承诺 · 周四</b>\n\n📹 <b>视频实拍代看</b>\n\n别只比装修。\n\n建议按这个顺序：\n\n① 位置｜通勤和生活方便吗？\n② 总预算｜水电管理费算进去了吗？\n③ 房屋状态｜设备实际怎么样？\n④ 租约｜押付、租期能接受吗？\n⑤ 配套｜停车、泳池、健身房真的需要吗？\n\n没有“最好”的房子，\n\n适合你的，才值得约看。\n\n👇 按自己的条件继续找。",
         (("🔍 帮我找房", "find_home"), ("🏘 当前可约", "latest")),
     ),
     MarketingTemplate(
         "fri",
         "📝 签约提醒",
-        "<b>📝 准备签租约？这几项先看清楚</b>\n\n签字、付押金前确认：\n\n✓ 月租和付款方式\n✓ 押金金额及退还条件\n✓ 租期和入住日期\n✓ 提前退租怎么处理\n✓ 水电、网络、管理费谁承担\n✓ 家具家电及房屋现状\n✓ 维修责任怎么划分\n\n口头谈好的重要条件，尽量写进租约。\n\n入住时再把房屋和物品状态拍照留档。",
+        "📮 <b>侨联周承诺 · 周五</b>\n\n🈚 <b>无中介费承诺</b>\n\n签字、付押金前确认：\n\n✓ 月租和付款方式\n✓ 押金金额及退还条件\n✓ 租期和入住日期\n✓ 提前退租怎么处理\n✓ 水电、网络、管理费谁承担\n✓ 家具家电及房屋现状\n✓ 维修责任怎么划分\n\n口头谈好的重要条件，尽量写进租约。\n\n入住时再把房屋和物品状态拍照留档。",
         (("🛡 侨联保障", "assurance"), ("💬 联系中文顾问", "advisor")),
     ),
     MarketingTemplate(
         "sat",
         "🏠 周末看房",
-        "<b>🏠 周末有时间？集中看房更省时间</b>\n\n建议一次安排 2–4 套同区域房源：\n\n📍 路线更集中\n💰 价格更容易比较\n🏠 户型差异看得更清楚\n📝 看完马上就有判断\n\n例如：\n\nBKK1｜2房｜$600–800\n\n可以一次筛出几套合适的再约看。\n\n👇 看看今天有哪些房源可以预约。",
+        "📮 <b>侨联周承诺 · 周六</b>\n\n🏆 <b>六年本地服务承诺</b>\n\n建议一次安排 2–4 套同区域房源：\n\n📍 路线更集中\n💰 价格更容易比较\n🏠 户型差异看得更清楚\n📝 看完马上就有判断\n\n例如：\n\nBKK1｜2房｜$600–800\n\n可以一次筛出几套合适的再约看。\n\n👇 看看今天有哪些房源可以预约。",
         (("🏘 当前可约", "latest"), ("📅 我的预约", "appointments")),
     ),
     MarketingTemplate(
         "sun",
         "🛡 侨联保障",
-        "<b>🛡 租到房，不代表服务就结束了。</b>\n\n侨联希望把容易出问题的环节提前做好：\n\n签约前\n核对租金、押金和相关费用\n\n入住时\n房屋、表计、家具家电拍照留档\n\n入住后\n需要报修或物业协调，可以找侨联\n\n退租时\n按入住记录协助逐项核对\n\n从找房、看房，到入住后的事情，\n\n有需要，都可以找侨联。",
+        "📮 <b>侨联周承诺 · 周日</b>\n\n🛡️ <b>入住售后承诺</b>\n\n侨联希望把容易出问题的环节提前做好：\n\n签约前\n核对租金、押金和相关费用\n\n入住时\n房屋、表计、家具家电拍照留档\n\n入住后\n需要报修或物业协调，可以找侨联\n\n退租时\n按入住记录协助逐项核对\n\n从找房、看房，到入住后的事情，\n\n有需要，都可以找侨联。",
         (("🛡 了解侨联保障", "assurance"), ("🛠 入住服务", "service")),
     ),
 )
@@ -165,21 +167,35 @@ class MarketingBroadcastService:
         self._set(f"marketing_button_{template.key}", clean)
 
     def footer_rows(self, template: MarketingTemplate) -> tuple[tuple[BroadcastButton, ...], ...]:
-        base = f"https://t.me/{self.user_bot_username}?start="
         weekday = next((index for index, item in enumerate(TEMPLATES) if item.key == template.key), 0)
         selected = self.button_key(weekday)
         if selected == "none":
             return ()
-        generic = {
-            "find": BroadcastButton("🔍 帮我找房", base + "find_home"),
-            "latest": BroadcastButton("🏠 最新房源", base + "latest"),
-            "contact": BroadcastButton("💬 联系中文顾问", base + "advisor"),
+        channel_username = str(os.getenv("CHANNEL_USERNAME") or os.getenv("CHANNEL_ID") or "").strip().lstrip("@")
+        find = BroadcastButton("🔍 开始找房", channel_general_action_url(self.user_bot_username, "find"))
+        advisor = BroadcastButton("💬 中文顾问", channel_general_action_url(self.user_bot_username, "service"))
+        service = BroadcastButton("🛎️ 侨联服务", channel_general_action_url(self.user_bot_username, "service"))
+        latest = BroadcastButton("📢 最新房源", f"https://t.me/{channel_username}") if channel_username and not channel_username.startswith("-") else None
+        locked = {
+            "mon": ((find, advisor), *((latest,),) if latest else ()),
+            "tue": ((advisor, service), (find,)),
+            "wed": ((find, advisor),),
+            "thu": ((advisor, find),),
+            "fri": ((advisor, find),),
+            "sat": ((find, service), (advisor,)),
+            "sun": ((service, advisor),),
         }
+        if selected == "default":
+            return locked[template.key]
+        generic = {"find": find, "contact": advisor}
+        if latest is not None:
+            generic["latest"] = latest
         if selected == "combo":
-            return ((generic["find"], generic["latest"]), (generic["contact"],))
+            first = tuple(button for button in (find, latest) if button is not None)
+            return (first, (advisor,))
         if selected in generic:
             return ((generic[selected],),)
-        return (tuple(BroadcastButton(label, base + payload) for label, payload in template.buttons),)
+        return locked[template.key]
 
     def claim_due(self, now: datetime | None = None) -> tuple[bool, str]:
         current = now.astimezone(self.timezone) if now else self.local_now()
