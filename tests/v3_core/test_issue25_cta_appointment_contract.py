@@ -122,6 +122,13 @@ def test_channel_ctas_and_sync_contract_share_one_real_listing():
     ]
     assert unbookable[0][0][1] == "https://t.me/QiaoLianBot?start=more_BKK1"
     assert unbookable[0][1][1] == urls["consult"]
+    orange = official_channel_button_spec(urls, inventory_status="high_demand", area="BKK1")
+    assert [[label for label, _ in row] for row in orange] == [
+        ["📷 房源详情", "💬 中文顾问"], ["🏠 帮我找房"],
+    ]
+    assert orange[0][0][1] == urls["details"]
+    assert orange[0][1][1] == urls["consult"]
+    assert orange[1][0][1] == "https://t.me/QiaoLianBot?start=find"
     rented = official_channel_button_spec(urls, inventory_status="rented", area="BKK1")
     assert [[label for label, _ in row] for row in rented] == [
         ["🏠 帮我找房", "🔎 更多房源"], ["💬 中文顾问"],
