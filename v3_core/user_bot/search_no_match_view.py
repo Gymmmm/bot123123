@@ -9,7 +9,7 @@ from .transition_views import TransitionChoice, TransitionView
 
 def build_search_no_match_view(intent: SearchSubmitIntent) -> TransitionView:
     goal = str(intent.goal or "any").strip()
-    summary = " · ".join(
+    summary = "｜".join(
         value
         for value in (
             str(intent.area_display or "").strip(),
@@ -18,19 +18,19 @@ def build_search_no_match_view(intent: SearchSubmitIntent) -> TransitionView:
         )
         if value
     )
-    summary_block = f"\n\n条件｜{he(summary)}" if summary else ""
+    summary_block = f"\n\n{he(summary)}" if summary else ""
     return TransitionView(
         kind="search_no_match",
         text=(
-            "🔍 <b>暂时没找到完全符合的房源</b>"
+            "<b>这组条件暂时没有对上的房源</b>"
             f"{summary_block}\n\n"
-            "我没有自动放宽你的条件。\n\n"
-            "可以调整条件再找，\n"
-            "也可以让中文顾问按原条件继续帮你找。"
+            "没有自动放宽条件。\n"
+            "可以换条件再找，或把原条件发给中文顾问。"
         ),
         rows=(
-            (TransitionChoice("🔄 调整条件", "change_search"), TransitionChoice("💬 中文顾问", "home", value="contact")),
-            (TransitionChoice("⬅️ 返回首页", "home"),),
+            (TransitionChoice("换条件", "change_search"),),
+            (TransitionChoice("中文顾问", "home", value="contact"),),
+            (TransitionChoice("返回首页", "home"),),
         ),
     )
 
