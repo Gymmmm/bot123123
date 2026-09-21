@@ -32,10 +32,10 @@ def _seed(db_path, *, appointment_count=5, inventory_status="reserved"):
                 channel_message_id,publish_status,post_text,published_at,updated_at)
                VALUES
                ('PUB_OLD','PKG_OLD','l_1','OFF_1','telegram','-100123','111','published',
-                '🏠 <b>富力城｜两房</b>\n\n🟡 已有预约 · 仍可预约　QL-RF-A2B3',
+                '🏠 <b>富力城｜两房</b>\n\n🟡 已有预约，仍可预约　QL-RF-A2B3',
                 '2026-09-08 10:00:00','2026-09-08 10:00:00'),
                ('PUB_NEW','PKG_NEW','l_1','OFF_1','telegram','-100123','222','published',
-                '🏠 <b>富力城｜两房</b>\n\n🟡 已有预约 · 仍可预约　QL-RF-A2B3',
+                '🏠 <b>富力城｜两房</b>\n\n🟡 已有预约，仍可预约　QL-RF-A2B3',
                 '2026-09-08 11:00:00','2026-09-08 11:00:00')"""
         )
         for index in range(appointment_count):
@@ -183,7 +183,7 @@ async def test_sync_refreshes_durable_status_immediately_before_telegram_edit(tm
         for button in row
     ]
     assert "📅 预约看房" not in labels
-    assert "⚪ 暂不可预约" in call["caption"]
+    assert "⚫ 已下架" in call["caption"]
     with sqlite3.connect(db_path) as conn:
         durable = conn.execute(
             "SELECT inventory_status FROM listings_v3 WHERE listing_id='l_1'"
