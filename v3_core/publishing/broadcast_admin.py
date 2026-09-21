@@ -13,6 +13,7 @@ from telegram.constants import ParseMode
 from v3_core.ops.runtime_state import RuntimeStateRepository
 
 from .broadcast import BUTTON_LABELS, BroadcastService
+from .channel_contract import sanitize_publisher_text
 from .marketing_broadcast import MarketingBroadcastService, TEMPLATES
 
 BROADCAST_EDIT_STATE_KEY = "v3_publisher_broadcast_edit"
@@ -198,6 +199,9 @@ class BroadcastAdminController:
         )
 
     async def _send_channel(self, context: Any, body: str, *, trigger_type: str, template_key: str = "live", footer=None):
+        body = sanitize_publisher_text(body)
+        if not body:
+            raise ValueError("broadcast_body_empty_after_sanitize")
         local_date = self.service.local_now().date().isoformat()
         try:
             result = await context.bot.send_message(

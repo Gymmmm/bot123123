@@ -38,6 +38,20 @@ _CHANNEL_SOURCE_CODE = "ch"
 _CAPTION_PUBLIC_ID_RE = re.compile(r"(?<![A-Z0-9-])(QL-[A-Z0-9]+(?:-[A-Z0-9]+)+)(?![A-Z0-9-])")
 
 
+_DEBUG_TRAILING_TEXT_RE = re.compile(
+    r"(?<=[\u4e00-\u9fff。！？.!?])(?:a['’]?a|a|c)+$",
+    re.IGNORECASE,
+)
+
+
+def sanitize_publisher_text(value: object) -> str:
+    """Strip known accidental trailing debug tokens from publisher text."""
+    text = str(value or "").rstrip()
+    if text.lower() in {"a", "c", "a'a", "a’a"}:
+        return ""
+    return _DEBUG_TRAILING_TEXT_RE.sub("", text).rstrip()
+
+
 def channel_caption_public_id(caption: object) -> str:
     ids = {normalize_public_id(value) for value in _CAPTION_PUBLIC_ID_RE.findall(str(caption or ""))}
     ids.discard("")
@@ -170,7 +184,7 @@ def official_channel_button_spec(
     - pending:
         Row1: [🔎 看相近房源] [💬 中文顾问]
     - rented / offline / inactive:
-        Row1: [🏠 帮我找房] [🔎 看看房源]
+        Row1: [🏠 帮我找房] [🔎 更多房源]
         Row2: [💬 中文顾问]
     """
     verified = official_channel_action_identity(actions)
@@ -199,14 +213,20 @@ def official_channel_button_spec(
         else None
     )
 
-    if status == "pending":
+    if status in {"pending", "high_demand"}:
         similar_btn = (CHANNEL_CTA_LABELS["similar"], more_url)
         row = [similar_btn]
         if consult_btn is not None:
             row.append(consult_btn)
         return (tuple(row),)
 
-    # rented / offline / inactive (and any other non-bookable)
+    if status in {"rented", "offline", "inactive", "withdrawn"}:
+        terminal_more_btn = ("🔎 更多房源", more_url)
+        rows = [(find_btn, terminal_more_btn)]
+        if consult_btn is not None:
+            rows.append((consult_btn,))
+        return tuple(rows)
+
     row = [more_btn]
     if consult_btn is not None:
         row.append(consult_btn)
@@ -290,4 +310,5 @@ __all__ = [
     "official_channel_action_urls",
     "official_channel_button_spec",
     "official_channel_cta_keys",
+    "sanitize_publisher_text",
 ]

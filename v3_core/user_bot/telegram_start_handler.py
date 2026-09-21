@@ -8,6 +8,8 @@ from typing import Any
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 
+from v3_core.publishing.public_ids import normalize_public_id
+
 from .appointment_history import AppointmentHistoryService
 from .assurance_views import build_assurance_home_view
 from .contact_effects import ContactEffectExecutor
@@ -86,6 +88,115 @@ def _book_plan(result: PublicListingFlowResult) -> TransitionPlan:
         book=BookTransition(draft=PublicAppointmentDraft(public_listing_id=intent.public_listing_id, mode="offline", source=intent.source)),
     )
 
+
+
+def _video_book_plan(result: PublicListingFlowResult) -> TransitionPlan:
+    if result.book is None:
+        raise ValueError("start_video_book_result_missing_intent")
+    intent = result.book
+    from .public_appointment import PublicAppointmentDraft
+    return TransitionPlan(
+        kind="book",
+        next_step="appointment_date",
+        effects=("render_appointment_date",),
+        book=BookTransition(
+            draft=PublicAppointmentDraft(
+                public_listing_id=intent.public_listing_id,
+                mode="video",
+                source=intent.source,
+            )
+        ),
+    )
+
+
+async def _handle_video_start(
+    update: Any,
+    context: Any,
+    *,
+    payload: str,
+    listings: PublicListingFlowService,
+    transition_views: TransitionViewService,
+    search_executor: SearchSubmitExecutor | None,
+    advisor_url: str,
+    channel_url: str,
+) -> TelegramStartOutcome | None:
+    raw = str(payload or "").strip()
+    message = getattr(update, "effective_message", None)
+    user_data = getattr(context, "user_data", None)
+    if message is None or not isinstance(user_data, dict):
+        return None
+
+    if raw == "video":
+        # No listing selected yet: mirror the legacy video-tour entry and
+        # surface real current inventory instead of treating the deeplink as invalid.
+        if search_executor is None:
+            plan = _search_entry_plan()
+            view = transition_views.build(plan)
+            await message.reply_text(
+                view.text,
+                parse_mode=ParseMode.HTML,
+                reply_markup=build_transition_keyboard(view),
+            )
+            apply_session_mutation(user_data, build_transition_session(plan))
+            user_data["v3_video_booking_preferred"] = True
+            return TelegramStartOutcome(True, "video_search", raw)
+        intent = SearchSubmitIntent(
+            criteria=SearchCriteria(raw_text=""),
+            source="video_deeplink",
+            goal="any",
+            area_display="",
+            budget_label="",
+            touch_payload={"video_booking": True},
+        )
+        execution = search_executor.execute(intent, limit=5)
+        presentation = await present_search_flow_result(update, context, execution.result)
+        if presentation.status == "no_match":
+            view = build_search_no_match_view(intent)
+            await message.reply_text(
+                view.text,
+                parse_mode=ParseMode.HTML,
+                reply_markup=build_transition_keyboard(view),
+            )
+        user_data["v3_video_booking_preferred"] = True
+        return TelegramStartOutcome(True, "video_search", raw)
+
+    prefix = "book_video_"
+    if not raw.startswith(prefix):
+        return None
+    public_id = normalize_public_id(raw[len(prefix):])
+    if public_id is None:
+        await _render_invalid_link(
+            message, advisor_url=advisor_url, channel_url=channel_url
+        )
+        return TelegramStartOutcome(True, "invalid_link", raw)
+
+    result = listings.resolve(f"property_{public_id}_book")
+    _remember_listing_context(user_data, result)
+    if not result.ok:
+        if _failure_reason(result) == "listing_not_bookable":
+            await _render_unbookable(
+                message,
+                result,
+                advisor_url=advisor_url,
+                channel_url=channel_url,
+            )
+            return TelegramStartOutcome(True, "unbookable", raw, result)
+        await _render_invalid_link(
+            message, advisor_url=advisor_url, channel_url=channel_url
+        )
+        return TelegramStartOutcome(True, "invalid_link", raw, result)
+
+    plan = _video_book_plan(result)
+    if plan.book is None:
+        raise ValueError("start_video_book_transition_missing_draft")
+    view = transition_views.appointment_date(plan.book.draft)
+    await message.reply_text(
+        view.text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=build_transition_keyboard(view),
+    )
+    apply_session_mutation(user_data, build_transition_session(plan))
+    return TelegramStartOutcome(True, "book_video", raw, result)
 
 def _search_entry_plan() -> TransitionPlan:
     return TransitionPlan(kind="change_search", next_step="search_entry", effects=("render_search_entry",), change_search=ChangeSearchTransition(source="daily_broadcast", goal="any"))
@@ -467,6 +578,20 @@ async def handle_v3_start(
         return TelegramStartOutcome(handled=True, kind="home")
 
     payload = str(args[0] or "").strip()
+
+    video_start = await _handle_video_start(
+        update,
+        context,
+        payload=payload,
+        listings=listings,
+        transition_views=transition_views,
+        search_executor=search_executor,
+        advisor_url=advisor_url,
+        channel_url=channel_url,
+    )
+    if video_start is not None:
+        return video_start
+
     search_start = await _handle_public_search_start(
         update,
         context,

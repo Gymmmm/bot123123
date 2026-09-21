@@ -8,6 +8,7 @@ from uuid import uuid4
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 
+from .consult import build_consultation_envelope, consultation_handoff_url
 from .lead_service import LeadUser
 from .service_effects import ServiceEffectExecutor, ServiceEffectResult
 from .service_flow import SERVICE_SLOT_LABELS, ServiceRequestDraft, TenantService
@@ -50,11 +51,27 @@ def _tenant_binding_view(service: TenantService, user_id: int) -> ServiceView:
     return tenant_home_view(service, user_id)
 
 
+def _runtime_service_callback(callback_data: str) -> str:
+    raw = str(callback_data or "")
+    prefix = "v3u:service:property"
+    if raw == prefix:
+        return "v3u:service:coordination"
+    if raw.startswith(prefix + "_"):
+        return "v3u:service:coordination_" + raw[len(prefix) + 1:]
+    return raw
+
+
 def build_service_keyboard(view: ServiceView, *, advisor_url: str = "") -> InlineKeyboardMarkup | None:
     if not view.rows:
         return None
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton(str(choice.label or ""), callback_data=choice.callback_data) for choice in row]
+        [
+            InlineKeyboardButton(
+                str(choice.label or ""),
+                callback_data=_runtime_service_callback(choice.callback_data),
+            )
+            for choice in row
+        ]
         for row in view.rows
     ])
 
@@ -66,6 +83,45 @@ async def render_service_view(query: Any, view: ServiceView, *, advisor_url: str
         await query.edit_message_caption(caption=view.text, parse_mode=ParseMode.HTML, reply_markup=markup)
         return
     await query.edit_message_text(view.text, parse_mode=ParseMode.HTML, reply_markup=markup)
+
+
+def _with_context_contact(
+    view: ServiceView,
+    *,
+    callback_data: str,
+    extra_line: str = "",
+) -> ServiceView:
+    rows = tuple(
+        tuple(
+            ServiceChoice(choice.label, callback_data)
+            if choice.label == "中文顾问"
+            else choice
+            for choice in row
+        )
+        for row in view.rows
+    )
+    text = view.text
+    if extra_line:
+        text = f"{text}\n\n{extra_line}"
+    return ServiceView(view.kind, text, rows)
+
+
+async def _render_consultation_handoff(
+    query: Any,
+    *,
+    envelope,
+    advisor_url: str,
+) -> None:
+    direct = consultation_handoff_url(advisor_url, envelope)
+    rows = []
+    if direct:
+        rows.append([InlineKeyboardButton("中文顾问", url=direct)])
+    rows.append([InlineKeyboardButton("返回侨联服务", callback_data="v3u:home:service")])
+    await query.edit_message_text(
+        "<b>中文顾问</b>\n\n直接把问题发给我。",
+        parse_mode=ParseMode.HTML,
+        reply_markup=InlineKeyboardMarkup(rows),
+    )
 
 
 def _chat_id(update: Any) -> int:
@@ -236,6 +292,12 @@ async def handle_v3_service_callback(
     if query is None or not raw.startswith(prefix):
         return TelegramServiceOutcome(False)
     action = raw[len(prefix):].strip()
+    # Accept pre-lock callbacks already present in old Telegram messages, while
+    # every newly rendered coordination button uses the coordination_* family.
+    if action == "property":
+        action = "coordination"
+    elif action.startswith("property_"):
+        action = "coordination_" + action[len("property_"):]
     user_data = getattr(context, "user_data", None)
     if not isinstance(user_data, dict):
         raise ValueError("telegram_user_data_missing_for_service")
@@ -246,12 +308,46 @@ async def handle_v3_service_callback(
         await _send_view(update, context, missing_lease_view(), advisor_url=advisor_url)
         return TelegramServiceOutcome(True, action, True)
 
+    if action.startswith("consult_ticket:") or action.startswith("consult_lease:"):
+        kind = "ticket" if action.startswith("consult_ticket:") else "lease"
+        reference_id = action.split(":", 1)[1]
+        property_name = ""
+        if kind == "lease":
+            binding = service.active_binding(user.user_id)
+            if binding is not None and str(getattr(binding, "id", "")) == reference_id:
+                property_name = str(getattr(binding, "property_name", "") or "")
+        envelope = build_consultation_envelope(
+            kind,
+            reference_id,
+            property_name=property_name,
+        )
+        effect = (
+            await effects.general(
+                bot=getattr(context, "bot", None),
+                user=user,
+                details=envelope.admin_details(),
+            )
+            if effects is not None
+            else None
+        )
+        await _render_consultation_handoff(
+            query,
+            envelope=envelope,
+            advisor_url=advisor_url,
+        )
+        return TelegramServiceOutcome(True, action, True, effect=effect)
+
     if action == "tenant":
         from .service_product_views import service_home_view
         await render_service_view(query, service_home_view(), advisor_url=advisor_url)
         return TelegramServiceOutcome(True, action, True)
     if action == "tenant_lease":
-        await _send_view(update, context, lease_view(service, user.user_id), advisor_url=advisor_url)
+        binding = service.require_active_binding(user.user_id)
+        view = _with_context_contact(
+            lease_view(service, user.user_id),
+            callback_data=f"v3u:service:consult_lease:{int(binding.id)}",
+        )
+        await _send_view(update, context, view, advisor_url=advisor_url)
         return TelegramServiceOutcome(True, action, True)
     if action == "tenant_renew":
         await _send_view(update, context, renew_view(service, user.user_id), advisor_url=advisor_url)
@@ -367,7 +463,18 @@ async def handle_v3_service_callback(
             effect = await effects.general(bot=getattr(context, "bot", None), user=user, details=detail)
             if _effect_success(effect):
                 outcome = "handoff"
-        await render_service_view(query, repair_result_view(outcome=outcome, issue_label=draft.issue_label, property_name=prop), advisor_url=advisor_url)
+        result_view = repair_result_view(
+            outcome=outcome,
+            issue_label=draft.issue_label,
+            property_name=prop,
+        )
+        if outcome == "ticket" and ticket_id is not None:
+            result_view = _with_context_contact(
+                result_view,
+                callback_data=f"v3u:service:consult_ticket:{ticket_id}",
+                extra_line=f"工单编号｜#{ticket_id}",
+            )
+        await render_service_view(query, result_view, advisor_url=advisor_url)
         if outcome != "failed":
             user_data.pop(SERVICE_REQUEST_SESSION_KEY, None)
             user_data.pop(SERVICE_REQUEST_ANCHOR_KEY, None)
@@ -379,11 +486,11 @@ async def handle_v3_service_callback(
         return TelegramServiceOutcome(True, action, True)
 
     # Property coordination transaction.
-    if action == "property":
+    if action == "coordination":
         user_data.pop(PROPERTY_SESSION_KEY, None)
         await _send_view(update, context, property_view(), anchor_key=PROPERTY_ANCHOR_KEY, advisor_url=advisor_url)
         return TelegramServiceOutcome(True, action, True)
-    if action.startswith("property_category:"):
+    if action.startswith("coordination_category:"):
         parsed = _property_category(action)
         if parsed is None:
             return TelegramServiceOutcome(True, action, False)
@@ -391,7 +498,7 @@ async def handle_v3_service_callback(
         user_data[PROPERTY_SESSION_KEY] = {"category_key": key, "category": label, "description": "", "event_time": "", "contacted": None, "stage": "description"}
         await render_service_view(query, property_description_view(label), advisor_url=advisor_url)
         return TelegramServiceOutcome(True, action, True)
-    if action == "property_modify_desc":
+    if action == "coordination_modify_desc":
         state = user_data.get(PROPERTY_SESSION_KEY)
         if not isinstance(state, dict):
             return TelegramServiceOutcome(True, action, False)
@@ -399,7 +506,7 @@ async def handle_v3_service_callback(
         state["stage"] = "description"
         await render_service_view(query, property_description_view(str(state.get("category") or "物业协调")), advisor_url=advisor_url)
         return TelegramServiceOutcome(True, action, True)
-    if action == "property_modify_time":
+    if action == "coordination_modify_time":
         state = user_data.get(PROPERTY_SESSION_KEY)
         if not isinstance(state, dict):
             return TelegramServiceOutcome(True, action, False)
@@ -407,7 +514,7 @@ async def handle_v3_service_callback(
         state["stage"] = "time"
         await render_service_view(query, property_time_view(), advisor_url=advisor_url)
         return TelegramServiceOutcome(True, action, True)
-    if action == "property_modify_contacted":
+    if action == "coordination_modify_contacted":
         state = user_data.get(PROPERTY_SESSION_KEY)
         if not isinstance(state, dict):
             return TelegramServiceOutcome(True, action, False)
@@ -415,7 +522,7 @@ async def handle_v3_service_callback(
         state["stage"] = "contacted"
         await render_service_view(query, property_contacted_view(), advisor_url=advisor_url)
         return TelegramServiceOutcome(True, action, True)
-    if action.startswith("property_time:"):
+    if action.startswith("coordination_time:"):
         state = user_data.get(PROPERTY_SESSION_KEY)
         if not isinstance(state, dict):
             return TelegramServiceOutcome(True, action, False)
@@ -428,7 +535,7 @@ async def handle_v3_service_callback(
         state["stage"] = "contacted"
         await render_service_view(query, property_contacted_view(), advisor_url=advisor_url)
         return TelegramServiceOutcome(True, action, True)
-    if action.startswith("property_contacted:"):
+    if action.startswith("coordination_contacted:"):
         state = user_data.get(PROPERTY_SESSION_KEY)
         if not isinstance(state, dict):
             return TelegramServiceOutcome(True, action, False)
@@ -444,7 +551,7 @@ async def handle_v3_service_callback(
             property_name=prop,
         ), advisor_url=advisor_url)
         return TelegramServiceOutcome(True, action, True)
-    if action == "property_confirm":
+    if action == "coordination_confirm":
         state = user_data.get(PROPERTY_SESSION_KEY)
         if not isinstance(state, dict):
             return TelegramServiceOutcome(True, action, False)
@@ -459,7 +566,7 @@ async def handle_v3_service_callback(
             user_data.pop(PROPERTY_SESSION_KEY, None)
             user_data.pop(PROPERTY_ANCHOR_KEY, None)
         return TelegramServiceOutcome(True, action, True, effect)
-    if action == "property_exit":
+    if action == "coordination_exit":
         user_data.pop(PROPERTY_SESSION_KEY, None)
         user_data.pop(PROPERTY_ANCHOR_KEY, None)
         await render_service_view(query, property_exit_view(), advisor_url=advisor_url)
