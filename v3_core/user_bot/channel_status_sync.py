@@ -261,4 +261,3 @@ __all__ = [
     "caption_with_appointment_status",
     "derive_appointment_inventory_status",
 ]
-
