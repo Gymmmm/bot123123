@@ -7,6 +7,9 @@ from .common import *
 def matches(data: str) -> bool:
     return (
         data == 'service:hub'
+        or data == 'service:resident'
+        or data.startswith('repair_')
+        or data.startswith('coordination_')
         or data == 'service:promise'
         or data == 'service:contact'
         or data in {'service:renew', 'service:change', 'service:renew_change', 'service:terminate', 'service:move', 'service:staging', 'service:addons', 'service:checkin_tips'}
@@ -30,7 +33,7 @@ def _service_back_keyboard(*, parent_callback: str='service:hub', parent_label: 
 async def handle_service_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, query, data: str, user) -> int | None:
     from .admin_contract import _user_contact_text, _user_mention_html
     from .flows import contact_management, show_search_entry, show_service_hub
-    from .keyboards_search import local_life_keyboard, nearby_area_keyboard, rfcity_back_keyboard, rfcity_keyboard, service_repair_keyboard
+    from .keyboards_search import local_life_keyboard, nearby_area_keyboard, rfcity_back_keyboard, rfcity_keyboard, service_repair_keyboard, resident_service_keyboard, repair_attachment_keyboard, repair_time_keyboard, repair_confirm_keyboard
     from .results_admin import _notify_admins, admin_repair_keyboard
     from .search import create_lead
     from .session_deeplink import now_ts
@@ -43,6 +46,106 @@ async def handle_service_callback(update: Update, context: ContextTypes.DEFAULT_
         # Generic service contact must not inherit a listing opened earlier in the chat.
         context.user_data.pop('contact_listing_id', None)
         return await contact_management(update, context, source='service_hub')
+
+    if data == 'service:resident':
+        context.user_data.pop('repair_flow', None)
+        context.user_data.pop('coordination_flow', None)
+        await render_panel(
+            update,
+            text='🛡️ <b>入住服务</b>\n签约不是服务的结束。',
+            parse_mode=ParseMode.HTML,
+            reply_markup=resident_service_keyboard(),
+            context=context,
+        )
+        return MAIN
+
+    if data == 'service:repair_hub':
+        context.user_data.pop('repair_flow', None)
+        await render_panel(update, text='🔧 <b>房屋报修</b>', parse_mode=ParseMode.HTML, reply_markup=service_repair_keyboard(), context=context)
+        return MAIN
+
+    if data.startswith('repair_type_'):
+        issue_key = data[len('repair_type_'):]
+        issue_labels = {
+            'ac': '空调',
+            'water': '热水 / 漏水',
+            'power': '灯具 / 电路',
+            'door': '门锁 / 门禁',
+            'washer': '洗衣机',
+            'fridge': '冰箱',
+            'network': '网络',
+            'furniture': '家具损坏',
+            'other': '其他问题',
+        }
+        issue_label = issue_labels.get(issue_key)
+        if not issue_label:
+            return MAIN
+        context.user_data['repair_flow'] = {'issue_key': issue_key, 'issue_label': issue_label, 'step': 'description'}
+        await render_panel(update, text=f'🔧 <b>{he(issue_label)}</b>\n\n请描述具体问题。', parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('⬅️ 退出报修', callback_data='service:resident')]]), context=context)
+        return MAIN
+
+    if data == 'repair_attachment_skip':
+        flow = context.user_data.get('repair_flow') or {}
+        if flow.get('step') != 'attachment':
+            return MAIN
+        flow['step'] = 'time'
+        context.user_data['repair_flow'] = flow
+        await render_panel(update, text='请选择方便处理的时间。', reply_markup=repair_time_keyboard(), context=context)
+        return MAIN
+
+    if data.startswith('repair_time_'):
+        flow = context.user_data.get('repair_flow') or {}
+        if flow.get('step') != 'time':
+            return MAIN
+        slot = data[len('repair_time_'):]
+        slot_map = {'today': '今天', 'tomorrow_am': '明天上午', 'tomorrow_pm': '明天下午'}
+        if slot not in slot_map:
+            return MAIN
+        flow['preferred_time'] = slot_map[slot]
+        flow['step'] = 'confirm'
+        context.user_data['repair_flow'] = flow
+        await render_panel(update, text=f"问题｜{he(str(flow.get('issue_label') or '-'))}\n时间｜{he(flow['preferred_time'])}", reply_markup=repair_confirm_keyboard(), context=context)
+        return MAIN
+
+    if data == 'repair_confirm':
+        flow = context.user_data.get('repair_flow') or {}
+        if flow.get('step') != 'confirm':
+            return MAIN
+        binding = db.get_active_binding(user.id)
+        binding_id = int((binding or {}).get('id') or 0) or None
+        detail = str(flow.get('description') or '')
+        attachment = str(flow.get('attachment_file_id') or '')
+        if attachment:
+            detail = f'{detail}\n附件：{attachment}'
+        ticket_id = db.create_repair_ticket(user.id, binding_id, str(flow.get('issue_label') or '其他问题'), detail, now_ts())
+        create_lead(user, action='service_request_submit', source='service_hub', listing_id=str((binding or {}).get('property_name') or ''), payload={'ticket_id': ticket_id, 'issue_type': flow.get('issue_label'), 'preferred_time': flow.get('preferred_time'), 'binding_id': binding_id})
+        await _notify_admins(context, title='新报修请求', lines=[f'客户：{_user_mention_html(user)}', f'联系方式：{he(_user_contact_text(user))}', f'工单：{ticket_id}', f"问题：{he(str(flow.get('issue_label') or '-'))}", f"时间：{he(str(flow.get('preferred_time') or '-'))}", f'说明：{he(detail)}'], reply_markup=admin_repair_keyboard(ticket_id))
+        context.user_data.pop('repair_flow', None)
+        await render_panel(
+            update,
+            text=(
+                '✅ <b>报修已提交</b>\n'
+                f'工单｜{ticket_id}\n'
+                f"问题｜{he(str(flow.get('issue_label') or '-'))}\n"
+                f"时间｜{he(str(flow.get('preferred_time') or '-'))}\n"
+                '处理进度会在这里通知你。'
+            ),
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('💬 中文顾问', callback_data=f'repair_advisor_{ticket_id}'), InlineKeyboardButton('🛡️ 返回入住服务', callback_data='service:resident')]]),
+            context=context,
+        )
+        return MAIN
+
+    if data.startswith('repair_advisor_'):
+        raw_ticket = data[len('repair_advisor_'):]
+        create_lead(user, action='repair_advisor_click', source='service_hub', payload={'ticket_id': raw_ticket})
+        context.user_data['service_ticket_id'] = raw_ticket
+        return await contact_management(update, context, source=f'repair_ticket:{raw_ticket}')
+
+    if data == 'coordination_start':
+        context.user_data['coordination_flow'] = {'step': 'issue'}
+        await render_panel(update, text='🏢 <b>物业协调</b>\n\n请描述需要协调的问题。', parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('⬅️ 返回入住服务', callback_data='service:resident')]]), context=context)
+        return MAIN
 
     if data == 'service:general':
         for key in ('contact_listing_id', 'contact_touch_payload', 'appt', 'active_listing_id', 'listing_id'):
@@ -74,9 +177,6 @@ async def handle_service_callback(update: Update, context: ContextTypes.DEFAULT_
         )
         return MAIN
 
-    if data == 'service:repair_hub':
-        await render_panel(update, text='🔧 <b>设备报修</b>\n\n请选择出现问题的设备。', parse_mode=ParseMode.HTML, reply_markup=service_repair_keyboard(), context=context)
-        return MAIN
 
     if data == 'service_request:property':
         await render_panel(
