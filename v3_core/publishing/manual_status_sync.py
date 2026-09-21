@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import asyncio
 from pathlib import Path
+import json
 import re
 import sqlite3
 import time
@@ -17,13 +18,12 @@ from typing import Any
 
 from telegram.constants import ParseMode
 
-from v3_core.status_labels import inventory_status_presentation
-
-from .channel_contract import channel_action_url, official_channel_action_urls
+from .channel_contract import assert_channel_identity, channel_action_url, official_channel_action_urls
+from .channel_renderer import channel_status_presentation
 from .telegram_adapter import build_channel_keyboard
 
 
-_STATUS_RE = re.compile(r"(?m)^[🟢🟡🔵🔴⚫]️?\s*(?:房源状态｜)?[^\n]*")
+_STATUS_RE = re.compile(r"(?m)^[🟢🟡🟠🔵🔴⚫]️?\s*(?:房源状态｜)?[^\n]*")
 
 
 @dataclass(frozen=True)
@@ -37,6 +37,28 @@ class ManualStatusSyncResult:
     error: str = ""
 
 
+def _frozen_public_id(row: dict[str, Any], listing_id: str) -> str:
+    snapshot = json.loads(str(row.get("snapshot_json") or "{}"))
+    public_id = str(snapshot.get("public_listing_id") or "").strip()
+    frozen_listing_id = str(snapshot.get("listing_id") or "").strip()
+    clean_listing = str(listing_id or "").strip()
+    if (
+        clean_listing != str(row.get("publication_listing_id") or "")
+        or clean_listing != str(row.get("package_listing_id") or "")
+        or clean_listing != frozen_listing_id
+    ):
+        raise ValueError("channel_identity_listing_id_mismatch")
+    if public_id != str(row.get("live_public_listing_id") or "").strip():
+        raise ValueError("channel_identity_public_listing_id_mismatch")
+    frozen_actions = json.loads(str(row.get("actions_json") or "{}"))
+    assert_channel_identity(
+        caption=row.get("post_text"),
+        actions=frozen_actions,
+        public_listing_id=public_id,
+    )
+    return public_id
+
+
 def caption_with_inventory_status(
     caption: object,
     *,
@@ -45,7 +67,7 @@ def caption_with_inventory_status(
 ) -> str:
     raw = str(caption or "").strip()
     public_id = str(public_listing_id or "").strip()
-    icon, label = inventory_status_presentation(status)
+    icon, label = channel_status_presentation(status)
     status_line = f"{icon} {label}　{public_id}".strip()
     if _STATUS_RE.search(raw):
         replaced = False
@@ -94,8 +116,11 @@ class PublisherManualStatusSynchronizer:
         with self._connect() as conn:
             row = conn.execute(
                 """SELECT pi.id AS publication_row_id,pi.channel_chat_id,
-                          pi.channel_message_id,pi.post_text,l.public_listing_id
+                          pi.channel_message_id,pi.post_text,pi.listing_id AS publication_listing_id,
+                          p.listing_id AS package_listing_id,p.snapshot_json,p.actions_json,
+                          l.public_listing_id AS live_public_listing_id
                    FROM publication_instances pi
+                   JOIN publication_packages_v3 p ON p.package_id=pi.package_id
                    JOIN listings_v3 l ON l.listing_id=pi.listing_id
                    WHERE pi.listing_id=?
                      AND pi.platform='telegram'
@@ -123,9 +148,7 @@ class PublisherManualStatusSynchronizer:
         if row is None:
             return ManualStatusSyncResult(clean_listing, clean_status, False, False, error="published_instance_not_found")
         try:
-            public_id = str(row.get("public_listing_id") or "").strip()
-            if not public_id:
-                raise ValueError("public_listing_id_missing")
+            public_id = _frozen_public_id(row, clean_listing)
             chat_id = str(row.get("channel_chat_id") or "").strip()
             message_id = int(str(row.get("channel_message_id") or "0"))
             caption = caption_with_inventory_status(
@@ -189,16 +212,28 @@ class PublisherManualStatusSynchronizer:
             job = conn.execute("SELECT * FROM publisher_status_sync_outbox_v3 WHERE listing_id=?", (listing_id,)).fetchone()
             listing = conn.execute("SELECT inventory_status FROM listings_v3 WHERE listing_id=?", (listing_id,)).fetchone()
             rows = conn.execute("""SELECT pi.id AS publication_row_id,pi.channel_chat_id,
-                pi.channel_message_id,pi.post_text,l.public_listing_id
-                FROM publication_instances pi JOIN listings_v3 l ON l.listing_id=pi.listing_id
+                pi.channel_message_id,pi.post_text,pi.listing_id AS publication_listing_id,
+                p.listing_id AS package_listing_id,p.snapshot_json,p.actions_json,
+                l.public_listing_id AS live_public_listing_id
+                FROM publication_instances pi
+                JOIN publication_packages_v3 p ON p.package_id=pi.package_id
+                JOIN listings_v3 l ON l.listing_id=pi.listing_id
                 WHERE pi.listing_id=? AND pi.platform='telegram' AND pi.publish_status='published'
                 AND CAST(COALESCE(pi.channel_message_id,'0') AS INTEGER)>0 ORDER BY pi.id""", (listing_id,)).fetchall()
         status = str(listing[0]) if listing else ""
         result = ManualStatusSyncResult(listing_id, status, False, False, error="published_instance_not_found")
-        for row in rows:
-            result = await self.sync(bot, listing_id=listing_id, status=status, _row=dict(row))
-            if not result.synced:
-                break
+        try:
+            for row in rows:
+                _frozen_public_id(dict(row), listing_id)
+        except Exception as exc:
+            result = ManualStatusSyncResult(
+                listing_id, status, True, False, error=str(exc)
+            )
+        else:
+            for row in rows:
+                result = await self.sync(bot, listing_id=listing_id, status=status, _row=dict(row))
+                if not result.synced:
+                    break
         if job:
             with self._connect() as conn:
                 if not rows or result.synced:
