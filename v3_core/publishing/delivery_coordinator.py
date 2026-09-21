@@ -32,6 +32,7 @@ class TelegramSendCommand:
     caption: str
     actions: dict[str, str]
     inventory_status: str
+    area_key: str = ""
 
 
 @dataclass(frozen=True)
@@ -124,7 +125,7 @@ class PublicationDeliveryCoordinator:
         # disagree while the DB remains safely pending until success.
         live_status = str(listing.get("inventory_status") or "pending").strip().lower()
         override = str(inventory_status_override or "").strip().lower()
-        allowed = {"active", "reserved", "pending", "rented", "inactive", "offline"}
+        allowed = {"active", "reserved", "high_demand", "pending", "rented", "inactive", "offline"}
         if override and override not in allowed:
             raise ValueError(f"invalid_inventory_status_override:{inventory_status_override}")
         effective_status = override or live_status
@@ -136,6 +137,7 @@ class PublicationDeliveryCoordinator:
             caption=package.post_text,
             actions=dict(package.actions),
             inventory_status=effective_status,
+            area_key=str(listing.get("public_location_key") or listing.get("canonical_area_key") or "").strip(),
         )
 
     def mark_sending(self, attempt_id: str) -> None:
