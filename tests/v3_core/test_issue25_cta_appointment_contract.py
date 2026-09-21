@@ -164,7 +164,7 @@ def test_details_and_photos_contract_has_real_fields_three_entries_and_no_intern
 
 def test_contact_entries_have_real_callbacks_when_external_config_is_missing():
     home = build_home_view(channel_url="")
-    contact = next(choice for row in home.rows for choice in row if choice.label == "中文顾问")
+    contact = next(choice for row in home.rows for choice in row if choice.label == "💬 中文顾问")
     assert contact.kind == "contact"
 
     intent = SearchSubmitIntent(
