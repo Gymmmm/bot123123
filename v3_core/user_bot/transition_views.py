@@ -105,7 +105,7 @@ def _appointment_mode_view(draft: PublicAppointmentDraft, inventory: PublicInven
                 TransitionChoice("实地看房", "appointment_mode", "offline"),
                 TransitionChoice("视频代看", "appointment_mode", "video"),
             ),
-            (TransitionChoice("退出预约", "appointment_exit"),),
+            (TransitionChoice("⬅️ 返回房源", "appointment_exit"),),
         ),
     )
 
@@ -123,11 +123,11 @@ def _appointment_date_view(draft: PublicAppointmentDraft, inventory: PublicInven
             f"{he(subject)}"
         ),
         rows=(
-            (TransitionChoice(f"今天 ({today.month}月{today.day}日)", "appointment_date", today_value),),
-            (TransitionChoice(f"明天 ({(today + timedelta(days=1)).month}月{(today + timedelta(days=1)).day}日)", "appointment_date", tomorrow_value),),
-            (TransitionChoice(f"后天 ({(today + timedelta(days=2)).month}月{(today + timedelta(days=2)).day}日)", "appointment_date", after_value),),
+            (TransitionChoice(f"今天 · {today.month}月{today.day}日", "appointment_date", today_value),),
+            (TransitionChoice(f"明天 · {(today + timedelta(days=1)).month}月{(today + timedelta(days=1)).day}日", "appointment_date", tomorrow_value),),
+            (TransitionChoice(f"后天 · {(today + timedelta(days=2)).month}月{(today + timedelta(days=2)).day}日", "appointment_date", after_value),),
             (TransitionChoice("其他日期", "appointment_other_date"),),
-            (TransitionChoice("返回", "appointment_back_mode"),),
+            (TransitionChoice("⬅️ 返回上一步", "appointment_back_mode"),),
         ),
     )
 
@@ -151,7 +151,7 @@ def _appointment_time_view(draft: PublicAppointmentDraft, inventory: PublicInven
 
 
 def _custom_date_prompt() -> TransitionView:
-    return TransitionView(kind="appointment_custom_date", text="<b>请输入日期</b>\n\n例如：<code>0905</code>、<code>9月5日</code> 或 <code>下周三</code>", rows=())
+    return TransitionView(kind="appointment_custom_date", text="<b>请输入日期</b>\n\n9月25日 / 0925 / 下周三", rows=())
 
 
 def _custom_time_prompt() -> TransitionView:
