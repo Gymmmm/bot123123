@@ -56,11 +56,32 @@ def test_channel_keyboard_booking_follows_inventory_status(status, has_book):
     assert ("📅 预约看房" in labels) is has_book
     assert ("📷 房源详情" in labels) is has_book
     assert "📸 更多实拍" not in labels
-    assert ("🏠 帮我找房" in labels) is (not has_book)
-    assert ("🔎 看看房源" in labels) is (not has_book)
+    if status == "pending":
+        assert labels == ["🔎 看相近房源", "💬 中文顾问"]
+    elif not has_book:
+        assert "🏠 帮我找房" in labels
+        assert "🔎 看看房源" in labels
     assert "💬 中文顾问" in labels
     assert "🔍 更多房源" not in labels
     assert "📷 更多详情" not in labels
+
+
+def test_channel_status_copy_uses_v1_final_lock_without_changing_inventory_logic():
+    expected = {
+        "active": "🟢 当前可预约",
+        "reserved": "🟡 已有预约，仍可预约",
+        "high_demand": "🟠 预约较多",
+        "pending": "🔵 房态确认中",
+        "rented": "🔴 已租出",
+        "offline": "⚫ 已下架",
+    }
+    for status, visible in expected.items():
+        caption = render_channel_caption(
+            listing={"project_name": "富力城", "layout": "1房", "property_type": "公寓", "inventory_status": status},
+            offer={"offer_type": "rent", "monthly_rent_usd": 680},
+            public_listing_id="QL-RF-A2B3",
+        )
+        assert visible in caption
 
 
 def test_channel_reserved_status_uses_locked_user_visible_semantics():
