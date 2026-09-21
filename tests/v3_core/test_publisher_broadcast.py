@@ -15,7 +15,7 @@ from v3_core.publishing.broadcast import (
     parse_hhmm,
 )
 from v3_core.publishing.publisher_app import V3PublisherApplication
-from v3_core.publishing.marketing_broadcast import TEMPLATES as MARKETING_TEMPLATES
+from v3_core.publishing.marketing_broadcast import (\n    MarketingBroadcastService,\n    TEMPLATES as MARKETING_TEMPLATES,\n)
 from v3_core.storage.bootstrap import initialize_v3_storage
 
 
@@ -45,12 +45,48 @@ def test_parse_hhmm_is_strict():
     assert parse_hhmm("12:60") is None
 
 
-def test_tuesday_marketing_button_describes_latest_listing_landing_truthfully():
-    tuesday = next(template for template in MARKETING_TEMPLATES if template.key == "tue")
-    assert tuesday.buttons == (
-        ("🏘 选择房源预约", "latest"),
-        ("🔍 继续找房", "find_home"),
-    )
+def test_marketing_template_button_metadata_matches_locked_v1_ctas():
+    expected = {
+        "mon": (("🔍 开始找房", "find"), ("💬 中文顾问", "advisor"), ("📢 最新房源", "latest")),
+        "tue": (("💬 中文顾问", "advisor"), ("🛎️ 侨联服务", "service"), ("🔍 开始找房", "find")),
+        "wed": (("🔍 开始找房", "find"), ("💬 中文顾问", "advisor")),
+        "thu": (("💬 中文顾问", "advisor"), ("🔍 开始找房", "find")),
+        "fri": (("💬 中文顾问", "advisor"), ("🔍 开始找房", "find")),
+        "sat": (("🔍 开始找房", "find"), ("🛎️ 侨联服务", "service"), ("💬 中文顾问", "advisor")),
+        "sun": (("🛎️ 侨联服务", "service"), ("💬 中文顾问", "advisor")),
+    }
+    assert {template.key: template.buttons for template in MARKETING_TEMPLATES} == expected
+
+
+def test_marketing_runtime_button_rows_and_urls_match_locked_v1(tmp_path, monkeypatch):
+    db = tmp_path / "marketing.db"
+    initialize_v3_storage(db)
+    monkeypatch.setenv("CHANNEL_USERNAME", "qiaolian_channel")
+    service = MarketingBroadcastService(db, user_bot_username="qiaolian_rent_bot")
+
+    expected_labels = {
+        "mon": [["🔍 开始找房", "💬 中文顾问"], ["📢 最新房源"]],
+        "tue": [["💬 中文顾问", "🛎️ 侨联服务"], ["🔍 开始找房"]],
+        "wed": [["🔍 开始找房", "💬 中文顾问"]],
+        "thu": [["💬 中文顾问", "🔍 开始找房"]],
+        "fri": [["💬 中文顾问", "🔍 开始找房"]],
+        "sat": [["🔍 开始找房", "🛎️ 侨联服务"], ["💬 中文顾问"]],
+        "sun": [["🛎️ 侨联服务", "💬 中文顾问"]],
+    }
+    expected_urls = {
+        "🔍 开始找房": "https://t.me/qiaolian_rent_bot?start=find",
+        "💬 中文顾问": "https://t.me/qiaolian_rent_bot?start=advisor",
+        "🛎️ 侨联服务": "https://t.me/qiaolian_rent_bot?start=service",
+        "📢 最新房源": "https://t.me/qiaolian_channel",
+    }
+
+    for template in MARKETING_TEMPLATES:
+        rows = service.footer_rows(template)
+        assert [[button.label for button in row] for row in rows] == expected_labels[template.key]
+        for row in rows:
+            for button in row:
+                assert button.url == expected_urls[button.label]
+                assert "↗" not in button.label
 
 
 def test_missing_database_is_not_created(tmp_path):
