@@ -182,7 +182,7 @@ def budget_bounds(code: object) -> tuple[str, int | None, int | None]:
 
 def _search_budget_view(area_display: str = "", *, back_label: str = "⬅️ 返回找房") -> TransitionView:
     clean_area = str(area_display or "").strip()
-    area_line = f"\n已选区域：{he(clean_area)}" if clean_area else ""
+    area_line = f"\n\n已选区域｜{he(clean_area)}" if clean_area else ""
     choices = tuple(
         TransitionChoice(label, "budget_choice", code, budget_min=budget_min, budget_max=budget_max)
         for code, label, budget_min, budget_max in _BUDGET_OPTIONS
@@ -191,11 +191,10 @@ def _search_budget_view(area_display: str = "", *, back_label: str = "⬅️ 返
         (choices[0], choices[1]),
         (choices[2], choices[3]),
         (choices[4], choices[5]),
-        (TransitionChoice("自己输入", "budget_custom"),),
-        (TransitionChoice("返回找房", "change_search"),),
+        (TransitionChoice("✏️ 自己输入", "budget_custom"), TransitionChoice("💬 中文顾问", "home", "contact")),
+        (TransitionChoice("⬅️ 返回找房", "change_search"),),
     )
-    return TransitionView(kind="search_budget", text=f"<b>选择预算</b>{area_line}\n\n美元 / 月", rows=rows)
-
+    return TransitionView(kind="search_budget", text=f"💰 <b>预算大概多少？</b>{area_line}\n\n美元 / 月", rows=rows)
 
 def _search_area_view() -> TransitionView:
     choices = tuple(TransitionChoice(label, "area_choice", code) for code, label in AREA_OPTIONS)
@@ -203,30 +202,30 @@ def _search_area_view() -> TransitionView:
         (choices[0], choices[1]),
         (choices[2], choices[3]),
         (choices[4], choices[5]),
-        (choices[6],),
-        (choices[7],),
+        (choices[6], choices[7]),
         (choices[8], choices[9]),
-        (choices[10],),
-        (TransitionChoice("其他位置", "area_other"),),
-        (TransitionChoice("返回找房", "change_search"),),
+        (choices[10], TransitionChoice("其他位置", "area_other")),
+        (TransitionChoice("⬅️ 返回找房", "change_search"),),
     )
-    return TransitionView(kind="search_area", text="<b>选择区域</b>\n\n请选择找房区域。", rows=rows)
-
+    return TransitionView(
+        kind="search_area",
+        text="📍 <b>想住哪里？</b>\n\n选择区域，也可以直接告诉我小区或附近地标。",
+        rows=rows,
+    )
 
 def _search_layout_view(area_display: str = "", budget_label: str = "") -> TransitionView:
     choices = tuple(TransitionChoice(label, "layout_choice", code) for code, label in LAYOUT_OPTIONS)
     selected = " · ".join(
         value for value in (str(area_display or "").strip(), str(budget_label or "").strip()) if value
     )
-    selected_line = f"\n\n已选：{he(selected)}" if selected else ""
+    selected_line = f"\n\n已选｜{he(selected)}" if selected else ""
     rows = (
         (choices[0], choices[1]),
         (choices[2], choices[3]),
         (choices[4], choices[5]),
-        (TransitionChoice("返回找房", "change_search"),),
+        (TransitionChoice("⬅️ 返回找房", "change_search"),),
     )
-    return TransitionView(kind="search_layout", text=f"<b>选择户型</b>{selected_line}", rows=rows)
-
+    return TransitionView(kind="search_layout", text=f"🏠 <b>想找什么户型？</b>{selected_line}", rows=rows)
 
 def _similar_view(plan: TransitionPlan) -> TransitionView:
     if plan.similar is None:
@@ -235,21 +234,22 @@ def _similar_view(plan: TransitionPlan) -> TransitionView:
 
 
 _SEARCH_ENTRY_TEXT = (
-    "<b>开始找房</b>\n\n"
-    "直接发需求，例如：<b>BKK1 两房，预算 $800</b>\n"
-    "也可以按条件筛选。"
+    "🔍 <b>想找什么样的房子？</b>\n\n"
+    "直接发需求就可以，例如：\n"
+    "<code>BKK1 一房，预算 $600</code>\n"
+    "<code>富力城两房，要能做饭</code>\n"
+    "<code>钻石岛公寓，想看实拍</code>\n\n"
+    "也可以按条件筛选："
 )
 
 
 def _search_entry_view() -> TransitionView:
     rows = (
-        (TransitionChoice("选择区域", "search_area"), TransitionChoice("选择预算", "search_budget")),
-        (TransitionChoice("选择户型", "search_layout"),),
-        (TransitionChoice("中文顾问", "home", "contact"),),
-        (TransitionChoice("返回首页", "home"),),
+        (TransitionChoice("📍 按区域", "search_area"), TransitionChoice("💰 按预算", "search_budget")),
+        (TransitionChoice("🏠 按户型", "search_layout"), TransitionChoice("💬 中文顾问", "home", "contact")),
+        (TransitionChoice("⬅️ 返回首页", "home"),),
     )
     return TransitionView(kind="search_entry", text=_SEARCH_ENTRY_TEXT, rows=rows)
-
 
 def _change_search_view(plan: TransitionPlan) -> TransitionView:
     if plan.change_search is None:
