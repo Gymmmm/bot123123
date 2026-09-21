@@ -106,7 +106,7 @@ async def test_appointments_create_independent_surface():
     assert [c[0] for c in query.calls]==["answer"]
     assert "QL-RF-A2B3" in message.calls[-1][1]
     labels=[b.text for row in message.calls[-1][2]["reply_markup"].inline_keyboard for b in row]
-    assert labels==["中文顾问","开始找房","返回首页"]
+    assert labels==["🔍 开始找房","💬 中文顾问","⬅️ 返回首页"]
 
 
 @pytest.mark.asyncio
