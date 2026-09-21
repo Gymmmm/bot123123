@@ -80,4 +80,3 @@ def test_explicit_payload_builder_keeps_legacy_default_and_validates_source_code
             "details",
             source_code="bad-code",
         )
-
