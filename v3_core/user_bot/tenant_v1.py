@@ -40,15 +40,13 @@ def tenant_home_view(service: TenantService, user_id: int) -> ServiceView:
 def missing_lease_view() -> ServiceView:
     return ServiceView(
         "tenant_lease_missing",
-        "<b>我的租约</b>\n\n"
-        "目前没有查到已绑定的租约记录。\n\n"
-        "如果您已经通过侨联入住，但这里暂未显示，可以联系中文顾问协助核对。",
+        "📋 <b>我的租约</b>\n"
+        "目前没有查到已绑定的租约。如果你已经通过侨联入住，但这里暂时没有显示，可以联系中文顾问帮你核对。",
         (
-            (ServiceChoice("中文顾问", "v3u:home:contact"),),
-            (ServiceChoice("返回侨联服务", "v3u:home:service"),),
+            (ServiceChoice("💬 中文顾问", "v3u:home:contact"),),
+            (ServiceChoice("⬅️ 返回侨联服务", "v3u:home:service"),),
         ),
     )
-
 
 def lease_view(service: TenantService, user_id: int) -> ServiceView:
     binding = service.require_active_binding(user_id)
@@ -59,20 +57,18 @@ def lease_view(service: TenantService, user_id: int) -> ServiceView:
     property_name = he(_safe_text(binding.property_name))
     return ServiceView(
         "tenant_lease",
-        f"<b>我的租约</b>\n\n"
-        f"<b>{property_name}</b>\n\n"
-        f"月租　{rent}\n"
-        f"押金　{deposit}\n"
-        f"交租日　{day}\n"
-        f"到期日　{he(end)}\n\n"
-        "当前租约有效",
+        f"📋 <b>租赁详情</b>\n"
+        f"🏠 {property_name}\n"
+        f"月租｜{rent}\n"
+        f"押金｜{deposit}\n"
+        f"交租日｜{day}\n"
+        f"到期日｜{he(end)}\n"
+        "状态｜🟢 租约有效",
         (
-            (ServiceChoice("申请续租", "v3u:service:tenant_renew"), ServiceChoice("申请退租", "v3u:service:tenant_terminate")),
-            (ServiceChoice("中文顾问", "v3u:home:contact"),),
-            (ServiceChoice("返回侨联服务", "v3u:home:service"),),
+            (ServiceChoice("🔄 申请续租", "v3u:service:tenant_renew"), ServiceChoice("💬 中文顾问", "v3u:home:contact")),
+            (ServiceChoice("⬅️ 返回侨联服务", "v3u:home:service"),),
         ),
     )
-
 
 def renew_view(service: TenantService, user_id: int) -> ServiceView:
     binding = service.require_active_binding(user_id)
