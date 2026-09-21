@@ -111,9 +111,10 @@ def test_channel_ctas_and_sync_contract_share_one_real_listing():
     assert [[label for label, _ in row] for row in rows] == [
         ["📷 房源详情", "📅 预约看房"], ["💬 中文顾问"],
     ]
-    assert all(f"property_{PUBLIC_ID}_" in urls[key] for key in ("details", "photos", "book"))
-    assert PUBLIC_ID in urls["consult"]
-    assert f"property_{PUBLIC_ID}_contact__ch" in urls["consult"]
+    assert urls["details"] == f"https://t.me/QiaoLianBot?start=property_{PUBLIC_ID}_details"
+    assert urls["photos"] == f"https://t.me/QiaoLianBot?start=property_{PUBLIC_ID}_photos"
+    assert urls["book"] == f"https://t.me/QiaoLianBot?start=property_{PUBLIC_ID}_book"
+    assert urls["consult"] == f"https://t.me/QiaoLianBot?start=property_{PUBLIC_ID}_contact"
     synced = official_channel_button_spec(urls, inventory_status="reserved")
     assert synced == rows
     unbookable = official_channel_button_spec(urls, inventory_status="pending", area="BKK1")
