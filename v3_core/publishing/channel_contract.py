@@ -6,6 +6,7 @@ legacy listing/draft tables merely to discover an identifier.
 """
 from __future__ import annotations
 
+import re
 from urllib.parse import parse_qs, urlparse
 
 from v3_core.status_labels import inventory_status_bookable
@@ -33,6 +34,33 @@ _ACTION_SUFFIX = {
 }
 _START_PAYLOAD_RE_PREFIX = "property_"
 _CHANNEL_SOURCE_CODE = "ch"
+
+_CAPTION_PUBLIC_ID_RE = re.compile(r"(?<![A-Z0-9-])(QL-[A-Z0-9]+(?:-[A-Z0-9]+)+)(?![A-Z0-9-])")
+
+
+def channel_caption_public_id(caption: object) -> str:
+    ids = {normalize_public_id(value) for value in _CAPTION_PUBLIC_ID_RE.findall(str(caption or ""))}
+    ids.discard("")
+    if len(ids) != 1:
+        raise ValueError("channel_caption_public_listing_id_missing_or_ambiguous")
+    return next(iter(ids))
+
+
+def assert_channel_identity(*, caption: object, actions: dict[str, str], public_listing_id: object) -> str:
+    expected = normalize_public_id(public_listing_id)
+    if not expected:
+        raise ValueError("channel_public_listing_id_missing")
+    caption_id = channel_caption_public_id(caption)
+    if caption_id != expected:
+        raise ValueError(f"channel_caption_public_listing_id_mismatch:{caption_id}:{expected}")
+    verified = official_channel_action_identity(actions)
+    action_ids = set()
+    for action, url in verified.items():
+        action_ids.add(_consult_public_id_from_url(url) if action == "consult" else _public_id_from_action_url(url, action))
+    if action_ids != {expected}:
+        raise ValueError(f"channel_action_public_listing_id_mismatch:{sorted(action_ids)}:{expected}")
+    return expected
+
 
 
 def channel_start_payload(
@@ -256,6 +284,8 @@ __all__ = [
     "channel_action_url",
     "channel_actions",
     "channel_start_payload",
+    "assert_channel_identity",
+    "channel_caption_public_id",
     "official_channel_action_identity",
     "official_channel_action_urls",
     "official_channel_button_spec",
