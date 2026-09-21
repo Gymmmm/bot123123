@@ -59,8 +59,7 @@ def test_channel_keyboard_booking_follows_inventory_status(status, has_book):
     if status == "pending":
         assert labels == ["🔎 看相近房源", "💬 中文顾问"]
     elif not has_book:
-        assert "🏠 帮我找房" in labels
-        assert "🔎 看看房源" in labels
+        assert labels == ["🔎 看相近房源", "💬 中文顾问"]
     assert "💬 中文顾问" in labels
     assert "🔍 更多房源" not in labels
     assert "📷 更多详情" not in labels
