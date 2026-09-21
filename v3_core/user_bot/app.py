@@ -32,7 +32,7 @@ from .appointment_availability import AppointmentAvailabilityService
 from .appointment_runtime_effects import AppointmentRuntimeEffectExecutor
 from .channel_status_sync import V3AppointmentChannelSynchronizer
 from .contact_effects import ContactEffectExecutor
-from .home_views import build_home_view, phnom_penh_greeting
+from .home_views import build_home_view
 from .listing_contact import ListingContactEffectExecutor
 from .legacy_routes import legacy_home_action, legacy_reply_text_action, legacy_start_payload
 from .runtime import UserBotReadRuntime, build_read_runtime
@@ -192,9 +192,7 @@ def build_v3_user_bot_dependencies(config: V3UserBotConfig) -> V3UserBotDependen
 async def _render_home_callback(update: Any, config: V3UserBotConfig) -> None:
     query = update.callback_query
     await query.answer()
-    user = getattr(update, "effective_user", None)
-    first_name = str(getattr(user, "first_name", "") or getattr(user, "full_name", "") or "您")
-    home = build_home_view(channel_url=config.channel_url, advisor_url=config.advisor_url, first_name=first_name, greeting=phnom_penh_greeting())
+    home = build_home_view(channel_url=config.channel_url, advisor_url=config.advisor_url)
     message = getattr(query, "message", None)
     markup = build_home_keyboard(home)
     if getattr(message, "photo", None):
