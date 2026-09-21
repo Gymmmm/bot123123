@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import pytest
 
 from v3_core.publishing.delivery_coordinator import PublicationDeliveryCoordinator
@@ -133,6 +135,8 @@ def test_prepare_send_returns_only_frozen_single_cover_command(tmp_path):
     assert command.caption == package.post_text
     assert command.actions == package.actions
     assert tuple(command.actions) == ("details", "photos", "book", "consult")
+    assert "QL-RF-A2B3" in command.caption
+    assert all("QL-RF-A2B3" in url for url in command.actions.values())
 
 
 def test_receipt_commits_delivery_package_and_exact_publication_identity(tmp_path):
@@ -151,6 +155,7 @@ def test_receipt_commits_delivery_package_and_exact_publication_identity(tmp_pat
     assert committed.attempt.state == "committed"
     assert committed.publication.channel_message_id == "777"
     assert committed.publication.package_id == package.package_id
+    assert committed.publication.listing_id == package.listing_id
     assert packages.get(package.package_id).status == "published"
     assert deliveries.get(command.attempt_id).state == "committed"
     stored = publications.get_for_package(
@@ -204,3 +209,21 @@ def test_prepare_send_blocks_stale_first_publish_for_already_published_listing(t
             package_id=package.package_id,
             channel_chat_id="-100123",
         )
+
+
+def test_prepare_send_blocks_caption_button_public_identity_mismatch(tmp_path, monkeypatch):
+    package, coordinator, packages, _, _ = _setup(tmp_path)
+    bad_actions = dict(package.actions)
+    bad_actions["details"] = bad_actions["details"].replace("QL-RF-A2B3", "QL-XX-Z9Z9")
+    bad = replace(package, actions=bad_actions)
+    monkeypatch.setattr(packages, "verify_frozen", lambda package_id: bad)
+    with pytest.raises(DeliveryBlocked, match="channel_identity_mismatch"):
+        coordinator.prepare_send(package_id=package.package_id, channel_chat_id="-100123")
+
+
+def test_prepare_send_blocks_package_snapshot_listing_identity_mismatch(tmp_path, monkeypatch):
+    package, coordinator, packages, _, _ = _setup(tmp_path)
+    bad = replace(package, snapshot={**package.snapshot, "listing_id": "l_other"})
+    monkeypatch.setattr(packages, "verify_frozen", lambda package_id: bad)
+    with pytest.raises(DeliveryBlocked, match="channel_identity_mismatch:snapshot_listing_id"):
+        coordinator.prepare_send(package_id=package.package_id, channel_chat_id="-100123")
