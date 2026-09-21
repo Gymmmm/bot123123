@@ -45,7 +45,7 @@ _DEBUG_TRAILING_TEXT_RE = re.compile(
 def sanitize_publisher_text(value: object) -> str:
     """Strip known accidental trailing debug tokens from publisher text."""
     text = str(value or "").rstrip()
-    if text.lower() in {"a", "c", "a'a", "a’a"}:
+    if text.strip().lower() in {"a", "c", "a'a", "a’a"}:
         return ""
     return _DEBUG_TRAILING_TEXT_RE.sub("", text).rstrip()
 
