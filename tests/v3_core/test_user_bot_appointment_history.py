@@ -134,7 +134,8 @@ def test_history_shows_only_two_upcoming_and_counts_terminal_or_past_rows(tmp_pa
     assert "🟡 待顾问确认" in view.text
     assert "实时视频看房" in view.text
     assert PUBLIC_ID not in view.text
-    assert "LST_PRIVATE_1" not in view.text\n    assert "更多预约记录请联系中文顾问。" in view.text
+    assert "LST_PRIVATE_1" not in view.text
+    assert "更多预约记录请联系中文顾问。" in view.text
 
 
 def test_other_users_appointments_are_not_visible(tmp_path):
