@@ -53,14 +53,15 @@ def test_unknown_valid_source_code_falls_back_without_breaking_link():
     assert route.source_code == "x1"
 
 
-def test_official_channel_urls_emit_channel_source_code():
+def test_official_channel_urls_emit_exact_v1_payloads():
     urls = official_channel_action_urls(
         "qiaolian_rent_bot", "QL-RF-A2B3", advisor_url="https://t.me/qiaolian_advisor"
     )
 
-    assert urls["details"].endswith("property_QL-RF-A2B3_details__ch")
-    assert urls["photos"].endswith("property_QL-RF-A2B3_photos__ch")
-    assert urls["book"].endswith("property_QL-RF-A2B3_book__ch")
+    assert urls["details"].endswith("property_QL-RF-A2B3_details")
+    assert urls["photos"].endswith("property_QL-RF-A2B3_photos")
+    assert urls["book"].endswith("property_QL-RF-A2B3_book")
+    assert urls["consult"].endswith("property_QL-RF-A2B3_contact")
 
 
 def test_explicit_payload_builder_keeps_legacy_default_and_validates_source_code():
@@ -79,3 +80,4 @@ def test_explicit_payload_builder_keeps_legacy_default_and_validates_source_code
             "details",
             source_code="bad-code",
         )
+
