@@ -96,14 +96,14 @@ def _appointment_mode_view(draft: PublicAppointmentDraft, inventory: PublicInven
     return TransitionView(
         kind="appointment_mode",
         text=(
-            "<b>预约看房</b>\n\n"
-            f"{he(subject)}\n"
-            "请选择看房方式。"
+            "📅 <b>预约看房</b>\n"
+            f"🏠 {he(subject)}\n"
+            "请选择看房方式："
         ),
         rows=(
             (
-                TransitionChoice("实地看房", "appointment_mode", "offline"),
-                TransitionChoice("视频代看", "appointment_mode", "video"),
+                TransitionChoice("🚶 实地看房", "appointment_mode", "offline"),
+                TransitionChoice("🎥 视频代看", "appointment_mode", "video"),
             ),
             (TransitionChoice("⬅️ 返回房源", "listing_details", public_listing_id=draft.public_listing_id),),
         ),
@@ -119,8 +119,8 @@ def _appointment_date_view(draft: PublicAppointmentDraft, inventory: PublicInven
     return TransitionView(
         kind="appointment_date",
         text=(
-            "<b>选择看房日期</b>\n\n"
-            f"{he(subject)}"
+            "📅 <b>选择看房日期</b>\n"
+            f"已选｜{he('视频代看' if draft.mode == 'video' else '实地看房')}"
         ),
         rows=(
             (TransitionChoice(f"今天 · {today.month}月{today.day}日", "appointment_date", today_value),),
@@ -139,13 +139,14 @@ def _appointment_time_view(draft: PublicAppointmentDraft, inventory: PublicInven
     return TransitionView(
         kind="appointment_time",
         text=(
-            "<b>选择看房时间</b>\n\n"
-            f"已选：{he(_date_display(draft.date))}"
+            "🕐 <b>选择看房时间</b>\n"
+            f"日期｜{he(_date_display(draft.date))}"
         ),
         rows=(
             (TransitionChoice("上午 09:00–12:00", "appointment_time", "am"),),
             (TransitionChoice("下午 14:00–17:00", "appointment_time", "pm"),),
-            (TransitionChoice("返回", "appointment_back_date"),),
+            (TransitionChoice("🕐 其他时间", "appointment_other_time"),),
+            (TransitionChoice("⬅️ 返回上一步", "appointment_back_date"),),
         ),
     )
 
