@@ -62,7 +62,7 @@ def build_contact_view(*, advisor_url: str = "") -> HomeView:
     return HomeView("contact",CONTACT_TEXT,((first,),(HomeChoice("开始找房","search"),),(HomeChoice("返回首页","root"),)))
 
 def build_appointment_history_home_view(history: AppointmentHistoryView) -> HomeView:
-    find_label="开始找房" if history.history_count == 0 and not history.items else "继续找房"
-    return HomeView("appointments",history.text,((HomeChoice("中文顾问","contact"),HomeChoice(find_label,"search")),(HomeChoice("返回首页","root"),)))
+    find_label="🔍 开始找房" if not history.items else "🔍 继续找房"
+    return HomeView("appointments",history.text,((HomeChoice(find_label,"search"),HomeChoice("💬 中文顾问","contact")),(HomeChoice("⬅️ 返回首页","root"),)))
 
 __all__=["ABOUT_TEXT","BOOK_TEXT","CONTACT_TEXT","HomeChoice","HomeChoiceKind","HomeView","WELCOME_TEXT","build_about_view","build_appointment_history_home_view","build_booking_view","build_contact_view","build_home_view"]
