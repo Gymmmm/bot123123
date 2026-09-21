@@ -23,13 +23,14 @@ class AssuranceView:
 
 
 ASSURANCE_HOME_TEXT = (
-    "<b>租到房，不代表服务就结束了。</b>\n\n"
-    "找房只是开始。住进去以后的事情，侨联也接着管。\n\n"
-    "签约前　核对租金、押金和相关费用\n"
-    "入住时　房屋、表计、家具家电拍照留档\n"
-    "入住后　报修或物业沟通，可以找侨联\n"
-    "退租时　按入住记录协助逐项核对\n\n"
-    "从找房到住进去以后，有需要都可以找侨联。"
+    "🏠 <b>侨联地产｜金边中文租房</b>\n"
+    "⭐ 金边本地6年经验\n"
+    "📍 富力城｜炳发城｜BKK1｜钻石岛\n"
+    "💬 专业中文顾问\n"
+    "📸 真实房源｜实拍更新\n"
+    "📹 实地看房 / 视频代看\n"
+    "找房 · 看房 · 签约 · 入住 · 售后\n"
+    "签约不是服务的结束。"
 )
 
 SIGNING_TEXT = ASSURANCE_HOME_TEXT
@@ -53,12 +54,11 @@ def build_assurance_home_view() -> AssuranceView:
         kind="home",
         text=ASSURANCE_HOME_TEXT,
         rows=(
-            (AssuranceChoice("入住交接留档", callback_data="v3u:assure:handover"),),
-            (AssuranceChoice("开始找房", callback_data="v3u:home:search"), AssuranceChoice("中文顾问", callback_data="v3u:home:contact")),
-            (AssuranceChoice("返回首页", callback_data="v3u:t:home"),),
+            (AssuranceChoice("🔍 开始找房", callback_data="v3u:home:search"),),
+            (AssuranceChoice("💬 中文顾问", callback_data="v3u:home:contact"),),
+            (AssuranceChoice("⬅️ 返回首页", callback_data="v3u:t:home"),),
         ),
     )
-
 
 def build_signing_view() -> AssuranceView:
     return build_assurance_home_view()
