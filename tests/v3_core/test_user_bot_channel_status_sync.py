@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 
 import pytest
@@ -26,6 +27,31 @@ def _seed(db_path, *, appointment_count=5, inventory_status="reserved"):
                VALUES ('l_1','QL-RF-A2B3','cr_1','hash','v3',?)""",
             (inventory_status,),
         )
+        actions = json.dumps({
+            "details": "https://t.me/qiaolian_rent_bot?start=property_QL-RF-A2B3_details__ch",
+            "photos": "https://t.me/qiaolian_rent_bot?start=property_QL-RF-A2B3_photos__ch",
+            "book": "https://t.me/qiaolian_rent_bot?start=property_QL-RF-A2B3_book__ch",
+            "consult": "https://t.me/qiaolian_rent_bot?start=property_QL-RF-A2B3_contact__ch",
+        }, ensure_ascii=False)
+        snapshot = json.dumps({
+            "schema": "v3_publication_snapshot.v1",
+            "listing_id": "l_1",
+            "public_listing_id": "QL-RF-A2B3",
+        }, ensure_ascii=False)
+        for package_id in ("PKG_OLD", "PKG_NEW"):
+            conn.execute(
+                """INSERT INTO publication_packages_v3
+                   (package_id,listing_id,offer_id,canonical_record_id,package_version,status,
+                    cover_style,cover_path,gallery_json,post_text,actions_json,snapshot_json,
+                    frozen_file_hashes_json,source_identity_json,public_token,canonical_facts_hash,content_hash)
+                   VALUES (?,?,?,?,?,'published',?,?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    package_id, "l_1", "OFF_OLD" if package_id == "PKG_OLD" else "OFF_NEW", "cr_1", 1,
+                    "classic", "/tmp/cover.jpg", "[]",
+                    "🏠 <b>富力城｜两房</b>\n\n🟡 已有预约，仍可预约　QL-RF-A2B3",
+                    actions, snapshot, "{}", "{}", "token", "hash", "content",
+                ),
+            )
         conn.execute(
             """INSERT INTO publication_instances
                (instance_id,package_id,listing_id,offer_id,platform,channel_chat_id,
@@ -196,3 +222,33 @@ def test_channel_sync_source_never_updates_listing_inventory():
 
     source = inspect.getsource(V3AppointmentChannelSynchronizer.sync)
     assert "UPDATE listings_v3 SET inventory_status" not in source
+
+
+@pytest.mark.asyncio
+async def test_status_sync_blocks_frozen_identity_mismatch_before_telegram_edit(tmp_path):
+    db_path = tmp_path / "identity-mismatch.db"
+    _seed(db_path, appointment_count=0, inventory_status="active")
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            "UPDATE publication_packages_v3 SET actions_json=? WHERE package_id='PKG_NEW'",
+            (json.dumps({
+                "details": "https://t.me/qiaolian_rent_bot?start=property_QL-XX-Z9Z9_details__ch",
+                "photos": "https://t.me/qiaolian_rent_bot?start=property_QL-XX-Z9Z9_photos__ch",
+                "book": "https://t.me/qiaolian_rent_bot?start=property_QL-XX-Z9Z9_book__ch",
+                "consult": "https://t.me/qiaolian_rent_bot?start=property_QL-XX-Z9Z9_contact__ch",
+            }),),
+        )
+        conn.commit()
+    fake = FakeBot()
+    sync = V3AppointmentChannelSynchronizer(
+        db_path,
+        publisher_bot_token="publisher-token",
+        user_bot_username="qiaolian_rent_bot",
+        advisor_url="https://t.me/qiaolian_advisor",
+        bot_factory=lambda token: fake,
+    )
+    result = await sync.sync("l_1")
+    assert result.attempted
+    assert not result.synced
+    assert "channel_" in result.error
+    assert fake.calls == []
