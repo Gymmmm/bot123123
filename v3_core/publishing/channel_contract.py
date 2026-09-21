@@ -33,8 +33,6 @@ _ACTION_SUFFIX = {
     "contact": "contact",
 }
 _START_PAYLOAD_RE_PREFIX = "property_"
-_CHANNEL_SOURCE_CODE = "ch"
-
 _CAPTION_PUBLIC_ID_RE = re.compile(r"(?<![A-Z0-9-])(QL-[A-Z0-9]+(?:-[A-Z0-9]+)+)(?![A-Z0-9-])")
 
 
@@ -115,7 +113,7 @@ def channel_general_action_url(username: str, payload: object) -> str:
 def channel_actions(public_listing_id: object) -> tuple[str, str, str]:
     """Return the three User Bot deep-link actions in stable order."""
     return tuple(
-        channel_start_payload(public_listing_id, action, source_code=_CHANNEL_SOURCE_CODE)
+        channel_start_payload(public_listing_id, action)
         for action in ("details", "photos", "book")
     )
 
@@ -136,7 +134,6 @@ def official_channel_action_urls(
             user,
             public_listing_id,
             action,
-            source_code=_CHANNEL_SOURCE_CODE,
         )
         for action in ("details", "photos", "book")
     }
@@ -144,7 +141,6 @@ def official_channel_action_urls(
         user,
         public_listing_id,
         "contact",
-        source_code=_CHANNEL_SOURCE_CODE,
     )
     if not urls["consult"]:
         raise ValueError("advisor_url_missing")
