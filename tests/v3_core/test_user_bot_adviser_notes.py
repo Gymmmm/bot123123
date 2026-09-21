@@ -106,7 +106,7 @@ def test_other_details_and_actions_remain_present_with_authoritative_copy():
     assert "已冻结建议。" in response.text
     assert "富力城" in response.text
     assert "$800" in response.text
-    assert "🟢 房源状态：随时可预约看房" in response.text
+    assert "🟢 房源状态：当前可预约" in response.text
     labels = [action.label for row in response.action_rows for action in row]
     assert "📅 预约看房" in labels
     assert "💬 中文顾问" in labels
