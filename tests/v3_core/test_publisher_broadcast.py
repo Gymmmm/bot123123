@@ -218,4 +218,3 @@ def test_publisher_dashboard_exposes_broadcast_center(tmp_path):
     buttons = [button for row in bot._dashboard_keyboard().inline_keyboard for button in row]
     broadcast = next(button for button in buttons if button.text == "📢 发布中心")
     assert broadcast.callback_data == "v3bc"
-
