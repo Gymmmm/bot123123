@@ -6,7 +6,7 @@ from .common import *
 async def handle_main_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     from .admin_contract import _user_contact_text, _user_mention_html
     from .keyboards_common import contact_handoff_keyboard, keyword_followup_keyboard, main_keyboard
-    from .keyboards_search import search_entry_keyboard, service_hub_keyboard
+    from .keyboards_search import search_entry_keyboard, service_hub_keyboard, repair_attachment_keyboard, repair_time_keyboard
     from .listing import _keyword_intro_text, listing_context, start_video_tour_flow
     from .results_admin import _allow_admin_notify, _notify_admins, send_find_results_as_cards
     from .search import create_lead, detect_area, detect_property_type, detect_room_type, parse_budget_range, search_listings_with_fallback, upsert_user_profile
@@ -26,6 +26,39 @@ async def handle_main_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     admin_contract_result = await handle_admin_contract_message(update, context)
     if admin_contract_result is not None:
         return admin_contract_result
+    repair_flow = context.user_data.get('repair_flow') or {}
+    if repair_flow.get('step') == 'description':
+        if not text:
+            return MAIN
+        repair_flow['description'] = text[:800]
+        repair_flow['step'] = 'attachment'
+        context.user_data['repair_flow'] = repair_flow
+        await render_panel(update, text='请发送照片或视频附件。', reply_markup=repair_attachment_keyboard(), context=context)
+        return MAIN
+
+    coordination_flow = context.user_data.get('coordination_flow') or {}
+    if coordination_flow.get('step') == 'issue':
+        if not text:
+            return MAIN
+        from .session_deeplink import now_ts
+        occurred_at = now_ts()
+        context.user_data.pop('coordination_flow', None)
+        create_lead(user, action='coordination_submit', source='service_hub', payload={'issue_type': text[:800], 'occurred_at': occurred_at})
+        await _notify_admins(context, title='物业协调', lines=[f'用户：{_user_mention_html(user)}', f'联系方式：{he(_user_contact_text(user))}', f'问题：{he(text[:800])}', f'时间：{he(occurred_at)}'])
+        await render_panel(
+            update,
+            text=(
+                '✅ <b>物业协调已提交</b>\n'
+                f'问题｜{he(text[:800])}\n'
+                f'时间｜{he(occurred_at)}\n'
+                '信息已经记录。处理进度会在这里通知你。'
+            ),
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('💬 中文顾问', callback_data='service:contact'), InlineKeyboardButton('🛡️ 返回入住服务', callback_data='service:resident')]]),
+            context=context,
+        )
+        return MAIN
+
     old_customer = context.user_data.pop('awaiting_old_customer', None)
     if old_customer is not None:
         if len(text) < 4:
@@ -163,6 +196,28 @@ async def handle_find_budget(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await send_find_results_as_cards(update, context, matches, match_mode)
     else:
         await render_panel(update, text=find_no_match_text(), parse_mode=ParseMode.HTML, reply_markup=no_match_followup_keyboard(), context=context, prefer_edit_anchor=True)
+    return MAIN
+
+async def handle_service_attachment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    from .keyboards_search import repair_time_keyboard
+    from .texts import render_panel
+    flow = context.user_data.get('repair_flow') or {}
+    if flow.get('step') != 'attachment':
+        return MAIN
+    message = update.effective_message
+    file_id = ''
+    if getattr(message, 'photo', None):
+        file_id = str(message.photo[-1].file_id)
+    elif getattr(message, 'video', None):
+        file_id = str(message.video.file_id)
+    elif getattr(message, 'document', None):
+        file_id = str(message.document.file_id)
+    if not file_id:
+        return MAIN
+    flow['attachment_file_id'] = file_id
+    flow['step'] = 'time'
+    context.user_data['repair_flow'] = flow
+    await render_panel(update, text='请选择方便处理的时间。', reply_markup=repair_time_keyboard(), context=context)
     return MAIN
 
 async def cmd_find(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
