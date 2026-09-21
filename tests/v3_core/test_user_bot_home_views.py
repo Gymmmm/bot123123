@@ -36,4 +36,4 @@ def test_contact_handoff_and_appointment_history_navigation_are_plain_text():
     history = AppointmentHistoryView(text="<b>我的预约</b>", items=(), history_count=0)
     appointment = build_appointment_history_home_view(history)
     labels = [b.text for row in build_home_keyboard(appointment).inline_keyboard for b in row]
-    assert labels == ["中文顾问", "开始找房", "返回首页"]
+    assert labels == ["🔍 开始找房", "💬 中文顾问", "⬅️ 返回首页"]
