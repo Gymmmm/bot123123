@@ -1,6 +1,11 @@
 name: qiaolian-v3-production-deploy
 
 on:
+  push:
+    branches:
+      - deploy-control
+    paths:
+      - '.github/deploy-control/request.json'
   workflow_dispatch:
     inputs:
       confirm:
@@ -30,22 +35,71 @@ env:
 
 jobs:
   verify-and-deploy:
-    if: github.event_name == 'workflow_dispatch' && inputs.confirm == 'DEPLOY'
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.confirm == 'DEPLOY') ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/deploy-control')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - name: Checkout deployment control event
+        if: github.event_name == 'push'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+
       - name: Validate requested immutable SHA
         env:
-          REQUESTED_SHA: '${{ inputs.deploy_sha }}'
+          EVENT_NAME: '${{ github.event_name }}'
+          MANUAL_CONFIRM: '${{ inputs.confirm }}'
+          MANUAL_SHA: '${{ inputs.deploy_sha }}'
         run: |
           set -Eeuo pipefail
+          if [ "$EVENT_NAME" = workflow_dispatch ]; then
+            test "$MANUAL_CONFIRM" = DEPLOY || { echo 'DEPLOY_BLOCKED confirm_must_equal_DEPLOY'; exit 1; }
+            REQUESTED_SHA="$MANUAL_SHA"
+          elif [ "$EVENT_NAME" = push ]; then
+            test "$GITHUB_REF" = refs/heads/deploy-control || { echo 'DEPLOY_BLOCKED invalid_control_branch'; exit 1; }
+            mapfile -t CHANGED_FILES < <(git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA")
+            test "${#CHANGED_FILES[@]}" -eq 1 || { echo 'DEPLOY_BLOCKED control_commit_must_change_one_file'; exit 1; }
+            test "${CHANGED_FILES[0]}" = .github/deploy-control/request.json || { echo 'DEPLOY_BLOCKED invalid_control_path'; exit 1; }
+            mapfile -t REQUEST_FIELDS < <(python3 - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+
+          data = json.loads(Path(".github/deploy-control/request.json").read_text(encoding="utf-8"))
+          if set(data) != {"confirm", "deploy_sha", "request_id"}:
+              raise SystemExit("DEPLOY_BLOCKED invalid_control_fields")
+          confirm = data["confirm"]
+          deploy_sha = data["deploy_sha"]
+          request_id = data["request_id"]
+          if confirm != "DEPLOY":
+              raise SystemExit("DEPLOY_BLOCKED confirm_must_equal_DEPLOY")
+          if not isinstance(deploy_sha, str) or re.fullmatch(r"[0-9a-f]{40}", deploy_sha) is None:
+              raise SystemExit("DEPLOY_BLOCKED deploy_sha_must_be_full_40_hex_commit")
+          if not isinstance(request_id, str) or re.fullmatch(r"[0-9A-Za-z._:-]{8,64}", request_id) is None:
+              raise SystemExit("DEPLOY_BLOCKED invalid_request_id")
+          print(confirm)
+          print(deploy_sha)
+          print(request_id)
+          PY
+            )
+            test "${REQUEST_FIELDS[0]}" = DEPLOY
+            REQUESTED_SHA="${REQUEST_FIELDS[1]}"
+            echo "DEPLOY_CONTROL_REQUEST_ID=${REQUEST_FIELDS[2]}"
+          else
+            echo 'DEPLOY_BLOCKED unsupported_event'
+            exit 1
+          fi
           [[ "$REQUESTED_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo 'DEPLOY_BLOCKED deploy_sha_must_be_full_40_hex_commit'; exit 1; }
           echo "DEPLOY_SHA=$REQUESTED_SHA" >> "$GITHUB_ENV"
 
       - name: Checkout requested immutable SHA
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.deploy_sha }}
+          ref: ${{ env.DEPLOY_SHA }}
           fetch-depth: 0
           persist-credentials: false
 
