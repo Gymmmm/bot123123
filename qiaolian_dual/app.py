@@ -44,7 +44,7 @@ def build_application(*, token: str | None = None) -> Application:
     from .attribution_hooks import start_with_attribution
     from .callbacks import handle_ui_callback
     from .jobs import lease_reminder_job
-    from .message_handlers import cmd_about, cmd_admin_add, cmd_admin_list, cmd_admin_remove, cmd_appointments, cmd_contact, cmd_favorites, cmd_find, cmd_help, cmd_search, cmd_service, handle_main_message
+    from .message_handlers import cmd_about, cmd_admin_add, cmd_admin_list, cmd_admin_remove, cmd_appointments, cmd_contact, cmd_favorites, cmd_find, cmd_help, cmd_search, cmd_service, handle_main_message, handle_service_attachment
     from .search_text_handlers import handle_find_area, handle_find_budget
 
     active_token = USER_BOT_TOKEN if token is None else str(token)
@@ -64,7 +64,7 @@ def build_application(*, token: str | None = None) -> Application:
             CallbackQueryHandler(appoint_flow_cb, pattern=_APPT_CB_PATTERN),
         ],
         states={
-            MAIN: [CallbackQueryHandler(appoint_flow_cb, pattern=_APPT_CB_PATTERN), CallbackQueryHandler(handle_ui_callback, pattern=_MAIN_CB_PATTERN), MessageHandler(filters.TEXT & ~filters.COMMAND, handle_main_message)],
+            MAIN: [CallbackQueryHandler(appoint_flow_cb, pattern=_APPT_CB_PATTERN), CallbackQueryHandler(handle_ui_callback, pattern=_MAIN_CB_PATTERN), MessageHandler((filters.PHOTO | filters.VIDEO | filters.Document.ALL), handle_service_attachment), MessageHandler(filters.TEXT & ~filters.COMMAND, handle_main_message)],
             FIND_AREA: [CallbackQueryHandler(handle_ui_callback, pattern=_MAIN_CB_PATTERN), MessageHandler(filters.TEXT & ~filters.COMMAND, handle_find_area)],
             FIND_BUDGET: [CallbackQueryHandler(handle_ui_callback, pattern=_MAIN_CB_PATTERN), MessageHandler(filters.TEXT & ~filters.COMMAND, handle_find_budget)],
             APPT_MODE: [CallbackQueryHandler(appoint_flow_cb, pattern=_APPT_CB_PATTERN), CallbackQueryHandler(handle_ui_callback, pattern=_MAIN_CB_PATTERN)],
@@ -87,6 +87,7 @@ def build_application(*, token: str | None = None) -> Application:
     app.add_handler(CommandHandler('admin', cmd_admin_home), group=-1)
     app.add_handler(CallbackQueryHandler(handle_admin_query, pattern=r'^adminq:'), group=-1)
     app.add_handler(conv_handler)
+    app.add_handler(MessageHandler((filters.PHOTO | filters.VIDEO | filters.Document.ALL), handle_service_attachment))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_main_message))
     logger.info('全局兜底 MessageHandler 已注册 (group=0)')
     app.add_error_handler(error_handler)
