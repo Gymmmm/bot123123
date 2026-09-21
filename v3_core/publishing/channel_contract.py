@@ -21,6 +21,7 @@ CHANNEL_CTA_LABELS = {
     "consult": "💬 中文顾问",
     "find": "🏠 帮我找房",
     "more": "🔎 看看房源",
+    "similar": "🔎 看相近房源",
 }
 
 _ACTION_SUFFIX = {
@@ -115,7 +116,7 @@ def official_channel_cta_keys(inventory_status: object = "active") -> tuple[str,
     if inventory_status_bookable(status):
         return ("details", "book", "consult")
     if status == "pending":
-        return ("consult", "find", "more")
+        return ("more", "consult")
     # rented / offline / inactive
     return ("find", "more", "consult")
 
@@ -137,8 +138,7 @@ def official_channel_button_spec(
         Row1: [📷 房源详情] [📅 预约看房]
         Row2: [💬 中文顾问]
     - pending:
-        Row1: [💬 中文顾问]
-        Row2: [🏠 帮我找房] [🔎 看看房源]
+        Row1: [🔎 看相近房源] [💬 中文顾问]
     - rented / offline / inactive:
         Row1: [🏠 帮我找房] [🔎 看看房源]
         Row2: [💬 中文顾问]
@@ -170,11 +170,11 @@ def official_channel_button_spec(
     )
 
     if status == "pending":
-        rows = []
+        similar_btn = (CHANNEL_CTA_LABELS["similar"], more_url)
+        row = [similar_btn]
         if consult_btn is not None:
-            rows.append((consult_btn,))
-        rows.append((find_btn, more_btn))
-        return tuple(rows)
+            row.append(consult_btn)
+        return (tuple(row),)
 
     # rented / offline / inactive (and any other non-bookable)
     rows = [(find_btn, more_btn)]
