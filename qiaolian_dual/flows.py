@@ -103,12 +103,16 @@ async def show_service_hub(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     from .keyboards_search import service_hub_keyboard
     from .texts import render_panel
     text = (
-        '🛠 <b>入住服务</b>\n\n'
-        '住下以后，有事也可以找侨联。\n\n'
-        '不管房子是不是通过侨联租的，住房或生活上遇到问题，都可以先问问我们。\n\n'
-        '能协助处理的，我们协助处理；需要专业服务的，我们帮您对接。'
+        '🛎️ <b>侨联服务</b>\n'
+        '找房只是开始。签约、入住和住进去以后的事情，都可以继续找侨联。'
     )
-    await render_panel(update, text=text, parse_mode=ParseMode.HTML, reply_markup=service_hub_keyboard(update.effective_user.id if update.effective_user else None), context=context)
+    await render_panel(
+        update,
+        text=text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=service_hub_keyboard(update.effective_user.id if update.effective_user else None),
+        context=context,
+    )
     return MAIN
 
 
