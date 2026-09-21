@@ -813,4 +813,3 @@ async def handle_v3_start(
 
 
 __all__ = ["BROADCAST_START_SHORTCUTS", "TelegramStartOutcome", "handle_v3_start"]
-
