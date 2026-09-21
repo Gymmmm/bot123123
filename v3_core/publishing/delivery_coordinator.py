@@ -15,6 +15,7 @@ from .delivery_state import (
     DeliveryBlocked,
     PublicationDeliveryStateRepository,
 )
+from .channel_contract import assert_channel_identity
 from .package_store import FrozenPackageStore
 from .publication_instances import (
     PublicationInstance,
@@ -99,12 +100,28 @@ class PublicationDeliveryCoordinator:
         if attempt.state not in {"prepared", "failed_before_send"}:
             raise DeliveryBlocked(f"delivery attempt is not sendable: {attempt.state}")
 
+        listing = self.reader.listing(package.listing_id)
+        snapshot_listing_id = str(package.snapshot.get("listing_id") or "").strip()
+        snapshot_public_id = str(package.snapshot.get("public_listing_id") or "").strip()
+        live_public_id = str(listing.get("public_listing_id") or "").strip()
+        if snapshot_listing_id != package.listing_id:
+            raise DeliveryBlocked("channel_identity_mismatch:snapshot_listing_id")
+        if not snapshot_public_id or snapshot_public_id != live_public_id:
+            raise DeliveryBlocked("channel_identity_mismatch:public_listing_id")
+        try:
+            assert_channel_identity(
+                caption=package.post_text,
+                actions=package.actions,
+                public_listing_id=snapshot_public_id,
+            )
+        except ValueError as exc:
+            raise DeliveryBlocked(f"channel_identity_mismatch:{exc}") from exc
+
         # Caption/facts remain frozen in the approved package. Normally the live
         # inventory status drives Telegram booking UI. Manual first-publish may
         # explicitly supply the status that will become live only after Telegram
         # acknowledges the send, so the first keyboard and frozen caption cannot
         # disagree while the DB remains safely pending until success.
-        listing = self.reader.listing(package.listing_id)
         live_status = str(listing.get("inventory_status") or "pending").strip().lower()
         override = str(inventory_status_override or "").strip().lower()
         allowed = {"active", "reserved", "pending", "rented", "inactive", "offline"}
