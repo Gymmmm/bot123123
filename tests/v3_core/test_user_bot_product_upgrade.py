@@ -24,14 +24,14 @@ def _button_labels(markup):
 def test_v3_home_uses_final_conversion_navigation():
     view = build_home_view(channel_url="https://t.me/qiaolian")
     labels = _labels(view)
-    assert labels == ["开始找房", "最新房源", "中文顾问", "侨联服务"]
+    assert labels == ["🔍 开始找房", "🛎️ 侨联服务", "📢 最新房源", "💬 中文顾问"]
     forbidden = ("智能找房", "顾问帮我找", "关于侨联", "房源频道", "侨联保障", "租赁服务指南", "我想换房")
     assert not any(any(term in label for term in forbidden) for label in labels)
 
 
 def test_home_without_channel_keeps_core_conversion_actions():
     labels = _labels(build_home_view())
-    assert labels == ["开始找房", "中文顾问", "侨联服务"]
+    assert labels == ["🔍 开始找房", "🛎️ 侨联服务", "💬 中文顾问"]
 
 
 def test_about_and_booking_are_compatible_secondary_home_actions():
