@@ -224,4 +224,3 @@ class MarketingBroadcastService:
 
     def mark_sent(self, local_date: str):
         self._set(KEY_LAST_SENT, local_date)
-
