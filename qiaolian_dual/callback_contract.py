@@ -21,12 +21,22 @@ async def handle_contract_callback(update: Update, context: ContextTypes.DEFAULT
     from .start_routes import route_start_arg
     from .texts import advisor_handoff_text, advisor_text, brand_story_text, deposit_text, lead_capture_text, listing_detail_text, local_life_text, promise_text, render_panel, rfcity_text, service_hub_text, smart_search_text, want_home_ack_text, welcome_text
     if data == 'contract:view':
-            binding = db.get_active_binding(user.id)
-            if not binding:
-                return await show_service_hub(update, context)
-            create_lead(user, action='contract_view_click', source='contract_hub', listing_id=str(binding.get('property_name') or ''), payload={'binding_id': binding.get('id')})
-            await render_panel(update, text=_binding_contract_text(binding, user.id), parse_mode=ParseMode.HTML, reply_markup=_contract_actions_keyboard(user.id))
+        binding = db.get_active_binding(user.id)
+        if not binding:
+            await render_panel(
+                update,
+                text=_binding_contract_text(None, user.id),
+                parse_mode=ParseMode.HTML,
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton('💬 中文顾问', callback_data='service:contact'),
+                    InlineKeyboardButton('⬅️ 返回侨联服务', callback_data='service:hub'),
+                ]]),
+                context=context,
+            )
             return MAIN
+        create_lead(user, action='contract_view_click', source='contract_hub', listing_id=str(binding.get('property_name') or ''), payload={'binding_id': binding.get('id')})
+        await render_panel(update, text=_binding_contract_text(binding, user.id), parse_mode=ParseMode.HTML, reply_markup=_contract_actions_keyboard(user.id), context=context)
+        return MAIN
     if data == 'contract:toggle_reminder':
             binding = db.get_active_binding(user.id)
             if not binding:
@@ -38,16 +48,34 @@ async def handle_contract_callback(update: Update, context: ContextTypes.DEFAULT
             await render_panel(update, text=f'{prefix}\n\n{_binding_contract_text(binding, user.id)}', parse_mode=ParseMode.HTML, reply_markup=_contract_actions_keyboard(user.id))
             return MAIN
     if data == 'contract:renew':
-            binding = db.get_active_binding(user.id)
-            if not binding:
-                return await show_service_hub(update, context)
-            days_left = _binding_days_left(binding)
-            day_text = f'{days_left} 天' if days_left is not None else '待确认'
-            open_tracking = db.get_open_renewal_tracking(binding_id=int(binding.get('id') or 0), user_id=user.id)
-            create_lead(user, action='renewal_inquiry_click', source='contract_hub', listing_id=str(binding.get('property_name') or ''), payload={'binding_id': binding.get('id'), 'days_left': days_left, 'open_tracking_id': (open_tracking or {}).get('id')})
-            followup = '这件事已经在跟进中。你有新想法，直接联系顾问说一声就行。' if open_tracking else '想继续住这套吗？确认后，顾问会和你核对租期和价格。'
-            await render_panel(update, text=f"🔄 <b>续租</b>\n\n🏠 当前房源：{he(str(binding.get('property_name') or '-'))}\n📅 到期日：{he(_binding_end_date(binding) or '待确认')}\n⏳ 还有：<b>{he(day_text)}</b>\n\n{followup}", parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('✅ 我想续租', callback_data=f"contract:renew_yes:{int(binding.get('id') or 0)}"), InlineKeyboardButton('🏠 我想换房', callback_data='contract:change')], [InlineKeyboardButton('💬 联系顾问', callback_data='appointment_menu:contact')]]))
+        binding = db.get_active_binding(user.id)
+        if not binding:
+            await render_panel(
+                update,
+                text=_binding_contract_text(None, user.id),
+                parse_mode=ParseMode.HTML,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('💬 中文顾问', callback_data='service:contact'), InlineKeyboardButton('⬅️ 返回侨联服务', callback_data='service:hub')]]),
+                context=context,
+            )
             return MAIN
+        create_lead(user, action='renewal_inquiry_click', source='contract_hub', listing_id=str(binding.get('property_name') or ''), payload={'binding_id': binding.get('id')})
+        await render_panel(
+            update,
+            text=(
+                '🔄 <b>申请续租</b>\n'
+                f'房源｜{he(str(binding.get("property_name") or "-"))}\n'
+                f'到期｜{he(_binding_end_date(binding) or "-")}\n'
+                '如果准备继续住，可以先提交续租意向。新的租期和租金，顾问会继续和你确认。'
+            ),
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton('✅ 提交续租意向', callback_data=f"contract:renew_yes:{int(binding.get('id') or 0)}")],
+                [InlineKeyboardButton('💬 中文顾问', callback_data='service:contact')],
+                [InlineKeyboardButton('⬅️ 返回租赁详情', callback_data='contract:view')],
+            ]),
+            context=context,
+        )
+        return MAIN
     if data.startswith('contract:renew_yes:'):
             raw_bid = data.split(':', 2)[2]
             try:
