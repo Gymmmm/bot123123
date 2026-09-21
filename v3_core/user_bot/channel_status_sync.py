@@ -101,13 +101,14 @@ def appointment_channel_keyboard(
     public_listing_id: str,
     status: str,
     advisor_url: str,
+    area: str = "",
 ) -> InlineKeyboardMarkup:
     actions = official_channel_action_urls(
         username, public_listing_id, advisor_url=advisor_url
     )
     rows = [
         [InlineKeyboardButton(label, url=url) for label, url in row]
-        for row in official_channel_button_spec(actions, inventory_status=status)
+        for row in official_channel_button_spec(actions, inventory_status=status, area=area)
     ]
     return InlineKeyboardMarkup(rows)
 
@@ -155,7 +156,7 @@ class V3AppointmentChannelSynchronizer:
                 """SELECT pi.id AS publication_row_id,pi.channel_chat_id,
                           pi.channel_message_id,pi.post_text,pi.listing_id AS publication_listing_id,
                           p.listing_id AS package_listing_id,p.snapshot_json,p.actions_json,
-                          l.inventory_status,l.public_listing_id AS live_public_listing_id
+                          l.inventory_status,l.public_listing_id AS live_public_listing_id,\n                          l.public_location_key
                    FROM publication_instances pi
                    JOIN publication_packages_v3 p ON p.package_id=pi.package_id
                    JOIN listings_v3 l ON l.listing_id=pi.listing_id
@@ -219,6 +220,7 @@ class V3AppointmentChannelSynchronizer:
                 public_listing_id=public_id,
                 status=target,
                 advisor_url=self.advisor_url,
+                area=str(row.get("public_location_key") or ""),
             )
             bot = self.bot_factory(self.publisher_bot_token)
             await bot.edit_message_caption(
@@ -259,3 +261,4 @@ __all__ = [
     "caption_with_appointment_status",
     "derive_appointment_inventory_status",
 ]
+
