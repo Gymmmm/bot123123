@@ -12,7 +12,7 @@ from .appointment_history import AppointmentHistoryService
 from .assurance_views import build_assurance_home_view
 from .contact_effects import ContactEffectExecutor
 from .deeplink import parse_channel_start_payload, parse_search_start_payload
-from .home_views import build_appointment_history_home_view, build_contact_view, build_home_view
+from .home_views import build_appointment_history_home_view, build_contact_view, build_home_view, phnom_penh_greeting
 from .lead_service import LeadUser
 from .listing_contact import ListingContactEffectExecutor, build_listing_contact_view
 from .public_flow import PublicListingFlowResult, PublicListingFlowService
@@ -462,7 +462,9 @@ async def handle_v3_start(
     args = tuple(getattr(context, "args", None) or ())
     user_data.clear()
     if not args:
-        home = build_home_view(channel_url=channel_url, advisor_url=advisor_url)
+        user = getattr(update, "effective_user", None)
+        first_name = str(getattr(user, "first_name", "") or getattr(user, "full_name", "") or "您")
+        home = build_home_view(channel_url=channel_url, advisor_url=advisor_url, first_name=first_name, greeting=phnom_penh_greeting())
         await message.reply_text(home.text, parse_mode=ParseMode.HTML, reply_markup=build_home_keyboard(home))
         return TelegramStartOutcome(handled=True, kind="home")
 
