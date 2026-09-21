@@ -247,7 +247,7 @@ async def test_unbookable_property_book_deeplink_shows_lock_copy_then_contextual
             (SemanticAction("✏️ 换个条件找", "change_search"),),
         ),
     )
-    listings = FakeListings(SimpleNamespace(ok=False, reason="listing_not_bookable", details=details, action="book", public_listing_id=public_id))
+    listings = FakeListings(SimpleNamespace(ok=False, reason="listing_not_bookable", details=details, action="book", public_listing_id=public_id, source="direct"))
     message = FakeMessage()
     context = _context(f"property_{public_id}_book")
     outcome = await handle_v3_start(_update(message), context, listings=listings, transition_views=_views())
