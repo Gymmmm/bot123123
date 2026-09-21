@@ -86,48 +86,41 @@ def _lease_reminder_label(user_id: int | None) -> str:
 
 def _binding_contract_text(binding: dict | None, user_id: int | None=None) -> str:
     if not binding:
-        return '📋 <b>我的租约</b>\n\n当前还没有绑定租约档案。\n请点「💬 联系中文顾问」，我们会后台录入房号、交租日和到期日。'
+        return (
+            '📋 <b>我的租约</b>\n'
+            '目前没有查到已绑定的租约。如果你已经通过侨联入住，但这里暂时没有显示，可以联系中文顾问帮你核对。'
+        )
     property_name = str(binding.get('property_name') or '-')
-    rent_day = binding.get('rent_day')
-    rent_text = f'每月 {int(rent_day)} 号' if isinstance(rent_day, int) else '待确认'
-    end_date = _binding_end_date(binding) or '待确认'
-    days_left = _binding_days_left(binding)
-    day_line = f'{days_left} 天' if days_left is not None else '待确认'
     monthly_rent = binding.get('monthly_rent')
     try:
         rent_value = float(monthly_rent or 0)
     except (TypeError, ValueError):
         rent_value = 0
-    rent_line = f'${int(rent_value)}/月' if rent_value > 0 else '待确认'
-    deposit_months = binding.get('deposit_months')
+    rent_line = str(int(rent_value)) if rent_value > 0 else '-'
+    deposit = binding.get('deposit')
+    if deposit in (None, ''):
+        deposit_months = binding.get('deposit_months')
+        try:
+            deposit = f'{int(deposit_months)}个月' if int(deposit_months) > 0 else '-'
+        except (TypeError, ValueError):
+            deposit = '-'
+    payment_day = binding.get('rent_day')
     try:
-        deposit_line = f'{int(deposit_months)} 个月' if int(deposit_months) > 0 else '待确认'
+        payment_day = str(int(payment_day))
     except (TypeError, ValueError):
-        deposit_line = '待确认'
-    reminder_line = _lease_reminder_label(user_id)
-    status_line = _contract_status_text(days_left)
+        payment_day = '-'
+    end_date = _binding_end_date(binding) or '-'
     return (
-        f'📋 <b>我的租约</b>\n\n'
-        f'<b>房源与账期</b>\n'
-        f'房源｜{he(property_name)}\n'
-        f'交租日｜{he(rent_text)}\n\n'
-        f'<b>金额与到期</b>\n'
-        f'月租｜{he(rent_line)}\n'
-        f'押金｜{he(deposit_line)}\n'
+        '📋 <b>租赁详情</b>\n'
+        f'🏠 {he(property_name)}\n'
+        f'月租｜${he(rent_line)}/月\n'
+        f'押金｜{he(str(deposit))}\n'
+        f'交租日｜每月{he(payment_day)}日\n'
         f'到期日｜{he(end_date)}\n'
-        f'还有｜<b>{he(day_line)}</b>\n\n'
-        f'<b>当前状态</b>\n'
-        f'{he(status_line)}\n'
-        f'{he(reminder_line)}'
+        '状态｜🟢 租约有效'
     )
-
 def _contract_actions_keyboard(user_id: int | None=None) -> InlineKeyboardMarkup:
-    """新租约页不再生成续租/换房入口；旧回调继续兼容历史按钮。"""
-    reminder_label = _lease_reminder_label(user_id)
-    rows: list[list[InlineKeyboardButton]] = [
-        [InlineKeyboardButton('📅 我的预约', callback_data='appointment_menu:list'), InlineKeyboardButton('🛠 入住后服务', callback_data='service:hub')],
-        [InlineKeyboardButton(reminder_label, callback_data='contract:toggle_reminder')],
-        [InlineKeyboardButton('💬 联系中文顾问', callback_data='appointment_menu:contact')],
-        [InlineKeyboardButton('🏠 返回首页', callback_data='home')],
-    ]
-    return InlineKeyboardMarkup(rows)
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton('🔄 申请续租', callback_data='contract:renew'), InlineKeyboardButton('💬 中文顾问', callback_data='service:contact')],
+        [InlineKeyboardButton('⬅️ 返回侨联服务', callback_data='service:hub')],
+    ])
