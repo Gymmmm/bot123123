@@ -198,13 +198,12 @@ def test_public_service_home_matches_frozen_product():
     callbacks = [choice.callback_data for row in view.rows for choice in row]
     assert "<b>侨联服务</b>" in view.text
     assert labels == [
-        "我的租约", "入住管家", "安心租房", "周边生活",
-        "中文顾问", "返回首页",
+        "📋 我的租约", "🛡️ 入住服务", "🏠 安心租房",
+        "💬 中文顾问", "⬅️ 返回首页",
     ]
     assert callbacks == [
         "v3u:service:tenant_lease", "v3u:service:concierge",
-        "v3u:home:rental", "v3u:service:local",
-        "v3u:home:contact", "v3u:t:home",
+        "v3u:home:rental", "v3u:home:contact", "v3u:t:home",
     ]
     assert "没有显示你的住房信息" not in view.text
 
@@ -314,7 +313,10 @@ async def test_missing_binding_is_only_a_lease_gate(tmp_path):
     )
     assert outcome.handled and outcome.rendered
     text = bot.calls[-1][1]
-    assert "目前没有查到已绑定的租约记录" in text
+    assert text == (
+        "📋 <b>我的租约</b>\n"
+        "目前没有查到已绑定的租约。如果你已经通过侨联入住，但这里暂时没有显示，可以联系中文顾问帮你核对。"
+    )
 
 
 class FakeEffects:
