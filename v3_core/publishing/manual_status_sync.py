@@ -18,7 +18,7 @@ from typing import Any
 
 from telegram.constants import ParseMode
 
-from .channel_contract import assert_channel_identity, channel_action_url, official_channel_action_urls
+from .channel_contract import assert_channel_identity, official_channel_action_urls
 from .channel_renderer import channel_status_presentation
 from .telegram_adapter import build_channel_keyboard
 
@@ -156,15 +156,8 @@ class PublisherManualStatusSynchronizer:
                 status=clean_status,
                 public_listing_id=public_id,
             )
-            actions = (
-                official_channel_action_urls(
-                    self.user_bot_username, public_id, advisor_url=self.advisor_url
-                )
-                if self.advisor_url
-                else {
-                    action: channel_action_url(self.user_bot_username, public_id, action)
-                    for action in ("details", "photos", "book")
-                }
+            actions = official_channel_action_urls(
+                self.user_bot_username, public_id, advisor_url=self.advisor_url
             )
             try:
                 await bot.edit_message_caption(
@@ -257,3 +250,4 @@ __all__ = [
     "PublisherManualStatusSynchronizer",
     "caption_with_inventory_status",
 ]
+
