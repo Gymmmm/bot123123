@@ -77,6 +77,4 @@ def test_pending_keyboard_still_hides_booking_for_normal_non_manual_send():
     labels = _labels(build_channel_keyboard(dict(ACTIONS), inventory_status="pending"))
     assert "📅 预约看房" not in labels
     assert "📷 房源详情" not in labels
-    assert labels[0] == "💬 中文顾问"
-    assert "🏠 帮我找房" in labels
-    assert "🔎 看看房源" in labels
+    assert labels == ["🔎 看相近房源", "💬 中文顾问"]
