@@ -7,6 +7,7 @@ the target chat/message identity comes from ``publication_instances``.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 import logging
 from pathlib import Path
 import re
@@ -16,6 +17,7 @@ from typing import Any, Callable
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 
 from v3_core.publishing.channel_contract import (
+    assert_channel_identity,
     official_channel_action_urls,
     official_channel_button_spec,
 )
@@ -151,9 +153,11 @@ class V3AppointmentChannelSynchronizer:
         with self._connect() as conn:
             row = conn.execute(
                 """SELECT pi.id AS publication_row_id,pi.channel_chat_id,
-                          pi.channel_message_id,pi.post_text,
-                          l.inventory_status,l.public_listing_id
+                          pi.channel_message_id,pi.post_text,pi.listing_id AS publication_listing_id,
+                          p.listing_id AS package_listing_id,p.snapshot_json,p.actions_json,
+                          l.inventory_status,l.public_listing_id AS live_public_listing_id
                    FROM publication_instances pi
+                   JOIN publication_packages_v3 p ON p.package_id=pi.package_id
                    JOIN listings_v3 l ON l.listing_id=pi.listing_id
                    WHERE pi.listing_id=? AND pi.platform='telegram'
                      AND pi.publish_status='published'
@@ -180,7 +184,15 @@ class V3AppointmentChannelSynchronizer:
             if row is None:
                 return ChannelStatusSyncResult(clean, attempted=False, synced=False, error="published_instance_not_found")
             previous = str(row.get("inventory_status") or "").strip().lower()
-            public_id = str(row.get("public_listing_id") or "").strip()
+            snapshot = json.loads(str(row.get("snapshot_json") or "{}"))
+            public_id = str(snapshot.get("public_listing_id") or "").strip()
+            frozen_listing_id = str(snapshot.get("listing_id") or "").strip()
+            if clean != str(row.get("publication_listing_id") or "") or clean != str(row.get("package_listing_id") or "") or clean != frozen_listing_id:
+                raise ValueError("channel_identity_listing_id_mismatch")
+            if public_id != str(row.get("live_public_listing_id") or "").strip():
+                raise ValueError("channel_identity_public_listing_id_mismatch")
+            frozen_actions = json.loads(str(row.get("actions_json") or "{}"))
+            assert_channel_identity(caption=row.get("post_text"), actions=frozen_actions, public_listing_id=public_id)
             chat_id = str(row.get("channel_chat_id") or "").strip()
             message_id = int(str(row.get("channel_message_id") or "0"))
 
