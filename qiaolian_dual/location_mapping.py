@@ -20,6 +20,30 @@ def _build_location_map() -> dict[str, tuple[str, list[str]]]:
 
 LOCATION_MAP = _build_location_map()
 
+# V1 FINAL LOCK: renter-facing Area slug routing.  The third value is the
+# existing canonical location key used by search; this does not alter GEO.
+AREA_SLUG_TABLE = (
+    ("BKK1", "bkk1", "BKK1"),
+    ("BKK2", "bkk2", "BKK2"),
+    ("BKK3", "bkk3", "BKK3"),
+    ("钻石岛", "koh_pich", "钻石岛"),
+    ("堆谷/TK", "tk", "TK/7月区"),
+    ("富力城", "fuli", "富力城"),
+    ("炳发城", "bingfa", "炳发城"),
+    ("金街附近", "gold_street", "金街"),
+    ("水净华", "chroy_changvar", "水净华"),
+    ("俄罗斯市场", "russian_market", "俄罗斯市场"),
+    ("永旺1", "aeon1", "永旺商圈"),
+)
+AREA_SLUG_BY_DISPLAY = {display: slug for display, slug, _key in AREA_SLUG_TABLE}
+AREA_KEY_BY_SLUG = {slug: key for _display, slug, key in AREA_SLUG_TABLE}
+
+
+def resolve_area_slug(value: str) -> str:
+    """Resolve one locked ASCII Area slug to the existing canonical location key."""
+    slug = clean_text(value).lower()
+    return AREA_KEY_BY_SLUG.get(slug, "")
+
 PRIMARY_LOCATION_KEYS = (
     "富力城", "炳发城", "太子幸福广场", "金街", "BKK1", "TK/7月区", "钻石岛",
 )
@@ -95,6 +119,9 @@ def has_secondary_locations():
 
 __all__ = [
     "LOCATION_MAP",
+    "AREA_SLUG_TABLE",
+    "AREA_SLUG_BY_DISPLAY",
+    "AREA_KEY_BY_SLUG",
     "PRIMARY_LOCATIONS",
     "SECONDARY_LOCATIONS",
     "get_all_location_aliases",
@@ -103,4 +130,5 @@ __all__ = [
     "get_secondary_location_buttons",
     "has_secondary_locations",
     "normalize_user_input",
+    "resolve_area_slug",
 ]
