@@ -200,11 +200,11 @@ def _published_view() -> PublishedListingView:
     )
 
 
-def test_details_labels_public_id_as_real_photo_reference():
+def test_details_hides_public_id_from_user_copy():
     text = build_details_response(_published_view()).text
     assert "富力城" in text and "1房" in text
     assert "$680" in text
-    assert "QL-RF-A2B3" in text and "🆔" not in text
+    assert "QL-RF-A2B3" not in text and "🆔" not in text
     assert "🏢 金边优质房源出租" in text
 
 
