@@ -173,7 +173,7 @@ class MarketingBroadcastService:
             return ()
         channel_username = str(os.getenv("CHANNEL_USERNAME") or os.getenv("CHANNEL_ID") or "").strip().lstrip("@")
         find = BroadcastButton("🔍 开始找房", channel_general_action_url(self.user_bot_username, "find"))
-        advisor = BroadcastButton("💬 中文顾问", channel_general_action_url(self.user_bot_username, "service"))
+        advisor = BroadcastButton("💬 中文顾问", channel_general_action_url(self.user_bot_username, "advisor"))
         service = BroadcastButton("🛎️ 侨联服务", channel_general_action_url(self.user_bot_username, "service"))
         latest = BroadcastButton("📢 最新房源", f"https://t.me/{channel_username}") if channel_username and not channel_username.startswith("-") else None
         locked = {
