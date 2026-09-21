@@ -1,4 +1,6 @@
+from qiaolian_dual.listing import _resolve_area_from_target
 from qiaolian_dual.location_mapping import AREA_SLUG_TABLE, resolve_area_slug
+from qiaolian_dual.session_deeplink import parse_start_arg_payload
 
 
 def test_locked_area_slugs_are_ascii_lowercase_unique_and_resolve():
@@ -9,6 +11,15 @@ def test_locked_area_slugs_are_ascii_lowercase_unique_and_resolve():
     assert all(slug == slug.lower() for slug in slugs)
     for _display, slug, key in AREA_SLUG_TABLE:
         assert resolve_area_slug(slug) == key
+
+
+def test_more_area_deeplinks_resolve_all_locked_slugs():
+    for _display, slug, key in AREA_SLUG_TABLE:
+        payload = parse_start_arg_payload(f"more_{slug}")
+        assert payload is not None
+        assert payload["action"] == "more"
+        assert payload["target"] == slug
+        assert _resolve_area_from_target(payload["target"]) == (key, "")
 
 
 def test_locked_underscore_slugs_preserve_underscores():
