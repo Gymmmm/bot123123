@@ -47,4 +47,3 @@ def test_channel_contract_is_only_details_photos_book():
         channel_start_payload(public_id, "advisor")
     with pytest.raises(ValueError, match="invalid_public_listing_id"):
         channel_start_payload("l_350", "details")
-
