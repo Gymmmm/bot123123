@@ -260,4 +260,3 @@ async def test_listing_contact_missing_advisor_url_uses_existing_bot_contact_flo
     first = query.kwargs["reply_markup"].inline_keyboard[0][0]
     assert first.url is None
     assert first.callback_data == "v3u:home:contact"
-
