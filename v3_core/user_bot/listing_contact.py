@@ -74,7 +74,6 @@ def build_listing_contact_view(
         "<b>咨询这套</b>",
         "",
         he(identity),
-        he(intent.public_listing_id),
         "",
         "这套房的信息已经带上。",
         "直接说想确认的事情即可。",
