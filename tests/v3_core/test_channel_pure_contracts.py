@@ -36,9 +36,9 @@ def test_public_id_normalization_keeps_current_ql_shape():
 def test_channel_contract_is_only_details_photos_book():
     public_id = "QL-RF-A2B3"
     assert channel_actions(public_id) == (
-        "property_QL-RF-A2B3_details__ch",
-        "property_QL-RF-A2B3_photos__ch",
-        "property_QL-RF-A2B3_book__ch",
+        "property_QL-RF-A2B3_details",
+        "property_QL-RF-A2B3_photos",
+        "property_QL-RF-A2B3_book",
     )
     assert channel_action_url("@QiaolianBot", public_id, "details") == (
         "https://t.me/QiaolianBot?start=property_QL-RF-A2B3_details"
@@ -47,3 +47,4 @@ def test_channel_contract_is_only_details_photos_book():
         channel_start_payload(public_id, "advisor")
     with pytest.raises(ValueError, match="invalid_public_listing_id"):
         channel_start_payload("l_350", "details")
+
