@@ -28,7 +28,7 @@ _CHANNEL_STATUS_PRESENTATION = {
 }
 
 
-def _channel_status_presentation(status: object) -> tuple[str, str]:
+def channel_status_presentation(status: object) -> tuple[str, str]:
     return _CHANNEL_STATUS_PRESENTATION.get(
         str(status or "").strip().lower(),
         ("🔵", "房态确认中"),
@@ -61,7 +61,7 @@ def _normalize_contract(value: Any) -> str:
 
 
 def _status_line(status: str, public_id: str) -> str:
-    icon, label = _channel_status_presentation(status)
+    icon, label = channel_status_presentation(status)
     return f"{icon} {label}　{public_id}"
 
 
@@ -147,4 +147,4 @@ def render_channel_caption(*, listing: dict[str, Any], offer: dict[str, Any], pu
     return "\n\n".join(sections).strip()[:1024]
 
 
-__all__ = ["render_channel_caption"]
+__all__ = ["channel_status_presentation", "render_channel_caption"]
