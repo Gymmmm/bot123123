@@ -75,7 +75,8 @@ async def test_search_home_creates_independent_search_panel_then_sets_session():
     assert outcome.handled and outcome.rendered
     assert [c[0] for c in query.calls]==["answer"]
     assert len(message.calls)==1
-    assert "开始找房" in message.calls[0][1]
+    assert "想找什么样的房子？" in message.calls[0][1]
+    assert "BKK1 一房，预算 $600" in message.calls[0][1]
     callbacks=[b.callback_data for row in message.calls[0][2]["reply_markup"].inline_keyboard for b in row]
     assert callbacks==[
         "v3u:t:search_area","v3u:t:search_budget","v3u:t:search_layout",
