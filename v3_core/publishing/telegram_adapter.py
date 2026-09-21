@@ -29,12 +29,12 @@ class TelegramBotLike(Protocol):
 
 
 def build_channel_keyboard(
-    actions: dict[str, str], *, inventory_status: object = "active"
+    actions: dict[str, str], *, inventory_status: object = "active", area: object = ""
 ) -> InlineKeyboardMarkup:
     rows = [
         [InlineKeyboardButton(label, url=url) for label, url in row]
         for row in official_channel_button_spec(
-            actions, inventory_status=inventory_status
+            actions, inventory_status=inventory_status, area=area
         )
     ]
     return InlineKeyboardMarkup(rows)
@@ -76,6 +76,7 @@ class TelegramChannelAdapter:
         keyboard = build_channel_keyboard(
             command.actions,
             inventory_status=command.inventory_status,
+            area=command.area_key,
         )
         return cover, keyboard
 
@@ -197,3 +198,4 @@ __all__ = [
     "build_channel_keyboard",
     "deliver_approved_package",
 ]
+
