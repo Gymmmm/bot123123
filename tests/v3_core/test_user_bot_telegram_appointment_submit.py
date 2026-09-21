@@ -134,7 +134,7 @@ async def test_submit_executor_success_renders_public_success_then_clears_sessio
     assert [call[0] for call in query.calls] == ["answer", "edit_text"]
     rendered = query.calls[-1][1][0]
     assert "预约已提交" in rendered
-    assert PUBLIC_ID in rendered
+    assert PUBLIC_ID not in rendered
     assert "LST_INTERNAL_1" not in rendered
     assert executor.calls[0][0].contact_value == "@alice"
     assert executor.calls[0][1].time == "pm"
