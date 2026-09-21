@@ -175,7 +175,17 @@ jobs:
           chmod 0640 "$BACKUP_PATH"; chown root:qiaolianbot "$BACKUP_PATH"; echo "DB_BACKUP path=$BACKUP_PATH bytes=$(stat -c %s "$BACKUP_PATH")"
           install -d -m 0755 "$ROOT/releases"
           if [ ! -d "$RELEASE/.git" ]; then rm -rf -- "$RELEASE"; git clone -q "$BUNDLE_PATH" --branch actions-production "$RELEASE"; fi
-          test "$(git -c safe.directory="$RELEASE" -C "$RELEASE" rev-parse HEAD)" = "$EXPECTED_SHA"
+          RELEASE_HEAD_REF=$(sed -n 's/^ref: //p' "$RELEASE/.git/HEAD")
+          if [ -n "$RELEASE_HEAD_REF" ]; then
+            if [ -f "$RELEASE/.git/$RELEASE_HEAD_REF" ]; then
+              RELEASE_HEAD=$(cat "$RELEASE/.git/$RELEASE_HEAD_REF")
+            else
+              RELEASE_HEAD=$(awk -v ref="$RELEASE_HEAD_REF" '$2==ref {print $1; exit}' "$RELEASE/.git/packed-refs")
+            fi
+          else
+            RELEASE_HEAD=$(cat "$RELEASE/.git/HEAD")
+          fi
+          test "$RELEASE_HEAD" = "$EXPECTED_SHA"
           printf '%s\n' "$EXPECTED_SHA" > "$RELEASE/.deployed_sha"; chmod 0644 "$RELEASE/.deployed_sha"; chown -R qiaolianbot:qiaolianbot "$RELEASE"
           runuser -u qiaolianbot -- bash -lc "set -a; source '$RUNTIME_ENV'; set +a; export QIAOLIAN_CODE_ROOT='$RELEASE'; exec '$PYTHON_BOOTSTRAP' '$RELEASE/run_v3_preflight.py' --component all --db '$DB'"
           trap rollback_release ERR
