@@ -131,10 +131,14 @@ def _is_upcoming(record: AppointmentHistoryRecord, *, now: datetime) -> bool:
     bits = record.appointment_date.replace("/", "-").split("-")
     try:
         nums = [int(part) for part in bits if part.isdigit()]
-        month, day = nums[-2], nums[-1]
-        return (month, day) >= (now.month, now.day)
+        if len(nums) >= 3:
+            year, month, day = nums[-3], nums[-2], nums[-1]
+        else:
+            month, day = nums[-2], nums[-1]
+            year = now.year
+        return datetime(year, month, day, tzinfo=now.tzinfo).date() >= now.date()
     except (ValueError, IndexError):
-        return True
+        return False
 
 
 def _subject(record: AppointmentHistoryRecord, inventory: PublicInventoryReader) -> str:
