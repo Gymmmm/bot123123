@@ -129,12 +129,12 @@ def test_history_shows_only_two_upcoming_and_counts_terminal_or_past_rows(tmp_pa
         now=datetime(2026, 9, 9, 12, 0, tzinfo=ZoneInfo("Asia/Phnom_Penh")),
     )
 
-    assert [item.appointment_id for item in view.items] == [1, 2]
+    assert [item.appointment_id for item in view.items] == [3, 2]
     assert view.history_count == 2
     assert "🟡 待顾问确认" in view.text
     assert "实时视频看房" in view.text
-    assert PUBLIC_ID in view.text
-    assert "LST_PRIVATE_1" not in view.text
+    assert PUBLIC_ID not in view.text
+    assert "LST_PRIVATE_1" not in view.text\n    assert "更多预约记录请联系中文顾问。" in view.text
 
 
 def test_other_users_appointments_are_not_visible(tmp_path):
