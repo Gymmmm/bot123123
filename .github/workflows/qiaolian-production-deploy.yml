@@ -1,6 +1,9 @@
 name: qiaolian-v3-production-deploy
 
 on:
+  push:
+    branches:
+      - ops/deploy-v1-final-79977c4d-20260921
   workflow_dispatch:
     inputs:
       confirm:
@@ -18,7 +21,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  DEPLOY_SHA: c378e00eff300a4b1c62c3b7ec1a661a360b346a
+  DEPLOY_SHA: 79977c4d6c541d01fd36a549b1d2c554fe8c2e53
   PROD_HOST: 50.114.74.120
   PROD_PORT: '22'
   PROD_SSH_USER: root
@@ -27,7 +30,7 @@ env:
 
 jobs:
   verify-and-deploy:
-    if: github.event_name == 'workflow_dispatch' && inputs.confirm == 'DEPLOY'
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.confirm == 'DEPLOY')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -140,6 +143,26 @@ jobs:
           PYTHON_VERSION=$($PYTHON_BOOTSTRAP -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
           test "$PYTHON_VERSION" = "3.12" || { echo "DEPLOY_BLOCKED python_version=$PYTHON_VERSION"; exit 1; }
           echo "DEPLOY_PREREQUISITES_OK python=$PYTHON_VERSION"
+
+          DB_PATH_PROD="$ROOT/runtime/data/qiaolian_dual_bot.db"
+          BACKUP_DIR=/opt/qiaolian_backups
+          BACKUP_PATH="$BACKUP_DIR/qiaolian_before_${EXPECTED_SHA}_$(date -u +%Y%m%d_%H%M%S).db"
+          test -f "$DB_PATH_PROD" || { echo "DEPLOY_BLOCKED missing_production_db"; exit 1; }
+          install -d -m 0750 -o root -g qiaolianbot "$BACKUP_DIR"
+          "$PYTHON_BOOTSTRAP" - "$DB_PATH_PROD" "$BACKUP_PATH" <<'PY'
+          import sqlite3, sys
+          src, dst = sys.argv[1:3]
+          source = sqlite3.connect(f"file:{src}?mode=ro", uri=True)
+          target = sqlite3.connect(dst)
+          with target:
+              source.backup(target)
+          result = target.execute("PRAGMA integrity_check").fetchone()[0]
+          target.close()
+          source.close()
+          if result != "ok":
+              raise SystemExit(f"backup_integrity_failed:{result}")
+          print(f"DB_BACKUP_OK path={dst}")
+          PY
 
           install -d -m 0755 "$ROOT/releases"
           if [ ! -d "$RELEASE/.git" ]; then
