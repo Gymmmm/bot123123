@@ -14,7 +14,7 @@ from .appointment_history import AppointmentHistoryService
 from .assurance_views import build_assurance_home_view
 from .contact_effects import ContactEffectExecutor
 from .deeplink import parse_channel_start_payload, parse_search_start_payload
-from .home_views import build_appointment_history_home_view, build_contact_view, build_home_view, phnom_penh_greeting
+from .home_views import build_appointment_history_home_view, build_contact_view, build_home_view
 from .lead_service import LeadUser
 from .listing_contact import ListingContactEffectExecutor, build_listing_contact_view
 from .listing_presenter import build_public_listing_details
@@ -121,6 +121,7 @@ async def _handle_video_start(
     listings: PublicListingFlowService,
     transition_views: TransitionViewService,
     search_executor: SearchSubmitExecutor | None,
+    saved_search_pref: dict[str, Any] | None,
     advisor_url: str,
     channel_url: str,
 ) -> TelegramStartOutcome | None:
@@ -131,8 +132,7 @@ async def _handle_video_start(
         return None
 
     if raw == "video":
-        # No listing selected yet: mirror the legacy video-tour entry and
-        # surface real current inventory instead of treating the deeplink as invalid.
+        # Keep the production fallback when inventory search is unavailable.
         if search_executor is None:
             plan = _search_entry_plan()
             view = transition_views.build(plan)
@@ -144,25 +144,13 @@ async def _handle_video_start(
             apply_session_mutation(user_data, build_transition_session(plan))
             user_data["v3_video_booking_preferred"] = True
             return TelegramStartOutcome(True, "video_search", raw)
-        intent = SearchSubmitIntent(
-            criteria=SearchCriteria(raw_text=""),
-            source="video_deeplink",
-            goal="any",
-            area_display="",
-            budget_label="",
-            touch_payload={"video_booking": True},
+        return await _handle_video_inventory_start(
+            update,
+            context,
+            transition_views=transition_views,
+            search_executor=search_executor,
+            saved_search_pref=saved_search_pref,
         )
-        execution = search_executor.execute(intent, limit=5)
-        presentation = await present_search_flow_result(update, context, execution.result)
-        if presentation.status == "no_match":
-            view = build_search_no_match_view(intent)
-            await message.reply_text(
-                view.text,
-                parse_mode=ParseMode.HTML,
-                reply_markup=build_transition_keyboard(view),
-            )
-        user_data["v3_video_booking_preferred"] = True
-        return TelegramStartOutcome(True, "video_search", raw)
 
     prefix = "book_video_"
     if not raw.startswith(prefix):
@@ -554,11 +542,10 @@ async def _handle_listing_contact_start(
 
 
 
-async def _handle_video_start(
+async def _handle_video_inventory_start(
     update: Any,
     context: Any,
     *,
-    payload: str,
     transition_views: TransitionViewService,
     search_executor: SearchSubmitExecutor | None,
     saved_search_pref: dict[str, Any] | None,
@@ -566,24 +553,6 @@ async def _handle_video_start(
     message = getattr(update, "effective_message", None)
     user_data = getattr(context, "user_data", None)
     if message is None or not isinstance(user_data, dict):
-        return None
-
-    if payload.startswith("book_video_"):
-        public_id = payload[len("book_video_"):].strip()
-        from .public_appointment import PublicAppointmentDraft
-        draft = PublicAppointmentDraft(public_listing_id=public_id, mode="video", source="video_deeplink")
-        view = transition_views.appointment_date(draft)
-        user_data[APPOINTMENT_SESSION_KEY] = {
-            "public_listing_id": draft.public_listing_id,
-            "mode": "video",
-            "date": "",
-            "time": "",
-            "source": draft.source,
-        }
-        await message.reply_text(view.text, parse_mode=ParseMode.HTML, reply_markup=build_transition_keyboard(view))
-        return TelegramStartOutcome(True, "book_video", payload)
-
-    if payload != "video":
         return None
 
     pref = dict(saved_search_pref or {})
@@ -655,7 +624,6 @@ async def _handle_video_start(
         price = ("$" + f"{int(details.monthly_rent_usd):,}") if details.monthly_rent_usd else "价格待确认"
         lines.extend([
             f"{index}. {details.location or '位置待确认'}｜{details.layout or '户型待确认'}｜{price}",
-            f"   房源编号：{details.public_listing_id}",
         ])
     lines.extend([
         "",
@@ -666,7 +634,7 @@ async def _handle_video_start(
     rows: list[list[InlineKeyboardButton]] = []
     if cards:
         first_id = cards[0].public_listing_id
-        rows.append([InlineKeyboardButton(f"💬 咨询 {first_id}", callback_data=encode_listing_callback("consult", first_id))])
+        rows.append([InlineKeyboardButton("💬 咨询这套房", callback_data=encode_listing_callback("consult", first_id))])
         user_data[APPOINTMENT_SESSION_KEY] = {
             "public_listing_id": first_id,
             "mode": "video",
@@ -677,7 +645,8 @@ async def _handle_video_start(
         rows.append([InlineKeyboardButton("📅 安排视频代看", callback_data="v3u:t:appointment_mode:video")])
     rows.append([InlineKeyboardButton("🏠 查看更多房源", callback_data=encode_home_callback("search"))])
     await message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(rows))
-    return TelegramStartOutcome(True, f"video_{mode}", payload)
+    user_data["v3_video_booking_preferred"] = True
+    return TelegramStartOutcome(True, f"video_{mode}", "video")
 
 
 async def handle_v3_start(
@@ -701,12 +670,14 @@ async def handle_v3_start(
     if not isinstance(user_data, dict):
         raise ValueError("telegram_user_data_missing_for_start")
 
+    stored_search_pref = user_data.get(SEARCH_PREF_SESSION_KEY)
+    saved_search_pref = (
+        dict(stored_search_pref) if isinstance(stored_search_pref, dict) else {}
+    )
     args = tuple(getattr(context, "args", None) or ())
     user_data.clear()
     if not args:
-        user = getattr(update, "effective_user", None)
-        first_name = str(getattr(user, "first_name", "") or getattr(user, "full_name", "") or "您")
-        home = build_home_view(channel_url=channel_url, advisor_url=advisor_url, first_name=first_name, greeting=phnom_penh_greeting())
+        home = build_home_view(channel_url=channel_url, advisor_url=advisor_url)
         await message.reply_text(home.text, parse_mode=ParseMode.HTML, reply_markup=build_home_keyboard(home))
         return TelegramStartOutcome(handled=True, kind="home")
 
@@ -719,6 +690,7 @@ async def handle_v3_start(
         listings=listings,
         transition_views=transition_views,
         search_executor=search_executor,
+        saved_search_pref=saved_search_pref,
         advisor_url=advisor_url,
         channel_url=channel_url,
     )
