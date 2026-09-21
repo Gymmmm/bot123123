@@ -131,10 +131,14 @@ def _is_upcoming(record: AppointmentHistoryRecord, *, now: datetime) -> bool:
     bits = record.appointment_date.replace("/", "-").split("-")
     try:
         nums = [int(part) for part in bits if part.isdigit()]
-        month, day = nums[-2], nums[-1]
-        return (month, day) >= (now.month, now.day)
+        if len(nums) >= 3:
+            year, month, day = nums[-3], nums[-2], nums[-1]
+        else:
+            month, day = nums[-2], nums[-1]
+            year = now.year
+        return datetime(year, month, day, tzinfo=now.tzinfo).date() >= now.date()
     except (ValueError, IndexError):
-        return True
+        return False
 
 
 def _subject(record: AppointmentHistoryRecord, inventory: PublicInventoryReader) -> str:
@@ -161,9 +165,10 @@ def _lines(item: AppointmentHistoryItem) -> list[str]:
     status_icon, status_label = {"pending": ("🟡", "待顾问确认"), "confirmed": ("🟢", "看房已确认")}.get(item.status, ("🟡", "待顾问确认"))
     mode = APPOINTMENT_MODE_LABELS.get(item.viewing_mode, item.viewing_mode or "待确认")
     return [
-        f"<b>{he(item.subject)}</b>",
-        f"{he(_date_compact(item.appointment_date))} · {he(_time_compact(item.appointment_time))} · {he(mode)}",
-        f"{status_icon} {he(status_label)}",
+        f"🏠 {he(item.subject)}",
+        f"方式｜{he(mode)}",
+        f"时间｜{he(_date_compact(item.appointment_date))} · {he(_time_compact(item.appointment_time))}",
+        f"状态｜{status_icon} {he(status_label)}",
     ]
 
 
@@ -205,7 +210,7 @@ class AppointmentHistoryService:
             )
         items = tuple(_item(record, self.inventory) for record in upcoming_records[:2])
 
-        parts = ["<b>我的预约</b>", ""]
+        parts = ["📅 <b>我的预约</b>"]
         for index, item in enumerate(items):
             parts.extend(_lines(item))
             if index < len(items) - 1:
