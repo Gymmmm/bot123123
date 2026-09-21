@@ -84,12 +84,13 @@ class _Inventory:
         return object()
 
 
-def test_property_advisor_view_keeps_public_ql_context(monkeypatch):
+def test_property_advisor_view_hides_public_ql_but_keeps_internal_identity(monkeypatch):
     import v3_core.user_bot.listing_contact as mod
     monkeypatch.setattr(mod, "build_public_listing_details", lambda view: _Details())
     intent = SimpleNamespace(public_listing_id="QL-RF-A2B3")
     view = build_listing_contact_view(intent, _Inventory(), advisor_url="https://t.me/advisor")
-    assert "QL-RF-A2B3" in view.text
+    assert "QL-RF-A2B3" not in view.text
+    assert view.public_listing_id == "QL-RF-A2B3"
     assert "l_" not in view.text.lower()
     assert "咨询这套" in view.text
 
