@@ -27,17 +27,18 @@ def build_appointment_success_view(draft: PublicAppointmentDraft, inventory: Pub
         subject=details.subject or details.location or "这套房"
     mode="视频代看" if draft.mode=="video" else "实地看房"
     lines=[
-        "✅ <b>预约已提交</b>","",
-        f"<b>{he(subject)}</b>",
-        f"{he(_date_display(draft.date))} · {he(_time_display(draft.time))} · {he(mode)}","",
-        "预约信息已记录，具体看房时间以顾问后续确认结果为准。","",
+        "✅ <b>预约已提交</b>",
+        f"房源｜{he(subject)}",
+        f"方式｜{he(mode)}",
+        f"时间｜{he(_date_display(draft.date))} · {he(_time_display(draft.time))}",
+        "预约信息已经记录。顾问会继续确认具体看房安排。",
     ]
     return TransitionView(
         kind="appointment_success",
         text="\n".join(lines),
         rows=(
-            (TransitionChoice("我的预约","home","appointments"),TransitionChoice("中文顾问","home","contact")),
-            (TransitionChoice("继续找房","home","search"),),
+            (TransitionChoice("📋 我的预约","home","appointments"),TransitionChoice("💬 中文顾问","home","contact")),
+            (TransitionChoice("🔍 继续找房","home","search"),),
         ),
     )
 
