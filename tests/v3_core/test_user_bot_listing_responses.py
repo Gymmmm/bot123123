@@ -89,7 +89,7 @@ def test_detail_text_matches_locked_sectioned_copy_shape():
     text = build_detail_text(view)
 
     assert text.startswith("━━━━━━━━━━━━━━━\n🏢 金边优质房源出租\n━━━━━━━━━━━━━━━")
-    assert "📌基本信息  房源编号：QL-RF-A2B3" in text
+    assert "📌基本信息" in text\n    assert "QL-RF-A2B3" not in text
     assert "・项目区域：富力城 · BKK1" in text
     assert "・户型格局：2房1厅" in text
     assert "・楼层类型：19楼" in text
@@ -105,7 +105,7 @@ def test_detail_text_matches_locked_sectioned_copy_shape():
     assert "💬 侨联说" in text
     assert "采光面宽，适合长期住。" in text
     assert "楼下配套成熟。" in text
-    assert text.strip().endswith("🟢 房源状态：随时可预约看房")
+    assert text.strip().endswith("🟢 房源状态：当前可预约")
     assert "钥匙已备" not in text
 
 
@@ -116,14 +116,14 @@ def test_detail_text_omits_missing_bullets_and_adviser_without_copy():
     text = response.text
 
     assert "🏢 金边优质房源出租" in text
-    assert "📌基本信息  房源编号：QL-RF-A2B3" in text
+    assert "📌基本信息" in text\n    assert "QL-RF-A2B3" not in text
     assert "・月租金额：$800 / 月" in text
     assert "🧾 费用与配套" not in text
     assert "物业管理" not in text
     assert "水电费用" not in text
     assert "大楼配套" not in text
     assert "💬 侨联说" not in text
-    assert "🟢 房源状态：随时可预约看房" in text
+    assert "🟢 房源状态：当前可预约" in text
     assert _actions(response.action_rows) == [["book", "consult"], ["similar"]]
     assert _labels(response.action_rows) == [
         ["📅 预约看房", "💬 中文顾问"],
@@ -180,7 +180,7 @@ def test_photos_response_single_flipper_with_short_caption(tmp_path):
     assert "再看更多" not in first.text
     # Full sectioned detail lives on detail_text (separate message)
     assert "🏢 金边优质房源出租" in first.detail_text
-    assert "QL-RF-A2B3" in first.detail_text
+    assert "QL-RF-A2B3" not in first.detail_text
     assert _actions(first.action_rows) == [["photos", "photos"], ["book", "consult"], ["similar"]]
     assert _labels(first.action_rows) == [
         ["⬅️ 上一张", "下一张 ➡️"],
