@@ -216,3 +216,18 @@ def test_duplicate_submission_is_idempotent_but_same_user_two_listings_are_disti
     assert b.kind == "created" and b.appointment_id != a.appointment_id
     assert len(repo.rows) == 2
     assert {row["listing_id"] for row in repo.rows.values()} == {"LST_1", "LST_2"}
+
+
+def test_new_channel_runtime_never_generates_legacy_buttons():
+    urls = official_channel_action_urls(
+        "QiaoLianBot", PUBLIC_ID, advisor_url="https://t.me/qiaolian_advisor"
+    )
+    forbidden = {"📋 租赁详情", "📸 更多实拍", "💬 咨询顾问"}
+    for status in ("active", "reserved", "pending", "rented", "inactive", "offline"):
+        rows = official_channel_button_spec(urls, inventory_status=status)
+        labels = {label for row in rows for label, _ in row}
+        assert labels.isdisjoint(forbidden)
+    pending = official_channel_button_spec(urls, inventory_status="pending")
+    assert [[label for label, _ in row] for row in pending] == [["🔎 看相近房源", "💬 中文顾问"]]
+    offline = official_channel_button_spec(urls, inventory_status="offline")
+    assert "📅 预约看房" not in [label for row in offline for label, _ in row]
