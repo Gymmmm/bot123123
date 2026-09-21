@@ -37,8 +37,7 @@ def test_round2_tenant_service_entry_is_public_regardless_of_binding(tmp_path):
     callbacks = [choice.callback_data for row in home.rows for choice in row]
     assert callbacks == [
         "v3u:service:tenant_lease", "v3u:service:concierge",
-        "v3u:home:rental", "v3u:service:local",
-        "v3u:home:contact", "v3u:t:home",
+        "v3u:home:rental", "v3u:home:contact", "v3u:t:home",
     ]
 
     db = tmp_path / "tenant.sqlite3"
@@ -47,8 +46,8 @@ def test_round2_tenant_service_entry_is_public_regardless_of_binding(tmp_path):
     missing = tenant_home_view(service, 99)
     missing_labels = [choice.label for row in missing.rows for choice in row]
     assert missing_labels == [
-        "我的租约", "入住管家", "安心租房", "周边生活",
-        "中文顾问", "返回首页",
+        "📋 我的租约", "🛡️ 入住服务", "🏠 安心租房",
+        "💬 中文顾问", "⬅️ 返回首页",
     ]
     assert "没有显示你的住房信息" not in missing.text
 
