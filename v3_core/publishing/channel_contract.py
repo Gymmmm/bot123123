@@ -102,6 +102,16 @@ def channel_action_url(
     return f"https://t.me/{user}?start={payload}"
 
 
+def channel_general_action_url(username: str, payload: object) -> str:
+    user = str(username or "").strip().lstrip("@")
+    value = str(payload or "").strip()
+    if not user:
+        raise ValueError("channel_username_missing")
+    if not value or not re.fullmatch(r"(?:find|service|more_[A-Za-z0-9_-]+)", value):
+        raise ValueError(f"unsupported_channel_general_payload:{payload}")
+    return f"https://t.me/{user}?start={value}"
+
+
 def channel_actions(public_listing_id: object) -> tuple[str, str, str]:
     """Return the three User Bot deep-link actions in stable order."""
     return tuple(
@@ -160,58 +170,33 @@ def official_channel_button_spec(
     actions: dict[str, str],
     *,
     inventory_status: object = "active",
+    area: object = "",
 ) -> tuple[tuple[tuple[str, str], ...], ...]:
-    """Return keyboard rows as ``((label, url), ...)`` for publish and sync.
-
-    Locked product matrix (2026-09-20):
-    - bookable active/reserved:
-        Row1: [📷 房源详情] [📅 预约看房]
-        Row2: [💬 中文顾问]
-    - pending:
-        Row1: [🔎 看相近房源] [💬 中文顾问]
-    - rented / offline / inactive:
-        Row1: [🏠 帮我找房] [🔎 看看房源]
-        Row2: [💬 中文顾问]
-    """
     verified = official_channel_action_identity(actions)
     status = str(inventory_status or "").strip().lower()
-    has_consult = "consult" in verified
+    bot = _bot_from_details_url(verified["details"])
+    find_btn = (CHANNEL_CTA_LABELS["find"], channel_general_action_url(bot, "find"))
+    area_key = re.sub(r"[^A-Za-z0-9_-]+", "_", str(area or "").strip()).strip("_")
+    more_payload = f"more_{area_key}" if area_key else "find"
+    more_btn = ("🔎 更多房源", channel_general_action_url(bot, more_payload))
+    consult_btn = (CHANNEL_CTA_LABELS["consult"], verified["consult"])
 
     if inventory_status_bookable(status):
-        rows: list[tuple[tuple[str, str], ...]] = [
+        return (
             (
                 (CHANNEL_CTA_LABELS["details"], verified["details"]),
                 (CHANNEL_CTA_LABELS["book"], verified["book"]),
             ),
-        ]
-        if has_consult:
-            rows.append(((CHANNEL_CTA_LABELS["consult"], verified["consult"]),))
-        return tuple(rows)
-
-    bot = _bot_from_details_url(verified["details"])
-    find_url = f"https://t.me/{bot}?start=find"
-    more_url = f"https://t.me/{bot}?start=find"
-    find_btn = (CHANNEL_CTA_LABELS["find"], find_url)
-    more_btn = (CHANNEL_CTA_LABELS["more"], more_url)
-    consult_btn = (
-        (CHANNEL_CTA_LABELS["consult"], verified["consult"])
-        if has_consult
-        else None
-    )
-
+            (consult_btn,),
+        )
+    if status in {"busy", "high_demand", "orange"}:
+        return (
+            ((CHANNEL_CTA_LABELS["details"], verified["details"]), consult_btn),
+            (find_btn,),
+        )
     if status == "pending":
-        similar_btn = (CHANNEL_CTA_LABELS["similar"], more_url)
-        row = [similar_btn]
-        if consult_btn is not None:
-            row.append(consult_btn)
-        return (tuple(row),)
-
-    # rented / offline / inactive (and any other non-bookable)
-    row = [more_btn]
-    if consult_btn is not None:
-        row.append(consult_btn)
-    return (tuple(row),)
-
+        return ((more_btn, consult_btn),)
+    return ((find_btn, more_btn), (consult_btn,))
 
 def official_channel_action_identity(actions: dict[str, str]) -> dict[str, str]:
     """Require details/photos/book URLs that share one public listing id."""
@@ -282,6 +267,7 @@ __all__ = [
     "CHANNEL_ACTION_ORDER",
     "CHANNEL_CTA_LABELS",
     "channel_action_url",
+    "channel_general_action_url",
     "channel_actions",
     "channel_start_payload",
     "assert_channel_identity",
