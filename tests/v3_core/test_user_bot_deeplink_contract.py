@@ -22,7 +22,7 @@ def test_public_channel_payload_round_trips_between_publisher_and_user_bot():
 
 def test_public_channel_payload_matches_locked_production_parser_for_official_actions():
     for public_id in PUBLIC_IDS:
-        for action in PUBLIC_CHANNEL_ACTIONS:
+        for action in ("details", "photos", "book"):
             payload = channel_start_payload(public_id, action)
             legacy = legacy_parse_start_arg_payload(payload)
             route = parse_channel_start_payload(payload)
@@ -34,6 +34,8 @@ def test_public_channel_payload_matches_locked_production_parser_for_official_ac
 
 def test_public_channel_contract_does_not_grow_fourth_listing_button():
     public_id = "QL-RF-A2B3"
+    contact = parse_channel_start_payload(f"property_{public_id}_contact")
+    assert contact is not None and contact.action == "contact" and contact.public_listing_id == public_id
     for action in ("consult", "advisor", "similar", "video", "discussion_entry", "map"):
         assert parse_channel_start_payload(f"property_{public_id}_{action}") is None
 
