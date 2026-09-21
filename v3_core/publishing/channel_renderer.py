@@ -8,8 +8,6 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from v3_core.status_labels import inventory_status_presentation
-
 from .formatting import display_floor, display_layout, display_property_type
 from .public_ids import normalize_public_id
 
@@ -17,6 +15,24 @@ _EMPTY_FACTS = {
     "", "—", "-", "--", "暂无", "[暂无]", "未知", "待确认", "待定", "none", "null", "unknown",
 }
 _GENERIC_HEADINGS = {"侨联地产", "侨联精选", "精选房源", "优质房源", "房源", "金边房源"}
+
+_CHANNEL_STATUS_PRESENTATION = {
+    "active": ("🟢", "当前可预约"),
+    "reserved": ("🟡", "已有预约，仍可预约"),
+    "high_demand": ("🟠", "预约较多"),
+    "pending": ("🔵", "房态确认中"),
+    "rented": ("🔴", "已租出"),
+    "inactive": ("⚫", "已下架"),
+    "offline": ("⚫", "已下架"),
+    "withdrawn": ("⚫", "已下架"),
+}
+
+
+def _channel_status_presentation(status: object) -> tuple[str, str]:
+    return _CHANNEL_STATUS_PRESENTATION.get(
+        str(status or "").strip().lower(),
+        ("🔵", "房态确认中"),
+    )
 
 
 def _clean(value: Any, limit: int = 40) -> str:
@@ -45,7 +61,7 @@ def _normalize_contract(value: Any) -> str:
 
 
 def _status_line(status: str, public_id: str) -> str:
-    icon, label = inventory_status_presentation(status)
+    icon, label = _channel_status_presentation(status)
     return f"{icon} {label}　{public_id}"
 
 
