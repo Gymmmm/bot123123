@@ -19,14 +19,13 @@ from v3_core.publishing.channel_contract import (
     official_channel_action_urls,
     official_channel_button_spec,
 )
-from v3_core.status_labels import inventory_status_presentation
 
 from .appointments import ACTIVE_APPOINTMENT_STATUSES
 
 logger = logging.getLogger(__name__)
 
 APPOINTMENT_LOCK_COUNT = 5
-_STATUS_RE = re.compile(r"(?m)^[🟢🟡🔵🔴⚫]️?\s*(?:房源状态｜)?[^\n]*")
+_STATUS_RE = re.compile(r"(?m)^[🟢🟡🟠🔵🔴⚫]️?\s*(?:房源状态｜)?[^\n]*")
 
 
 def derive_appointment_inventory_status(current_status: str, active_count: int) -> str:
@@ -47,8 +46,17 @@ def derive_appointment_inventory_status(current_status: str, active_count: int) 
 
 
 def appointment_status_label(status: str, active_count: int = 0) -> str:
-    icon, label = inventory_status_presentation(status)
-    return f"{icon} {label}"
+    clean = str(status or "").strip().lower()
+    return {
+        "active": "🟢 当前可预约",
+        "reserved": "🟡 已有预约，仍可预约",
+        "high_demand": "🟠 预约较多",
+        "pending": "🔵 房态确认中",
+        "rented": "🔴 已租出",
+        "inactive": "⚫ 已下架",
+        "offline": "⚫ 已下架",
+        "withdrawn": "⚫ 已下架",
+    }.get(clean, "🔵 房态确认中")
 
 
 def caption_with_appointment_status(
