@@ -15,7 +15,10 @@ from v3_core.publishing.broadcast import (
     parse_hhmm,
 )
 from v3_core.publishing.publisher_app import V3PublisherApplication
-from v3_core.publishing.marketing_broadcast import (\n    MarketingBroadcastService,\n    TEMPLATES as MARKETING_TEMPLATES,\n)
+from v3_core.publishing.marketing_broadcast import (
+    MarketingBroadcastService,
+    TEMPLATES as MARKETING_TEMPLATES,
+)
 from v3_core.storage.bootstrap import initialize_v3_storage
 
 
