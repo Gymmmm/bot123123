@@ -187,7 +187,7 @@ class MarketingBroadcastService:
         }
         if selected == "default":
             return locked[template.key]
-        generic = {"find": find, "contact": advisor}
+        generic = {"find": BroadcastButton("🔍 帮我找房", find.url), "contact": BroadcastButton("💬 联系中文顾问", advisor.url)}
         if latest is not None:
             generic["latest"] = latest
         if selected == "combo":
