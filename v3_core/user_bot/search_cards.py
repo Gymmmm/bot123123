@@ -56,20 +56,15 @@ def build_search_card(views: Iterable[PublishedListingView], index: int) -> Sear
     view=items[position]
     details=build_public_listing_details(view)
     floor=display_floor(details.floor)
-    subject=" · ".join(
-        v for v in (
-            str(details.project_name or "").strip(),
-            str(details.layout or "").strip(),
-        ) if v
-    ) or str(details.location or "").strip() or details.public_listing_id
+    area=str(details.location or "").strip()
+    layout=str(details.layout or "").strip()
     rent=(
         f"${int(details.monthly_rent_usd):,}/月"
         if details.monthly_rent_usd is not None and int(details.monthly_rent_usd)>0
         else ""
     )
-    lines=[f"<b>{he(subject)}</b>"]
-    if rent:
-        lines.append(he(rent))
+    title=" · ".join(v for v in (area,layout,rent) if v) or "房源"
+    lines=[f"<b>💰 {he(title)}</b>"]
     if floor:
         lines.append(he(floor))
     lines.append(f"{details.status_icon} {he(details.status_label)} · {position+1}/{len(items)}")
