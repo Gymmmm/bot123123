@@ -1,6 +1,9 @@
 name: qiaolian-v3-production-deploy
 
 on:
+  push:
+    branches:
+      - master
   workflow_dispatch:
     inputs:
       confirm:
@@ -30,13 +33,13 @@ env:
 
 jobs:
   verify-and-deploy:
-    if: github.event_name == 'workflow_dispatch' && inputs.confirm == 'DEPLOY'
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.confirm == 'DEPLOY')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - name: Validate requested immutable SHA
         env:
-          REQUESTED_SHA: '${{ inputs.deploy_sha }}'
+          REQUESTED_SHA: '${{ github.event_name == 'push' && '79977c4d6c541d01fd36a549b1d2c554fe8c2e53' || inputs.deploy_sha }}'
         run: |
           set -Eeuo pipefail
           [[ "$REQUESTED_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo 'DEPLOY_BLOCKED deploy_sha_must_be_full_40_hex_commit'; exit 1; }
@@ -45,7 +48,7 @@ jobs:
       - name: Checkout requested immutable SHA
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.deploy_sha }}
+          ref: ${{ github.event_name == 'push' && '79977c4d6c541d01fd36a549b1d2c554fe8c2e53' || inputs.deploy_sha }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -150,6 +153,7 @@ jobs:
           test -d "$OLD/telethon_sessions" || { echo "DEPLOY_BLOCKED missing_telethon_sessions"; exit 1; }
           OLD_RELEASE=$(readlink -f "$CURRENT"); test -d "$OLD_RELEASE" || { echo "DEPLOY_BLOCKED current_release_missing"; exit 1; }
           OLD_SHA=$(basename "$OLD_RELEASE"); echo "CURRENT_PRODUCTION_SHA=$OLD_SHA"
+          test "$OLD_SHA" = "d7a1a3d3ab7c3bf3ee429c4d6b7e7fd9f6005bac" || { echo "DEPLOY_BLOCKED production_sha_changed expected=d7a1a3d3ab7c3bf3ee429c4d6b7e7fd9f6005bac actual=$OLD_SHA"; exit 1; }
           for service in "${SERVICES[@]}"; do test "$(systemctl is-active "$service")" = active || { echo "DEPLOY_BLOCKED service_not_active=$service"; exit 1; }; done
           for python_candidate in "$VENV/bin/python" "$OLD/.venv/bin/python" /opt/qiaolian-python-3.12/bin/python3 /usr/local/bin/python3.12 /usr/bin/python3.12; do if [ -x "$python_candidate" ]; then PYTHON_BOOTSTRAP="$python_candidate"; break; fi; done
           test -n "$PYTHON_BOOTSTRAP" || { echo "DEPLOY_BLOCKED missing_python_bootstrap"; exit 1; }
