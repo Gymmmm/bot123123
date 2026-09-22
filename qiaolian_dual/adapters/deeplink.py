@@ -11,7 +11,7 @@ _PROPERTY = re.compile(
 _BOOK_VIDEO = re.compile(r"^book_video_(.+)$", re.IGNORECASE)
 
 _ACTION_MAP = {
-    "details": "detail",
+    "details": "details",
     "photos": "photos",
     "book": "book",
     "contact": "consult",
