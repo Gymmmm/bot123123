@@ -126,7 +126,7 @@ async def handle_listing_callback(update: Update, context: ContextTypes.DEFAULT_
             await render_panel(update, text=listing_unavailable_text(reason, lid), parse_mode=ParseMode.HTML, reply_markup=_with_return_nav(listing_unavailable_keyboard(lid)), context=context)
             return MAIN
         item = listing_context(lid)
-        if not item or not db.get_listing(lid):
+        if not item:
             await render_panel(update, text='未找到该房源详情，可能已下架。', reply_markup=main_keyboard(), context=context)
             return MAIN
         context.user_data['contact_listing_id'] = lid
@@ -141,7 +141,7 @@ async def handle_listing_callback(update: Update, context: ContextTypes.DEFAULT_
 
     if data.startswith('listing:similar:'):
         lid = data.split(':', 2)[2]
-        item = db.get_listing(lid) if lid else None
+        item = listing_context(lid) if lid else None
         if not item:
             await render_panel(update, text='未找到房源信息。', reply_markup=main_keyboard(), context=context)
             return MAIN
