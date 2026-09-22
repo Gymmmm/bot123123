@@ -73,7 +73,7 @@ def test_bookable_keyboard_contract_is_locked_matrix_and_ordered():
         ["📷 房源详情", "📅 预约看房"],
         ["💬 中文顾问"],
     ]
-    assert rows[0][0].url == ACTIONS["details"]
+    assert rows[0][0].url == ACTIONS["photos"]
     assert rows[0][1].url == ACTIONS["book"]
     assert rows[1][0].url == ACTIONS["consult"]
 

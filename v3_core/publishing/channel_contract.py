@@ -184,31 +184,20 @@ def official_channel_button_spec(
     inventory_status: object = "active",
     area: object = "",
 ) -> tuple[tuple[tuple[str, str], ...], ...]:
+    """Channel CTA rows. ``area`` kept for call-site compatibility; unused."""
+    del area
     verified = official_channel_action_identity(actions)
     status = str(inventory_status or "").strip().lower()
-    bot = _bot_from_details_url(verified["details"])
-    find_btn = (CHANNEL_CTA_LABELS["find"], channel_general_action_url(bot, "find"))
-    area_key = re.sub(r"[^A-Za-z0-9_-]+", "_", str(area or "").strip()).strip("_")
-    more_payload = f"more_{area_key}" if area_key else "find"
-    more_btn = ("🔎 更多房源", channel_general_action_url(bot, more_payload))
+    # Label stays 📷 房源详情; deep link opens the photo flipper (_photos).
+    details_btn = (CHANNEL_CTA_LABELS["details"], verified["photos"])
     consult_btn = (CHANNEL_CTA_LABELS["consult"], verified["consult"])
 
     if inventory_status_bookable(status):
         return (
-            (
-                (CHANNEL_CTA_LABELS["details"], verified["details"]),
-                (CHANNEL_CTA_LABELS["book"], verified["book"]),
-            ),
+            (details_btn, (CHANNEL_CTA_LABELS["book"], verified["book"])),
             (consult_btn,),
         )
-    if status in {"busy", "high_demand", "orange"}:
-        return (
-            ((CHANNEL_CTA_LABELS["details"], verified["details"]), consult_btn),
-            (find_btn,),
-        )
-    if status == "pending":
-        return ((more_btn, consult_btn),)
-    return ((find_btn, more_btn), (consult_btn,))
+    return ((details_btn,), (consult_btn,))
 
 def official_channel_action_identity(actions: dict[str, str]) -> dict[str, str]:
     """Require details/photos/book URLs that share one public listing id."""

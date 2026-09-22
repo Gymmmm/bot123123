@@ -76,5 +76,4 @@ async def test_manual_first_publish_can_send_as_active_without_prechanging_inven
 def test_pending_keyboard_still_hides_booking_for_normal_non_manual_send():
     labels = _labels(build_channel_keyboard(dict(ACTIONS), inventory_status="pending"))
     assert "📅 预约看房" not in labels
-    assert "📷 房源详情" not in labels
-    assert labels == ["🔎 更多房源", "💬 中文顾问"]
+    assert labels == ["📷 房源详情", "💬 中文顾问"]

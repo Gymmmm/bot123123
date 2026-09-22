@@ -13,6 +13,8 @@ _ACTION_SUFFIX = {
     "details": "details",
     "photos": "photos",
     "book": "book",
+    "contact": "contact",
+    "consult": "contact",
 }
 
 
