@@ -5,23 +5,31 @@ from .common import *
 
 
 def main_keyboard() -> InlineKeyboardMarkup:
-    rows = [
-        [InlineKeyboardButton('🔍 帮我找房', callback_data='home_smart_search'), InlineKeyboardButton('📅 我的预约', callback_data='hub:appointments')],
-        [InlineKeyboardButton('🛡 侨联保障', callback_data='hub:rental'), InlineKeyboardButton('🛠 入住服务', callback_data='hub:service')],
-    ]
-    channel_url = str(CHANNEL_URL or '').strip()
-    if channel_url:
-        rows.append([InlineKeyboardButton('房源频道', url=channel_url), InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')])
-    else:
-        rows.append([InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')])
-    return InlineKeyboardMarkup(rows)
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton("🔍 智能找房", callback_data="home_smart_search"),
+                InlineKeyboardButton("📖 关于侨联地产", callback_data="home_brand"),
+            ],
+            [
+                InlineKeyboardButton("📅 预约看房", callback_data="home_appoint"),
+                InlineKeyboardButton("💎 直接问顾问", callback_data="home_consult"),
+            ],
+            [
+                InlineKeyboardButton("⚡ 入住管家", callback_data="home_living"),
+                InlineKeyboardButton("🧭 周边服务", callback_data="home_nearby"),
+            ],
+        ]
+    )
 
 
 def no_match_followup_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton('✏️ 调整条件', callback_data='findmode:guided'), InlineKeyboardButton('🏘 看相近房源', callback_data='find:similar')],
-        [InlineKeyboardButton('💬 联系我们', callback_data='appointment_menu:contact')],
-        [InlineKeyboardButton('🏠 返回首页', callback_data='home')],
+        [InlineKeyboardButton("💬 联系顾问", callback_data="appointment_menu:contact")],
+        [
+            InlineKeyboardButton("🎯 继续筛选", callback_data="findmode:guided"),
+            InlineKeyboardButton("🏠 返回首页", callback_data="home"),
+        ],
     ])
 
 
