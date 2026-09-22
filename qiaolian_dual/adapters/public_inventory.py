@@ -9,6 +9,7 @@ class PublicInventoryAdapter:
     def __init__(self, db_path: str | None = None):
         self.db_path = db_path
         self._reader = None
+        self._search_reader = None
 
     def _load_reader(self):
         if self._reader is not None:
@@ -19,6 +20,16 @@ class PublicInventoryAdapter:
         if self.db_path:
             return self._reader
         raise RuntimeError("public_inventory_db_path_required")
+
+    def _load_search_reader(self):
+        if self._search_reader is not None:
+            return self._search_reader
+        if not self.db_path:
+            raise RuntimeError("public_inventory_db_path_required")
+        from v3_core.user_bot.public_search import PublicSearchReader
+
+        self._search_reader = PublicSearchReader(self.db_path)
+        return self._search_reader
 
     def normalize_public_id(self, value: object) -> str | None:
         from qiaolian_dual.public_listing_id import normalize_public_id
@@ -34,37 +45,147 @@ class PublicInventoryAdapter:
         ql = self.normalize_public_id(public_listing_id)
         if not ql:
             return None
-        reader = self._load_reader()
-        return reader.resolve(ql)
+        return self._load_reader().resolve(ql)
 
     def to_3858_listing(self, view) -> dict[str, Any] | None:
         if view is None:
             return None
+
+        snapshot = dict(getattr(view, "snapshot", None) or {})
         frozen = dict(getattr(view, "frozen_listing", None) or {})
-        offer = dict(getattr(view, "frozen_offer", None) or {})
-        listing = dict(getattr(view, "listing", None) or {})
-        public_id = str(getattr(view, "public_listing_id", "") or listing.get("public_listing_id") or "")
-        price = offer.get("monthly_rent_usd")
-        if price is None:
-            price = listing.get("price") or frozen.get("price") or 0
+        frozen_offer = dict(getattr(view, "frozen_offer", None) or {})
+        canonical = dict(snapshot.get("canonical_facts") or {})
+        live_listing = dict(getattr(view, "listing", None) or {})
+        live_offer = dict(getattr(view, "offer", None) or {})
+
+        public_id = str(
+            getattr(view, "public_listing_id", "")
+            or snapshot.get("public_listing_id")
+            or live_listing.get("public_listing_id")
+            or ""
+        ).strip()
+        internal_id = str(
+            getattr(view, "listing_id", "")
+            or snapshot.get("listing_id")
+            or live_listing.get("listing_id")
+            or ""
+        ).strip()
+
+        price = live_offer.get("monthly_rent_usd")
+        if price in (None, ""):
+            price = frozen_offer.get("monthly_rent_usd")
+        if price in (None, ""):
+            price = canonical.get("monthly_rent_usd")
+
+        project = (
+            frozen.get("project_name")
+            or frozen.get("project_alias")
+            or canonical.get("project_name")
+            or canonical.get("project_alias")
+            or canonical.get("community_name")
+            or ""
+        )
+        community = canonical.get("community_name") or project
+        area = (
+            frozen.get("public_location_display")
+            or frozen.get("canonical_area_display")
+            or canonical.get("public_location_display")
+            or canonical.get("canonical_area_display")
+            or ""
+        )
+        property_type = (
+            frozen.get("property_type")
+            or canonical.get("property_type")
+            or canonical.get("property_type_display")
+            or ""
+        )
+        layout = frozen.get("layout") or canonical.get("layout") or ""
+        size_sqm = frozen.get("size_sqm")
+        if size_sqm in (None, ""):
+            size_sqm = canonical.get("size_sqm")
+        floor = frozen.get("floor")
+        if floor in (None, ""):
+            floor = canonical.get("floor")
+
+        deposit = (
+            frozen_offer.get("deposit_terms")
+            or frozen_offer.get("payment_terms")
+            or canonical.get("deposit_payment_terms")
+            or ""
+        )
+        contract_term = frozen_offer.get("contract_term") or canonical.get("contract_term_display") or ""
+        status = str(
+            live_listing.get("inventory_status")
+            or frozen.get("inventory_status")
+            or "pending"
+        ).strip().lower()
+        gallery = list(getattr(view, "gallery", ()) or ())
+
         return {
             "listing_id": public_id,
-            "internal_listing_id": str(getattr(view, "listing_id", "") or listing.get("listing_id") or ""),
-            "title": frozen.get("display_title") or listing.get("display_title") or listing.get("title") or "",
-            "area": frozen.get("public_location_display")
-            or listing.get("public_location_display")
-            or listing.get("area")
-            or "",
-            "price": price,
-            "layout": frozen.get("layout") or listing.get("layout") or "",
-            "size_sqm": frozen.get("size_sqm") or listing.get("size_sqm") or "",
-            "deposit_rule": offer.get("deposit_terms") or frozen.get("deposit_rule") or "",
-            "available_date": offer.get("available_date") or frozen.get("available_date") or "",
+            "public_listing_id": public_id,
+            "internal_listing_id": internal_id,
+            "title": canonical.get("display_title") or frozen.get("display_title") or live_listing.get("display_title") or "",
+            "project": project,
+            "community": community,
+            "area": area,
+            "property_type": property_type,
+            "layout": layout,
+            "bedrooms": frozen.get("bedrooms") if frozen.get("bedrooms") is not None else canonical.get("bedrooms"),
+            "bathrooms": frozen.get("bathrooms") if frozen.get("bathrooms") is not None else canonical.get("bathrooms"),
+            "price": price or 0,
+            "size_sqm": size_sqm or "",
+            "size": size_sqm or "",
+            "floor": floor or "",
+            "deposit": deposit,
+            "deposit_rule": deposit,
+            "contract_term": contract_term,
+            "available_date": frozen_offer.get("available_date") or canonical.get("available_date") or "",
+            "status": status,
+            "inventory_status": status,
             "bookable": bool(getattr(view, "bookable", False)),
+            "published": True,
+            "normalized_data": canonical,
+            "highlights": list(canonical.get("highlights") or []),
+            "adviser_copy": str(snapshot.get("adviser_copy") or ""),
+            "gallery": gallery,
+            "media_files": gallery,
+            "caption_variant": "a",
         }
 
     def get_listing(self, public_listing_id: object) -> dict[str, Any] | None:
         return self.to_3858_listing(self.resolve(public_listing_id))
+
+    def search(
+        self,
+        *,
+        property_type: str | None = None,
+        areas: list[str] | tuple[str, ...] | None = None,
+        budget_min: int | None = None,
+        budget_max: int | None = None,
+        limit: int = 6,
+    ) -> list[dict[str, Any]]:
+        views = self._load_search_reader().search(
+            property_type=str(property_type or "").strip(),
+            location_keys=tuple(
+                dict.fromkeys(
+                    str(area or "").strip()
+                    for area in (areas or ())
+                    if str(area or "").strip() and str(area or "").strip() != "不限"
+                )
+            ),
+            budget_min=budget_min,
+            budget_max=budget_max,
+            limit=max(1, int(limit)),
+        )
+        return [
+            item
+            for item in (self.to_3858_listing(view) for view in views)
+            if item is not None
+        ]
+
+    def recent(self, *, limit: int = 10) -> list[dict[str, Any]]:
+        return self.search(limit=limit)
 
     def is_bookable(self, public_listing_id: object) -> bool:
         view = self.resolve(public_listing_id)
