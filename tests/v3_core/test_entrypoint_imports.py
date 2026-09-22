@@ -28,5 +28,7 @@ def test_v3_entrypoints_expose_explicit_callable_boundary():
     assert callable(collector.main)
     assert callable(worker.main)
     assert callable(publisher.run)
-    assert callable(user_bot.run_v3_user_bot)
+    assert callable(user_bot.main)
+    assert callable(user_bot.acquire_user_bot_polling_lock)
+    assert callable(user_bot.release_user_bot_polling_lock)
     assert callable(preflight.main)

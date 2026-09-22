@@ -68,9 +68,13 @@ def test_v3_application_registers_admin_command_and_adminq_callbacks():
     assert "availability=deps.appointment_effects.availability" in source
     assert "channel_sync=deps.appointment_effects.channel" in source
     entrypoint = Path("run_v3_user_bot.py").read_text(encoding="utf-8")
-    assert "admin_home_handler=show_unified_admin_home" in entrypoint
-    assert "admin_query_handler=handle_admin_query" in entrypoint
-    assert "admin_authorizer=_is_admin_user" in entrypoint
+    dual_app = Path("qiaolian_dual/app.py").read_text(encoding="utf-8")
+    assert "from qiaolian_dual.user_bot import main" in entrypoint
+    assert "acquire_user_bot_polling_lock" in entrypoint
+    assert "release_user_bot_polling_lock" in entrypoint
+    assert "v3_core.user_bot.app" not in entrypoint
+    assert "CommandHandler('admin', cmd_admin_home)" in dual_app
+    assert "CallbackQueryHandler(handle_admin_query, pattern=r'^adminq:')" in dual_app
 
 
 def test_v3_reuses_complete_existing_admin_console():

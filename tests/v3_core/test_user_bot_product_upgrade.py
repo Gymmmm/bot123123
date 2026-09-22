@@ -117,14 +117,22 @@ def test_admin_home_exposes_consult_contract_renewal_and_service_work():
     assert "🛠 服务工单" in labels
 
 
-def test_production_entrypoint_wires_complete_admin_adapters():
-    source = Path("run_v3_user_bot.py").read_text(encoding="utf-8")
-    assert "show_unified_admin_home" in source
-    assert "admin_contract_command_handler=cmd_contracts" in source
-    assert "admin_contract_callback_handler=handle_admin_contract_callback" in source
-    assert "admin_contract_text_handler=handle_admin_contract_text" in source
-    assert "admin_workflow_callback_handler=handle_v3_admin_workflow" in source
-    assert "qiaolian_dual.v3_admin_workflow_bridge" in source
+def test_production_entrypoint_wires_3858_admin_and_workflow_routes():
+    entrypoint = Path("run_v3_user_bot.py").read_text(encoding="utf-8")
+    dual_app = Path("qiaolian_dual/app.py").read_text(encoding="utf-8")
+    admin_callbacks = Path("qiaolian_dual/callback_admin.py").read_text(encoding="utf-8")
+
+    assert "from qiaolian_dual.user_bot import main" in entrypoint
+    assert "acquire_user_bot_polling_lock" in entrypoint
+    assert "release_user_bot_polling_lock" in entrypoint
+    assert "v3_core.user_bot.app" not in entrypoint
+
+    assert "CommandHandler('contracts', cmd_contracts)" in dual_app
+    assert "CommandHandler('admin', cmd_admin_home)" in dual_app
+    assert "CallbackQueryHandler(handle_admin_query, pattern=r'^adminq:')" in dual_app
+    assert "data.startswith('adminlead:')" in admin_callbacks
+    assert "data.startswith('adminrepair:')" in admin_callbacks
+    assert "if action == 'done':" in admin_callbacks
 
 
 def test_v3_app_registers_admin_contract_and_workflow_routes():
