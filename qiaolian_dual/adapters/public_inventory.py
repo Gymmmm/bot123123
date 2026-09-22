@@ -42,6 +42,25 @@ class PublicInventoryAdapter:
             return None
         return str(getattr(view, "listing_id", "") or "").strip() or None
 
+    def public_id_for_internal(self, value: object) -> str | None:
+        internal_id = str(value or "").strip()
+        if not internal_id or not self.db_path:
+            return None
+        from pathlib import Path
+        import sqlite3
+
+        path = Path(self.db_path).expanduser().resolve()
+        if not path.is_file():
+            raise FileNotFoundError(path)
+        uri = f"file:{path.as_posix()}?mode=ro"
+        with sqlite3.connect(uri, uri=True, timeout=5) as conn:
+            row = conn.execute(
+                "SELECT public_listing_id FROM listings_v3 WHERE listing_id=? LIMIT 1",
+                (internal_id,),
+            ).fetchone()
+        public_id = self.normalize_public_id(row[0]) if row and row[0] else None
+        return public_id
+
     def resolve(self, public_listing_id: object):
         ql = self.normalize_public_id(public_listing_id)
         if not ql:
