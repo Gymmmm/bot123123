@@ -49,6 +49,7 @@ class PublicInventoryAdapter:
             price = listing.get("price") or frozen.get("price") or 0
         return {
             "listing_id": public_id,
+            "internal_listing_id": str(getattr(view, "listing_id", "") or listing.get("listing_id") or ""),
             "title": frozen.get("display_title") or listing.get("display_title") or listing.get("title") or "",
             "area": frozen.get("public_location_display")
             or listing.get("public_location_display")

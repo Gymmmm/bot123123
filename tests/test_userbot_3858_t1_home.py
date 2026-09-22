@@ -1,3 +1,8 @@
+import importlib
+
+import qiaolian_dual.adapters as adapters_package
+import qiaolian_dual.session_deeplink as session_deeplink
+import qiaolian_dual.user_bot as user_bot
 from qiaolian_dual.adapters.deeplink import DeeplinkAdapter
 from qiaolian_dual.keyboards_common import main_keyboard, no_match_followup_keyboard
 from qiaolian_dual.messages import home_text
@@ -35,8 +40,36 @@ def test_t1_deeplink_adapter_wins_property_and_book_video():
     assert details["action"] == "details"
     assert details["target"] == "QL-PP-AAAA"
     assert details["channel_return"] is True
+
     contact = parse_start_arg_payload("property_QL-PP-AAAA_contact")
     assert contact["action"] == "consult"
+    assert contact["target"] == "QL-PP-AAAA"
+
     video = parse_start_arg_payload("book_video_QL-PP-AAAA")
     assert video["action"] == "video"
+    assert video["target"] == "QL-PP-AAAA"
+
+    want_home = parse_start_arg_payload("want_home")
+    assert want_home["action"] == "want_home"
+
+    tenant_bind = parse_start_arg_payload("t_bind_xxx")
+    assert tenant_bind["action"] == "tenant_bind"
+    assert tenant_bind["target"] == "xxx"
+
     assert DeeplinkAdapter().parse("want_home") is None
+
+
+def test_t1_adapters_import_has_no_start_arg_side_effect():
+    before = session_deeplink.parse_start_arg_payload
+    importlib.reload(adapters_package)
+    assert session_deeplink.parse_start_arg_payload is before
+
+
+def test_t1_user_bot_and_session_deeplink_are_behaviorally_identical():
+    for arg in (
+        "property_QL-PP-AAAA_contact",
+        "book_video_QL-PP-AAAA",
+        "want_home",
+        "t_bind_xxx",
+    ):
+        assert user_bot.parse_start_arg_payload(arg) == session_deeplink.parse_start_arg_payload(arg)

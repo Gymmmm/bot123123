@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from .common import *
+from .adapters.deeplink import DeeplinkAdapter
 
 def user_display_name(user) -> str:
     return (getattr(user, 'full_name', '') or getattr(user, 'first_name', '') or '').strip()
@@ -40,6 +41,17 @@ def _base36_decode(token: str) -> int | None:
         return None
 
 def parse_start_arg_payload(arg: str) -> dict | None:
+    modern = DeeplinkAdapter().parse(arg)
+    if modern is not None:
+        return {
+            "action": modern["action"],
+            "target": modern.get("target") or "",
+            "post_token": "",
+            "channel_message_id": None,
+            "source": modern.get("source") or "channel",
+            "channel_return": bool(modern.get("channel_return")),
+        }
+
     from .texts import _channel_index_action
     index_payload = _channel_index_action(arg)
     if index_payload is not None:

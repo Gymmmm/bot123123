@@ -21,20 +21,31 @@ class AppointmentAdapter:
         public_id = str(data.get("listing_id") or "").strip()
         if not public_id:
             raise ValueError("appointment_listing_required")
+
         listing = self.inventory.get_listing(public_id)
         if listing is None:
             raise ValueError("listing_not_published")
         if not listing.get("bookable"):
             raise ValueError("listing_not_bookable")
+
+        internal_listing_id = str(listing.get("internal_listing_id") or "").strip()
+        if not internal_listing_id:
+            resolve_internal_id = getattr(self.inventory, "resolve_internal_id", None)
+            if callable(resolve_internal_id):
+                internal_listing_id = str(resolve_internal_id(public_id) or "").strip()
+        if not internal_listing_id:
+            raise ValueError("listing_not_published")
+
         if self.list_appointments is not None:
             existing = self.list_appointments(int(data["user_id"]), limit=20) or []
             for row in existing:
                 status = str(row.get("status") or "").lower()
-                same = str(row.get("listing_id") or "") == public_id
+                same = str(row.get("listing_id") or "") == internal_listing_id
                 unfinished = status in {"pending", "assigned", "contacted", ""}
                 if same and unfinished:
                     raise ValueError("appointment_duplicate")
+
         payload = dict(data)
-        payload["listing_id"] = public_id
+        payload["listing_id"] = internal_listing_id
         payload.setdefault("status", "pending")
         return int(self.create_appointment(payload))

@@ -39,7 +39,7 @@ def test_gallery_media_flag_and_text_return():
 
 def test_deeplink_property_and_book_video():
     parser = DeeplinkAdapter()
-    assert parser.parse("property_QL-PP-AAAA_details")["action"] == "detail"
+    assert parser.parse("property_QL-PP-AAAA_details")["action"] == "details"
     assert parser.parse("property_QL-PP-AAAA_book")["action"] == "book"
     assert parser.parse("book_video_QL-PP-AAAA")["action"] == "video"
     assert parser.parse("want_home") is None
@@ -47,11 +47,16 @@ def test_deeplink_property_and_book_video():
 
 def test_appointment_duplicate_and_unbookable():
     class Inventory:
-        def __init__(self, bookable):
+        def __init__(self, bookable, internal_id="l_123"):
             self.bookable = bookable
+            self.internal_id = internal_id
 
         def get_listing(self, public_id):
-            return {"listing_id": public_id, "bookable": self.bookable}
+            return {
+                "listing_id": public_id,
+                "internal_listing_id": self.internal_id,
+                "bookable": self.bookable,
+            }
 
     created = {}
 
@@ -60,7 +65,7 @@ def test_appointment_duplicate_and_unbookable():
         return 9
 
     def list_appts(_user_id, limit=20):
-        return [{"listing_id": "QL-PP-AAAA", "status": "pending"}]
+        return [{"listing_id": "l_123", "status": "pending"}]
 
     blocked = AppointmentAdapter(
         inventory=Inventory(True), create_appointment=create, list_appointments=list_appts
@@ -71,16 +76,20 @@ def test_appointment_duplicate_and_unbookable():
     except ValueError as exc:
         assert str(exc) == "appointment_duplicate"
 
+    created.clear()
     unbookable = AppointmentAdapter(inventory=Inventory(False), create_appointment=create)
     try:
         unbookable.submit({"user_id": 1, "listing_id": "QL-PP-AAAA"})
         raise AssertionError("unbookable must fail")
     except ValueError as exc:
         assert str(exc) == "listing_not_bookable"
+    assert created == {}
 
-    ok = AppointmentAdapter(inventory=Inventory(True), create_appointment=create)
+    ok = AppointmentAdapter(
+        inventory=Inventory(True, internal_id="l_456"), create_appointment=create
+    )
     assert ok.submit({"user_id": 1, "listing_id": "QL-PP-BBBB"}) == 9
-    assert created["listing_id"] == "QL-PP-BBBB"
+    assert created["listing_id"] == "l_456"
     assert created["status"] == "pending"
 
 
