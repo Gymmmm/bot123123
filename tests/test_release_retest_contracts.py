@@ -18,7 +18,7 @@ def test_cover_renderer_prefers_canonical_facts_over_polluted_legacy_fields():
                 "property_type_display": "公寓",
                 "deal_type": "rent",
                 "layout": "2房1厅",
-                "public_location_display": "洪森大道",
+                "public_location_display": "60米大道",
                 "size_sqm": 82,
                 "floor": "12楼",
                 "monthly_rent_usd": 680,
@@ -27,7 +27,7 @@ def test_cover_renderer_prefers_canonical_facts_over_polluted_legacy_fields():
     )
     assert fields["project"] == "Urban Village"
     assert fields["property_type"] == "公寓"
-    assert fields["area"] == "洪森大道"
+    assert fields["area"] == "60米大道"
     assert fields["price"] == "$680"
     assert fields["price_line"] == "$680/月"
     assert fields["size"] == "82㎡"

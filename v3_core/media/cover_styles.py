@@ -3,7 +3,7 @@
 Extracted from qiaolian_dual/cover_styles.py at
 8e4605cf5cc21dfec3ce30729654b09e39de9abf.
 
-正式横版封面只保留三套：经典蓝卡、右侧价格牌、黑金高级感。
+正式横版封面：经典蓝卡、右侧价格牌、黑金高级感、极简实拍渐变。
 旧名称只做兼容映射，不再形成新的渲染分支。
 """
 from __future__ import annotations
@@ -14,18 +14,20 @@ from pathlib import Path
 # This file moved two package levels deeper than the production source.
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-FINAL_COVER_STYLES = ("classic_blue", "right_price", "black_gold")
+FINAL_COVER_STYLES = ("classic_blue", "right_price", "black_gold", "premium_photo")
 
 STYLE_LABELS = {
     "classic_blue": "经典蓝卡",
     "right_price": "右侧价格牌",
     "black_gold": "黑金高级感",
+    "premium_photo": "极简实拍渐变",
 }
 
 _TEMPLATE_PATHS = {
     "classic_blue": REPO_ROOT / "templates" / "property" / "01_经典蓝卡模板.html",
     "right_price": REPO_ROOT / "templates" / "property" / "03_右侧价格牌模板.html",
     "black_gold": REPO_ROOT / "templates" / "property" / "04_黑金高级感_右侧价格牌模板.html",
+    "premium_photo": REPO_ROOT / "templates" / "property" / "13_侨联极简实拍渐变版.html",
     "video_vertical": REPO_ROOT / "templates" / "property" / "04_竖版视频封面模板.html",
 }
 
@@ -49,13 +51,13 @@ ACCEPTED_COVER_STYLE_KEYS = frozenset(
 
 
 def recommended_cover_style(*values: object) -> str:
-    """Return the production default, reserving black gold for villas."""
+    """Return the production default: premium photo for ordinary, black gold for villas."""
     identity = " ".join(str(value or "").strip().lower() for value in values)
-    return "black_gold" if ("别墅" in identity or "villa" in identity) else "right_price"
+    return "black_gold" if ("别墅" in identity or "villa" in identity) else "premium_photo"
 
 
 def normalize_cover_style(style: str | None, *, allow_video: bool = True) -> str:
-    """把旧名称收敛到最终三套；空值固定使用经典蓝卡。"""
+    """把旧名称收敛到正式封面套装；空值固定使用经典蓝卡。"""
     value = str(style or "classic_blue").strip().lower()
     value = _ALIASES.get(value, value)
     if value == "video_vertical" and allow_video:

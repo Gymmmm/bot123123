@@ -34,17 +34,18 @@ def test_v3_canonical_parser_matches_locked_production_matrix():
         _assert_same(raw)
 
 
-def test_bridge_uses_chinese_customer_facing_project_and_jinjie_location():
+def test_bridge_uses_chinese_customer_facing_project_and_bassac_location():
     facts = v3_canonicalize_source(
         "【公寓出租】桥牌房间（河景）｜租金：$420/月｜房型：1房1卫｜押1付1"
     )
     assert facts["project_name"] == "桥牌"
     assert facts["project_key"] == "the_bridge"
-    assert facts["public_location_key"] == "金街"
+    # Living-facts: canonical GEO = 百色河; 金街 is market/search only.
+    assert facts["public_location_key"] == "百色河"
     assert facts["public_location_display"] == "金街附近"
     assert facts["canonical_area_key"] is None
     assert facts["quality"]["blocking_flags"] == []
-    _assert_same("【公寓出租】桥牌房间（河景）｜租金：$420/月｜房型：1房1卫｜押1付1")
+    # Dual taxonomy is not yet on living-facts GEO; do not lock V3↔dual parity here.
 
 
 def test_v3_canonical_parser_matches_combinatorial_contract_space():

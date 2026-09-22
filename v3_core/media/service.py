@@ -23,7 +23,7 @@ from .source_scrub import scrub_file
 
 MAX_SCRUB_COVERAGE = 0.08
 SCRUB_REVISION = "source_scrub_v2_crop_mild_enhance_20260920"
-GALLERY_BRAND_REVISION = "qiaolian_gallery_logo_v4_three_style_20260920"
+GALLERY_BRAND_REVISION = "qiaolian_gallery_logo_v5_premium_photo_20260923"
 
 
 @dataclass(frozen=True)
@@ -81,6 +81,8 @@ class MediaPreparationService:
             "minimal_white",
             "blue_banner",
             "premium_4image",
+            "premium_photo",
+            "premium",
         }:
             return "classic_blue"
         return "right_price"

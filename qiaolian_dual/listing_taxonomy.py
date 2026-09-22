@@ -61,7 +61,7 @@ PHYSICAL_AREAS: tuple[PhysicalArea, ...] = (
     PhysicalArea("BKK1", "BKK1", "sangkat", ("boeung keng kang 1", "bkk1", "bkk 1", "bkk-1", "万景岗1", "万景岗一区")),
     PhysicalArea("BKK2", "BKK2", "sangkat", ("boeung keng kang 2", "bkk2", "bkk 2", "bkk-2", "万景岗2", "万景岗二区")),
     PhysicalArea("BKK3", "BKK3", "sangkat", ("boeung keng kang 3", "bkk3", "bkk 3", "bkk-3", "万景岗3", "万景岗三区")),
-    PhysicalArea("百色河", "永旺1附近（百色河区）", "sangkat", ("tonle bassac", "tonle basak", "百色河", "百色河区")),
+    PhysicalArea("百色河", "永旺1附近", "sangkat", ("tonle bassac", "tonle basak", "百色河", "百色河区")),
     PhysicalArea("TK/7月区", "堆谷（TK）", "khan", ("tuol kork", "toul kork", "堆谷", "堆谷区", "7月区", "七月区")),
     PhysicalArea("森速", "森速（永旺2一带）", "khan", ("sen sok", "sensok", "森速", "森速区")),
     PhysicalArea("水净华", "水净华半岛", "khan", ("chroy changvar", "chroy changva", "水净华", "水静华")),
@@ -78,12 +78,12 @@ _MARKET_LOCATIONS_EXPLICIT: tuple[MarketLocation, ...] = (
     MarketLocation("BKK3", "BKK3", "district", ("bkk3", "bkk 3", "bkk-3", "万景岗3", "万景岗三区")),
     MarketLocation("BKK", "BKK", "district", ("bkk", "万景岗")),
     MarketLocation("钻石岛", "钻石岛", "district", ("钻石岛", "钻岛", "koh pich", "diamond island")),
-    MarketLocation("百色河", "永旺1附近（百色河区）", "district", ("百色河", "百色河区", "tonle bassac", "tonle basak", "bassac")),
+    MarketLocation("百色河", "永旺1附近", "district", ("百色河", "百色河区", "tonle bassac", "tonle basak", "bassac")),
     MarketLocation("俄罗斯市场", "俄罗斯市场附近", "nearby", ("俄罗斯市场", "俄罗斯市场附近", "俄市", "russian market", "ttp", "toul tom poung", "toul tompoung")),
     MarketLocation("TK/7月区", "堆谷（TK）", "district", ("堆谷", "堆谷区", "堆谷（TK）", "tk", "tuol kork", "toul kork", "7月区", "七月区")),
-    MarketLocation("洪森大道", "洪森大道", "corridor", ("洪森大道", "60米大道", "60米路", "hun sen boulevard", "hun sen blvd", "ph60m")),
+    MarketLocation("洪森大道", "60米大道", "corridor", ("洪森大道", "60米大道", "60米路", "hun sen boulevard", "hun sen blvd", "ph60m")),
     # Source-backed low-precision public label; do not promote to a physical area.
-    MarketLocation("一号路", "一号路附近", "corridor", ("一号路附近", "一号路", "1号路", "一号公路", "1号公路", "one road")),
+    MarketLocation("一号路", "一号路", "corridor", ("一号路附近", "一号路", "1号路", "一号公路", "1号公路", "one road")),
     MarketLocation("598路", "598路附近", "corridor", ("598路附近", "598路", "598公路")),
     MarketLocation("50米路", "50米路附近", "corridor", ("50米路附近", "50米路", "50米大道")),
     # Source-backed low-precision label; do not promote road/market wording to a physical area.
@@ -93,15 +93,17 @@ _MARKET_LOCATIONS_EXPLICIT: tuple[MarketLocation, ...] = (
     MarketLocation("森速", "森速（永旺2一带）", "district", ("森速", "森速区", "森速（永旺2一带）", "sen sok", "sensok")),
     MarketLocation("水净华", "水净华半岛", "district", ("水净华", "水净华区", "水净华半岛", "水静华", "chroy changvar", "chroy changva")),
     MarketLocation("河边", "河边", "corridor", ("河边", "河畔", "riverside")),
-    MarketLocation("金街", "金街附近", "nearby", ("金街", "金街附近", "金街中国城", "桥牌", "the bridge")),
+    MarketLocation("金街", "金街附近", "nearby", ("金街", "金街附近", "金街中国城")),
     MarketLocation("机场附近", "机场附近", "nearby", ("机场附近", "机场路", "老机场", "旧机场")),
     MarketLocation("中央市场", "中央市场", "nearby", ("中央市场", "新街市", "central market", "phsar thmei")),
     MarketLocation("奥林匹克", "奥林匹克", "nearby", ("奥林匹克", "奥林匹亚", "olympic", "olympia")),
     MarketLocation("富力城", "富力城", "project_market", ("富力城", "富力中心城", "r&f city", "rf city", "r f city", "金边中心城")),
-    MarketLocation("炳发城", "炳发城", "project_market", ("炳发城", "borey peng huoth")),
+    MarketLocation("炳发城", "一号路 / 60米 / 50米炳发", "project_market", ("炳发城", "borey peng huoth")),
     # The legacy slash-combined value remains only as an input/search alias;
     # canonical keys and public displays are one resolved location concept.
-    MarketLocation("太子幸福广场", "太子幸福广场", "project_market", ("太子/幸福", "太子幸福广场", "太子幸福", "幸福广场", "the pinnacle", "prince happiness plaza")),
+    # Do not alias project identity tokens (the pinnacle / 幸福广场) onto this market —
+    # that pollutes canonical GEO (living-facts: Pinnacle GEO = 百色河).
+    MarketLocation("太子幸福广场", "太子幸福广场", "project_market", ("太子/幸福", "太子幸福广场", "太子幸福")),
 )
 
 # A bare physical-area mention is useful as a conservative Level-1 search
@@ -128,7 +130,7 @@ MANUAL_MARKET_ALIASES: dict[str, tuple[str, ...]] = {
 
 PROJECT_IDENTITIES: tuple[ProjectIdentity, ...] = (
     ProjectIdentity("the_bridge", "桥牌", "project", ("桥牌", "the bridge"), property_family="公寓"),
-    ProjectIdentity("aeon1", "永旺一", "project", ("Aeon1", "永旺一", "永旺1", "aeon 1")),
+    ProjectIdentity("aeon1", "永旺一", "project", ("Aeon1", "永旺一", "永旺1", "aeon 1"), property_family="公寓"),
     ProjectIdentity("vila_town", "Vila Town", "project", ("vila town",)),
     ProjectIdentity("the_pinnacle", "The Pinnacle 幸福广场", "project", ("the pinnacle", "太子幸福广场", "幸福广场", "prince happiness plaza"), property_family="公寓"),
     ProjectIdentity("rf_city", "富力城", "project", ("富力城", "富力中心城", "r&f city", "rf city")),
@@ -307,7 +309,7 @@ def _extract_markets(text: str) -> tuple[list[str], list[str], list[dict[str, An
         if hit:
             alias, position = hit
             matches.append((item, alias, position))
-    relation_priority = {"district": 0, "corridor": 1, "project_market": 2, "nearby": 3}
+    relation_priority = {"corridor": 0, "district": 1, "project_market": 2, "nearby": 3}
     matches.sort(key=lambda match: (relation_priority.get(match[0].relation, 9), match[2], -len(match[1])))
     unique: list[tuple[MarketLocation, str, int]] = []
     seen: set[str] = set()
@@ -489,6 +491,32 @@ def _extract_property(text: str) -> tuple[str, str | None, str, str, list[dict[s
     return "未知", None, "未知", "unknown", [], ["unknown_property_type"]
 
 
+def _enrich_peng_corridor_displays(
+    *,
+    market_keys: list[str],
+    market_displays: list[str],
+    brand_key: str | None,
+    project_key: str | None,
+) -> list[str]:
+    """Customer phrases for Peng Huoth corridor posts without a named Star project."""
+    if not market_keys or not market_displays:
+        return market_displays
+    is_peng = brand_key == "peng_huoth" or project_key == "peng_huoth_city"
+    if not is_peng:
+        return market_displays
+    displays = list(market_displays)
+    primary = market_keys[0]
+    if primary == "一号路":
+        displays[0] = "铁桥头 · 一号路炳发" if "铁桥头" in market_keys else "一号路炳发"
+    elif primary == "洪森大道":
+        displays[0] = "60米大道 · 炳发"
+    elif primary == "50米路":
+        displays[0] = "50米炳发"
+    elif primary == "6号路":
+        displays[0] = "6号路炳发"
+    return displays
+
+
 def classify_listing_taxonomy(raw_text: str) -> TaxonomyResult:
     text = str(raw_text or "")
     area_key, area_display, area_level, area_status, area_evidence, area_flags = _extract_physical_area(text)
@@ -506,6 +534,12 @@ def classify_listing_taxonomy(raw_text: str) -> TaxonomyResult:
                 _evidence(project_meta.property_family, "project_property_metadata", "high", project_name or project_key)
             ]
             property_flags = [flag for flag in property_flags if flag != "unknown_property_type"]
+    market_displays = _enrich_peng_corridor_displays(
+        market_keys=market_keys,
+        market_displays=market_displays,
+        brand_key=brand_key,
+        project_key=project_key,
+    )
     project_alias_evidence = ([_evidence(project_alias, "raw_project_alias", "high", project_alias)] if project_alias else [])
     return TaxonomyResult(
         canonical_area_key=area_key,

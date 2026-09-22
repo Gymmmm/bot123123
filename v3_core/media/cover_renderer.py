@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from .cover_styles import cover_template_path, normalize_cover_style
+from .photo_formatter import resolve_gallery_logo_path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -39,7 +40,7 @@ class CoverRenderData:
     highlight_2: str = ""
     highlight_3: str = ""
 
-    def tokens(self, source_image: str) -> dict[str, str]:
+    def tokens(self, source_image: str, *, style: str | None = None) -> dict[str, str]:
         deal_type = str(self.deal_type or "rent").lower()
         raw_price = str(self.price or "").strip()
         negotiable = raw_price in {"售价面议", "租金面议", "价格面议", "面议"}
@@ -47,8 +48,11 @@ class CoverRenderData:
         if price and not price.startswith("$") and not negotiable:
             price = f"${price}"
         suffix = "/月" if deal_type == "rent" and price and not negotiable else ""
+        logo_path = resolve_gallery_logo_path(style)
+        logo_src = _file_to_data_url(str(logo_path)) if logo_path and logo_path.is_file() else ""
         return {
             "BG_SRC": _file_to_data_url(source_image),
+            "LOGO_SRC": logo_src,
             "REF": str(self.public_listing_id or ""),
             "PROJECT": str(self.project or self.property_type or "优质房源"),
             "PROJECT_ALIAS": str(self.project_alias or ""),
@@ -112,7 +116,7 @@ def render_cover(
     if not source.is_file():
         raise FileNotFoundError(f"cover_source_not_found:{source}")
     output.parent.mkdir(parents=True, exist_ok=True)
-    tokens = data.tokens(str(source))
+    tokens = data.tokens(str(source), style=style)
 
     with sync_playwright() as playwright:
         launch_options: dict[str, Any] = {
@@ -167,6 +171,21 @@ def render_cover(
                         if (el.decode) { try { await el.decode(); } catch (_) {} }
                     }"""
                 )
+
+            brand_logo = page.locator("#brandLogo").first
+            if brand_logo.count():
+                logo_src = str(tokens.get("LOGO_SRC") or "")
+                if logo_src:
+                    brand_logo.evaluate("(el, src) => el.src = src", logo_src)
+                    brand_logo.evaluate(
+                        """async el => {
+                            if (!el.complete) await new Promise(resolve => {
+                                el.onload = resolve; el.onerror = resolve;
+                            });
+                        }"""
+                    )
+                else:
+                    brand_logo.evaluate("el => { el.removeAttribute('src'); el.style.display = 'none'; }")
 
             field_ids = {
                 "ref": "REF",

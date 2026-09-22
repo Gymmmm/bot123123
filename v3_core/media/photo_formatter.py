@@ -145,14 +145,14 @@ def _fallback_brand_logo(canvas_width: int) -> Image.Image:
 def resolve_gallery_logo_path(cover_style: str | None) -> Path | None:
     """Map cover style to the matching gallery corner mark asset.
 
-    classic_blue → white/brand-matched text mark (no blue plate)
+    classic_blue / premium_photo → white/brand-matched text mark
     right_price  → white text mark
     black_gold   → champagne gold mark
     """
     key = str(cover_style or "").strip().lower()
     if key in _BLACK_GOLD_STYLE_KEYS:
         path = BLACK_GOLD_LOGO
-    elif key in _CLASSIC_BLUE_STYLE_KEYS:
+    elif key in _CLASSIC_BLUE_STYLE_KEYS or key in {"premium_photo", "premium"}:
         path = CLASSIC_BLUE_LOGO
     else:
         path = RIGHT_PRICE_LOGO

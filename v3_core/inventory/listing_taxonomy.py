@@ -33,6 +33,13 @@ class ProjectIdentity:
     kind: str  # project or brand
     aliases: tuple[str, ...]
     property_family: str | None = None
+    # single: property_family may backfill when source omits type.
+    # mixed: never auto-fill property_type from this project.
+    property_type_mode: str | None = None  # "single" | "mixed" | None
+    # Verified project → public location relation (must reference a real market/
+    # physical concept). Never treat the project display name as the location.
+    default_location_key: str | None = None
+    default_location_display: str | None = None
 
 
 @dataclass(frozen=True)
@@ -61,7 +68,7 @@ PHYSICAL_AREAS: tuple[PhysicalArea, ...] = (
     PhysicalArea("BKK1", "BKK1", "sangkat", ("boeung keng kang 1", "bkk1", "bkk 1", "bkk-1", "万景岗1", "万景岗一区")),
     PhysicalArea("BKK2", "BKK2", "sangkat", ("boeung keng kang 2", "bkk2", "bkk 2", "bkk-2", "万景岗2", "万景岗二区")),
     PhysicalArea("BKK3", "BKK3", "sangkat", ("boeung keng kang 3", "bkk3", "bkk 3", "bkk-3", "万景岗3", "万景岗三区")),
-    PhysicalArea("百色河", "永旺1附近（百色河区）", "sangkat", ("tonle bassac", "tonle basak", "百色河", "百色河区")),
+    PhysicalArea("百色河", "永旺1附近", "sangkat", ("tonle bassac", "tonle basak", "百色河", "百色河区")),
     PhysicalArea("TK/7月区", "堆谷（TK）", "khan", ("tuol kork", "toul kork", "堆谷", "堆谷区", "7月区", "七月区")),
     PhysicalArea("森速", "森速（永旺2一带）", "khan", ("sen sok", "sensok", "森速", "森速区")),
     PhysicalArea("水净华", "水净华半岛", "khan", ("chroy changvar", "chroy changva", "水净华", "水静华")),
@@ -78,12 +85,12 @@ _MARKET_LOCATIONS_EXPLICIT: tuple[MarketLocation, ...] = (
     MarketLocation("BKK3", "BKK3", "district", ("bkk3", "bkk 3", "bkk-3", "万景岗3", "万景岗三区")),
     MarketLocation("BKK", "BKK", "district", ("bkk", "万景岗")),
     MarketLocation("钻石岛", "钻石岛", "district", ("钻石岛", "钻岛", "koh pich", "diamond island")),
-    MarketLocation("百色河", "永旺1附近（百色河区）", "district", ("百色河", "百色河区", "tonle bassac", "tonle basak", "bassac")),
+    MarketLocation("百色河", "永旺1附近", "district", ("百色河", "百色河区", "tonle bassac", "tonle basak", "bassac")),
     MarketLocation("俄罗斯市场", "俄罗斯市场附近", "nearby", ("俄罗斯市场", "俄罗斯市场附近", "俄市", "russian market", "ttp", "toul tom poung", "toul tompoung")),
     MarketLocation("TK/7月区", "堆谷（TK）", "district", ("堆谷", "堆谷区", "堆谷（TK）", "tk", "tuol kork", "toul kork", "7月区", "七月区")),
-    MarketLocation("洪森大道", "洪森大道", "corridor", ("洪森大道", "60米大道", "60米路", "hun sen boulevard", "hun sen blvd", "ph60m")),
+    MarketLocation("洪森大道", "60米大道", "corridor", ("洪森大道", "60米大道", "60米路", "hun sen boulevard", "hun sen blvd", "ph60m")),
     # Source-backed low-precision public label; do not promote to a physical area.
-    MarketLocation("一号路", "一号路附近", "corridor", ("一号路附近", "一号路", "1号路", "一号公路", "1号公路", "one road")),
+    MarketLocation("一号路", "一号路", "corridor", ("一号路附近", "一号路", "1号路", "一号公路", "1号公路", "one road")),
     MarketLocation("598路", "598路附近", "corridor", ("598路附近", "598路", "598公路")),
     MarketLocation("50米路", "50米路附近", "corridor", ("50米路附近", "50米路", "50米大道")),
     # Source-backed low-precision label; do not promote road/market wording to a physical area.
@@ -93,15 +100,15 @@ _MARKET_LOCATIONS_EXPLICIT: tuple[MarketLocation, ...] = (
     MarketLocation("森速", "森速（永旺2一带）", "district", ("森速", "森速区", "森速（永旺2一带）", "sen sok", "sensok")),
     MarketLocation("水净华", "水净华半岛", "district", ("水净华", "水净华区", "水净华半岛", "水静华", "chroy changvar", "chroy changva")),
     MarketLocation("河边", "河边", "corridor", ("河边", "河畔", "riverside")),
-    MarketLocation("金街", "金街附近", "nearby", ("金街", "金街附近", "金街中国城", "桥牌", "the bridge")),
+    MarketLocation("金街", "金街附近", "nearby", ("金街", "金街附近", "金街中国城")),
     MarketLocation("机场附近", "机场附近", "nearby", ("机场附近", "机场路", "老机场", "旧机场")),
     MarketLocation("中央市场", "中央市场", "nearby", ("中央市场", "新街市", "central market", "phsar thmei")),
     MarketLocation("奥林匹克", "奥林匹克", "nearby", ("奥林匹克", "奥林匹亚", "olympic", "olympia")),
     MarketLocation("富力城", "富力城", "project_market", ("富力城", "富力中心城", "r&f city", "rf city", "r f city", "金边中心城")),
-    MarketLocation("炳发城", "炳发城", "project_market", ("炳发城", "borey peng huoth")),
+    MarketLocation("炳发城", "一号路 / 60米 / 50米炳发", "project_market", ("炳发城", "borey peng huoth")),
     # The legacy slash-combined value remains only as an input/search alias;
     # canonical keys and public displays are one resolved location concept.
-    MarketLocation("太子幸福广场", "太子幸福广场", "project_market", ("太子/幸福", "太子幸福广场", "太子幸福", "幸福广场", "the pinnacle", "prince happiness plaza")),
+    MarketLocation("太子幸福广场", "太子幸福广场", "project_market", ("太子/幸福", "太子幸福广场", "太子幸福")),
 )
 
 # A bare physical-area mention is useful as a conservative Level-1 search
@@ -127,15 +134,63 @@ MANUAL_MARKET_ALIASES: dict[str, tuple[str, ...]] = {
 }
 
 PROJECT_IDENTITIES: tuple[ProjectIdentity, ...] = (
-    ProjectIdentity("the_bridge", "桥牌", "project", ("桥牌", "the bridge"), property_family="公寓"),
-    ProjectIdentity("aeon1", "永旺一", "project", ("Aeon1", "永旺一", "永旺1", "aeon 1")),
+    ProjectIdentity(
+        "the_bridge",
+        "桥牌",
+        "project",
+        ("桥牌", "the bridge"),
+        property_family="公寓",
+        property_type_mode="single",
+        # GEO bucket=百色河(Tonle Bassac); customer display uses 永旺1/金街 anchors.
+        default_location_key="百色河",
+        default_location_display="金街附近",
+    ),
+    ProjectIdentity(
+        "aeon1",
+        "永旺一",
+        "project",
+        ("Aeon1", "永旺一", "永旺1", "aeon 1"),
+        property_family="公寓",
+        property_type_mode="single",
+        default_location_key="永旺商圈",
+        default_location_display="永旺1附近",
+    ),
     ProjectIdentity("vila_town", "Vila Town", "project", ("vila town",)),
-    ProjectIdentity("the_pinnacle", "The Pinnacle 幸福广场", "project", ("the pinnacle", "太子幸福广场", "幸福广场", "prince happiness plaza"), property_family="公寓"),
-    ProjectIdentity("rf_city", "富力城", "project", ("富力城", "富力中心城", "r&f city", "rf city")),
+    ProjectIdentity(
+        "the_pinnacle",
+        "The Pinnacle 幸福广场",
+        "project",
+        ("the pinnacle", "太子幸福广场", "幸福广场", "prince happiness plaza"),
+        property_family="公寓",
+        property_type_mode="single",
+        # GEO=Tonle Bassac; customer-facing = 莫尼旺/BKK (V2).
+        default_location_key="百色河",
+        default_location_display="莫尼旺大道附近",
+    ),
+    ProjectIdentity(
+        "rf_city",
+        "富力城",
+        "project",
+        ("富力城", "富力中心城", "r&f city", "rf city"),
+        property_type_mode="mixed",
+        # Market mega-area; customer display prefers corridor anchors (V2).
+        default_location_key="富力城",
+        default_location_display="60米大道 · 永旺3附近",
+    ),
     ProjectIdentity("chip_mong", "Chip Mong", "brand", ("chip mong land", "chip mong", "chipmong", "集茂")),
     # “炳发城” is an explicit project token; the broader Peng Huoth developer
     # name remains a brand and is not promoted to a specific project.
-    ProjectIdentity("peng_huoth_city", "炳发城", "project", ("炳发城",)),
+    ProjectIdentity(
+        "peng_huoth_city",
+        "炳发城",
+        "project",
+        ("炳发城",),
+        property_type_mode="mixed",
+        # Catch-all brand campus: Chinese customers navigate by road corridor,
+        # not the bare name「炳发城」alone.
+        default_location_key="炳发城",
+        default_location_display="一号路 / 60米 / 50米炳发",
+    ),
     ProjectIdentity("peng_huoth", "Peng Huoth", "brand", ("borey peng huoth", "peng huoth", "炳发")),
 )
 
@@ -329,7 +384,7 @@ def _extract_markets(text: str) -> tuple[list[str], list[str], list[dict[str, An
         non_overlapping.append(match)
     matches = non_overlapping
 
-    relation_priority = {"district": 0, "corridor": 1, "project_market": 2, "nearby": 3}
+    relation_priority = {"corridor": 0, "district": 1, "project_market": 2, "nearby": 3}
     matches.sort(key=lambda match: (relation_priority.get(match[0].relation, 9), match[2], -len(match[1])))
     unique: list[tuple[MarketLocation, str, int]] = []
     seen: set[str] = set()
@@ -540,23 +595,182 @@ def _extract_property(text: str) -> tuple[str, str | None, str, str, list[dict[s
     return "未知", None, "未知", "unknown", [], ["unknown_property_type"]
 
 
+def project_identity_by_key(key: object) -> ProjectIdentity | None:
+    # Do not run clean_text() on keys: it turns underscores into spaces and
+    # would break lookups like ``the_pinnacle``.
+    wanted = str(key or "").strip().casefold()
+    if not wanted:
+        return None
+    return next((item for item in PROJECT_IDENTITIES if item.key.casefold() == wanted), None)
+
+
+def _effective_property_type_mode(project: ProjectIdentity) -> str | None:
+    mode = str(project.property_type_mode or "").strip().lower()
+    if mode in {"single", "mixed"}:
+        return mode
+    # Backward compatible: a declared family without mode means single-use.
+    if project.property_family:
+        return "single"
+    return None
+
+
+def _apply_verified_project_defaults(
+    *,
+    project_key: str | None,
+    project_name: str | None,
+    area_status: str,
+    market_keys: list[str],
+    market_displays: list[str],
+    market_evidence: list[dict[str, Any]],
+    family: str,
+    subtype: str | None,
+    property_display: str,
+    property_status: str,
+    property_evidence: list[dict[str, Any]],
+    property_flags: list[str],
+) -> tuple[
+    list[str],
+    list[str],
+    list[dict[str, Any]],
+    str,
+    str | None,
+    str,
+    str,
+    list[dict[str, Any]],
+    list[str],
+]:
+    """Backfill location/type only from VERIFIED project relations."""
+    project = project_identity_by_key(project_key)
+    if project is None or project.kind != "project":
+        return (
+            market_keys,
+            market_displays,
+            market_evidence,
+            family,
+            subtype,
+            property_display,
+            property_status,
+            property_evidence,
+            property_flags,
+        )
+
+    # Location: only when source did not already confirm area/market evidence.
+    if (
+        area_status != "confirmed"
+        and not market_keys
+        and project.default_location_key
+        and project.default_location_display
+    ):
+        loc_key = clean_text(project.default_location_key)
+        loc_display = clean_text(project.default_location_display)
+        if loc_key and loc_display:
+            market_keys = [loc_key]
+            market_displays = [loc_display]
+            market_evidence = [
+                _evidence(loc_key, "project_default_location", "high", project_name or project.key)
+            ]
+
+    # Property type: source text wins; mixed never backfills.
+    mode = _effective_property_type_mode(project)
+    if family == "未知" and mode == "single" and project.property_family:
+        family = project.property_family
+        subtype = None
+        property_display = project.property_family
+        property_status = "inferred"
+        property_evidence = [
+            _evidence(
+                project.property_family,
+                "project_property_metadata",
+                "high",
+                project_name or project.key,
+            )
+        ]
+        property_flags = [flag for flag in property_flags if flag != "unknown_property_type"]
+
+    return (
+        market_keys,
+        market_displays,
+        market_evidence,
+        family,
+        subtype,
+        property_display,
+        property_status,
+        property_evidence,
+        property_flags,
+    )
+
+
+def _enrich_peng_corridor_displays(
+    *,
+    market_keys: list[str],
+    market_displays: list[str],
+    brand_key: str | None,
+    project_key: str | None,
+) -> list[str]:
+    """Customer phrases for Peng Huoth corridor posts without a named Star project.
+
+    Bare「一号路炳发 / 60米炳发」should read like V2 road markets, not a district
+    label alone.
+    """
+    if not market_keys or not market_displays:
+        return market_displays
+    is_peng = brand_key == "peng_huoth" or project_key == "peng_huoth_city"
+    if not is_peng:
+        return market_displays
+    displays = list(market_displays)
+    primary = market_keys[0]
+    if primary == "一号路":
+        displays[0] = "铁桥头 · 一号路炳发" if "铁桥头" in market_keys else "一号路炳发"
+    elif primary == "洪森大道":
+        displays[0] = "60米大道 · 炳发"
+    elif primary == "50米路":
+        displays[0] = "50米炳发"
+    elif primary == "6号路":
+        displays[0] = "6号路炳发"
+    return displays
+
+
 def classify_listing_taxonomy(raw_text: str) -> TaxonomyResult:
     text = str(raw_text or "")
     area_key, area_display, area_level, area_status, area_evidence, area_flags = _extract_physical_area(text)
     market_keys, market_displays, market_evidence, market_flags = _extract_markets(text)
     project_key, project_name, project_alias, brand_key, brand_name, project_evidence, project_flags = _extract_project(text)
     family, subtype, property_display, property_status, property_evidence, property_flags = _extract_property(text)
-    if family == "未知" and project_key:
-        project_meta = next((item for item in PROJECT_IDENTITIES if item.key == project_key), None)
-        if project_meta and project_meta.kind == "project" and project_meta.property_family:
-            family = project_meta.property_family
-            subtype = None
-            property_display = project_meta.property_family
-            property_status = "inferred"
-            property_evidence = [
-                _evidence(project_meta.property_family, "project_property_metadata", "high", project_name or project_key)
-            ]
-            property_flags = [flag for flag in property_flags if flag != "unknown_property_type"]
+
+    # Ambiguous / multi-project hits never receive relation backfill.
+    if "ambiguous_project" not in project_flags:
+        (
+            market_keys,
+            market_displays,
+            market_evidence,
+            family,
+            subtype,
+            property_display,
+            property_status,
+            property_evidence,
+            property_flags,
+        ) = _apply_verified_project_defaults(
+            project_key=project_key,
+            project_name=project_name,
+            area_status=area_status,
+            market_keys=market_keys,
+            market_displays=market_displays,
+            market_evidence=market_evidence,
+            family=family,
+            subtype=subtype,
+            property_display=property_display,
+            property_status=property_status,
+            property_evidence=property_evidence,
+            property_flags=property_flags,
+        )
+
+    market_displays = _enrich_peng_corridor_displays(
+        market_keys=market_keys,
+        market_displays=market_displays,
+        brand_key=brand_key,
+        project_key=project_key,
+    )
+
     project_alias_evidence = ([_evidence(project_alias, "raw_project_alias", "high", project_alias)] if project_alias else [])
     return TaxonomyResult(
         canonical_area_key=area_key,
@@ -595,7 +809,13 @@ def public_location_from_fields(
     project_key: object = None,
     project_name: object = None,
 ) -> tuple[str | None, str | None, str]:
-    """Resolve the public location from canonical fields in one place."""
+    """Resolve the public location from canonical fields in one place.
+
+    Project identity is never used as a location label. Location comes from
+    confirmed physical area, market evidence, or a VERIFIED project default
+    already projected into market_* fields by ``classify_listing_taxonomy``.
+    """
+    del project_name  # kept for call-site compatibility; never displayed as area
     area_key = clean_text(canonical_area_key)
     area_display = clean_text(canonical_area_display)
     if area_status == "confirmed" and area_key and area_display:
@@ -604,10 +824,20 @@ def public_location_from_fields(
     market_displays = [clean_text(value) for value in (market_location_displays or []) if clean_text(value)]
     if market_keys and market_displays:
         return market_keys[0], market_displays[0], "level_1_market_confirmed"
-    project_key_text = clean_text(project_key)
-    project_name_text = clean_text(project_name)
-    if project_key_text and project_name_text:
-        return project_key_text, project_name_text, "level_1_project_confirmed"
+
+    # Last-chance VERIFIED project default when callers skip classify injection.
+    project = project_identity_by_key(project_key)
+    if (
+        project is not None
+        and project.kind == "project"
+        and project.default_location_key
+        and project.default_location_display
+    ):
+        return (
+            clean_text(project.default_location_key),
+            clean_text(project.default_location_display),
+            "level_1_market_confirmed",
+        )
     return None, None, "unknown"
 
 
@@ -630,10 +860,12 @@ __all__ = [
     "MARKET_LOCATIONS",
     "PHYSICAL_AREAS",
     "PROJECT_IDENTITIES",
+    "ProjectIdentity",
     "TaxonomyResult",
     "classify_listing_taxonomy",
     "market_location_by_key",
     "physical_area_by_key",
+    "project_identity_by_key",
     "public_location",
     "public_location_from_fields",
     "resolve_location_alias",

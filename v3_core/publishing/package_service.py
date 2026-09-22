@@ -5,7 +5,7 @@ import hashlib
 from pathlib import Path
 from typing import Any
 
-from v3_core.adviser_copy import generate_adviser_text, verified_canonical_adviser_facts
+from v3_core.adviser_copy import build_adviser_copy, validate_adviser_copy, verified_canonical_adviser_facts
 from v3_core.publishing.channel_contract import official_channel_action_urls
 from v3_core.publishing.channel_renderer import render_channel_caption
 from v3_core.publishing.eligibility import evaluate_offer_eligibility
@@ -14,17 +14,27 @@ from v3_core.storage.inventory_repository import InventoryRepository
 from .package_store import FrozenPackage, FrozenPackageStore
 
 
-def _publisher_adviser_facts(facts: dict[str, Any]) -> dict[str, Any]:
+def _publisher_adviser_facts(
+    facts: dict[str, Any],
+    *,
+    listing: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Return verified facts suitable for Publisher-side judgement.
 
-    Generic fields are allowed as context so several facts can be composed into
-    one useful observation. The adviser engine suppresses generic single-field
-    boilerplate while this marker is present. Property type alone still never
-    creates adviser copy.
+    Listing row may supply repaired ``layout`` / ``floor`` when canonical facts
+    lag behind operator edits. Location alias tables stay in parse/canonicalize;
+    they are not used to invent adviser location prose here.
     """
     result = verified_canonical_adviser_facts(dict(facts or {}))
     result["property_type"] = ""
     result["_publisher_adviser_mode"] = "composite"
+    row = dict(listing or {})
+    layout = str(row.get("layout") or result.get("layout") or "").strip()
+    if layout:
+        result["layout"] = layout
+    floor = str(row.get("floor") or result.get("floor") or "").strip()
+    if floor:
+        result["floor"] = floor
     return result
 
 
@@ -74,15 +84,16 @@ class PackageBuildService:
         public_id = str(listing.get("public_listing_id") or "")
         adviser_seed = public_id or str(listing_id)
         if adviser_copy_override is None:
-            adviser_copy = generate_adviser_text(
-                _publisher_adviser_facts(facts),
+            adviser_copy = build_adviser_copy(
+                _publisher_adviser_facts(facts, listing=listing),
                 seed=adviser_seed,
                 max_points=2,
-                allow_fallback=False,
             )
+            validate_adviser_copy(adviser_copy)
             adviser_copy_source = "auto"
         else:
             adviser_copy = str(adviser_copy_override).strip()
+            validate_adviser_copy(adviser_copy)
             adviser_copy_source = "hidden" if not adviser_copy else "manual"
 
         frozen_status = str(
@@ -130,7 +141,7 @@ class PackageBuildService:
             "canonical_facts_hash": str(canonical["facts_hash"]),
             "canonical_facts": facts,
             "adviser_copy": adviser_copy,
-            "adviser_copy_version": "v1_publisher_authoritative",
+            "adviser_copy_version": "v2",
             "adviser_copy_source": adviser_copy_source,
             "adviser_seed": adviser_seed,
             "listing": {

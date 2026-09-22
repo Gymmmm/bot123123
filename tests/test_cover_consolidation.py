@@ -9,7 +9,7 @@ from qiaolian_dual.cover_styles import (
 
 
 def test_only_three_horizontal_cover_styles_are_active():
-    assert FINAL_COVER_STYLES == ("classic_blue", "right_price", "black_gold")
+    assert FINAL_COVER_STYLES == ("classic_blue", "right_price", "black_gold", "premium_photo")
     assert set(COVER_TEMPLATE_MAP) == {*FINAL_COVER_STYLES, "video_vertical"}
     for style in FINAL_COVER_STYLES:
         assert cover_template_path(style).is_file()
@@ -25,8 +25,8 @@ def test_legacy_names_collapse_into_final_styles():
 
 def test_launch_default_cover_routing_is_deterministic():
     cases = (
-        ("公寓", 600, "classic_blue"),
-        ("公寓", 1199, "classic_blue"),
+        ("公寓", 600, "premium_photo"),
+        ("公寓", 1199, "premium_photo"),
         ("公寓", 1200, "black_gold"),
         ("排屋", 600, "black_gold"),
         ("别墅", 5000, "black_gold"),
@@ -51,8 +51,9 @@ def test_right_price_is_manual_only():
         price=600,
         is_special=True,
     )
-    assert routed["cover_template"] == "classic_blue"
+    assert routed["cover_template"] == "premium_photo"
     assert normalize_cover_style("right_price") == "right_price"
+    assert normalize_cover_style("premium_photo") == "premium_photo"
 
 
 def test_admin_publish_shape_is_fixed_to_cover_and_buttons():

@@ -16,6 +16,9 @@ _listing_taxonomy.PROJECT_IDENTITIES = tuple(
         item.kind,
         tuple(alias for alias in item.aliases if _listing_taxonomy.clean_text(alias)),
         item.property_family,
+        item.property_type_mode,
+        item.default_location_key,
+        item.default_location_display,
     )
     for item in _listing_taxonomy.PROJECT_IDENTITIES
 )

@@ -31,7 +31,7 @@ def test_channel_status_sync_uses_same_detail_label():
 
 
 def test_launch_cover_defaults_match_final_product_contract():
-    assert classify(source_type="telegram", source_name="collector", property_type="公寓", project="", price=800)["cover_template"] == "classic_blue"
+    assert classify(source_type="telegram", source_name="collector", property_type="公寓", project="", price=800)["cover_template"] == "premium_photo"
     assert classify(source_type="telegram", source_name="collector", property_type="公寓", project="", price=1200)["cover_template"] == "black_gold"
     assert classify(source_type="telegram", source_name="collector", property_type="排屋", project="", price=700)["cover_template"] == "black_gold"
     assert classify(source_type="telegram", source_name="collector", property_type="别墅", project="", price=700)["cover_template"] == "black_gold"

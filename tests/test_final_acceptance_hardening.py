@@ -76,7 +76,7 @@ def test_chinese_english_khmer_input_keeps_facts_separate() -> None:
     assert facts["project_name"] == "Urban Village"
     assert facts["canonical_area_key"] is None
     assert facts["market_location_keys"] == ["洪森大道"]
-    assert facts["public_location_display"] == "洪森大道"
+    assert facts["public_location_display"] == "60米大道"
     assert facts["property_type"] == "公寓"
     assert facts["bedrooms"] == 2
     assert facts["bathrooms"] == 2

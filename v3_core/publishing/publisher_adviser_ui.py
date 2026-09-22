@@ -15,7 +15,7 @@ from typing import Any
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 
-from v3_core.adviser_copy import generate_adviser_text
+from v3_core.adviser_copy import build_adviser_copy, validate_adviser_copy
 from .inventory_dashboard_ui import PublisherInventoryDashboardController
 from .operator_flow import BLOCKER_LABELS, DISPLAY_FIELDS, OPTIONAL_FIELDS
 from .package_service import _publisher_adviser_facts
@@ -41,12 +41,13 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
     def _auto_adviser_copy(self, detail: Any) -> str:
         facts = dict(detail.canonical.get("facts") or {})
         public_id = str(detail.listing.get("public_listing_id") or detail.listing.get("listing_id") or "")
-        return generate_adviser_text(
-            _publisher_adviser_facts(facts),
+        text = build_adviser_copy(
+            _publisher_adviser_facts(facts, listing=dict(detail.listing or {})),
             seed=public_id,
             max_points=2,
-            allow_fallback=False,
         ).strip()
+        validate_adviser_copy(text)
+        return text
 
     def _adviser_display(self, detail: Any, state: dict[str, Any]) -> str:
         mode = self._adviser_mode(state)
@@ -272,11 +273,17 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
             if not 1 <= len(lines) <= 2:
                 await update.effective_message.reply_text("请发送 1–2 句侨联说，换行分开。")
                 return True
+            manual_copy = "\n".join(lines)
+            try:
+                validate_adviser_copy(manual_copy)
+            except ValueError as exc:
+                await update.effective_message.reply_text(f"侨联说未通过校验：{exc}")
+                return True
             if not isinstance(state, dict):
                 context.user_data.pop(SIMPLE_EDIT_STATE_KEY, None)
                 return True
             state["adviser_mode"] = "manual"
-            state["adviser_copy"] = "\n".join(lines)
+            state["adviser_copy"] = manual_copy
             self._invalidate_preview(state)
             context.user_data.pop(SIMPLE_EDIT_STATE_KEY, None)
             await self.show_manual_confirmation(update.effective_message, context)
@@ -353,6 +360,7 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
                 await query.message.reply_text(
                     "选择封面模板：",
                     reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("极简实拍渐变", callback_data="v3smp|manual_style|premium_photo")],
                         [InlineKeyboardButton("右侧价格牌", callback_data="v3smp|manual_style|right_price")],
                         [InlineKeyboardButton("黑金模板", callback_data="v3smp|manual_style|black_gold")],
                         [InlineKeyboardButton("经典蓝卡", callback_data="v3smp|manual_style|classic_blue")],

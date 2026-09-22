@@ -11,7 +11,8 @@ from typing import Any
 def apply_publisher_product_policy() -> None:
     """Lock final Publisher adviser and manual-gate behavior.
 
-    1. Publisher-generated adviser copy is always a single point.
+    1. Publisher auto adviser_copy stays within 1–2 decision points via
+       ``build_adviser_copy`` (location/layout first; no marketing fluff).
     2. A stale canonical ``missing_layout`` flag cannot block manual publish
        after the operator flow has explicitly repaired/populated ``listing.layout``.
     """
@@ -21,15 +22,16 @@ def apply_publisher_product_policy() -> None:
     if getattr(PublisherAdviserAdminController, "_final_product_policy_applied", False):
         return
 
-    original_generate = package_service.generate_adviser_text
+    original_build = package_service.build_adviser_copy
 
-    def generate_one_point(*args: Any, **kwargs: Any) -> str:
-        kwargs["max_points"] = 1
-        return original_generate(*args, **kwargs)
+    def build_bounded(*args: Any, **kwargs: Any) -> str:
+        kwargs.setdefault("max_points", 2)
+        kwargs["max_points"] = min(int(kwargs.get("max_points") or 2), 2)
+        return original_build(*args, **kwargs)
 
-    # Both modules imported the generator directly, so patch both references.
-    package_service.generate_adviser_text = generate_one_point
-    publisher_adviser_ui.generate_adviser_text = generate_one_point
+    # Both modules import the builder directly, so patch both references.
+    package_service.build_adviser_copy = build_bounded
+    publisher_adviser_ui.build_adviser_copy = build_bounded
 
     original_manual_blockers = PublisherAdviserAdminController._manual_blockers
 

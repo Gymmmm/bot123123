@@ -291,8 +291,209 @@ def generate_adviser_text(
     return "\n".join(generate_adviser_lines(facts, seed=seed, max_points=max_points, allow_fallback=allow_fallback))
 
 
+FORBIDDEN_ADVISER_PHRASES = frozenset(
+    {
+        "性价比极高",
+        "不容错过",
+        "绝佳选择",
+        "顶级配套",
+        "高端生活",
+        "稀缺房源",
+        "房东好说话",
+        "价格还能谈",
+        "视野无遮挡",
+        "采光非常好",
+        "非常安静",
+    }
+)
+
+_ADVISER_COPY_MAX_LEN = 220
+
+_STUDIO_LAYOUTS = frozenset({"单间", "开间", "studio", "Studio", "STUDIO"})
+_ONE_BED_LAYOUTS = frozenset({"一房", "1房", "1BR", "1br", "一居", "1居"})
+_TWO_BED_LAYOUTS = frozenset({"两房", "2房", "2BR", "2br", "两居", "2居"})
+
+
+def _is_unknown(value: Any) -> bool:
+    text = str(value or "").strip().lower()
+    return text in {"", "unknown", "none", "null", "未知", "待确认", "不详", "暂无"}
+
+
+def _layout_bucket(layout: str) -> str:
+    text = re.sub(r"\s+", "", str(layout or "").strip())
+    if not text:
+        return ""
+    if text in _STUDIO_LAYOUTS or re.fullmatch(r"studio|开间|单间", text, re.I):
+        return "studio"
+    if text in _ONE_BED_LAYOUTS or re.match(r"^1\s*房", text) or re.match(r"^一房", text):
+        return "one"
+    if text in _TWO_BED_LAYOUTS or re.match(r"^2\s*房", text) or re.match(r"^两房", text):
+        return "two"
+    # Compact forms like 1房1厅 / 2房1厅
+    if re.match(r"^1房", text) or re.match(r"^一房", text):
+        return "one"
+    if re.match(r"^2房", text) or re.match(r"^两房", text):
+        return "two"
+    return ""
+
+
+def _kitchen_is_independent(facts: dict[str, Any]) -> bool:
+    kitchen = str(facts.get("kitchen") or "").strip().lower()
+    if kitchen in {"independent", "独立厨房", "独立厨"} or ("独立" in kitchen and "厨" in kitchen):
+        return True
+    house = facts.get("house") if isinstance(facts.get("house"), dict) else {}
+    features = _strings(house.get("features"))
+    return any(token in features for token in {"独立厨房", "独立厨"})
+
+
+def _incomplete_reminder_labels(facts: dict[str, Any], tags: list[str] | None = None) -> list[str]:
+    """Remind only when a decision-relevant fee/policy is truly unknown."""
+    included = _strings(facts.get("included"))
+    amenities = _strings(facts.get("amenities"))
+    house = facts.get("house") if isinstance(facts.get("house"), dict) else {}
+    services = facts.get("services") if isinstance(facts.get("services"), dict) else {}
+    tagset = set(tags if tags is not None else adviser_tags_from_facts(facts))
+    reminders: list[str] = []
+
+    management_known = (
+        not _is_unknown(facts.get("management_fee"))
+        or any(value in included for value in {"物业费", "物业", "management", "management fee"})
+        or services.get("management_included") is True
+    )
+    if not management_known:
+        reminders.append("管理费")
+
+    parking_known = (
+        not _is_unknown(facts.get("parking"))
+        or not _is_unknown(facts.get("parking_fee"))
+        or any(value in amenities for value in {"停车位", "停车场", "parking"})
+        or "parking" in tagset
+    )
+    if not parking_known:
+        reminders.append("停车")
+
+    pets = str(house.get("pets") or facts.get("pet_policy") or "").strip()
+    if _is_unknown(pets) and "pet_allowed" not in tagset:
+        reminders.append("宠物政策")
+
+    wifi_known = (
+        not _is_unknown(facts.get("wifi"))
+        or not _is_unknown(facts.get("internet_fee"))
+        or any(value in included for value in {"wi-fi", "wifi", "网费", "网络费", "internet"})
+        or bool(tagset & {"wifi_included", "wifi_ready", "management_wifi", "management_wifi_ready"})
+    )
+    if not wifi_known:
+        reminders.append("网络")
+
+    return reminders
+
+
+def _decision_insights(facts: dict[str, Any], *, seed: str, max_points: int) -> list[str]:
+    """Build 1–2 short decision points from verified facts only.
+
+    Location alias tables belong to parse/canonicalize — not adviser prose.
+    Do not invent location selling points from ``public_location_display``.
+    """
+    insights: list[str] = []
+    layout = str(facts.get("layout") or "").strip()
+    bucket = _layout_bucket(layout)
+
+    if bucket == "studio":
+        insights.append("户型比较紧凑，更适合一个人住、想控制整体租房预算的人。")
+    elif bucket == "one":
+        insights.append("一房的空间相对独立，更适合一个人或两个人长期住。")
+    elif bucket == "two":
+        insights.append("两房的使用空间更完整，适合两个人以上居住，或者需要独立工作空间的人。")
+
+    # Floor: only when explicitly verified high_floor — never invent quietness/view/sun.
+    if facts.get("high_floor") is True or "high_floor" in _explicit_signals(facts):
+        insights.append(
+            "如果比较在意楼层，可以把这套放进优先看房范围，实际视野和采光建议现场确认。"
+        )
+
+    if _kitchen_is_independent(facts):
+        insights.append("有独立厨房，平时自己做饭的话会更实用。")
+
+    # Fill remaining slots with the evidence-driven phrase engine (no marketing fluff).
+    remaining = max(0, max_points - len(insights))
+    if remaining:
+        for line in generate_adviser_lines(facts, seed=seed, max_points=remaining, allow_fallback=False):
+            if line and line not in insights:
+                insights.append(line)
+            if len(insights) >= max_points:
+                break
+
+    return insights[:max_points]
+
+
+def build_adviser_copy(
+    facts: dict[str, Any] | None,
+    *,
+    seed: str = "",
+    max_points: int = 2,
+) -> str:
+    """Publisher-side adviser_copy generator.
+
+    Rules:
+    - Only use verified/frozen facts.
+    - Do not invent advantages.
+    - Do not repeat the whole listing detail.
+    - Prefer 1–2 decision-relevant points.
+    - Add confirmation reminder only when needed.
+    - User Bot must only read the frozen adviser_copy (no header here;
+      the detail view adds ``💬 侨联说``).
+    """
+    try:
+        limit = max(0, min(int(max_points), 2))
+    except (TypeError, ValueError):
+        limit = 2
+    if limit == 0:
+        return ""
+
+    clean = verified_canonical_adviser_facts(dict(facts or {}))
+    selected = _decision_insights(clean, seed=seed, max_points=limit)
+    if not selected:
+        # Stay empty when nothing decision-relevant is verified — do not invent filler.
+        return ""
+
+    body = "\n".join(selected)
+    tags = adviser_tags_from_facts(clean)
+    reminders = _incomplete_reminder_labels(clean, tags)
+    if reminders:
+        names = "、".join(reminders[:3])
+        with_reminder = f"{body}\n\n{names}目前资料不完整，看房时建议一起确认。"
+        if len(with_reminder) <= _ADVISER_COPY_MAX_LEN:
+            body = with_reminder
+    # Prefer dropping the second insight over exceeding the hard length gate.
+    while len(body) > _ADVISER_COPY_MAX_LEN and "\n" in body:
+        body = "\n".join(body.splitlines()[:-1]).strip()
+    if len(body) > _ADVISER_COPY_MAX_LEN:
+        body = body[: _ADVISER_COPY_MAX_LEN - 1].rstrip() + "…"
+    return body
+
+
+def validate_adviser_copy(text: str) -> None:
+    """Hard gate against marketing fluff and oversized copy."""
+    value = str(text or "")
+    if not value.strip():
+        return
+    for phrase in FORBIDDEN_ADVISER_PHRASES:
+        if phrase in value:
+            raise ValueError(f"adviser_copy contains unsupported phrase: {phrase}")
+    if len(value) > _ADVISER_COPY_MAX_LEN:
+        raise ValueError("adviser_copy is too long")
+
+
 __all__ = [
-    "PHRASES", "TAG_CATEGORY", "VALID_TAGS", "COMMON_AMENITY_TAGS",
-    "verified_canonical_adviser_facts", "adviser_tags_from_facts",
-    "generate_adviser_lines", "generate_adviser_text",
+    "PHRASES",
+    "TAG_CATEGORY",
+    "VALID_TAGS",
+    "COMMON_AMENITY_TAGS",
+    "FORBIDDEN_ADVISER_PHRASES",
+    "verified_canonical_adviser_facts",
+    "adviser_tags_from_facts",
+    "generate_adviser_lines",
+    "generate_adviser_text",
+    "build_adviser_copy",
+    "validate_adviser_copy",
 ]

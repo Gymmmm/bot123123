@@ -57,6 +57,16 @@ PROJECTS: tuple[tuple[str, str, tuple[str, ...], str | None], ...] = (
     ("phnom_penh_galaxy_garden", "金边星河花园", ("phnom penh galaxy garden", "galaxy garden", "金边星河花园", "金边星河", "星河花园", "星河"), "公寓"),
     ("one_70", "ONE 70 金边首座", ("one 70", "one70", "one-70", "金边首座", "金边首座one70"), "公寓"),
     ("ding_li_tower", "Ding Li Tower 鼎立大厦", ("ding li tower", "dingli tower", "鼎立", "鼎立大厦"), "公寓"),
+    # Peng Huoth / 炳发 — corridor projects (family=None → mixed below; do NOT
+    # bind bare「60米炳发/一号路炳发」as DIRECT project aliases).
+    ("the_star_diamond", "炳发钻石城 The Star Diamond", ("the star diamond", "star diamond", "炳发钻石城", "炳发 the star diamond"), None),
+    ("the_star_diamond_ii", "炳发 The Star Diamond II", ("the star diamond ii", "the star diamond 2", "star diamond ii", "炳发钻石城二期"), None),
+    ("the_star_platinum", "炳发 The Star Platinum", ("the star platinum", "star platinum", "炳发 the star platinum", "grand star platinum"), None),
+    ("the_star_platinum_roseville", "炳发 Roseville", ("the star platinum roseville", "star platinum roseville", "炳发 roseville", "roseville炳发", "炳发roseville"), None),
+    ("the_star_platinum_rosato", "炳发 Rosato", ("the star platinum rosato", "star platinum rosato", "炳发 rosato", "炳发rosato"), None),
+    ("the_star_mera_garden", "炳发美拉花园 The Star Mera Garden", ("the star mera garden", "star mera garden", "mera garden", "炳发美拉花园", "炳发美拉", "美拉花园"), None),
+    ("the_star_munirah", "炳发 The Star Munirah", ("the star munirah", "star munirah", "炳发 munirah", "炳发munirah"), None),
+    ("the_star_jumeirah", "炳发朱美拉 The Star Jumeirah", ("the star jumeirah", "star jumeirah", "炳发朱美拉", "炳发 jumeirah"), None),
 )
 
 PROJECT_ALIAS_EXTENSIONS: dict[str, tuple[str, ...]] = {
@@ -64,6 +74,73 @@ PROJECT_ALIAS_EXTENSIONS: dict[str, tuple[str, ...]] = {
     "the_pinnacle": ("太子幸福", "太子幸福广场", "幸福广场", "太子幸福公寓", "prince happiness", "prince happiness plaza"),
     "rf_city": ("富力", "富力金边", "富力金边中心城", "金边中心城", "r&f", "r and f city"),
     "peng_huoth": ("炳发", "penghuoth"),
+}
+
+# Batch-1 high-confidence public market locations for VERIFIED projects.
+# Only fill when the relation is stable; leave blank rather than guess.
+# Keys/displays must already exist in MARKET_LOCATIONS (core or this module).
+PROJECT_DEFAULT_LOCATIONS: dict[str, tuple[str, str]] = {
+    # key = GEO/area bucket; display = Chinese-customer anchors (V2).
+    # Never lead with bare「百色河」.
+    "the_peak": ("百色河", "金街附近"),
+    "urban_village_1": ("洪森大道", "60米大道附近"),
+    "urban_village_2": ("洪森大道", "60米大道附近"),
+    "morgan_enmaison": ("水净华", "水净华 · 日本桥附近"),
+    "rose_garden": ("百色河", "永旺1附近"),
+    "one_park": ("隆边", "隆边"),
+    "diamond_bay_garden": ("钻石岛", "钻石岛"),
+    "wealth_mansion": ("水净华", "水净华 · 日本桥附近"),
+    "picasso_city_garden": ("BKK1", "BKK1"),
+    "agile_sky_residence": ("BKK3", "BKK3 · 莫尼旺大道"),
+    "la_vista_one": ("水净华", "水净华 · 湄公河边"),
+    "le_conde_bkk1": ("BKK1", "BKK1"),
+    "the_view": ("BKK1", "BKK1"),
+    "de_castle_royal": ("BKK1", "BKK1"),
+    "j_tower_1": ("BKK1", "BKK1"),
+    "j_tower_2": ("BKK1", "BKK1"),
+    "j_tower_3": ("百色河", "永旺1附近"),
+    "mesong": ("钻石岛", "钻石岛"),
+    "diamond_one": ("钻石岛", "钻石岛"),
+    "diamond_twin_tower": ("钻石岛", "钻石岛"),
+    "olympia_city": ("奥林匹克", "奥林匹克体育场旁"),
+    "parc_21": ("俄罗斯市场", "俄罗斯市场附近"),
+    "orkide_royal": ("2004路", "2004路附近"),
+    "vue_aston": ("铁桥头", "铁桥头 · Norea附近"),
+    "sky_villa": ("马卡拉", "马卡拉"),
+    "royal_platinum": ("TK/7月区", "堆谷（TK）"),
+    "time_square_1": ("BKK1", "BKK1"),
+    "time_square_5": ("BKK1", "BKK1"),
+    "time_square_9": ("BKK1", "BKK1"),
+    "time_square_11": ("BKK3", "BKK3"),
+    "time_square_2": ("TK/7月区", "堆谷（TK）"),
+    "time_square_3": ("万谷湖", "万谷湖"),
+    "time_square_7": ("TK/7月区", "堆谷（TK）"),
+    "time_square_8": ("俄罗斯市场", "俄罗斯市场附近"),
+    "morgan_tower": ("钻石岛", "钻石岛"),
+    "prince_huan_yu_center": ("百色河", "金界 / 永旺1附近"),
+    "prince_central_plaza": ("诺罗敦大道", "独立碑附近"),
+    "prince_modern_plaza": ("诺罗敦大道", "诺罗敦大道"),
+    "prince_international_plaza": ("俄罗斯大道", "俄罗斯大道"),
+    "phnom_penh_galaxy_garden": ("森速", "新金边"),
+    # Web-verified public addresses (customer display, not bare sangkat names)
+    "vila_town": ("洪森大道", "60米大道附近"),  # Borey Villa Town, Chak Angrae / Hun Sen Blvd
+    "royal_park": ("TK/7月区", "堆谷（TK）"),  # St608 Toul Kork / Boeung Kak 2
+    "peninsula_private_residence": ("水净华", "水净华 · 日本桥附近"),  # Keo Chenda, ≠钻石岛
+    "chief_tower": ("BKK1", "BKK1 · 莫尼旺大道"),  # St322 × Monivong
+    "m_residence": ("BKK1", "BKK1"),  # #170 St282 official site
+    "odom_living": ("诺罗敦大道", "独立碑附近"),  # 160B Norodom, ~800m Independence Monument
+    "one_70": ("隆边", "隆边 · PPCC附近"),  # St70 Daun Penh / PPCC
+    # ding_li_tower: DingLi Sunshine City(7Makara) vs Dingli Tower(TK) conflict — leave empty
+    # Peng Huoth corridor projects (V5/V2). Bare「60米炳发/一号路炳发」stay road
+    # markets only — never DIRECT_RESOLVE to one Star community.
+    "the_star_diamond": ("洪森大道", "60米大道 · 永旺3附近"),
+    "the_star_diamond_ii": ("洪森大道", "60米大道 · 永旺3附近"),
+    "the_star_platinum": ("一号路", "铁桥头 · 一号路炳发"),
+    "the_star_platinum_roseville": ("一号路", "铁桥头 · 一号路炳发"),
+    "the_star_platinum_rosato": ("一号路", "铁桥头 · 一号路炳发"),
+    "the_star_mera_garden": ("50米路", "50米路附近"),
+    "the_star_munirah": ("6号路", "6A路 · 水净华方向"),
+    "the_star_jumeirah": ("6号路", "6A路 · 水净华方向"),
 }
 
 # These are common Chinese-market names but not stable enough to force into one
@@ -117,13 +194,13 @@ MARKET_ALIAS_EXTENSIONS: dict[str, tuple[str, ...]] = {
     "河边": ("sisowath quay",),
     "金街": ("金街旁", "the bridge一带", "bridge附近"),
     "富力城": ("富力金边中心城", "r and f city"),
-    "洪森大道": ("60米", "60米大道", "60米路", "hun sen blvd", "hun sen boulevard", "samdech hun sen blvd", "samdech hun sen boulevard", "ph60m"),
+    "50米路": ("50m road", "50m boulevard", "50米", "50米大道", "50米炳发"),
+    "洪森大道": ("60米", "60米大道", "60米路", "60米炳发", "永旺3炳发", "hun sen blvd", "hun sen boulevard", "samdech hun sen blvd", "samdech hun sen boulevard", "ph60m"),
     "一号路": ("一号路炳发", "1号路炳发", "一号公路", "1号公路", "national road 1", "nr1"),
-    "598路": ("street 598", "st 598"),
-    "50米路": ("50m road", "50m boulevard"),
+    "6号路": ("6a炳发", "6号路炳发", "national road 6a"),
+    "铁桥头": ("铁桥头炳发", "chbar ampov"),
     "永旺商圈": ("aeon mall 1", "aeon mall1", "永旺1附近"),
     "永旺2": ("aeon mall 2", "aeon mall2"),
-    "铁桥头": ("铁桥头炳发", "chbar ampov"),
 }
 
 
@@ -133,12 +210,46 @@ def apply_phnom_penh_aliases(taxonomy: Any) -> None:
     projects = list(taxonomy.PROJECT_IDENTITIES)
     for key, display, aliases, family in PROJECTS:
         if key not in project_keys:
-            projects.append(taxonomy.ProjectIdentity(key, display, "project", aliases, property_family=family))
+            loc = PROJECT_DEFAULT_LOCATIONS.get(key)
+            # Borey / Star communities are mixed (villa+shophouse+condo); never
+            # infer a single property_type from the project alone.
+            is_peng_huoth_community = key.startswith("the_star_") or key.startswith("peng_huoth_")
+            mode = "mixed" if is_peng_huoth_community else ("single" if family else None)
+            projects.append(
+                taxonomy.ProjectIdentity(
+                    key,
+                    display,
+                    "project",
+                    aliases,
+                    property_family=family,
+                    property_type_mode=mode,
+                    default_location_key=loc[0] if loc else None,
+                    default_location_display=loc[1] if loc else None,
+                )
+            )
     extended_projects = []
     for item in projects:
         extra = PROJECT_ALIAS_EXTENSIONS.get(item.key, ())
         aliases = tuple(dict.fromkeys((*item.aliases, *extra)))
-        extended_projects.append(taxonomy.ProjectIdentity(item.key, item.display, item.kind, aliases, item.property_family))
+        loc_key = getattr(item, "default_location_key", None)
+        loc_display = getattr(item, "default_location_display", None)
+        # Fill missing locations only; never overwrite core-registry values.
+        if not loc_key or not loc_display:
+            loc = PROJECT_DEFAULT_LOCATIONS.get(item.key)
+            if loc:
+                loc_key, loc_display = loc
+        extended_projects.append(
+            taxonomy.ProjectIdentity(
+                item.key,
+                item.display,
+                item.kind,
+                aliases,
+                getattr(item, "property_family", None),
+                getattr(item, "property_type_mode", None),
+                loc_key,
+                loc_display,
+            )
+        )
     taxonomy.PROJECT_IDENTITIES = tuple(extended_projects)
 
     market_keys = {item.key for item in taxonomy.MARKET_LOCATIONS}

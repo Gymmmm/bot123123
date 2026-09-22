@@ -2,17 +2,20 @@ from types import SimpleNamespace
 
 import pytest
 
-from v3_core.adviser_copy import generate_adviser_text
+from v3_core.adviser_copy import (
+    FORBIDDEN_ADVISER_PHRASES,
+    build_adviser_copy,
+    validate_adviser_copy,
+)
 from v3_core.publishing.package_service import _publisher_adviser_facts
 from v3_core.publishing.publisher_adviser_ui import PublisherAdviserAdminController
 
 
-def _copy(facts: dict) -> str:
-    return generate_adviser_text(
-        _publisher_adviser_facts(facts),
+def _copy(facts: dict, *, listing: dict | None = None) -> str:
+    return build_adviser_copy(
+        _publisher_adviser_facts(facts, listing=listing),
         seed="QL-POLICY-TEST",
         max_points=2,
-        allow_fallback=False,
     )
 
 
@@ -34,7 +37,7 @@ def test_useful_uncommon_signals_can_still_create_auto_adviser_copy():
             "furnished": True,
             "pets": "允许",
         },
-        "amenities": ["泳池", "私人泳池"],
+        "amenities": ["泳池", "私人泳池", "停车位"],
         "included": ["物业费", "网费"],
     }
 
@@ -45,13 +48,16 @@ def test_useful_uncommon_signals_can_still_create_auto_adviser_copy():
     assert "家具" not in copy
     assert "物业费" not in copy
     assert "网费" not in copy
+    validate_adviser_copy(copy)
 
 
 def test_layout_plus_high_floor_river_view_creates_decision_copy_not_disclaimer():
     facts = {
         "layout": "2+1",
         "floor": "48",
-        "house": {"features": ["河景"]},
+        "included": ["物业费", "网费"],
+        "amenities": ["停车位"],
+        "house": {"features": ["河景"], "pets": "不允许"},
     }
 
     copy = _copy(facts)
@@ -66,8 +72,38 @@ def test_layout_plus_high_floor_river_view_creates_decision_copy_not_disclaimer(
 
 
 def test_single_generic_view_still_does_not_create_copy():
-    facts = {"house": {"features": ["河景"]}}
+    facts = {
+        "house": {"features": ["河景"], "pets": "不允许"},
+        "included": ["物业费", "网费"],
+        "parking_fee": "另计",
+        "internet_fee": "已含",
+    }
+    # Avoid incomplete-field reminders masking the empty-insight contract.
     assert _copy(facts) == ""
+
+
+def test_public_location_is_not_turned_into_adviser_copy():
+    """Alias/location tables feed parse — not 侨联说 prose."""
+    copy = _copy(
+        {
+            "included": ["物业费", "网费"],
+            "amenities": ["停车位"],
+            "house": {"pets": "不允许"},
+        },
+        listing={"public_location_display": "BKK1", "layout": "1房1厅"},
+    )
+    assert "BKK1" not in copy
+    assert "一带活动" not in copy
+    assert "一个人" in copy or "一房" in copy
+    validate_adviser_copy(copy)
+
+
+def test_forbidden_adviser_phrases_are_rejected():
+    with pytest.raises(ValueError, match="unsupported phrase"):
+        validate_adviser_copy("这套房源性价比极高，不容错过")
+    for phrase in sorted(FORBIDDEN_ADVISER_PHRASES)[:3]:
+        with pytest.raises(ValueError):
+            validate_adviser_copy(f"看看这套，{phrase}。")
 
 
 def test_manual_labelled_two_plus_one_is_recovered_without_owner_reentry():
