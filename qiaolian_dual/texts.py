@@ -3,16 +3,12 @@ from __future__ import annotations
 
 from .common import *
 def welcome_text() -> str:
-    return (
-        '💎 <b>侨联地产｜您在金边的自己人</b>\n\n'
-        '找房、约看房、入住服务，都可以从这里开始。\n\n'
-        '如果您已经在频道看到具体房源，直接点房源下方按钮进入，房源信息会自动带上。\n\n'
-        '也可以直接告诉我：<b>区域 + 预算 + 户型</b>。\n\n'
-        '请选择您现在需要的服务：'
-    )
+    from .messages import home_text
+    return home_text()
 
 def channel_welcome_text(first_name: str='') -> str:
-    return welcome_text()
+    from .messages import channel_welcome_text as _channel_welcome_text
+    return _channel_welcome_text(first_name=first_name)
 
 def discussion_entry_welcome_text(first_name: str='', listing_id: str='') -> str:
     return copy_discussion_entry_welcome_text(first_name=first_name, listing_id=listing_id)
@@ -50,6 +46,8 @@ async def render_panel(update: Update, *, text: str, reply_markup: InlineKeyboar
             return
         except Exception as exc:
             if 'message is not modified' in str(exc).lower():
+                if context is not None and query.message is not None:
+                    context.user_data[PANEL_ANCHOR_KEY] = {'chat_id': int(query.message.chat_id), 'message_id': int(query.message.message_id)}
                 return
             logger.debug('render_panel edit failed, fallback to send: %s', exc)
     if context is not None and prefer_edit_anchor and (query is None):
