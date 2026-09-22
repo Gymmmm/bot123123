@@ -10,7 +10,6 @@ BANNED = (
     '查看这套',
     '查看实拍',
     '查看更多实拍',
-    '咨询这套',
     '咨询顾问',
     '完整实拍',
     '让顾问帮我找',
@@ -39,15 +38,14 @@ def test_current_available_lives_inside_find_home():
     home = ' '.join(_labels(main_keyboard()))
     find = ' '.join(_labels(guided_search_keyboard()))
     assert '当前可预约' not in home
-    assert '当前可预约' in find
+    assert '当前可约' in find
 
 
 def test_find_card_and_album_use_locked_advisor_label():
     card = ' '.join(_labels(_listing_card_keyboard('l_2')))
     album = ' '.join(_labels(_photo_action_keyboard('l_2', available=True)))
-    assert '💬 联系中文顾问' in card
-    assert '💬 联系中文顾问' in album
-    assert '📋 租赁详情' in album
+    assert '💬 咨询这套' in card
+    assert '💬 咨询这套' in album
     assert '📅 预约看房' in album
     assert '咨询顾问' not in card
     assert '咨询顾问' not in album

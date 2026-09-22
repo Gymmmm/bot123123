@@ -66,10 +66,38 @@ def detect_property_type(text: str) -> str:
     return ''
 
 
+def detect_project_terms(text: str, *, residential_only: bool = True) -> tuple[str, ...]:
+    """Match project aliases from the existing taxonomy (no Registry dependency)."""
+    from v3_core.inventory.listing_taxonomy import PROJECT_IDENTITIES, clean_text
+
+    raw = clean_text(text).casefold()
+    if not raw:
+        return ()
+    terms: list[str] = []
+    for item in PROJECT_IDENTITIES:
+        family = str(item.property_family or '').strip()
+        if residential_only and family and family not in {'公寓', '住宅'}:
+            # Keep entries with unknown family (common for mixed residential stock).
+            if family in {'办公室', '商铺', '商业', '土地'}:
+                continue
+        aliases = (item.display, *item.aliases)
+        if not any(clean_text(alias).casefold() and clean_text(alias).casefold() in raw for alias in aliases):
+            continue
+        for alias in aliases:
+            cleaned = str(alias or '').strip()
+            if cleaned and cleaned not in terms:
+                terms.append(cleaned)
+        display = str(item.display or '').strip()
+        if display and display not in terms:
+            terms.append(display)
+    return tuple(terms)
+
+
 def _public_search_listings(
     *,
     property_type: str | None = None,
     areas: list[str] | tuple[str, ...] | None = None,
+    project_terms: list[str] | tuple[str, ...] | None = None,
     budget_min: int | None = None,
     budget_max: int | None = None,
     ilike_fragment: str | None = None,
@@ -83,6 +111,7 @@ def _public_search_listings(
         return PublicInventoryAdapter(DB_PATH).search(
             property_type=property_type or None,
             areas=areas,
+            project_terms=project_terms,
             budget_min=budget_min,
             budget_max=budget_max,
             limit=limit,
@@ -112,6 +141,7 @@ def search_listings_with_fallback(
     budget_min: int | None,
     budget_max: int | None,
     text_fragment: str = '',
+    project_terms: list[str] | tuple[str, ...] | None = None,
     limit: int = 3,
 ) -> tuple[list[dict], str]:
     """执行严格公开搜索；没有严格匹配时不自动放宽条件。"""
@@ -119,6 +149,7 @@ def search_listings_with_fallback(
     matches = _public_search_listings(
         property_type=property_type or None,
         areas=_area_aliases(area),
+        project_terms=project_terms,
         budget_min=budget_min,
         budget_max=budget_max,
         limit=limit,

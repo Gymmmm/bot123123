@@ -179,12 +179,20 @@ class PublicInventoryAdapter:
         *,
         property_type: str | None = None,
         areas: list[str] | tuple[str, ...] | None = None,
+        project_terms: list[str] | tuple[str, ...] | None = None,
         budget_min: int | None = None,
         budget_max: int | None = None,
         limit: int = 6,
     ) -> list[dict[str, Any]]:
         views = self._load_search_reader().search(
             property_type=str(property_type or "").strip(),
+            project_terms=tuple(
+                dict.fromkeys(
+                    str(value or "").strip()
+                    for value in (project_terms or ())
+                    if str(value or "").strip()
+                )
+            ),
             location_keys=tuple(
                 dict.fromkeys(
                     str(area or "").strip()

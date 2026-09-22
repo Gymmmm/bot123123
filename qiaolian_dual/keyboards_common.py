@@ -25,7 +25,7 @@ def main_keyboard() -> InlineKeyboardMarkup:
 
 def no_match_followup_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("💬 联系顾问", callback_data="appointment_menu:contact")],
+        [InlineKeyboardButton("💬 联系中文顾问", callback_data="appointment_menu:contact")],
         [
             InlineKeyboardButton("🎯 继续筛选", callback_data="findmode:guided"),
             InlineKeyboardButton("🏠 返回首页", callback_data="home"),
@@ -48,7 +48,7 @@ def room_type_keyboard() -> InlineKeyboardMarkup:
 
 def latest_listing_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton('🔍 帮我找房', callback_data='home_smart_search'), InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')],
+        [InlineKeyboardButton('🔍 帮我找房', callback_data='home_smart_search'), InlineKeyboardButton('💬 联系中文顾问', callback_data='hub:advisor')],
         [InlineKeyboardButton('⬅️ 返回首页', callback_data='home')],
     ])
 
@@ -61,7 +61,7 @@ def keyword_followup_keyboard(*, area: str='', room_type: str='') -> InlineKeybo
         rows.append([InlineKeyboardButton('📍 按区域', callback_data='hub:area'), InlineKeyboardButton('💰 按预算', callback_data='hub:budget')])
     else:
         rows.append([InlineKeyboardButton('📍 按区域', callback_data='hub:area'), InlineKeyboardButton('💰 按预算', callback_data='hub:budget')])
-    rows.append([InlineKeyboardButton('💬 联系我们', callback_data='appointment_menu:contact')])
+    rows.append([InlineKeyboardButton('💬 联系中文顾问', callback_data='appointment_menu:contact')])
     rows.append([InlineKeyboardButton('⬅️ 返回', callback_data='home_smart_search')])
     return InlineKeyboardMarkup(rows)
 
@@ -104,13 +104,14 @@ def _listing_channel_url(listing_id: str) -> str:
 
 
 def contact_handoff_keyboard(*, listing_id: str='') -> InlineKeyboardMarkup:
-    """所有客户联系入口统一使用“联系我们”。"""
+    """有房源用「咨询这套」，无房源用「联系中文顾问」。"""
     listing_id = str(listing_id or '').strip()
     advisor_url = _advisor_listing_url(listing_id) if listing_id else _advisor_tg_url()
+    label = '💬 咨询这套' if listing_id else '💬 联系中文顾问'
     if advisor_url:
-        chat_btn = InlineKeyboardButton('💬 联系我们', url=advisor_url)
+        chat_btn = InlineKeyboardButton(label, url=advisor_url)
     else:
-        chat_btn = InlineKeyboardButton('💬 联系我们', callback_data='appointment_menu:contact')
+        chat_btn = InlineKeyboardButton(label, callback_data='appointment_menu:contact')
     if listing_id:
         return InlineKeyboardMarkup([
             [chat_btn],
@@ -125,7 +126,7 @@ def contact_handoff_keyboard(*, listing_id: str='') -> InlineKeyboardMarkup:
 
 def appointment_success_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton('📅 查看我的预约', callback_data='appointment_menu:list'), InlineKeyboardButton('💬 联系我们', callback_data='appointment_menu:contact')],
+        [InlineKeyboardButton('📅 查看我的预约', callback_data='appointment_menu:list'), InlineKeyboardButton('💬 联系中文顾问', callback_data='appointment_menu:contact')],
         [InlineKeyboardButton('🔍 继续找房', callback_data='home_smart_search')],
     ])
 
@@ -140,7 +141,7 @@ def channel_return_keyboard(channel_url: str='') -> InlineKeyboardMarkup:
 
 def lead_capture_keyboard() -> InlineKeyboardMarkup:
     advisor_url = _advisor_tg_url()
-    chat_btn = InlineKeyboardButton('💬 联系我们', url=advisor_url) if advisor_url else InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')
+    chat_btn = InlineKeyboardButton('💬 联系中文顾问', url=advisor_url) if advisor_url else InlineKeyboardButton('💬 联系中文顾问', callback_data='hub:advisor')
     return InlineKeyboardMarkup([
         [chat_btn],
         [InlineKeyboardButton('🔍 继续找房', callback_data='home_smart_search')],
@@ -152,6 +153,6 @@ def old_tenant_followup_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton('📋 我的租约', callback_data='contract:view')],
         [InlineKeyboardButton('📅 我的预约', callback_data='appointment_menu:list'), InlineKeyboardButton('🛠 入住服务', callback_data='service:hub')],
-        [InlineKeyboardButton('💬 联系我们', callback_data='appointment_menu:contact')],
+        [InlineKeyboardButton('💬 联系中文顾问', callback_data='appointment_menu:contact')],
         [InlineKeyboardButton('🏠 返回首页', callback_data='home')],
     ])

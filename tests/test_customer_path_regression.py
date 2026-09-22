@@ -35,6 +35,6 @@ def test_booking_display_uses_shared_formatters():
 
 def test_listing_detail_uses_consistent_contact_wording():
     source = Path("qiaolian_dual/listing.py").read_text(encoding="utf-8")
-    assert "InlineKeyboardButton('💬 联系我们'" in source
-    assert "联系中文顾问" not in source
+    assert "InlineKeyboardButton('💬 咨询这套'" in source
+    assert "InlineKeyboardButton('💬 联系中文顾问'" in source
     assert "咨询顾问" not in source

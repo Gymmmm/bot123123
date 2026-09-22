@@ -55,7 +55,7 @@ def _appointment_listing_compact(value: object) -> str:
 
 def _appointment_card_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton('🔎 查看详情', callback_data='appointment_menu:details'), InlineKeyboardButton('💬 联系我们', callback_data='appointment_menu:contact')],
+        [InlineKeyboardButton('🔎 查看详情', callback_data='appointment_menu:details'), InlineKeyboardButton('💬 联系中文顾问', callback_data='appointment_menu:contact')],
         [InlineKeyboardButton('🔍 继续找房', callback_data='home_smart_search'), InlineKeyboardButton('🏠 返回首页', callback_data='home')],
     ])
 
@@ -155,7 +155,7 @@ def _appointment_details_keyboard(user_id: int) -> InlineKeyboardMarkup:
                 if listing_id:
                     buttons.append([
                         InlineKeyboardButton('📋 查看房源', callback_data=f'listing:detail:{listing_id}'),
-                        InlineKeyboardButton('💬 联系我们', callback_data=f'listing:consult:{listing_id}'),
+                        InlineKeyboardButton('💬 咨询这套', callback_data=f'listing:consult:{listing_id}'),
                     ])
                 break
     buttons.append([InlineKeyboardButton('⬅️ 返回预约列表', callback_data='appointment_menu:list')])
@@ -194,5 +194,5 @@ def list_favorites_text(user_id: int) -> str:
             detail.append(f"{item.get('size_sqm')}㎡")
         detail_text = f" | {' · '.join(detail)}" if detail else ''
         parts.append(f"• {item.get('listing_id', '-')} | {item.get('area', '金边')} | {_fmt_price(item.get('price'))}{detail_text}")
-    parts.append('\n需要继续咨询时，点「💬 联系我们」。')
+    parts.append('\n需要继续咨询时，点「💬 联系中文顾问」。')
     return '\n'.join(parts)

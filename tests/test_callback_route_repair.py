@@ -74,20 +74,26 @@ def test_home_available_button_uses_unified_callback():
     kb = main_keyboard()
     mapping = {button.text: button.callback_data for row in kb.inline_keyboard for button in row}
     assert '🏠 可预约房源' not in mapping
-    assert mapping['🔍 帮我找房'] == 'home_smart_search'
-    assert mapping['📅 我的预约'] == 'hub:appointments'
-    assert mapping['🛡 侨联保障'] == 'hub:rental'
-    assert mapping['🛠 入住服务'] == 'hub:service'
-    assert mapping['💬 联系我们'] == 'hub:advisor'
+    assert mapping['🔍 智能找房'] == 'home_smart_search'
+    assert mapping['📖 关于侨联地产'] == 'home_brand'
+    assert mapping['📅 预约看房'] == 'home_appoint'
+    assert mapping['💎 直接问顾问'] == 'home_consult'
+    assert mapping['⚡ 入住管家'] == 'home_living'
+    assert mapping['🧭 周边服务'] == 'home_nearby'
 
 
 @pytest.mark.asyncio
 async def test_home_available_callback_enters_real_recommendation_handler(monkeypatch):
-    import qiaolian_dual.callback_navigation as nav
     import qiaolian_dual.results_admin as results
-    monkeypatch.setattr(nav.db, 'list_recent_listings', lambda limit: [
-        {'listing_id': 'l_1', 'status': 'active'}, {'listing_id': 'l_2', 'status': 'reserved'}, {'listing_id': 'l_3', 'status': 'rented'},
-    ])
+    import qiaolian_dual.search as search_mod
+    monkeypatch.setattr(
+        search_mod,
+        '_public_search_listings',
+        lambda **kwargs: [
+            {'listing_id': 'l_1', 'status': 'active'},
+            {'listing_id': 'l_2', 'status': 'reserved'},
+        ],
+    )
     seen = {}
     async def fake_cards(update, context, matches, mode):
         seen['ids'] = [item['listing_id'] for item in matches]; seen['mode'] = mode
@@ -209,7 +215,7 @@ def test_unavailable_page_is_html_and_has_all_real_callbacks():
     text = listing_unavailable_text('pending')
     assert '🔵 <b>这套房正在确认最新房态</b>' in text
     kb = listing_unavailable_keyboard('')
-    assert labels(kb) == ['🏘 同区可约房源', '💬 联系我们', '🏠 房源详情']
+    assert labels(kb) == ['🏘 同区可约房源', '💬 咨询这套', '🏠 房源详情']
     assert callbacks(kb) == ['unavail:more:any', 'listing:consult:', 'listing:detail:']
 
 

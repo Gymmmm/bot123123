@@ -95,13 +95,15 @@ async def handle_main_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     room_type = detect_room_type(text)
     budget_min, budget_max = parse_budget_range(text)
     property_type = detect_property_type(text)
+    from .search import detect_project_terms
+    project_terms = detect_project_terms(text, residential_only=property_type != '办公室')
     wants_video = any((token in normalized_text for token in ('视频看房', '视频代看', '实拍', '视频')))
-    if area_use or room_type or budget_min is not None or (budget_max is not None):
+    if area_use or room_type or budget_min is not None or (budget_max is not None) or project_terms:
         _remember_video_pref(context, area=area_use or None, budget_min=budget_min, budget_max=budget_max, layout=room_type or property_type or None)
     if wants_video:
         return await start_video_tour_flow(update, context, source='natural_keyword', area=area_use, budget_min=budget_min, budget_max=budget_max, layout=room_type or property_type)
-    if area_use or room_type or budget_min is not None or (budget_max is not None):
-        matches, match_mode = search_listings_with_fallback(property_type=property_type or None, area=area_use, budget_min=budget_min, budget_max=budget_max, text_fragment=f'{text} {room_type}'.strip(), limit=5)
+    if area_use or room_type or budget_min is not None or (budget_max is not None) or project_terms:
+        matches, match_mode = search_listings_with_fallback(property_type=property_type or None, area=area_use, budget_min=budget_min, budget_max=budget_max, text_fragment=f'{text} {room_type}'.strip(), project_terms=project_terms, limit=5)
         logger.info('route=natural_keyword update_id=%s user_id=%s area=%s budget=%s-%s mode=%s matched=%d ids=%s', getattr(update, 'update_id', None), getattr(user, 'id', None), area_use or '-', budget_min, budget_max, match_mode, len(matches), ','.join((str(item.get('listing_id') or '-') for item in matches[:5])))
         create_lead(user, action='keyword_find_play', source='natural_keyword', area=area_use, property_type=property_type, budget_min=budget_min, budget_max=budget_max, payload={'message': text[:700], 'match_mode': match_mode, 'room_type': room_type})
         if matches:

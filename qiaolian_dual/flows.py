@@ -34,7 +34,7 @@ async def start_appointment(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             text='📅 <b>预约看房</b>\n\n请先从具体房源的「预约看房」进入。',
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton('🔍 帮我找房', callback_data='home_smart_search')],
-                [InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')],
+                [InlineKeyboardButton('💬 联系中文顾问', callback_data='hub:advisor')],
                 [InlineKeyboardButton('⬅️ 返回首页', callback_data='home')],
             ]),
             parse_mode=ParseMode.HTML,

@@ -143,10 +143,10 @@ def listing_cost_keyboard(listing_id: str) -> InlineKeyboardMarkup:
     if status in {'active', 'reserved'}:
         return InlineKeyboardMarkup([
             [InlineKeyboardButton('📅 预约看房', callback_data=f'listing:appoint:{listing_id}'), InlineKeyboardButton('📸 更多实拍', callback_data=f'listing:photos:{listing_id}')],
-            [InlineKeyboardButton('💬 联系我们', callback_data=f'listing:consult:{listing_id}')],
+            [InlineKeyboardButton('💬 咨询这套', callback_data=f'listing:consult:{listing_id}')],
         ])
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton('📸 更多实拍', callback_data=f'listing:photos:{listing_id}'), InlineKeyboardButton('💬 联系我们', callback_data=f'listing:consult:{listing_id}')],
+        [InlineKeyboardButton('📸 更多实拍', callback_data=f'listing:photos:{listing_id}'), InlineKeyboardButton('💬 咨询这套', callback_data=f'listing:consult:{listing_id}')],
         [InlineKeyboardButton('🏘 看相近房源', callback_data=f'unavail:more:{listing_id}')],
     ])
 
@@ -169,7 +169,7 @@ def listing_entry_keyboard(listing_id: str) -> InlineKeyboardMarkup:
     ]]
     if status in {'active', 'reserved'}:
         rows.append([InlineKeyboardButton('📅 预约看房', callback_data=f'listing:appoint:{listing_id}')])
-    rows.append([InlineKeyboardButton('💬 联系我们', callback_data=f'listing:consult:{listing_id}')])
+    rows.append([InlineKeyboardButton('💬 咨询这套', callback_data=f'listing:consult:{listing_id}')])
     rows.append([InlineKeyboardButton('🔍 继续找房', callback_data='home_smart_search')])
     return InlineKeyboardMarkup(rows)
 
@@ -237,16 +237,16 @@ def listing_unavailable_keyboard(listing_id: str='') -> InlineKeyboardMarkup:
     if status == 'rented':
         return InlineKeyboardMarkup([
             [InlineKeyboardButton('🏘 看相近房源', callback_data=f'unavail:more:{area_token}')],
-            [InlineKeyboardButton('💬 联系我们', callback_data=f'listing:consult:{listing_id}')],
+            [InlineKeyboardButton('💬 咨询这套', callback_data=f'listing:consult:{listing_id}')],
         ])
     if status in {'offline', 'inactive'}:
         return InlineKeyboardMarkup([
             [InlineKeyboardButton('🔍 继续找房', callback_data='home_smart_search')],
-            [InlineKeyboardButton('💬 联系我们', callback_data=f'listing:consult:{listing_id}')],
+            [InlineKeyboardButton('💬 咨询这套', callback_data=f'listing:consult:{listing_id}')],
         ])
     return InlineKeyboardMarkup([
         [InlineKeyboardButton('🏘 同区可约房源', callback_data=f'unavail:more:{area_token}')],
-        [InlineKeyboardButton('💬 联系我们', callback_data=f'listing:consult:{listing_id}')],
+        [InlineKeyboardButton('💬 咨询这套', callback_data=f'listing:consult:{listing_id}')],
         [InlineKeyboardButton('🏠 房源详情', callback_data=f'listing:detail:{listing_id}')],
     ])
 
@@ -344,7 +344,7 @@ def _video_match_keyboard(matches: list[dict]) -> InlineKeyboardMarkup:
         listing_id = str(item.get('listing_id') or '').strip()
         if listing_id:
             rows.append([InlineKeyboardButton('🏠 房源详情', callback_data=f'listing:detail:{listing_id}')])
-    rows.append([InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')])
+    rows.append([InlineKeyboardButton('💬 联系中文顾问', callback_data='hub:advisor')])
     rows.append([InlineKeyboardButton('🔍 继续找房', callback_data='home_smart_search')])
     return InlineKeyboardMarkup(rows)
 
