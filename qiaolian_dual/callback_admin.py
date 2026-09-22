@@ -71,6 +71,17 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 return MAIN
             action = parts[1]
             lead_id, appointment_id, customer_id = map(int, parts[2:])
+            if action == 'done':
+                from .admin_consult import handle_admin_done
+                await handle_admin_done(
+                    update,
+                    context,
+                    query,
+                    lead_id=lead_id,
+                    appointment_id=appointment_id,
+                    customer_id=customer_id,
+                )
+                return MAIN
             status_map = {'claim': ('claimed', 'assigned', '🟢 顾问跟进中'), 'contacted': ('contacted', 'contacted', '🟢 顾问跟进中'), 'invalid': ('invalid', 'cancelled', '⚪ 已结束跟进')}
             if action not in status_map:
                 return MAIN
