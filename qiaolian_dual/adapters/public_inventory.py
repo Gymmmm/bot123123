@@ -37,9 +37,10 @@ class PublicInventoryAdapter:
         return normalize_public_id(value)
 
     def resolve_internal_id(self, value: object) -> str | None:
-        from qiaolian_dual.public_listing_id import resolve_listing_id
-
-        return resolve_listing_id(value, db_path=self.db_path)
+        view = self.resolve(value)
+        if view is None:
+            return None
+        return str(getattr(view, "listing_id", "") or "").strip() or None
 
     def resolve(self, public_listing_id: object):
         ql = self.normalize_public_id(public_listing_id)
@@ -71,9 +72,7 @@ class PublicInventoryAdapter:
             or ""
         ).strip()
 
-        price = live_offer.get("monthly_rent_usd")
-        if price in (None, ""):
-            price = frozen_offer.get("monthly_rent_usd")
+        price = frozen_offer.get("monthly_rent_usd")
         if price in (None, ""):
             price = canonical.get("monthly_rent_usd")
 
