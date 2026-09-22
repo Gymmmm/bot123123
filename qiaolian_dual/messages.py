@@ -131,16 +131,32 @@ def deposit_text() -> str:
 
 
 def home_text() -> str:
+    advisor = (ADVISOR_TG or "").strip()
+    if advisor and not advisor.startswith("@"):
+        advisor = f"@{advisor}"
+    advisor = advisor or "@qiaolian_support"
     return (
-        "您好，我是侨联小管家。\n\n"
-        "金边租房，先选你现在要做的事。"
+        "🏠 <b>侨联地产 · 金边华人房产服务</b>\n\n"
+        "真实房源 · 实拍更新\n"
+        "公寓 · 别墅 · 商铺 · 土地\n\n"
+        "━━━━━━━━━━\n\n"
+        "在金边找房，找自己人\n\n"
+        f"📱 顾问：{e(advisor)}\n\n"
+        "👇 点按钮开始："
     )
 
 
 def channel_welcome_text(first_name: str = "") -> str:
-    if not first_name:
-        return home_text()
-    return f"👋 您好 <b>{e(first_name)}</b>。\n\n{home_text()}"
+    name_part = f" {e(first_name)}" if first_name else ""
+    return (
+        f"👋 欢迎{name_part}来到 <b>侨联找房助手</b>\n\n"
+        "找房、看房、视频代看、入住后的服务，我都可以帮你。\n\n"
+        "你可以直接告诉我需求，例如：\n\n"
+        "<code>富力800公寓</code>\n"
+        "<code>BKK一居</code>\n"
+        "<code>1000以内房子</code>\n\n"
+        "也可以点击下面入口开始："
+    )
 
 
 def about_text() -> str:
