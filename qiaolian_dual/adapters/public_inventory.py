@@ -140,6 +140,7 @@ class PublicInventoryAdapter:
         gallery = list(getattr(view, "gallery", ()) or ())
         package = dict(getattr(view, "package", None) or {})
         cover_path = str(package.get("cover_path") or "").strip()
+        cover_style = str(package.get("cover_style") or "").strip()
 
         return {
             "listing_id": public_id,
@@ -170,6 +171,7 @@ class PublicInventoryAdapter:
             "adviser_copy": str(snapshot.get("adviser_copy") or ""),
             "adviser_copy_source": str(snapshot.get("adviser_copy_source") or ""),
             "cover_path": cover_path,
+            "cover_style": cover_style,
             "gallery": gallery,
             "media_files": gallery,
             "caption_variant": "a",

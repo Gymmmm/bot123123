@@ -28,6 +28,97 @@ def _is_cover_name(path: str) -> bool:
     return name in {'cover.jpg', 'cover.jpeg', 'cover.png', 'cover.webp'} or name.startswith('cover')
 
 
+def _looks_like_rendered_cover(path: Path, *, public_id: str, style: str) -> bool:
+    name = path.name.lower()
+    pid = str(public_id or '').strip().lower()
+    if not pid or pid not in name:
+        return False
+    if path.suffix.lower() not in {'.png', '.jpg', '.jpeg', '.webp'}:
+        return False
+    if style and style.lower() in name:
+        return True
+    return name.startswith(pid + '_') or name.startswith(pid + '.')
+
+
+def _cover_search_roots(item: dict) -> list[Path]:
+    roots: list[Path] = []
+    seen: set[str] = set()
+
+    def _add(path: Path) -> None:
+        try:
+            resolved = path.expanduser().resolve()
+        except OSError:
+            return
+        key = str(resolved)
+        if key in seen:
+            return
+        seen.add(key)
+        roots.append(resolved)
+
+    explicit = str(item.get('cover_path') or '').strip()
+    if explicit:
+        parent = Path(explicit).expanduser().parent
+        _add(parent)
+        _add(parent.parent)
+
+    media = item.get('media_files') if isinstance(item.get('media_files'), list) else []
+    for raw in media:
+        gallery_path = Path(str(raw or '').strip())
+        if not str(gallery_path):
+            continue
+        parent = gallery_path.expanduser().parent
+        _add(parent)
+        for up in list(parent.parents)[:6]:
+            _add(up)
+            _add(up / 'covers_v3')
+            _add(up / 'covers')
+            if up.name in {'gallery', 'prepared_v3', 'media'}:
+                _add(up.parent / 'covers_v3')
+                _add(up.parent / 'covers')
+                _add(up.parent.parent / 'covers_v3')
+
+    # Common production mounts when absolute frozen paths are stale.
+    for root in (
+        Path('/opt/qiaolian_dual_bots/media/covers_v3'),
+        Path('/opt/qiaolian_dual_bots/media/covers'),
+        Path('/opt/qiaolian_v3/runtime/media/covers_v3'),
+    ):
+        _add(root)
+    return roots
+
+
+def resolve_cover_path(item: dict) -> str:
+    """Prefer frozen cover_path; if missing on disk, rediscover rendered cover."""
+    explicit = _existing(item.get('cover_path'))
+    if explicit:
+        return explicit
+
+    public_id = str(item.get('public_listing_id') or item.get('listing_id') or '').strip()
+    style = str(item.get('cover_style') or '').strip()
+    if not public_id:
+        return ''
+
+    candidates: list[str] = []
+    for root in _cover_search_roots(item):
+        if style:
+            for suffix in ('.png', '.jpg', '.jpeg', '.webp'):
+                candidates.append(str(root / f'{public_id}_{style}{suffix}'))
+        try:
+            if not root.is_dir():
+                continue
+            for child in root.iterdir():
+                if child.is_file() and _looks_like_rendered_cover(child, public_id=public_id, style=style):
+                    candidates.append(str(child))
+        except OSError:
+            continue
+
+    for candidate in candidates:
+        found = _existing(candidate)
+        if found and _looks_like_rendered_cover(Path(found), public_id=public_id, style=style):
+            return found
+    return ''
+
+
 def listing_media_paths(item: dict) -> list[str]:
     """Cover first, then unique gallery files that exist on disk."""
     ordered: list[str] = []
@@ -40,11 +131,15 @@ def listing_media_paths(item: dict) -> list[str]:
         seen.add(resolved)
         ordered.append(resolved)
 
-    _add(item.get('cover_path'))
+    cover = resolve_cover_path(item if isinstance(item, dict) else {})
+    _add(cover)
     media = item.get('media_files') if isinstance(item.get('media_files'), list) else []
     covers = [p for p in media if isinstance(p, str) and _is_cover_name(p)]
     others = [p for p in media if isinstance(p, str) and not _is_cover_name(p)]
     for path in covers + others:
+        # Skip duplicate cover-named assets once rendered cover is already first.
+        if cover and _is_cover_name(str(path)):
+            continue
         _add(path)
     if not ordered:
         _add(item.get('media_file_id'))
@@ -61,7 +156,7 @@ def flipper_caption(item: dict, *, photo_index: int, photo_total: int) -> str:
     head = ' · '.join(part for part in (project, layout, price) if part) or '房源'
     total = max(0, int(photo_total or 0))
     if total > 0:
-        index = max(0, int(photo_index or 0)) % total
+        index = min(max(0, int(photo_index or 0)), total - 1)
         return f'{he(head)} · 📸 {index + 1}/{total}'
     return he(head)
 
@@ -92,16 +187,18 @@ def photo_flipper_keyboard(
     photo_total: int,
     return_to_results: bool = False,
 ) -> InlineKeyboardMarkup:
+    """Edge-aware pager: hide 上一张 on first, 下一张 on last (no wrap)."""
     rows: list[list[InlineKeyboardButton]] = []
     total = max(0, int(photo_total or 0))
     index = max(0, int(photo_index or 0))
     if total > 1:
-        prev_i = (index - 1) % total
-        next_i = (index + 1) % total
-        rows.append([
-            InlineKeyboardButton('⬅️ 上一张', callback_data=f'album:{listing_id}:{prev_i}'),
-            InlineKeyboardButton('下一张 ➡️', callback_data=f'album:{listing_id}:{next_i}'),
-        ])
+        nav: list[InlineKeyboardButton] = []
+        if index > 0:
+            nav.append(InlineKeyboardButton('⬅️ 上一张', callback_data=f'album:{listing_id}:{index - 1}'))
+        if index < total - 1:
+            nav.append(InlineKeyboardButton('下一张 ➡️', callback_data=f'album:{listing_id}:{index + 1}'))
+        if nav:
+            rows.append(nav)
     action: list[InlineKeyboardButton] = []
     if available:
         action.append(InlineKeyboardButton('📅 预约看房', callback_data=f'listing:appoint:{listing_id}'))
@@ -150,7 +247,7 @@ async def send_or_edit_photo_flipper(
         await bot.send_message(chat_id=chat_id, text=text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
         return
 
-    index = int(photo_index or 0) % total
+    index = min(max(0, int(photo_index or 0)), total - 1)
     path = paths[index]
     caption = flipper_caption(item, photo_index=index, photo_total=total)
     keyboard = photo_flipper_keyboard(
@@ -183,6 +280,7 @@ __all__ = [
     'flipper_caption',
     'listing_media_paths',
     'photo_flipper_keyboard',
+    'resolve_cover_path',
     'search_card_keyboard',
     'send_or_edit_photo_flipper',
 ]
