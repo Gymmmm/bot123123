@@ -185,11 +185,15 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
         return MAIN
 
     if action in {'more', 'similar'}:
+        from .search import _area_aliases, _public_search_listings
         area, listing_id = _resolve_area_from_target(target)
         if action == 'similar' and listing_id:
             area = str(listing_context(listing_id).get('area') or area)
         create_lead(user, action=f'{action}_click', source=source, area=area, listing_id=listing_id, payload=touch_payload)
-        matches_found = [item for item in db.search_listings(areas=[area] if area and area != '不限' else None, limit=5) if str(item.get('status') or '').lower() in {'active', 'reserved'}]
+        matches_found = _public_search_listings(
+            areas=_area_aliases(area) if area and area != '不限' else None,
+            limit=5,
+        )
         if matches_found:
             from .results_admin import send_find_results_as_cards
             await send_find_results_as_cards(update, context, matches_found, 'strict')
