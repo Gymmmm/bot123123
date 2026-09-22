@@ -119,7 +119,7 @@ async def test_modern_channel_sync_uses_publication_instances_and_does_not_mutat
 
     buttons = call["reply_markup"].inline_keyboard
     urls = [button.url for row in buttons for button in row if button.url]
-    assert any(f"property_{PUBLIC_ID}_details" in url for url in urls)
+    assert any(f"property_{PUBLIC_ID}_photos" in url for url in urls)
     assert any(f"property_{PUBLIC_ID}_book" in url for url in urls)
 
     with sqlite3.connect(path) as conn:

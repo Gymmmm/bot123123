@@ -3,10 +3,11 @@ from pathlib import Path
 
 def test_no_detail_to_appointment_alias_and_no_photo_similar_fallback():
     source = Path('qiaolian_dual/callback_listing.py').read_text(encoding='utf-8')
-    detail = source[source.index("if data.startswith('listing:detail:')"):source.index("if data.startswith('listing:similar:')")]
-    assert "return await start_appointment" not in detail
-    photos = source[source.index("if data.startswith('listing:photos:')"):source.index("if data == 'find:show_more'")]
+    photos = source[source.index("if data.startswith('listing:photos:')"):source.index("if data.startswith('listing:appoint:')")]
+    assert "return await start_appointment" not in photos
     assert 'listing:similar:' not in photos
+    assert 'album:' in source
+    assert 'find:show_current' in source
 
 
 def test_reserved_is_explicitly_available():
@@ -22,10 +23,11 @@ def test_unavailable_callback_paths_use_html_parse_mode():
             assert 'parse_mode=ParseMode.HTML' in source
 
 
-def test_recommendation_card_no_longer_routes_detail_to_open():
+def test_recommendation_card_uses_unified_photo_detail():
     source = Path('qiaolian_dual/results_admin.py').read_text(encoding='utf-8')
-    assert "InlineKeyboardButton('🏠 房源详情', callback_data=f'listing:detail:{listing_id}')" in source
+    assert "📷 房源详情" in source or "search_card_keyboard" in source
     assert "InlineKeyboardButton('📋 租赁详情', callback_data=f'listing:detail:{listing_id}')" not in source
+    assert "📸 更多实拍" not in Path('qiaolian_dual/media_flipper.py').read_text(encoding='utf-8')
 
 
 def test_rental_service_callbacks_are_wired_and_legacy_aliases_are_kept():
@@ -54,7 +56,11 @@ def test_rental_customer_copy_uses_non_guarantee_deposit_language():
 def test_rental_handover_uses_v2_preview_and_pdf_actions():
     rental = Path('qiaolian_dual/callback_rental.py').read_text(encoding='utf-8')
     assert "'📸 查看留档示例', callback_data='hub:rental:handover:preview'" in rental
-    assert "'📄 查看押金说明', callback_data='hub:rental:deposit'" in rental
     assert "'📥 下载完整版 PDF', callback_data='hub:rental:handover:pdf'" in rental
+    assert '_send_handover_preview' in rental
     assert 'send_photo' in rental
     assert 'send_document' in rental
+    # Must not auto-bundle PDF when opening handover home.
+    handover_home = rental[rental.index("if data == 'hub:rental:handover':"):rental.index("if data == 'hub:rental:handover:preview':")]
+    assert '_send_asset' not in handover_home
+    assert 'handover_text()' in handover_home

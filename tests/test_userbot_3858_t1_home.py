@@ -28,7 +28,9 @@ def test_t1_home_is_3858_six_buttons():
 def test_t1_welcome_uses_3858_home_copy():
     text = welcome_text()
     assert text == home_text()
-    assert "侨联地产 · 金边华人房产服务" in text
+    assert "侨联地产｜金边中文租房" in text
+    assert "请选择服务：" in text
+    assert "金边本地6年经验" in text
 
 
 def test_t1_no_match_keeps_3858_recovery():

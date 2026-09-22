@@ -67,12 +67,10 @@ async def show_search_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         update,
         text=(
             '🔍 <b>想找什么样的房子？</b>\n\n'
-            '直接发一句话就可以：\n\n'
-            '「BKK1 一房，预算 $600」\n'
-            '「富力城两房，要能做饭」\n'
-            '「想找高层、安静一点的」\n\n'
-            '我们会根据您的需求，优先筛选 2–3 套更值得看的房源。\n\n'
-            '还没想好？也可以按条件找 👇'
+            '直接发需求，例如：\n'
+            '<code>BKK1 一房 预算 $600</code>\n'
+            '<code>富力城 两房 要能做饭</code>\n\n'
+            '也可以按条件找：'
         ),
         reply_markup=guided_search_keyboard(),
         parse_mode=ParseMode.HTML,

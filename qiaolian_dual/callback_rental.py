@@ -54,8 +54,9 @@ def handover_text() -> str:
 
 def handover_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton('🔒 押金保障', callback_data='hub:rental:deposit'), InlineKeyboardButton('📄 入住交接留档', callback_data='hub:rental:handover:details')],
-        [InlineKeyboardButton('💡 费用说明', callback_data='hub:rental:fees'), InlineKeyboardButton('📥 下载完整资料', callback_data='hub:rental:handover:pdf')],
+        [InlineKeyboardButton('📸 查看留档示例', callback_data='hub:rental:handover:preview')],
+        [InlineKeyboardButton('📄 留档说明', callback_data='hub:rental:handover:details'), InlineKeyboardButton('📥 下载完整版 PDF', callback_data='hub:rental:handover:pdf')],
+        [InlineKeyboardButton('💬 联系中文顾问', callback_data='hub:advisor')],
         [InlineKeyboardButton('⬅️ 返回', callback_data='hub:rental')],
     ])
 
@@ -99,6 +100,7 @@ def deposit_text() -> str:
         '🔒 <b>押金保障</b>\n\n'
         '入住前，侨联协助完成房屋现状留档，包含设施状态、已有瑕疵、水电表读数等信息。\n\n'
         '退租时，侨联可作为第三方协助核对房屋状态、费用明细及扣费依据。如出现明显争议，优先协助沟通协调。\n\n'
+        '最终押金退还金额仍以合同和实际核对结果为准。\n\n'
         '押金保障不是退租那天才开始，而是从入住第一天就把细节留清楚。'
     )
 
@@ -190,23 +192,31 @@ def _font(size: int, *, bold: bool = False):
     return ImageFont.load_default()
 
 
-async def _send_asset_bundle(update, context, query, kind: str) -> int:
+async def _send_asset_file(update, context, query, kind: str, *, as_document: bool) -> int:
     if kind not in {'handover', 'deposit'}:
         raise ValueError('unsupported assurance asset')
+    chat_id = update.effective_chat.id
+    asset = _ASSET_DIR / (f'{kind}.pdf' if as_document else f'{kind}.png')
+    if as_document:
+        await context.bot.send_document(chat_id=chat_id, document=asset.open('rb'))
+    else:
+        await context.bot.send_photo(chat_id=chat_id, photo=asset.open('rb'))
+    return MAIN
+
+
+async def _send_handover_preview(update, context, query) -> int:
     chat_id = update.effective_chat.id
     try:
         await query.message.delete()
     except Exception:
         pass
-    title = '入住交接' if kind == 'handover' else '押金说明'
-    await context.bot.send_photo(chat_id=chat_id, photo=(_ASSET_DIR / f'{kind}.png').open('rb'))
-    await context.bot.send_document(chat_id=chat_id, document=(_ASSET_DIR / f'{kind}.pdf').open('rb'))
-    instruction = (
-        '请在入住当天逐项核对并填写，双方确认后各自保存，退租时再按留档记录核对。'
-        if kind == 'handover' else
-        '请在签约前核对押金金额、退还条件和扣费依据；退租时结合合同与入住留档逐项确认。最终押金退还金额仍以合同和实际核对结果为准。'
+    await context.bot.send_photo(chat_id=chat_id, photo=(_ASSET_DIR / 'handover.png').open('rb'))
+    sent = await context.bot.send_message(
+        chat_id=chat_id,
+        text=preview_followup_text(),
+        parse_mode=ParseMode.HTML,
+        reply_markup=preview_followup_keyboard(),
     )
-    sent = await context.bot.send_message(chat_id=chat_id, text=f'✅ <b>{title}资料已发送</b>\n\n{instruction}', parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('💬 联系中文顾问', callback_data='hub:advisor')], [InlineKeyboardButton('⬅️ 返回侨联保障', callback_data='hub:rental')]]))
     context.user_data['_panel_anchor'] = {'chat_id': int(sent.chat_id), 'message_id': int(sent.message_id)}
     return MAIN
 
@@ -226,16 +236,18 @@ async def handle_rental_callback(update, context, query, data: str, user) -> int
         await render_panel(update, text=fees_text(), parse_mode=ParseMode.HTML, reply_markup=fees_keyboard(), context=context)
         return MAIN
     if data == 'hub:rental:handover':
-        return await _send_asset_bundle(update, context, query, 'handover')
+        await render_panel(update, text=handover_text(), parse_mode=ParseMode.HTML, reply_markup=handover_keyboard(), context=context)
+        return MAIN
     if data == 'hub:rental:handover:preview':
-        return await _send_asset_bundle(update, context, query, 'handover')
+        return await _send_handover_preview(update, context, query)
     if data == 'hub:rental:handover:details':
         await render_panel(update, text=details_text(), parse_mode=ParseMode.HTML, reply_markup=details_keyboard(), context=context, prefer_edit_anchor=True)
         return MAIN
     if data == 'hub:rental:handover:pdf':
-        return await _send_asset_bundle(update, context, query, 'handover')
+        return await _send_asset_file(update, context, query, 'handover', as_document=True)
     if data == 'hub:rental:deposit':
-        return await _send_asset_bundle(update, context, query, 'deposit')
+        await render_panel(update, text=deposit_text(), parse_mode=ParseMode.HTML, reply_markup=deposit_keyboard(), context=context)
+        return MAIN
     if data == 'hub:rental:viewing':
         await render_panel(update, text=viewing_text(), parse_mode=ParseMode.HTML, reply_markup=viewing_keyboard(), context=context)
         return MAIN

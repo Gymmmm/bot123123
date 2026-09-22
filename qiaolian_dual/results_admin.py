@@ -6,18 +6,9 @@ from .utils_formatting import _display_layout
 
 
 def _listing_card_keyboard(listing_id: str, *, available: bool = True, nav: list[InlineKeyboardButton] | None = None) -> InlineKeyboardMarkup:
-    rows: list[list[InlineKeyboardButton]] = []
-    if nav:
-        rows.append(nav)
-    rows.append([
-        InlineKeyboardButton('🏠 房源详情', callback_data=f'listing:detail:{listing_id}'),
-        InlineKeyboardButton('📸 更多实拍', callback_data=f'listing:photos:{listing_id}'),
-    ])
-    if available:
-        rows.append([InlineKeyboardButton('📅 预约看房', callback_data=f'listing:appoint:{listing_id}')])
-    rows.append([InlineKeyboardButton('💬 咨询这套', callback_data=f'listing:consult:{listing_id}')])
-    rows.append([InlineKeyboardButton('✏️ 换个条件', callback_data='home_smart_search')])
-    return InlineKeyboardMarkup(rows)
+    from .media_flipper import search_card_keyboard
+
+    return search_card_keyboard(listing_id, available=available, listing_nav=nav)
 
 
 def _rent_usd(value: object) -> int | None:
@@ -83,14 +74,13 @@ async def send_find_results_as_cards(update: Update, context: ContextTypes.DEFAU
     ids = [str(item.get('listing_id') or '').strip() for item in matches if item.get('listing_id')]
     context.user_data['find_card_listing_ids'] = ids
     context.user_data['find_card_match_mode'] = str(match_mode or 'strict')
+    context.user_data['find_card_index'] = 0
     query = getattr(update, 'callback_query', None)
     from .listing import listing_context
+    from .media_flipper import listing_media_paths
     first_item = listing_context(ids[0]) if ids else {}
-    first_media = first_item.get('media_files') if isinstance(first_item.get('media_files'), list) else []
-    first_photo = next((path for path in first_media if isinstance(path, str) and os.path.exists(path)), '')
-    if not first_photo:
-        candidate = str(first_item.get('media_file_id') or '')
-        first_photo = candidate if candidate and os.path.exists(candidate) else ''
+    paths = listing_media_paths(first_item if isinstance(first_item, dict) else {})
+    first_photo = paths[0] if paths else ''
     replace = bool(query is not None and (getattr(query.message, 'photo', None) or not first_photo))
     await send_find_result_card(update, context, 0, replace=replace)
 
@@ -159,7 +149,9 @@ def _find_result_card_content(item: dict, index: int, total: int, result_ids: li
         ]
 
     media_files = item.get('media_files') if isinstance(item.get('media_files'), list) else []
-    photo_path = next((p for p in media_files if isinstance(p, str) and os.path.exists(p)), '')
+    from .media_flipper import listing_media_paths
+    paths = listing_media_paths(item)
+    photo_path = paths[0] if paths else ''
     if not photo_path:
         candidate = str(item.get('media_file_id') or '')
         photo_path = candidate if candidate and os.path.exists(candidate) else ''
@@ -182,6 +174,7 @@ async def send_find_result_card(update: Update, context: ContextTypes.DEFAULT_TY
     context.user_data['find_card_listing_ids'] = valid_ids
     index = valid_ids.index(requested_id) if requested_id in valid_ids else min(int(index), len(valid_ids) - 1)
     item = listing_context(valid_ids[index])
+    context.user_data['find_card_index'] = index
     caption, keyboard, photo_path = _find_result_card_content(item, index, len(valid_ids), valid_ids)
     query = getattr(update, 'callback_query', None)
 
@@ -221,7 +214,7 @@ def search_results_keyboard(matches: list[dict]) -> InlineKeyboardMarkup:
     for item in matches[:3]:
         listing_id = str(item.get('listing_id') or '').strip()
         if listing_id:
-            rows.append([InlineKeyboardButton('🏠 房源详情', callback_data=f'listing:detail:{listing_id}')])
+            rows.append([InlineKeyboardButton('📷 房源详情', callback_data=f'listing:photos:{listing_id}')])
     rows.extend([
         [InlineKeyboardButton('✏️ 调整条件', callback_data='home_smart_search')],
         [InlineKeyboardButton('💬 联系中文顾问', callback_data='hub:advisor')],
@@ -275,52 +268,47 @@ def _allow_admin_notify(context: ContextTypes.DEFAULT_TYPE, *, key: str, cooldow
     return True
 
 
-def _photo_action_keyboard(listing_id: str, *, available: bool) -> InlineKeyboardMarkup:
-    rows = [[InlineKeyboardButton('🏠 房源详情', callback_data=f'listing:detail:{listing_id}')]]
-    if available:
-        rows[0].append(InlineKeyboardButton('📅 预约看房', callback_data=f'listing:appoint:{listing_id}'))
-    rows.append([InlineKeyboardButton('💬 咨询这套', callback_data=f'listing:consult:{listing_id}')])
-    return InlineKeyboardMarkup(rows)
 
+def _photo_action_keyboard(listing_id: str, *, available: bool, photo_index: int = 0, photo_total: int = 0, return_to_results: bool = False) -> InlineKeyboardMarkup:
+    from .media_flipper import photo_flipper_keyboard
 
-async def send_listing_photo_preview(bot, chat_id: int, listing_id: str) -> None:
-    from .listing import listing_context
-    from .utils_formatting import _display_listing_id
-    from telegram import InputMediaPhoto
-
-    info = listing_context(str(listing_id or '').strip())
-    media_files = info.get('media_files', []) if isinstance(info, dict) else []
-    photos = list(dict.fromkeys(
-        p for p in media_files
-        if isinstance(p, str) and os.path.exists(p)
-        and os.path.basename(p).lower() not in {'cover.jpg', 'cover.jpeg', 'cover.png'}
-    ))
-    status = str(info.get('status') or 'active').strip().lower()
-    keyboard = _photo_action_keyboard(listing_id, available=status in {'active', 'reserved'})
-    qc = _display_listing_id(listing_id)
-
-    if not photos:
-        await bot.send_message(
-            chat_id=chat_id,
-            text=(f'📸 <b>更多实拍｜{he(qc)}</b>\n\n这套房的实拍暂时没有加载出来。\n\n可以稍后再试，或直接联系我们。'),
-            parse_mode=ParseMode.HTML,
-            reply_markup=keyboard,
-        )
-        return
-
-    for offset in range(0, len(photos), 10):
-        chunk = photos[offset:offset + 10]
-        media = []
-        for path in chunk:
-            with open(path, 'rb') as photo:
-                media.append(InputMediaPhoto(media=photo.read()))
-        if len(media) == 1:
-            await bot.send_photo(chat_id=chat_id, photo=media[0].media)
-        else:
-            await bot.send_media_group(chat_id=chat_id, media=media)
-    await bot.send_message(
-        chat_id=chat_id,
-        text='📸 <b>以上是这套房目前保存的现场实拍。</b>\n\n想进一步了解，可以继续看详情，或直接预约。',
-        parse_mode=ParseMode.HTML,
-        reply_markup=keyboard,
+    return photo_flipper_keyboard(
+        listing_id,
+        available=available,
+        photo_index=photo_index,
+        photo_total=photo_total,
+        return_to_results=return_to_results,
     )
+
+
+async def send_listing_photo_preview(
+    bot,
+    chat_id: int,
+    listing_id: str,
+    *,
+    query=None,
+    photo_index: int = 0,
+    return_to_results: bool = False,
+    send_detail: bool = False,
+) -> None:
+    from .listing import listing_context, listing_cost_text
+    from .media_flipper import send_or_edit_photo_flipper
+
+    listing_id = str(listing_id or '').strip()
+    info = listing_context(listing_id) if listing_id else {}
+    await send_or_edit_photo_flipper(
+        bot=bot,
+        chat_id=chat_id,
+        listing_id=listing_id,
+        item=info if isinstance(info, dict) else {},
+        photo_index=photo_index,
+        query=query,
+        return_to_results=return_to_results,
+    )
+    if send_detail:
+        detail = listing_cost_text(listing_id)
+        if detail:
+            try:
+                await bot.send_message(chat_id=chat_id, text=detail, parse_mode=ParseMode.HTML)
+            except Exception:
+                logger.debug('发送房源详情文本失败: %s', listing_id, exc_info=True)

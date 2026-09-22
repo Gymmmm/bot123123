@@ -107,7 +107,7 @@ def test_five_appointment_lock_is_covered_without_manual_booking():
 
     assert APPOINTMENT_LOCK_COUNT == 5
     assert _status_label("pending", 5) == "🔵 已有5份预约看房，房态待确认"
-    labels = [[button.text for button in row] for row in _keyboard("Bot", "", "l_89", "pending").inline_keyboard]
-    assert labels == [["🏠 房源详情", "📸 更多实拍"]]
-    bookable = [[button.text for button in row] for row in _keyboard("Bot", "", "l_89", "reserved").inline_keyboard]
-    assert bookable == [["🏠 房源详情", "📸 更多实拍"], ["📅 预约看房"]]
+    labels = [[button.text for button in row] for row in _keyboard("Bot", "l_89", "pending").inline_keyboard]
+    assert labels == [["📷 房源详情"]]
+    bookable = [[button.text for button in row] for row in _keyboard("Bot", "l_89", "reserved").inline_keyboard]
+    assert bookable == [["📷 房源详情"], ["📅 预约看房"]]

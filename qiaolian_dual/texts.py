@@ -158,6 +158,13 @@ def listing_detail_text(item: dict) -> str:
     from .talk_engine import generate_talk
 
     base = copy_listing_detail(item)
-    talk = generate_talk(item, max_points=2, allow_empty=False).strip()
+    source = str(item.get('adviser_copy_source') or '').strip().lower()
+    talk = ''
+    if source != 'hidden':
+        talk = str(item.get('adviser_copy') or '').strip()
+    if not talk and source != 'hidden':
+        talk = generate_talk(item, max_points=2, allow_empty=False).strip()
+    if not talk:
+        return base
     safe_talk = '\n'.join(he(line) for line in talk.splitlines() if line.strip())
     return f"{base}\n\n💬 <b>侨联说</b>\n{safe_talk}"

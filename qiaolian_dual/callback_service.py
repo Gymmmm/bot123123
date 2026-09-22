@@ -79,16 +79,20 @@ async def handle_service_callback(update: Update, context: ContextTypes.DEFAULT_
         return MAIN
 
     if data == 'service_request:property':
+        context.user_data['awaiting_service_request'] = {
+            'issue_key': 'property',
+            'issue_label': SERVICE_REQUEST_LABELS.get('property', '物业协调'),
+        }
         await render_panel(
             update,
             text=(
                 '🏢 <b>物业协调</b>\n\n'
-                '如遇噪音、停车、门禁、公共区域或垃圾处理等问题，可以直接说明具体情况。\n\n'
+                '如遇噪音、停车、门禁、公共区域或垃圾处理等问题，请直接说明具体情况。\n\n'
                 '建议包括：\n'
                 '• 发生了什么\n'
                 '• 大概从什么时候开始\n'
                 '• 是否已经与物业沟通过\n\n'
-                '我们会协助整理沟通重点，并根据实际情况对接物业。'
+                '发送文字说明后，再选择方便处理的时间。'
             ),
             parse_mode=ParseMode.HTML,
             reply_markup=_service_back_keyboard(),
@@ -104,7 +108,12 @@ async def handle_service_callback(update: Update, context: ContextTypes.DEFAULT_
         note = '\n\n如果情况紧急，请直接联系我们。' if urgent else ''
         await render_panel(
             update,
-            text=f'🔧 <b>{he(issue_label)}</b>\n\n请发送问题照片或短视频，并简单说明异常情况。\n例如：<code>空调可以启动，但一直不制冷。</code>{note}',
+            text=(
+                f'🔧 <b>{he(issue_label)}</b>\n\n'
+                '请直接发送文字说明问题。\n'
+                f'例如：<code>空调可以启动，但一直不制冷。</code>{note}\n\n'
+                '说明收到后，会再请您选择方便处理的时间。'
+            ),
             parse_mode=ParseMode.HTML,
             reply_markup=_service_back_keyboard(parent_callback='service:repair_hub'),
             context=context,

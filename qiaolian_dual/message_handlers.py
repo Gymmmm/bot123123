@@ -45,7 +45,17 @@ async def handle_main_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         service_request['detail'] = text[:800]
         context.user_data['service_request_detail'] = service_request
         issue_key = str(service_request.get('issue_key') or 'repair_other')
-        await render_panel(update, text=f'✅ 已记录：{he(text[:500])}\n\n选希望处理的时间：', parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('🚨 今天内', callback_data=f'service_slot:{issue_key}:today'), InlineKeyboardButton('🕘 明天上午', callback_data=f'service_slot:{issue_key}:tomorrow_am')], [InlineKeyboardButton('🕒 明天下午', callback_data=f'service_slot:{issue_key}:tomorrow_pm')], [InlineKeyboardButton('⬅️ 返回入住后服务', callback_data='service:hub')]]), context=context)
+        await render_panel(
+            update,
+            text=f'✅ <b>问题已记录</b>\n\n{he(text[:500])}\n\n请选择方便处理的时间：',
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton('今天内', callback_data=f'service_slot:{issue_key}:today'), InlineKeyboardButton('明天上午', callback_data=f'service_slot:{issue_key}:tomorrow_am')],
+                [InlineKeyboardButton('明天下午', callback_data=f'service_slot:{issue_key}:tomorrow_pm')],
+                [InlineKeyboardButton('⬅️ 返回入住服务', callback_data='service:hub')],
+            ]),
+            context=context,
+        )
         return MAIN
     general_kind = None
     if context.user_data.pop('awaiting_service_general', None):

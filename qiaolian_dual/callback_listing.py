@@ -7,6 +7,7 @@ from .common import *
 def matches(data: str) -> bool:
     return (
         data == 'find:show_more'
+        or data == 'find:show_current'
         or data.startswith('findcard:')
         or data.startswith('listing:open:')
         or data.startswith('listing:photos:')
@@ -14,6 +15,7 @@ def matches(data: str) -> bool:
         or data.startswith('listing:consult:')
         or data.startswith('listing:detail:')
         or data.startswith('listing:similar:')
+        or data.startswith('album:')
     )
 
 
@@ -33,6 +35,10 @@ def _with_return_nav(markup: InlineKeyboardMarkup, *, include_search: bool=True)
     if nav:
         rows.append(nav)
     return InlineKeyboardMarkup(rows)
+
+
+def _from_search_results(context: ContextTypes.DEFAULT_TYPE) -> bool:
+    return bool(context.user_data.get('find_card_listing_ids'))
 
 
 async def handle_listing_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, query, data: str, user) -> int | None:
@@ -68,6 +74,11 @@ async def handle_listing_callback(update: Update, context: ContextTypes.DEFAULT_
         await send_find_result_card(update, context, index, replace=True)
         return MAIN
 
+    if data == 'find:show_current':
+        index = int(context.user_data.get('find_card_index') or 0)
+        await send_find_result_card(update, context, index, replace=True)
+        return MAIN
+
     if data == 'find:show_more':
         ids = list(context.user_data.get('find_card_listing_ids') or [])
         ids.extend(str(value) for value in (context.user_data.pop('find_more_listing_ids', []) or []) if str(value or '').strip())
@@ -82,16 +93,53 @@ async def handle_listing_callback(update: Update, context: ContextTypes.DEFAULT_
     # 历史 listing:open 只作为兼容 alias；新 UI 不再展示“查看这套”。
     if data.startswith('listing:open:'):
         lid = data.split(':', 2)[2]
-        data = f'listing:detail:{lid}'
+        data = f'listing:photos:{lid}'
 
-    if data.startswith('listing:photos:'):
-        lid = data.split(':', 2)[2]
+    if data.startswith('album:'):
+        parts = data.split(':', 2)
+        if len(parts) < 3:
+            return MAIN
+        lid, index_raw = parts[1], parts[2]
+        try:
+            photo_index = int(index_raw)
+        except (TypeError, ValueError):
+            return MAIN
         allowed, reason = listing_action_allowed(lid, 'photos')
         if not allowed:
             await render_panel(update, text=listing_unavailable_text(reason, lid), parse_mode=ParseMode.HTML, reply_markup=_with_return_nav(listing_unavailable_keyboard(lid)), context=context)
             return MAIN
         context.user_data['contact_listing_id'] = lid
-        await send_listing_photo_preview(context.bot, update.effective_chat.id, lid)
+        await send_listing_photo_preview(
+            context.bot,
+            update.effective_chat.id,
+            lid,
+            query=query,
+            photo_index=photo_index,
+            return_to_results=_from_search_results(context),
+            send_detail=False,
+        )
+        return MAIN
+
+    if data.startswith('listing:photos:') or data.startswith('listing:detail:'):
+        lid = data.split(':', 2)[2]
+        action = 'photos' if data.startswith('listing:photos:') else 'detail'
+        allowed, reason = listing_action_allowed(lid, action)
+        if not allowed:
+            await render_panel(update, text=listing_unavailable_text(reason, lid), parse_mode=ParseMode.HTML, reply_markup=_with_return_nav(listing_unavailable_keyboard(lid)), context=context)
+            return MAIN
+        context.user_data['contact_listing_id'] = lid
+        if action == 'detail':
+            create_lead(user, action='listing_detail_view', source='listing_landing', listing_id=lid)
+        return_to_results = _from_search_results(context)
+        await send_listing_photo_preview(
+            context.bot,
+            update.effective_chat.id,
+            lid,
+            query=query,
+            photo_index=0,
+            return_to_results=return_to_results,
+            send_detail=True,
+        )
         return MAIN
 
     if data.startswith('listing:appoint:'):
@@ -118,26 +166,6 @@ async def handle_listing_callback(update: Update, context: ContextTypes.DEFAULT_
         context.user_data['contact_listing_id'] = lid
         context.user_data['contact_touch_payload'] = {'listing_id': lid, 'entry': 'listing_card'}
         return await contact_management(update, context, source='listing_card', from_listing=lid)
-
-    if data.startswith('listing:detail:'):
-        lid = data.split(':', 2)[2]
-        allowed, reason = listing_action_allowed(lid, 'detail')
-        if not allowed:
-            await render_panel(update, text=listing_unavailable_text(reason, lid), parse_mode=ParseMode.HTML, reply_markup=_with_return_nav(listing_unavailable_keyboard(lid)), context=context)
-            return MAIN
-        item = listing_context(lid)
-        if not item:
-            await render_panel(update, text='未找到该房源详情，可能已下架。', reply_markup=main_keyboard(), context=context)
-            return MAIN
-        context.user_data['contact_listing_id'] = lid
-        create_lead(user, action='listing_detail_view', source='listing_landing', listing_id=lid)
-        detail_text = listing_cost_text(lid)
-        detail_kb = _with_return_nav(listing_cost_keyboard(lid))
-        if getattr(query.message, 'photo', None):
-            await query.edit_message_caption(caption=detail_text, parse_mode=ParseMode.HTML, reply_markup=detail_kb)
-        else:
-            await render_panel(update, text=detail_text, parse_mode=ParseMode.HTML, reply_markup=detail_kb, context=context)
-        return MAIN
 
     if data.startswith('listing:similar:'):
         lid = data.split(':', 2)[2]

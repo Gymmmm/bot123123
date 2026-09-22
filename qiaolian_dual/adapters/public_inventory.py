@@ -138,6 +138,8 @@ class PublicInventoryAdapter:
             or "pending"
         ).strip().lower()
         gallery = list(getattr(view, "gallery", ()) or ())
+        package = dict(getattr(view, "package", None) or {})
+        cover_path = str(package.get("cover_path") or "").strip()
 
         return {
             "listing_id": public_id,
@@ -166,9 +168,14 @@ class PublicInventoryAdapter:
             "normalized_data": canonical,
             "highlights": list(canonical.get("highlights") or []),
             "adviser_copy": str(snapshot.get("adviser_copy") or ""),
+            "adviser_copy_source": str(snapshot.get("adviser_copy_source") or ""),
+            "cover_path": cover_path,
             "gallery": gallery,
             "media_files": gallery,
             "caption_variant": "a",
+            "water_rate": frozen.get("water_rate") or canonical.get("water_rate") or "",
+            "electric_rate": frozen.get("electric_rate") or canonical.get("electric_rate") or "",
+            "management_fee": frozen.get("management_fee") or canonical.get("management_fee") or "",
         }
 
     def get_listing(self, public_listing_id: object) -> dict[str, Any] | None:

@@ -131,18 +131,26 @@ def deposit_text() -> str:
 
 
 def home_text() -> str:
-    advisor = (ADVISOR_TG or "").strip()
-    if advisor and not advisor.startswith("@"):
-        advisor = f"@{advisor}"
-    advisor = advisor or "@qiaolian_support"
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    hour = datetime.now(ZoneInfo("Asia/Phnom_Penh")).hour
+    if 5 <= hour < 12:
+        greeting = "上午好"
+    elif 12 <= hour < 18:
+        greeting = "下午好"
+    else:
+        greeting = "晚上好"
     return (
-        "🏠 <b>侨联地产 · 金边华人房产服务</b>\n\n"
-        "真实房源 · 实拍更新\n"
-        "公寓 · 别墅 · 商铺 · 土地\n\n"
-        "━━━━━━━━━━\n\n"
-        "在金边找房，找自己人\n\n"
-        f"📱 顾问：{e(advisor)}\n\n"
-        "👇 点按钮开始："
+        f"👋 <b>您好</b>，{greeting}\n\n"
+        "🏠 <b>侨联地产｜金边中文租房</b>\n"
+        "💬 中文顾问｜实地看房 / 视频代看\n\n"
+        "📍 富力城｜炳发城｜BKK1｜钻石岛\n"
+        "🛎️ 找房 · 看房 · 签约 · 入住 · 售后\n\n"
+        "⭐ 金边本地6年经验\n"
+        "📸 真实房源｜实拍更新\n"
+        "📹 没时间到现场？可约视频实拍代看\n\n"
+        "请选择服务："
     )
 
 

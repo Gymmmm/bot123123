@@ -105,27 +105,25 @@ async def test_home_available_callback_enters_real_recommendation_handler(monkey
 
 
 @pytest.mark.asyncio
-async def test_listing_detail_calls_real_detail_route(monkeypatch):
-    import qiaolian_dual.callback_listing as listing_cb
-    import qiaolian_dual.texts as texts
+async def test_listing_detail_opens_unified_photo_flipper(monkeypatch):
+    import qiaolian_dual.results_admin as results
     import qiaolian_dual.listing as listing_mod
     import qiaolian_dual.search as search_mod
-    monkeypatch.setattr(listing_cb.db, 'get_listing', lambda lid: {'listing_id': lid, 'status': 'active'})
     monkeypatch.setattr(listing_mod, 'listing_is_available', lambda lid: (True, 'active'))
     monkeypatch.setattr(listing_mod, 'listing_action_allowed', lambda lid, action: (True, 'active'))
     monkeypatch.setattr(search_mod, 'create_lead', lambda *a, **k: None)
-    monkeypatch.setattr(listing_mod, 'listing_cost_text', lambda lid: '<b>DETAIL</b>')
     seen = {}
-    async def fake_render(update, **kwargs): seen.update(kwargs)
-    monkeypatch.setattr(texts, 'render_panel', fake_render)
+    async def fake_preview(bot, chat_id, listing_id, **kwargs):
+        seen['listing_id'] = listing_id
+        seen.update(kwargs)
+    monkeypatch.setattr(results, 'send_listing_photo_preview', fake_preview)
     update, query = make_update('listing:detail:l_2')
     context = DummyContext()
     await handle_ui_callback(update, context, hooks=BASE_HOOKS)
     assert query.answers == 1
-    assert seen['text'] == '<b>DETAIL</b>'
-    assert seen['parse_mode'] == ParseMode.HTML
+    assert seen['listing_id'] == 'l_2'
+    assert seen.get('send_detail') is True
     assert context.user_data['contact_listing_id'] == 'l_2'
-    assert '📅 预约看房' in labels(seen['reply_markup'])
 
 
 @pytest.mark.asyncio
@@ -169,7 +167,9 @@ async def test_listing_photos_calls_complete_album_handler(monkeypatch):
     monkeypatch.setattr(listing_mod, 'listing_is_available', lambda lid: (True, 'active'))
     monkeypatch.setattr(listing_mod, 'listing_action_allowed', lambda lid, action: (True, 'active'))
     seen = {}
-    async def fake_album(bot, chat_id, listing_id): seen['listing_id'] = listing_id
+    async def fake_album(bot, chat_id, listing_id, **kwargs):
+        seen['listing_id'] = listing_id
+        seen.update(kwargs)
     monkeypatch.setattr(results, 'send_listing_photo_preview', fake_album)
     update, query = make_update('listing:photos:l_2')
     context = DummyContext()
@@ -215,8 +215,8 @@ def test_unavailable_page_is_html_and_has_all_real_callbacks():
     text = listing_unavailable_text('pending')
     assert '🔵 <b>这套房正在确认最新房态</b>' in text
     kb = listing_unavailable_keyboard('')
-    assert labels(kb) == ['🏘 同区可约房源', '💬 咨询这套', '🏠 房源详情']
-    assert callbacks(kb) == ['unavail:more:any', 'listing:consult:', 'listing:detail:']
+    assert labels(kb) == ['🏘 同区可约房源', '💬 咨询这套', '📷 房源详情']
+    assert callbacks(kb) == ['unavail:more:any', 'listing:consult:', 'listing:photos:']
 
 
 @pytest.mark.asyncio
@@ -267,7 +267,7 @@ def test_recommendation_card_detail_photo_appointment_consult_callbacks(monkeypa
     monkeypatch.setattr(listing_mod, 'listing_context', lambda lid: item)
     _, kb, _ = _find_result_card_content(item, 0, 1, ['l_2'])
     cbs = callbacks(kb)
-    assert 'listing:detail:l_2' in cbs and 'listing:appoint:l_2' in cbs
+    assert 'listing:photos:l_2' in cbs and 'listing:appoint:l_2' in cbs
     assert 'listing:photos:l_2' in cbs and 'listing:consult:l_2' in cbs
     assert not any('similar' in cb for cb in cbs)
 

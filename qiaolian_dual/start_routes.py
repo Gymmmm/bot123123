@@ -93,29 +93,17 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
         create_lead(user, action='consult_click', source=source, listing_id=listing_id, payload=touch_payload)
         return await contact_management(update, context, source=source, from_listing=listing_id)
 
-    if action == 'photos':
+    if action in {'details', 'photos'}:
         listing_id = target
-        allowed, reason = listing_action_allowed(listing_id, 'photos')
+        allowed, reason = listing_action_allowed(listing_id, 'photos' if action == 'photos' else 'detail')
         if not allowed:
             await render_panel(update, text=listing_unavailable_text(reason, listing_id), parse_mode=ParseMode.HTML, reply_markup=listing_unavailable_keyboard(listing_id), context=context)
             return MAIN
         context.user_data['contact_listing_id'] = listing_id
-        context.user_data['contact_touch_payload'] = {**touch_payload, 'entry': 'photos'}
+        context.user_data['contact_touch_payload'] = {**touch_payload, 'entry': action}
         _store_active_entry(context, arg=arg, action=action, listing_id=listing_id, touch_payload=touch_payload)
-        create_lead(user, action='photos_click', source=source, listing_id=listing_id, payload=touch_payload)
-        await send_listing_photo_preview(context.bot, message.chat_id, listing_id)
-        return MAIN
-
-    if action == 'details':
-        listing_id = target
-        allowed, reason = listing_action_allowed(listing_id, 'detail')
-        if not allowed:
-            await render_panel(update, text=listing_unavailable_text(reason, listing_id), parse_mode=ParseMode.HTML, reply_markup=listing_unavailable_keyboard(listing_id), context=context)
-            return MAIN
-        context.user_data['contact_listing_id'] = listing_id
-        _store_active_entry(context, arg=arg, action=action, listing_id=listing_id, touch_payload=touch_payload)
-        create_lead(user, action='listing_detail_view', source=source, listing_id=listing_id, payload=touch_payload)
-        await render_panel(update, text=listing_cost_text(listing_id), parse_mode=ParseMode.HTML, reply_markup=listing_cost_keyboard(listing_id), context=context)
+        create_lead(user, action='photos_click' if action == 'photos' else 'listing_detail_view', source=source, listing_id=listing_id, payload=touch_payload)
+        await send_listing_photo_preview(context.bot, message.chat_id, listing_id, send_detail=True)
         return MAIN
 
     if action in {'index_area', 'area_index'}:

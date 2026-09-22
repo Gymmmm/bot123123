@@ -91,14 +91,13 @@ def _caption_with_status(caption: str, status: str, appointment_count: int = 0, 
 
 
 def _keyboard(username: str, public_listing_id: str, status: str) -> InlineKeyboardMarkup:
-    details = InlineKeyboardButton("📋 租赁详情", url=channel_action_url(username, public_listing_id, "details"))
-    photos = InlineKeyboardButton("📸 更多实拍", url=channel_action_url(username, public_listing_id, "photos"))
+    details = InlineKeyboardButton("📷 房源详情", url=channel_action_url(username, public_listing_id, "photos"))
     if status in {"active", "reserved"}:
         return InlineKeyboardMarkup([
-            [details, photos],
+            [details],
             [InlineKeyboardButton("📅 预约看房", url=channel_action_url(username, public_listing_id, "book"))],
         ])
-    return InlineKeyboardMarkup([[details, photos]])
+    return InlineKeyboardMarkup([[details]])
 
 
 async def sync_channel_listing_status(listing_id: str) -> bool:
