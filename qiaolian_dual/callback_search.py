@@ -73,9 +73,13 @@ async def handle_search_callback(update: Update, context: ContextTypes.DEFAULT_T
         return FIND_AREA
 
     if data.startswith('unavail:more:'):
+        from .search import _area_aliases, _public_search_listings
         area = detect_area(data.split(':', 2)[2])
         create_lead(user, action='unavailable_more_click', source='listing_unavailable', area=area, listing_id=str(context.user_data.get('contact_listing_id') or ''))
-        matches_found = db.search_listings(areas=[area] if area and area not in {'不限', 'any'} else None, limit=5)
+        matches_found = _public_search_listings(
+            areas=_area_aliases(area) if area and area not in {'不限', 'any'} else None,
+            limit=5,
+        )
         if matches_found:
             await send_results(update, context, matches_found, 'strict')
         else:
