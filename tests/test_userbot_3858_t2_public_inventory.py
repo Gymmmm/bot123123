@@ -156,6 +156,13 @@ def test_listing_context_uses_public_inventory_snapshot(tmp_path, monkeypatch):
     assert dual_listing.listing_is_available(PUBLIC_ID) == (True, "active")
 
 
+def test_public_similar_target_resolves_area_from_public_inventory(tmp_path, monkeypatch):
+    db = _db(tmp_path)
+    monkeypatch.setattr(dual_listing, "DB_PATH", str(db))
+
+    assert dual_listing._resolve_area_from_target(PUBLIC_ID) == ("BKK1", PUBLIC_ID)
+
+
 def test_rented_public_listing_keeps_detail_but_blocks_booking(tmp_path, monkeypatch):
     db = _db(tmp_path, status="rented", offer_status="inactive")
     monkeypatch.setattr(dual_listing, "DB_PATH", str(db))
@@ -169,9 +176,12 @@ def test_rented_public_listing_keeps_detail_but_blocks_booking(tmp_path, monkeyp
 def test_t2_read_paths_no_longer_require_legacy_listing_rows():
     callback_source = open("qiaolian_dual/callback_listing.py", encoding="utf-8").read()
     navigation_source = open("qiaolian_dual/callback_navigation.py", encoding="utf-8").read()
+    search_callback_source = open("qiaolian_dual/callback_search.py", encoding="utf-8").read()
     start_source = open("qiaolian_dual/start_routes.py", encoding="utf-8").read()
 
     assert "if not item or not db.get_listing(lid)" not in callback_source
     assert "item = db.get_listing(lid) if lid else None" not in callback_source
     assert "db.list_recent_listings(10)" not in navigation_source
+    assert "matches_found = db.search_listings" not in search_callback_source
+    assert "matches_found = [item for item in db.search_listings" not in start_source
     assert "if action in {'appoint', 'consult', 'photos', 'details', 'book'" not in start_source
