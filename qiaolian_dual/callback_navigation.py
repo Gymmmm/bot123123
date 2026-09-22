@@ -74,7 +74,8 @@ async def handle_navigation_callback(update: Update, context: ContextTypes.DEFAU
         return MAIN
 
     if data in {'hub:available', 'hub:latest'}:
-        matches_found = [item for item in db.list_recent_listings(10) if str(item.get('status') or '').strip().lower() in {'active', 'reserved'}]
+        from .search import _public_search_listings
+        matches_found = _public_search_listings(limit=10)
         if matches_found:
             await send_find_results_as_cards(update, context, matches_found, 'strict')
         else:
