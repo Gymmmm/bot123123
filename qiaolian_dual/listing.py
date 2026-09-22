@@ -10,6 +10,14 @@ def listing_context(listing_id: str) -> dict:
     listing_id = str(listing_id or '').strip()
     if not listing_id:
         return {}
+
+    from .adapters.public_inventory import PublicInventoryAdapter
+    public_inventory = PublicInventoryAdapter(DB_PATH)
+    public_id = public_inventory.normalize_public_id(listing_id)
+    if public_id:
+        modern = public_inventory.get_listing(public_id)
+        return dict(modern or {})
+
     merged: dict = {}
     try:
         listing = db.get_listing(listing_id)
@@ -170,6 +178,23 @@ def listing_is_available(listing_id: str) -> tuple[bool, str]:
     listing_id = str(listing_id or '').strip()
     if not listing_id:
         return (False, 'missing')
+
+    from .adapters.public_inventory import PublicInventoryAdapter
+    public_inventory = PublicInventoryAdapter(DB_PATH)
+    public_id = public_inventory.normalize_public_id(listing_id)
+    if public_id:
+        item = public_inventory.get_listing(public_id)
+        if not item:
+            return (False, 'missing')
+        status = str(item.get('status') or 'pending').strip().lower()
+        if bool(item.get('bookable')) and status in {'active', 'reserved'}:
+            return (True, status)
+        if status == 'rented':
+            return (False, 'rented')
+        if status in {'offline', 'inactive'}:
+            return (False, 'offline')
+        return (False, 'pending')
+
     listing = db.get_listing(listing_id)
     if not listing:
         return (False, 'missing')
@@ -183,7 +208,6 @@ def listing_is_available(listing_id: str) -> tuple[bool, str]:
     if status in {'offline', 'inactive'}:
         return (False, 'offline')
     return (False, status or 'pending')
-
 
 def listing_action_allowed(listing_id: str, action: str) -> tuple[bool, str]:
     """不可预约不等于不可查看：详情、实拍和联系我们仍可访问。"""
@@ -273,7 +297,8 @@ def _daily_listing_line(item: dict) -> str:
 
 
 def _latest_listing_text(limit: int=5) -> str:
-    matches = [item for item in db.list_recent_listings(limit) if str(item.get('status') or '').strip().lower() in {'active', 'reserved'}]
+    from .search import _public_search_listings
+    matches = _public_search_listings(limit=limit)
     if not matches:
         return '暂时没有可以安排看房的房源。'
     return '🏘 <b>最近可预约房源</b>\n\n下面这些房源目前可以申请看房。\n\n' + '\n'.join(_daily_listing_line(item) for item in matches[:limit])
