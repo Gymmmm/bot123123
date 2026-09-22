@@ -357,8 +357,18 @@ async def handle_admin_query(update: Update, context: ContextTypes.DEFAULT_TYPE)
         appointment_id = 0
         uid = int(lead.get("user_id") or 0)
         listing_id = str(lead.get("listing_id") or "")
+        appointment_listing_id = listing_id
+        if listing_id:
+            from .adapters.public_inventory import PublicInventoryAdapter
+            appointment_listing_id = (
+                PublicInventoryAdapter(DB_PATH).resolve_internal_id(listing_id)
+                or listing_id
+            )
         with db.connect() as conn:
-            row = conn.execute("SELECT id FROM appointments WHERE user_id=? AND (?='' OR listing_id=?) ORDER BY id DESC LIMIT 1", (uid, listing_id, listing_id)).fetchone()
+            row = conn.execute(
+                "SELECT id FROM appointments WHERE user_id=? AND (?='' OR listing_id=?) ORDER BY id DESC LIMIT 1",
+                (uid, appointment_listing_id, appointment_listing_id),
+            ).fetchone()
             if row:
                 appointment_id = int(row[0])
         await query.edit_message_text(format_lead_card(lead), parse_mode=ParseMode.HTML, reply_markup=consult_action_keyboard(lead_id=int(raw), appointment_id=appointment_id, user_id=uid, listing_id=listing_id))
