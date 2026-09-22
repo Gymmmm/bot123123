@@ -101,8 +101,9 @@ async def handle_appointment_callback(update: Update, context: ContextTypes.DEFA
         if not row or str(row.get('status') or '') in {'done', 'cancelled'}:
             await answer_callback_once(query, '这条预约已无法修改', show_alert=True)
             return MAIN
+        from .appointments_view import _appointment_public_listing_id
         context.user_data['appt'] = {
-            'listing_id': str(row.get('listing_id') or ''),
+            'listing_id': _appointment_public_listing_id(row.get('listing_id')),
             'mode': str(row.get('viewing_mode') or 'offline'),
             'date': str(row.get('appointment_date') or ''),
             'source': 'appointment_edit',
