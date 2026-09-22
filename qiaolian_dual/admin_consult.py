@@ -189,6 +189,9 @@ def enrich_admin_notification(title: str, lines: list[str]) -> tuple[str, list[s
     return title, lines
 
 
+HISTORY_PAGE_SIZE = 8
+
+
 def _lead_list_keyboard(rows: list[dict]) -> InlineKeyboardMarkup:
     buttons = []
     for lead in rows[:12]:
@@ -196,6 +199,40 @@ def _lead_list_keyboard(rows: list[dict]) -> InlineKeyboardMarkup:
         name = str(lead.get("display_name") or lead.get("username") or "客户")[:10]
         source = admin_source_group_zh(_lead_source_type(lead))
         buttons.append([InlineKeyboardButton(f"{lead_status_zh(lead.get('lead_status'))}｜{name}｜{source}"[:58], callback_data=f"adminq:lead:{lid}")])
+    buttons.append([InlineKeyboardButton("⬅️ 返回咨询后台", callback_data="adminq:home")])
+    return InlineKeyboardMarkup(buttons)
+
+
+def _history_lead_button_text(lead: dict) -> str:
+    from .public_listing_id import normalize_public_id
+
+    name = str(lead.get("display_name") or lead.get("username") or "客户").strip()[:10] or "客户"
+    raw_listing_id = str(lead.get("public_listing_id") or lead.get("listing_id") or "").strip()
+    public_listing_id = normalize_public_id(raw_listing_id) or ""
+    area = str(lead.get("area") or "").strip()[:12]
+    action = entry_action_zh(lead.get("entry_action") or lead.get("action"))
+
+    parts = [name]
+    if public_listing_id:
+        parts.append(_display_listing_id(public_listing_id))
+    elif area:
+        parts.append(area)
+    parts.append(action)
+    return "｜".join(part for part in parts if part)[:58]
+
+
+def _history_lead_keyboard(rows: list[dict], *, page: int, has_next: bool) -> InlineKeyboardMarkup:
+    buttons = [
+        [InlineKeyboardButton(_history_lead_button_text(lead), callback_data=f"adminq:lead:{int(lead.get('id') or 0)}")]
+        for lead in rows[:HISTORY_PAGE_SIZE]
+    ]
+    nav = []
+    if page > 0:
+        nav.append(InlineKeyboardButton("⬅️ 上一页", callback_data=f"adminq:history:{page - 1}"))
+    if has_next:
+        nav.append(InlineKeyboardButton("下一页 ➡️", callback_data=f"adminq:history:{page + 1}"))
+    if nav:
+        buttons.append(nav)
     buttons.append([InlineKeyboardButton("⬅️ 返回咨询后台", callback_data="adminq:home")])
     return InlineKeyboardMarkup(buttons)
 
@@ -245,9 +282,21 @@ async def handle_admin_query(update: Update, context: ContextTypes.DEFAULT_TYPE)
         rows = list_leads_by_status("new", 20)
         await query.edit_message_text(f"🆕 <b>新咨询</b>\n\n当前 {len(rows)} 条。", parse_mode=ParseMode.HTML, reply_markup=_lead_list_keyboard(rows))
         return
-    if action == "history":
-        rows = list_leads_by_status("all", 20)
-        await query.edit_message_text("📚 <b>最近跟进记录</b>\n\n最近 20 条线索。", parse_mode=ParseMode.HTML, reply_markup=_lead_list_keyboard(rows))
+    if action == "history" or action.startswith("history:"):
+        page = 0
+        if ":" in action:
+            raw_page = action.split(":", 1)[1]
+            if raw_page.isdigit():
+                page = max(0, int(raw_page))
+        offset = page * HISTORY_PAGE_SIZE
+        rows = list_leads_by_status("all", offset + HISTORY_PAGE_SIZE + 1)
+        page_rows = rows[offset:offset + HISTORY_PAGE_SIZE]
+        has_next = len(rows) > offset + HISTORY_PAGE_SIZE
+        await query.edit_message_text(
+            f"📚 <b>最近跟进记录</b>\n\n第 {page + 1} 页 · 每页最多 {HISTORY_PAGE_SIZE} 条。",
+            parse_mode=ParseMode.HTML,
+            reply_markup=_history_lead_keyboard(page_rows, page=page, has_next=has_next),
+        )
         return
     if action == "listings":
         rows = list_listing_leads(20)
