@@ -28,9 +28,26 @@ def _appointment_time_compact(value: object) -> str:
     return label.replace('-', '–').replace('至', '–').strip() or '待安排'
 
 
+def _appointment_public_listing_id(value: object) -> str:
+    raw = str(value or '').strip()
+    if not raw:
+        return ''
+    from .public_listing_id import normalize_public_id
+    public_id = normalize_public_id(raw)
+    if public_id:
+        return public_id
+    if re.fullmatch('(?i)l[_-]?\\d+', raw):
+        from .adapters.public_inventory import PublicInventoryAdapter
+        try:
+            return PublicInventoryAdapter(DB_PATH).public_id_for_internal(raw) or raw
+        except (FileNotFoundError, sqlite3.Error):
+            return raw
+    return raw
+
+
 def _appointment_listing_compact(value: object) -> str:
     from .utils_formatting import _display_listing_id
-    raw = str(value or '待推荐').strip()
+    raw = _appointment_public_listing_id(value) or '待推荐'
     if not raw or raw in {'-', '未填写'}:
         return '待顾问匹配'
     if re.fullmatch('(?i)l[_-]?\\d+', raw):
@@ -85,7 +102,7 @@ def _appointment_summary_line(row: dict) -> list[str]:
         'cancelled': ('⚪', '已取消'),
     }
     status_icon, status = status_map.get(raw_status, ('🟡', APPOINTMENT_STATUS_LABELS.get(raw_status, '等待确认')))
-    listing_id = str(row.get('listing_id') or '')
+    listing_id = _appointment_public_listing_id(row.get('listing_id'))
     item = listing_context(listing_id) if listing_id else {}
     project = str(item.get('project') or item.get('community') or item.get('area') or '').strip()
     layout = _display_layout(item.get('layout') or item.get('property_type'), item.get('property_type')) if item else ''
@@ -136,7 +153,7 @@ def _appointment_details_keyboard(user_id: int) -> InlineKeyboardMarkup:
                     InlineKeyboardButton('✏️ 修改时间', callback_data=f'appointment_menu:edit:{appt_id}'),
                     InlineKeyboardButton('❌ 取消预约', callback_data=f'appointment_menu:cancel:{appt_id}'),
                 ])
-                listing_id = str(row.get('listing_id') or '')
+                listing_id = _appointment_public_listing_id(row.get('listing_id'))
                 if listing_id:
                     buttons.append([
                         InlineKeyboardButton('📋 查看房源', callback_data=f'listing:detail:{listing_id}'),
