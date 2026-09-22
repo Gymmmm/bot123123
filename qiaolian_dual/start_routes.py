@@ -221,7 +221,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE, *, upsert_us
     from .keyboards_common import main_keyboard, no_match_followup_keyboard
     from .search import upsert_user_profile as default_upsert_user_profile
     from .session_deeplink import clear_session_for_fresh_entry
-    from .texts import channel_welcome_text, render_panel
+    from .texts import render_panel, welcome_text
 
     user = update.effective_user
     upsert_user_profile = upsert_user_profile_fn or default_upsert_user_profile
@@ -242,7 +242,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE, *, upsert_us
     context.user_data.clear()
     await render_panel(
         update,
-        text=channel_welcome_text(first_name=getattr(user, 'first_name', '') or getattr(user, 'full_name', '') or ''),
+        text=welcome_text(),
         reply_markup=main_keyboard(),
         parse_mode=ParseMode.HTML,
         context=context,
