@@ -36,7 +36,7 @@ def build_application(*, token: str | None = None) -> Application:
     from .attribution_runtime import install_attribution_runtime
     install_attribution_runtime()
 
-    from .admin_consult import cmd_admin_home, handle_admin_query
+    from .admin_consult import cmd_admin_home
     from .admin_contract_ui import cmd_contracts
     from .admin_commands import cmd_deal_done, cmd_lead_response, cmd_push_all, cmd_push_local, cmd_repair_update
     from .admin_contract import _all_user_admin_ids
@@ -85,7 +85,6 @@ def build_application(*, token: str | None = None) -> Application:
     )
     app.add_handler(CommandHandler('contracts', cmd_contracts), group=-1)
     app.add_handler(CommandHandler('admin', cmd_admin_home), group=-1)
-    app.add_handler(CallbackQueryHandler(handle_admin_query, pattern=r'^adminq:'), group=-1)
     app.add_handler(conv_handler)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_main_message))
     logger.info('全局兜底 MessageHandler 已注册 (group=0)')

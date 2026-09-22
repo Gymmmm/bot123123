@@ -74,7 +74,10 @@ def test_v3_application_registers_admin_command_and_adminq_callbacks():
     assert "release_user_bot_polling_lock" in entrypoint
     assert "v3_core.user_bot.app" not in entrypoint
     assert "CommandHandler('admin', cmd_admin_home)" in dual_app
-    assert "CallbackQueryHandler(handle_admin_query, pattern=r'^adminq:')" in dual_app
+    assert "CallbackQueryHandler(handle_admin_query, pattern=r'^adminq:')" not in dual_app
+    dual_admin = Path("qiaolian_dual/callback_admin.py").read_text(encoding="utf-8")
+    assert "data.startswith(('adminq:', 'adminlead:', 'adminrepair:'))" in dual_admin
+    assert "await handle_admin_query(update, context)" in dual_admin
 
 
 def test_v3_reuses_complete_existing_admin_console():

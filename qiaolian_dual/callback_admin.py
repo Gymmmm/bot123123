@@ -5,7 +5,7 @@ from .common import *
 
 
 def matches(data: str) -> bool:
-    return data.startswith(('adminlead:', 'adminrepair:'))
+    return data.startswith(('adminq:', 'adminlead:', 'adminrepair:'))
 
 
 async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, query, data: str, user) -> int | None:
@@ -20,6 +20,10 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
     from .session_deeplink import _remember_video_pref, clear_session_for_fresh_entry, now_ts, user_display_name
     from .start_routes import route_start_arg
     from .texts import advisor_handoff_text, advisor_text, brand_story_text, deposit_text, lead_capture_text, listing_detail_text, local_life_text, promise_text, render_panel, rfcity_text, service_hub_text, smart_search_text, want_home_ack_text, welcome_text
+    if data.startswith('adminq:'):
+        from .admin_consult import handle_admin_query
+        await handle_admin_query(update, context)
+        return MAIN
     if data.startswith('adminrepair:'):
             from .admin_contract import _is_admin_user
             from .messages import repair_progress_text

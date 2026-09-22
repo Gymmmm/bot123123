@@ -48,7 +48,7 @@ def test_3858_application_keeps_admin_user_routes_and_single_lease_reminder():
 
     assert "CommandHandler('contracts', cmd_contracts)" in source
     assert "CommandHandler('admin', cmd_admin_home)" in source
-    assert "CallbackQueryHandler(handle_admin_query, pattern=r'^adminq:')" in source
+    assert "CallbackQueryHandler(handle_admin_query, pattern=r'^adminq:')" not in source
     assert "CommandHandler('start', start_with_attribution)" in source
     assert "CommandHandler('find', cmd_find)" in source
     assert "CommandHandler('appointments', cmd_appointments)" in source
@@ -59,9 +59,13 @@ def test_3858_application_keeps_admin_user_routes_and_single_lease_reminder():
     assert source.count("run_daily(lease_reminder_job") == 1
 
 
-def test_3858_admin_callback_keeps_lead_and_repair_closure():
+def test_3858_admin_callback_keeps_adminq_lead_and_repair_closure():
     source = _read("qiaolian_dual/callback_admin.py")
 
+    assert "data.startswith(('adminq:', 'adminlead:', 'adminrepair:'))" in source
+    assert "if data.startswith('adminq:')" in source
+    assert "from .admin_consult import handle_admin_query" in source
+    assert "await handle_admin_query(update, context)" in source
     assert "data.startswith('adminrepair:')" in source
     assert "data.startswith('adminlead:')" in source
     assert "if action == 'done':" in source
