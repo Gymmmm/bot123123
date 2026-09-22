@@ -36,13 +36,11 @@ def _appointment_public_listing_id(value: object) -> str:
     public_id = normalize_public_id(raw)
     if public_id:
         return public_id
-    if re.fullmatch('(?i)l[_-]?\\d+', raw):
-        from .adapters.public_inventory import PublicInventoryAdapter
-        try:
-            return PublicInventoryAdapter(DB_PATH).public_id_for_internal(raw) or raw
-        except (FileNotFoundError, sqlite3.Error):
-            return raw
-    return raw
+    from .adapters.public_inventory import PublicInventoryAdapter
+    try:
+        return PublicInventoryAdapter(DB_PATH).public_id_for_internal(raw) or raw
+    except (FileNotFoundError, sqlite3.Error):
+        return raw
 
 
 def _appointment_listing_compact(value: object) -> str:
