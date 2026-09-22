@@ -15,20 +15,19 @@ def labels(markup):
 
 def test_v2_home_is_locked():
     home_labels = labels(main_keyboard())
-    assert home_labels[:4] == [
-        '🔍 帮我找房', '📅 我的预约',
-        '🛡 侨联保障', '🛠 入住服务',
+    assert home_labels == [
+        '🔍 智能找房', '📖 关于侨联地产',
+        '📅 预约看房', '💎 直接问顾问',
+        '⚡ 入住管家', '🧭 周边服务',
     ]
-    assert home_labels[-1] == '💬 联系我们'
-    assert set(home_labels[4:-1]).issubset({'房源频道'})
     text = welcome_text()
-    assert '侨联地产｜您在金边的自己人' in text
-    assert '区域 + 预算 + 户型' in text
+    assert '侨联地产 · 金边华人房产服务' in text
+    assert '在金边找房，找自己人' in text
 
 
 def test_v2_find_home_short_buttons():
     assert labels(guided_search_keyboard()) == [
-        '📍 按区域', '💰 按预算', '🏠 按户型', '🏘 当前可约', '⬅️ 返回首页'
+        '📍 按区域', '💰 按预算', '🏠 按户型', '🈲 当前可约', '⬅️ 返回首页'
     ]
     assert labels(room_type_keyboard()) == ['单间', '一房', '两房', '三房', '四房+', '不限', '⬅️ 返回']
 
@@ -59,7 +58,7 @@ def test_v2_listing_status_and_contacts():
     with patch('qiaolian_dual.listing.listing_context', return_value=pending):
         assert '房态：房态确认中' in listing_cost_text('l_1')
         assert '这套房正在确认最新房态' in listing_unavailable_text('pending', 'l_1')
-        assert labels(listing_unavailable_keyboard('l_1')) == ['🏘 同区可约房源', '💬 联系我们', '🏠 房源详情']
+        assert labels(listing_unavailable_keyboard('l_1')) == ['🈲 同区可约房源', '💬 联系我们', '🏠 房源详情']
 
 
 def test_v2_more_photos_actions_use_current_detail_label():
