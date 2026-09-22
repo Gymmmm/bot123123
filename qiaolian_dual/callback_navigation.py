@@ -39,7 +39,8 @@ async def handle_navigation_callback(update: Update, context: ContextTypes.DEFAU
 
     # 历史首页入口兼容：不再生成品牌故事/旧找房助手页面。
     if data == 'home_brand':
-        await render_panel(update, text=welcome_text(), reply_markup=main_keyboard(), parse_mode=ParseMode.HTML, context=context)
+        from .messages import brand_text
+        await render_panel(update, text=brand_text(), reply_markup=main_keyboard(), parse_mode=ParseMode.HTML, context=context)
         return MAIN
     if data in {'home_appoint', 'hub:appoint'}:
         return await show_appointment_hub(update, context)
