@@ -48,7 +48,7 @@ async def route_start_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, ar
     else:
         target, target_meta = _split_target_meta(raw_target)
     target = target or raw_target
-    if action in {'appoint', 'consult', 'photos', 'details', 'book', 'similar', 'video', 'fav', 'discussion_entry'}:
+    if action in {'appoint', 'book', 'video', 'fav', 'discussion_entry'}:
         target = _internal_listing_id(target)
         if target is None:
             await render_panel(update, text='未找到该房源', reply_markup=no_match_followup_keyboard(), context=context)
