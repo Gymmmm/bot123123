@@ -1,6 +1,7 @@
 """把预约/管理端房态同步到该房源最新的频道主帖。
 
-这里只改状态行和行动按钮，不重新解析或改写任何房源事实。
+只更新现代 publication instance 的频道展示状态，不改 durable inventory truth，
+不重新解析或改写任何 frozen publication facts。
 """
 from __future__ import annotations
 
@@ -11,7 +12,7 @@ import sqlite3
 
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 
-from .channel_links import channel_action_url, public_qc_code
+from .channel_links import channel_action_url
 from .config import DB_PATH, USER_BOT_USERNAME
 
 logger = logging.getLogger(__name__)
@@ -20,7 +21,7 @@ APPOINTMENT_LOCK_COUNT = 5
 _ACTIVE_APPOINTMENT_STATUSES = ("pending", "assigned", "contacted", "confirmed")
 
 _STATUS_RE = re.compile(r"(?m)^[🟢🟡🔵🔴⚫]️?\s*(?:房源状态｜)?[^\n]*")
-_PUBLIC_ID_RE = re.compile(r"\b(?:QL-[A-HJ-NP-Z2-9]{6}|QC\d{3,8})\b", re.I)
+_PUBLIC_ID_RE = re.compile(r"\b(?:QL-[A-HJ-NP-Z2-9]{2,4}-[A-HJ-NP-Z][2-9][A-HJ-NP-Z][2-9]|QL-[A-HJ-NP-Z2-9]{6}|QC\d{3,8})\b", re.I)
 
 
 def _active_appointment_count(conn: sqlite3.Connection, listing_id: str) -> int:
@@ -31,21 +32,18 @@ def _active_appointment_count(conn: sqlite3.Connection, listing_id: str) -> int:
     return int(row[0] if row else 0)
 
 
-def _apply_appointment_lock(conn: sqlite3.Connection, listing_id: str, status: str, appointment_count: int) -> str:
+def _effective_status(status: str, appointment_count: int) -> str:
+    """Derive channel display state without mutating durable inventory_status."""
     status = str(status or "").strip().lower()
-    if status in {"rented", "inactive", "offline"}:
+    if status in {"rented", "inactive", "offline", "pending"}:
         return status
-    if status == "pending" and appointment_count < APPOINTMENT_LOCK_COUNT:
-        return status
-    if status not in {"active", "reserved", "pending"}:
+    if status not in {"active", "reserved"}:
         return status or "pending"
-    target = "pending" if appointment_count >= APPOINTMENT_LOCK_COUNT else ("reserved" if appointment_count >= 1 else "active")
-    if target != status:
-        conn.execute(
-            "UPDATE listings SET status=?, updated_at=datetime('now','localtime') WHERE listing_id=? AND status IN ('active','reserved','pending')",
-            (target, listing_id),
-        )
-    return target
+    if appointment_count >= APPOINTMENT_LOCK_COUNT:
+        return "pending"
+    if appointment_count >= 1:
+        return "reserved"
+    return status
 
 
 def _status_label(status: str, appointment_count: int = 0) -> str:
@@ -62,12 +60,12 @@ def _status_label(status: str, appointment_count: int = 0) -> str:
     }.get(status, "🔵 房态待确认")
 
 
-def _caption_with_status(caption: str, status: str, appointment_count: int = 0, listing_id: str = "") -> str:
+def _caption_with_status(caption: str, status: str, appointment_count: int = 0, public_listing_id: str = "") -> str:
     raw = str(caption or "").strip()
     label = _status_label(status, appointment_count)
     found = _PUBLIC_ID_RE.search(raw)
-    qc = found.group(0).upper() if found else public_qc_code(listing_id)
-    status_line = f"{label}　{qc}" if qc else label
+    public_id = found.group(0).upper() if found else str(public_listing_id or "").strip().upper()
+    status_line = f"{label}　{public_id}" if public_id else label
     if _STATUS_RE.search(raw):
         replaced = False
         lines: list[str] = []
@@ -92,14 +90,13 @@ def _caption_with_status(caption: str, status: str, appointment_count: int = 0, 
     return "\n".join(parts).strip()[:1024]
 
 
-def _keyboard(username: str, token: str, listing_id: str, status: str) -> InlineKeyboardMarkup:
-    _ = token
-    details = InlineKeyboardButton("📋 租赁详情", url=channel_action_url(username, listing_id, "details"))
-    photos = InlineKeyboardButton("📸 更多实拍", url=channel_action_url(username, listing_id, "photos"))
+def _keyboard(username: str, public_listing_id: str, status: str) -> InlineKeyboardMarkup:
+    details = InlineKeyboardButton("📋 租赁详情", url=channel_action_url(username, public_listing_id, "details"))
+    photos = InlineKeyboardButton("📸 更多实拍", url=channel_action_url(username, public_listing_id, "photos"))
     if status in {"active", "reserved"}:
         return InlineKeyboardMarkup([
             [details, photos],
-            [InlineKeyboardButton("📅 预约看房", url=channel_action_url(username, listing_id, "book"))],
+            [InlineKeyboardButton("📅 预约看房", url=channel_action_url(username, public_listing_id, "book"))],
         ])
     return InlineKeyboardMarkup([[details, photos]])
 
@@ -108,38 +105,66 @@ async def sync_channel_listing_status(listing_id: str) -> bool:
     listing_id = str(listing_id or "").strip()
     token = str(os.getenv("PUBLISHER_BOT_TOKEN") or "").strip()
     username = str(USER_BOT_USERNAME or "").strip().lstrip("@")
-    channel_id = str(os.getenv("CHANNEL_ID") or "").strip()
-    if not listing_id or not token or not username or not channel_id:
+    if not listing_id or not token or not username:
         return False
     try:
         with sqlite3.connect(DB_PATH) as conn:
             conn.row_factory = sqlite3.Row
             row = conn.execute(
-                """SELECT p.id AS post_row_id, p.channel_message_id, p.post_text,
-                          l.status, pp.public_token
-                   FROM posts p
-                   JOIN listings l ON l.listing_id=p.listing_id
-                   LEFT JOIN publication_packages pp ON pp.package_id=p.publication_package_id
-                   WHERE p.listing_id=? AND p.publish_status='published'
-                     AND CAST(COALESCE(p.channel_message_id,'0') AS INTEGER)>0
-                   ORDER BY CAST(p.channel_message_id AS INTEGER) DESC LIMIT 1""",
+                """SELECT pi.id AS instance_row_id,
+                          pi.channel_chat_id,
+                          pi.channel_message_id,
+                          pi.post_text,
+                          l.inventory_status,
+                          l.public_listing_id,
+                          pp.public_token
+                   FROM publication_instances pi
+                   JOIN listings_v3 l ON l.listing_id=pi.listing_id
+                   JOIN listing_offers o ON o.offer_id=pi.offer_id
+                   LEFT JOIN publication_packages_v3 pp ON pp.package_id=pi.package_id
+                   WHERE pi.listing_id=?
+                     AND pi.platform='telegram'
+                     AND pi.publish_status='published'
+                     AND o.offer_type='rent'
+                     AND o.publication_policy='telegram_rent'
+                     AND CAST(COALESCE(pi.channel_message_id,'0') AS INTEGER)>0
+                   ORDER BY pi.updated_at DESC, pi.id DESC
+                   LIMIT 1""",
                 (listing_id,),
             ).fetchone()
             if not row:
                 return False
+
+            public_id = str(row["public_listing_id"] or "").strip()
+            chat_id = str(row["channel_chat_id"] or os.getenv("CHANNEL_ID") or "").strip()
+            if not public_id or not chat_id:
+                return False
+
             message_id = int(row["channel_message_id"])
             appointment_count = _active_appointment_count(conn, listing_id)
-            status = _apply_appointment_lock(conn, listing_id, str(row["status"] or "pending").strip().lower(), appointment_count)
-            caption = _caption_with_status(str(row["post_text"] or ""), status, appointment_count, listing_id)
-            markup = _keyboard(username, str(row["public_token"] or ""), listing_id, status)
+            status = _effective_status(
+                str(row["inventory_status"] or "pending"),
+                appointment_count,
+            )
+            caption = _caption_with_status(
+                str(row["post_text"] or ""),
+                status,
+                appointment_count,
+                public_id,
+            )
+            markup = _keyboard(username, public_id, status)
+
             await Bot(token=token).edit_message_caption(
-                chat_id=channel_id,
+                chat_id=chat_id,
                 message_id=message_id,
                 caption=caption,
                 parse_mode="HTML",
                 reply_markup=markup,
             )
-            conn.execute("UPDATE posts SET post_text=?, updated_at=CURRENT_TIMESTAMP WHERE id=?", (caption, int(row["post_row_id"])))
+            conn.execute(
+                "UPDATE publication_instances SET post_text=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                (caption, int(row["instance_row_id"])),
+            )
         return True
     except Exception:
         logger.exception("频道房态同步失败: listing_id=%s", listing_id)
