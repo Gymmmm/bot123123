@@ -103,7 +103,7 @@ def test_detail_text_matches_locked_sectioned_copy_shape():
     assert "・物业管理：含物业费" in text
     assert "・水电费用：水 按表 / 电 0.25$/度" in text
     assert "・大楼配套：泳池、健身房" in text
-    assert "💬 侨联说" in text
+    assert "💬 侨联判断" in text
     assert "采光面宽，适合长期住。" in text
     assert "楼下配套成熟。" in text
     assert text.strip().endswith("🟢 房源状态：当前可预约")
@@ -124,7 +124,7 @@ def test_detail_text_omits_missing_bullets_and_adviser_without_copy():
     assert "物业管理" not in text
     assert "水电费用" not in text
     assert "大楼配套" not in text
-    assert "💬 侨联说" not in text
+    assert "💬 侨联判断" not in text
     assert "🟢 房源状态：当前可预约" in text
     assert _actions(response.action_rows) == [["book", "consult"], ["similar"]]
     assert _labels(response.action_rows) == [
@@ -152,7 +152,7 @@ def test_photo_caption_is_short_not_sectioned():
     assert caption == "富力城 · 2房1厅 · $800/月 · 📸 1/3"
     assert "基本信息" not in caption
     assert "金边优质房源出租" not in caption
-    assert "侨联说" not in caption
+    assert "侨联判断" not in caption
 
 
 def test_photos_response_single_flipper_with_short_caption(tmp_path):

@@ -90,12 +90,22 @@ def test_search_card_preserves_fixed_sha_copy_and_uses_frozen_cover(tmp_path):
 
     card = build_search_card((first, second), 0)
 
-    assert card.text == "<b>💰 BKK1 · 2房1厅 · $800/月</b>\n19楼\n🟢 当前可预约 · 1/2"
+    assert card.text == (
+        "💰 <b>QL-RF-A2B3 · BKK1 · 2房1厅 · $800/月</b>\n"
+        "📐 95㎡｜19层\n"
+        "📍 BKK1\n"
+        "\n"
+        "🟢 当前可预约｜1/2\n"
+        "\n"
+        "📸 实拍房源｜中文顾问\n"
+        "📹 没时间到现场？可约视频实拍代看\n"
+        "还有不清楚的，直接回复问我，或联系顾问"
+    )
     assert card.photo_path == str(cover)
     assert _actions(card) == [
         ["previous", "next"],
         ["details", "book"],
-        ["change_search"],
+        ["change_search", "consult"],
     ]
 
 
@@ -153,7 +163,7 @@ def test_search_card_listing_actions_target_current_public_identity():
 
     assert _actions(card) == [
         ["details", "book"],
-        ["change_search"],
+        ["change_search", "consult"],
     ]
     for action in actions:
         if action.action != "change_search":
@@ -188,11 +198,12 @@ def test_live_reserved_status_changes_badge_without_changing_frozen_facts():
 
     card = build_search_card((view,), 0)
 
-    assert "<b>💰 BKK1 · 2房1厅 · $800/月</b>" in card.text
+    assert "💰 <b>QL-RF-A2B3 · BKK1 · 2房1厅 · $800/月</b>" in card.text
     assert "$800/月" in card.text
-    assert "19楼" in card.text
+    assert "19层" in card.text
     assert "🟡 已有预约，仍可预约" in card.text
     assert _actions(card)[0] == ["details", "book"]
+    assert _actions(card)[1] == ["change_search", "consult"]
 
 
 def test_build_search_cards_builds_one_card_per_result():
@@ -222,3 +233,57 @@ def test_build_search_cards_builds_one_card_per_result():
 def test_empty_search_card_is_rejected():
     with pytest.raises(ValueError, match="search_card_requires_results"):
         build_search_card((), 0)
+
+
+def test_search_card_shows_deposit_and_estimated_first_payment():
+    listing_id = "LST_1"
+    public_id = "QL-RF-A2B3"
+    snapshot = {
+        "schema": "v3_publication_snapshot.v1",
+        "listing_id": listing_id,
+        "public_listing_id": public_id,
+        "offer_id": f"OFF_{listing_id}",
+        "canonical_record_id": f"CAN_{listing_id}",
+        "canonical_facts_hash": f"hash-{listing_id}",
+        "canonical_facts": {"deposit_months": 1, "prepay_months": 1},
+        "listing": {
+            "project_name": "富力城",
+            "property_type": "公寓",
+            "layout": "2房1厅",
+            "public_location_display": "BKK1",
+            "size_sqm": 95,
+            "floor": "19",
+        },
+        "offer": {
+            "offer_type": "rent",
+            "monthly_rent_usd": 800,
+            "publication_policy": "telegram_rent",
+            "payment_terms": "押1付1",
+        },
+    }
+    view = PublishedListingView(
+        listing={
+            "listing_id": listing_id,
+            "public_listing_id": public_id,
+            "inventory_status": "active",
+        },
+        offer={
+            "offer_id": f"OFF_{listing_id}",
+            "offer_type": "rent",
+            "offer_status": "active",
+            "publication_policy": "telegram_rent",
+            "payment_terms": "押1付1",
+            "monthly_rent_usd": 800,
+        },
+        publication={"instance_id": f"PUB_{listing_id}"},
+        package={
+            "snapshot_json": json.dumps(snapshot, ensure_ascii=False),
+            "gallery_json": "[]",
+            "cover_path": "",
+        },
+    )
+
+    card = build_search_card((view,), 0)
+
+    assert "押1付1｜预计首付 <b>$1,600</b>" in card.text
+    assert "💬 中文顾问" in [item.label for row in card.action_rows for item in row]

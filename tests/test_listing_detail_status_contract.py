@@ -68,7 +68,7 @@ def test_listing_cost_text_includes_talk_when_facts_support_it(monkeypatch):
         lambda _lid: _item("active", highlights=["可养宠物", "河景"]),
     )
     text = listing_mod.listing_cost_text("l_89")
-    assert "💬 <b>侨联说</b>" in text
+    assert "💬 <b>侨联判断</b>" in text
     assert STATUS_LINE["active"] in text
     assert "水费" not in text
     assert "电费" not in text
@@ -79,7 +79,7 @@ def test_listing_cost_text_omits_talk_when_no_distinctive_fact(monkeypatch):
 
     monkeypatch.setattr(listing_mod, "listing_context", lambda _lid: _item("reserved"))
     text = listing_mod.listing_cost_text("l_89")
-    assert "💬 <b>侨联说</b>" not in text
+    assert "💬 <b>侨联判断</b>" not in text
     assert STATUS_LINE["reserved"] in text
 
 

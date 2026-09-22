@@ -6,13 +6,15 @@ from unittest.mock import patch
 
 
 class HomeKeyboardTests(unittest.TestCase):
-    def test_main_keyboard_keeps_one_primary_action_and_two_support_actions(self):
-        """首页只保留找房主入口和两个辅助入口。"""
+    def test_main_keyboard_keeps_final_ui_five_actions(self):
+        """首页对齐 FINAL_UI：找房、可预约、预约、入住服务、顾问。"""
         from qiaolian_dual.user_bot import main_keyboard
         kb = main_keyboard()
         rows = kb.inline_keyboard
-        self.assertEqual([len(row) for row in rows], [1, 2])
-        self.assertEqual(rows[0][0].text, "🔍 智能找房")
+        self.assertEqual([len(row) for row in rows], [2, 2, 1])
+        self.assertEqual(rows[0][0].text, "🔍 帮我找房")
+        self.assertEqual(rows[0][1].text, "🏠 可预约房源")
+        self.assertEqual(rows[2][0].text, "💬 联系中文顾问")
 
     def test_main_keyboard_callback_data(self):
         """首页按钮 callback_data 是否正确。"""
@@ -20,9 +22,15 @@ class HomeKeyboardTests(unittest.TestCase):
         kb = main_keyboard()
         flat = [btn for row in kb.inline_keyboard for btn in row]
         data_set = {btn.callback_data for btn in flat}
-        for expected in ("home_smart_search", "home_brand", "home_consult"):
+        for expected in (
+            "home_smart_search",
+            "hub:available",
+            "hub:appointments",
+            "home_living",
+            "home_consult",
+        ):
             self.assertIn(expected, data_set, f"Missing callback_data: {expected}")
-        self.assertEqual(len(data_set), 3)
+        self.assertEqual(len(data_set), 5)
 
     def test_main_keyboard_no_url_buttons(self):
         """首页按钮不应包含 URL（全部内部回调）。"""

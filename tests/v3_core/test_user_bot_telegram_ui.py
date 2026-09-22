@@ -92,7 +92,10 @@ def test_search_card_keyboard_encodes_navigation_with_public_ids():
         "v3u:listing:details:QL-RF-A2B3",
         "v3u:listing:book:QL-RF-A2B3",
     ]
-    assert rows[2] == ["v3u:change_search"]
+    assert rows[2] == [
+        "v3u:change_search",
+        "v3u:listing:consult:QL-RF-A2B3",
+    ]
     assert "LST_" not in repr(rows)
 
 

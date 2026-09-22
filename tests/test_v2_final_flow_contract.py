@@ -16,13 +16,13 @@ def labels(markup):
 def test_v2_home_is_locked():
     home_labels = labels(main_keyboard())
     assert home_labels == [
-        '🔍 智能找房', '📖 关于侨联地产',
-        '📅 预约看房', '💎 直接问顾问',
-        '⚡ 入住管家', '🧭 周边服务',
+        '🔍 帮我找房', '🏠 可预约房源',
+        '📅 我的预约', '🛠 入住服务',
+        '💬 联系中文顾问',
     ]
     text = welcome_text()
-    assert '侨联地产 · 金边华人房产服务' in text
-    assert '在金边找房，找自己人' in text
+    assert '侨联小管家' in text
+    assert '想找金边租房' in text
 
 
 def test_v2_find_home_short_buttons():

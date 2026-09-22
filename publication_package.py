@@ -666,6 +666,8 @@ def build_package(
         "drawbacks": [],
         "highlights": projection["highlights"],
     })
+    from v3_core.publishing.public_presentation import public_listing_presentation_from_draft
+    d = public_listing_presentation_from_draft(d)
     listing_id = str(d.get("listing_id") or "").strip()
     if not re.fullmatch(r"(?i)l_\d+", listing_id):
         from meihua_publisher import system_listing_id_from_draft
@@ -775,7 +777,7 @@ def build_package(
     source_identity_json = json.dumps(source_identity, ensure_ascii=False, sort_keys=True)
     source_identity_hash = hashlib.sha256(source_identity_json.encode()).hexdigest()
     snapshot = {k: d.get(k) for k in (
-        "draft_id","listing_id","project","project_name","project_alias","area","property_type",
+        "draft_id","listing_id","project_entity_id","preferred_project_name_cn","canonical_project_name_en","project","project_name","project_alias","canonical_geo","canonical_road","public_location_display","area","property_type",
         "price","original_price","layout","size","floor","deposit","contract_term","available_date",
         "management_fee","internet_fee","water_rate","electric_rate","parking_fee","viewing_time",
         "video_viewing","highlights",
@@ -881,6 +883,8 @@ def render_cover_preview(db_path: str, draft_id: str, output_path: str, *, templ
                 "deposit": projection.get("deposit", ""),
                 "highlights": projection.get("highlights", []),
             })
+        from v3_core.publishing.public_presentation import public_listing_presentation_from_draft
+        d = public_listing_presentation_from_draft(d)
         originals = _paths(conn, d.get("source_post_id"))
         if not originals:
             raise ValueError("missing_usable_images")

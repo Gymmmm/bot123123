@@ -20,9 +20,9 @@ BANNED = (
 )
 
 LOCKED_HOME = [
-    '🔍 智能找房', '📖 关于侨联地产',
-    '📅 预约看房', '💎 直接问顾问',
-    '⚡ 入住管家', '🧭 周边服务',
+    '🔍 帮我找房', '🏠 可预约房源',
+    '📅 我的预约', '🛠 入住服务',
+    '💬 联系中文顾问',
 ]
 LOCKED_LISTING = {'📋 租赁详情', '📸 更多实拍', '📅 预约看房', '💬 联系中文顾问'}
 
@@ -35,11 +35,11 @@ def test_home_is_five_locked_buttons():
     assert _labels(main_keyboard()) == LOCKED_HOME
 
 
-def test_current_available_lives_inside_find_home():
+def test_current_available_lives_on_home_and_find_shortcut():
     home = ' '.join(_labels(main_keyboard()))
     find = ' '.join(_labels(guided_search_keyboard()))
-    assert '当前可预约' not in home
-    assert '当前可预约' in find
+    assert '可预约房源' in home
+    assert '当前可约' in find
 
 
 def test_find_card_and_album_use_locked_advisor_label():

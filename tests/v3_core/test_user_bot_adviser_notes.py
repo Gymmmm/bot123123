@@ -62,8 +62,8 @@ def test_publisher_copy_is_returned_and_rendered_verbatim(source):
     view = _view(adviser_copy=frozen, adviser_copy_source=source)
     assert adviser_notes_for_view(view) == frozen
     text = build_details_response(view).text
-    assert "💬 侨联说" in text
-    assert "<b>侨联说</b>" not in text
+    assert "💬 侨联判断" in text
+    assert "<b>侨联判断</b>" not in text
     assert frozen.splitlines()[0] in text
     assert frozen.splitlines()[1] in text
     assert "<blockquote>" not in text
@@ -73,7 +73,7 @@ def test_publisher_copy_is_returned_and_rendered_verbatim(source):
 def test_hidden_source_never_displays_even_when_copy_exists():
     view = _view(adviser_copy="这段不能公开", adviser_copy_source="hidden")
     assert adviser_notes_for_view(view) == ""
-    assert "侨联说" not in build_details_response(view).text
+    assert "侨联判断" not in build_details_response(view).text
     assert "这段不能公开" not in build_details_response(view).text
 
 
@@ -81,7 +81,7 @@ def test_hidden_source_never_displays_even_when_copy_exists():
 def test_empty_or_missing_copy_hides_entire_section(copy):
     view = _view(adviser_copy=copy, include_copy=copy is not None)
     assert adviser_notes_for_view(view) == ("" if copy is None else str(copy))
-    assert "侨联说" not in build_details_response(view).text
+    assert "侨联判断" not in build_details_response(view).text
 
 
 @pytest.mark.parametrize(
@@ -96,13 +96,13 @@ def test_empty_or_missing_copy_hides_entire_section(copy):
 def test_listing_facts_never_generate_user_bot_adviser_copy(facts, listing):
     view = _view(include_copy=False, canonical_facts=facts, listing=listing)
     assert adviser_notes_for_view(view) == ""
-    assert "侨联说" not in build_details_response(view).text
+    assert "侨联判断" not in build_details_response(view).text
 
 
 def test_other_details_and_actions_remain_present_with_authoritative_copy():
     view = _view(adviser_copy="已冻结建议。", adviser_copy_source="auto")
     response = build_details_response(view)
-    assert "💬 侨联说" in response.text
+    assert "💬 侨联判断" in response.text
     assert "已冻结建议。" in response.text
     assert "富力城" in response.text
     assert "$800" in response.text

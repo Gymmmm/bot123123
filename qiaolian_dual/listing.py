@@ -135,7 +135,7 @@ def listing_cost_text(listing_id: str) -> str:
     talk = generate_talk(item, max_points=2, allow_empty=True).strip()
     if talk:
         safe_talk = '\n'.join(he(line) for line in talk.splitlines() if line.strip())
-        lines.extend(['', '💬 <b>侨联说</b>', '', safe_talk])
+        lines.extend(['', '💬 <b>侨联判断</b>', '', safe_talk])
     return '\n'.join(lines)
 
 def listing_cost_keyboard(listing_id: str) -> InlineKeyboardMarkup:

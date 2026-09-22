@@ -269,7 +269,7 @@ def build_detail_text(view: PublishedListingView) -> str:
     notes = _adviser_copy_for_view(view)
     if notes:
         safe_notes = "\n".join(he(line) for line in notes.splitlines() if line.strip())
-        lines.extend(["", "💬 侨联说", safe_notes])
+        lines.extend(["", "💬 侨联判断", safe_notes])
 
     lines.extend(["", _detail_status_line(details)])
     return "\n".join(lines).strip()

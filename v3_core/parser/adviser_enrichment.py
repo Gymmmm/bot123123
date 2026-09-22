@@ -1,4 +1,4 @@
-"""Evidence-only extraction for the public ``侨联说`` copy.
+"""Evidence-only extraction for the public ``侨联判断`` copy.
 
 This stage is additive. It never changes authoritative listing facts, price,
 location, identity, property type or publication eligibility. It only stores

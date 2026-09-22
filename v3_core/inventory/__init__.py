@@ -1,32 +1,3 @@
-"""V3 inventory-domain extraction."""
-
-from . import listing_taxonomy as _listing_taxonomy
-from .phnom_penh_aliases import apply_phnom_penh_aliases as _apply_phnom_penh_aliases
-
-_apply_phnom_penh_aliases(_listing_taxonomy)
-
-# Defensive gate for market-maintained alias extensions.  A malformed
-# single-item Python tuple can otherwise be iterated as characters, and a
-# whitespace character would normalize to an empty alias that matches every
-# listing.  Never allow blank aliases into the active taxonomy.
-_listing_taxonomy.PROJECT_IDENTITIES = tuple(
-    _listing_taxonomy.ProjectIdentity(
-        item.key,
-        item.display,
-        item.kind,
-        tuple(alias for alias in item.aliases if _listing_taxonomy.clean_text(alias)),
-        item.property_family,
-    )
-    for item in _listing_taxonomy.PROJECT_IDENTITIES
-)
-_listing_taxonomy.MARKET_LOCATIONS = tuple(
-    _listing_taxonomy.MarketLocation(
-        item.key,
-        item.display,
-        item.relation,
-        tuple(alias for alias in item.aliases if _listing_taxonomy.clean_text(alias)),
-    )
-    for item in _listing_taxonomy.MARKET_LOCATIONS
-)
-
-__all__ = []
+"""V3 inventory domain. Project identity loads directly from Registry V3; no import-order monkey patch."""
+from .project_registry import RESEARCH_PROJECTS,ACTIVE_PROJECTS,FAMILIES,resolve_project,project_by_key,project_search_terms,canonical_location_projection,public_location_for_project
+__all__=["RESEARCH_PROJECTS","ACTIVE_PROJECTS","FAMILIES","resolve_project","project_by_key","project_search_terms","canonical_location_projection","public_location_for_project"]

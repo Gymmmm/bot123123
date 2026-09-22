@@ -1,0 +1,523 @@
+raw_alias,normalized_alias,entity_level,target_display_name,canonical_identity,alias_kind,weight,search_only,conflict_flag,resolution_action,verification_status,notes
+170,170,PROJECT,ONE 70（金边首座）,project:one-70,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+1号路炳发,1号路炳发,FAMILY_GEO,炳发,family:peng-huoth,MARKET_POSITIONING,70,True,True,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,同一号路炳发
+1号路炳发,1号路炳发,PROJECT,炳发 The Star Platinum,project:the-star-platinum,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,“1号路炳发”与“一号路炳发”等价，仅作为family+geo候选。
+1号路炳发,1号路炳发,PROJECT,炳发 Athina,project:the-star-platinum-athina,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,“1号路炳发”与“一号路炳发”等价，仅作为family+geo候选。
+1号路炳发,1号路炳发,PROJECT,炳发 Capital One,project:the-star-platinum-capital-one,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,“1号路炳发”与“一号路炳发”等价，仅作为family+geo候选。
+1号路炳发,1号路炳发,PROJECT,炳发 Eco Delta,project:the-star-platinum-eco-delta,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,“1号路炳发”与“一号路炳发”等价，仅作为family+geo候选。
+1号路炳发,1号路炳发,PROJECT,炳发 Eco Melody,project:the-star-platinum-eco-melody,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,“1号路炳发”与“一号路炳发”等价，仅作为family+geo候选。
+1号路炳发,1号路炳发,PROJECT,炳发 Eco Romance,project:the-star-platinum-eco-romance,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,“1号路炳发”与“一号路炳发”等价，仅作为family+geo候选。
+1号路炳发,1号路炳发,PROJECT,炳发 Eco Sunrise,project:the-star-platinum-eco-sunrise,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,“1号路炳发”与“一号路炳发”等价，仅作为family+geo候选。
+1号路炳发,1号路炳发,PROJECT,炳发 Eco Varanda,project:the-star-platinum-eco-varanda,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,“1号路炳发”与“一号路炳发”等价，仅作为family+geo候选。
+1号路炳发,1号路炳发,PROJECT,炳发 Euro Ville,project:the-star-platinum-euro-ville,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,“1号路炳发”与“一号路炳发”等价，仅作为family+geo候选。
+1号路炳发,1号路炳发,PROJECT,炳发 Herminus,project:the-star-platinum-herminus,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,“1号路炳发”与“一号路炳发”等价，仅作为family+geo候选。
+1号路炳发,1号路炳发,PROJECT,炳发 Mastery,project:the-star-platinum-mastery,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,“1号路炳发”与“一号路炳发”等价，仅作为family+geo候选。
+1号路炳发,1号路炳发,PROJECT,炳发 Mercurean I,project:the-star-platinum-mercurean-i,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,“1号路炳发”与“一号路炳发”等价，仅作为family+geo候选。
+1号路炳发,1号路炳发,PROJECT,炳发 Mercurean II,project:the-star-platinum-mercurean-ii,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,“1号路炳发”与“一号路炳发”等价，仅作为family+geo候选。
+1号路炳发,1号路炳发,PROJECT,炳发 Paradigm,project:the-star-platinum-paradigm,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,“1号路炳发”与“一号路炳发”等价，仅作为family+geo候选。
+1号路炳发,1号路炳发,PROJECT,炳发 Polaris I,project:the-star-platinum-polaris-i,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,“1号路炳发”与“一号路炳发”等价，仅作为family+geo候选。
+1号路炳发,1号路炳发,PROJECT,炳发 Polaris II,project:the-star-platinum-polaris-ii,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,“1号路炳发”与“一号路炳发”等价，仅作为family+geo候选。
+1号路炳发,1号路炳发,PROJECT,炳发 Rosato,project:the-star-platinum-rosato,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,“1号路炳发”与“一号路炳发”等价，仅作为family+geo候选。
+1号路炳发,1号路炳发,PROJECT,炳发 Roseville,project:the-star-platinum-roseville,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,“1号路炳发”与“一号路炳发”等价，仅作为family+geo候选。
+1号路炳发,1号路炳发,PROJECT,炳发 Polaris 23 公寓,project:the-star-polaris-23-condominium,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,“1号路炳发”与“一号路炳发”等价，仅作为family+geo候选。
+2004奥凯德,2004奥凯德,FAMILY / MARKET_GEO,Orkide / 奥凯德,family:orkide,FAMILY_GEO,70,True,True,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,2004路优先The Royal/The Grand但仍需项目词；品牌词不得单独定项目。
+2004奥凯德,2004奥凯德,PROJECT,奥凯德 The Royal（别墅社区）,project:orkide-the-royal,STRONG_PROJECT_ALIAS,95,True,True,CANDIDATE_ONLY,VERIFIED,
+2004奥凯德Grand,2004奥凯德grand,PROJECT,奥凯德 The Grand,project:orkide-the-grand,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+2004奥凯德公寓,2004奥凯德公寓,PROJECT,奥凯德皇家公寓,project:new:orkide-the-royal-condominium,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,V3仅有Orkide The Royal别墅社区，本轮确认The Royal Condominium为独立真实公寓项目，必须拆开。
+217炳发,217炳发,PROJECT,炳发 The Star Eternal,project:the-star-eternal,FAMILY_GEO,70,True,False,DIRECT_RESOLVE,VERIFIED,
+271,271,PROJECT,太子幸福广场,project:the-pinnacle,PROJECT_LANDMARK,85,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯GEO/地标词不能直接解析到具体PROJECT。
+271 Chip Mong,271chipmong,PROJECT,集茂271,project:chip-mong-landmark-271,PROJECT_ROAD,90,True,False,DIRECT_RESOLVE,VERIFIED,
+2号路Chankiri,2号路chankiri,PROJECT,Chankiri Palm Creek（棕榈溪）,project:chankiri-palm-creek,PROJECT_ROAD,90,True,False,DIRECT_RESOLVE,PARTIAL,
+371炳发,371炳发,PROJECT,炳发 The Star Natural,project:the-star-natural,FAMILY_GEO,70,True,False,DIRECT_RESOLVE,VERIFIED,
+4号路Piphup Thmey,4号路piphupthmey,PROJECT,Piphup Thmey 4号路社区,project:piphup-thmey-nr4,PROJECT_ROAD,90,True,False,DIRECT_RESOLVE,NEEDS_VERIFICATION,
+50米Chip Mong,50米chipmong,PROJECT,集茂50米,project:chip-mong-park-land-50m,PROJECT_ROAD,90,True,False,DIRECT_RESOLVE,VERIFIED,
+50米炳发,50米炳发,FAMILY / MARKET_GEO,炳发,family:peng-huoth,FAMILY_GEO,70,True,True,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,先按道路/地标缩小family，再解析具体项目；开发商名“炳发”不得直接当PROJECT。
+50米炳发,50米炳发,PROJECT,炳发美拉花园,project:the-star-mera-garden,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+598炳发,598炳发,PROJECT,炳发 The Star Light,project:the-star-light,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+598炳发,598炳发,PROJECT,炳发 The Star Premier,project:the-star-premier,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+598路,598路,PROJECT,集茂598,project:chip-mong-park-land-598,PROJECT_ROAD,90,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯GEO/地标词不能直接解析到具体PROJECT。
+60米,60米,PROJECT,首都·国金一期,project:urban-village-1,PROJECT_LANDMARK,85,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯GEO/地标词不能直接解析到具体PROJECT。
+60米,60米,PROJECT,首都·国金二期,project:urban-village-2,PROJECT_LANDMARK,85,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯GEO/地标词不能直接解析到具体PROJECT。
+60米Chip Mong,60米chipmong,PROJECT,集茂60米,project:chip-mong-landmark-60m,PROJECT_ROAD,90,True,False,DIRECT_RESOLVE,VERIFIED,
+60米富力城,60米富力城,PROJECT,富力城,project:rf-city,PROJECT_ROAD,90,True,False,DIRECT_RESOLVE,VERIFIED,
+60米炳发,60米炳发,FAMILY / MARKET_GEO,炳发,family:peng-huoth,FAMILY_GEO,70,True,True,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,先按道路/地标缩小family，再解析具体项目；开发商名“炳发”不得直接当PROJECT。
+60米炳发,60米炳发,PROJECT,炳发钻石城,project:the-star-diamond,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+60米炳发,60米炳发,PROJECT,炳发 The Star Diamond II,project:the-star-diamond-ii,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+6A Chip Mong,6achipmong,PROJECT,集茂6A,project:chip-mong-park-land-6a,PROJECT_ROAD,90,True,False,DIRECT_RESOLVE,VERIFIED,
+6A奥凯德,6a奥凯德,PROJECT,奥凯德 Botanic City,project:orkide-botanic-city,PROJECT_ROAD,90,True,False,DIRECT_RESOLVE,VERIFIED,
+6A炳发,6a炳发,PROJECT,炳发朱美拉,project:the-star-jumeirah,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+6A炳发,6a炳发,PROJECT,炳发 The Star Munirah,project:the-star-munirah,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+Agile Sky Residence,agileskyresidence,PROJECT,雅居乐天悦（天空公馆）,project:agile-sky-residence,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+BKK,bkk,PROJECT,BKK Mansion,project:bkk-mansion,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,NEEDS_VERIFICATION,纯地理词不能直接映射某个PROJECT。；纯GEO/地标词不能直接解析到具体PROJECT。
+BKK1,bkk1,PROJECT,王府观邸,project:le-conde-bkk1,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯地理词不能直接映射某个PROJECT。；纯GEO/地标词不能直接解析到具体PROJECT。
+BKK1雅居乐,bkk1雅居乐,PROJECT,雅居乐天悦（天空公馆）,project:agile-sky-residence,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,官方canonical在BKK3/莫尼旺，BKK1雅居乐应弃用。
+BKK3雅居乐,bkk3雅居乐,PROJECT,雅居乐天悦（天空公馆）,project:agile-sky-residence,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+BKK Mansion,bkkmansion,PROJECT,BKK Mansion,project:bkk-mansion,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,NEEDS_VERIFICATION,
+BKK雅居乐,bkk雅居乐,PROJECT,雅居乐天悦（天空公馆）,project:agile-sky-residence,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+Boeung Snor炳发,boeungsnor炳发,PROJECT,炳发 The Star Platinum,project:the-star-platinum,FAMILY_GEO,70,True,False,DIRECT_RESOLVE,VERIFIED,
+Borey New World Kour Srov 1&2,boreynewworldkoursrov1&2,PROJECT,新世界 Kour Srov 1&2,project:new-world-kour-srov-1-2,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+Borey New World Kour Srov 3,boreynewworldkoursrov3,PROJECT,新世界 Kour Srov 3,project:new-world-kour-srov-3,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+Borey Peng Huoth,boreypenghuoth,FAMILY / MARKET_GEO,炳发,family:peng-huoth,AMBIGUOUS_FAMILY,70,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,先按道路/地标缩小family，再解析具体项目；开发商名“炳发”不得直接当PROJECT。
+Borey Peng Huoth Chamkardong,boreypenghuothchamkardong,PROJECT,炳发 Chamkar Dong,project:peng-huoth-chamkardong,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Borey Peng Huoth Veng Sreng,boreypenghuothvengsreng,PROJECT,炳发 Veng Sreng,project:peng-huoth-veng-sreng,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Borey Piphup Thmey Chamkar Dong,boreypiphupthmeychamkardong,PROJECT,Piphup Thmey Chamkar Dong,project:piphup-thmey-chamkar-dong,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+Borey Piphup Thmey National Road 4,boreypiphupthmeynationalroad4,PROJECT,Piphup Thmey 4号路社区,project:piphup-thmey-nr4,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,NEEDS_VERIFICATION,
+Borey Piphup Thmey Sen Sok,boreypiphupthmeysensok,PROJECT,Piphup Thmey 森速社区,project:piphup-thmey-sen-sok,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+Bridge,bridge,PROJECT,桥牌公寓（世桥）,project:the-bridge,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+CA&SA,ca&sa,PROJECT,钻石凯撒酒店式公寓,project:new:casa-service-apartment,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,与CASA by Meridian不是同一项目，需严格分开。
+CASA by Meridian,casabymeridian,PROJECT,钻石庭（CASA Meridian）,project:casa-meridian,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+CASA Meridian,casameridian,PROJECT,钻石庭（CASA Meridian）,project:casa-meridian,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+Chamkar Dong,chamkardong,PROJECT,集茂50米,project:chip-mong-park-land-50m,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+Chamkar Dong Chip Mong,chamkardongchipmong,PROJECT,集茂 Land Riche Chamkar Dong,project:chip-mong-landriche-chamkar-dong,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+Chamkar Dong Piphup Thmey,chamkardongpiphupthmey,PROJECT,Piphup Thmey Chamkar Dong,project:piphup-thmey-chamkar-dong,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+Chamkar Dong炳发,chamkardong炳发,PROJECT,炳发 Chamkar Dong,project:peng-huoth-chamkardong,FAMILY_GEO,70,True,False,DIRECT_RESOLVE,VERIFIED,
+Chankiri,chankiri,FAMILY / MARKET_GEO,Chankiri,family:chankiri,FAMILY_GEO,70,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,当前可确认Palm Creek；其它同名/后续分期不自动合并。
+Chankiri Palm Creek,chankiripalmcreek,PROJECT,Chankiri Palm Creek（棕榈溪）,project:chankiri-palm-creek,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+Chief Tower,chieftower,PROJECT,Chief Tower,project:chief-tower,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,NEEDS_VERIFICATION,
+Chip Mong,chipmong,FAMILY / MARKET_GEO,Chip Mong,family:chip-mong,AMBIGUOUS_FAMILY,20,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,道路/项目词优先：598、50M、60M、271、6A、TK、Sen Sok。
+Chip Mong 271附近,chipmong271附近,PROJECT,集茂271,project:chip-mong-landmark-271,PROJECT_LANDMARK,85,True,False,DIRECT_RESOLVE,VERIFIED,
+Chip Mong Grand Phnom Penh City,chipmonggrandphnompenhcity,PROJECT,集茂金边大城,project:chip-mong-grand-phnom-penh-city,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Chip Mong Land,chipmongland,FAMILY / MARKET_GEO,Chip Mong,family:chip-mong,FAMILY_GEO,70,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,道路/项目词优先：598、50M、60M、271、6A、TK、Sen Sok。
+Chip Mong Landmark 271,chipmonglandmark271,PROJECT,集茂271,project:chip-mong-landmark-271,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Chip Mong Landmark 60M,chipmonglandmark60m,PROJECT,集茂60米,project:chip-mong-landmark-60m,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Chip Mong Land Riche Chamkar Dong,chipmonglandrichechamkardong,PROJECT,集茂 Land Riche Chamkar Dong,project:chip-mong-landriche-chamkar-dong,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+Chip Mong Park Land 50M,chipmongparkland50m,PROJECT,集茂50米,project:chip-mong-park-land-50m,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Chip Mong Park Land 598,chipmongparkland598,PROJECT,集茂598,project:chip-mong-park-land-598,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Chip Mong Park Land 6A,chipmongparkland6a,PROJECT,集茂6A,project:chip-mong-park-land-6a,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Chip Mong Park Land Sen Sok,chipmongparklandsensok,PROJECT,集茂森速,project:chip-mong-park-land-sen-sok,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Chip Mong Park Land TK,chipmongparklandtk,PROJECT,集茂TK,project:chip-mong-park-land-tk,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+Chip Mong Park Land TK 公寓,chipmongparklandtk公寓,PROJECT,集茂TK公寓,project:chip-mong-park-land-tk-condo,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+De Castle Royal,decastleroyal,PROJECT,De Castle Royal（德卡斯尔皇家）,project:de-castle-royal,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+Diamond Bay Garden,diamondbaygarden,PROJECT,钻石湾花园,project:diamond-bay-garden,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+Diamond CA&SA,diamondca&sa,PROJECT,钻石凯撒酒店式公寓,project:new:casa-service-apartment,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,与CASA by Meridian不是同一项目，需严格分开。
+Diamond CA&SA Service Apartment,diamondca&saserviceapartment,PROJECT,钻石凯撒酒店式公寓,project:new:casa-service-apartment,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,与CASA by Meridian不是同一项目，需严格分开。
+Diamond One,diamondone,PROJECT,钻石一号,project:diamond-one,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+Diamond Twin Tower,diamondtwintower,PROJECT,钻石双子塔,project:diamond-twin-tower,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+Ding Li Tower,dinglitower,PROJECT,鼎利大厦,project:ding-li-tower,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,NEEDS_VERIFICATION,
+Eco区炳发,eco区炳发,PROJECT,炳发 Eco Delta,project:the-star-platinum-eco-delta,STRONG_PROJECT_ALIAS,95,True,True,CANDIDATE_ONLY,VERIFIED,
+Eco区炳发,eco区炳发,PROJECT,炳发 Eco Melody,project:the-star-platinum-eco-melody,STRONG_PROJECT_ALIAS,95,True,True,CANDIDATE_ONLY,VERIFIED,
+Eco区炳发,eco区炳发,PROJECT,炳发 Eco Romance,project:the-star-platinum-eco-romance,STRONG_PROJECT_ALIAS,95,True,True,CANDIDATE_ONLY,VERIFIED,
+Eco区炳发,eco区炳发,PROJECT,炳发 Eco Sunrise,project:the-star-platinum-eco-sunrise,STRONG_PROJECT_ALIAS,95,True,True,CANDIDATE_ONLY,VERIFIED,
+Eco区炳发,eco区炳发,PROJECT,炳发 Eco Varanda,project:the-star-platinum-eco-varanda,STRONG_PROJECT_ALIAS,95,True,True,CANDIDATE_ONLY,VERIFIED,
+Elite Town,elitetown,FAMILY,名仕城,family:new:elite-town,NEW_VERIFIED_ALIAS,95,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,OCIC官方中文明确“钻石岛名仕城1期和2期”，III为商业住宅项目；裸“名仕城”只到项目family。
+Elite Town III,elitetowniii,FAMILY,名仕城,family:new:elite-town,NEW_VERIFIED_ALIAS,95,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,OCIC官方中文明确“钻石岛名仕城1期和2期”，III为商业住宅项目；裸“名仕城”只到项目family。
+EnMaison,enmaison,PROJECT,摩根天御,project:morgan-enmaison,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+Factory Phnom Penh附近,factoryphnompenh附近,PROJECT,首都·国金一期,project:urban-village-1,PROJECT_LANDMARK,85,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯GEO/地标词不能直接解析到具体PROJECT。
+Factory Phnom Penh附近,factoryphnompenh附近,PROJECT,首都·国金二期,project:urban-village-2,PROJECT_LANDMARK,85,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯GEO/地标词不能直接解析到具体PROJECT。
+Grand Phnom Penh,grandphnompenh,PROJECT,集茂金边大城,project:chip-mong-grand-phnom-penh-city,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+Grand Phnom Penh City,grandphnompenhcity,PROJECT,集茂金边大城,project:chip-mong-grand-phnom-penh-city,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+J1,j1,PROJECT,J Tower 1,project:j-tower-1,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+J2,j2,PROJECT,J Tower 2,project:j-tower-2,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+J3,j3,PROJECT,J Tower 3,project:j-tower-3,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+J Tower,jtower,FAMILY / MARKET_GEO,J Tower,family:j-tower,FAMILY_GEO,70,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,必须有1/2/3或明确地址证据。
+J Tower 1,jtower1,PROJECT,J Tower 1,project:j-tower-1,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+J Tower 2,jtower2,PROJECT,J Tower 2,project:j-tower-2,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+J Tower 3,jtower3,PROJECT,J Tower 3,project:j-tower-3,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+J塔,j塔,FAMILY / MARKET_GEO,J Tower,family:j-tower,FAMILY_GEO,70,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,必须有1/2/3或明确地址证据。
+Kour Srov新世界,koursrov新世界,FAMILY / MARKET_GEO,New World / 新世界,family:new-world,FAMILY_GEO,70,True,True,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,裸New World只到family；Kour Srov 1&2与3按明确项目名区分。
+Kour Srov新世界,koursrov新世界,PROJECT,新世界 Kour Srov 3,project:new-world-kour-srov-3,STRONG_PROJECT_ALIAS,95,True,True,CANDIDATE_ONLY,PARTIAL,
+Landmark 271,landmark271,PROJECT,集茂271,project:chip-mong-landmark-271,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Landmark 60M,landmark60m,PROJECT,集茂60米,project:chip-mong-landmark-60m,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Land Riche Chamkar Dong,landrichechamkardong,PROJECT,集茂 Land Riche Chamkar Dong,project:chip-mong-landriche-chamkar-dong,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+La Seine,laseine,PROJECT,塞纳河,project:new:la-seine,NEW_PARTIAL_ALIAS,70,True,False,DIRECT_RESOLVE,PARTIAL,OCIC官方Koh Pich项目列表确认La Seine真实存在；本轮不扩大其住宅/商业细分。
+La Vista One,lavistaone,PROJECT,紫晶壹号,project:la-vista-one,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Le Conde,leconde,PROJECT,王府观邸,project:le-conde-bkk1,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+Le Condé,lecondé,PROJECT,王府观邸,project:le-conde-bkk1,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Le Condé BKK1,lecondébkk1,PROJECT,王府观邸,project:le-conde-bkk1,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Mera Garden,meragarden,PROJECT,炳发美拉花园,project:the-star-mera-garden,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+MESONG,mesong,PROJECT,金汇 MESONG,project:mesong,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,The Mesa? 为不确定旧alias，禁止自动匹配。
+Mong Reththy炳发,mongreththy炳发,PROJECT,炳发 The Star Quateria,project:the-star-quateria,FAMILY_GEO,70,True,False,DIRECT_RESOLVE,VERIFIED,
+Monireth炳发,monireth炳发,PROJECT,炳发 The Star Eternal,project:the-star-eternal,FAMILY_GEO,70,True,False,DIRECT_RESOLVE,VERIFIED,
+Morgan,morgan,FAMILY / MARKET_GEO,摩根,family:morgan,AMBIGUOUS_FAMILY,20,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,裸Morgan只到family；EnMaison住宅与Tower办公/综合体严格分开。
+Morgan EnMaison,morganenmaison,PROJECT,摩根天御,project:morgan-enmaison,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Morgan Tower,morgantower,PROJECT,摩根大厦,project:morgan-tower,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+M Residence,mresidence,PROJECT,M Residence,project:m-residence,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+New World,newworld,FAMILY / MARKET_GEO,New World / 新世界,family:new-world,AMBIGUOUS_FAMILY,20,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,裸New World只到family；Kour Srov 1&2与3按明确项目名区分。
+New World Kour Srov 1&2,newworldkoursrov1&2,PROJECT,新世界 Kour Srov 1&2,project:new-world-kour-srov-1-2,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+New World Kour Srov 3,newworldkoursrov3,PROJECT,新世界 Kour Srov 3,project:new-world-kour-srov-3,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+Norea附近The Palms,norea附近thepalms,PROJECT,The Palms（棕榈社区）,project:the-palms,PROJECT_LANDMARK,85,True,False,DIRECT_RESOLVE,VERIFIED,
+Norea附近炳发,norea附近炳发,FAMILY / MARKET_GEO,炳发,family:peng-huoth,FAMILY_GEO,70,True,True,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,先按道路/地标缩小family，再解析具体项目；开发商名“炳发”不得直接当PROJECT。
+Norea附近炳发,norea附近炳发,PROJECT,炳发 Euro Ville,project:the-star-platinum-euro-ville,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+Norea附近炳发,norea附近炳发,PROJECT,炳发 Rosato,project:the-star-platinum-rosato,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+Norea附近炳发,norea附近炳发,PROJECT,炳发 Roseville,project:the-star-platinum-roseville,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+Olympia,olympia,PROJECT,奥林匹亚城,project:olympia-city,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+Olympia City,olympiacity,PROJECT,奥林匹亚城,project:olympia-city,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+ONE 70,one70,PROJECT,ONE 70（金边首座）,project:one-70,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+One Park,onepark,PROJECT,金边壹号 ONE PARK,project:one-park,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+One Park Residence,oneparkresidence,PROJECT,金边壹号 ONE PARK,project:one-park,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+Orkide,orkide,FAMILY / MARKET_GEO,Orkide / 奥凯德,family:orkide,FAMILY_GEO,70,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,2004路优先The Royal/The Grand但仍需项目词；品牌词不得单独定项目。
+Orkide 2004,orkide2004,PROJECT,奥凯德 The Royal（别墅社区）,project:orkide-the-royal,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+Orkide Botanic City,orkidebotaniccity,PROJECT,奥凯德 Botanic City,project:orkide-botanic-city,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Orkide Grand,orkidegrand,PROJECT,奥凯德 The Grand,project:orkide-the-grand,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+Orkide Pochentong,orkidepochentong,PROJECT,奥凯德 Pochentong,project:orkide-pochentong,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Orkide The Botanic City,orkidethebotaniccity,PROJECT,奥凯德 Botanic City,project:orkide-botanic-city,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Orkide The Grand,orkidethegrand,PROJECT,奥凯德 The Grand,project:orkide-the-grand,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Orkide The Pochentong,orkidethepochentong,PROJECT,奥凯德 Pochentong,project:orkide-pochentong,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Orkide The Royal,orkidetheroyal,PROJECT,奥凯德 The Royal（别墅社区）,project:orkide-the-royal,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Orkide The Royal Condominium,orkidetheroyalcondominium,PROJECT,奥凯德皇家公寓,project:new:orkide-the-royal-condominium,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,V3仅有Orkide The Royal别墅社区，本轮确认The Royal Condominium为独立真实公寓项目，必须拆开。
+Orkide The Royal 别墅社区,orkidetheroyal别墅社区,PROJECT,奥凯德 The Royal（别墅社区）,project:orkide-the-royal,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Orkide Villa,orkidevilla,FAMILY / MARKET_GEO,Orkide / 奥凯德,family:orkide,FAMILY_GEO,70,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,2004路优先The Royal/The Grand但仍需项目词；品牌词不得单独定项目。
+Oxley Worldbridge,oxleyworldbridge,FAMILY / MARKET_GEO,Oxley Worldbridge,family:oxley-worldbridge,FAMILY_GEO,70,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,Bridge/Peak/Palms分别解析，不共享canonical GEO。
+Palm Creek,palmcreek,PROJECT,Chankiri Palm Creek（棕榈溪）,project:chankiri-palm-creek,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+Parc 21,parc21,PROJECT,柏盛21（Parc 21）,project:parc-21,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+Park Land 50M,parkland50m,PROJECT,集茂50米,project:chip-mong-park-land-50m,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Park Land 598,parkland598,PROJECT,集茂598,project:chip-mong-park-land-598,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Park Land 6A,parkland6a,PROJECT,集茂6A,project:chip-mong-park-land-6a,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Park Land Sen Sok,parklandsensok,PROJECT,集茂森速,project:chip-mong-park-land-sen-sok,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Park Land TK,parklandtk,PROJECT,集茂TK,project:chip-mong-park-land-tk,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+Park Land TK Condo,parklandtkcondo,PROJECT,集茂TK公寓,project:chip-mong-park-land-tk-condo,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+PARTIAL,partial,PROJECT,Piphup Thmey 森速社区,project:piphup-thmey-sen-sok,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+Peak,peak,PROJECT,香格里拉公寓 The Peak,project:the-peak,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+Peak Residences,peakresidences,PROJECT,香格里拉公寓 The Peak,project:the-peak,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+Peng Huoth,penghuoth,FAMILY / MARKET_GEO,炳发,family:peng-huoth,FAMILY_GEO,70,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,先按道路/地标缩小family，再解析具体项目；开发商名“炳发”不得直接当PROJECT。
+Phnom Penh Galaxy Garden,phnompenhgalaxygarden,PROJECT,金边星河花园,project:xinghe-garden,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+Picasso,picasso,PROJECT,毕加索城市花园,project:picasso-city-garden,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+Picasso City Garden,picassocitygarden,PROJECT,毕加索城市花园,project:picasso-city-garden,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Picasso Sky Gemme,picassoskygemme,PROJECT,Picasso Sky Gemme（中文俗称待核）,project:new:picasso-sky-gemme,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,与Picasso City Garden为两个不同项目；旧表“毕加索天空之石/天空宝石”需避免硬译。
+Piphup Thmey,piphupthmey,FAMILY / MARKET_GEO,Piphup Thmey,family:piphup-thmey,FAMILY_GEO,70,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,按Sen Sok/Chamkar Dong/NR4等位置证据解析；裸品牌不定项目。
+Piphup Thmey 4号路社区,piphupthmey4号路社区,PROJECT,Piphup Thmey 4号路社区,project:piphup-thmey-nr4,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,NEEDS_VERIFICATION,
+Piphup Thmey Chamkar Dong,piphupthmeychamkardong,PROJECT,Piphup Thmey Chamkar Dong,project:piphup-thmey-chamkar-dong,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+Piphup Thmey NR4,piphupthmeynr4,PROJECT,Piphup Thmey 4号路社区,project:piphup-thmey-nr4,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,NEEDS_VERIFICATION,
+Piphup Thmey Sen Sok,piphupthmeysensok,PROJECT,Piphup Thmey 森速社区,project:piphup-thmey-sen-sok,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+Prince,prince,FAMILY / MARKET_GEO,太子,family:prince,AMBIGUOUS_FAMILY,20,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,裸太子只到family；需幸福/国际/寰宇/中央/现代等项目词。
+Prince Central Plaza,princecentralplaza,PROJECT,太子中央广场,project:prince-central-plaza,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+Prince Happiness Plaza,princehappinessplaza,PROJECT,太子幸福广场,project:the-pinnacle,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+Prince International Plaza,princeinternationalplaza,PROJECT,太子国际广场,project:prince-international-plaza,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+Prince Modern Plaza,princemodernplaza,PROJECT,太子现代广场,project:prince-modern-plaza,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+Prince One Tropica,princeonetropica,PROJECT,Prince One Tropica（中文俗称待核）,project:new:prince-one-tropica,NEW_PARTIAL_ALIAS,70,True,False,DIRECT_RESOLVE,PARTIAL,真实项目已确认；未找到足够稳定的华人中文俗称，因此中文名不硬翻。
+Prince Universe,princeuniverse,PROJECT,太子寰宇中心,project:prince-universe,EXACT_PROJECT_NAME,100,False,False,SEARCH_ONLY_LEGACY,VERIFIED,canonical英文修正为Prince Huan Yu Center。
+R&F City,r&fcity,PROJECT,富力城,project:rf-city,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+R and F,randf,PROJECT,富力城,project:rf-city,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+RF City,rfcity,PROJECT,富力城,project:rf-city,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+Rose Garden,rosegarden,PROJECT,玫瑰滨江园,project:rose-garden,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Rose Garden Condo,rosegardencondo,PROJECT,玫瑰滨江园,project:rose-garden,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+Rose Garden Condominium,rosegardencondominium,PROJECT,玫瑰滨江园,project:rose-garden,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+Royal One,royalone,FAMILY / MARKET_GEO,皇家一号,family:royal-one,FAMILY_GEO,70,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,裸Royal One默认只指Royal One候选；TK token是TK Royal One必要强证据。
+SKYTREE,skytree,PROJECT,天空树,project:skytree,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+Sky Villa,skyvilla,PROJECT,Sky Villa（天空别墅）,project:sky-villa,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+The Bridge,thebridge,PROJECT,桥牌公寓（世桥）,project:the-bridge,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The Elysee,theelysee,PROJECT,爱丽舍宫,project:new:the-elysee,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,OCIC官方确认钻石岛大型法式商业/商住项目。
+The Elysée,theelysée,PROJECT,爱丽舍宫,project:new:the-elysee,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,OCIC官方确认钻石岛大型法式商业/商住项目。
+The Gateway,thegateway,PROJECT,The Gateway,project:the-gateway,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+The Mesa?,themesa?,PROJECT,金汇 MESONG,project:mesong,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,PARTIAL,The Mesa? 为不确定旧alias，禁止自动匹配。
+The Palms,thepalms,PROJECT,The Palms（棕榈社区）,project:the-palms,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The Palms 棕榈社区,thepalms棕榈社区,PROJECT,The Palms（棕榈社区）,project:the-palms,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The Peak,thepeak,PROJECT,香格里拉公寓 The Peak,project:the-peak,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The Peak 香格里拉,thepeak香格里拉,PROJECT,香格里拉公寓 The Peak,project:the-peak,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The Pinnacle,thepinnacle,PROJECT,太子幸福广场,project:the-pinnacle,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+The Pinnacle Residence,thepinnacleresidence,PROJECT,太子幸福广场,project:the-pinnacle,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The Star Diamond,thestardiamond,PROJECT,炳发钻石城,project:the-star-diamond,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The Star Diamond II,thestardiamondii,PROJECT,炳发 The Star Diamond II,project:the-star-diamond-ii,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The Star Emerald II,thestaremeraldii,PROJECT,炳发翡翠 II,project:the-star-emerald-ii,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The Star Eternal,thestareternal,PROJECT,炳发 The Star Eternal,project:the-star-eternal,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The Star Jumeirah,thestarjumeirah,PROJECT,炳发朱美拉,project:the-star-jumeirah,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The Star Light,thestarlight,PROJECT,炳发 The Star Light,project:the-star-light,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The Star Mera Garden,thestarmeragarden,PROJECT,炳发美拉花园,project:the-star-mera-garden,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The Star Munirah,thestarmunirah,PROJECT,炳发 The Star Munirah,project:the-star-munirah,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The Star Natural,thestarnatural,PROJECT,炳发 The Star Natural,project:the-star-natural,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The Star Platinum,thestarplatinum,PROJECT,炳发 The Star Platinum,project:the-star-platinum,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The Star Platinum Athina,thestarplatinumathina,PROJECT,炳发 Athina,project:the-star-platinum-athina,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The Star Platinum Capital One,thestarplatinumcapitalone,PROJECT,炳发 Capital One,project:the-star-platinum-capital-one,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The Star Platinum Eco Delta,thestarplatinumecodelta,PROJECT,炳发 Eco Delta,project:the-star-platinum-eco-delta,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The Star Platinum Eco Melody,thestarplatinumecomelody,PROJECT,炳发 Eco Melody,project:the-star-platinum-eco-melody,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The Star Platinum Eco Romance,thestarplatinumecoromance,PROJECT,炳发 Eco Romance,project:the-star-platinum-eco-romance,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The Star Platinum Eco Sunrise,thestarplatinumecosunrise,PROJECT,炳发 Eco Sunrise,project:the-star-platinum-eco-sunrise,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The Star Platinum Eco Varanda,thestarplatinumecovaranda,PROJECT,炳发 Eco Varanda,project:the-star-platinum-eco-varanda,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The Star Platinum Euro Ville,thestarplatinumeuroville,PROJECT,炳发 Euro Ville,project:the-star-platinum-euro-ville,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The Star Platinum Herminus,thestarplatinumherminus,PROJECT,炳发 Herminus,project:the-star-platinum-herminus,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The Star Platinum Mastery,thestarplatinummastery,PROJECT,炳发 Mastery,project:the-star-platinum-mastery,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The Star Platinum Mercurean I,thestarplatinummercureani,PROJECT,炳发 Mercurean I,project:the-star-platinum-mercurean-i,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The Star Platinum Mercurean II,thestarplatinummercureanii,PROJECT,炳发 Mercurean II,project:the-star-platinum-mercurean-ii,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The Star Platinum Paradigm,thestarplatinumparadigm,PROJECT,炳发 Paradigm,project:the-star-platinum-paradigm,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The Star Platinum Polaris I,thestarplatinumpolarisi,PROJECT,炳发 Polaris I,project:the-star-platinum-polaris-i,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The Star Platinum Polaris II,thestarplatinumpolarisii,PROJECT,炳发 Polaris II,project:the-star-platinum-polaris-ii,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The Star Platinum Rosato,thestarplatinumrosato,PROJECT,炳发 Rosato,project:the-star-platinum-rosato,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The Star Platinum Roseville,thestarplatinumroseville,PROJECT,炳发 Roseville,project:the-star-platinum-roseville,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The Star Polaris 23 Condominium,thestarpolaris23condominium,PROJECT,炳发 Polaris 23 公寓,project:the-star-polaris-23-condominium,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The Star Premier,thestarpremier,PROJECT,炳发 The Star Premier,project:the-star-premier,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The Star Quateria,thestarquateria,PROJECT,炳发 The Star Quateria,project:the-star-quateria,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+The View,theview,PROJECT,The View,project:the-view,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+The View Serviced Residence,theviewservicedresidence,PROJECT,The View,project:the-view,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+Time Square,timesquare,FAMILY / MARKET_GEO,时代广场,family:time-square,FAMILY_GEO,70,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,必须有数字/道路/BKK/TK等证据才能解析具体期数。
+Time Square 1,timesquare1,PROJECT,时代广场1,project:times-square-1,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Time Square 11,timesquare11,PROJECT,时代广场11（Time Castle）,project:times-square-11,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Time Square 2,timesquare2,PROJECT,时代广场2,project:times-square-2,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Time Square 3,timesquare3,PROJECT,时代广场3,project:times-square-3,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Time Square 302,timesquare302,PROJECT,时代广场6（Time Square 302）,project:new:times-square-6,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,V3缺失；官方明确 Time Square 6 = Time Square 302。
+Time Square 5,timesquare5,PROJECT,时代广场5（Time Square 306）,project:times-square-5,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Time Square 6,timesquare6,PROJECT,时代广场6（Time Square 302）,project:new:times-square-6,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,V3缺失；官方明确 Time Square 6 = Time Square 302。
+Time Square 7,timesquare7,PROJECT,时代广场7,project:times-square-7,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Time Square 8,timesquare8,PROJECT,时代广场8,project:times-square-8,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Time Square 9,timesquare9,PROJECT,时代广场9期,project:times-square-9,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Times Square 1,timessquare1,PROJECT,时代广场1,project:times-square-1,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+TK,tk,PROJECT,TK Royal One,project:tk-royal-one,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+TK Chip Mong,tkchipmong,PROJECT,集茂TK,project:chip-mong-park-land-tk,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+TK Condo,tkcondo,PROJECT,集茂TK公寓,project:chip-mong-park-land-tk-condo,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+TK Royal One,tkroyalone,PROJECT,TK Royal One,project:tk-royal-one,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+TK皇家一号,tk皇家一号,PROJECT,TK Royal One,project:tk-royal-one,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+TS6,ts6,PROJECT,时代广场6（Time Square 302）,project:new:times-square-6,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,V3缺失；官方明确 Time Square 6 = Time Square 302。
+Urban Village,urbanvillage,FAMILY / MARKET_GEO,首都·国金,family:urban-village,FAMILY_GEO,70,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,裸Urban Village/首都国金只到family；需一期/二期或明确位置证据。
+Urban Village 1,urbanvillage1,PROJECT,首都·国金一期,project:urban-village-1,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+Urban Village 2,urbanvillage2,PROJECT,首都·国金二期,project:urban-village-2,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+Urban Village Phase 1,urbanvillagephase1,PROJECT,首都·国金一期,project:urban-village-1,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Urban Village Phase 2,urbanvillagephase2,PROJECT,首都·国金二期,project:urban-village-2,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+UV1,uv1,PROJECT,首都·国金一期,project:urban-village-1,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+UV2,uv2,PROJECT,首都·国金二期,project:urban-village-2,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+Veng Sreng炳发,vengsreng炳发,PROJECT,炳发 Veng Sreng,project:peng-huoth-veng-sreng,FAMILY_GEO,70,True,False,DIRECT_RESOLVE,VERIFIED,
+VERIFIED,verified,PROJECT,The Palms（棕榈社区）,project:the-palms,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+Vila Town,vilatown,PROJECT,Vila Town,project:vila-town,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,NEEDS_VERIFICATION,
+Vue Aston,vueaston,PROJECT,滨江雅诗顿,project:vue-aston,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Wealth Mansion,wealthmansion,PROJECT,威尔斯公馆,project:wealth-mansion,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+Wells Mansion?,wellsmansion?,PROJECT,威尔斯公馆,project:wealth-mansion,EXACT_PROJECT_NAME,100,False,True,REDIRECT_NEEDS_VERIFICATION,VERIFIED,旧Wells Mansion记录并入Wealth Mansion冲突候选；不得创建独立项目。
+Worldbridge,worldbridge,FAMILY / MARKET_GEO,Oxley Worldbridge,family:oxley-worldbridge,FAMILY_GEO,70,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,Bridge/Peak/Palms分别解析，不共享canonical GEO。
+ពិភពថ្មី,ពិភពថ្មី,FAMILY / MARKET_GEO,Piphup Thmey,family:piphup-thmey,FAMILY_GEO,70,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,按Sen Sok/Chamkar Dong/NR4等位置证据解析；裸品牌不定项目。
+一公园,一公园,PROJECT,金边壹号 ONE PARK,project:one-park,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+一号路The Palms,一号路thepalms,PROJECT,The Palms（棕榈社区）,project:the-palms,PROJECT_ROAD,90,True,False,DIRECT_RESOLVE,VERIFIED,
+一号路炳发,一号路炳发,FAMILY / MARKET_GEO,炳发,family:peng-huoth,FAMILY_GEO,70,True,True,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,先按道路/地标缩小family，再解析具体项目；开发商名“炳发”不得直接当PROJECT。
+一号路炳发,一号路炳发,PROJECT,炳发 The Star Platinum,project:the-star-platinum,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+一号路炳发,一号路炳发,PROJECT,炳发 Athina,project:the-star-platinum-athina,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+一号路炳发,一号路炳发,PROJECT,炳发 Capital One,project:the-star-platinum-capital-one,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+一号路炳发,一号路炳发,PROJECT,炳发 Eco Delta,project:the-star-platinum-eco-delta,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+一号路炳发,一号路炳发,PROJECT,炳发 Eco Melody,project:the-star-platinum-eco-melody,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+一号路炳发,一号路炳发,PROJECT,炳发 Eco Romance,project:the-star-platinum-eco-romance,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+一号路炳发,一号路炳发,PROJECT,炳发 Eco Sunrise,project:the-star-platinum-eco-sunrise,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+一号路炳发,一号路炳发,PROJECT,炳发 Eco Varanda,project:the-star-platinum-eco-varanda,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+一号路炳发,一号路炳发,PROJECT,炳发 Euro Ville,project:the-star-platinum-euro-ville,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+一号路炳发,一号路炳发,PROJECT,炳发 Herminus,project:the-star-platinum-herminus,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+一号路炳发,一号路炳发,PROJECT,炳发 Mastery,project:the-star-platinum-mastery,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+一号路炳发,一号路炳发,PROJECT,炳发 Mercurean I,project:the-star-platinum-mercurean-i,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+一号路炳发,一号路炳发,PROJECT,炳发 Mercurean II,project:the-star-platinum-mercurean-ii,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+一号路炳发,一号路炳发,PROJECT,炳发 Paradigm,project:the-star-platinum-paradigm,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+一号路炳发,一号路炳发,PROJECT,炳发 Polaris I,project:the-star-platinum-polaris-i,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+一号路炳发,一号路炳发,PROJECT,炳发 Polaris II,project:the-star-platinum-polaris-ii,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+一号路炳发,一号路炳发,PROJECT,炳发 Rosato,project:the-star-platinum-rosato,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+一号路炳发,一号路炳发,PROJECT,炳发 Roseville,project:the-star-platinum-roseville,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+一号路炳发,一号路炳发,PROJECT,炳发 Polaris 23 公寓,project:the-star-polaris-23-condominium,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+世桥,世桥,PROJECT,桥牌公寓（世桥）,project:the-bridge,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+俄市方向,俄市方向,PROJECT,奥林匹亚城,project:olympia-city,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+俄罗斯市场方向,俄罗斯市场方向,PROJECT,时代广场1,project:times-square-1,PROJECT_LANDMARK,85,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯GEO/地标词不能直接解析到具体PROJECT。
+凯撒公寓,凯撒公寓,PROJECT,钻石凯撒酒店式公寓,project:new:casa-service-apartment,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,与CASA by Meridian不是同一项目，需严格分开。
+名仕城,名仕城,FAMILY,名仕城,family:new:elite-town,NEW_VERIFIED_ALIAS,95,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,OCIC官方中文明确“钻石岛名仕城1期和2期”，III为商业住宅项目；裸“名仕城”只到项目family。
+国金一期,国金一期,PROJECT,首都·国金一期,project:urban-village-1,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+国金二期,国金二期,PROJECT,首都·国金二期,project:urban-village-2,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+堆谷,堆谷,PROJECT,J Tower 1,project:j-tower-1,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,J Tower旧堆谷映射错误。；纯GEO/地标词不能直接解析到具体PROJECT。
+堆谷,堆谷,PROJECT,J Tower 2,project:j-tower-2,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯地理词不能直接映射某个PROJECT。；纯GEO/地标词不能直接解析到具体PROJECT。
+堆谷,堆谷,PROJECT,J Tower 3,project:j-tower-3,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯地理词不能直接映射某个PROJECT。；纯GEO/地标词不能直接解析到具体PROJECT。
+堆谷,堆谷,PROJECT,时代广场1,project:times-square-1,PROJECT_LANDMARK,85,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯GEO/地标词不能直接解析到具体PROJECT。
+堆谷,堆谷,PROJECT,时代广场2,project:times-square-2,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯地理词不能直接映射某个PROJECT。；纯GEO/地标词不能直接解析到具体PROJECT。
+堆谷,堆谷,PROJECT,时代广场3,project:times-square-3,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯地理词不能直接映射某个PROJECT。；纯GEO/地标词不能直接解析到具体PROJECT。
+堆谷,堆谷,PROJECT,时代广场5（Time Square 306）,project:times-square-5,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯地理词不能直接映射某个PROJECT。；纯GEO/地标词不能直接解析到具体PROJECT。
+堆谷,堆谷,PROJECT,TK Royal One,project:tk-royal-one,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯GEO/地标词不能直接解析到具体PROJECT。
+堆谷方向,堆谷方向,PROJECT,金边壹号 ONE PARK,project:one-park,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+塞纳河,塞纳河,PROJECT,塞纳河,project:new:la-seine,NEW_PARTIAL_ALIAS,70,True,False,DIRECT_RESOLVE,PARTIAL,OCIC官方Koh Pich项目列表确认La Seine真实存在；本轮不扩大其住宅/商业细分。
+天空别墅（易混天空树）,天空别墅易混天空树,PROJECT,Sky Villa（天空别墅）,project:sky-villa,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+天空树,天空树,PROJECT,天空树,project:skytree,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+太子,太子,FAMILY / MARKET_GEO,太子,family:prince,AMBIGUOUS_FAMILY,20,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,裸太子只到family；需幸福/国际/寰宇/中央/现代等项目词。
+太子One Tropica,太子onetropica,PROJECT,Prince One Tropica（中文俗称待核）,project:new:prince-one-tropica,NEW_PARTIAL_ALIAS,70,True,False,DIRECT_RESOLVE,PARTIAL,真实项目已确认；未找到足够稳定的华人中文俗称，因此中文名不硬翻。
+太子One Tropica（搜索用）,太子onetropica搜索用,PROJECT,Prince One Tropica（中文俗称待核）,project:new:prince-one-tropica,NEW_PARTIAL_ALIAS,70,True,False,DIRECT_RESOLVE,PARTIAL,真实项目已确认；未找到足够稳定的华人中文俗称，因此中文名不硬翻。
+太子中央,太子中央,PROJECT,太子中央广场,project:prince-central-plaza,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+太子中央广场,太子中央广场,PROJECT,太子中央广场,project:prince-central-plaza,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+太子国际,太子国际,PROJECT,太子国际广场,project:prince-international-plaza,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+太子国际广场,太子国际广场,PROJECT,太子国际广场,project:prince-international-plaza,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+太子寰宇,太子寰宇,PROJECT,太子寰宇中心,project:prince-universe,STRONG_PROJECT_ALIAS,95,True,False,SEARCH_ONLY_LEGACY,VERIFIED,canonical英文修正为Prince Huan Yu Center。
+太子寰宇中心,太子寰宇中心,PROJECT,太子寰宇中心,project:prince-universe,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+太子幸福,太子幸福,PROJECT,太子幸福广场,project:the-pinnacle,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+太子幸福广场,太子幸福广场,PROJECT,太子幸福广场,project:the-pinnacle,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+太子现代,太子现代,PROJECT,太子现代广场,project:prince-modern-plaza,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+太子现代广场,太子现代广场,PROJECT,太子现代广场,project:prince-modern-plaza,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+太子系,太子系,FAMILY / MARKET_GEO,太子,family:prince,AMBIGUOUS_FAMILY,20,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,裸太子只到family；需幸福/国际/寰宇/中央/现代等项目词。
+奥凯德,奥凯德,FAMILY / MARKET_GEO,Orkide / 奥凯德,family:orkide,FAMILY_GEO,70,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,2004路优先The Royal/The Grand但仍需项目词；品牌词不得单独定项目。
+奥凯德2004,奥凯德2004,PROJECT,奥凯德 The Royal（别墅社区）,project:orkide-the-royal,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+奥凯德6A,奥凯德6a,PROJECT,奥凯德 Botanic City,project:orkide-botanic-city,PROJECT_ROAD,90,True,False,DIRECT_RESOLVE,VERIFIED,
+奥凯德Botanic City,奥凯德botaniccity,PROJECT,奥凯德 Botanic City,project:orkide-botanic-city,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+奥凯德Pochentong,奥凯德pochentong,PROJECT,奥凯德 Pochentong,project:orkide-pochentong,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+奥凯德The Grand,奥凯德thegrand,PROJECT,奥凯德 The Grand,project:orkide-the-grand,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+奥凯德The Royal,奥凯德theroyal,PROJECT,奥凯德 The Royal（别墅社区）,project:orkide-the-royal,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+奥凯德公寓,奥凯德公寓,PROJECT,奥凯德皇家公寓,project:new:orkide-the-royal-condominium,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,V3仅有Orkide The Royal别墅社区，本轮确认The Royal Condominium为独立真实公寓项目，必须拆开。
+奥凯德皇家公寓,奥凯德皇家公寓,PROJECT,奥凯德皇家公寓,project:new:orkide-the-royal-condominium,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,V3仅有Orkide The Royal别墅社区，本轮确认The Royal Condominium为独立真实公寓项目，必须拆开。
+奥林匹亚,奥林匹亚,PROJECT,奥林匹亚城,project:olympia-city,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+奥林匹克商圈,奥林匹克商圈,PROJECT,奥林匹亚城,project:olympia-city,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+奥林匹克城,奥林匹克城,PROJECT,奥林匹亚城,project:olympia-city,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+威尔斯,威尔斯,PROJECT,威尔斯公馆,project:wealth-mansion,STRONG_PROJECT_ALIAS,95,True,True,REDIRECT_NEEDS_VERIFICATION,VERIFIED,旧Wells Mansion记录并入Wealth Mansion冲突候选；不得创建独立项目。
+威尔斯公馆,威尔斯公馆,PROJECT,威尔斯公馆,project:wealth-mansion,EXACT_PROJECT_NAME,100,False,True,REDIRECT_NEEDS_VERIFICATION,VERIFIED,旧Wells Mansion记录并入Wealth Mansion冲突候选；不得创建独立项目。
+富力,富力,PROJECT,富力城,project:rf-city,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+富力中心城,富力中心城,PROJECT,富力城,project:rf-city,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+富力城,富力城,PROJECT,富力城,project:rf-city,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+峰会,峰会,PROJECT,香格里拉公寓 The Peak,project:the-peak,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+幸福广场,幸福广场,PROJECT,太子幸福广场,project:the-pinnacle,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+康帝,康帝,PROJECT,王府观邸,project:le-conde-bkk1,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+（待核）,待核,PROJECT,钻石名邸,project:diamond-mansion,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,NEEDS_VERIFICATION,
+德城堡,德城堡,PROJECT,De Castle Royal（德卡斯尔皇家）,project:de-castle-royal,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+摩根,摩根,FAMILY / MARKET_GEO,摩根,family:morgan,AMBIGUOUS_FAMILY,20,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,裸Morgan只到family；EnMaison住宅与Tower办公/综合体严格分开。
+摩根塔,摩根塔,PROJECT,摩根大厦,project:morgan-tower,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+摩根大厦,摩根大厦,PROJECT,摩根大厦,project:morgan-tower,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+摩根天御,摩根天御,PROJECT,摩根天御,project:morgan-enmaison,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+新世界,新世界,FAMILY / MARKET_GEO,New World / 新世界,family:new-world,AMBIGUOUS_FAMILY,20,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,裸New World只到family；Kour Srov 1&2与3按明确项目名区分。
+新世界3,新世界3,PROJECT,新世界 Kour Srov 3,project:new-world-kour-srov-3,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+新世界Kour Srov,新世界koursrov,PROJECT,新世界 Kour Srov 1&2,project:new-world-kour-srov-1-2,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+新世界 Kour Srov 1&2,新世界koursrov1&2,PROJECT,新世界 Kour Srov 1&2,project:new-world-kour-srov-1-2,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+新世界 Kour Srov 3,新世界koursrov3,PROJECT,新世界 Kour Srov 3,project:new-world-kour-srov-3,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+新世界生活/皮普特梅 Sen Sok社区,新世界生活皮普特梅sensok社区,PROJECT,Piphup Thmey 森速社区,project:piphup-thmey-sen-sok,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+时代,时代,FAMILY / MARKET_GEO,时代广场,family:time-square,AMBIGUOUS_FAMILY,20,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,必须有数字/道路/BKK/TK等证据才能解析具体期数。
+时代1,时代1,PROJECT,时代广场1,project:times-square-1,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+时代11,时代11,PROJECT,时代广场11（Time Castle）,project:times-square-11,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+时代2,时代2,PROJECT,时代广场2,project:times-square-2,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+时代3,时代3,PROJECT,时代广场3,project:times-square-3,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+时代302,时代302,PROJECT,时代广场6（Time Square 302）,project:new:times-square-6,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,V3缺失；官方明确 Time Square 6 = Time Square 302。
+时代5,时代5,PROJECT,时代广场5（Time Square 306）,project:times-square-5,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+时代6,时代6,PROJECT,时代广场6（Time Square 302）,project:new:times-square-6,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,V3缺失；官方明确 Time Square 6 = Time Square 302。
+时代7,时代7,PROJECT,时代广场7,project:times-square-7,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+时代8,时代8,PROJECT,时代广场8,project:times-square-8,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+时代9,时代9,PROJECT,时代广场9期,project:times-square-9,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+时代商圈,时代商圈,PROJECT,J Tower 1,project:j-tower-1,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,J Tower旧堆谷映射错误。
+时代广场,时代广场,FAMILY / MARKET_GEO,时代广场,family:time-square,AMBIGUOUS_FAMILY,20,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,必须有数字/道路/BKK/TK等证据才能解析具体期数。
+时代广场1,时代广场1,PROJECT,时代广场1,project:times-square-1,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+时代广场11,时代广场11,PROJECT,时代广场11（Time Castle）,project:times-square-11,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+时代广场2,时代广场2,PROJECT,时代广场2,project:times-square-2,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+时代广场3,时代广场3,PROJECT,时代广场3,project:times-square-3,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+时代广场5,时代广场5,PROJECT,时代广场5（Time Square 306）,project:times-square-5,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+时代广场6,时代广场6,PROJECT,时代广场6（Time Square 302）,project:new:times-square-6,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,V3缺失；官方明确 Time Square 6 = Time Square 302。
+时代广场7,时代广场7,PROJECT,时代广场7,project:times-square-7,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+时代广场8,时代广场8,PROJECT,时代广场8,project:times-square-8,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+时代广场9,时代广场9,PROJECT,时代广场9期,project:times-square-9,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+星河花园,星河花园,PROJECT,金边星河花园,project:xinghe-garden,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+桥,桥,PROJECT,桥牌公寓（世桥）,project:the-bridge,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+桥牌,桥牌,PROJECT,桥牌公寓（世桥）,project:the-bridge,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+棕榈社区,棕榈社区,PROJECT,The Palms（棕榈社区）,project:the-palms,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+森速,森速,PROJECT,集茂598,project:chip-mong-park-land-598,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯地理词不能直接映射某个PROJECT。；纯GEO/地标词不能直接解析到具体PROJECT。
+森速,森速,PROJECT,金边壹号 ONE PARK,project:one-park,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,PARTIAL,纯GEO/地标词不能直接解析到具体PROJECT。
+森速Chip Mong,森速chipmong,PROJECT,集茂金边大城,project:chip-mong-grand-phnom-penh-city,STRONG_PROJECT_ALIAS,95,True,True,CANDIDATE_ONLY,VERIFIED,
+森速Chip Mong,森速chipmong,PROJECT,集茂森速,project:chip-mong-park-land-sen-sok,STRONG_PROJECT_ALIAS,95,True,True,CANDIDATE_ONLY,VERIFIED,
+森速Chip Mong公寓,森速chipmong公寓,PROJECT,集茂TK公寓,project:chip-mong-park-land-tk-condo,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+森速Piphup Thmey,森速piphupthmey,PROJECT,Piphup Thmey 森速社区,project:piphup-thmey-sen-sok,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+森速方向炳发,森速方向炳发,PROJECT,炳发 The Star Light,project:the-star-light,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+森速方向炳发,森速方向炳发,PROJECT,炳发 The Star Premier,project:the-star-premier,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+森速炳发,森速炳发,PROJECT,炳发翡翠 II,project:the-star-emerald-ii,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+森速炳发,森速炳发,PROJECT,炳发 The Star Quateria,project:the-star-quateria,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+毕加索,毕加索,PROJECT,毕加索城市花园,project:picasso-city-garden,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+毕加索 Sky Gemme,毕加索skygemme,PROJECT,Picasso Sky Gemme（中文俗称待核）,project:new:picasso-sky-gemme,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,与Picasso City Garden为两个不同项目；旧表“毕加索天空之石/天空宝石”需避免硬译。
+毕加索天空宝石（仅搜索）,毕加索天空宝石仅搜索,PROJECT,Picasso Sky Gemme（中文俗称待核）,project:new:picasso-sky-gemme,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,与Picasso City Garden为两个不同项目；旧表“毕加索天空之石/天空宝石”需避免硬译。
+毕加索花园,毕加索花园,PROJECT,毕加索城市花园,project:picasso-city-garden,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+水净华,水净华,PROJECT,摩根天御,project:morgan-enmaison,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯GEO/地标词不能直接解析到具体PROJECT。
+水净华方向,水净华方向,PROJECT,集茂6A,project:chip-mong-park-land-6a,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+水净华方向炳发,水净华方向炳发,PROJECT,炳发朱美拉,project:the-star-jumeirah,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+水净华方向炳发,水净华方向炳发,PROJECT,炳发 The Star Munirah,project:the-star-munirah,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+永旺1桥牌,永旺1桥牌,PROJECT,桥牌公寓（世桥）,project:the-bridge,PROJECT_LANDMARK,85,True,False,DIRECT_RESOLVE,VERIFIED,
+永旺1香格里拉,永旺1香格里拉,PROJECT,香格里拉公寓 The Peak,project:the-peak,PROJECT_LANDMARK,85,True,False,DIRECT_RESOLVE,VERIFIED,
+永旺2 Piphup Thmey,永旺2piphupthmey,PROJECT,Piphup Thmey 森速社区,project:piphup-thmey-sen-sok,PROJECT_LANDMARK,85,True,False,DIRECT_RESOLVE,PARTIAL,
+永旺2方向,永旺2方向,PROJECT,集茂森速,project:chip-mong-park-land-sen-sok,PROJECT_LANDMARK,85,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯GEO/地标词不能直接解析到具体PROJECT。
+永旺3 Chankiri,永旺3chankiri,PROJECT,Chankiri Palm Creek（棕榈溪）,project:chankiri-palm-creek,PROJECT_LANDMARK,85,True,False,DIRECT_RESOLVE,PARTIAL,
+永旺3富力城,永旺3富力城,PROJECT,富力城,project:rf-city,PROJECT_LANDMARK,85,True,False,DIRECT_RESOLVE,VERIFIED,
+永旺3方向,永旺3方向,PROJECT,集茂60米,project:chip-mong-landmark-60m,PROJECT_LANDMARK,85,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯GEO/地标词不能直接解析到具体PROJECT。
+永旺3方向,永旺3方向,PROJECT,太子幸福广场,project:the-pinnacle,PROJECT_LANDMARK,85,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯GEO/地标词不能直接解析到具体PROJECT。
+永旺3炳发,永旺3炳发,FAMILY / MARKET_GEO,炳发,family:peng-huoth,FAMILY_GEO,70,True,True,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,先按道路/地标缩小family，再解析具体项目；开发商名“炳发”不得直接当PROJECT。
+永旺3炳发,永旺3炳发,PROJECT,炳发钻石城,project:the-star-diamond,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+永旺3炳发,永旺3炳发,PROJECT,炳发 The Star Diamond II,project:the-star-diamond-ii,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+永旺3附近炳发,永旺3附近炳发,PROJECT,炳发钻石城,project:the-star-diamond,FAMILY_GEO,70,True,False,DIRECT_RESOLVE,VERIFIED,
+洪森大道口,洪森大道口,PROJECT,太子幸福广场,project:the-pinnacle,PROJECT_LANDMARK,85,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯GEO/地标词不能直接解析到具体PROJECT。
+洪森大道富力城,洪森大道富力城,PROJECT,富力城,project:rf-city,PROJECT_ROAD,90,True,False,DIRECT_RESOLVE,VERIFIED,
+洪森大道炳发,洪森大道炳发,PROJECT,炳发钻石城,project:the-star-diamond,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+洪森大道炳发,洪森大道炳发,PROJECT,炳发 The Star Diamond II,project:the-star-diamond-ii,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+湄松,湄松,PROJECT,金汇 MESONG,project:mesong,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,PARTIAL,The Mesa? 为不确定旧alias，禁止自动匹配。
+炳发,炳发,FAMILY / MARKET_GEO,炳发,family:peng-huoth,AMBIGUOUS_FAMILY,20,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,先按道路/地标缩小family，再解析具体项目；开发商名“炳发”不得直接当PROJECT。
+炳发 Athina,炳发athina,PROJECT,炳发 Athina,project:the-star-platinum-athina,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+炳发 Capital One,炳发capitalone,PROJECT,炳发 Capital One,project:the-star-platinum-capital-one,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+炳发 Chamkar Dong,炳发chamkardong,PROJECT,炳发 Chamkar Dong,project:peng-huoth-chamkardong,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+炳发 Eco Delta,炳发ecodelta,PROJECT,炳发 Eco Delta,project:the-star-platinum-eco-delta,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+炳发 Eco Melody,炳发ecomelody,PROJECT,炳发 Eco Melody,project:the-star-platinum-eco-melody,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+炳发 Eco Romance,炳发ecoromance,PROJECT,炳发 Eco Romance,project:the-star-platinum-eco-romance,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+炳发 Eco Sunrise,炳发ecosunrise,PROJECT,炳发 Eco Sunrise,project:the-star-platinum-eco-sunrise,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+炳发 Eco Varanda,炳发ecovaranda,PROJECT,炳发 Eco Varanda,project:the-star-platinum-eco-varanda,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+炳发 Euro Ville,炳发euroville,PROJECT,炳发 Euro Ville,project:the-star-platinum-euro-ville,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+炳发 Herminus,炳发herminus,PROJECT,炳发 Herminus,project:the-star-platinum-herminus,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+炳发 Mastery,炳发mastery,PROJECT,炳发 Mastery,project:the-star-platinum-mastery,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+炳发Mera Garden,炳发meragarden,PROJECT,炳发美拉花园,project:the-star-mera-garden,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+炳发 Mercurean I,炳发mercureani,PROJECT,炳发 Mercurean I,project:the-star-platinum-mercurean-i,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+炳发 Mercurean II,炳发mercureanii,PROJECT,炳发 Mercurean II,project:the-star-platinum-mercurean-ii,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+炳发 Paradigm,炳发paradigm,PROJECT,炳发 Paradigm,project:the-star-platinum-paradigm,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+炳发 Polaris 23 公寓,炳发polaris23公寓,PROJECT,炳发 Polaris 23 公寓,project:the-star-polaris-23-condominium,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+炳发 Polaris I,炳发polarisi,PROJECT,炳发 Polaris I,project:the-star-platinum-polaris-i,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+炳发 Polaris II,炳发polarisii,PROJECT,炳发 Polaris II,project:the-star-platinum-polaris-ii,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+炳发 Rosato,炳发rosato,PROJECT,炳发 Rosato,project:the-star-platinum-rosato,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+炳发 Roseville,炳发roseville,PROJECT,炳发 Roseville,project:the-star-platinum-roseville,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+炳发 The Star Diamond,炳发thestardiamond,PROJECT,炳发钻石城,project:the-star-diamond,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+炳发 The Star Diamond II,炳发thestardiamondii,PROJECT,炳发 The Star Diamond II,project:the-star-diamond-ii,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+炳发 The Star Emerald II,炳发thestaremeraldii,PROJECT,炳发翡翠 II,project:the-star-emerald-ii,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+炳发 The Star Eternal,炳发thestareternal,PROJECT,炳发 The Star Eternal,project:the-star-eternal,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+炳发 The Star Jumeirah,炳发thestarjumeirah,PROJECT,炳发朱美拉,project:the-star-jumeirah,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+炳发 The Star Light,炳发thestarlight,PROJECT,炳发 The Star Light,project:the-star-light,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+炳发 The Star Mera Garden,炳发thestarmeragarden,PROJECT,炳发美拉花园,project:the-star-mera-garden,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+炳发 The Star Munirah,炳发thestarmunirah,PROJECT,炳发 The Star Munirah,project:the-star-munirah,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+炳发 The Star Natural,炳发thestarnatural,PROJECT,炳发 The Star Natural,project:the-star-natural,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+炳发 The Star Platinum,炳发thestarplatinum,PROJECT,炳发 The Star Platinum,project:the-star-platinum,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+炳发 The Star Premier,炳发thestarpremier,PROJECT,炳发 The Star Premier,project:the-star-premier,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+炳发 The Star Quateria,炳发thestarquateria,PROJECT,炳发 The Star Quateria,project:the-star-quateria,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+炳发 Veng Sreng,炳发vengsreng,PROJECT,炳发 Veng Sreng,project:peng-huoth-veng-sreng,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+爱丽舍,爱丽舍,PROJECT,爱丽舍宫,project:new:the-elysee,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,OCIC官方确认钻石岛大型法式商业/商住项目。
+爱丽舍宫,爱丽舍宫,PROJECT,爱丽舍宫,project:new:the-elysee,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,OCIC官方确认钻石岛大型法式商业/商住项目。
+独立碑商圈,独立碑商圈,PROJECT,太子中央广场,project:prince-central-plaza,PROJECT_LANDMARK,85,True,True,DEPRECATE_PROJECT_ALIAS,PARTIAL,纯GEO/地标词不能直接解析到具体PROJECT。
+玫瑰园,玫瑰园,PROJECT,玫瑰滨江园,project:rose-garden,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+玫瑰滨江,玫瑰滨江,PROJECT,玫瑰滨江园,project:rose-garden,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+玫瑰滨江园,玫瑰滨江园,PROJECT,玫瑰滨江园,project:rose-garden,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+百色河玫瑰,百色河玫瑰,PROJECT,玫瑰滨江园,project:rose-garden,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+皇家一号,皇家一号,FAMILY / MARKET_GEO,皇家一号,family:royal-one,FAMILY_GEO,70,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,裸Royal One默认只指Royal One候选；TK token是TK Royal One必要强证据。
+皇家公寓,皇家公寓,PROJECT,奥凯德皇家公寓,project:new:orkide-the-royal-condominium,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,V3仅有Orkide The Royal别墅社区，本轮确认The Royal Condominium为独立真实公寓项目，必须拆开。
+精英城,精英城,FAMILY,名仕城,family:new:elite-town,NEW_VERIFIED_ALIAS,95,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,OCIC官方中文明确“钻石岛名仕城1期和2期”，III为商业住宅项目；裸“名仕城”只到项目family。
+维拉,维拉,PROJECT,Vila Town,project:vila-town,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,NEEDS_VERIFICATION,
+网关,网关,PROJECT,The Gateway,project:the-gateway,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+莫尼旺雅居乐,莫尼旺雅居乐,PROJECT,雅居乐天悦（天空公馆）,project:agile-sky-residence,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+诺罗敦玫瑰,诺罗敦玫瑰,PROJECT,玫瑰滨江园,project:rose-garden,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+财富大厦,财富大厦,PROJECT,威尔斯公馆,project:wealth-mansion,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+近富力,近富力,PROJECT,富力城,project:rf-city,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+金界香格里拉,金界香格里拉,PROJECT,香格里拉公寓 The Peak,project:the-peak,PROJECT_LANDMARK,85,True,False,DIRECT_RESOLVE,VERIFIED,
+金街桥牌,金街桥牌,PROJECT,桥牌公寓（世桥）,project:the-bridge,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+金边中心城,金边中心城,PROJECT,富力城,project:rf-city,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+金边星河花园,金边星河花园,PROJECT,金边星河花园,project:xinghe-garden,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+钻石一号,钻石一号,PROJECT,钻石一号,project:diamond-one,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+钻石凯撒,钻石凯撒,PROJECT,钻石凯撒酒店式公寓,project:new:casa-service-apartment,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,与CASA by Meridian不是同一项目，需严格分开。
+钻石凯撒公寓,钻石凯撒公寓,PROJECT,钻石凯撒酒店式公寓,project:new:casa-service-apartment,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,与CASA by Meridian不是同一项目，需严格分开。
+钻石双塔,钻石双塔,PROJECT,钻石双子塔,project:diamond-twin-tower,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+钻石名邸,钻石名邸,PROJECT,钻石名邸,project:diamond-mansion,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,NEEDS_VERIFICATION,
+钻石岛,钻石岛,PROJECT,钻石庭（CASA Meridian）,project:casa-meridian,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,PARTIAL,纯地理词不能直接映射某个PROJECT。；纯GEO/地标词不能直接解析到具体PROJECT。
+钻石岛,钻石岛,PROJECT,钻石湾花园,project:diamond-bay-garden,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,PARTIAL,纯地理词不能直接映射某个PROJECT。；纯GEO/地标词不能直接解析到具体PROJECT。
+钻石岛,钻石岛,PROJECT,钻石名邸,project:diamond-mansion,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,NEEDS_VERIFICATION,纯地理词不能直接映射某个PROJECT。；纯GEO/地标词不能直接解析到具体PROJECT。
+钻石岛,钻石岛,PROJECT,钻石一号,project:diamond-one,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,PARTIAL,纯地理词不能直接映射某个PROJECT。；纯GEO/地标词不能直接解析到具体PROJECT。
+钻石岛,钻石岛,PROJECT,钻石双子塔,project:diamond-twin-tower,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,PARTIAL,纯地理词不能直接映射某个PROJECT。；纯GEO/地标词不能直接解析到具体PROJECT。
+钻石岛,钻石岛,PROJECT,金汇 MESONG,project:mesong,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,PARTIAL,纯地理词不能直接映射某个PROJECT。；纯GEO/地标词不能直接解析到具体PROJECT。
+钻石岛名仕城,钻石岛名仕城,FAMILY,名仕城,family:new:elite-town,NEW_VERIFIED_ALIAS,95,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,OCIC官方中文明确“钻石岛名仕城1期和2期”，III为商业住宅项目；裸“名仕城”只到项目family。
+钻石岛塞纳河,钻石岛塞纳河,PROJECT,塞纳河,project:new:la-seine,NEW_PARTIAL_ALIAS,70,True,False,DIRECT_RESOLVE,PARTIAL,OCIC官方Koh Pich项目列表确认La Seine真实存在；本轮不扩大其住宅/商业细分。
+钻石岛方向,钻石岛方向,PROJECT,滨江雅诗顿,project:vue-aston,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+钻石岛桥牌,钻石岛桥牌,PROJECT,桥牌公寓（世桥）,project:the-bridge,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+钻石岛爱丽舍,钻石岛爱丽舍,PROJECT,爱丽舍宫,project:new:the-elysee,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,OCIC官方确认钻石岛大型法式商业/商住项目。
+钻石岛香格里拉,钻石岛香格里拉,PROJECT,香格里拉公寓 The Peak,project:the-peak,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+钻石湾花园,钻石湾花园,PROJECT,钻石湾花园,project:diamond-bay-garden,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+铁桥头,铁桥头,PROJECT,炳发 The Star Platinum,project:the-star-platinum,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯地理词不能直接映射某个PROJECT。；纯GEO/地标词不能直接解析到具体PROJECT。
+铁桥头方向,铁桥头方向,PROJECT,滨江雅诗顿,project:vue-aston,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+铁桥头炳发,铁桥头炳发,FAMILY / MARKET_GEO,炳发,family:peng-huoth,FAMILY_GEO,70,True,True,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,先按道路/地标缩小family，再解析具体项目；开发商名“炳发”不得直接当PROJECT。
+铁桥头炳发,铁桥头炳发,PROJECT,炳发 Athina,project:the-star-platinum-athina,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+铁桥头炳发,铁桥头炳发,PROJECT,炳发 Capital One,project:the-star-platinum-capital-one,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+铁桥头炳发,铁桥头炳发,PROJECT,炳发 Eco Delta,project:the-star-platinum-eco-delta,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+铁桥头炳发,铁桥头炳发,PROJECT,炳发 Eco Melody,project:the-star-platinum-eco-melody,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+铁桥头炳发,铁桥头炳发,PROJECT,炳发 Eco Romance,project:the-star-platinum-eco-romance,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+铁桥头炳发,铁桥头炳发,PROJECT,炳发 Eco Sunrise,project:the-star-platinum-eco-sunrise,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+铁桥头炳发,铁桥头炳发,PROJECT,炳发 Eco Varanda,project:the-star-platinum-eco-varanda,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+铁桥头炳发,铁桥头炳发,PROJECT,炳发 Euro Ville,project:the-star-platinum-euro-ville,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+铁桥头炳发,铁桥头炳发,PROJECT,炳发 Herminus,project:the-star-platinum-herminus,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+铁桥头炳发,铁桥头炳发,PROJECT,炳发 Mastery,project:the-star-platinum-mastery,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+铁桥头炳发,铁桥头炳发,PROJECT,炳发 Mercurean I,project:the-star-platinum-mercurean-i,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+铁桥头炳发,铁桥头炳发,PROJECT,炳发 Mercurean II,project:the-star-platinum-mercurean-ii,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+铁桥头炳发,铁桥头炳发,PROJECT,炳发 Paradigm,project:the-star-platinum-paradigm,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+铁桥头炳发,铁桥头炳发,PROJECT,炳发 Polaris I,project:the-star-platinum-polaris-i,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+铁桥头炳发,铁桥头炳发,PROJECT,炳发 Polaris II,project:the-star-platinum-polaris-ii,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+铁桥头炳发,铁桥头炳发,PROJECT,炳发 Rosato,project:the-star-platinum-rosato,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+铁桥头炳发,铁桥头炳发,PROJECT,炳发 Roseville,project:the-star-platinum-roseville,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+铁桥头炳发,铁桥头炳发,PROJECT,炳发 Polaris 23 公寓,project:the-star-polaris-23-condominium,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+雅居乐,雅居乐,PROJECT,雅居乐天悦（天空公馆）,project:agile-sky-residence,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+雅居乐天空公馆,雅居乐天空公馆,PROJECT,雅居乐天悦（天空公馆）,project:agile-sky-residence,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+集茂,集茂,FAMILY / MARKET_GEO,Chip Mong,family:chip-mong,AMBIGUOUS_FAMILY,20,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,道路/项目词优先：598、50M、60M、271、6A、TK、Sen Sok。
+首都国金,首都国金,FAMILY / MARKET_GEO,首都·国金,family:urban-village,FAMILY_GEO,70,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,裸Urban Village/首都国金只到family；需一期/二期或明确位置证据。
+首都·国金一期,首都国金一期,PROJECT,首都·国金一期,project:urban-village-1,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+首都·国金二期,首都国金二期,PROJECT,首都·国金二期,project:urban-village-2,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+香格里拉,香格里拉,PROJECT,香格里拉公寓 The Peak,project:the-peak,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+鼎利,鼎利,PROJECT,鼎利大厦,project:ding-li-tower,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,NEEDS_VERIFICATION,
+鼎利大厦,鼎利大厦,PROJECT,鼎利大厦,project:ding-li-tower,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,NEEDS_VERIFICATION,

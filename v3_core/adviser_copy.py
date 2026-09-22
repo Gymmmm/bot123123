@@ -1,6 +1,6 @@
-"""Evidence-driven copy engine for ``💬 侨联说``.
+"""Evidence-driven copy engine for ``💬 侨联判断``.
 
-侨联说 is a compact renter-facing judgement, not a second facts list. It may
+侨联判断 is a compact renter-facing judgement, not a second facts list. It may
 combine several verified facts into one useful observation, but it must never
 invent market comparisons or turn a single generic field into boilerplate.
 """

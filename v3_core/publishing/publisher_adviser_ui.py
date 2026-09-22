@@ -1,4 +1,4 @@
-"""Publisher-side authoritative controls for 💬 侨联说.
+"""Publisher-side authoritative controls for 💬 侨联判断.
 
 Publisher owns generation and final approval of adviser copy. Manual publishing
 may keep auto copy, replace it with 1-2 operator lines, or hide it. The final
@@ -102,7 +102,7 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
         lines = ["<b>🏠 房源资料已整理</b>", ""]
         for name, label in DISPLAY_FIELDS:
             lines.append(f"{label}：{escape(self._display_value(name, values.get(name)))}")
-        lines.extend(["", f"📷 图片：{len(state.get('images') or [])} 张", f"🎬 视频：{len(state.get('videos') or [])} 条", "", "💬 <b>侨联说</b>"])
+        lines.extend(["", f"📷 图片：{len(state.get('images') or [])} 张", f"🎬 视频：{len(state.get('videos') or [])} 条", "", "💬 <b>侨联判断</b>"])
         adviser = self._adviser_display(detail, state)
         lines.extend(escape(line) for line in adviser.splitlines() if line.strip())
 
@@ -120,7 +120,7 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
             buttons.append([InlineKeyboardButton("➕ 补充资料", callback_data="v3smp|manual_supplement"), InlineKeyboardButton("✏️ 修改资料", callback_data="v3smp|manual_edit")])
         else:
             buttons.append([InlineKeyboardButton("✏️ 修改资料", callback_data="v3smp|manual_edit")])
-        buttons.append([InlineKeyboardButton("💬 调整侨联说", callback_data="v3smp|manual_adviser")])
+        buttons.append([InlineKeyboardButton("💬 调整侨联判断", callback_data="v3smp|manual_adviser")])
         buttons.append([InlineKeyboardButton("📤 检查并发布" if blockers else "👀 生成预览", callback_data="v3smp|manual_preview")])
         buttons.append([InlineKeyboardButton("❌ 取消", callback_data="v3smp|manual_cancel")])
         await message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(buttons))
@@ -133,7 +133,7 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
         current = self._adviser_display(detail, state)
         context.user_data[SIMPLE_EDIT_STATE_KEY] = {"kind": "manual_adviser"}
         await message.reply_text(
-            "<b>💬 调整侨联说</b>\n\n当前内容：\n" + escape(current) + "\n\n直接发送 1–2 句新文案，换行分开。\n保存后必须重新生成预览，发布的一定是预览里看到的版本。",
+            "<b>💬 调整侨联判断</b>\n\n当前内容：\n" + escape(current) + "\n\n直接发送 1–2 句新文案，换行分开。\n保存后必须重新生成预览，发布的一定是预览里看到的版本。",
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🙈 不显示", callback_data="v3smp|manual_adviser_hide"), InlineKeyboardButton("↩️ 恢复自动", callback_data="v3smp|manual_adviser_auto")], [InlineKeyboardButton("⬅️ 返回资料确认", callback_data="v3smp|manual_back_confirm")]]),
         )
@@ -241,7 +241,7 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
                 parse_mode=ParseMode.HTML,
                 reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton("📤 确认发布到频道", callback_data="v3smp|manual_send")],
-                    [InlineKeyboardButton("💬 调整侨联说", callback_data="v3smp|manual_adviser")],
+                    [InlineKeyboardButton("💬 调整侨联判断", callback_data="v3smp|manual_adviser")],
                     [InlineKeyboardButton("🖼 更换封面图片", callback_data="v3smp|manual_cover"), InlineKeyboardButton("🎨 更换封面模板", callback_data="v3smp|manual_templates")],
                     [InlineKeyboardButton("⬅️ 返回资料确认", callback_data="v3smp|manual_back_confirm")],
                 ]),
@@ -270,7 +270,7 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
                 return True
             lines = [line.strip() for line in raw.splitlines() if line.strip()]
             if not 1 <= len(lines) <= 2:
-                await update.effective_message.reply_text("请发送 1–2 句侨联说，换行分开。")
+                await update.effective_message.reply_text("请发送 1–2 句侨联判断，换行分开。")
                 return True
             if not isinstance(state, dict):
                 context.user_data.pop(SIMPLE_EDIT_STATE_KEY, None)
@@ -329,7 +329,7 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
                     valid_session = False
             if not valid_session:
                 await query.message.reply_text(
-                    "⚠️ 这张预览已经失效。侨联说或资料有过调整，请重新生成预览后再发布。",
+                    "⚠️ 这张预览已经失效。侨联判断或资料有过调整，请重新生成预览后再发布。",
                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("👀 重新生成预览", callback_data="v3smp|manual_preview")]]),
                 )
                 return True

@@ -8,16 +8,15 @@ def main_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("🔍 智能找房", callback_data="home_smart_search"),
-                InlineKeyboardButton("📖 关于侨联地产", callback_data="home_brand"),
+                InlineKeyboardButton("🔍 帮我找房", callback_data="home_smart_search"),
+                InlineKeyboardButton("🏠 可预约房源", callback_data="hub:available"),
             ],
             [
-                InlineKeyboardButton("📅 预约看房", callback_data="home_appoint"),
-                InlineKeyboardButton("💎 直接问顾问", callback_data="home_consult"),
+                InlineKeyboardButton("📅 我的预约", callback_data="hub:appointments"),
+                InlineKeyboardButton("🛠 入住服务", callback_data="home_living"),
             ],
             [
-                InlineKeyboardButton("⚡ 入住管家", callback_data="home_living"),
-                InlineKeyboardButton("🧭 周边服务", callback_data="home_nearby"),
+                InlineKeyboardButton("💬 联系中文顾问", callback_data="home_consult"),
             ],
         ]
     )

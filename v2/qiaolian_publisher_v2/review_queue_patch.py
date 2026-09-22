@@ -82,14 +82,21 @@ def install_review_queue_patch() -> None:
 
         for index, row in enumerate(rows, start=1):
             d = ap._draft_to_caption_dict(row)
+            from v3_core.publishing.public_presentation import public_listing_presentation_from_draft
+            d = public_listing_presentation_from_draft(d)
             cap = build_caption(d, caption_variant="a")
-            canonical_head = ap.display_title(d.get("title") or d.get("project") or d.get("area") or row["title"])
+            project_cn = str(d.get("preferred_project_name_cn") or d.get("project") or "").strip()
+            project_en = str(d.get("canonical_project_name_en") or d.get("project_name_en") or "").strip()
+            project_display = "｜".join(x for x in (project_en, project_cn) if x) or ap.display_title(d.get("title") or d.get("area") or row["title"])
+            registry_state = "🟢 Registry 已确认" if d.get("project_entity_id") else ("🟡 项目存在歧义" if d.get("project_resolution_ambiguity") else "🔵 项目待确认")
             head = (
-                f"📋 <b>待审核 {index}/{min(publishable_total, limit)}</b>"
-                f"　·　可审核 {publishable_total} 套"
-                f"　·　资料不完整 {exception_total} 套\n\n"
-                "🏠 <b>请确认这套房源</b>\n"
-                f"{html.escape(canonical_head)}\n\n"
+                f"📋 <b>待审核 {index}/{min(publishable_total, limit)}</b>\n\n"
+                f"🏠 <b>{html.escape(project_display)}</b>\n"
+                f"💰 {html.escape(str(d.get('price') or '—'))}/月\n"
+                f"📍 {html.escape(str(d.get('public_location_display') or d.get('area') or '—'))}\n"
+                f"🏢 {html.escape(str(d.get('floor') or '—'))}\n"
+                f"{registry_state}\n"
+                f"🟢 房源资料：通过\n\n"
             )
             text = head + (cap[:3200] if len(cap) > 3200 else cap)
             img = await asyncio.to_thread(ap._formal_preview_cover, row) or ap._cover_path_for_draft(row)

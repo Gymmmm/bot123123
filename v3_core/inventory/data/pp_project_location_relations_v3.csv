@@ -1,0 +1,40 @@
+project_entity_id,target_entity_id,target_name_cn,relation_type,distance_m,distance_km,walk_minutes,drive_minutes,source,confidence,notes
+project:rose-garden,landmark:sofitel-phnom-penh,索菲特酒店,WALKABLE,300.0,0.3,,,https://www.rosegarden-condo.com/,HIGH,项目官网约300m。
+project:rose-garden,landmark:koh-pich-rainbow-bridge,钻石岛彩虹桥,ADJACENT,,,,,https://www.rosegarden-condo.com/,HIGH,官网表述在彩虹桥对面。
+project:parc-21,landmark:russian-market,俄罗斯市场,WALKABLE,,,,,https://www.parc21condo.com/,HIGH,官网明确short walk。
+project:the-view,landmark:aeon-1,永旺1,WALKABLE,900.0,0.9,10.0,,https://www.hotels.com/ho758231584/the-view-serviced-residence-phnom-penh-cambodia/,MEDIUM,住宿平台距离/步行时间。
+project:the-palms,landmark:southbridge,Southbridge国际学校,NEARBY_DRIVE,,2.4,,6.0,https://www.baancoin.com/projects/cambodia/phnom-penh/chbar-ampov/veal-sbov/the-palms,MEDIUM,约2.3-2.4km/6分钟。
+project:the-palms,landmark:koh-norea-bridge,诺利亚桥,NEARBY_DRIVE,,,,5.0,https://camrealtyservice.com/boreys/the-palms/,MEDIUM,市场/楼盘页称约5分钟。
+project:the-star-platinum-rosato,landmark:monivong-bridge,莫尼旺桥,NEARBY_DRIVE,,2.5,,,https://boreypenghuoth.com/borey/en/our-properties/the-star-platinum-rosato/,HIGH,官网称距桥约2.5km。
+project:the-star-platinum-euro-ville,landmark:monivong-bridge,莫尼旺桥,NEARBY_DRIVE,,2.5,,,https://boreypenghuoth.com/borey/en/project-listing/,MEDIUM,官方各项目页/项目列表属于一号路Grand Star Platinum体系；2.5km证据在对应项目页。
+project:the-star-platinum-roseville,landmark:monivong-bridge,莫尼旺桥,NEARBY_DRIVE,,2.5,,,https://boreypenghuoth.com/borey/en/project-listing/,MEDIUM,官方各项目页/项目列表属于一号路Grand Star Platinum体系；2.5km证据在对应项目页。
+project:the-star-platinum-mastery,landmark:monivong-bridge,莫尼旺桥,NEARBY_DRIVE,,2.5,,,https://boreypenghuoth.com/borey/en/project-listing/,MEDIUM,官方各项目页/项目列表属于一号路Grand Star Platinum体系；2.5km证据在对应项目页。
+project:the-star-platinum-eco-romance,landmark:monivong-bridge,莫尼旺桥,NEARBY_DRIVE,,2.5,,,https://boreypenghuoth.com/borey/en/project-listing/,MEDIUM,官方各项目页/项目列表属于一号路Grand Star Platinum体系；2.5km证据在对应项目页。
+project:the-star-platinum-eco-varanda,landmark:monivong-bridge,莫尼旺桥,NEARBY_DRIVE,,2.5,,,https://boreypenghuoth.com/borey/en/project-listing/,MEDIUM,官方各项目页/项目列表属于一号路Grand Star Platinum体系；2.5km证据在对应项目页。
+project:the-star-platinum-eco-melody,landmark:monivong-bridge,莫尼旺桥,NEARBY_DRIVE,,2.5,,,https://boreypenghuoth.com/borey/en/project-listing/,MEDIUM,官方各项目页/项目列表属于一号路Grand Star Platinum体系；2.5km证据在对应项目页。
+project:the-star-platinum-eco-delta,landmark:monivong-bridge,莫尼旺桥,NEARBY_DRIVE,,2.5,,,https://boreypenghuoth.com/borey/en/project-listing/,MEDIUM,官方各项目页/项目列表属于一号路Grand Star Platinum体系；2.5km证据在对应项目页。
+project:the-star-platinum-paradigm,landmark:monivong-bridge,莫尼旺桥,NEARBY_DRIVE,,2.5,,,https://boreypenghuoth.com/borey/en/project-listing/,MEDIUM,官方各项目页/项目列表属于一号路Grand Star Platinum体系；2.5km证据在对应项目页。
+project:the-star-platinum-polaris-i,landmark:monivong-bridge,莫尼旺桥,NEARBY_DRIVE,,2.5,,,https://boreypenghuoth.com/borey/en/project-listing/,MEDIUM,官方各项目页/项目列表属于一号路Grand Star Platinum体系；2.5km证据在对应项目页。
+project:the-star-platinum-capital-one,landmark:monivong-bridge,莫尼旺桥,NEARBY_DRIVE,,2.5,,,https://boreypenghuoth.com/borey/en/project-listing/,MEDIUM,官方各项目页/项目列表属于一号路Grand Star Platinum体系；2.5km证据在对应项目页。
+project:the-star-platinum-mercurean-ii,landmark:kbal-thnal-skybridge,Kbal Thnal立交桥,NEARBY_DRIVE,,2.0,,,https://boreypenghuoth.com/borey/en/our-properties/the-star-platinum-mercurean-ii/,HIGH,官网称约2km。
+project:chankiri-palm-creek,landmark:aeon-3,永旺3,NEARBY_DRIVE,,,,,https://urbanlandasia.com/assets/documents/Chankiri-Palm-Creek-E-Brochure-EN.pdf,HIGH,官方资料称距Hun Sen Blvd及未来AEON3仅数分钟，未给精确分钟。
+project:chip-mong-park-land-50m,landmark:aeon-3,永旺3,NEARBY_DRIVE,,,,10.0,https://www.api.cmld-qas.com/articles/news/Park-Land-50M/en,HIGH,Chip Mong官方新闻称约10分钟。
+project:chip-mong-park-land-50m,landmark:chip-mong-271,Chip Mong 271,NEARBY_DRIVE,,,,15.0,https://www.api.cmld-qas.com/articles/news/Park-Land-50M/en,HIGH,Chip Mong官方新闻称约15分钟。
+project:piphup-thmey-sen-sok,landmark:aeon-2,永旺2,NEARBY_DRIVE,,,,7.0,https://camrealtyservice.com/boreys/pi-phup-thmey-sen-sok-aeon-mall-2/,MEDIUM,市场项目页约7分钟。
+project:piphup-thmey-sen-sok,landmark:makro-sen-sok,Makro森速,NEARBY_DRIVE,,,,5.0,https://camrealtyservice.com/boreys/pi-phup-thmey-sen-sok-aeon-mall-2/,MEDIUM,市场项目页约5分钟。
+project:agile-sky-residence,geo:bkk1,BKK1,MARKET_POSITIONING,,,,,,MEDIUM,市场位置表达；不反写canonical GEO。
+project:the-bridge,geo:koh-pich,钻石岛,MARKET_POSITIONING,,,,,,MEDIUM,市场位置表达；不反写canonical GEO。
+project:the-bridge,landmark:aeon-1,永旺1,MARKET_POSITIONING,,,,,,MEDIUM,市场位置表达；不反写canonical GEO。
+project:the-peak,geo:koh-pich,钻石岛,MARKET_POSITIONING,,,,,,MEDIUM,市场位置表达；不反写canonical GEO。
+project:the-peak,landmark:nagaworld,金界,MARKET_POSITIONING,,,,,,MEDIUM,市场位置表达；不反写canonical GEO。
+project:rf-city,landmark:aeon-3,永旺3,MARKET_POSITIONING,,,,,,MEDIUM,市场位置表达；不反写canonical GEO。
+project:urban-village-1,landmark:aeon-3,永旺3,MARKET_POSITIONING,,,,,,MEDIUM,市场位置表达；不反写canonical GEO。
+project:urban-village-2,landmark:aeon-3,永旺3,MARKET_POSITIONING,,,,,,MEDIUM,市场位置表达；不反写canonical GEO。
+project:times-square-3,landmark:tk-avenue,TK Avenue,MARKET_POSITIONING,,,,,,MEDIUM,市场位置表达；不反写canonical GEO。
+project:times-square-7,landmark:tk-avenue,TK Avenue,MARKET_POSITIONING,,,,,,MEDIUM,市场位置表达；不反写canonical GEO。
+project:times-square-11,landmark:russian-market,俄罗斯市场,MARKET_POSITIONING,,,,,,MEDIUM,市场位置表达；不反写canonical GEO。
+project:diamond-bay-garden,landmark:aeon-1,永旺1,MARKET_POSITIONING,,,,,,MEDIUM,市场位置表达；不反写canonical GEO。
+project:la-vista-one,landmark:sunrise-japan-hospital,Sunrise Japan Hospital,MARKET_POSITIONING,,,,,,MEDIUM,市场位置表达；不反写canonical GEO。
+project:the-star-diamond,landmark:aeon-3,永旺3,MARKET_POSITIONING,,,,,,MEDIUM,市场位置表达；不反写canonical GEO。
+project:the-star-diamond-ii,landmark:aeon-3,永旺3,MARKET_POSITIONING,,,,,,MEDIUM,市场位置表达；不反写canonical GEO。
+project:the-star-platinum-rosato,landmark:koh-norea-bridge,诺利亚桥,MARKET_POSITIONING,,,,,,MEDIUM,市场位置表达；不反写canonical GEO。

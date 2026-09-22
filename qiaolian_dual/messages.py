@@ -131,18 +131,10 @@ def deposit_text() -> str:
 
 
 def home_text() -> str:
-    advisor = (ADVISOR_TG or "").strip()
-    if advisor and not advisor.startswith("@"):
-        advisor = f"@{advisor}"
-    advisor = advisor or "@qiaolian_support"
     return (
-        "🏠 <b>侨联地产 · 金边华人房产服务</b>\n\n"
-        "真实房源 · 实拍更新\n"
-        "公寓 · 别墅 · 商铺 · 土地\n\n"
-        "━━━━━━━━━━\n\n"
-        "在金边找房，找自己人\n\n"
-        f"📱 顾问：{e(advisor)}\n\n"
-        "👇 点按钮开始："
+        "👋 我是<b>侨联小管家</b>\n\n"
+        "想找金边租房，直接告诉我区域、预算或户型就可以。\n"
+        "也可以点下面开始。"
     )
 
 

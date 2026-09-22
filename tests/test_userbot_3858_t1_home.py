@@ -14,21 +14,23 @@ def _labels(markup):
     return [button.text for row in markup.inline_keyboard for button in row]
 
 
-def test_t1_home_is_3858_six_buttons():
+def test_t1_home_is_final_ui_five_buttons():
     assert _labels(main_keyboard()) == [
-        "🔍 智能找房",
-        "📖 关于侨联地产",
-        "📅 预约看房",
-        "💎 直接问顾问",
-        "⚡ 入住管家",
-        "🧭 周边服务",
+        "🔍 帮我找房",
+        "🏠 可预约房源",
+        "📅 我的预约",
+        "🛠 入住服务",
+        "💬 联系中文顾问",
     ]
 
 
-def test_t1_welcome_uses_3858_home_copy():
+def test_t1_welcome_uses_butler_home_copy():
     text = welcome_text()
     assert text == home_text()
-    assert "侨联地产 · 金边华人房产服务" in text
+    assert "侨联小管家" in text
+    assert "想找金边租房" in text
+    assert "关于侨联地产" not in text
+    assert "智能找房" not in _labels(main_keyboard())
 
 
 def test_t1_no_match_keeps_3858_recovery():
