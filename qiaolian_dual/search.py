@@ -75,69 +75,21 @@ def _public_search_listings(
     ilike_fragment: str | None = None,
     limit: int = 6,
 ) -> list[dict]:
-    """面向租客的公开房源查询，只返回真实发布且可预约的房源。"""
-    table_names = db._table_names()
-    if not {'drafts', 'posts'}.issubset(table_names):
-        return []
+    """面向租客的公开房源查询：只读现代已发布且当前可预约库存。"""
+    del ilike_fragment
+    from .adapters.public_inventory import PublicInventoryAdapter
 
-    clauses = [
-        "listings.status IN ('active','reserved')",
-        """EXISTS (
-            SELECT 1 FROM drafts d JOIN posts p ON p.draft_id=d.draft_id
-            WHERE d.listing_id=listings.listing_id AND d.review_status='published'
-              AND p.platform='telegram' AND p.publish_status IN ('published','success','ok')
-        )""",
-    ]
-    params: list[object] = []
-
-    if property_type:
-        clauses.append('listings.property_type=?')
-        params.append(property_type)
-
-    cleaned_areas = [str(area).strip() for area in (areas or []) if str(area or '').strip() and str(area).strip() != '不限']
-    if cleaned_areas:
-        placeholders = ','.join('?' for _ in cleaned_areas)
-        clauses.append(f'listings.area IN ({placeholders})')
-        params.extend(cleaned_areas)
-
-    if budget_min is not None:
-        clauses.append('listings.price>=?')
-        params.append(int(budget_min))
-    if budget_max is not None:
-        clauses.append('listings.price<=?')
-        params.append(int(budget_max))
-
-    fragment = str(ilike_fragment or '').strip()
-    if fragment:
-        token = f'%{fragment}%'
-        clauses.append(
-            "(listings.title LIKE ? OR listings.area LIKE ? OR listings.community LIKE ? "
-            "OR listings.layout LIKE ? OR listings.property_type LIKE ? OR listings.highlights LIKE ?)"
+    try:
+        return PublicInventoryAdapter(DB_PATH).search(
+            property_type=property_type or None,
+            areas=areas,
+            budget_min=budget_min,
+            budget_max=budget_max,
+            limit=limit,
         )
-        params.extend([token] * 6)
-
-    sql = (
-        'SELECT listings.* FROM listings WHERE '
-        + ' AND '.join(clauses)
-        + ' ORDER BY CASE listings.status WHEN \'active\' THEN 0 ELSE 1 END, '
-          'listings.updated_at DESC, listings.created_at DESC LIMIT ?'
-    )
-    params.append(max(1, int(limit)))
-
-    with db.connect() as conn:
-        rows = conn.execute(sql, params).fetchall()
-
-    result: list[dict] = []
-    for row in rows:
-        item = {key: row[key] for key in row.keys()}
-        raw_tags = item.pop('tags_json', '[]') or '[]'
-        try:
-            item['tags'] = json.loads(raw_tags)
-        except (TypeError, ValueError, json.JSONDecodeError):
-            item['tags'] = []
-        result.append(item)
-    return result
-
+    except (FileNotFoundError, sqlite3.Error):
+        logger.exception("读取现代公开房源失败")
+        return []
 
 def _area_aliases(area: str | None) -> list[str] | None:
     """把客户侧组合区域投影成数据库可查询的 canonical aliases。"""
