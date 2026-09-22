@@ -180,6 +180,7 @@ class PublicInventoryAdapter:
         property_type: str | None = None,
         areas: list[str] | tuple[str, ...] | None = None,
         project_terms: list[str] | tuple[str, ...] | None = None,
+        room_type: str | None = None,
         budget_min: int | None = None,
         budget_max: int | None = None,
         limit: int = 6,
@@ -200,6 +201,7 @@ class PublicInventoryAdapter:
                     if str(area or "").strip() and str(area or "").strip() != "不限"
                 )
             ),
+            room_type=str(room_type or "").strip(),
             budget_min=budget_min,
             budget_max=budget_max,
             limit=max(1, int(limit)),

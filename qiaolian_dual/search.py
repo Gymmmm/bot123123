@@ -98,6 +98,7 @@ def _public_search_listings(
     property_type: str | None = None,
     areas: list[str] | tuple[str, ...] | None = None,
     project_terms: list[str] | tuple[str, ...] | None = None,
+    room_type: str | None = None,
     budget_min: int | None = None,
     budget_max: int | None = None,
     ilike_fragment: str | None = None,
@@ -112,6 +113,7 @@ def _public_search_listings(
             property_type=property_type or None,
             areas=areas,
             project_terms=project_terms,
+            room_type=room_type,
             budget_min=budget_min,
             budget_max=budget_max,
             limit=limit,
@@ -142,6 +144,7 @@ def search_listings_with_fallback(
     budget_max: int | None,
     text_fragment: str = '',
     project_terms: list[str] | tuple[str, ...] | None = None,
+    room_type: str | None = None,
     limit: int = 3,
 ) -> tuple[list[dict], str]:
     """执行严格公开搜索；没有严格匹配时不自动放宽条件。"""
@@ -150,6 +153,7 @@ def search_listings_with_fallback(
         property_type=property_type or None,
         areas=_area_aliases(area),
         project_terms=project_terms,
+        room_type=room_type,
         budget_min=budget_min,
         budget_max=budget_max,
         limit=limit,

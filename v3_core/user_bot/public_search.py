@@ -21,6 +21,70 @@ from .search_query import SearchCriteria
 from .search_results import augment_strict_single_result
 
 
+_ROOM_TYPE_ALIASES = {
+    "studio": "studio",
+    "开间": "studio",
+    "单间": "studio",
+    "1房": "1房",
+    "一房": "1房",
+    "2房": "2房",
+    "两房": "2房",
+    "二房": "2房",
+    "3房": "3房",
+    "三房": "3房",
+    "4房": "4房",
+    "四房": "4房",
+    "四房+": "4房",
+}
+
+
+def _normalize_room_type(room_type: object) -> str:
+    raw = str(room_type or "").strip()
+    if not raw or raw in {"any", "不限"}:
+        return ""
+    return _ROOM_TYPE_ALIASES.get(raw, raw)
+
+
+def _room_type_sql(room_type: object) -> tuple[str, list[object]]:
+    """Strict bedroom/layout filter for published inventory search."""
+    token = _normalize_room_type(room_type)
+    if not token:
+        return "", []
+    if token == "studio":
+        return (
+            "("
+            "lower(COALESCE(l.layout, '')) LIKE '%studio%' "
+            "OR COALESCE(l.layout, '') LIKE '%开间%' "
+            "OR COALESCE(l.layout, '') LIKE '%单间%'"
+            ")",
+            [],
+        )
+    bedroom_map = {"1房": 1, "2房": 2, "3房": 3}
+    layout_patterns = {
+        "1房": ("%1房%", "%一房%", "%1br%", "%1 bed%"),
+        "2房": ("%2房%", "%两房%", "%二房%", "%2br%", "%2 bed%"),
+        "3房": ("%3房%", "%三房%", "%3br%", "%3 bed%"),
+        "4房": ("%4房%", "%四房%", "%4br%", "%4 bed%", "%5房%", "%五房%"),
+    }
+    patterns = layout_patterns.get(token)
+    if not patterns:
+        return "", []
+    layout_clause = " OR ".join(
+        "lower(COALESCE(l.layout, '')) LIKE lower(?)" for _ in patterns
+    )
+    params: list[object] = list(patterns)
+    if token == "4房":
+        return (
+            f"(COALESCE(l.bedrooms, 0) >= 4 OR ((l.bedrooms IS NULL OR l.bedrooms = 0) AND ({layout_clause})))",
+            params,
+        )
+    bedrooms = bedroom_map[token]
+    return (
+        f"(l.bedrooms = ? OR ((l.bedrooms IS NULL OR l.bedrooms = 0) AND ({layout_clause})))",
+        [bedrooms, *params],
+    )
+
+
 @dataclass(frozen=True)
 class SearchExecution:
     items: tuple[PublishedListingView, ...]
@@ -50,6 +114,7 @@ class PublicSearchReader:
         property_type: str = "",
         project_terms: tuple[str, ...] = (),
         location_keys: tuple[str, ...] = (),
+        room_type: str = "",
         budget_min: int | None = None,
         budget_max: int | None = None,
         limit: int = 3,
@@ -101,6 +166,11 @@ class PublicSearchReader:
             )
             params.extend(clean_locations)
             params.extend(clean_locations)
+
+        room_clause, room_params = _room_type_sql(room_type)
+        if room_clause:
+            clauses.append(room_clause)
+            params.extend(room_params)
 
         if budget_min is not None:
             clauses.append("o.monthly_rent_usd>=?")
@@ -155,6 +225,7 @@ class PublicSearchService:
         items = self.reader.search(
             property_type=criteria.property_type,
             location_keys=criteria.location_keys,
+            room_type=criteria.room_type,
             budget_min=criteria.budget_min,
             budget_max=criteria.budget_max,
             limit=limit,

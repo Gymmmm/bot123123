@@ -47,7 +47,7 @@ async def handle_search_callback(update: Update, context: ContextTypes.DEFAULT_T
         room_type = data.split(':', 1)[1]
         property_type = '' if room_type == 'any' else detect_property_type(room_type)
         _remember_video_pref(context, layout=None if room_type == 'any' else room_type)
-        matches_found, match_mode = search_listings(property_type=property_type or None, area=None, budget_min=None, budget_max=None, text_fragment='' if room_type == 'any' else room_type, limit=5)
+        matches_found, match_mode = search_listings(property_type=property_type or None, area=None, budget_min=None, budget_max=None, text_fragment='' if room_type == 'any' else room_type, room_type=None if room_type == 'any' else room_type, limit=5)
         create_lead(user, action='keyword_find_play', source='home_layout', property_type=property_type, payload={'message': room_type, 'match_mode': match_mode, 'room_type': room_type})
         if matches_found:
             await send_results(update, context, matches_found, 'strict')

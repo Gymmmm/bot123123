@@ -2,8 +2,8 @@
 
 Budget/property/room parsing follows the locked production User Bot. Location
 matching is derived from the V3 canonical taxonomy instead of maintaining a
-second alias table. Room type is intentionally recorded but not applied as a
-strict DB filter yet, matching fixed-SHA production behavior.
+second alias table. Room type is applied as a published-inventory filter by
+PublicSearchReader when present.
 """
 from __future__ import annotations
 
@@ -15,9 +15,10 @@ from v3_core.inventory.listing_taxonomy import MARKET_LOCATIONS, PHYSICAL_AREAS,
 
 _ROOM_TYPE_HINTS = {
     "studio": ("studio", "开间", "单间"),
-    "1房": ("1房", "一房", "1br", "1 bed", "一居"),
-    "2房": ("2房", "二房", "2br", "2 bed", "两居"),
-    "3房": ("3房", "三房", "3br", "3 bed", "三居"),
+    "1房": ("1房", "一房", "1br", "1 bed", "一居", "一室"),
+    "2房": ("2房", "两房", "二房", "2br", "2 bed", "两居", "两室", "二室"),
+    "3房": ("3房", "三房", "3br", "3 bed", "三居", "三室"),
+    "4房": ("4房", "四房", "4br", "4 bed", "四居", "四室", "四房+"),
 }
 
 _PROPERTY_TYPES = (
@@ -115,6 +116,7 @@ class SearchCriteria:
         return bool(
             self.property_type
             or self.location_keys
+            or self.room_type
             or self.budget_min is not None
             or self.budget_max is not None
         )

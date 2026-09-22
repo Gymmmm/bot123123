@@ -103,7 +103,7 @@ async def handle_main_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     if wants_video:
         return await start_video_tour_flow(update, context, source='natural_keyword', area=area_use, budget_min=budget_min, budget_max=budget_max, layout=room_type or property_type)
     if area_use or room_type or budget_min is not None or (budget_max is not None) or project_terms:
-        matches, match_mode = search_listings_with_fallback(property_type=property_type or None, area=area_use, budget_min=budget_min, budget_max=budget_max, text_fragment=f'{text} {room_type}'.strip(), project_terms=project_terms, limit=5)
+        matches, match_mode = search_listings_with_fallback(property_type=property_type or None, area=area_use, budget_min=budget_min, budget_max=budget_max, text_fragment=f'{text} {room_type}'.strip(), project_terms=project_terms, room_type=room_type or None, limit=5)
         logger.info('route=natural_keyword update_id=%s user_id=%s area=%s budget=%s-%s mode=%s matched=%d ids=%s', getattr(update, 'update_id', None), getattr(user, 'id', None), area_use or '-', budget_min, budget_max, match_mode, len(matches), ','.join((str(item.get('listing_id') or '-') for item in matches[:5])))
         create_lead(user, action='keyword_find_play', source='natural_keyword', area=area_use, property_type=property_type, budget_min=budget_min, budget_max=budget_max, payload={'message': text[:700], 'match_mode': match_mode, 'room_type': room_type})
         if matches:

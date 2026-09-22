@@ -23,6 +23,7 @@ def test_property_and_room_detection_match_locked_keywords():
     assert detect_property_type("办公室 1000以内") == "办公室"
     assert detect_room_type("BKK1 一房 800内") == "1房"
     assert detect_room_type("想找2br") == "2房"
+    assert detect_room_type("富力城两房") == "2房"
     assert detect_room_type("studio") == "studio"
 
 

@@ -169,18 +169,26 @@ def test_search_returns_only_current_durably_published_rent_inventory(tmp_path):
     assert all(item.bookable for item in items)
 
 
-def test_strict_search_uses_type_location_and_budget_but_not_room_hint(tmp_path):
+def test_strict_search_applies_room_type_filter(tmp_path):
     db = _db(tmp_path)
+    _seed_listing(
+        db,
+        suffix="G",
+        public_id="QL-BK-N6P7",
+        property_type="公寓",
+        location_key="BKK1",
+        rent=780,
+        layout="1房1卫",
+    )
     service = PublicSearchService(PublicSearchReader(db))
-    criteria = parse_search_criteria("BKK1 公寓 800以内 一房")
 
-    result = service.strict(criteria, limit=5)
+    one_br = service.strict(parse_search_criteria("BKK1 公寓 800以内 一房"), limit=5)
+    two_br = service.strict(parse_search_criteria("BKK1 公寓 800以内 两房"), limit=5)
 
-    assert result.mode == "strict"
-    assert criteria.room_type == "1房"
-    # Fixed-SHA parity: room hint is recorded but not yet a DB filter. The
-    # published BKK1 apartment is a 2-room listing and still matches.
-    assert [item.public_listing_id for item in result.items] == ["QL-BK-A2B3"]
+    assert one_br.mode == "strict"
+    assert [item.public_listing_id for item in one_br.items] == ["QL-BK-N6P7"]
+    assert two_br.mode == "strict"
+    assert [item.public_listing_id for item in two_br.items] == ["QL-BK-A2B3"]
 
 
 def test_strict_search_never_auto_relaxes_conditions(tmp_path):

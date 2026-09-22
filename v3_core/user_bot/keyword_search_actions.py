@@ -68,21 +68,18 @@ def _last_pref(criteria: SearchCriteria) -> dict[str, object]:
 def _looks_like_direct_search(criteria: SearchCriteria) -> bool:
     """Claim only text with enough currently-enforced rental filters.
 
-    Room type is intentionally not used as the deciding filter here because the
-    current published-inventory query does not strictly filter by room type.
-    This prevents messages such as just "两房" from being presented as a precise
-    room-type search when they are not.
+    A bare room-type mention such as just "两房" is still not enough on its own.
+    Room type is now a real published-inventory filter, so it can complete a
+    location/budget search when paired with another housing cue.
     """
     has_location = bool(criteria.location_keys)
     has_budget = criteria.budget_min is not None or criteria.budget_max is not None
     has_property_type = bool(str(criteria.property_type or "").strip())
+    has_room_type = bool(str(criteria.room_type or "").strip())
 
-    # A location is a strong real-estate intent when accompanied by another
-    # housing cue, including room type. Budget/property combinations are also
-    # sufficiently specific. A lone number or casual room-type mention is not.
-    if has_location and (has_budget or has_property_type or bool(criteria.room_type)):
+    if has_location and (has_budget or has_property_type or has_room_type):
         return True
-    if has_budget and has_property_type:
+    if has_budget and (has_property_type or has_room_type):
         return True
     return False
 

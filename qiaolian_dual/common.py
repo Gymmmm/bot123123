@@ -28,7 +28,13 @@ logger = logging.getLogger(__name__)
 MAIN, FIND_AREA, FIND_BUDGET, APPT_MODE, APPT_FOCUS, APPT_DATE, APPT_TIME, APPT_CONFIRM = range(8)
 _AREA_HINT_KEYS = ('BKK1', 'BKK2', 'BKK3', '森速', 'TK/7月区', '俄罗斯市场', '钻石岛')
 AREA_HINTS = [get_display_location(key) for key in _AREA_HINT_KEYS] + ['不限']
-ROOM_TYPE_HINTS = {'studio': ['studio', '开间', '单间'], '1房': ['1房', '一房', '1br', '1 bed', '一居'], '2房': ['2房', '二房', '2br', '2 bed', '两居'], '3房': ['3房', '三房', '3br', '3 bed', '三居']}
+ROOM_TYPE_HINTS = {
+    'studio': ['studio', '开间', '单间'],
+    '1房': ['1房', '一房', '1br', '1 bed', '一居', '一室'],
+    '2房': ['2房', '两房', '二房', '2br', '2 bed', '两居', '两室', '二室'],
+    '3房': ['3房', '三房', '3br', '3 bed', '三居', '三室'],
+    '4房': ['4房', '四房', '4br', '4 bed', '四居', '四室', '四房+'],
+}
 START_ACTIONS = ('consult', 'appoint', 'fav', 'more')
 START_ACTION_ALIASES = {'a': 'appoint', 'f': 'fav', 'm': 'more', 'q': 'consult'}
 START_ACTION_CODES = {action: alias for alias, action in START_ACTION_ALIASES.items()}
