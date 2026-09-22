@@ -41,7 +41,7 @@ class AppointmentAdapter:
             for row in existing:
                 status = str(row.get("status") or "").lower()
                 same = str(row.get("listing_id") or "") == internal_listing_id
-                unfinished = status in {"pending", "assigned", "contacted", ""}
+                unfinished = status in {"pending", "assigned", "contacted"}
                 if same and unfinished:
                     raise ValueError("appointment_duplicate")
 
