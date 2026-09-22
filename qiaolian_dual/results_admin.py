@@ -15,9 +15,50 @@ def _listing_card_keyboard(listing_id: str, *, available: bool = True, nav: list
     ])
     if available:
         rows.append([InlineKeyboardButton('📅 预约看房', callback_data=f'listing:appoint:{listing_id}')])
-    rows.append([InlineKeyboardButton('💬 联系我们', callback_data=f'listing:consult:{listing_id}')])
+    rows.append([InlineKeyboardButton('💬 咨询这套', callback_data=f'listing:consult:{listing_id}')])
     rows.append([InlineKeyboardButton('✏️ 换个条件', callback_data='home_smart_search')])
     return InlineKeyboardMarkup(rows)
+
+
+def _rent_usd(value: object) -> int | None:
+    if isinstance(value, (int, float)) and value > 0:
+        return int(value)
+    raw = str(value or '').strip()
+    if not raw:
+        return None
+    match = re.search(r'(\d[\d,]*)', raw.replace('，', ','))
+    if not match:
+        return None
+    amount = int(match.group(1).replace(',', ''))
+    return amount if amount > 0 else None
+
+
+def _estimated_first_payment(item: dict, rent: int | None) -> int | None:
+    """押+付月数 × 月租；优先 canonical 月数，其次解析「押X付Y」。"""
+    if rent is None or rent <= 0:
+        return None
+    facts = item.get('normalized_data')
+    if not isinstance(facts, dict):
+        facts = {}
+    months = 0
+    try:
+        deposit = int(facts.get('deposit_months') or 0)
+        prepay = int(facts.get('prepay_months') or 0)
+        months = deposit + prepay
+    except (TypeError, ValueError):
+        months = 0
+    if months <= 0:
+        payment = str(
+            item.get('deposit')
+            or item.get('deposit_rule')
+            or item.get('payment_terms')
+            or facts.get('deposit_payment_terms')
+            or ''
+        )
+        match = re.search(r'押\s*(\d+)\s*付\s*(\d+)', payment)
+        if match:
+            months = int(match.group(1)) + int(match.group(2))
+    return rent * months if months > 0 else None
 
 
 async def send_listing_card(bot, chat_id: int, listing: dict, index: int=0, total: int=1) -> None:
@@ -63,22 +104,55 @@ def _find_result_card_content(item: dict, index: int, total: int, result_ids: li
     full = listing_context(listing_id)
     if full:
         item = {**item, **{k: v for k, v in full.items() if v not in (None, '', [], {})}}
-    project = clean_inline_text(str(item.get('project') or item.get('community') or item.get('area') or '金边'))
+    project = clean_inline_text(
+        str(
+            item.get('preferred_project_name_cn')
+            or item.get('project')
+            or item.get('community')
+            or item.get('area')
+            or '金边'
+        )
+    )
     property_type = clean_inline_text(str(item.get('property_type') or ''))
     layout = _display_layout(clean_inline_text(str(item.get('layout') or item.get('property_type') or '房源')), property_type)
+    rent_value = _rent_usd(item.get('price'))
     price = _fmt_price(item.get('price'))
+    deposit = clean_inline_text(
+        str(
+            item.get('deposit')
+            or item.get('deposit_rule')
+            or item.get('payment_terms')
+            or ''
+        )
+    )
+    first_payment = _estimated_first_payment(item, rent_value)
     size = clean_inline_text(str(item.get('size_sqm') or item.get('size') or ''))
     floor = _display_floor(item.get('floor'))
+    lease = clean_inline_text(str(item.get('contract_term') or ''))
     status = str(item.get('status') or 'active').strip().lower()
     status_text = '🟡 <b>已有预约 · 仍可预约</b>' if status == 'reserved' else '🟢 <b>当前可预约</b>'
+    public_id = clean_inline_text(str(item.get('public_listing_id') or item.get('listing_id') or ''))
 
-    lines = [f'🏠 <b>{he(project)}｜{he(layout)}</b>', f'💰 <b>{he(price)}</b>', '']
+    title_bits = [value for value in (public_id, project, layout, price) if value]
+    lines = [f'💰 <b>{he(" · ".join(title_bits) if title_bits else price or "房源")}</b>']
+    if deposit and first_payment:
+        lines.extend(['', f'{he(deposit)}｜预计首付 <b>${first_payment:,}</b>'])
+    elif deposit:
+        lines.extend(['', he(deposit)])
+    elif first_payment:
+        lines.extend(['', f'预计首付 <b>${first_payment:,}</b>'])
+    property_bits = []
+    if size:
+        property_bits.append(f"{size}{'㎡' if '㎡' not in size else ''}")
+    if floor:
+        property_bits.append(floor)
+    if lease:
+        property_bits.append(lease)
+    if property_bits:
+        lines.append(f"📐 {he('｜'.join(property_bits))}")
     if item.get('area'):
         lines.append(f'📍 {he(str(item.get("area")))}')
-    house_bits = [value for value in (size + ('㎡' if size and '㎡' not in size else ''), floor) if value]
-    if house_bits:
-        lines.append(f"📐 {he(' · '.join(house_bits))}")
-    lines.extend(['', status_text, f'第 {index + 1}/{total} 套'])
+    lines.extend(['', status_text, f'{index + 1}/{total}'])
 
     nav: list[InlineKeyboardButton] = []
     if total > 1:
@@ -158,7 +232,7 @@ def search_results_keyboard(matches: list[dict]) -> InlineKeyboardMarkup:
             rows.append([InlineKeyboardButton('🏠 房源详情', callback_data=f'listing:detail:{listing_id}')])
     rows.extend([
         [InlineKeyboardButton('✏️ 调整条件', callback_data='home_smart_search')],
-        [InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')],
+        [InlineKeyboardButton('💬 联系中文顾问', callback_data='hub:advisor')],
         [InlineKeyboardButton('🏠 返回首页', callback_data='home')],
     ])
     return InlineKeyboardMarkup(rows)
@@ -213,7 +287,7 @@ def _photo_action_keyboard(listing_id: str, *, available: bool) -> InlineKeyboar
     rows = [[InlineKeyboardButton('🏠 房源详情', callback_data=f'listing:detail:{listing_id}')]]
     if available:
         rows[0].append(InlineKeyboardButton('📅 预约看房', callback_data=f'listing:appoint:{listing_id}'))
-    rows.append([InlineKeyboardButton('💬 联系我们', callback_data=f'listing:consult:{listing_id}')])
+    rows.append([InlineKeyboardButton('💬 咨询这套', callback_data=f'listing:consult:{listing_id}')])
     return InlineKeyboardMarkup(rows)
 
 

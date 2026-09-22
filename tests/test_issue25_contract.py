@@ -170,7 +170,7 @@ async def test_album_has_no_summary_and_one_action_box():
     assert bot.send_message.await_count == 1
     text = bot.send_message.await_args.kwargs["text"]
     assert "不应重复" not in text
-    assert _labels(bot.send_message.await_args.kwargs["reply_markup"]) == [["🏠 房源详情", "📅 预约看房"], ["💬 联系我们"]]
+    assert _labels(bot.send_message.await_args.kwargs["reply_markup"]) == [["🏠 房源详情", "📅 预约看房"], ["💬 咨询这套"]]
 
 
 @pytest.mark.asyncio
@@ -181,7 +181,7 @@ async def test_album_empty_copy_keeps_actions():
     assert bot.send_message.await_count == 1
     assert "这套房的实拍暂时没有加载出来。" in bot.send_message.await_args.kwargs["text"]
     assert bot.send_message.await_args.kwargs["reply_markup"] is not None
-    assert _labels(bot.send_message.await_args.kwargs["reply_markup"]) == [["🏠 房源详情", "📅 预约看房"], ["💬 联系我们"]]
+    assert _labels(bot.send_message.await_args.kwargs["reply_markup"]) == [["🏠 房源详情", "📅 预约看房"], ["💬 咨询这套"]]
 
 
 def test_date_keyboard_has_video_branch_without_mode_gate():

@@ -70,6 +70,7 @@ def _public_search_listings(
     *,
     property_type: str | None = None,
     areas: list[str] | tuple[str, ...] | None = None,
+    project_terms: list[str] | tuple[str, ...] | None = None,
     budget_min: int | None = None,
     budget_max: int | None = None,
     ilike_fragment: str | None = None,
@@ -83,6 +84,7 @@ def _public_search_listings(
         return PublicInventoryAdapter(DB_PATH).search(
             property_type=property_type or None,
             areas=areas,
+            project_terms=project_terms,
             budget_min=budget_min,
             budget_max=budget_max,
             limit=limit,
@@ -105,6 +107,20 @@ def _area_aliases(area: str | None) -> list[str] | None:
     return get_all_location_aliases(raw)
 
 
+def detect_project_terms(text: str, *, residential_only: bool = True) -> tuple[str, ...]:
+    """Resolve Chinese/English project aliases via Project Registry naming layer."""
+    raw = str(text or "").strip()
+    if not raw:
+        return ()
+    try:
+        from v3_core.user_bot.search_query import detect_project_terms as _v3_detect
+
+        return tuple(_v3_detect(raw, residential_only=residential_only))
+    except Exception:
+        logger.exception("project term detection failed")
+        return ()
+
+
 def search_listings_with_fallback(
     *,
     property_type: str | None,
@@ -112,13 +128,21 @@ def search_listings_with_fallback(
     budget_min: int | None,
     budget_max: int | None,
     text_fragment: str = '',
+    project_terms: list[str] | tuple[str, ...] | None = None,
     limit: int = 3,
 ) -> tuple[list[dict], str]:
     """执行严格公开搜索；没有严格匹配时不自动放宽条件。"""
-    del text_fragment
+    terms = tuple(
+        dict.fromkeys(
+            str(value or '').strip()
+            for value in (project_terms or detect_project_terms(text_fragment, residential_only=property_type != '办公室'))
+            if str(value or '').strip()
+        )
+    )
     matches = _public_search_listings(
         property_type=property_type or None,
-        areas=_area_aliases(area),
+        areas=() if terms else _area_aliases(area),
+        project_terms=terms or None,
         budget_min=budget_min,
         budget_max=budget_max,
         limit=limit,

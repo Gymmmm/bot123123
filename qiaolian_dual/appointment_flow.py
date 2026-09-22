@@ -160,7 +160,7 @@ async def _submit_appointment(
                     '这套房已经有一条进行中的预约。\n\n可以到「我的预约」查看，或联系顾问修改时间。',
                     InlineKeyboardMarkup([
                         [InlineKeyboardButton('📅 查看我的预约', callback_data='appointment_menu:list')],
-                        [InlineKeyboardButton('💬 联系我们', callback_data=f'listing:consult:{lid}')],
+                        [InlineKeyboardButton('💬 咨询这套', callback_data=f'listing:consult:{lid}')],
                     ]),
                 )
                 return MAIN

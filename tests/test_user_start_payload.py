@@ -124,7 +124,7 @@ class UserStartPayloadTests(unittest.TestCase):
         rows = keyboard.inline_keyboard
         labels = [button.text for row in rows for button in row]
         callbacks = [button.callback_data for row in rows for button in row]
-        self.assertEqual(labels[:4], ["🏠 房源详情", "📸 更多实拍", "📅 预约看房", "💬 联系我们"])
+        self.assertEqual(labels[:4], ["🏠 房源详情", "📸 更多实拍", "📅 预约看房", "💬 咨询这套"])
         self.assertIn("listing:photos:l_1024", callbacks)
         self.assertIn("listing:detail:l_1024", callbacks)
         self.assertIn("listing:appoint:l_1024", callbacks)

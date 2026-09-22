@@ -40,7 +40,7 @@ def rental_home_text() -> str:
 def rental_home_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton('📋 入住交接', callback_data='hub:rental:handover'), InlineKeyboardButton('🔐 押金与退租', callback_data='hub:rental:deposit')],
-        [InlineKeyboardButton('🚚 搬家协助', callback_data='hub:rental:moving'), InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')],
+        [InlineKeyboardButton('🚚 搬家协助', callback_data='hub:rental:moving'), InlineKeyboardButton('💬 联系中文顾问', callback_data='hub:advisor')],
     ])
 
 
@@ -69,7 +69,7 @@ def preview_followup_text() -> str:
 def preview_followup_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton('📄 查看押金说明', callback_data='hub:rental:deposit'), InlineKeyboardButton('📥 下载完整版 PDF', callback_data='hub:rental:handover:pdf')],
-        [InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')],
+        [InlineKeyboardButton('💬 联系中文顾问', callback_data='hub:advisor')],
         [InlineKeyboardButton('⬅️ 返回', callback_data='hub:rental:handover')],
     ])
 
@@ -90,7 +90,7 @@ def details_text() -> str:
 def details_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton('📸 查看留档示例', callback_data='hub:rental:handover:preview')],
-        [InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')],
+        [InlineKeyboardButton('💬 联系中文顾问', callback_data='hub:advisor')],
         [InlineKeyboardButton('⬅️ 返回', callback_data='hub:rental:handover')],
     ])
 
@@ -105,7 +105,7 @@ def deposit_text() -> str:
 def deposit_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton('📄 入住交接留档', callback_data='hub:rental:handover:details')],
-        [InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')],
+        [InlineKeyboardButton('💬 联系中文顾问', callback_data='hub:advisor')],
         [InlineKeyboardButton('⬅️ 返回', callback_data='hub:rental:handover')],
     ])
 
@@ -126,7 +126,7 @@ def fees_text() -> str:
 def fees_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton('🔍 去找房', callback_data='home_smart_search')],
-        [InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')],
+        [InlineKeyboardButton('💬 联系中文顾问', callback_data='hub:advisor')],
         [InlineKeyboardButton('⬅️ 返回', callback_data='hub:rental:handover')],
     ])
 
@@ -141,7 +141,7 @@ def viewing_text() -> str:
 def viewing_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton('🔍 帮我找房', callback_data='home_smart_search')],
-        [InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')],
+        [InlineKeyboardButton('💬 联系中文顾问', callback_data='hub:advisor')],
         [InlineKeyboardButton('⬅️ 返回', callback_data='hub:rental')],
     ])
 
@@ -158,7 +158,7 @@ def moving_text() -> str:
 
 def moving_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')],
+        [InlineKeyboardButton('💬 联系中文顾问', callback_data='hub:advisor')],
         [InlineKeyboardButton('⬅️ 返回', callback_data='hub:rental')],
     ])
 
@@ -175,7 +175,7 @@ def about_text() -> str:
 
 def about_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')],
+        [InlineKeyboardButton('💬 联系中文顾问', callback_data='hub:advisor')],
         [InlineKeyboardButton('⬅️ 返回', callback_data='hub:rental')],
     ])
 
@@ -206,7 +206,7 @@ async def _send_asset_bundle(update, context, query, kind: str) -> int:
         if kind == 'handover' else
         '请在签约前核对押金金额、退还条件和扣费依据；退租时结合合同与入住留档逐项确认。最终押金退还金额仍以合同和实际核对结果为准。'
     )
-    sent = await context.bot.send_message(chat_id=chat_id, text=f'✅ <b>{title}资料已发送</b>\n\n{instruction}', parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('💬 联系我们', callback_data='hub:advisor')], [InlineKeyboardButton('⬅️ 返回侨联保障', callback_data='hub:rental')]]))
+    sent = await context.bot.send_message(chat_id=chat_id, text=f'✅ <b>{title}资料已发送</b>\n\n{instruction}', parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('💬 联系中文顾问', callback_data='hub:advisor')], [InlineKeyboardButton('⬅️ 返回侨联保障', callback_data='hub:rental')]]))
     context.user_data['_panel_anchor'] = {'chat_id': int(sent.chat_id), 'message_id': int(sent.message_id)}
     return MAIN
 

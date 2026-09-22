@@ -22,16 +22,17 @@ def _callbacks(markup):
 
 def test_customer_wording_is_unified():
     labels = _labels(main_keyboard())
-    assert labels[:4] == ['🔍 帮我找房', '📅 我的预约', '🛡 侨联保障', '🛠 入住服务']
-    assert labels[-1] == '💬 联系我们'
-    assert set(labels[4:-1]).issubset({'房源频道'})
+    assert labels == [
+        '🔍 帮我找房',
+        '🏠 可预约房源',
+        '📅 我的预约',
+        '🛠 入住服务',
+        '💬 联系中文顾问',
+    ]
     joined = ' '.join(labels)
-    assert '可预约房源' not in joined
-    assert '当前可预约' not in joined
-    assert '在架房源' not in joined
-    assert '联系中文顾问' not in joined
-    assert '管理号' not in joined
-    assert '待推荐' not in joined
+    assert '智能找房' not in joined
+    assert '关于侨联' not in joined
+    assert '侨联保障' not in joined
 
 
 def test_new_tenant_pages_do_not_generate_renew_or_change_buttons():

@@ -86,7 +86,7 @@ def _decode_budget_choice(goal: str, code: str) -> tuple[str, int | None, int | 
 def appointment_menu_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton('📅 预约看房', callback_data='appointment_menu:offline')],
-        [InlineKeyboardButton('📅 我的预约', callback_data='appointment_menu:list'), InlineKeyboardButton('💬 联系我们', callback_data='appointment_menu:contact')],
+        [InlineKeyboardButton('📅 我的预约', callback_data='appointment_menu:list'), InlineKeyboardButton('💬 联系中文顾问', callback_data='appointment_menu:contact')],
         [InlineKeyboardButton('⬅️ 返回首页', callback_data='home')],
     ])
 
@@ -125,7 +125,7 @@ def service_repair_keyboard() -> InlineKeyboardMarkup:
 
 def service_detail_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton('💬 联系我们', callback_data='service:contact')],
+        [InlineKeyboardButton('💬 联系中文顾问', callback_data='service:contact')],
         [InlineKeyboardButton('⬅️ 返回入住服务', callback_data='service:hub')],
     ])
 
@@ -165,9 +165,9 @@ def merchant_join_keyboard() -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
     if advisor_url:
         rows.append([InlineKeyboardButton('📩 提交商家信息', url=advisor_url)])
-        rows.append([InlineKeyboardButton('💬 联系我们', url=advisor_url)])
+        rows.append([InlineKeyboardButton('💬 联系中文顾问', url=advisor_url)])
     else:
         rows.append([InlineKeyboardButton('📩 提交商家信息', callback_data='service:contact')])
-        rows.append([InlineKeyboardButton('💬 联系我们', callback_data='service:contact')])
+        rows.append([InlineKeyboardButton('💬 联系中文顾问', callback_data='service:contact')])
     rows.append([InlineKeyboardButton('⬅️ 返回生活服务', callback_data='service:local_life')])
     return InlineKeyboardMarkup(rows)

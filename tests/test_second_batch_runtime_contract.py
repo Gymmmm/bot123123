@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 
-LOCKED_ALBUM_LABELS = ['🏠 房源详情', '📅 预约看房', '💬 联系我们']
+LOCKED_ALBUM_LABELS = ['🏠 房源详情', '📅 预约看房', '💬 咨询这套']
 
 
 def _labels(kb):
@@ -139,7 +139,7 @@ def test_full_album_action_box_is_single_and_exact():
     fn = src[src.index('async def send_listing_photo_preview'):]
     assert "🏠 房源详情" in kb
     assert "📅 预约看房" in kb
-    assert "💬 联系我们" in kb
+    assert "💬 咨询这套" in kb
     assert "🤖 侨联找房助手" not in kb
     assert "💬 咨询顾问" not in kb
     assert '_photo_action_keyboard(' in fn

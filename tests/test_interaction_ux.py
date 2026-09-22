@@ -28,10 +28,9 @@ class InteractionUxTests(unittest.TestCase):
             ]
         )
         rows = keyboard.inline_keyboard
-        self.assertEqual(rows[0][0].callback_data, "listing:open:l_100")
-        self.assertEqual(rows[1][0].callback_data, "listing:open:l_200")
-        self.assertIn("BKK1", rows[0][0].text)
-        self.assertIn("$700/月", rows[0][0].text)
+        self.assertEqual(rows[0][0].callback_data, "listing:detail:l_100")
+        self.assertEqual(rows[1][0].callback_data, "listing:detail:l_200")
+        self.assertIn("房源详情", rows[0][0].text)
 
     def test_lead_handoff_does_not_request_phone_or_wechat(self):
         text = lead_capture_text()
@@ -42,11 +41,11 @@ class InteractionUxTests(unittest.TestCase):
             keyboard = lead_capture_keyboard()
         labels = [button.text for row in keyboard.inline_keyboard for button in row]
         self.assertNotIn("📱 发送手机号", labels)
-        self.assertIn("💬 打开顾问对话", labels)
+        self.assertIn("💬 联系中文顾问", labels)
 
     def test_return_home_uses_same_product_identity(self):
         text = welcome_text()
-        self.assertIn("侨联地产", text)
+        self.assertIn("侨联小管家", text)
         self.assertNotIn("土地", text)
 
 

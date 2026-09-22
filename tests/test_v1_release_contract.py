@@ -16,7 +16,7 @@ from qiaolian_dual.texts import advisor_text, help_text
 from v2.qiaolian_publisher_v2.keyboards import publish_post_keyboard
 
 
-LOCKED_ALBUM_LABELS = ["🏠 房源详情", "📅 预约看房", "💬 联系我们"]
+LOCKED_ALBUM_LABELS = ["🏠 房源详情", "📅 预约看房", "💬 咨询这套"]
 
 
 def _buttons(keyboard):
@@ -35,7 +35,7 @@ def test_channel_post_has_exact_three_locked_ctas_and_listing_context():
         post_token="qlabc123",
     )
     assert [[button.text for button in row] for row in keyboard.inline_keyboard] == [
-        ["🏠 房源详情", "📸 更多实拍"],
+        ["📋 租赁详情", "📸 更多实拍"],
         ["📅 预约看房"],
     ]
     urls = [unquote(button.url or "") for button in _buttons(keyboard)]
@@ -75,9 +75,30 @@ def test_channel_detail_photos_book_payloads_preserve_public_qc_target():
     photos = parse_start_arg_payload("property_QC0042_photos")
     book = parse_start_arg_payload("property_QC0042_book")
 
-    assert detail == {"action": "details", "target": "QC0042", "post_token": "", "channel_message_id": None}
-    assert photos == {"action": "photos", "target": "QC0042", "post_token": "", "channel_message_id": None}
-    assert book == {"action": "book", "target": "QC0042", "post_token": "", "channel_message_id": None}
+    assert detail == {
+        "action": "details",
+        "target": "QC0042",
+        "post_token": "",
+        "channel_message_id": None,
+        "source": "channel",
+        "channel_return": True,
+    }
+    assert photos == {
+        "action": "photos",
+        "target": "QC0042",
+        "post_token": "",
+        "channel_message_id": None,
+        "source": "channel",
+        "channel_return": True,
+    }
+    assert book == {
+        "action": "book",
+        "target": "QC0042",
+        "post_token": "",
+        "channel_message_id": None,
+        "source": "channel",
+        "channel_return": True,
+    }
 
 
 def test_listing_detail_hides_unknown_or_empty_rows():

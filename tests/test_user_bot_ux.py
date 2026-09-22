@@ -20,11 +20,12 @@ class UserBotUxTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(state, MAIN)
         message.reply_text.assert_awaited()
         text = message.reply_text.await_args.args[0]
-        self.assertIn("我来帮你找", text)
+        self.assertIn("我来为您找", text)
         markup = message.reply_text.await_args.kwargs["reply_markup"]
         button_texts = [button.text for row in markup.inline_keyboard for button in row]
-        self.assertIn("🏢 公寓", button_texts)
-        self.assertIn("🏠 返回首页", button_texts)
+        self.assertIn("📍 按区域", button_texts)
+        self.assertIn("💰 按预算", button_texts)
+        self.assertIn("⬅️ 返回首页", button_texts)
 
     async def test_guided_pref_state_blocks_free_text(self):
         message = SimpleNamespace(text="BKK1", reply_text=AsyncMock())
@@ -40,7 +41,7 @@ class UserBotUxTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(state, MAIN)
         message.reply_text.assert_awaited()
         text = message.reply_text.await_args.args[0]
-        self.assertIn("已保留你的筛选进度", text)
+        self.assertIn("已保留您的筛选进度", text)
         self.assertIn("区域或预算按钮", text)
 
     def test_old_tenant_binding_text_reads_backend_binding(self):

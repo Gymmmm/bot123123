@@ -109,7 +109,7 @@ class UserJourneyRehearsalTests(unittest.IsolatedAsyncioTestCase):
         markup = query.edit_message_text.await_args.kwargs.get("reply_markup")
         button_texts = [btn.text for row in markup.inline_keyboard for btn in row]
         self.assertIn("🏠 我要换房", button_texts)
-        self.assertIn("💬 联系我们", button_texts)
+        self.assertIn("💬 咨询这套", button_texts)
         self.assertIn("📅 预约看房", button_texts)
 
 

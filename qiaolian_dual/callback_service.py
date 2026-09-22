@@ -22,7 +22,7 @@ def matches(data: str) -> bool:
 
 def _service_back_keyboard(*, parent_callback: str='service:hub', parent_label: str='返回上一页') -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton('💬 联系我们', callback_data='service:contact')],
+        [InlineKeyboardButton('💬 联系中文顾问', callback_data='service:contact')],
         [InlineKeyboardButton(f'⬅️ {parent_label}', callback_data=parent_callback)],
     ])
 

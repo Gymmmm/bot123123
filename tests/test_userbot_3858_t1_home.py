@@ -34,7 +34,7 @@ def test_t1_welcome_uses_butler_home_copy():
 
 
 def test_t1_no_match_keeps_3858_recovery():
-    assert _labels(no_match_followup_keyboard()) == ["💬 联系顾问", "🎯 继续筛选", "🏠 返回首页"]
+    assert _labels(no_match_followup_keyboard()) == ["💬 联系中文顾问", "🎯 继续筛选", "🏠 返回首页"]
 
 
 def test_t1_deeplink_adapter_wins_property_and_book_video():

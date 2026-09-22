@@ -27,7 +27,7 @@ def test_v2_home_is_locked():
 
 def test_v2_find_home_short_buttons():
     assert labels(guided_search_keyboard()) == [
-        '📍 按区域', '💰 按预算', '🏠 按户型', '🈲 当前可约', '⬅️ 返回首页'
+        '📍 按区域', '💰 按预算', '🏠 按户型', '🏘 当前可约', '⬅️ 返回首页'
     ]
     assert labels(room_type_keyboard()) == ['单间', '一房', '两房', '三房', '四房+', '不限', '⬅️ 返回']
 
@@ -53,17 +53,17 @@ def test_v2_listing_status_and_contacts():
         assert '🏠 <b>房源详情</b>' in text
         assert '<b>租金：</b> <b>$800/月</b>' in text
         assert '房态：当前可预约' in text
-        assert labels(listing_cost_keyboard('l_1')) == ['📅 预约看房', '📸 更多实拍', '💬 联系我们']
+        assert labels(listing_cost_keyboard('l_1')) == ['📅 预约看房', '📸 更多实拍', '💬 咨询这套']
     pending = {**base, 'status': 'pending'}
     with patch('qiaolian_dual.listing.listing_context', return_value=pending):
         assert '房态：房态确认中' in listing_cost_text('l_1')
         assert '这套房正在确认最新房态' in listing_unavailable_text('pending', 'l_1')
-        assert labels(listing_unavailable_keyboard('l_1')) == ['🈲 同区可约房源', '💬 联系我们', '🏠 房源详情']
+        assert labels(listing_unavailable_keyboard('l_1')) == ['🏘 同区可约房源', '💬 咨询这套', '🏠 房源详情']
 
 
 def test_v2_more_photos_actions_use_current_detail_label():
-    assert labels(_photo_action_keyboard('l_1', available=True)) == ['🏠 房源详情', '📅 预约看房', '💬 联系我们']
-    assert labels(_photo_action_keyboard('l_1', available=False)) == ['🏠 房源详情', '💬 联系我们']
+    assert labels(_photo_action_keyboard('l_1', available=True)) == ['🏠 房源详情', '📅 预约看房', '💬 咨询这套']
+    assert labels(_photo_action_keyboard('l_1', available=False)) == ['🏠 房源详情', '💬 咨询这套']
 
 
 def test_v2_assurance_and_move_in_hubs():
@@ -72,7 +72,7 @@ def test_v2_assurance_and_move_in_hubs():
     assert '签约前核对费用' in assurance
     assert '入住时把房屋、表计和物品状态留档' in assurance
     assert labels(rental_home_keyboard()) == [
-        '📋 入住交接', '🔐 押金与退租', '🚚 搬家协助', '💬 联系我们'
+        '📋 入住交接', '🔐 押金与退租', '🚚 搬家协助', '💬 联系中文顾问'
     ]
     assert labels(service_hub_keyboard()) == [
         '🔧 设备报修', '🏢 物业协调', '📦 生活服务', '💬 其他帮助', '⬅️ 返回首页'
