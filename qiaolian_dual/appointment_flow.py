@@ -129,37 +129,69 @@ async def _submit_appointment(
             payload={'appointment_id': edit_id, 'viewing_mode': mode, 'appointment_date': appt.get('date'), 'appointment_time': time_value},
         )
     else:
-        with db.connect() as conn:
-            existing = conn.execute(
-                "SELECT id FROM appointments WHERE user_id=? AND listing_id=? AND viewing_mode=? AND appointment_date=? AND appointment_time=? AND status NOT IN ('cancelled','done') ORDER BY id DESC LIMIT 1",
-                (int(user.id), lid, mode, appt.get('date'), time_value),
-            ).fetchone()
-        if existing:
-            appointment_id = int(existing[0])
-        else:
-            appointment_id = db.create_appointment({
-                'user_id': user.id,
-                'username': getattr(user, 'username', '') or '',
-                'display_name': user_display_name(user),
-                'listing_id': lid,
+        from .adapters.appointment import AppointmentAdapter
+        from .adapters.public_inventory import PublicInventoryAdapter
+
+        appointment_adapter = AppointmentAdapter(
+            inventory=PublicInventoryAdapter(DB_PATH),
+            create_appointment=db.create_appointment,
+            list_appointments=db.list_appointments,
+        )
+        appointment_payload = {
+            'user_id': user.id,
+            'username': getattr(user, 'username', '') or '',
+            'display_name': user_display_name(user),
+            'listing_id': lid,
+            'viewing_mode': mode,
+            'appointment_date': appt.get('date'),
+            'appointment_time': time_value,
+            'contact_value': f"@{getattr(user, 'username', '')}" if getattr(user, 'username', '') else str(user.id),
+            'note': '',
+            'status': 'pending',
+            'created_at': now_ts(),
+        }
+        try:
+            appointment_id = appointment_adapter.submit(appointment_payload)
+        except ValueError as exc:
+            code = str(exc)
+            if code == 'appointment_duplicate':
+                context.user_data.pop('appt', None)
+                await respond(
+                    '这套房已经有一条进行中的预约。\n\n可以到「我的预约」查看，或联系顾问修改时间。',
+                    InlineKeyboardMarkup([
+                        [InlineKeyboardButton('📅 查看我的预约', callback_data='appointment_menu:list')],
+                        [InlineKeyboardButton('💬 联系我们', callback_data=f'listing:consult:{lid}')],
+                    ]),
+                )
+                return MAIN
+            if code in {'listing_not_bookable', 'listing_not_published'}:
+                context.user_data.pop('appt', None)
+                current = listing_context(lid)
+                reason = str(current.get('status') or 'pending').strip().lower() if current else 'missing'
+                await respond(listing_unavailable_text(reason, lid), listing_unavailable_keyboard(lid))
+                return MAIN
+            raise
+
+        lead_id = create_lead(
+            user,
+            action='appointment_submit',
+            source=str(appt.get('source') or 'user_bot'),
+            listing_id=lid,
+            payload={
+                'appointment_id': appointment_id,
                 'viewing_mode': mode,
                 'appointment_date': appt.get('date'),
                 'appointment_time': time_value,
-                'contact_value': f"@{getattr(user, 'username', '')}" if getattr(user, 'username', '') else str(user.id),
-                'note': '',
-                'status': 'pending',
-                'created_at': now_ts(),
-            })
-            lead_id = create_lead(
-                user,
-                action='appointment_submit',
-                source=str(appt.get('source') or 'user_bot'),
-                listing_id=lid,
-                payload={'viewing_mode': mode, 'appointment_date': appt.get('date'), 'appointment_time': time_value, **touch_payload},
-            )
+                **touch_payload,
+            },
+        )
 
     from .channel_status_sync import sync_channel_listing_status
-    await sync_channel_listing_status(lid)
+    sync_listing_id = lid
+    if not edit_id:
+        from .adapters.public_inventory import PublicInventoryAdapter
+        sync_listing_id = PublicInventoryAdapter(DB_PATH).resolve_internal_id(lid) or lid
+    await sync_channel_listing_status(sync_listing_id)
 
     item = listing_context(lid)
     title = str(item.get('project') or item.get('community') or item.get('area') or '这套房').strip()
