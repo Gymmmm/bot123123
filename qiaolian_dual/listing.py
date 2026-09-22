@@ -276,11 +276,12 @@ def channel_topic_welcome_text(topic: str) -> str:
 
 def _resolve_area_from_target(target: str) -> tuple[str, str]:
     from .location_mapping import resolve_area_slug
+    from .public_listing_id import normalize_public_id
     from .search import detect_area
     raw_target = str(target or '').strip()
     if not raw_target:
         return ('', '')
-    listing_id = raw_target if raw_target.startswith('l_') else ''
+    listing_id = raw_target if raw_target.startswith('l_') or normalize_public_id(raw_target) else ''
     area = resolve_area_slug(raw_target) or detect_area(raw_target)
     if area == raw_target[:40]:
         area = ''
