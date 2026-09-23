@@ -33,6 +33,7 @@ from .public_appointment import PublicAppointmentDraft
 from .search_no_match_view import build_search_no_match_view
 from .search_submit_executor import SearchSubmitExecution, SearchSubmitExecutor
 from .telegram_search_results import TelegramSearchPresentation, present_search_flow_result
+from .telegram_edit import edit_query_panel
 from .telegram_transition_ui import build_transition_keyboard
 from .transition_actions import (
     APPOINTMENT_AWAITING_DATE_KEY,
@@ -78,16 +79,9 @@ class TelegramTransitionActionOutcome:
 
 async def _edit_view(query: Any, view: TransitionView) -> None:
     keyboard = build_transition_keyboard(view) if view.rows else None
-    message = getattr(query, "message", None)
-    if getattr(message, "photo", None):
-        await query.edit_message_caption(
-            caption=view.text,
-            parse_mode=ParseMode.HTML,
-            reply_markup=keyboard,
-        )
-        return
-    await query.edit_message_text(
-        view.text,
+    await edit_query_panel(
+        query,
+        text=view.text,
         parse_mode=ParseMode.HTML,
         reply_markup=keyboard,
     )
