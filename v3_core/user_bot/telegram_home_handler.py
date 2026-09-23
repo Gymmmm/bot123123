@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from telegram.constants import ParseMode
-from v3_core.storage.service_repository import SQLiteTenantServiceRepository
 
 from .appointment_history import AppointmentHistoryService, AppointmentHistoryView
 from .assurance_views import build_assurance_home_view
@@ -17,6 +16,7 @@ from .service_flow import TenantService
 from .service_product_views import service_home_view
 from .service_views import local_life_view
 from .telegram_assurance_handler import render_assurance_view
+from .telegram_edit import edit_query_panel
 from .telegram_home_ui import build_home_keyboard
 from .telegram_service_handler import render_service_view
 from .telegram_transition_ui import build_transition_keyboard
@@ -57,20 +57,22 @@ def _lead_user(update: Any) -> LeadUser:
 
 async def _edit_home_view(query: Any, view) -> None:
     markup = build_home_keyboard(view)
-    message = getattr(query, "message", None)
-    if getattr(message, "photo", None):
-        await query.edit_message_caption(caption=view.text, parse_mode=ParseMode.HTML, reply_markup=markup)
-        return
-    await query.edit_message_text(view.text, parse_mode=ParseMode.HTML, reply_markup=markup)
+    await edit_query_panel(
+        query,
+        text=view.text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=markup,
+    )
 
 
 async def _edit_transition_view(query: Any, view: TransitionView) -> None:
     markup = build_transition_keyboard(view) if view.rows else None
-    message = getattr(query, "message", None)
-    if getattr(message, "photo", None):
-        await query.edit_message_caption(caption=view.text, parse_mode=ParseMode.HTML, reply_markup=markup)
-        return
-    await query.edit_message_text(view.text, parse_mode=ParseMode.HTML, reply_markup=markup)
+    await edit_query_panel(
+        query,
+        text=view.text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=markup,
+    )
 
 
 def _search_entry_plan() -> TransitionPlan:
@@ -80,14 +82,6 @@ def _search_entry_plan() -> TransitionPlan:
         effects=("render_search_entry",),
         change_search=ChangeSearchTransition(source="user_search", goal="any"),
     )
-
-
-def _tenant_service_from_history(history: AppointmentHistoryService) -> TenantService | None:
-    reader = getattr(history, "reader", None)
-    db_path = getattr(reader, "db_path", None)
-    if db_path is None:
-        return None
-    return TenantService(SQLiteTenantServiceRepository(db_path))
 
 
 async def handle_v3_home_callback(
