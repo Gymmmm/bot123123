@@ -100,7 +100,7 @@ class AdminAppointmentReader:
     @staticmethod
     def _select_sql(where_clause: str) -> str:
         return f"""SELECT a.*,l.public_listing_id,l.display_title,l.project_name
-                   FROM appointments a
+                   FROM appointments_v3 a
                    LEFT JOIN listings_v3 l ON l.listing_id=a.listing_id
                    WHERE {where_clause}"""
 
@@ -151,8 +151,8 @@ class AdminAppointmentReader:
         with self._connect(readonly=False) as conn:
             conn.execute("BEGIN IMMEDIATE")
             cursor = conn.execute(
-                """UPDATE appointments
-                   SET status=?
+                """UPDATE appointments_v3
+                   SET status=?,updated_at=CURRENT_TIMESTAMP
                    WHERE id=? AND status=?""",
                 (clean_status, int(appointment_id), previous),
             )
