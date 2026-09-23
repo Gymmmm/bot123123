@@ -8,10 +8,35 @@ from telegram.constants import ParseMode
 
 from .admin_consult import format_lead_card, handle_admin_done
 from .admin_contract import _is_admin_user
-from .common import answer_callback_once, db, he
+from .common import DB_PATH, answer_callback_once, db, he
 from .messages import advisor_response_notice_text, repair_progress_text
 from .results_admin import admin_lead_keyboard
 from .session_deeplink import user_display_name
+
+
+def _update_v3_repair_ticket(ticket_id: int, stage: str):
+    import sqlite3
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                "SELECT * FROM repair_tickets_v3 WHERE id=? LIMIT 1",
+                (int(ticket_id),),
+            ).fetchone()
+            if row is None:
+                return None
+            conn.execute(
+                "UPDATE repair_tickets_v3 SET status=? WHERE id=?",
+                (str(stage or ""), int(ticket_id)),
+            )
+            conn.commit()
+            updated = conn.execute(
+                "SELECT * FROM repair_tickets_v3 WHERE id=? LIMIT 1",
+                (int(ticket_id),),
+            ).fetchone()
+        return dict(updated) if updated is not None else None
+    except sqlite3.OperationalError:
+        return None
 
 
 async def handle_v3_admin_workflow(update, context, query, data: str, user):
@@ -29,7 +54,11 @@ async def handle_v3_admin_workflow(update, context, query, data: str, user):
         if stage not in labels:
             return
         ticket_id = int(parts[2])
-        ticket = db.update_repair_ticket_status(ticket_id, stage)
+        # V3 service submissions live in repair_tickets_v3. Fall back to the
+        # historical table only for callbacks attached to old messages.
+        ticket = _update_v3_repair_ticket(ticket_id, stage)
+        if not ticket:
+            ticket = db.update_repair_ticket_status(ticket_id, stage)
         if not ticket:
             await answer_callback_once(query, "未找到这条报修，可能已处理", show_alert=True)
             return
