@@ -581,9 +581,6 @@ def build_v3_user_bot_application(
     app.add_handler(CommandHandler("find", find), group=0)
     app.add_handler(CommandHandler("appointments", appointments), group=0)
     app.add_handler(CommandHandler("service", service), group=0)
-    # Historical /favorites remains a compatibility entry; the product no
-    # longer exposes favorites on the home IA, so it returns to active search.
-    app.add_handler(CommandHandler("favorites", find), group=0)
     app.add_handler(CommandHandler("about", legacy_about), group=0)
     app.add_handler(CommandHandler("contact", legacy_contact), group=0)
     app.add_handler(CommandHandler("help", legacy_help), group=0)
