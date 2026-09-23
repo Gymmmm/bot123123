@@ -141,7 +141,11 @@ async def handle_v3_home_callback(
         return TelegramHomeOutcome(handled=True, action=action, rendered=True)
 
     if action == "local":
-        await render_service_view(query, local_life_view(), advisor_url=advisor_url)
+        await render_service_view(
+            query,
+            local_life_view(back_to_home=True),
+            advisor_url=advisor_url,
+        )
         return TelegramHomeOutcome(handled=True, action=action, rendered=True)
 
     if action == "contact":
