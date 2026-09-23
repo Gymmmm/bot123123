@@ -87,8 +87,8 @@ def _book_plan(result: PublicListingFlowResult) -> TransitionPlan:
     from .public_appointment import PublicAppointmentDraft
     return TransitionPlan(
         kind="book",
-        next_step="appointment_date",
-        effects=("render_appointment_date",),
+        next_step="appointment_mode",
+        effects=("render_appointment_mode",),
         book=BookTransition(draft=PublicAppointmentDraft(public_listing_id=intent.public_listing_id, mode="offline", source=intent.source)),
     )
 
@@ -101,8 +101,8 @@ def _video_book_plan(result: PublicListingFlowResult) -> TransitionPlan:
     from .public_appointment import PublicAppointmentDraft
     return TransitionPlan(
         kind="book",
-        next_step="appointment_date",
-        effects=("render_appointment_date",),
+        next_step="appointment_mode",
+        effects=("render_appointment_mode",),
         book=BookTransition(
             draft=PublicAppointmentDraft(
                 public_listing_id=intent.public_listing_id,
