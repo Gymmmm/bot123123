@@ -56,12 +56,12 @@ ABOUT_TEXT = (
     "看房、费用确认、入住交接留档和入住后的住房事项，都可以继续找侨联。"
 )
 CONTACT_TEXT = (
-    "<b>中文顾问</b>\n\n"
+    "💬 <b>中文顾问</b>\n\n"
     "直接把问题发给我。\n"
     "找房可以说：区域、预算、几房、什么时候入住。"
 )
 BOOK_TEXT = (
-    "<b>预约看房</b>\n\n"
+    "📅 <b>预约看房</b>\n\n"
     "请从具体房源进入预约，选择看房方式、日期和时间后提交。\n\n"
     "提交后表示预约信息已记录，不代表时间已经确认。"
 )
@@ -107,12 +107,28 @@ def build_about_view(*, advisor_url: str = "") -> HomeView:
     )
 
 def build_booking_view(*, advisor_url: str = "") -> HomeView:
-    return HomeView("book",BOOK_TEXT,((HomeChoice("开始找房","search"),HomeChoice("我的预约","appointments")),(HomeChoice("中文顾问","contact"),),(HomeChoice("返回首页","root"),)))
+    return HomeView(
+        "book",
+        BOOK_TEXT,
+        (
+            (HomeChoice("🔍 开始找房", "search"), HomeChoice("📋 我的预约", "appointments")),
+            (HomeChoice("💬 中文顾问", "contact"),),
+            (HomeChoice("⬅️ 返回首页", "root"),),
+        ),
+    )
 
 def build_contact_view(*, advisor_url: str = "") -> HomeView:
     advisor=advisor_handoff_url(advisor_url)
-    first=HomeChoice("中文顾问","contact",url=advisor) if advisor else HomeChoice("中文顾问","contact")
-    return HomeView("contact",CONTACT_TEXT,((first,),(HomeChoice("开始找房","search"),),(HomeChoice("返回首页","root"),)))
+    first=HomeChoice("💬 中文顾问","contact",url=advisor) if advisor else HomeChoice("💬 中文顾问","contact")
+    return HomeView(
+        "contact",
+        CONTACT_TEXT,
+        (
+            (first,),
+            (HomeChoice("🔍 开始找房", "search"),),
+            (HomeChoice("⬅️ 返回首页", "root"),),
+        ),
+    )
 
 def build_appointment_history_home_view(history: AppointmentHistoryView) -> HomeView:
     find_label="🔍 开始找房" if not history.items else "🔍 继续找房"
