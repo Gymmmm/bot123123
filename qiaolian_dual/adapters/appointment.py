@@ -18,9 +18,17 @@ class AppointmentAdapter:
         self.list_appointments = list_appointments
 
     def submit(self, data: dict[str, Any]) -> int:
-        public_id = str(data.get("listing_id") or "").strip()
-        if not public_id:
+        raw_public_id = str(data.get("listing_id") or "").strip()
+        if not raw_public_id:
             raise ValueError("appointment_listing_required")
+        normalize_public_id = getattr(self.inventory, "normalize_public_id", None)
+        public_id = (
+            str(normalize_public_id(raw_public_id) or "").strip()
+            if callable(normalize_public_id)
+            else raw_public_id
+        )
+        if not public_id:
+            raise ValueError("listing_not_published")
 
         listing = self.inventory.get_listing(public_id)
         if listing is None:

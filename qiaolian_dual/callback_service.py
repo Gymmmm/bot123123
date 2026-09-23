@@ -31,7 +31,7 @@ async def handle_service_callback(update: Update, context: ContextTypes.DEFAULT_
     from .admin_contract import _user_contact_text, _user_mention_html
     from .flows import contact_management, show_search_entry, show_service_hub
     from .keyboards_search import local_life_keyboard, nearby_area_keyboard, rfcity_back_keyboard, rfcity_keyboard, service_repair_keyboard
-    from .results_admin import _notify_admins, admin_repair_keyboard
+    from .results_admin import _notify_admins
     from .search import create_lead
     from .session_deeplink import now_ts
     from .texts import local_life_text, render_panel, rfcity_text
@@ -120,30 +120,73 @@ async def handle_service_callback(update: Update, context: ContextTypes.DEFAULT_
         slot_map = {'today': '今天内安排', 'tomorrow_am': '明天上午', 'tomorrow_pm': '明天下午'}
         slot_label = slot_map.get(slot, slot)
         binding = db.get_active_binding(user.id)
-        detail_ctx = context.user_data.pop('service_request_detail', {})
+        detail_ctx = context.user_data.get('service_request_detail', {})
         detail = str(detail_ctx.get('detail') or f'按钮提交：{slot_label}')
         binding_id = int((binding or {}).get('id') or 0) or None
-        ticket_id = db.create_repair_ticket(user.id, binding_id, issue_label, f'{detail}\n希望时间：{slot_label}', now_ts())
-        create_lead(
-            user,
-            action='service_request_submit',
-            source='service_hub',
-            listing_id=str((binding or {}).get('property_name') or ''),
-            payload={'issue_key': issue_key, 'issue_label': issue_label, 'time_slot': slot, 'detail': detail, 'binding_id': binding_id},
-        )
-        await _notify_admins(
-            context,
-            title='新报修请求',
-            lines=[
-                f'客户：{_user_mention_html(user)}',
-                f'联系方式：{he(_user_contact_text(user))}',
-                f'房源：{he(str((binding or {}).get("property_name") or "-"))}',
-                f'问题：{he(issue_label)}',
-                f'说明：{he(detail)}',
-                f'希望时间：{he(slot_label)}',
-            ],
-            reply_markup=admin_repair_keyboard(ticket_id),
-        )
+        lead_payload = {'issue_key': issue_key, 'issue_label': issue_label, 'time_slot': slot, 'detail': detail, 'binding_id': binding_id}
+        if not binding:
+            create_lead(
+                user,
+                action='service_request_submit',
+                source='service_hub',
+                listing_id='',
+                payload=lead_payload,
+            )
+            await _notify_admins(
+                context,
+                title='新报修请求',
+                lines=[
+                    f'客户：{_user_mention_html(user)}',
+                    f'联系方式：{he(_user_contact_text(user))}',
+                    '房源：-',
+                    f'问题：{he(issue_label)}',
+                    f'说明：{he(detail)}',
+                    f'希望时间：{he(slot_label)}',
+                ],
+            )
+        else:
+            from .adapters.repair import RepairAdapter, persist_repair_ticket_v3
+
+            created_at = now_ts()
+            repair = RepairAdapter(
+                get_active_binding=db.get_active_binding,
+                persist_ticket=lambda **kwargs: persist_repair_ticket_v3(DB_PATH, **kwargs),
+            ).create(
+                user_id=user.id,
+                issue_key=issue_key,
+                issue_type=issue_label,
+                description=detail,
+                time_slot=slot,
+                day=created_at[:10],
+                created_at=created_at,
+            )
+            ticket_id = int(repair['ticket_id'])
+            if repair['created']:
+                create_lead(
+                    user,
+                    action='service_request_submit',
+                    source='service_hub',
+                    listing_id=str(binding.get('property_name') or ''),
+                    payload=lead_payload,
+                )
+                repair_keyboard = InlineKeyboardMarkup([
+                    [InlineKeyboardButton('✅ 已接手', callback_data=f'adminrepairv3:accepted:{ticket_id}'), InlineKeyboardButton('📅 已安排', callback_data=f'adminrepairv3:scheduled:{ticket_id}')],
+                    [InlineKeyboardButton('🔧 处理中', callback_data=f'adminrepairv3:in_progress:{ticket_id}'), InlineKeyboardButton('✅ 已完成', callback_data=f'adminrepairv3:done:{ticket_id}')],
+                    [InlineKeyboardButton('💬 需要客户补充', callback_data=f'adminrepairv3:need_info:{ticket_id}')],
+                ])
+                await _notify_admins(
+                    context,
+                    title='新报修请求',
+                    lines=[
+                        f'客户：{_user_mention_html(user)}',
+                        f'联系方式：{he(_user_contact_text(user))}',
+                        f'房源：{he(str(binding.get("property_name") or "-"))}',
+                        f'问题：{he(issue_label)}',
+                        f'说明：{he(detail)}',
+                        f'希望时间：{he(slot_label)}',
+                    ],
+                    reply_markup=repair_keyboard,
+                )
         urgent = issue_key in {'repair_water', 'repair_power', 'repair_door'}
         urgent_note = '\n\n如果情况紧急，请直接联系我们。' if urgent else ''
         await render_panel(

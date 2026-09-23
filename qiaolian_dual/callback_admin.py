@@ -5,7 +5,7 @@ from .common import *
 
 
 def matches(data: str) -> bool:
-    return data.startswith(('adminq:', 'adminlead:', 'adminrepair:'))
+    return data.startswith(('adminq:', 'adminlead:', 'adminrepair:', 'adminrepairv3:'))
 
 
 async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, query, data: str, user) -> int | None:
@@ -24,7 +24,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
         from .admin_consult import handle_admin_query
         await handle_admin_query(update, context)
         return MAIN
-    if data.startswith('adminrepair:'):
+    if data.startswith(('adminrepair:', 'adminrepairv3:')):
             from .admin_contract import _is_admin_user
             from .messages import repair_progress_text
             if not _is_admin_user(getattr(user, 'id', 0)):
@@ -42,7 +42,11 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
             if stage not in labels:
                 return MAIN
             ticket_id = int(parts[2])
-            ticket = db.update_repair_ticket_status(ticket_id, stage)
+            if data.startswith('adminrepairv3:'):
+                from .adapters.repair import update_repair_ticket_v3_status
+                ticket = update_repair_ticket_v3_status(DB_PATH, ticket_id, stage)
+            else:
+                ticket = db.update_repair_ticket_status(ticket_id, stage)
             if not ticket:
                 await answer_callback_once(query, '未找到这条报修，可能已处理', show_alert=True)
                 return MAIN

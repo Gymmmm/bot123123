@@ -38,9 +38,9 @@ def _appointment_public_listing_id(value: object) -> str:
         return public_id
     from .adapters.public_inventory import PublicInventoryAdapter
     try:
-        return PublicInventoryAdapter(DB_PATH).public_id_for_internal(raw) or raw
+        return PublicInventoryAdapter(DB_PATH).public_id_for_internal(raw) or ''
     except (FileNotFoundError, sqlite3.Error):
-        return raw
+        return ''
 
 
 def _appointment_listing_compact(value: object) -> str:

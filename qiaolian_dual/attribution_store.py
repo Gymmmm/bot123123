@@ -146,11 +146,16 @@ def source_stats(limit=20):
 
 
 def list_today_appointments(today_prefix, limit=20):
+    if "appointments" not in db._table_names():
+        return []
     with db.connect() as conn:
-        table = "appointments_v3" if "appointments_v3" in db._table_names() else "appointments"
         rows = conn.execute(
-            f"""SELECT a.*,l.public_listing_id
-                FROM {table} a
+            """SELECT a.id,a.user_id,a.username,a.display_name,
+                       COALESCE(l.public_listing_id,'') AS listing_id,
+                       l.public_listing_id,
+                       a.viewing_mode,a.appointment_date,a.appointment_time,
+                       a.contact_value,a.note,a.status,a.created_at
+                FROM appointments a
                 LEFT JOIN listings_v3 l ON l.listing_id=a.listing_id
                 WHERE a.appointment_date LIKE ?
                    OR date(datetime(a.created_at,'+7 hours'))=?

@@ -106,6 +106,7 @@ def test_repair_requires_dual_binding_and_stable_token():
             description="x",
             time_slot="today",
             day="2026-09-22",
+            created_at="2026-09-22 10:00:00",
         )
         raise AssertionError("missing binding must fail")
     except ValueError as exc:
@@ -128,8 +129,9 @@ def test_repair_requires_dual_binding_and_stable_token():
         description="x",
         time_slot="today",
         day="2026-09-22",
+        created_at="2026-09-22 10:00:00",
     )
-    second_token = RepairAdapter.request_token(7, 3, "repair_ac", "2026-09-22")
+    second_token = RepairAdapter.request_token(7, 3, "repair_ac", "x", "today", "2026-09-22")
     assert first["ticket_id"] == 44
     assert first["request_token"] == second_token
     assert seen["binding_id"] == 3

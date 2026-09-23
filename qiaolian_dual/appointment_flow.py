@@ -104,17 +104,19 @@ async def _submit_appointment(
     touch_payload = dict(appt.get('touch_payload') or {})
     edit_id = int(touch_payload.get('edit_appointment_id') or 0)
     lead_id = None
+    persisted_listing_id = ''
 
     if edit_id:
         with db.connect() as conn:
             existing = conn.execute(
-                "SELECT id FROM appointments WHERE id=? AND user_id=? AND status NOT IN ('done','cancelled')",
+                "SELECT id,listing_id FROM appointments WHERE id=? AND user_id=? AND status NOT IN ('done','cancelled')",
                 (edit_id, int(user.id)),
             ).fetchone()
             if not existing:
                 context.user_data.pop('appt', None)
                 await respond('这条预约已经无法修改。', InlineKeyboardMarkup([[InlineKeyboardButton('📅 我的预约', callback_data='appointment_menu:list')]]))
                 return MAIN
+            persisted_listing_id = str(existing['listing_id'] or '')
             conn.execute(
                 "UPDATE appointments SET viewing_mode=?, appointment_date=?, appointment_time=?, status='pending' WHERE id=? AND user_id=?",
                 (mode, appt.get('date'), time_value, edit_id, int(user.id)),
@@ -187,10 +189,10 @@ async def _submit_appointment(
         )
 
     from .channel_status_sync import sync_channel_listing_status
-    sync_listing_id = lid
+    sync_listing_id = persisted_listing_id
     if not edit_id:
         from .adapters.public_inventory import PublicInventoryAdapter
-        sync_listing_id = PublicInventoryAdapter(DB_PATH).resolve_internal_id(lid) or lid
+        sync_listing_id = PublicInventoryAdapter(DB_PATH).resolve_internal_id(lid) or ''
     await sync_channel_listing_status(sync_listing_id)
 
     item = listing_context(lid)
