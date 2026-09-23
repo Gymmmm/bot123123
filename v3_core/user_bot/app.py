@@ -220,6 +220,7 @@ def build_takeover_user_bot_dependencies(
             publisher_bot_token=config.publisher_bot_token,
             user_bot_username=config.user_bot_username,
             advisor_url=config.advisor_url,
+            appointment_table="appointments",
         ),
         admins=admins,
         inventory=read.inventory,
