@@ -69,10 +69,12 @@ def test_v3_application_registers_admin_command_and_adminq_callbacks():
     assert "channel_sync=deps.appointment_effects.channel" in source
     entrypoint = Path("run_v3_user_bot.py").read_text(encoding="utf-8")
     dual_app = Path("qiaolian_dual/app.py").read_text(encoding="utf-8")
-    assert "from qiaolian_dual.user_bot import main" in entrypoint
+    assert "build_takeover_user_bot_dependencies" in entrypoint
+    assert "ProductionAdminAppointmentReader" in entrypoint
+    assert "handle_v3_admin_workflow" in entrypoint
     assert "acquire_user_bot_polling_lock" in entrypoint
     assert "release_user_bot_polling_lock" in entrypoint
-    assert "v3_core.user_bot.app" not in entrypoint
+    assert "from qiaolian_dual.user_bot import main" not in entrypoint
     assert "CommandHandler('admin', cmd_admin_home)" in dual_app
     assert "CallbackQueryHandler(handle_admin_query, pattern=r'^adminq:')" not in dual_app
     dual_admin = Path("qiaolian_dual/callback_admin.py").read_text(encoding="utf-8")
