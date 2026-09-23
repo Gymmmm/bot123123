@@ -20,10 +20,18 @@ class ServiceEffectResult:
 
 
 class ServiceEffectExecutor:
-    def __init__(self, *, leads: LeadService, admins: TelegramAdminNotifier, now: Callable[[], str] | None = None):
+    def __init__(
+        self,
+        *,
+        leads: LeadService,
+        admins: TelegramAdminNotifier,
+        now: Callable[[], str] | None = None,
+        repair_reply_markup_factory: Callable[[int], Any] | None = None,
+    ):
         self.leads = leads
         self.admins = admins
         self.now = now or (lambda: datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        self.repair_reply_markup_factory = repair_reply_markup_factory
 
     def _record(self, *, user: LeadUser, request: LeadRequest) -> LeadEffectResult:
         try:
@@ -67,6 +75,11 @@ class ServiceEffectExecutor:
                     f"问题：{he(ticket.issue_type)}",
                     f"说明：{he(ticket.description.split(chr(10), 1)[0])}",
                     f"希望时间：{he(submission.slot_label)}",
+                ),
+                reply_markup=(
+                    self.repair_reply_markup_factory(int(ticket.id))
+                    if self.repair_reply_markup_factory is not None
+                    else None
                 ),
             ),
         )
