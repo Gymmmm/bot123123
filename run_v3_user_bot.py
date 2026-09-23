@@ -26,6 +26,8 @@ from qiaolian_dual.message_handlers import (
     cmd_admin_remove,
 )
 from qiaolian_dual.v3_admin_workflow_bridge import handle_v3_admin_workflow
+from qiaolian_dual.user_bot import handle_ui_callback as handle_legacy_callback
+from qiaolian_dual.user_bot import route_start_arg as handle_legacy_start
 from v3_core.user_bot.app import (
     V3UserBotConfig,
     build_takeover_user_bot_dependencies,
@@ -50,6 +52,8 @@ def main() -> None:
         admin_contract_text_handler=handle_admin_contract_message,
         admin_workflow_callback_handler=handle_v3_admin_workflow,
         lease_reminder_handler=lease_reminder_job,
+        compat_start_handler=handle_legacy_start,
+        compat_callback_handler=handle_legacy_callback,
         compat_command_handlers={
             "admin_list": cmd_admin_list,
             "admin_add": cmd_admin_add,
