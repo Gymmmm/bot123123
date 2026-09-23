@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from telegram.error import BadRequest
 
 from v3_core.user_bot.home_views import HomeView
-from v3_core.user_bot.service_views import ServiceView
+from v3_core.user_bot.service_views import ServiceView, local_life_view
 from v3_core.user_bot.telegram_home_handler import handle_v3_home_callback
 from v3_core.user_bot.telegram_service_handler import _send_view
 from v3_core.user_bot.telegram_edit import edit_query_panel
@@ -153,3 +153,12 @@ def test_home_handler_no_longer_constructs_v3_tenant_shadow_repository():
     source = Path("v3_core/user_bot/telegram_home_handler.py").read_text(encoding="utf-8")
     assert "SQLiteTenantServiceRepository" not in source
     assert "_tenant_service_from_history" not in source
+
+
+def test_home_local_life_can_return_directly_to_home_without_changing_service_path():
+    home_view = local_life_view(back_to_home=True)
+    service_view = local_life_view()
+    assert home_view.rows[-1][0].label == "返回首页"
+    assert home_view.rows[-1][0].callback_data == "v3u:t:home"
+    assert service_view.rows[-1][0].label == "返回侨联服务"
+    assert service_view.rows[-1][0].callback_data == "v3u:home:service"
