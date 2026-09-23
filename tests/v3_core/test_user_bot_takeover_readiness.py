@@ -104,6 +104,13 @@ def _db(tmp_path):
             INSERT INTO tenant_bindings_v3(
                 user_id,binding_code,property_name,status,created_at
             ) VALUES (123,'B2','错误 V3 绑定','active','2026-09-23 00:00:00');
+            INSERT INTO appointments(
+                user_id,username,display_name,listing_id,viewing_mode,
+                appointment_date,appointment_time,contact_value,note,status,created_at
+            ) VALUES (
+                456,'legacy','Legacy','QL-PP-D2W2','offline',
+                '09-24','am','@legacy','','pending','2026-09-23 11:00:00'
+            );
             """
         )
     return path
@@ -136,6 +143,11 @@ def test_takeover_appointment_write_and_history_use_production_table(tmp_path):
 
     admin = ProductionAdminAppointmentReader(path)
     assert admin.get(appointment_id)["public_listing_id"] == "QL-PP-D2W2"
+    legacy = admin.list_pending(limit=10)
+    assert any(
+        row["user_id"] == 456 and row["public_listing_id"] == "QL-PP-D2W2"
+        for row in legacy
+    )
 
 
 def test_takeover_leads_write_existing_advisor_console_table(tmp_path):
@@ -148,7 +160,7 @@ def test_takeover_leads_write_existing_advisor_console_table(tmp_path):
             "display_name": "Alice",
             "source": "channel_listing",
             "action": "appointment_submit",
-            "listing_id": "QL-PP-D2W2",
+            "listing_id": "l_15",
             "payload": {"start_payload": "property_QL-PP-D2W2_book"},
             "created_at": "2026-09-23 12:01:00",
         }
@@ -194,6 +206,10 @@ def test_takeover_entry_wires_single_scheduler_and_compatibility_bridges():
     assert "compat_start_handler=handle_legacy_start" in source
     assert "compat_callback_handler=handle_legacy_callback" in source
     assert "lease_reminder_handler=lease_reminder_job" in source
+    assert "appointment_table=\"appointments\"" in app
+    assert "compat_callback_fallback" in app
+    assert 'CallbackQueryHandler(compat_callback_fallback, pattern=r"^")' in app
+    assert '"favorites": cmd_favorites' in source
     assert "v3_admin_repair_keyboard" in source
     assert "adminrepairv3:" in Path("qiaolian_dual/v3_admin_workflow_bridge.py").read_text(encoding="utf-8")
     assert '"favorites": cmd_favorites' in source
