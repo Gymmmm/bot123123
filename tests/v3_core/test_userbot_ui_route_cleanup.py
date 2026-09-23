@@ -65,7 +65,7 @@ def test_legacy_navigation_maps_to_frozen_surfaces_without_reexposing_old_ui():
     assert legacy_home_action("hub:service") == "rental"
     assert legacy_home_action("hub:assurance") == "rental"
     assert legacy_home_action("home_brand") == "about"
-    assert legacy_home_action("menu_about") == "rental"
+    assert legacy_home_action("menu_about") == "about"
     assert legacy_home_action("hub:advisor") == "contact"
     assert legacy_home_action("appointment_menu:contact") == "contact"
     assert legacy_home_action("hub:precise") == "search"
