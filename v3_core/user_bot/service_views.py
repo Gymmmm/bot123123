@@ -450,7 +450,12 @@ def utility_stub_view(kind: str) -> ServiceView:
     )
 
 
-def local_life_view() -> ServiceView:
+def local_life_view(*, back_to_home: bool = False) -> ServiceView:
+    back_choice = (
+        ServiceChoice("返回首页", "v3u:t:home")
+        if back_to_home
+        else ServiceChoice("返回侨联服务", "v3u:home:service")
+    )
     return ServiceView(
         kind="local_life",
         text=(
@@ -461,7 +466,7 @@ def local_life_view() -> ServiceView:
         rows=(
             (ServiceChoice("富力城周边", "v3u:service:rfcity"),),
             (ServiceChoice("问问其他区域", "v3u:home:contact"),),
-            (ServiceChoice("返回侨联服务", "v3u:home:service"),),
+            (back_choice,),
         ),
     )
 
