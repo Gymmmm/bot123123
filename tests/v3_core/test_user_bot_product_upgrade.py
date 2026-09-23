@@ -24,14 +24,20 @@ def _button_labels(markup):
 def test_v3_home_uses_final_conversion_navigation():
     view = build_home_view(channel_url="https://t.me/qiaolian")
     labels = _labels(view)
-    assert labels == ["🔍 开始找房", "🛎️ 侨联服务", "📢 最新房源", "💬 中文顾问"]
-    forbidden = ("智能找房", "顾问帮我找", "关于侨联", "房源频道", "侨联保障", "租赁服务指南", "我想换房")
-    assert not any(any(term in label for term in forbidden) for label in labels)
+    assert labels == [
+        "🔍 智能找房", "📖 关于侨联地产",
+        "📅 预约看房", "💎 直接问顾问",
+        "⚡ 入住管家", "🧭 周边服务",
+    ]
 
 
 def test_home_without_channel_keeps_core_conversion_actions():
     labels = _labels(build_home_view())
-    assert labels == ["🔍 开始找房", "🛎️ 侨联服务", "💬 中文顾问"]
+    assert labels == [
+        "🔍 智能找房", "📖 关于侨联地产",
+        "📅 预约看房", "💎 直接问顾问",
+        "⚡ 入住管家", "🧭 周边服务",
+    ]
 
 
 def test_about_and_booking_are_compatible_secondary_home_actions():
@@ -122,10 +128,14 @@ def test_production_entrypoint_wires_3858_admin_and_workflow_routes():
     dual_app = Path("qiaolian_dual/app.py").read_text(encoding="utf-8")
     admin_callbacks = Path("qiaolian_dual/callback_admin.py").read_text(encoding="utf-8")
 
-    assert "from qiaolian_dual.user_bot import main" in entrypoint
+    assert "build_takeover_user_bot_dependencies" in entrypoint
+    assert "ProductionAdminAppointmentReader" in entrypoint
+    assert "handle_v3_admin_workflow" in entrypoint
+    assert "handle_legacy_start" in entrypoint
+    assert "handle_legacy_callback" in entrypoint
     assert "acquire_user_bot_polling_lock" in entrypoint
     assert "release_user_bot_polling_lock" in entrypoint
-    assert "v3_core.user_bot.app" not in entrypoint
+    assert "from qiaolian_dual.user_bot import main" not in entrypoint
 
     assert "CommandHandler('contracts', cmd_contracts)" in dual_app
     assert "CommandHandler('admin', cmd_admin_home)" in dual_app
