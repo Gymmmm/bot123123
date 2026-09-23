@@ -10,7 +10,7 @@ def _callbacks(markup):
 
 
 def test_home_callback_codec_remains_v3_only():
-    for action in ("search", "appointments", "rental", "service", "contact"):
+    for action in ("search", "book", "appointments", "about", "rental", "service", "local", "contact"):
         encoded = encode_home_callback(action)
         parsed = parse_home_callback(encoded)
         assert encoded == f"v3u:home:{action}"
@@ -18,7 +18,7 @@ def test_home_callback_codec_remains_v3_only():
     assert parse_home_callback("hub:appointments") is None
 
 
-def test_home_is_final_minimal_surface():
+def test_home_preserves_takeover_six_action_surface():
     view = build_home_view(
         channel_url="https://t.me/qiaolian",
         first_name="Gym",
@@ -28,12 +28,12 @@ def test_home_is_final_minimal_surface():
     labels = [b.text for row in markup.inline_keyboard for b in row]
     assert labels == ["🔍 智能找房", "📖 关于侨联地产", "📅 预约看房", "💎 直接问顾问", "⚡ 入住管家", "🧭 周边服务"]
     assert _callbacks(markup) == ["v3u:home:search", "v3u:home:about", "v3u:home:book", "v3u:home:contact", "v3u:home:service", "v3u:home:local"]
-    assert markup.inline_keyboard[1][0].url == "https://t.me/qiaolian"
+    assert all(button.url is None for row in markup.inline_keyboard for button in row)
     assert "Gym" in view.text
     assert "晚上好" in view.text
 
 
-def test_home_without_channel_keeps_other_three_buttons():
+def test_home_without_channel_keeps_takeover_six_actions():
     markup = build_home_keyboard(
         build_home_view(channel_url="", first_name="Gym", greeting="上午好")
     )
