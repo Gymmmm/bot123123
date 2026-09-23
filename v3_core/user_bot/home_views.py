@@ -47,8 +47,12 @@ def welcome_text(*, first_name: str, greeting: str) -> str:
 
 WELCOME_TEXT = welcome_text(first_name="您", greeting="您好")
 ABOUT_TEXT = (
-    "<b>安心租房</b>\n\n"
-    "找房不只是看图片、签合同。看房、费用确认、入住交接留档和入住后的住房事项，都可以提前了解清楚。"
+    "🏠 <b>侨联地产｜金边中文租房</b>\n\n"
+    "中文顾问为你筛房、带看、确认费用，并继续跟进签约、入住和售后。\n\n"
+    "✅ 真实房源｜实拍更新\n"
+    "✅ 实地看房｜视频代看\n"
+    "✅ 押付、水电、物业等费用提前确认\n"
+    "✅ 入住后的报修和物业事项继续协助"
 )
 CONTACT_TEXT = (
     "<b>中文顾问</b>\n\n"
@@ -92,7 +96,14 @@ def build_home_view(
     )
 
 def build_about_view(*, advisor_url: str = "") -> HomeView:
-    return HomeView("about",ABOUT_TEXT,((HomeChoice("开始找房","search"),HomeChoice("中文顾问","contact")),(HomeChoice("返回首页","root"),)))
+    return HomeView(
+        "about",
+        ABOUT_TEXT,
+        (
+            (HomeChoice("🔍 开始找房", "search"), HomeChoice("💬 中文顾问", "contact")),
+            (HomeChoice("⬅️ 返回首页", "root"),),
+        ),
+    )
 
 def build_booking_view(*, advisor_url: str = "") -> HomeView:
     return HomeView("book",BOOK_TEXT,((HomeChoice("开始找房","search"),HomeChoice("我的预约","appointments")),(HomeChoice("中文顾问","contact"),),(HomeChoice("返回首页","root"),)))
