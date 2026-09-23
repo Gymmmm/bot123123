@@ -11,7 +11,7 @@ from .appointment_history import AppointmentHistoryService, AppointmentHistoryVi
 from .assurance_views import build_assurance_home_view
 from .contact_effects import ContactEffectExecutor, ContactEffectResult
 from .home_callbacks import HomeAction, parse_home_callback
-from .home_views import build_appointment_history_home_view, build_booking_view, build_contact_view
+from .home_views import build_about_view, build_appointment_history_home_view, build_booking_view, build_contact_view
 from .lead_service import LeadUser
 from .service_flow import TenantService
 from .service_product_views import service_home_view
@@ -133,7 +133,11 @@ async def handle_v3_home_callback(
         await _edit_home_view(query, view)
         return TelegramHomeOutcome(True, action, True, appointment_history=history)
 
-    if action in {"about", "rental"}:
+    if action == "about":
+        await _edit_home_view(query, build_about_view(advisor_url=advisor_url))
+        return TelegramHomeOutcome(handled=True, action=action, rendered=True)
+
+    if action == "rental":
         await render_assurance_view(query, build_assurance_home_view(), advisor_url=advisor_url)
         return TelegramHomeOutcome(handled=True, action=action, rendered=True)
 
