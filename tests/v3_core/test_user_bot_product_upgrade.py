@@ -44,7 +44,8 @@ def test_about_and_booking_are_compatible_secondary_home_actions():
     assert parse_home_callback(encode_home_callback("about")).action == "about"
     assert parse_home_callback(encode_home_callback("book")).action == "book"
     about = build_about_view().text
-    assert "安心租房" in about
+    assert "侨联地产｜金边中文租房" in about
+    assert "真实房源" in about
     assert "看房、费用确认、入住交接留档" in about
     assert "预约看房" in build_booking_view().text
     assert "换房" not in build_about_view().text
