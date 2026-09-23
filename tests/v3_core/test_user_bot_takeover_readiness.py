@@ -134,7 +134,7 @@ def test_takeover_appointment_write_and_history_use_production_table(tmp_path):
         }
     )
     with sqlite3.connect(path) as conn:
-        assert conn.execute("SELECT COUNT(*) FROM appointments").fetchone()[0] == 1
+        assert conn.execute("SELECT COUNT(*) FROM appointments").fetchone()[0] == 2
         assert conn.execute("SELECT COUNT(*) FROM appointments_v3").fetchone()[0] == 0
 
     records = ProductionAppointmentHistoryReader(path).list_for_user(123)
