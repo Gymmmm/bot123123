@@ -135,12 +135,17 @@ class V3AppointmentChannelSynchronizer:
         user_bot_username: str,
         advisor_url: str = "",
         bot_factory: Callable[[str], Any] | None = None,
+        appointment_table: str = "appointments_v3",
     ):
         self.db_path = Path(db_path).expanduser().resolve()
         self.publisher_bot_token = str(publisher_bot_token or "").strip()
         self.user_bot_username = str(user_bot_username or "").strip().lstrip("@")
         self.advisor_url = str(advisor_url or "").strip()
         self.bot_factory = bot_factory or (lambda token: Bot(token=token))
+        clean_table = str(appointment_table or "appointments_v3").strip()
+        if clean_table not in {"appointments_v3", "appointments"}:
+            raise ValueError("unsupported_appointment_table")
+        self.appointment_table = clean_table
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(str(self.db_path), timeout=30)
@@ -168,7 +173,7 @@ class V3AppointmentChannelSynchronizer:
                 (listing_id,),
             ).fetchone()
             count_row = conn.execute(
-                f"""SELECT COUNT(*) AS count FROM appointments_v3
+                f"""SELECT COUNT(*) AS count FROM {self.appointment_table}
                     WHERE listing_id=? AND status IN ({placeholders})""",
                 (listing_id, *statuses),
             ).fetchone()
