@@ -223,7 +223,7 @@ def test_missing_channel_url_does_not_create_channel_button():
 def test_missing_advisor_url_uses_internal_contact_callback_not_dead_url():
     view = build_contact_view(advisor_url="")
     first = view.rows[0][0]
-    assert first.label == "中文顾问"
+    assert first.label == "💬 中文顾问"
     assert first.url == ""
     button = encode_home_choice(first)
     assert button.url is None
