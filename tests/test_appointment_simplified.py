@@ -128,7 +128,7 @@ class SimplifiedAppointmentTests(unittest.IsolatedAsyncioTestCase):
             patch.object(user_bot, "_notify_admins", new=AsyncMock()),
             patch("qiaolian_dual.listing.listing_is_available", return_value=(True, "active")),
             patch("qiaolian_dual.adapters.public_inventory.PublicInventoryAdapter.resolve_internal_id", return_value="LST_315"),
-            patch("qiaolian_dual.appointment_flow.listing_context", return_value={"project": "测试房源", "layout": "一房"}),
+            patch("qiaolian_dual.listing.listing_context", return_value={"project": "测试房源", "layout": "一房"}),
             patch("qiaolian_dual.channel_status_sync.sync_channel_listing_status", new=AsyncMock()),
         ):
             state = await user_bot.appoint_flow_cb(update, context)
@@ -165,7 +165,7 @@ class SimplifiedAppointmentTests(unittest.IsolatedAsyncioTestCase):
             patch("qiaolian_dual.results_admin._notify_admins", new=AsyncMock()),
             patch("qiaolian_dual.listing.listing_is_available", return_value=(True, "active")),
             patch("qiaolian_dual.adapters.public_inventory.PublicInventoryAdapter.resolve_internal_id", return_value="LST_315"),
-            patch("qiaolian_dual.appointment_flow.listing_context", return_value={"project": "测试房源", "layout": "一房"}),
+            patch("qiaolian_dual.listing.listing_context", return_value={"project": "测试房源", "layout": "一房"}),
             patch("qiaolian_dual.channel_status_sync.sync_channel_listing_status", new=AsyncMock()),
         ):
             state = await user_bot.handle_appointment_text(update, context)
@@ -206,7 +206,7 @@ class SimplifiedAppointmentTests(unittest.IsolatedAsyncioTestCase):
             patch.object(user_bot, "_notify_admins", new=AsyncMock()) as notify,
             patch("qiaolian_dual.listing.listing_is_available", return_value=(True, "active")),
             patch("qiaolian_dual.adapters.public_inventory.PublicInventoryAdapter.resolve_internal_id", return_value="LST_315"),
-            patch("qiaolian_dual.appointment_flow.listing_context", return_value={"project": "测试房源", "layout": "一房"}),
+            patch("qiaolian_dual.listing.listing_context", return_value={"project": "测试房源", "layout": "一房"}),
             patch("qiaolian_dual.channel_status_sync.sync_channel_listing_status", new=AsyncMock()),
         ):
             state = await user_bot.appoint_flow_cb(update, context)
