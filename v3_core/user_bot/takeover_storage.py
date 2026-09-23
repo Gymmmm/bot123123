@@ -363,6 +363,16 @@ class ProductionTenantServiceRepository(SQLiteTenantServiceRepository):
 class ProductionAdminAppointmentReader(AdminAppointmentReader):
     """Admin appointment console over the same live appointments table."""
 
+    @classmethod
+    def _public_row(cls, conn: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
+        value = super()._public_row(conn, row)
+        if not str(value.get("public_listing_id") or "").strip():
+            from v3_core.publishing.public_ids import normalize_public_id
+            direct = normalize_public_id(value.get("listing_id"))
+            if direct:
+                value["public_listing_id"] = direct
+        return value
+
     @staticmethod
     def _select_sql(where_clause: str) -> str:
         return f"""SELECT a.*,l.public_listing_id,l.display_title,l.project_name
