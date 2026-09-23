@@ -8,30 +8,19 @@ def _read(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
 
 
-def test_production_user_entry_starts_3858_with_polling_guard():
+def test_production_user_entry_starts_v3_takeover_with_polling_guard():
     source = _read("run_v3_user_bot.py")
 
-    assert "from qiaolian_dual.user_bot import main" in source
+    assert "from v3_core.user_bot.app import (" in source
+    assert "build_takeover_user_bot_dependencies" in source
+    assert "run_v3_user_bot" in source
+    assert "ProductionAdminAppointmentReader" in source
+    assert "handle_legacy_start" in source
+    assert "handle_legacy_callback" in source
+    assert "lease_reminder_job" in source
     assert "acquire_user_bot_polling_lock" in source
     assert "release_user_bot_polling_lock" in source
-    assert "lock_handle = acquire_user_bot_polling_lock()" in source
-    assert "main()" in source
-    assert "release_user_bot_polling_lock(lock_handle)" in source
-
-    assert "v3_core.user_bot.app" not in source
-    assert "run_v3_user_bot" not in source
-    for handler_name in (
-        "handle_v3_start",
-        "handle_v3_home_callback",
-        "handle_v3_listing_callback",
-        "handle_v3_transition_action",
-        "handle_v3_transition_text",
-        "handle_v3_service_callback",
-        "handle_v3_keyword_search_text",
-        "build_home_view",
-        "build_home_keyboard",
-    ):
-        assert handler_name not in source
+    assert "from qiaolian_dual.user_bot import main" not in source
 
 
 def test_run_component_keeps_single_user_entry_and_other_commands_unchanged():
