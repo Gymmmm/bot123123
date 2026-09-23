@@ -27,7 +27,7 @@ def test_home_is_final_minimal_surface():
     markup = build_home_keyboard(view)
     labels = [b.text for row in markup.inline_keyboard for b in row]
     assert labels == ["🔍 智能找房", "📖 关于侨联地产", "📅 预约看房", "💎 直接问顾问", "⚡ 入住管家", "🧭 周边服务"]
-    assert _callbacks(markup) == ["v3u:home:search", "v3u:home:service", "v3u:home:contact"]
+    assert _callbacks(markup) == ["v3u:home:search", "v3u:home:about", "v3u:home:book", "v3u:home:contact", "v3u:home:service", "v3u:home:local"]
     assert markup.inline_keyboard[1][0].url == "https://t.me/qiaolian"
     assert "Gym" in view.text
     assert "晚上好" in view.text
@@ -39,7 +39,7 @@ def test_home_without_channel_keeps_other_three_buttons():
     )
     labels = [b.text for row in markup.inline_keyboard for b in row]
     assert labels == ["🔍 智能找房", "📖 关于侨联地产", "📅 预约看房", "💎 直接问顾问", "⚡ 入住管家", "🧭 周边服务"]
-    assert _callbacks(markup) == ["v3u:home:search", "v3u:home:service", "v3u:home:contact"]
+    assert _callbacks(markup) == ["v3u:home:search", "v3u:home:about", "v3u:home:book", "v3u:home:contact", "v3u:home:service", "v3u:home:local"]
 
 
 def test_contact_handoff_and_appointment_history_navigation_are_plain_text():
