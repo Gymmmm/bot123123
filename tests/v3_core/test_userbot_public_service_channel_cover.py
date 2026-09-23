@@ -312,7 +312,8 @@ async def test_missing_binding_is_only_a_lease_gate(tmp_path):
         service=service,
     )
     assert outcome.handled and outcome.rendered
-    text = bot.calls[-1][1]
+    assert bot.calls == []
+    text = query.calls[-1][1]
     assert text == (
         "📋 <b>我的租约</b>\n"
         "目前没有查到已绑定的租约。如果你已经通过侨联入住，但这里暂时没有显示，可以联系中文顾问帮你核对。"
