@@ -192,7 +192,11 @@ def build_v3_user_bot_dependencies(config: V3UserBotConfig) -> V3UserBotDependen
     )
 
 
-def build_takeover_user_bot_dependencies(config: V3UserBotConfig) -> V3UserBotDependencies:
+def build_takeover_user_bot_dependencies(
+    config: V3UserBotConfig,
+    *,
+    repair_reply_markup_factory: Callable[[int], Any] | None = None,
+) -> V3UserBotDependencies:
     """Use V3 UX with the live 3858 appointment/lead/tenant data boundaries."""
     read = build_read_runtime(config.db_path)
     transition = build_takeover_transition_runtime(config.db_path)
@@ -202,7 +206,11 @@ def build_takeover_user_bot_dependencies(config: V3UserBotConfig) -> V3UserBotDe
         leads=transition.lead_effects,
         admins=admins,
     )
-    service_effects = ServiceEffectExecutor(leads=transition.leads, admins=admins)
+    service_effects = ServiceEffectExecutor(
+        leads=transition.leads,
+        admins=admins,
+        repair_reply_markup_factory=repair_reply_markup_factory,
+    )
     appointment_effects = AppointmentRuntimeEffectExecutor(
         availability=AppointmentAvailabilityService(
             repository=ProductionAppointmentRepository(config.db_path)
