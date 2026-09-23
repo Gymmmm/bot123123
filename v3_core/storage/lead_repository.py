@@ -1,4 +1,4 @@
-"""Additive V3 persistence for User Bot leads."""
+"""V3 lead persistence over the production leads table."""
 from __future__ import annotations
 
 import json
@@ -7,7 +7,7 @@ import sqlite3
 from typing import Any
 
 DDL = """
-CREATE TABLE IF NOT EXISTS leads_v3 (
+CREATE TABLE IF NOT EXISTS leads (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER,
     username TEXT NOT NULL DEFAULT '',
@@ -31,12 +31,21 @@ CREATE TABLE IF NOT EXISTS leads_v3 (
     assigned_at TEXT NOT NULL DEFAULT '',
     intent TEXT NOT NULL DEFAULT '',
     lead_status TEXT NOT NULL DEFAULT 'new',
+    source_type TEXT NOT NULL DEFAULT '',
+    source_detail TEXT NOT NULL DEFAULT '',
+    first_source_type TEXT NOT NULL DEFAULT '',
+    first_source_detail TEXT NOT NULL DEFAULT '',
+    first_entry_at TEXT NOT NULL DEFAULT '',
+    latest_touch_at TEXT NOT NULL DEFAULT '',
+    entry_action TEXT NOT NULL DEFAULT '',
+    deep_link_payload TEXT NOT NULL DEFAULT '',
+    channel_message_id INTEGER,
     created_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_leads_v3_user_created
-    ON leads_v3(user_id, created_at);
-CREATE INDEX IF NOT EXISTS idx_leads_v3_listing_action
-    ON leads_v3(listing_id, action);
+CREATE INDEX IF NOT EXISTS idx_leads_user_created
+    ON leads(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_leads_listing_action
+    ON leads(listing_id, action);
 """
 
 
@@ -85,12 +94,15 @@ class SQLiteLeadRepository:
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             cursor = conn.execute(
-                """INSERT INTO leads_v3
+                """INSERT INTO leads
                    (user_id,username,display_name,source,action,listing_id,area,
                     property_type,budget_min,budget_max,payload_json,message_id,
                     post_token,caption_variant,agent_id,response_at,conversion_value,
-                    advisor_id,advisor_name,assigned_at,intent,lead_status,created_at)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    advisor_id,advisor_name,assigned_at,intent,lead_status,
+                    source_type,source_detail,first_source_type,first_source_detail,
+                    first_entry_at,latest_touch_at,entry_action,deep_link_payload,
+                    channel_message_id,created_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     user_id,
                     str(payload.get("username") or ""),
@@ -114,6 +126,15 @@ class SQLiteLeadRepository:
                     str(payload.get("assigned_at") or ""),
                     str(payload.get("intent") or ""),
                     str(payload.get("lead_status") or "new"),
+                    str(payload.get("source_type") or payload.get("source") or ""),
+                    str(payload.get("source_detail") or payload.get("action") or ""),
+                    str(payload.get("first_source_type") or payload.get("source") or ""),
+                    str(payload.get("first_source_detail") or payload.get("action") or ""),
+                    str(payload.get("first_entry_at") or created_at),
+                    str(payload.get("latest_touch_at") or created_at),
+                    str(payload.get("entry_action") or payload.get("action") or ""),
+                    str(payload.get("deep_link_payload") or parsed.get("start_payload") or parsed.get("deep_link_payload") or ""),
+                    message_id,
                     created_at,
                 ),
             )
@@ -123,7 +144,7 @@ class SQLiteLeadRepository:
 
     def get(self, lead_id: int) -> dict[str, Any] | None:
         with self._connect() as conn:
-            row = conn.execute("SELECT * FROM leads_v3 WHERE id=?", (int(lead_id),)).fetchone()
+            row = conn.execute("SELECT * FROM leads WHERE id=?", (int(lead_id),)).fetchone()
         if row is None:
             return None
         result = dict(row)
@@ -141,7 +162,7 @@ class SQLiteLeadRepository:
         """
         with self._connect() as conn:
             rows = conn.execute(
-                """SELECT id,payload_json FROM leads_v3
+                """SELECT id,payload_json FROM leads
                    WHERE user_id=? AND action=?
                    ORDER BY id DESC""",
                 (int(user_id), str(action or "")),
