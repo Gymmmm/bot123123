@@ -20,6 +20,7 @@ from .service_views import (
     repair_result_view, repair_exit_view, rfcity_category_view, rfcity_home_view,
     slot_view, utility_stub_view,
 )
+from .telegram_edit import edit_query_panel
 from .tenant_v1 import (
     deposit_view, guide_view, handover_view, lease_view, missing_lease_view, renew_view,
     submit_request, tenant_home_view, terminate_view,
@@ -78,11 +79,12 @@ def build_service_keyboard(view: ServiceView, *, advisor_url: str = "") -> Inlin
 
 async def render_service_view(query: Any, view: ServiceView, *, advisor_url: str = "") -> None:
     markup = build_service_keyboard(view, advisor_url=advisor_url)
-    message = getattr(query, "message", None)
-    if getattr(message, "photo", None):
-        await query.edit_message_caption(caption=view.text, parse_mode=ParseMode.HTML, reply_markup=markup)
-        return
-    await query.edit_message_text(view.text, parse_mode=ParseMode.HTML, reply_markup=markup)
+    await edit_query_panel(
+        query,
+        text=view.text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=markup,
+    )
 
 
 def _with_context_contact(
