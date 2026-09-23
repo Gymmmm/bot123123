@@ -15,6 +15,21 @@ from .session_deeplink import user_display_name
 from .keyboards_search import service_detail_keyboard
 
 
+def v3_admin_repair_keyboard(ticket_id: int) -> InlineKeyboardMarkup:
+    ticket = int(ticket_id or 0)
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("✅ 已接手", callback_data=f"adminrepairv3:accepted:{ticket}"),
+            InlineKeyboardButton("📅 已安排", callback_data=f"adminrepairv3:scheduled:{ticket}"),
+        ],
+        [
+            InlineKeyboardButton("🔧 处理中", callback_data=f"adminrepairv3:in_progress:{ticket}"),
+            InlineKeyboardButton("✅ 已完成", callback_data=f"adminrepairv3:done:{ticket}"),
+        ],
+        [InlineKeyboardButton("💬 需要客户补充", callback_data=f"adminrepairv3:need_info:{ticket}")],
+    ])
+
+
 def _update_v3_repair_ticket(ticket_id: int, stage: str):
     import sqlite3
     try:
@@ -93,7 +108,8 @@ async def handle_v3_admin_workflow(update, context, query, data: str, user):
         await answer_callback_once(query, "仅顾问可操作", show_alert=True)
         return
 
-    if data.startswith("adminrepair:"):
+    if data.startswith(("adminrepair:", "adminrepairv3:")):
+        is_v3 = data.startswith("adminrepairv3:")
         parts = data.split(":")
         if len(parts) != 3 or not parts[2].isdigit():
             await answer_callback_once(query, "这条报修已失效", show_alert=True)
@@ -103,11 +119,11 @@ async def handle_v3_admin_workflow(update, context, query, data: str, user):
         if stage not in labels:
             return
         ticket_id = int(parts[2])
-        # V3 service submissions live in repair_tickets_v3. Fall back to the
-        # historical table only for callbacks attached to old messages.
-        ticket = _update_v3_repair_ticket(ticket_id, stage)
-        if not ticket:
-            ticket = db.update_repair_ticket_status(ticket_id, stage)
+        ticket = (
+            _update_v3_repair_ticket(ticket_id, stage)
+            if is_v3
+            else db.update_repair_ticket_status(ticket_id, stage)
+        )
         if not ticket:
             await answer_callback_once(query, "未找到这条报修，可能已处理", show_alert=True)
             return
@@ -173,4 +189,8 @@ async def handle_v3_admin_workflow(update, context, query, data: str, user):
     await answer_callback_once(query, "已更新")
 
 
-__all__ = ["cmd_v3_repair_update", "handle_v3_admin_workflow"]
+__all__ = [
+    "cmd_v3_repair_update",
+    "handle_v3_admin_workflow",
+    "v3_admin_repair_keyboard",
+]
