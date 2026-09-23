@@ -194,5 +194,5 @@ def test_takeover_entry_wires_single_scheduler_and_compatibility_bridges():
     assert "compat_start_handler=handle_legacy_start" in source
     assert "compat_callback_handler=handle_legacy_callback" in source
     assert "lease_reminder_handler=lease_reminder_job" in source
-    assert 'CommandHandler("favorites", find)' in app
+    assert '"favorites": cmd_favorites' in source
     assert 'name="lease_reminder_job"' in app
