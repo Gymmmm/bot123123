@@ -45,7 +45,7 @@ def test_home_without_channel_keeps_takeover_six_actions():
 def test_contact_handoff_and_appointment_history_navigation_are_plain_text():
     contact = build_contact_view(advisor_url="https://t.me/advisor")
     markup = build_home_keyboard(contact)
-    assert contact.rows[0][0].label == "中文顾问"
+    assert contact.rows[0][0].label == "💬 中文顾问"
     assert markup.inline_keyboard[0][0].url.startswith("https://t.me/advisor?text=")
     assert _callbacks(markup) == ["v3u:home:search", "v3u:t:home"]
 
