@@ -9,7 +9,7 @@ from v3_core.user_bot.telegram_callback_response import TelegramCallbackResponse
 from v3_core.user_bot.transition_plan import build_transition_plan
 
 
-def test_book_transition_starts_public_id_offline_appointment_at_date_without_side_effects():
+def test_book_transition_starts_public_id_appointment_at_mode_without_side_effects():
     response = TelegramCallbackResponse(
         kind="transition",
         status="ok",
@@ -25,8 +25,8 @@ def test_book_transition_starts_public_id_offline_appointment_at_date_without_si
     plan = build_transition_plan(response)
 
     assert plan.kind == "book"
-    assert plan.next_step == "appointment_date"
-    assert plan.effects == ("render_appointment_date",)
+    assert plan.next_step == "appointment_mode"
+    assert plan.effects == ("render_appointment_mode",)
     assert not plan.includes("record_lead")
     assert plan.book is not None
     assert plan.book.public_listing_id == "QL-RF-A2B3"
