@@ -7,7 +7,7 @@ starting appointment persistence.
 
 The plans preserve fixed-SHA entry semantics while keeping Telegram/session
 identity public:
-- book -> public-ID offline appointment draft, next step date;
+- book -> public-ID appointment draft, next step mode selection;
 - consult -> contact handoff, with lead/admin effects declared but not run;
 - similar -> keep only the frozen public area, goal any, next step budget;
 - change search -> reset to the normal search entry.
@@ -25,6 +25,7 @@ from .telegram_callback_response import TelegramCallbackResponse
 
 TransitionKind = Literal["book", "consult", "similar", "change_search"]
 TransitionStep = Literal[
+    "appointment_mode",
     "appointment_date",
     "contact_handoff",
     "search_budget",
@@ -33,6 +34,7 @@ TransitionStep = Literal[
 TransitionEffect = Literal[
     "record_lead",
     "notify_admin",
+    "render_appointment_mode",
     "render_appointment_date",
     "render_contact_handoff",
     "render_search_budget",
@@ -89,8 +91,8 @@ def build_transition_plan(response: TelegramCallbackResponse) -> TransitionPlan:
             raise ValueError("book_transition_missing_intent")
         return TransitionPlan(
             kind="book",
-            next_step="appointment_date",
-            effects=("render_appointment_date",),
+            next_step="appointment_mode",
+            effects=("render_appointment_mode",),
             book=BookTransition(
                 draft=PublicAppointmentDraft(
                     public_listing_id=intent.public_listing_id,
