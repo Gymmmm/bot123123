@@ -136,19 +136,18 @@ def _chat_id(update: Any) -> int:
 
 
 async def _send_view(update: Any, context: Any, view: ServiceView, *, anchor_key: str | None = None, advisor_url: str = "") -> Any:
-    markup = build_service_keyboard(view, advisor_url=advisor_url)
     query = getattr(update, "callback_query", None)
     source_message = getattr(query, "message", None) if query is not None else None
     sent = None
-    reply = getattr(source_message, "reply_text", None)
-    if callable(reply):
-        sent = await reply(view.text, parse_mode=ParseMode.HTML, reply_markup=markup)
+    if query is not None and source_message is not None:
+        await render_service_view(query, view, advisor_url=advisor_url)
+        sent = source_message
     else:
         sent = await context.bot.send_message(
             chat_id=_chat_id(update),
             text=view.text,
             parse_mode=ParseMode.HTML,
-            reply_markup=markup,
+            reply_markup=build_service_keyboard(view, advisor_url=advisor_url),
         )
     user_data = getattr(context, "user_data", None)
     if anchor_key and isinstance(user_data, dict):
