@@ -26,11 +26,21 @@ from qiaolian_dual.message_handlers import (
     cmd_admin_remove,
 )
 from qiaolian_dual.v3_admin_workflow_bridge import handle_v3_admin_workflow
-from v3_core.user_bot.app import run_v3_user_bot
+from v3_core.user_bot.app import (
+    V3UserBotConfig,
+    build_takeover_user_bot_dependencies,
+    run_v3_user_bot,
+)
+from v3_core.user_bot.takeover_storage import ProductionAdminAppointmentReader
 
 
 def main() -> None:
+    config = V3UserBotConfig.from_env()
+    dependencies = build_takeover_user_bot_dependencies(config)
     run_v3_user_bot(
+        config=config,
+        dependencies=dependencies,
+        admin_appointment_reader=ProductionAdminAppointmentReader(config.db_path),
         admin_command_ids=tuple(sorted(_all_user_admin_ids())),
         admin_authorizer=_is_admin_user,
         admin_home_handler=cmd_admin_home,
