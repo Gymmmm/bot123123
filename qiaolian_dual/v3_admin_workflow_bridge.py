@@ -12,6 +12,7 @@ from .common import DB_PATH, answer_callback_once, db, he
 from .messages import advisor_response_notice_text, repair_progress_text
 from .results_admin import admin_lead_keyboard
 from .session_deeplink import user_display_name
+from .keyboards_search import service_detail_keyboard
 
 
 def _update_v3_repair_ticket(ticket_id: int, stage: str):
@@ -37,6 +38,54 @@ def _update_v3_repair_ticket(ticket_id: int, stage: str):
         return dict(updated) if updated is not None else None
     except sqlite3.OperationalError:
         return None
+
+
+async def cmd_v3_repair_update(update, context):
+    """Takeover-compatible repair status command: V3 tickets first, legacy fallback."""
+    user = update.effective_user
+    if not _is_admin_user(getattr(user, "id", 0)):
+        await update.effective_message.reply_text("❌ 无权限。该命令仅限管理员使用。")
+        return
+    args = [str(value).strip() for value in (context.args or []) if str(value).strip()]
+    if len(args) < 2:
+        await update.effective_message.reply_text(
+            "用法：\n/repair_update <工单号> <已接手|已安排|处理中|已完成|需补充> [补充说明]"
+        )
+        return
+    try:
+        ticket_id = int(args[0])
+    except (TypeError, ValueError):
+        await update.effective_message.reply_text("❌ 工单号需要是数字。")
+        return
+    stage_map = {
+        "已接手": "accepted", "接手": "accepted", "accepted": "accepted",
+        "已安排": "scheduled", "安排": "scheduled", "scheduled": "scheduled",
+        "处理中": "in_progress", "处理": "in_progress", "in_progress": "in_progress",
+        "已完成": "done", "完成": "done", "done": "done",
+        "需补充": "need_info", "补充": "need_info", "need_info": "need_info",
+    }
+    stage = stage_map.get(args[1].lower())
+    if not stage:
+        await update.effective_message.reply_text("❌ 进度请使用：已接手、已安排、处理中、已完成或需补充。")
+        return
+    ticket = _update_v3_repair_ticket(ticket_id, stage)
+    if not ticket:
+        ticket = db.update_repair_ticket_status(ticket_id, stage)
+    if not ticket:
+        await update.effective_message.reply_text("⚠️ 未找到工单，或进度无效。")
+        return
+    note = " ".join(args[2:]).strip()
+    try:
+        await context.bot.send_message(
+            chat_id=int(ticket.get("user_id") or 0),
+            text=repair_progress_text(str(ticket.get("issue_type") or "报修事项"), stage, note),
+            parse_mode=ParseMode.HTML,
+            reply_markup=service_detail_keyboard(),
+        )
+    except Exception:
+        await update.effective_message.reply_text("⚠️ 进度已保存，但通知发送失败。")
+        return
+    await update.effective_message.reply_text(f"✅ 已通知客户：工单 #{ticket_id} 已更新。")
 
 
 async def handle_v3_admin_workflow(update, context, query, data: str, user):
@@ -124,4 +173,4 @@ async def handle_v3_admin_workflow(update, context, query, data: str, user):
     await answer_callback_once(query, "已更新")
 
 
-__all__ = ["handle_v3_admin_workflow"]
+__all__ = ["cmd_v3_repair_update", "handle_v3_admin_workflow"]
