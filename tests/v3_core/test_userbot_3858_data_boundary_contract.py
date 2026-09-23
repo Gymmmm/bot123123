@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import os
 import sqlite3
 from pathlib import Path
+import subprocess
+import sys
 
 import pytest
 
@@ -236,3 +239,32 @@ def test_admin_today_appointments_reads_dual_table_even_when_v3_exists(tmp_path,
     assert rows[0]["user_id"] == 9200
     assert rows[0]["listing_id"] == ""
     assert "LST_ONLY_DUAL" not in str(rows[0])
+
+
+def test_3858_user_bot_related_regression_gate(tmp_path):
+    repo_root = Path(__file__).resolve().parents[2]
+    targets = [
+        "tests/test_userbot_3858_adapters_t0.py",
+        "tests/test_userbot_3858_runtime_entry.py",
+        "tests/test_userbot_3858_t1_home.py",
+        "tests/test_userbot_3858_t2_public_inventory.py",
+        "tests/test_userbot_3858_t31_channel_status_sync.py",
+        "tests/test_userbot_3858_t3_appointment_adapter.py",
+        "tests/test_callback_route_repair.py",
+        "tests/test_appointment_simplified.py",
+        "tests/test_appointment_mobile_copy.py",
+        "tests/test_lead_workflow.py",
+    ]
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(repo_root)
+    env.setdefault("USER_BOT_TOKEN", "123456:TESTTOKEN")
+    env.setdefault("PUBLISHER_BOT_TOKEN", "123456:TESTTOKEN")
+    env["DB_PATH"] = str(tmp_path / "3858-regression.sqlite3")
+    proc = subprocess.run(
+        [sys.executable, "-m", "pytest", "-q", *targets],
+        cwd=repo_root,
+        env=env,
+        text=True,
+        capture_output=True,
+    )
+    assert proc.returncode == 0, proc.stdout + "\n" + proc.stderr
