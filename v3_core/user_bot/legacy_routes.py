@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-LegacyHomeAction = Literal["home", "search", "appointments", "rental", "service", "contact"]
+LegacyHomeAction = Literal["home", "search", "book", "appointments", "rental", "service", "local", "contact"]
 
 _LEGACY_HOME_ACTIONS: dict[str, LegacyHomeAction] = {
     "hub:find": "search",
@@ -19,6 +19,13 @@ _LEGACY_HOME_ACTIONS: dict[str, LegacyHomeAction] = {
     "hub:help": "home",
     "home_smart_search": "search",
     "home_brand": "rental",
+    "home_appoint": "book",
+    "home_consult": "contact",
+    "home_living": "service",
+    "home_nearby": "local",
+    "home": "home",
+    "service:hub": "service",
+    "appointment_menu:list": "appointments",
     "menu_about": "rental",
     "menu_human": "contact",
     "menu_service": "service",
@@ -49,9 +56,11 @@ _LEGACY_REPLY_TEXT_ACTIONS: dict[str, LegacyHomeAction] = {
 _LEGACY_START_PAYLOADS: dict[LegacyHomeAction, str] = {
     "home": "",
     "search": "find_home",
+    "book": "appointments",
     "appointments": "appointments",
     "rental": "assurance",
     "service": "service",
+    "local": "service",
     "contact": "advisor",
 }
 
