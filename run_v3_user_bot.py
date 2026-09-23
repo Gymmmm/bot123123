@@ -25,10 +25,10 @@ from qiaolian_dual.message_handlers import (
     cmd_admin_remove,
     cmd_favorites,
 )
-from qiaolian_dual.results_admin import admin_repair_keyboard
 from qiaolian_dual.v3_admin_workflow_bridge import (
     cmd_v3_repair_update,
     handle_v3_admin_workflow,
+    v3_admin_repair_keyboard,
 )
 from qiaolian_dual.user_bot import handle_ui_callback as handle_legacy_callback
 from qiaolian_dual.user_bot import route_start_arg as handle_legacy_start
@@ -44,7 +44,7 @@ def main() -> None:
     config = V3UserBotConfig.from_env()
     dependencies = build_takeover_user_bot_dependencies(
         config,
-        repair_reply_markup_factory=admin_repair_keyboard,
+        repair_reply_markup_factory=v3_admin_repair_keyboard,
     )
     run_v3_user_bot(
         config=config,
