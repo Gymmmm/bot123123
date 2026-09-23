@@ -48,6 +48,8 @@ from .telegram_start_handler import handle_v3_start
 from .telegram_transition_action_handler import handle_v3_transition_action
 from .telegram_transition_text_handler import handle_v3_transition_text
 from .transition_runtime import UserBotTransitionRuntime, build_transition_runtime
+from .takeover_runtime import build_takeover_transition_runtime
+from .takeover_storage import ProductionAdminAppointmentReader, ProductionAppointmentRepository
 
 logger = logging.getLogger(__name__)
 
@@ -190,6 +192,41 @@ def build_v3_user_bot_dependencies(config: V3UserBotConfig) -> V3UserBotDependen
     )
 
 
+def build_takeover_user_bot_dependencies(config: V3UserBotConfig) -> V3UserBotDependencies:
+    """Use V3 UX with the live 3858 appointment/lead/tenant data boundaries."""
+    read = build_read_runtime(config.db_path)
+    transition = build_takeover_transition_runtime(config.db_path)
+    admins = TelegramAdminNotifier(config.admin_ids)
+    contact_effects = ContactEffectExecutor(leads=transition.lead_effects, admins=admins)
+    listing_contact_effects = ListingContactEffectExecutor(
+        leads=transition.lead_effects,
+        admins=admins,
+    )
+    service_effects = ServiceEffectExecutor(leads=transition.leads, admins=admins)
+    appointment_effects = AppointmentRuntimeEffectExecutor(
+        availability=AppointmentAvailabilityService(
+            repository=ProductionAppointmentRepository(config.db_path)
+        ),
+        channel=V3AppointmentChannelSynchronizer(
+            config.db_path,
+            publisher_bot_token=config.publisher_bot_token,
+            user_bot_username=config.user_bot_username,
+            advisor_url=config.advisor_url,
+        ),
+        admins=admins,
+        inventory=read.inventory,
+    )
+    return V3UserBotDependencies(
+        read=read,
+        transition=transition,
+        admins=admins,
+        contact_effects=contact_effects,
+        listing_contact_effects=listing_contact_effects,
+        service_effects=service_effects,
+        appointment_effects=appointment_effects,
+    )
+
+
 async def _render_home_callback(update: Any, config: V3UserBotConfig) -> None:
     query = update.callback_query
     await query.answer()
@@ -224,10 +261,11 @@ def build_v3_user_bot_application(
     admin_workflow_callback_handler: Callable[[Any, Any, Any, str, Any], Awaitable[Any]] | None = None,
     lease_reminder_handler: Callable[[Any], Awaitable[Any]] | None = None,
     compat_command_handlers: dict[str, Callable[[Any, Any], Awaitable[Any]]] | None = None,
+    admin_appointment_reader: AdminAppointmentReader | None = None,
 ) -> Application:
     config.validate()
     deps = dependencies or build_v3_user_bot_dependencies(config)
-    admin_appointments = AdminAppointmentReader(config.db_path)
+    admin_appointments = admin_appointment_reader or AdminAppointmentReader(config.db_path)
     runtime_state = RuntimeStateRepository(config.db_path)
 
     async def configure_command_menu(application: Application) -> None:
@@ -574,6 +612,7 @@ __all__ = [
     "public_command_menu",
     "remove_legacy_reply_keyboard",
     "V3UserBotDependencies",
+    "build_takeover_user_bot_dependencies",
     "build_v3_user_bot_application",
     "build_v3_user_bot_dependencies",
     "run_v3_user_bot",
