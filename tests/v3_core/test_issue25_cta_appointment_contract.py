@@ -7,6 +7,7 @@ from v3_core.publishing.channel_contract import (
     CHANNEL_CTA_LABELS,
     official_channel_action_urls,
     official_channel_button_spec,
+    official_channel_cta_keys,
 )
 from v3_core.user_bot.appointment_confirmation_view import build_appointment_confirmation_view
 from v3_core.user_bot.appointment_service import AppointmentSubmissionService, AppointmentUser
@@ -140,6 +141,9 @@ def test_channel_ctas_and_sync_contract_share_one_real_listing():
         ["📷 房源详情"], ["💬 中文顾问"],
     ]
     assert offline[0][0][1] == urls["photos"]
+    assert official_channel_cta_keys("active") == ("details", "book", "consult")
+    for status in ("pending", "high_demand", "rented", "offline", "inactive"):
+        assert official_channel_cta_keys(status) == ("details", "consult")
 
 
 def test_details_and_photos_contract_has_real_fields_three_entries_and_no_internal_id():
