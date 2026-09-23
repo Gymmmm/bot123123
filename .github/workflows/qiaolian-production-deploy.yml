@@ -251,7 +251,11 @@ jobs:
           runuser -u qiaolianbot -- bash -lc "set -a; source '$RUNTIME_ENV'; set +a; export QIAOLIAN_CODE_ROOT='$RELEASE'; exec '$PYTHON_BOOTSTRAP' '$RELEASE/run_v3_preflight.py' --component all --db '$DB'"
           trap rollback_release ERR
           ln -sfn "$RELEASE" "$ROOT/current.next"; mv -Tf "$ROOT/current.next" "$CURRENT"; SWITCHED=1
-          ACTIVATED_AT=$(date -u '+%Y-%m-%d %H:%M:%S UTC'); systemctl restart "${SERVICES[@]}"; sleep 10
+          systemctl restart "${SERVICES[@]}"
+          # Start the log window only after the old processes have fully
+          # stopped. Shutdown races can emit harmless TargetClosedError traces.
+          ACTIVATED_AT=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          sleep 10
           HEALTH_FAILED=0
           for service in "${SERVICES[@]}"; do ACTIVE=$(systemctl is-active "$service" 2>/dev/null||true); PID=$(systemctl show "$service" -p MainPID --value 2>/dev/null||echo 0); RESTARTS=$(systemctl show "$service" -p NRestarts --value 2>/dev/null||echo unknown); echo "SERVICE_HEALTH unit=$service active=$ACTIVE pid=$PID restarts=$RESTARTS"; [ "$ACTIVE" = active ]||HEALTH_FAILED=1; [ "${PID:-0}" -gt 0 ] 2>/dev/null||HEALTH_FAILED=1; [ "$RESTARTS" = 0 ]||HEALTH_FAILED=1; done
           LOGS=$(journalctl -u qiaolian-v3@collector.service -u qiaolian-v3@canonical.service -u qiaolian-v3@publisher.service -u qiaolian-v3@user.service --since "$ACTIVATED_AT" --no-pager); printf '%s\n' "$LOGS"
