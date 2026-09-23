@@ -227,6 +227,23 @@ jobs:
           if [ ! -d "$RELEASE/.git" ]; then rm -rf -- "$RELEASE"; git clone -q "$BUNDLE_PATH" --branch actions-production "$RELEASE"; fi
           test "$(git -C "$RELEASE" rev-parse HEAD)" = "$EXPECTED_SHA"
           printf '%s\n' "$EXPECTED_SHA" > "$RELEASE/.deployed_sha"; chmod 0644 "$RELEASE/.deployed_sha"; chown -R qiaolianbot:qiaolianbot "$RELEASE"
+
+          # Keep the shared Playwright browser cache aligned with the installed
+          # Python package before publisher health checks. This is idempotent.
+          PLAYWRIGHT_CACHE="$OLD/.playwright-browsers"
+          install -d -m 0755 -o qiaolianbot -g qiaolianbot "$PLAYWRIGHT_CACHE"
+          runuser -u qiaolianbot -- env PLAYWRIGHT_BROWSERS_PATH="$PLAYWRIGHT_CACHE" "$VENV/bin/python" -m playwright install chromium
+          runuser -u qiaolianbot -- env PLAYWRIGHT_BROWSERS_PATH="$PLAYWRIGHT_CACHE" "$VENV/bin/python" - <<'PY'
+          from playwright.sync_api import sync_playwright
+          with sync_playwright() as p:
+              browser = p.chromium.launch(headless=True)
+              page = browser.new_page()
+              page.set_content("<html><body>playwright-ok</body></html>")
+              assert page.text_content("body") == "playwright-ok"
+              browser.close()
+          print("PLAYWRIGHT_SMOKE_OK")
+          PY
+
           runuser -u qiaolianbot -- bash -lc "set -a; source '$RUNTIME_ENV'; set +a; export QIAOLIAN_CODE_ROOT='$RELEASE'; exec '$PYTHON_BOOTSTRAP' '$RELEASE/run_v3_preflight.py' --component all --db '$DB'"
           trap rollback_release ERR
           ln -sfn "$RELEASE" "$ROOT/current.next"; mv -Tf "$ROOT/current.next" "$CURRENT"; SWITCHED=1
