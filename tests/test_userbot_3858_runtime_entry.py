@@ -62,11 +62,11 @@ def test_3858_application_keeps_admin_user_routes_and_single_lease_reminder():
 def test_3858_admin_callback_keeps_adminq_lead_and_repair_closure():
     source = _read("qiaolian_dual/callback_admin.py")
 
-    assert "data.startswith(('adminq:', 'adminlead:', 'adminrepair:'))" in source
+    assert "data.startswith(('adminq:', 'adminlead:', 'adminrepair:', 'adminrepairv3:'))" in source
     assert "if data.startswith('adminq:')" in source
     assert "from .admin_consult import handle_admin_query" in source
     assert "await handle_admin_query(update, context)" in source
-    assert "data.startswith('adminrepair:')" in source
+    assert "data.startswith(('adminrepair:', 'adminrepairv3:'))" in source
     assert "data.startswith('adminlead:')" in source
     assert "if action == 'done':" in source
     assert "from .admin_consult import handle_admin_done" in source
