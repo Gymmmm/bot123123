@@ -2,7 +2,7 @@
 
 Locked production normalizes lead metadata in ``search.create_lead`` and then
 writes the legacy ``leads`` table. V3 keeps that normalization explicit and
-writes through the production-compatible repository so the existing advisor console keeps one lead stream. Telegram
+writes only through an injected repository (normally ``leads_v3``). Telegram
 admin notification is deliberately a separate effect.
 """
 from __future__ import annotations
@@ -161,7 +161,7 @@ def appointment_lead_request(
     return LeadRequest(
         action=action,
         source=str(execution.submission.lead_source or draft.source or "user_bot"),
-        listing_id=str(draft.public_listing_id or ""),
+        listing_id=str(execution.listing_id or ""),
         payload={
             "appointment_id": int(execution.submission.appointment_id),
             "viewing_mode": draft.mode,
@@ -183,9 +183,9 @@ def listing_contact_lead_request(intent: ConsultIntent) -> LeadRequest:
     return LeadRequest(
         action="consult_menu_click",
         source=str(intent.source or "listing_callback"),
-        listing_id=str(intent.public_listing_id or ""),
+        listing_id=str(intent.listing_id or ""),
         payload={
-            "listing_id": str(intent.public_listing_id or ""),
+            "listing_id": str(intent.listing_id or ""),
             "touchpoint": str(intent.touchpoint or "").strip(),
         },
     )
