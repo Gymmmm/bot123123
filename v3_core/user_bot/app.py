@@ -6,6 +6,7 @@ only composes V3-owned handlers against an already initialized additive V3 DB.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import time as dt_time
 import logging
 import os
 from pathlib import Path
@@ -221,6 +222,8 @@ def build_v3_user_bot_application(
     admin_contract_callback_handler: Callable[[Any, Any, Any, str, Any], Awaitable[Any]] | None = None,
     admin_contract_text_handler: Callable[[Any, Any], Awaitable[Any]] | None = None,
     admin_workflow_callback_handler: Callable[[Any, Any, Any, str, Any], Awaitable[Any]] | None = None,
+    lease_reminder_handler: Callable[[Any], Awaitable[Any]] | None = None,
+    compat_command_handlers: dict[str, Callable[[Any, Any], Awaitable[Any]]] | None = None,
 ) -> Application:
     config.validate()
     deps = dependencies or build_v3_user_bot_dependencies(config)
@@ -512,11 +515,18 @@ def build_v3_user_bot_application(
     app.add_handler(CommandHandler("find", find), group=0)
     app.add_handler(CommandHandler("appointments", appointments), group=0)
     app.add_handler(CommandHandler("service", service), group=0)
+    # Historical /favorites remains a compatibility entry; the product no
+    # longer exposes favorites on the home IA, so it returns to active search.
+    app.add_handler(CommandHandler("favorites", find), group=0)
     app.add_handler(CommandHandler("about", legacy_about), group=0)
     app.add_handler(CommandHandler("contact", legacy_contact), group=0)
     app.add_handler(CommandHandler("help", legacy_help), group=0)
     app.add_handler(CommandHandler("admin", admin), group=0)
     app.add_handler(CommandHandler("contracts", contracts), group=0)
+    for command, handler in sorted((compat_command_handlers or {}).items()):
+        clean = str(command or "").strip().lstrip("/")
+        if clean and callable(handler):
+            app.add_handler(CommandHandler(clean, handler), group=0)
     app.add_handler(CallbackQueryHandler(admin_callbacks, pattern=r"^adminq:"), group=0)
     app.add_handler(
         CallbackQueryHandler(
@@ -529,7 +539,7 @@ def build_v3_user_bot_application(
     app.add_handler(
         CallbackQueryHandler(
             callbacks,
-            pattern=r"^(?:hub:|listing:|service:|contract:|appointment_menu:|apdate:|aptime:|find|repair|renewal|termination|change_home|change:|advisor:|adviser:|home_brand$|home_smart_search$|menu_about$|menu_human$|menu_service$)",
+            pattern=r"^(?:hub:|listing:|service:|contract:|appointment_menu:|apdate:|aptime:|find|repair|renewal|termination|change_home|change:|advisor:|adviser:|home$|home_brand$|home_smart_search$|home_appoint$|home_consult$|home_living$|home_nearby$|menu_about$|menu_human$|menu_service$)",
         ),
         group=0,
     )
@@ -538,6 +548,14 @@ def build_v3_user_bot_application(
     app.add_error_handler(errors)
     if app.job_queue is not None:
         app.job_queue.run_repeating(heartbeat, interval=30, first=5, name="v3_user_runtime_heartbeat")
+        if lease_reminder_handler is not None:
+            app.job_queue.run_daily(
+                lease_reminder_handler,
+                time=dt_time(hour=9, minute=5),
+                name="lease_reminder_job",
+            )
+    elif lease_reminder_handler is not None:
+        logger.warning("job_queue unavailable: lease reminder job not started")
     return app
 
 
