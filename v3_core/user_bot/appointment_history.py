@@ -1,8 +1,8 @@
-"""Read-only takeover appointment history and public presentation.
+"""Read-only V3 appointment history and public presentation.
 
 The fixed-SHA User Bot renders recent appointments from its legacy appointment
 and listing tables. V3 keeps the same compact list semantics but crosses the
-storage boundary through production ``appointments`` plus ``listings_v3``. Internal
+storage boundary through ``appointments_v3`` and ``listings_v3`` only. Internal
 listing ids are never exposed by the returned view models or rendered text.
 """
 from __future__ import annotations
@@ -53,7 +53,7 @@ class AppointmentHistoryView:
 
 
 class SQLiteAppointmentHistoryReader:
-    """Read production ``appointments`` without creating or mutating the database."""
+    """Read ``appointments_v3`` without creating or mutating the database."""
 
     def __init__(self, db_path: str | Path):
         self.db_path = Path(db_path).expanduser().resolve()
@@ -73,7 +73,7 @@ class SQLiteAppointmentHistoryReader:
             rows = conn.execute(
                 """SELECT a.id,a.viewing_mode,a.appointment_date,a.appointment_time,
                           a.status,a.created_at,l.public_listing_id
-                   FROM appointments a
+                   FROM appointments_v3 a
                    JOIN listings_v3 l ON l.listing_id=a.listing_id
                    WHERE a.user_id=?
                    ORDER BY a.created_at DESC,a.id DESC
