@@ -15,6 +15,7 @@ from typing import Any, Awaitable, Callable
 from dotenv import load_dotenv
 from telegram import BotCommand, BotCommandScopeAllPrivateChats, BotCommandScopeChat, ReplyKeyboardRemove
 from telegram.constants import ParseMode
+from telegram.error import NetworkError
 from telegram.ext import (
     Application,
     ApplicationBuilder,
@@ -39,6 +40,7 @@ from .legacy_routes import legacy_home_action, legacy_reply_text_action, legacy_
 from .runtime import UserBotReadRuntime, build_read_runtime
 from .service_effects import ServiceEffectExecutor
 from .telegram_assurance_handler import handle_v3_assurance_callback
+from .telegram_edit import edit_query_panel
 from .telegram_home_handler import handle_v3_home_callback
 from .telegram_home_ui import build_home_keyboard
 from .telegram_keyword_search_handler import handle_v3_keyword_search_text
@@ -240,20 +242,12 @@ async def _render_home_callback(update: Any, config: V3UserBotConfig) -> None:
     query = update.callback_query
     await query.answer()
     home = build_home_view(channel_url=config.channel_url, advisor_url=config.advisor_url)
-    message = getattr(query, "message", None)
-    markup = build_home_keyboard(home)
-    if getattr(message, "photo", None):
-        await query.edit_message_caption(
-            caption=home.text,
-            parse_mode=ParseMode.HTML,
-            reply_markup=markup,
-        )
-    else:
-        await query.edit_message_text(
-            home.text,
-            parse_mode=ParseMode.HTML,
-            reply_markup=markup,
-        )
+    await edit_query_panel(
+        query,
+        text=home.text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=build_home_keyboard(home),
+    )
 
 
 def build_v3_user_bot_application(
@@ -581,8 +575,13 @@ def build_v3_user_bot_application(
         runtime_state.heartbeat("user", state="running")
 
     async def errors(update, context):
-        runtime_state.heartbeat("user", state="running", error=f"{type(context.error).__name__}: {context.error}")
-        logger.exception("V3 User Bot update failed", exc_info=context.error)
+        error = context.error
+        if isinstance(error, NetworkError):
+            runtime_state.heartbeat("user", state="running", event=True)
+            logger.warning("V3 User Bot transient Telegram network error: %s", error)
+            return
+        runtime_state.heartbeat("user", state="running", error=f"{type(error).__name__}: {error}")
+        logger.exception("V3 User Bot update failed", exc_info=error)
 
     app.add_handler(CommandHandler("start", start), group=0)
     app.add_handler(CommandHandler("find", find), group=0)
