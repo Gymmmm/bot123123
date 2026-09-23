@@ -3,10 +3,13 @@ from __future__ import annotations
 import asyncio
 from types import SimpleNamespace
 
+from telegram.error import BadRequest
+
 from v3_core.user_bot.home_views import HomeView
 from v3_core.user_bot.service_views import ServiceView
 from v3_core.user_bot.telegram_home_handler import handle_v3_home_callback
 from v3_core.user_bot.telegram_service_handler import _send_view
+from v3_core.user_bot.telegram_edit import edit_query_panel
 from v3_core.user_bot.transition_views import TransitionView
 
 
@@ -118,3 +121,35 @@ def test_home_about_edits_brand_page_instead_of_assurance_or_new_message():
     assert query.edits
     assert "侨联地产｜金边中文租房" in query.edits[-1][1]
     assert "真实房源" in query.edits[-1][1]
+
+
+class _NoopQuery(_Query):
+    async def edit_message_text(self, text, **kwargs):
+        raise BadRequest("Message is not modified")
+
+
+class _FailQuery(_Query):
+    async def edit_message_text(self, text, **kwargs):
+        raise BadRequest("Message to edit not found")
+
+
+def test_edit_first_swallows_only_message_not_modified():
+    query = _NoopQuery("v3u:home:search")
+    assert _run(edit_query_panel(query, text="SAME")) is False
+
+
+def test_edit_first_does_not_swallow_other_bad_request():
+    query = _FailQuery("v3u:home:search")
+    try:
+        _run(edit_query_panel(query, text="BROKEN"))
+    except BadRequest as exc:
+        assert "Message to edit not found" in str(exc)
+    else:
+        raise AssertionError("non-noop BadRequest must be re-raised")
+
+
+def test_home_handler_no_longer_constructs_v3_tenant_shadow_repository():
+    from pathlib import Path
+    source = Path("v3_core/user_bot/telegram_home_handler.py").read_text(encoding="utf-8")
+    assert "SQLiteTenantServiceRepository" not in source
+    assert "_tenant_service_from_history" not in source
