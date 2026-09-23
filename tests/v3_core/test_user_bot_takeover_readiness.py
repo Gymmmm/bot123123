@@ -194,5 +194,7 @@ def test_takeover_entry_wires_single_scheduler_and_compatibility_bridges():
     assert "compat_start_handler=handle_legacy_start" in source
     assert "compat_callback_handler=handle_legacy_callback" in source
     assert "lease_reminder_handler=lease_reminder_job" in source
+    assert "v3_admin_repair_keyboard" in source
+    assert "adminrepairv3:" in Path("qiaolian_dual/v3_admin_workflow_bridge.py").read_text(encoding="utf-8")
     assert '"favorites": cmd_favorites' in source
     assert 'name="lease_reminder_job"' in app
