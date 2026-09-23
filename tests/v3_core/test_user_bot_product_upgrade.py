@@ -152,6 +152,6 @@ def test_v3_app_registers_admin_contract_and_workflow_routes():
     assert 'CommandHandler("admin", admin)' in source
     assert 'CommandHandler("contracts", contracts)' in source
     assert 'pattern=r"^adminq:"' in source
-    assert 'pattern=r"^(?:admincontract|adminlead|adminrepair):"' in source
+    assert 'pattern=r"^(?:admincontract|adminlead|adminrepair|adminrepairv3):"' in source
     assert 'raw.startswith("admincontract:")' in source
     assert 'raw.startswith(("adminlead:", "adminrepair:", "adminrepairv3:"))' in source
