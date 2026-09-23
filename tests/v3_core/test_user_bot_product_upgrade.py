@@ -130,10 +130,10 @@ def test_production_entrypoint_wires_3858_admin_and_workflow_routes():
     assert "CommandHandler('contracts', cmd_contracts)" in dual_app
     assert "CommandHandler('admin', cmd_admin_home)" in dual_app
     assert "CallbackQueryHandler(handle_admin_query, pattern=r'^adminq:')" not in dual_app
-    assert "data.startswith(('adminq:', 'adminlead:', 'adminrepair:'))" in admin_callbacks
+    assert "data.startswith(('adminq:', 'adminlead:', 'adminrepair:', 'adminrepairv3:'))" in admin_callbacks
     assert "await handle_admin_query(update, context)" in admin_callbacks
     assert "data.startswith('adminlead:')" in admin_callbacks
-    assert "data.startswith('adminrepair:')" in admin_callbacks
+    assert "data.startswith(('adminrepair:', 'adminrepairv3:'))" in admin_callbacks
     assert "if action == 'done':" in admin_callbacks
 
 

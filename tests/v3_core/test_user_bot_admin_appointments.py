@@ -76,7 +76,7 @@ def test_v3_application_registers_admin_command_and_adminq_callbacks():
     assert "CommandHandler('admin', cmd_admin_home)" in dual_app
     assert "CallbackQueryHandler(handle_admin_query, pattern=r'^adminq:')" not in dual_app
     dual_admin = Path("qiaolian_dual/callback_admin.py").read_text(encoding="utf-8")
-    assert "data.startswith(('adminq:', 'adminlead:', 'adminrepair:'))" in dual_admin
+    assert "data.startswith(('adminq:', 'adminlead:', 'adminrepair:', 'adminrepairv3:'))" in dual_admin
     assert "await handle_admin_query(update, context)" in dual_admin
 
 
@@ -123,11 +123,15 @@ class _AdminDb:
             return {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
 
 
-def test_complete_admin_console_reads_real_v3_appointments_and_service_tickets(tmp_path, monkeypatch):
+def test_complete_admin_console_reads_dual_appointments_and_v3_service_tickets(tmp_path, monkeypatch):
     path = tmp_path / "admin-v3.sqlite3"
     with sqlite3.connect(path) as conn:
         conn.executescript("""
-            CREATE TABLE appointments(id INTEGER PRIMARY KEY, appointment_date TEXT, created_at TEXT);
+            CREATE TABLE appointments(
+                id INTEGER PRIMARY KEY,user_id INTEGER,username TEXT,display_name TEXT,
+                listing_id TEXT,viewing_mode TEXT,appointment_date TEXT,appointment_time TEXT,
+                contact_value TEXT,note TEXT,status TEXT,created_at TEXT
+            );
             CREATE TABLE appointments_v3(
                 id INTEGER PRIMARY KEY,user_id INTEGER,username TEXT,display_name TEXT,
                 listing_id TEXT,appointment_date TEXT,appointment_time TEXT,status TEXT,created_at TEXT
@@ -138,8 +142,10 @@ def test_complete_admin_console_reads_real_v3_appointments_and_service_tickets(t
                 id INTEGER PRIMARY KEY,issue_type TEXT,status TEXT,created_at TEXT
             );
             INSERT INTO listings_v3 VALUES ('l_15','QL-PP-D2W2');
+            INSERT INTO appointments VALUES
+                (1,123,'gym','Gym','l_15','offline','09-10','evening','','','pending','2026-09-09 11:10:34');
             INSERT INTO appointments_v3 VALUES
-                (1,123,'gym','Gym','l_15','09-10','evening','pending','2026-09-09 11:10:34');
+                (99,999,'wrong','Wrong','l_15','09-10','evening','pending','2026-09-09 11:10:34');
             INSERT INTO repair_tickets_v3 VALUES
                 (1,'物业协调','new','2026-09-09 11:12:00');
         """)
