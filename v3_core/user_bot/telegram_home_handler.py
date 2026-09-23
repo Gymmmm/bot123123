@@ -118,14 +118,7 @@ async def handle_v3_home_callback(
         plan = _search_entry_plan()
         view = search_views.build(plan)
         mutation = build_transition_session(plan)
-        message = getattr(query, "message", None)
-        if message is None:
-            raise ValueError("telegram_home_message_missing")
-        await message.reply_text(
-            view.text,
-            parse_mode=ParseMode.HTML,
-            reply_markup=build_transition_keyboard(view),
-        )
+        await _edit_transition_view(query, view)
         apply_session_mutation(user_data, mutation)
         return TelegramHomeOutcome(handled=True, action=action, rendered=True)
 
@@ -137,14 +130,7 @@ async def handle_v3_home_callback(
         user = _lead_user(update)
         history = appointment_history.build(user.user_id)
         view = build_appointment_history_home_view(history)
-        message = getattr(query, "message", None)
-        if message is None:
-            raise ValueError("telegram_home_message_missing")
-        await message.reply_text(
-            view.text,
-            parse_mode=ParseMode.HTML,
-            reply_markup=build_home_keyboard(view),
-        )
+        await _edit_home_view(query, view)
         return TelegramHomeOutcome(True, action, True, appointment_history=history)
 
     if action in {"about", "rental"}:
@@ -153,15 +139,7 @@ async def handle_v3_home_callback(
 
     if action == "service":
         view = service_home_view()
-        message = getattr(query, "message", None)
-        if message is None:
-            raise ValueError("telegram_home_message_missing")
-        from .telegram_service_handler import build_service_keyboard
-        await message.reply_text(
-            view.text,
-            parse_mode=ParseMode.HTML,
-            reply_markup=build_service_keyboard(view, advisor_url=advisor_url),
-        )
+        await render_service_view(query, view, advisor_url=advisor_url)
         return TelegramHomeOutcome(handled=True, action=action, rendered=True)
 
     if action == "local":
