@@ -1,10 +1,8 @@
-"""Side-by-side SQLite persistence for V3 User Bot appointments.
+"""V3 appointment persistence over the production appointment table.
 
-This repository deliberately owns only ``appointments_v3`` plus the minimal
-``listings_v3`` availability operations required by the extracted appointment
-domain. It never reads or writes the legacy ``appointments`` table and its
-constructor performs no schema initialization; additive DDL is executed only by
-``initialize_v3_storage``.
+The takeover runtime keeps appointments as the single operational source of
+truth so existing 3858 history/admin workflows remain continuous. Modern
+listings_v3 stays the inventory/bookability source.
 """
 from __future__ import annotations
 
@@ -20,7 +18,7 @@ UNFINISHED_APPOINTMENT_STATUSES = frozenset(
 
 class SQLiteAppointmentRepository:
     DDL = """
-    CREATE TABLE IF NOT EXISTS appointments_v3 (
+    CREATE TABLE IF NOT EXISTS appointments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
         username TEXT NOT NULL DEFAULT '',
@@ -33,15 +31,13 @@ class SQLiteAppointmentRepository:
         note TEXT NOT NULL DEFAULT '',
         status TEXT NOT NULL DEFAULT 'pending',
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY(listing_id) REFERENCES listings_v3(listing_id)
     );
-    CREATE INDEX IF NOT EXISTS idx_appointments_v3_user
-        ON appointments_v3(user_id, created_at DESC, id DESC);
-    CREATE INDEX IF NOT EXISTS idx_appointments_v3_listing_status
-        ON appointments_v3(listing_id, status);
-    CREATE INDEX IF NOT EXISTS idx_appointments_v3_duplicate
-        ON appointments_v3(
+    CREATE INDEX IF NOT EXISTS idx_appointments_user
+        ON appointments(user_id, created_at DESC, id DESC);
+    CREATE INDEX IF NOT EXISTS idx_appointments_listing_status
+        ON appointments(listing_id, status);
+    CREATE INDEX IF NOT EXISTS idx_appointments_duplicate
+        ON appointments(
             user_id, listing_id, viewing_mode,
             appointment_date, appointment_time, status
         );
@@ -70,7 +66,7 @@ class SQLiteAppointmentRepository:
         placeholders = ",".join("?" for _ in statuses)
         with self._connect() as conn:
             row = conn.execute(
-                f"""SELECT * FROM appointments_v3
+                f"""SELECT * FROM appointments
                     WHERE user_id=? AND listing_id=? AND viewing_mode=?
                       AND appointment_date=? AND appointment_time=?
                       AND status IN ({placeholders})
@@ -90,7 +86,7 @@ class SQLiteAppointmentRepository:
     def get_for_user(self, appointment_id: int, user_id: int) -> dict[str, Any] | None:
         with self._connect() as conn:
             row = conn.execute(
-                "SELECT * FROM appointments_v3 WHERE id=? AND user_id=?",
+                "SELECT * FROM appointments WHERE id=? AND user_id=?",
                 (int(appointment_id), int(user_id)),
             ).fetchone()
         return dict(row) if row is not None else None
@@ -107,7 +103,7 @@ class SQLiteAppointmentRepository:
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             cursor = conn.execute(
-                """INSERT INTO appointments_v3
+                """INSERT INTO appointments
                    (user_id,username,display_name,listing_id,viewing_mode,
                     appointment_date,appointment_time,contact_value,note,status,created_at)
                    VALUES (?,?,?,?,?,?,?,?,?,?,COALESCE(NULLIF(?,''),CURRENT_TIMESTAMP))""",
@@ -142,9 +138,8 @@ class SQLiteAppointmentRepository:
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             cursor = conn.execute(
-                """UPDATE appointments_v3
-                   SET viewing_mode=?,appointment_date=?,appointment_time=?,status=?,
-                       updated_at=CURRENT_TIMESTAMP
+                """UPDATE appointments
+                   SET viewing_mode=?,appointment_date=?,appointment_time=?,status=?
                    WHERE id=? AND user_id=?""",
                 (
                     str(mode or "offline").strip(),
@@ -168,8 +163,8 @@ class SQLiteAppointmentRepository:
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             cursor = conn.execute(
-                """UPDATE appointments_v3
-                   SET status=?,updated_at=CURRENT_TIMESTAMP
+                """UPDATE appointments
+                   SET status=?
                    WHERE id=? AND user_id=?""",
                 (str(status or "").strip(), int(appointment_id), int(user_id)),
             )
@@ -198,7 +193,7 @@ class SQLiteAppointmentRepository:
         placeholders = ",".join("?" for _ in clean_statuses)
         with self._connect() as conn:
             row = conn.execute(
-                f"""SELECT COUNT(*) AS count FROM appointments_v3
+                f"""SELECT COUNT(*) AS count FROM appointments
                     WHERE listing_id=? AND status IN ({placeholders})""",
                 (str(listing_id or "").strip(), *clean_statuses),
             ).fetchone()
