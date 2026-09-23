@@ -17,7 +17,6 @@ from qiaolian_dual.admin_commands import (
     cmd_lead_response,
     cmd_push_all,
     cmd_push_local,
-    cmd_repair_update,
 )
 from qiaolian_dual.jobs import lease_reminder_job
 from qiaolian_dual.message_handlers import (
@@ -26,7 +25,10 @@ from qiaolian_dual.message_handlers import (
     cmd_admin_remove,
 )
 from qiaolian_dual.results_admin import admin_repair_keyboard
-from qiaolian_dual.v3_admin_workflow_bridge import handle_v3_admin_workflow
+from qiaolian_dual.v3_admin_workflow_bridge import (
+    cmd_v3_repair_update,
+    handle_v3_admin_workflow,
+)
 from qiaolian_dual.user_bot import handle_ui_callback as handle_legacy_callback
 from qiaolian_dual.user_bot import route_start_arg as handle_legacy_start
 from v3_core.user_bot.app import (
@@ -64,7 +66,7 @@ def main() -> None:
             "admin_remove": cmd_admin_remove,
             "deal_done": cmd_deal_done,
             "lead_response": cmd_lead_response,
-            "repair_update": cmd_repair_update,
+            "repair_update": cmd_v3_repair_update,
             "push_local": cmd_push_local,
             "push_all": cmd_push_all,
         },
