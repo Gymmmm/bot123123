@@ -144,3 +144,95 @@ def test_appointment_ui_and_routes_do_not_expose_internal_identity():
     assert "persisted_listing_id" in flow
     assert 'FROM appointments a' in store
     assert 'appointments_v3" if' not in store
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("arg", "expected_mode"),
+    [
+        ("property_QL-BK-A2B3_book", ""),
+        ("book_video_QL-BK-A2B3", "video"),
+    ],
+)
+async def test_property_book_and_book_video_keep_ql_until_appointment_adapter(arg, expected_mode, monkeypatch):
+    from types import SimpleNamespace
+    from qiaolian_dual import start_routes
+    import qiaolian_dual.flows as flows
+    import qiaolian_dual.listing as listing_mod
+
+    captured = {}
+
+    async def fake_start_appointment(update, context, listing_id, **kwargs):
+        captured["listing_id"] = listing_id
+        captured["mode"] = kwargs.get("initial_mode", "")
+        return 321
+
+    monkeypatch.setattr(flows, "start_appointment", fake_start_appointment)
+    monkeypatch.setattr(listing_mod, "listing_is_available", lambda listing_id: (True, "active"))
+    monkeypatch.setattr(
+        listing_mod,
+        "listing_context",
+        lambda listing_id: {"listing_id": listing_id, "public_listing_id": listing_id, "status": "active"},
+    )
+    update = SimpleNamespace(
+        effective_user=SimpleNamespace(id=9100, username="tester", first_name="T"),
+        effective_message=SimpleNamespace(chat_id=9100),
+    )
+    context = SimpleNamespace(user_data={})
+    result = await start_routes.route_start_arg(
+        update,
+        context,
+        arg,
+        create_lead_fn=lambda *args, **kwargs: 1,
+    )
+    assert result == 321
+    assert captured == {"listing_id": "QL-BK-A2B3", "mode": expected_mode}
+
+
+def test_my_appointment_display_never_returns_internal_id(monkeypatch):
+    monkeypatch.setattr(
+        appointments_view.db,
+        "list_appointments",
+        lambda user_id, limit=20: [{
+            "id": 1,
+            "listing_id": "LST_PRIVATE_1",
+            "viewing_mode": "offline",
+            "appointment_date": "2026-09-23",
+            "appointment_time": "pm",
+            "status": "pending",
+        }],
+    )
+    monkeypatch.setattr(appointments_view, "_appointment_public_listing_id", lambda value: "QL-BK-A2B3")
+    import qiaolian_dual.listing as listing_mod
+    monkeypatch.setattr(
+        listing_mod,
+        "listing_context",
+        lambda listing_id: {"project": "富力城", "layout": "2房1厅", "property_type": "公寓"},
+    )
+    text = appointments_view.list_recent_appointments(1)
+    assert "QL-BK-A2B3" in text
+    assert "LST_PRIVATE_1" not in text
+
+
+def test_admin_today_appointments_reads_dual_table_even_when_v3_exists(tmp_path, monkeypatch):
+    import qiaolian_dual.attribution_store as store
+
+    path = _db(tmp_path)
+    dual = Database(path)
+    dual.create_appointment({
+        "user_id": 9200,
+        "username": "u",
+        "display_name": "U",
+        "listing_id": "LST_ONLY_DUAL",
+        "viewing_mode": "video",
+        "appointment_date": "2026-09-23",
+        "appointment_time": "pm",
+        "status": "pending",
+        "created_at": "2026-09-23 10:00:00",
+    })
+    monkeypatch.setattr(store, "db", dual)
+    rows = store.list_today_appointments("2026-09-23", 20)
+    assert len(rows) == 1
+    assert rows[0]["user_id"] == 9200
+    assert rows[0]["listing_id"] == ""
+    assert "LST_ONLY_DUAL" not in str(rows[0])
