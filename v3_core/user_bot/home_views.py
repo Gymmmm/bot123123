@@ -68,17 +68,21 @@ def build_home_view(
     first_name: str = "您",
     greeting: str | None = None,
 ) -> HomeView:
-    channel = str(channel_url or "").strip()
-    second: list[HomeChoice] = []
-    if channel:
-        second.append(HomeChoice("📢 最新房源", "root", url=channel))
-    second.append(HomeChoice("💬 中文顾问", "contact"))
+    # Takeover keeps the proven 3858 six-action IA while every action is
+    # rendered by the V3 handlers below.
     rows: list[tuple[HomeChoice, ...]] = [
         (
-            HomeChoice("🔍 开始找房", "search"),
-            HomeChoice("🛎️ 侨联服务", "service"),
+            HomeChoice("🔍 智能找房", "search"),
+            HomeChoice("📖 关于侨联地产", "about"),
         ),
-        tuple(second),
+        (
+            HomeChoice("📅 预约看房", "book"),
+            HomeChoice("💎 直接问顾问", "contact"),
+        ),
+        (
+            HomeChoice("⚡ 入住管家", "service"),
+            HomeChoice("🧭 周边服务", "local"),
+        ),
     ]
     resolved_greeting = str(greeting or "").strip() or phnom_penh_greeting()
     return HomeView(
