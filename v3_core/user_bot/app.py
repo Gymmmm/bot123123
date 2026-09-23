@@ -368,7 +368,7 @@ def build_v3_user_bot_application(
         if raw.startswith("admincontract:") and admin_contract_callback_handler is not None:
             await admin_contract_callback_handler(update, context, query, raw, user)
             return
-        if raw.startswith(("adminlead:", "adminrepair:")) and admin_workflow_callback_handler is not None:
+        if raw.startswith(("adminlead:", "adminrepair:", "adminrepairv3:")) and admin_workflow_callback_handler is not None:
             await admin_workflow_callback_handler(update, context, query, raw, user)
 
     async def _run_start_payload(update, context, payload: str | None = None):
@@ -601,7 +601,7 @@ def build_v3_user_bot_application(
     app.add_handler(
         CallbackQueryHandler(
             legacy_admin_callbacks,
-            pattern=r"^(?:admincontract|adminlead|adminrepair):",
+            pattern=r"^(?:admincontract|adminlead|adminrepair|adminrepairv3):",
         ),
         group=0,
     )
