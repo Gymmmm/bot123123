@@ -244,6 +244,15 @@ class ProductionLeadRepository:
         message_id = None if raw_message_id in (None, "", 0, "0") else int(raw_message_id)
         source = str(payload.get("source") or "")
         source_detail = str(payload.get("source_detail") or action)
+        listing_id = str(payload.get("listing_id") or "").strip()
+        if listing_id and not listing_id.upper().startswith("QL-"):
+            with self._connect() as lookup:
+                row = lookup.execute(
+                    "SELECT public_listing_id FROM listings_v3 WHERE listing_id=? LIMIT 1",
+                    (listing_id,),
+                ).fetchone()
+            if row is not None:
+                listing_id = str(row["public_listing_id"] or listing_id).strip()
         deep_link = str(
             payload.get("deep_link_payload")
             or parsed.get("start_payload")
@@ -268,7 +277,7 @@ class ProductionLeadRepository:
                     str(payload.get("display_name") or ""),
                     source,
                     action,
-                    str(payload.get("listing_id") or ""),
+                    listing_id,
                     str(payload.get("area") or ""),
                     str(payload.get("property_type") or ""),
                     payload.get("budget_min"),
