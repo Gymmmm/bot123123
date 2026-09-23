@@ -349,6 +349,12 @@ def build_v3_user_bot_application(
         else:
             await handle_admin_callback(update, admin_appointments)
 
+    async def compat_callback_fallback(update, context):
+        runtime_state.heartbeat("user", state="running", event=True)
+        if compat_callback_handler is None:
+            return
+        await compat_callback_handler(update, context)
+
     async def legacy_admin_callbacks(update, context):
         runtime_state.heartbeat("user", state="running", event=True)
         query = getattr(update, "callback_query", None)
@@ -607,6 +613,8 @@ def build_v3_user_bot_application(
         ),
         group=0,
     )
+    if compat_callback_handler is not None:
+        app.add_handler(CallbackQueryHandler(compat_callback_fallback, pattern=r"^"), group=0)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text), group=0)
     app.add_handler(MessageHandler((filters.PHOTO | filters.VIDEO) & ~filters.COMMAND, media), group=0)
     app.add_error_handler(errors)
