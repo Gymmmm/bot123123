@@ -13,6 +13,7 @@ from .lead_service import LeadUser
 from .listing_contact import ListingContactEffectExecutor, ListingContactEffectResult, build_listing_contact_view
 from .public_inventory import PublicInventoryReader
 from .telegram_callback_handler import TelegramCallbackHandlerOutcome, handle_v3_callback
+from .telegram_edit import edit_query_panel
 from .telegram_navigation import advisor_handoff_url
 from .transition_views import TransitionViewService
 
@@ -53,11 +54,12 @@ async def _render_contact(query: Any, *, text: str, public_listing_id: str, advi
         [contact_button],
         [InlineKeyboardButton("返回房源详情", callback_data=encode_listing_callback("details", public_listing_id))],
     ])
-    message = getattr(query, "message", None)
-    if getattr(message, "photo", None):
-        await query.edit_message_caption(caption=text, parse_mode=ParseMode.HTML, reply_markup=markup)
-        return
-    await query.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=markup)
+    await edit_query_panel(
+        query,
+        text=text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=markup,
+    )
 
 
 def _is_historical_callback(raw: str) -> bool:
@@ -81,11 +83,7 @@ async def _render_updated_entry(query: Any, *, advisor_url: str = "") -> None:
         [advisor_button],
     ])
     text = "<b>入口已更新</b>\n\n请使用下面的最新入口。"
-    message = getattr(query, "message", None)
-    if getattr(message, "photo", None):
-        await query.edit_message_caption(caption=text, reply_markup=markup)
-    else:
-        await query.edit_message_text(text, reply_markup=markup)
+    await edit_query_panel(query, text=text, reply_markup=markup)
 
 
 async def handle_v3_listing_callback(
