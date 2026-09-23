@@ -23,6 +23,7 @@ from qiaolian_dual.message_handlers import (
     cmd_admin_add,
     cmd_admin_list,
     cmd_admin_remove,
+    cmd_favorites,
 )
 from qiaolian_dual.results_admin import admin_repair_keyboard
 from qiaolian_dual.v3_admin_workflow_bridge import (
@@ -61,6 +62,7 @@ def main() -> None:
         compat_start_handler=handle_legacy_start,
         compat_callback_handler=handle_legacy_callback,
         compat_command_handlers={
+            "favorites": cmd_favorites,
             "admin_list": cmd_admin_list,
             "admin_add": cmd_admin_add,
             "admin_remove": cmd_admin_remove,
