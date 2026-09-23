@@ -200,7 +200,7 @@ def test_my_appointment_display_never_returns_internal_id(monkeypatch):
             "id": 1,
             "listing_id": "LST_PRIVATE_1",
             "viewing_mode": "offline",
-            "appointment_date": "2099-09-23",
+            "appointment_date": "2099-12-31",
             "appointment_time": "pm",
             "status": "pending",
         }],
