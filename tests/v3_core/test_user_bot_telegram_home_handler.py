@@ -67,17 +67,17 @@ def _search_views(): return TransitionViewService(EmptyInventory())
 
 
 @pytest.mark.asyncio
-async def test_search_home_creates_independent_search_panel_then_sets_session():
+async def test_search_home_edits_existing_panel_then_sets_session():
     message=FakeMessage()
     query=FakeQuery("v3u:home:search",message=message)
     context=_context()
     outcome=await handle_v3_home_callback(_update(query),context,appointment_history=FakeHistory(),search_views=_search_views())
     assert outcome.handled and outcome.rendered
-    assert [c[0] for c in query.calls]==["answer"]
-    assert len(message.calls)==1
-    assert "想找什么样的房子？" in message.calls[0][1]
-    assert "BKK1 一房，预算 $600" in message.calls[0][1]
-    callbacks=[b.callback_data for row in message.calls[0][2]["reply_markup"].inline_keyboard for b in row]
+    assert [c[0] for c in query.calls]==["answer","edit_text"]
+    assert message.calls==[]
+    assert "想找什么样的房子？" in query.calls[-1][1][0]
+    assert "BKK1 一房，预算 $600" in query.calls[-1][1][0]
+    callbacks=[b.callback_data for row in query.calls[-1][2]["reply_markup"].inline_keyboard for b in row]
     assert callbacks==[
         "v3u:t:search_area","v3u:t:search_budget","v3u:t:search_layout",
         "v3u:home:contact","v3u:t:home",
@@ -87,37 +87,40 @@ async def test_search_home_creates_independent_search_panel_then_sets_session():
 
 
 @pytest.mark.asyncio
-async def test_search_send_failure_does_not_create_session():
-    message=FakeMessage(fail_reply=True)
-    query=FakeQuery("v3u:home:search",message=message)
+async def test_search_edit_failure_does_not_create_session():
+    message=FakeMessage()
+    query=FakeQuery("v3u:home:search",message=message,fail_edit=True)
     context=_context()
-    with pytest.raises(RuntimeError,match="telegram_send_failed"):
+    with pytest.raises(RuntimeError,match="telegram_edit_failed"):
         await handle_v3_home_callback(_update(query),context,appointment_history=FakeHistory(),search_views=_search_views())
     assert context.user_data=={}
 
 
 @pytest.mark.asyncio
-async def test_appointments_create_independent_surface():
+async def test_appointments_edit_existing_surface():
     message=FakeMessage()
     query=FakeQuery("v3u:home:appointments",message=message)
     history=FakeHistory()
     outcome=await handle_v3_home_callback(_update(query),_context(),appointment_history=history)
     assert outcome.handled and outcome.rendered
     assert history.calls==[123]
-    assert [c[0] for c in query.calls]==["answer"]
-    assert "QL-RF-A2B3" in message.calls[-1][1]
-    labels=[b.text for row in message.calls[-1][2]["reply_markup"].inline_keyboard for b in row]
+    assert [c[0] for c in query.calls]==["answer","edit_text"]
+    assert message.calls==[]
+    assert "QL-RF-A2B3" in query.calls[-1][1][0]
+    labels=[b.text for row in query.calls[-1][2]["reply_markup"].inline_keyboard for b in row]
     assert labels==["🔍 开始找房","💬 中文顾问","⬅️ 返回首页"]
 
 
 @pytest.mark.asyncio
-async def test_service_home_creates_independent_surface():
+async def test_service_home_edits_existing_surface():
     message=FakeMessage()
     query=FakeQuery("v3u:home:service",message=message)
     outcome=await handle_v3_home_callback(_update(query),_context(),appointment_history=FakeHistory())
     assert outcome.handled and outcome.rendered
-    assert "侨联服务" in message.calls[-1][1]
-    labels=[b.text for row in message.calls[-1][2]["reply_markup"].inline_keyboard for b in row]
+    assert message.calls==[]
+    assert [c[0] for c in query.calls]==["answer","edit_text"]
+    assert "侨联服务" in query.calls[-1][1][0]
+    labels=[b.text for row in query.calls[-1][2]["reply_markup"].inline_keyboard for b in row]
     assert labels==["📋 我的租约","🛡️ 入住服务","🏠 安心租房","💬 中文顾问","⬅️ 返回首页"]
 
 
