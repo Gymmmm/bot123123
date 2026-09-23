@@ -1,4 +1,4 @@
-"""V3 persistence for tenant bindings and repair tickets."""
+"""V3 service persistence with production tenant bindings and V3 repair tickets."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -133,7 +133,7 @@ class SQLiteTenantServiceRepository:
                 """SELECT id,user_id,binding_code,property_name,lease_end_date,rent_day,
                           monthly_rent,contract_start_date,contract_end_date,deposit_months,
                           contract_notes,status
-                   FROM tenant_bindings_v3
+                   FROM tenant_bindings
                    WHERE user_id=? AND status='active'
                    ORDER BY id DESC LIMIT 1""",
                 (int(user_id),),
