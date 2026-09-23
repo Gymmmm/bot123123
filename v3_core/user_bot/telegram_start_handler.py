@@ -181,7 +181,7 @@ async def _handle_video_start(
     plan = _video_book_plan(result)
     if plan.book is None:
         raise ValueError("start_video_book_transition_missing_draft")
-    view = transition_views.appointment_date(plan.book.draft)
+    view = transition_views.build(plan)
     await message.reply_text(
         view.text,
         parse_mode=ParseMode.HTML,
