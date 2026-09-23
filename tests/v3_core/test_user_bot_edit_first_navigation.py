@@ -97,3 +97,24 @@ def test_service_send_view_edits_callback_panel_and_keeps_same_anchor():
     assert query.edits and query.edits[-1][1] == "REPAIR"
     assert query.message.replies == []
     assert context.user_data["anchor"] == {"chat_id": 100, "message_id": 200}
+
+
+def test_home_about_edits_brand_page_instead_of_assurance_or_new_message():
+    query = _Query("v3u:home:about")
+    update = SimpleNamespace(callback_query=query)
+    context = _Context()
+
+    outcome = _run(
+        handle_v3_home_callback(
+            update,
+            context,
+            appointment_history=SimpleNamespace(),
+        )
+    )
+
+    assert outcome.handled is True
+    assert outcome.rendered is True
+    assert query.message.replies == []
+    assert query.edits
+    assert "侨联地产｜金边中文租房" in query.edits[-1][1]
+    assert "真实房源" in query.edits[-1][1]
