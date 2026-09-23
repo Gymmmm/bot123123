@@ -8,6 +8,7 @@ from typing import Any
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, InputFile
 from telegram.constants import ParseMode
 
+from .telegram_edit import edit_query_panel
 from .assurance_views import (
     AssuranceView,
     assurance_asset_bundle,
@@ -43,11 +44,12 @@ def build_assurance_keyboard(view: AssuranceView, *, advisor_url: str = "") -> I
 
 async def render_assurance_view(query: Any, view: AssuranceView, *, advisor_url: str = "") -> None:
     markup = build_assurance_keyboard(view, advisor_url=advisor_url)
-    message = getattr(query, "message", None)
-    if getattr(message, "photo", None):
-        await query.edit_message_caption(caption=view.text, parse_mode=ParseMode.HTML, reply_markup=markup)
-        return
-    await query.edit_message_text(view.text, parse_mode=ParseMode.HTML, reply_markup=markup)
+    await edit_query_panel(
+        query,
+        text=view.text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=markup,
+    )
 
 
 async def send_assurance_pdf(update: Any, context: Any, *, repo_root: str | Path, kind: str) -> None:
