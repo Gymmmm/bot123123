@@ -262,6 +262,8 @@ def build_v3_user_bot_application(
     lease_reminder_handler: Callable[[Any], Awaitable[Any]] | None = None,
     compat_command_handlers: dict[str, Callable[[Any, Any], Awaitable[Any]]] | None = None,
     admin_appointment_reader: AdminAppointmentReader | None = None,
+    compat_start_handler: Callable[[Any, Any, str], Awaitable[Any]] | None = None,
+    compat_callback_handler: Callable[[Any, Any], Awaitable[Any]] | None = None,
 ) -> Application:
     config.validate()
     deps = dependencies or build_v3_user_bot_dependencies(config)
@@ -359,6 +361,15 @@ def build_v3_user_bot_application(
         if payload is not None:
             context.args = [payload] if payload else []
         try:
+            active_args = tuple(getattr(context, "args", None) or ())
+            active_payload = str(active_args[0] or "").strip() if active_args else ""
+            legacy_only = active_payload.startswith(
+                ("t_bind_", "detail__", "photos__", "book__", "ch_", "l_")
+            )
+            if legacy_only and compat_start_handler is not None:
+                handled_state = await compat_start_handler(update, context, active_payload)
+                if handled_state is not None:
+                    return
             await handle_v3_start(
                 update,
                 context,
@@ -476,6 +487,15 @@ def build_v3_user_bot_application(
                 repo_root=config.repo_root,
                 advisor_url=config.advisor_url,
             )
+            return
+        legacy_prefixes = (
+            "hub:", "service:", "contract:", "appointment_menu:", "apdate:",
+            "aptime:", "apfocus:", "findarea:", "findbudget:", "findmode:",
+            "repair", "renewal", "termination", "change_home", "change:",
+            "advisor:", "adviser:",
+        )
+        if compat_callback_handler is not None and raw.startswith(legacy_prefixes):
+            await compat_callback_handler(update, context)
             return
         await handle_v3_listing_callback(
             update,
