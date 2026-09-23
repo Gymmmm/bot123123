@@ -186,7 +186,7 @@ def test_takeover_legacy_home_callbacks_cover_old_six_button_messages():
     expected = {
         "home": "home",
         "home_smart_search": "search",
-        "home_brand": "rental",
+        "home_brand": "about",
         "home_appoint": "book",
         "home_consult": "contact",
         "home_living": "service",
