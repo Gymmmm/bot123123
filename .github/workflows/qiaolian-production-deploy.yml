@@ -224,8 +224,12 @@ jobs:
           PY
           chmod 0640 "$BACKUP_PATH"; chown root:qiaolianbot "$BACKUP_PATH"; echo "DB_BACKUP path=$BACKUP_PATH bytes=$(stat -c %s "$BACKUP_PATH")"
           install -d -m 0755 "$ROOT/releases"
-          if [ ! -d "$RELEASE/.git" ]; then rm -rf -- "$RELEASE"; git clone -q "$BUNDLE_PATH" --branch actions-production "$RELEASE"; fi
-          test "$(git -C "$RELEASE" rev-parse HEAD)" = "$EXPECTED_SHA"
+          if [ ! -d "$RELEASE/.git" ]; then
+            rm -rf -- "$RELEASE"
+            git clone -q "$BUNDLE_PATH" --branch actions-production "$RELEASE"
+            chown -R qiaolianbot:qiaolianbot "$RELEASE"
+          fi
+          test "$(runuser -u qiaolianbot -- git -C "$RELEASE" rev-parse HEAD)" = "$EXPECTED_SHA"
           printf '%s\n' "$EXPECTED_SHA" > "$RELEASE/.deployed_sha"; chmod 0644 "$RELEASE/.deployed_sha"; chown -R qiaolianbot:qiaolianbot "$RELEASE"
 
           # Keep the shared Playwright browser cache aligned with the installed
