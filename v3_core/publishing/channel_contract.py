@@ -162,15 +162,11 @@ def official_channel_action_urls(
 
 
 def official_channel_cta_keys(inventory_status: object = "active") -> tuple[str, ...]:
+    """Return the semantic CTA keys used by the actual channel keyboard."""
     status = str(inventory_status or "").strip().lower()
     if inventory_status_bookable(status):
         return ("details", "book", "consult")
-    if status in {"busy", "high_demand", "orange"}:
-        return ("details", "consult", "find")
-    if status == "pending":
-        return ("more", "consult")
-    # rented / offline / inactive
-    return ("find", "more", "consult")
+    return ("details", "consult")
 
 
 def _bot_from_details_url(details_url: str) -> str:
