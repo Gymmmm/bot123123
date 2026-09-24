@@ -424,7 +424,14 @@ def _quality(facts: dict[str, Any]) -> dict[str, Any]:
     if "ambiguous_market_location" in candidate_flags and not facts.get("canonical_area_key"): review.append("ambiguous_market_location")
     if "project_brand_only" in candidate_flags: info.append("project_brand_only")
     if deal_type == "sale": hard.append("non_rental_source")
-    elif deal_type == "mixed": review.append("mixed_sale_rent_terms")
+    elif deal_type == "mixed":
+        # Cambodian source posts often mention both rent and sale. When monthly
+        # rent is already confirmed, keep the rent offer publishable and treat
+        # the dual wording as a warning — not a hard autopilot block.
+        if facts.get("monthly_rent_usd"):
+            warning.append("mixed_sale_rent_terms")
+        else:
+            review.append("mixed_sale_rent_terms")
     elif deal_type == "unknown": review.append("missing_rental_intent")
     if facts.get("size_sqm") is None and not facts.get("land_dimension") and not facts.get("building_dimension") and not facts.get("unlabelled_dimension"): warning.append("missing_size")
     if not facts.get("highlights"): warning.append("missing_highlights")

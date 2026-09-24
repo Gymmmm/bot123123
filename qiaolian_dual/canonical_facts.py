@@ -505,7 +505,11 @@ def _quality(facts: dict[str, Any]) -> dict[str, Any]:
     if deal_type == "sale":
         hard.append("non_rental_source")
     elif deal_type == "mixed":
-        review.append("mixed_sale_rent_terms")
+        # Rent-primary dual wording: do not block autopilot when rent is known.
+        if facts.get("monthly_rent_usd"):
+            warning.append("mixed_sale_rent_terms")
+        else:
+            review.append("mixed_sale_rent_terms")
     elif deal_type == "unknown":
         review.append("missing_rental_intent")
     if facts.get("size_sqm") is None and not facts.get("land_dimension") and not facts.get("building_dimension") and not facts.get("unlabelled_dimension"):

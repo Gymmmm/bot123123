@@ -678,7 +678,16 @@ class AutoPublishService:
     @staticmethod
     def _critical_quality_flags(facts: dict[str, Any]) -> tuple[str, ...]:
         quality = facts.get("quality") if isinstance(facts.get("quality"), dict) else {}
-        return tuple(str(x) for x in (quality.get("blocking_flags") or []) if str(x).strip())
+        flags = [str(x).strip() for x in (quality.get("blocking_flags") or []) if str(x).strip()]
+        # Backward-compatible with frozen quality_json that still lists
+        # mixed_sale_rent_terms as blocking after rent was confirmed.
+        try:
+            rent = int(float(facts.get("monthly_rent_usd") or 0))
+        except (TypeError, ValueError):
+            rent = 0
+        if rent > 0:
+            flags = [flag for flag in flags if flag != "mixed_sale_rent_terms"]
+        return tuple(flags)
 
     def _strict_blockers(
         self,

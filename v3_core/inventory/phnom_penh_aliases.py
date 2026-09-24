@@ -70,10 +70,51 @@ PROJECTS: tuple[tuple[str, str, tuple[str, ...], str | None], ...] = (
 )
 
 PROJECT_ALIAS_EXTENSIONS: dict[str, tuple[str, ...]] = {
-    "the_bridge": ("bridge", "桥牌公寓", "世桥", "the bridge club"),
-    "the_pinnacle": ("太子幸福", "太子幸福广场", "幸福广场", "太子幸福公寓", "prince happiness", "prince happiness plaza"),
-    "rf_city": ("富力", "富力金边", "富力金边中心城", "金边中心城", "r&f", "r and f city"),
+    "the_bridge": ("bridge", "桥牌公寓", "世桥", "the bridge club", "桥牌The Bridge", "thebridge"),
+    "the_pinnacle": (
+        "太子幸福", "太子幸福广场", "幸福广场", "太子幸福公寓",
+        "prince happiness", "prince happiness plaza", "pinnacle幸福", "the pinnacle幸福广场",
+    ),
+    "rf_city": ("富力", "富力金边", "富力金边中心城", "金边中心城", "r&f", "r and f city", "富力中心"),
     "peng_huoth": ("炳发", "penghuoth"),
+    "prince_huan_yu_center": (
+        "太子寰宇", "太子·寰宇", "寰宇中心", "寰宇", "huanyu", "huan yu",
+        "prince huanyu", "太子环宇", "环宇中心",
+    ),
+    "prince_central_plaza": ("太子中央", "太子中心广场", "中央广场太子"),
+    "prince_international_plaza": ("太子国际", "太子国际中心"),
+    "prince_modern_plaza": ("太子现代", "现代广场太子"),
+    "the_peak": ("peak香格里拉", "香格里拉peak", "thepeak", "巅峰公寓"),
+    "urban_village_1": ("首都国金", "国金一期", "uv国金"),
+    "urban_village_2": ("国金二期", "首都国金二期"),
+    "one_park": ("onepark", "金边ONE PARK", "壹号公园"),
+    "olympia_city": ("olympia", "奥城", "奥林匹克城公寓"),
+    "mesong": ("金汇梅松", "梅松公寓", "mesong金汇"),
+    "rose_garden": ("玫瑰滨江", "滨江玫瑰"),
+    "morgan_enmaison": ("摩根天御", "天御摩根", "enmaison"),
+    "parc_21": ("柏盛", "parc21", "金柬柏盛"),
+    "la_vista_one": ("紫晶", "紫晶1号", "lavista"),
+    "vue_aston": ("雅诗顿", "滨江阿斯顿", "vueaston"),
+    "phnom_penh_galaxy_garden": ("星河", "星河花园公寓", "galaxy花园"),
+    "royal_platinum": ("皇家铂金公寓", "铂金皇家"),
+    "le_conde_bkk1": ("观邸", "王府观邸BKK1", "leconde"),
+    "picasso_city_garden": ("毕加索花园", "picasso公寓"),
+    "agile_sky_residence": ("雅居乐", "天悦雅居乐", "agile天悦"),
+    "de_castle_royal": ("帝卡斯", "de castle"),
+    "the_view": ("the view公寓", "view公寓BKK1"),
+    "sky_villa": ("天空别墅公寓",),
+    "chief_tower": ("首峰", "chief大厦"),
+    "wealth_mansion": ("威尔斯", "wealth公馆"),
+    "orkide_royal": ("ORKIDE", "orkide公寓"),
+    "one_70": ("ONE70", "首座one70"),
+    "diamond_bay_garden": ("钻石湾", "钻石湾公寓"),
+    "diamond_one": ("钻石1号", "diamond1"),
+    "diamond_twin_tower": ("钻石双塔", "双子塔钻石岛"),
+    "peninsula_private_residence": ("半岛御景公寓", "peninsula御景"),
+    "vila_town": ("vila town炳发", "villa town", "维拉镇"),
+    "the_star_mera_garden": ("美拉", "mera炳发", "炳发mera"),
+    "the_star_diamond": ("钻石城炳发", "star diamond炳发"),
+    "the_star_jumeirah": ("朱美拉炳发", "jumeirah炳发"),
 }
 
 # Batch-1 high-confidence public market locations for VERIFIED projects.
@@ -121,6 +162,11 @@ PROJECT_DEFAULT_LOCATIONS: dict[str, tuple[str, str]] = {
     "prince_central_plaza": ("诺罗敦大道", "独立碑附近"),
     "prince_modern_plaza": ("诺罗敦大道", "诺罗敦大道"),
     "prince_international_plaza": ("俄罗斯大道", "俄罗斯大道"),
+    # the_pinnacle already in core registry; keep customer display aligned
+    "the_pinnacle": ("百色河", "莫尼旺大道附近"),
+    "the_bridge": ("百色河", "金街附近"),
+    "rf_city": ("富力城", "60米大道 · 永旺3附近"),
+    "peng_huoth_city": ("炳发城", "一号路 / 60米 / 50米炳发"),
     "phnom_penh_galaxy_garden": ("森速", "新金边"),
     # Web-verified public addresses (customer display, not bare sangkat names)
     "vila_town": ("洪森大道", "60米大道附近"),  # Borey Villa Town, Chak Angrae / Hun Sen Blvd

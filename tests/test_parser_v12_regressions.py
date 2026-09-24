@@ -44,7 +44,9 @@ def test_mixed_listing_keeps_rent_and_sale_as_separate_facts() -> None:
     assert facts["deal_type"] == "mixed"
     assert facts["monthly_rent_usd"] == 680
     assert facts["sale_price_usd"] == 100000
-    assert "mixed_sale_rent_terms" in facts["quality"]["review_flags"]
+    # Rent-primary dual wording stays visible as a warning, not a publish block.
+    assert "mixed_sale_rent_terms" in facts["quality"]["warning_flags"]
+    assert "mixed_sale_rent_terms" not in facts["quality"]["blocking_flags"]
     assert package_gate(facts, 4)["ok"] is False
 
 
