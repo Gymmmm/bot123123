@@ -15,7 +15,7 @@ from typing import Any
 from .listing_taxonomy import classify_listing_taxonomy, public_location_from_fields
 
 SCHEMA_VERSION = "canonical_facts.v1"
-PARSER_REVISION = "v1.4"
+PARSER_REVISION = "v1.5"
 CITY_KEY = "phnom_penh"
 CITY_DISPLAY = "金边"
 

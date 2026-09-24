@@ -7,7 +7,7 @@ def _parse(raw: str):
 
 
 def test_r2_advances_parser_revision():
-    assert PARSER_REVISION == "v1.4"
+    assert PARSER_REVISION == "v1.5"
 
 
 def test_real_l267_l268_compact_labelled_layouts_are_extracted_without_guesses():
@@ -84,6 +84,10 @@ def test_real_taxonomy_regressions_keep_headline_project_and_treat_nearby_as_evi
 💰出租价格：$600/月
 🏠房间户型：复式1房1厅
 📍周边配套：金界、金街美食广场、苏豪夜市、永旺1""", "太子·寰宇中心"),
+        "l_164": ("""381🌳 【公寓出租】 #寰宇单间
+💰 租金：$300/月
+🏠 户型：单间（12楼，朝北）
+📍 位置：Naga 3旁，近永旺1超市、寰宇商场""", "太子·寰宇中心"),
         "l_197": ("""343🌳【特价高端公寓出租】#香格里拉
 💰出租价格：$700/月
 🏠房间户型：1房1厅

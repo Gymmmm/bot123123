@@ -360,6 +360,15 @@ _NEARBY_LOCATION_CONTEXT = re.compile(
     flags=re.I,
 )
 
+# Location lines that only name landmarks ("近永旺1超市 / Naga旁") must not
+# compete with the listing headline/hashtag for project identity. Bare
+# ``位置：富力城`` stays available so campus names still resolve.
+_NEARBY_PROJECT_CONTEXT = re.compile(
+    r"(?:周边配套|周边|生活配套)\s*[:：][^\n]*"
+    r"|(?:位置|地址|地段)\s*[:：][^\n]*(?:近|旁|旁边|对面|附近)[^\n]*",
+    flags=re.I,
+)
+
 
 def _inside_nearby_context(text: str, position: int) -> bool:
     return any(match.start() <= position < match.end() for match in _NEARBY_LOCATION_CONTEXT.finditer(str(text or "")))
@@ -406,8 +415,6 @@ def _extract_markets(text: str) -> tuple[list[str], list[str], list[dict[str, An
             flags.append("ambiguous_market_location")
     return keys, displays, evidence, flags
 
-
-_NEARBY_PROJECT_CONTEXT = _NEARBY_LOCATION_CONTEXT
 
 _FALSE_EXPLICIT_PROJECT_VALUES = {"物业费", "网络", "房间保洁", "保洁", "停车位"}
 
