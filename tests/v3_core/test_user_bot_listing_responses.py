@@ -217,9 +217,9 @@ def test_photos_response_drops_missing_files_and_keeps_text_fallback(tmp_path):
     assert not response.has_media
     assert response.media_groups == ()
     assert response.photo_path == ""
-    assert "・月租金额：$800 / 月" in response.text
+    assert "💵 $800/月" in response.text
     assert "📸 " not in response.text
-    assert "🏢 金边优质房源出租" in response.text
+    assert "🏢 金边优质房源出租" not in response.text
     assert response.detail_text == ""
 
 

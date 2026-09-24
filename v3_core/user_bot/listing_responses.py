@@ -515,7 +515,7 @@ def build_photos_response(
 
     return PublicPhotosResponse(
         media_groups=groups,
-        text=build_photo_caption(view, photo_index=index, photo_total=total) if total else build_detail_text(view),
+        text=build_photo_caption(view, photo_index=index, photo_total=total),
         detail_text="",
         photo_path=current,
         photo_index=index,
