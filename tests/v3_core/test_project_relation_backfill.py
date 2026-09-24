@@ -22,6 +22,13 @@ def test_pinnacle_bare_text_gets_verified_location_and_single_type():
     assert facts["property_type_status"] == "inferred"
 
 
+def test_pinnacle_chinese_alias_uses_geographic_area_not_project_name():
+    facts = canonicalize_source("太子幸福广场\n2房2厅\n租金$850/月\n39楼")
+    assert facts["project_key"] == "the_pinnacle"
+    assert facts["public_location_display"] == "莫尼旺大道附近"
+    assert "幸福广场" not in (facts["public_location_display"] or "")
+
+
 def test_rf_city_mixed_does_not_infer_apartment():
     facts = canonicalize_source("富力城出租\n2房\n租金$800/月")
     assert facts["project_key"] == "rf_city"

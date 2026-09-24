@@ -32,9 +32,9 @@ PHRASES: dict[str, tuple[str, ...]] = {
         "每周三次上门，日常基本不用太操心。",
     ),
     "cleaning_included": (
-        "这套包含保洁，日常维护会省事一些。",
-        "保洁已经包在里面，自己少打扫一点。",
-        "有保洁服务，入住会轻松一些。",
+        "租金里含保洁，自己请人打扫的钱能省下来。",
+        "保洁已经包进租金，日常少操心卫生。",
+        "含保洁服务，入住后打扫压力会小一点。",
     ),
     "linen_weekly": (
         "床品每周会处理一次，日常少一件事。",
@@ -385,27 +385,45 @@ def _decision_insights(facts: dict[str, Any], *, seed: str, max_points: int) -> 
     ``public_location_display``. Do not emit customer-facing incompleteness copy.
     """
     insights: list[str] = []
+    tags = adviser_tags_from_facts(facts)
+    tagset = set(tags)
+    floor = _floor_number(facts.get("floor"))
+    cleaning = bool(tagset & {"cleaning_included", "cleaning_1x", "cleaning_2x", "cleaning_3x"})
+    wifi = bool(tagset & {"wifi_included", "wifi_ready", "management_wifi", "management_wifi_ready"})
 
-    # Floor: only when explicitly verified high_floor — never invent quietness/view/sun.
-    if facts.get("high_floor") is True or "high_floor" in _explicit_signals(facts):
+    # Concrete unit facts can combine: high floor + included service is decision-useful.
+    if floor is not None and floor >= 20 and cleaning:
+        insights.append(f"{floor}楼这套还包保洁，住高层少操心卫生。")
+    elif floor is not None and floor >= 20 and wifi:
+        insights.append(f"{floor}楼网络已经搞定，入住少折腾一步。")
+    elif facts.get("high_floor") is True or "high_floor" in _explicit_signals(facts):
         insights.append(
             "楼层偏高，如果在意楼层可以放进优先看房范围，实际视野和采光现场确认更稳。"
         )
 
-    if _kitchen_is_independent(facts):
+    if _kitchen_is_independent(facts) and len(insights) < max_points:
         insights.append("有独立厨房，平时自己做饭会更实用。")
 
     # Fill remaining slots with the evidence-driven phrase engine (no marketing fluff).
+    # Skip weak standalone cleaning/wifi lines when already composed with floor.
+    used_weak = bool(insights) and (cleaning or wifi)
     remaining = max(0, max_points - len(insights))
     if remaining:
-        for line in generate_adviser_lines(facts, seed=seed, max_points=remaining, allow_fallback=False):
-            if line and line not in insights:
-                # Reject leftover layout-only boilerplate if any generator still emits it.
-                if any(phrase in line for phrase in ("更灵活", "资料不完整")):
-                    continue
-                insights.append(line)
+        for line in generate_adviser_lines(facts, seed=seed, max_points=remaining + 2, allow_fallback=False):
+            if not line or line in insights:
+                continue
+            if any(phrase in line for phrase in ("更灵活", "资料不完整")):
+                continue
+            if used_weak and any(token in line for token in ("保洁", "网费", "宽带", "网络")):
+                continue
+            insights.append(line)
             if len(insights) >= max_points:
                 break
+
+    # Bare "包保洁" alone is too thin for 侨联说 — hide the block instead.
+    if len(insights) == 1 and cleaning and floor is None and "保洁" in insights[0] and "楼" not in insights[0]:
+        if not (tagset - {"cleaning_included", "cleaning_1x", "cleaning_2x", "cleaning_3x", "furnished", "pool", "gym", "pool_gym"}):
+            return []
 
     return insights[:max_points]
 

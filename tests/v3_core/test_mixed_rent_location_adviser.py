@@ -65,3 +65,49 @@ def test_adviser_copy_uses_spoken_variants_not_stiff_boilerplate() -> None:
     assert "更灵活" not in copy
     # Prefer human advisor tone over bureaucratic restatement.
     assert any(token in copy for token in ("房东", "宠物", "毛孩", "优先"))
+
+
+def test_adviser_composes_high_floor_with_cleaning() -> None:
+    copy = build_adviser_copy(
+        {
+            "floor": "39",
+            "adviser_signals_version": "explicit-v1",
+            "adviser_signals": ["cleaning_included"],
+            "services": {"cleaning": "包含"},
+        },
+        seed="QL-PP-U4S6",
+        max_points=2,
+    )
+    assert "39楼" in copy
+    assert "保洁" in copy
+    assert "自己少打扫一点" not in copy
+
+
+def test_detail_hides_region_when_it_only_restates_project() -> None:
+    from types import SimpleNamespace
+
+    from v3_core.user_bot.listing_responses import _listing_fact_lines
+
+    details = SimpleNamespace(
+        project_name="The Pinnacle 幸福广场",
+        location="太子幸福广场",
+        property_type="公寓",
+        layout="2房2厅｜2卫",
+        monthly_rent_usd=850,
+        size_sqm=None,
+        floor="39",
+        deposit_terms="押1付1",
+        contract_term="1年",
+        inventory_status="active",
+        status_icon="🟢",
+        status_label="当前可预约",
+        public_listing_id="QL-PP-U4S6",
+        management_fee="",
+        water_rate="",
+        electric_rate="",
+        building_amenities="",
+    )
+    text = "\n".join(_listing_fact_lines(details))
+    assert "🏡 项目：The Pinnacle 幸福广场" in text
+    assert "📍 区域" not in text
+    assert "莫尼旺" not in text  # hidden until location is fixed upstream

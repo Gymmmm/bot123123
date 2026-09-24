@@ -108,7 +108,7 @@ _MARKET_LOCATIONS_EXPLICIT: tuple[MarketLocation, ...] = (
     MarketLocation("炳发城", "一号路 / 60米 / 50米炳发", "project_market", ("炳发城", "borey peng huoth")),
     # The legacy slash-combined value remains only as an input/search alias;
     # canonical keys and public displays are one resolved location concept.
-    MarketLocation("太子幸福广场", "太子幸福广场", "project_market", ("太子/幸福", "太子幸福广场", "太子幸福")),
+    MarketLocation("太子幸福广场", "莫尼旺大道附近", "project_market", ("太子/幸福", "太子幸福广场", "太子幸福")),
 )
 
 # A bare physical-area mention is useful as a conservative Level-1 search
@@ -614,6 +614,39 @@ def _effective_property_type_mode(project: ProjectIdentity) -> str | None:
     return None
 
 
+def _market_is_project_self_label(market_keys: list[str], project: ProjectIdentity) -> bool:
+    """True when market evidence only renames the same project (not a real area)."""
+    if len(market_keys) != 1:
+        return False
+    market = market_location_by_key(market_keys[0])
+    if market is None or str(market.relation or "") != "project_market":
+        return False
+    names = {
+        clean_text(project.key).casefold(),
+        clean_text(project.display).casefold(),
+        *(clean_text(alias).casefold() for alias in project.aliases),
+    }
+    names.discard("")
+    market_names = {
+        clean_text(market.key).casefold(),
+        clean_text(market.display).casefold(),
+        *(clean_text(alias).casefold() for alias in market.aliases),
+    }
+    market_names.discard("")
+    # Mega-area project_markets (富力城) intentionally reuse the project display
+    # as the public area label — keep those.
+    if clean_text(market.display).casefold() == clean_text(project.display).casefold():
+        return False
+    if names & market_names:
+        return True
+    # Soft overlap: shared Chinese core like 幸福广场 inside The Pinnacle 幸福广场.
+    for left in names:
+        for right in market_names:
+            if len(left) >= 4 and len(right) >= 4 and (left in right or right in left):
+                return True
+    return False
+
+
 def _apply_verified_project_defaults(
     *,
     project_key: str | None,
@@ -654,16 +687,18 @@ def _apply_verified_project_defaults(
             property_flags,
         )
 
-    # Location: only when source did not already confirm area/market evidence.
+    # Location: fill when source has no market/area yet. If the only market hit
+    # is a project_market self-label (e.g. 太子幸福广场 for The Pinnacle), replace
+    # it with the verified geographic customer anchor so 项目/区域 do not repeat.
     if (
         area_status != "confirmed"
-        and not market_keys
         and project.default_location_key
         and project.default_location_display
     ):
         loc_key = clean_text(project.default_location_key)
         loc_display = clean_text(project.default_location_display)
-        if loc_key and loc_display:
+        self_label = _market_is_project_self_label(market_keys, project)
+        if loc_key and loc_display and (not market_keys or self_label):
             market_keys = [loc_key]
             market_displays = [loc_display]
             market_evidence = [

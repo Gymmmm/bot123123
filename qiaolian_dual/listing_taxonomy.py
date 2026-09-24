@@ -103,7 +103,7 @@ _MARKET_LOCATIONS_EXPLICIT: tuple[MarketLocation, ...] = (
     # canonical keys and public displays are one resolved location concept.
     # Do not alias project identity tokens (the pinnacle / 幸福广场) onto this market —
     # that pollutes canonical GEO (living-facts: Pinnacle GEO = 百色河).
-    MarketLocation("太子幸福广场", "太子幸福广场", "project_market", ("太子/幸福", "太子幸福广场", "太子幸福")),
+    MarketLocation("太子幸福广场", "莫尼旺大道附近", "project_market", ("太子/幸福", "太子幸福广场", "太子幸福")),
 )
 
 # A bare physical-area mention is useful as a conservative Level-1 search
