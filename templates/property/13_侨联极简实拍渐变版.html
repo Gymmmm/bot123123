@@ -32,14 +32,14 @@ body{
 
 /* =========================================================
    PRODUCTION POSTER
-   16:9
+   4:3，适合手机频道里查看室内空间
    html_cover_renderer.py 会直接截图 .poster
    ========================================================= */
 
 .poster{
   position:relative;
   width:1600px;
-  height:900px;
+  height:1200px;
   overflow:hidden;
   background:#111;
 }
@@ -98,6 +98,12 @@ body{
   display:none;
 }
 
+/* 有完整品牌图时只展示一次品牌名 */
+.brand:has(.brand-logo[src^="data:"]) .brand-line,
+.brand:has(.brand-logo[src^="data:"]) .brand-text{
+  display:none;
+}
+
 .brand-line{
   width:4px;
   min-height:92px;
@@ -146,7 +152,7 @@ body{
   left:0;
   right:0;
   bottom:0;
-  height:43%;
+  height:40%;
 
   background:linear-gradient(
     to bottom,
@@ -167,23 +173,23 @@ body{
 
 .content{
   position:absolute;
-  right:54px;
-  bottom:46px;
+  left:54px;
+  bottom:56px;
 
-  width:1080px;
+  width:calc(100% - 108px);
 
   display:flex;
   flex-direction:column;
-  align-items:flex-end;
+  align-items:flex-start;
 
-  text-align:right;
+  text-align:left;
 }
 
 /* 区域 · 项目 · 户型 */
 .title{
-  max-width:1080px;
+  max-width:100%;
 
-  font-size:50px;
+  font-size:54px;
   line-height:1.2;
   font-weight:800;
   letter-spacing:.3px;
@@ -203,7 +209,7 @@ body{
 .price{
   margin-top:12px;
 
-  font-size:105px;
+  font-size:96px;
   line-height:.96;
   font-weight:900;
   letter-spacing:1px;
@@ -222,7 +228,7 @@ body{
   margin-top:18px;
 
   display:flex;
-  justify-content:flex-end;
+  justify-content:flex-start;
   align-items:center;
   flex-wrap:wrap;
   gap:0;
@@ -257,7 +263,7 @@ body{
   margin-top:15px;
 
   display:flex;
-  justify-content:flex-end;
+  justify-content:flex-start;
   flex-wrap:wrap;
   gap:9px;
 }
@@ -316,7 +322,7 @@ body{
   <!-- 房源信息 -->
   <div class="content">
 
-    <div class="title" id="coverTitle" data-autofit="50">
+    <div class="title" id="coverTitle" data-autofit="36">
       <span id="t3" data-field="t3">{{AREA}}</span>
       <span id="areaSep"> · </span>
       <span id="t1">{{PROJECT}}</span>
@@ -324,7 +330,7 @@ body{
       <span id="t2">{{LAYOUT}}</span>
     </div>
 
-    <div class="price" id="t6" data-autofit="105">
+    <div class="price" id="t6" data-autofit="72">
       {{PRICE_LINE}}
     </div>
 
@@ -413,9 +419,11 @@ body{
       AREA · PROJECT
     */
 
-    const hasArea = !isEmpty(area);
+    const hasArea = !isEmpty(area) && cleanText(area.textContent) !== cleanText(project.textContent);
     const hasProject = !isEmpty(project);
     const hasLayout = !isEmpty(layout);
+
+    area.style.display = hasArea ? "" : "none";
 
     areaSep.style.display =
       hasArea && (hasProject || hasLayout)
@@ -432,17 +440,17 @@ body{
   function fitTitle(){
 
     /*
-      先按正常 50px；
+      先按正常 54px；
       太长再逐步缩小。
     */
 
-    let size = 50;
+    let size = 54;
 
     title.style.fontSize = size + "px";
 
     while(
       title.scrollWidth > title.clientWidth &&
-      size > 34
+      size > 36
     ){
       size -= 1;
       title.style.fontSize = size + "px";
@@ -458,12 +466,12 @@ body{
       这种极端价格超宽
     */
 
-    let size = 105;
+    let size = 96;
 
     price.style.fontSize = size + "px";
 
     while(
-      price.scrollWidth > 900 &&
+      price.scrollWidth > 1400 &&
       size > 72
     ){
       size -= 2;
