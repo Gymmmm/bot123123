@@ -19,6 +19,7 @@ def _view(
     gallery=(),
     canonical_facts=None,
     adviser_copy="",
+    project_name="富力城",
 ):
     snapshot = {
         "schema": "v3_publication_snapshot.v1",
@@ -30,7 +31,7 @@ def _view(
         "canonical_facts": dict(canonical_facts or {}),
         "adviser_copy": adviser_copy,
         "listing": {
-            "project_name": "富力城",
+            "project_name": project_name,
             "property_type": "公寓",
             "layout": "2房1厅",
             "public_location_display": "BKK1",
@@ -159,6 +160,13 @@ def test_photo_caption_keeps_rental_essentials_with_photo():
     assert "基本信息" not in caption
     assert "金边优质房源出租" not in caption
     assert "侨联说" not in caption
+
+
+def test_photo_caption_uses_location_when_project_is_missing():
+    caption = build_photo_caption(_view(project_name=""), photo_index=0, photo_total=10)
+    assert caption.startswith("🏡 BKK1｜2房1厅\n💵 $800/月")
+    assert "📍 BKK1" not in caption
+    assert caption.endswith("📸 1/10")
 
 
 def test_photos_response_single_flipper_with_details_on_photo(tmp_path):

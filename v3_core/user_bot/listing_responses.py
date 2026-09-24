@@ -283,16 +283,17 @@ def build_photo_caption(
     """Essential rental details stay with the photo while browsing the gallery."""
     details = build_public_listing_details(view)
     project = str(details.project_name or "").strip()
+    location = str(details.location or "").strip()
     layout = str(details.layout or "").strip()
     rent = _format_price(details.monthly_rent_usd)
-    head = "｜".join(he(part) for part in (project, layout) if part)
+    head = "｜".join(he(part) for part in (project or location, layout) if part)
     if not head:
         head = he(str(details.location or "房源").strip())
     lines = [f"🏡 {head}"]
     if rent:
         lines.append(f"💵 {rent}")
-    location = str(details.location or "").strip()
-    facts = [he(part) for part in (location, _format_size(details.size_sqm), display_floor(details.floor)) if part]
+    other_location = location if project and location != project else ""
+    facts = [he(part) for part in (other_location, _format_size(details.size_sqm), display_floor(details.floor)) if part]
     if facts:
         lines.append("📍 " + " · ".join(facts))
     terms = [he(part) for part in (details.deposit_terms, details.contract_term) if part]
