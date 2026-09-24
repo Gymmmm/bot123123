@@ -104,7 +104,7 @@ _MARKET_LOCATIONS_EXPLICIT: tuple[MarketLocation, ...] = (
     MarketLocation("机场附近", "机场附近", "nearby", ("机场附近", "机场路", "老机场", "旧机场")),
     MarketLocation("中央市场", "中央市场", "nearby", ("中央市场", "新街市", "central market", "phsar thmei")),
     MarketLocation("奥林匹克", "奥林匹克", "nearby", ("奥林匹克", "奥林匹亚", "olympic", "olympia")),
-    MarketLocation("富力城", "富力城", "project_market", ("富力城", "富力中心城", "r&f city", "rf city", "r f city", "金边中心城")),
+    MarketLocation("富力城", "60米大道 · 永旺3附近", "project_market", ("富力城", "富力中心城", "r&f city", "rf city", "r f city", "金边中心城")),
     MarketLocation("炳发城", "一号路 / 60米 / 50米炳发", "project_market", ("炳发城", "borey peng huoth")),
     # The legacy slash-combined value remains only as an input/search alias;
     # canonical keys and public displays are one resolved location concept.
@@ -614,13 +614,72 @@ def _effective_property_type_mode(project: ProjectIdentity) -> str | None:
     return None
 
 
+def location_display_overlaps_project(project_name: object, location_display: object) -> bool:
+    """True when a location label is only restating the project (not a real area)."""
+    project = clean_text(project_name)
+    location = clean_text(location_display)
+    if not project or not location:
+        return False
+    if project == location:
+        return True
+
+    market = market_location_by_key(location)
+    if market is None:
+        market = next(
+            (item for item in MARKET_LOCATIONS if clean_text(item.display) == location),
+            None,
+        )
+    if market is not None:
+        relation = str(market.relation or "")
+        if relation != "project_market":
+            return False
+        # Campus nickname used as area (key/alias). Rewritten geographic displays
+        # (key=太子幸福广场, display=莫尼旺大道附近) are real customer areas.
+        if location == clean_text(market.key) or location.casefold() in {
+            clean_text(alias).casefold() for alias in market.aliases
+        }:
+            return True
+        if location == clean_text(market.display) and clean_text(market.display) != clean_text(market.key):
+            return False
+
+    if physical_area_by_key(location) is not None:
+        return False
+    if any(clean_text(item.display) == location for item in PHYSICAL_AREAS):
+        return False
+
+    def _norm(value: str) -> str:
+        text = re.sub(r"(?i)\bthe\b", "", value)
+        text = re.sub(r"[\s·・./|｜\-]+", "", text)
+        return text.casefold()
+
+    left, right = _norm(project), _norm(location)
+    if not left or not right:
+        return False
+    if left == right or (len(right) >= 6 and (right in left or left in right)):
+        return True
+    for size in range(min(len(left), len(right), 8), 3, -1):
+        for idx in range(0, len(left) - size + 1):
+            token = left[idx : idx + size]
+            if token.isascii():
+                continue
+            if token in right:
+                return True
+    return False
+
+
 def _market_is_project_self_label(market_keys: list[str], project: ProjectIdentity) -> bool:
     """True when market evidence only renames the same project (not a real area)."""
     if len(market_keys) != 1:
         return False
     market = market_location_by_key(market_keys[0])
-    if market is None or str(market.relation or "") != "project_market":
+    if market is None:
         return False
+    # Already the verified geographic customer anchor — keep.
+    if project.default_location_display and clean_text(market.display) == clean_text(
+        project.default_location_display
+    ):
+        return False
+
     names = {
         clean_text(project.key).casefold(),
         clean_text(project.display).casefold(),
@@ -633,18 +692,23 @@ def _market_is_project_self_label(market_keys: list[str], project: ProjectIdenti
         *(clean_text(alias).casefold() for alias in market.aliases),
     }
     market_names.discard("")
-    # Mega-area project_markets (富力城) intentionally reuse the project display
-    # as the public area label — keep those.
-    if clean_text(market.display).casefold() == clean_text(project.display).casefold():
+
+    overlapped = bool(names & market_names) or location_display_overlaps_project(
+        project.display, market.display
+    )
+    if not overlapped:
+        for left in names:
+            for right in market_names:
+                if len(left) >= 4 and len(right) >= 4 and (left in right or right in left):
+                    overlapped = True
+                    break
+            if overlapped:
+                break
+    if not overlapped:
         return False
-    if names & market_names:
-        return True
-    # Soft overlap: shared Chinese core like 幸福广场 inside The Pinnacle 幸福广场.
-    for left in names:
-        for right in market_names:
-            if len(left) >= 4 and len(right) >= 4 and (left in right or right in left):
-                return True
-    return False
+    # Campus / project nickname markets (富力城、炳发城、太子幸福广场) or any
+    # display that restates the project must yield to geographic defaults.
+    return bool(project.default_location_key and project.default_location_display)
 
 
 def _apply_verified_project_defaults(
@@ -834,6 +898,47 @@ def classify_listing_taxonomy(raw_text: str) -> TaxonomyResult:
     )
 
 
+def preferred_public_location_for_project(
+    *,
+    project_key: object = None,
+    project_name: object = None,
+    location_key: object = None,
+    location_display: object = None,
+) -> tuple[str | None, str | None]:
+    """Return geographic location when current label restates the project."""
+    project = project_identity_by_key(project_key)
+    if project is None or project.kind != "project":
+        # Resolve by display / alias when key missing (legacy rows).
+        wanted = clean_text(project_name).casefold()
+        if wanted:
+            for item in PROJECT_IDENTITIES:
+                if item.kind != "project":
+                    continue
+                names = {
+                    clean_text(item.key).casefold(),
+                    clean_text(item.display).casefold(),
+                    *(clean_text(alias).casefold() for alias in item.aliases),
+                }
+                if wanted in names or location_display_overlaps_project(item.display, project_name):
+                    project = item
+                    break
+    if (
+        project is None
+        or project.kind != "project"
+        or not project.default_location_key
+        or not project.default_location_display
+    ):
+        return clean_text(location_key) or None, clean_text(location_display) or None
+
+    display = clean_text(location_display)
+    key = clean_text(location_key)
+    if (not display) or location_display_overlaps_project(project.display, display) or location_display_overlaps_project(
+        project_name, display
+    ):
+        return clean_text(project.default_location_key), clean_text(project.default_location_display)
+    return key or None, display or None
+
+
 def public_location_from_fields(
     *,
     canonical_area_key: object = None,
@@ -850,29 +955,32 @@ def public_location_from_fields(
     confirmed physical area, market evidence, or a VERIFIED project default
     already projected into market_* fields by ``classify_listing_taxonomy``.
     """
-    del project_name  # kept for call-site compatibility; never displayed as area
     area_key = clean_text(canonical_area_key)
     area_display = clean_text(canonical_area_display)
     if area_status == "confirmed" and area_key and area_display:
-        return area_key, area_display, "level_2_physical_confirmed"
+        if not location_display_overlaps_project(project_name, area_display):
+            return area_key, area_display, "level_2_physical_confirmed"
     market_keys = [clean_text(value) for value in (market_location_keys or []) if clean_text(value)]
     market_displays = [clean_text(value) for value in (market_location_displays or []) if clean_text(value)]
     if market_keys and market_displays:
-        return market_keys[0], market_displays[0], "level_1_market_confirmed"
+        key, display = preferred_public_location_for_project(
+            project_key=project_key,
+            project_name=project_name,
+            location_key=market_keys[0],
+            location_display=market_displays[0],
+        )
+        if key and display:
+            return key, display, "level_1_market_confirmed"
 
     # Last-chance VERIFIED project default when callers skip classify injection.
-    project = project_identity_by_key(project_key)
-    if (
-        project is not None
-        and project.kind == "project"
-        and project.default_location_key
-        and project.default_location_display
-    ):
-        return (
-            clean_text(project.default_location_key),
-            clean_text(project.default_location_display),
-            "level_1_market_confirmed",
-        )
+    key, display = preferred_public_location_for_project(
+        project_key=project_key,
+        project_name=project_name,
+        location_key=None,
+        location_display=None,
+    )
+    if key and display:
+        return key, display, "level_1_market_confirmed"
     return None, None, "unknown"
 
 
@@ -903,5 +1011,7 @@ __all__ = [
     "project_identity_by_key",
     "public_location",
     "public_location_from_fields",
+    "preferred_public_location_for_project",
+    "location_display_overlaps_project",
     "resolve_location_alias",
 ]

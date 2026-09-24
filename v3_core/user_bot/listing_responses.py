@@ -8,10 +8,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from html import escape as he
 from pathlib import Path
-import re
 from typing import Literal
 
 from v3_core.publishing.formatting import display_floor
+from v3_core.inventory.listing_taxonomy import location_display_overlaps_project
 
 from .adviser_notes import adviser_notes_for_view
 from .listing_presenter import build_public_listing_details
@@ -186,36 +186,6 @@ def _adviser_copy_for_view(view: PublishedListingView) -> str:
     return adviser_notes_for_view(view, max_points=2, allow_empty=True).strip()
 
 
-def _location_overlaps_project(project: str, location: str) -> bool:
-    """Hide 区域 when it only restates the project name (e.g. 太子幸福广场)."""
-    project = str(project or "").strip()
-    location = str(location or "").strip()
-    if not project or not location:
-        return False
-    if location == project:
-        return True
-
-    def _norm(value: str) -> str:
-        text = re.sub(r"(?i)\bthe\b", "", value)
-        text = re.sub(r"[\s·・./|｜\-]+", "", text)
-        return text.casefold()
-
-    left, right = _norm(project), _norm(location)
-    if not left or not right:
-        return False
-    if left == right or left in right or right in left:
-        return True
-    # Shared Chinese core tokens of length >= 4 (幸福广场).
-    for size in range(min(len(left), len(right), 8), 3, -1):
-        for idx in range(0, len(left) - size + 1):
-            token = left[idx : idx + size]
-            if token.isascii():
-                continue
-            if token in right:
-                return True
-    return False
-
-
 def _listing_fact_lines(details) -> list[str]:
     """Public snapshot facts plus live availability, omitting unknown fields."""
     project = str(details.project_name or "").strip()
@@ -226,7 +196,7 @@ def _listing_fact_lines(details) -> list[str]:
         lines.append(f"🏡 项目：{he(project)}")
     elif details.property_type:
         lines.append(f"🏡 类型：{he(details.property_type)}")
-    if location and not _location_overlaps_project(project, location):
+    if location and not location_display_overlaps_project(project, location):
         lines.append(f"📍 区域：{he(location)}")
     if layout:
         lines.append(f"🛏 户型：{he(layout)}")

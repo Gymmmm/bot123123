@@ -97,7 +97,7 @@ _MARKET_LOCATIONS_EXPLICIT: tuple[MarketLocation, ...] = (
     MarketLocation("机场附近", "机场附近", "nearby", ("机场附近", "机场路", "老机场", "旧机场")),
     MarketLocation("中央市场", "中央市场", "nearby", ("中央市场", "新街市", "central market", "phsar thmei")),
     MarketLocation("奥林匹克", "奥林匹克", "nearby", ("奥林匹克", "奥林匹亚", "olympic", "olympia")),
-    MarketLocation("富力城", "富力城", "project_market", ("富力城", "富力中心城", "r&f city", "rf city", "r f city", "金边中心城")),
+    MarketLocation("富力城", "60米大道 · 永旺3附近", "project_market", ("富力城", "富力中心城", "r&f city", "rf city", "r f city", "金边中心城")),
     MarketLocation("炳发城", "一号路 / 60米 / 50米炳发", "project_market", ("炳发城", "borey peng huoth")),
     # The legacy slash-combined value remains only as an input/search alias;
     # canonical keys and public displays are one resolved location concept.

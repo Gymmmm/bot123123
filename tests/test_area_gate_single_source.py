@@ -100,7 +100,7 @@ def test_location_catalogs_are_derived_from_one_taxonomy() -> None:
     market_only = {item.display for item in MARKET_LOCATIONS} - physical_displays
     assert set(CANONICAL_AREAS) == physical_displays
     assert not (set(CANONICAL_AREAS) & {"富力城", "炳发城", "俄罗斯市场", "钻石岛", "金边市区"})
-    assert {"富力城", "一号路 / 60米 / 50米炳发", "俄罗斯市场附近", "钻石岛"} <= market_only
+    assert {"60米大道 · 永旺3附近", "一号路 / 60米 / 50米炳发", "俄罗斯市场附近", "钻石岛"} <= market_only
     assert "莫尼旺大道附近" in {item.display for item in MARKET_LOCATIONS}
     assert any(item.key == "太子幸福广场" for item in MARKET_LOCATIONS)
     assert "太子/幸福" not in {item.display for item in MARKET_LOCATIONS}

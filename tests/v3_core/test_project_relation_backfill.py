@@ -32,7 +32,7 @@ def test_pinnacle_chinese_alias_uses_geographic_area_not_project_name():
 def test_rf_city_mixed_does_not_infer_apartment():
     facts = canonicalize_source("富力城出租\n2房\n租金$800/月")
     assert facts["project_key"] == "rf_city"
-    assert facts["public_location_display"] == "富力城"
+    assert facts["public_location_display"] == "60米大道 · 永旺3附近"
     assert facts["property_type"] == "未知"
     assert facts["property_type_status"] == "unknown"
 
