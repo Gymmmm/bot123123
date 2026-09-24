@@ -77,4 +77,16 @@ def test_unknown_project_without_property_evidence_stays_unknown_property_type()
     assert facts["deal_type"] == "rent"
     assert facts["property_type"] == "未知"
     assert facts["property_type_status"] == "unknown"
+    # Layout confirms a rentable unit; type gap is warning-only for autopilot.
+    assert "unknown_property_type" not in facts["quality"]["blocking_flags"]
+    assert "unknown_property_type" in facts["quality"]["warning_flags"]
+
+
+def test_unknown_property_type_still_blocks_without_layout():
+    facts = _facts(
+        "项目：Random Residence\n"
+        "位置：BKK1\n"
+        "租金：850美金/月\n"
+    )
+    assert facts["property_type"] == "未知"
     assert "unknown_property_type" in facts["quality"]["blocking_flags"]

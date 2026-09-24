@@ -15,7 +15,7 @@ from typing import Any
 from .listing_taxonomy import classify_listing_taxonomy, public_location_from_fields
 
 SCHEMA_VERSION = "canonical_facts.v1"
-PARSER_REVISION = "v1.3"
+PARSER_REVISION = "v1.4"
 CITY_KEY = "phnom_penh"
 CITY_DISPLAY = "金边"
 
@@ -417,11 +417,28 @@ def _quality(facts: dict[str, Any]) -> dict[str, Any]:
     if facts.get("price_status") == "conflict": hard.append("conflicting_rental_price")
     if facts.get("sale_price_status") == "conflict": hard.append("conflicting_sale_price")
     if not facts.get("layout"): hard.append("missing_layout")
-    if facts.get("property_type") == "未知": hard.append("ambiguous_property_type" if facts.get("property_type_status") == "ambiguous" else "unknown_property_type")
+    if facts.get("property_type") == "未知":
+        prop_flag = (
+            "ambiguous_property_type"
+            if facts.get("property_type_status") == "ambiguous"
+            else "unknown_property_type"
+        )
+        # Layout already confirms livable structure for rent autopilot; keep the
+        # type gap visible as a warning instead of a hard publish block.
+        if facts.get("layout") or facts.get("bedrooms"):
+            warning.append(prop_flag)
+        else:
+            hard.append(prop_flag)
     candidate_flags = {str(flag) for flag in (facts.get("candidate_flags") or [])}
     for flag in ("ambiguous_area", "ambiguous_project"):
         if flag in candidate_flags: review.append(flag)
-    if "ambiguous_market_location" in candidate_flags and not facts.get("canonical_area_key"): review.append("ambiguous_market_location")
+    # Public market display is enough for publish; do not also require a geo khan key.
+    if (
+        "ambiguous_market_location" in candidate_flags
+        and not facts.get("canonical_area_key")
+        and not facts.get("public_location_key")
+    ):
+        review.append("ambiguous_market_location")
     if "project_brand_only" in candidate_flags: info.append("project_brand_only")
     if deal_type == "sale": hard.append("non_rental_source")
     elif deal_type == "mixed":

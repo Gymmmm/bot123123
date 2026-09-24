@@ -687,6 +687,15 @@ class AutoPublishService:
             rent = 0
         if rent > 0:
             flags = [flag for flag in flags if flag != "mixed_sale_rent_terms"]
+        # Frozen snapshots may still hard-block these; demote when evidence exists.
+        if str(facts.get("layout") or "").strip() or facts.get("bedrooms"):
+            flags = [
+                flag
+                for flag in flags
+                if flag not in {"unknown_property_type", "ambiguous_property_type"}
+            ]
+        if str(facts.get("public_location_key") or facts.get("public_location_display") or "").strip():
+            flags = [flag for flag in flags if flag != "ambiguous_market_location"]
         return tuple(flags)
 
     def _strict_blockers(
