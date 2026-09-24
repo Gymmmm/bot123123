@@ -86,9 +86,9 @@ body{
 }
 
 .brand-logo{
-  height:92px;
+  height:128px;
   width:auto;
-  max-width:280px;
+  max-width:380px;
   object-fit:contain;
   filter: drop-shadow(0 2px 10px rgba(0,0,0,.55));
 }
@@ -152,7 +152,7 @@ body{
   left:0;
   right:0;
   bottom:0;
-  height:40%;
+  height:38%;
 
   background:linear-gradient(
     to bottom,
@@ -185,12 +185,12 @@ body{
   text-align:left;
 }
 
-/* 区域 · 项目 · 户型 */
+/* 项目名称是封面主标题，位置和户型另起一行 */
 .title{
   max-width:100%;
 
-  font-size:54px;
-  line-height:1.2;
+  font-size:80px;
+  line-height:1.15;
   font-weight:800;
   letter-spacing:.3px;
 
@@ -205,11 +205,24 @@ body{
   text-overflow:ellipsis;
 }
 
+.details{
+  margin-top:11px;
+  max-width:100%;
+  font-size:46px;
+  line-height:1.2;
+  font-weight:700;
+  color:#f3e1bd;
+  text-shadow:0 2px 9px rgba(0,0,0,.85);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
 /* 价格 */
 .price{
-  margin-top:12px;
+  margin-top:18px;
 
-  font-size:96px;
+  font-size:110px;
   line-height:.96;
   font-weight:900;
   letter-spacing:1px;
@@ -322,11 +335,12 @@ body{
   <!-- 房源信息 -->
   <div class="content">
 
-    <div class="title" id="coverTitle" data-autofit="36">
+    <div class="title" id="coverTitle" data-autofit="44">
+      <span id="t1">{{PROJECT}}</span>
+    </div>
+    <div class="details">
       <span id="t3" data-field="t3">{{AREA}}</span>
       <span id="areaSep"> · </span>
-      <span id="t1">{{PROJECT}}</span>
-      <span id="projectSep"> · </span>
       <span id="t2">{{LAYOUT}}</span>
     </div>
 
@@ -378,13 +392,13 @@ body{
 
   const title = document.getElementById("coverTitle");
   const price = document.getElementById("t6");
+  const details = document.querySelector(".details");
 
   const area = document.getElementById("t3");
   const project = document.getElementById("t1");
   const layout = document.getElementById("t2");
 
   const areaSep = document.getElementById("areaSep");
-  const projectSep = document.getElementById("projectSep");
 
 
   function cleanText(v){
@@ -408,49 +422,30 @@ body{
 
   function cleanSeparators(){
 
-    /*
-      AREA 为空：
-      PROJECT · LAYOUT
-
-      PROJECT 为空：
-      AREA · LAYOUT
-
-      LAYOUT 为空：
-      AREA · PROJECT
-    */
-
     const hasArea = !isEmpty(area) && cleanText(area.textContent) !== cleanText(project.textContent);
-    const hasProject = !isEmpty(project);
     const hasLayout = !isEmpty(layout);
 
     area.style.display = hasArea ? "" : "none";
 
-    areaSep.style.display =
-      hasArea && (hasProject || hasLayout)
-        ? ""
-        : "none";
-
-    projectSep.style.display =
-      hasProject && hasLayout
-        ? ""
-        : "none";
+    areaSep.style.display = hasArea && hasLayout ? "" : "none";
+    details.style.display = hasArea || hasLayout ? "" : "none";
   }
 
 
   function fitTitle(){
 
     /*
-      先按正常 54px；
+      先按正常 80px；
       太长再逐步缩小。
     */
 
-    let size = 54;
+    let size = 80;
 
     title.style.fontSize = size + "px";
 
     while(
       title.scrollWidth > title.clientWidth &&
-      size > 36
+      size > 44
     ){
       size -= 1;
       title.style.fontSize = size + "px";
@@ -466,7 +461,7 @@ body{
       这种极端价格超宽
     */
 
-    let size = 96;
+    let size = 110;
 
     price.style.fontSize = size + "px";
 
