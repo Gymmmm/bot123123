@@ -7,6 +7,7 @@ resume from a saved ``sent`` attempt without sending again.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import sqlite3
 from typing import Any
 
 from v3_core.storage.inventory_reader import InventoryReader
@@ -163,11 +164,73 @@ class PublicationDeliveryCoordinator:
     def reconcile_unknown_as_sent(
         self, *, attempt_id: str, telegram_result: dict[str, Any]
     ) -> PublicationCommitResult:
-        self.deliveries.reconcile_unknown_as_sent(attempt_id, telegram_result)
-        return self.finalize_saved_receipt(attempt_id=attempt_id)
+        attempt = self.deliveries.get(attempt_id)
+        if attempt.state not in {"unknown", "sent", "committed"}:
+            raise DeliveryBlocked(
+                f"cannot reconcile {attempt.state} delivery as sent; expected unknown"
+            )
+        if attempt.state == "unknown":
+            self.deliveries.reconcile_unknown_as_sent(attempt_id, telegram_result)
+        result = self.finalize_saved_receipt(attempt_id=attempt_id)
+        self._mark_auto_item_published(
+            offer_id=str(result.attempt.offer_id or result.publication.offer_id or ""),
+            package_id=str(result.attempt.package_id),
+            channel_message_id=str(result.publication.channel_message_id or ""),
+        )
+        return result
 
     def reconcile_unknown_as_not_sent(self, *, attempt_id: str, reason: str) -> DeliveryAttempt:
-        return self.deliveries.reconcile_unknown_as_not_sent(attempt_id, reason)
+        attempt = self.deliveries.reconcile_unknown_as_not_sent(attempt_id, reason)
+        self._clear_telegram_unknown_auto_item(offer_id=str(attempt.offer_id or ""))
+        return attempt
+
+    def _mark_auto_item_published(
+        self, *, offer_id: str, package_id: str, channel_message_id: str
+    ) -> None:
+        clean_offer = str(offer_id or "").strip()
+        if not clean_offer:
+            return
+        with sqlite3.connect(self.deliveries.db_path) as conn:
+            conn.execute(
+                """UPDATE publisher_auto_items_v3
+                      SET state='published',
+                          reason_code='',
+                          reason_text='',
+                          package_id=CASE WHEN ?<>'' THEN ? ELSE package_id END,
+                          channel_message_id=CASE WHEN ?<>'' THEN ? ELSE channel_message_id END,
+                          published_at=COALESCE(published_at, CURRENT_TIMESTAMP),
+                          updated_at=CURRENT_TIMESTAMP
+                    WHERE offer_id=?""",
+                (
+                    str(package_id or ""),
+                    str(package_id or ""),
+                    str(channel_message_id or ""),
+                    str(channel_message_id or ""),
+                    clean_offer,
+                ),
+            )
+            conn.commit()
+
+    def _clear_telegram_unknown_auto_item(self, *, offer_id: str) -> None:
+        clean_offer = str(offer_id or "").strip()
+        if not clean_offer:
+            return
+        with sqlite3.connect(self.deliveries.db_path) as conn:
+            conn.execute(
+                """UPDATE publisher_auto_items_v3
+                      SET state='queued',
+                          reason_code='',
+                          reason_text='',
+                          ignored=0,
+                          updated_at=CURRENT_TIMESTAMP
+                    WHERE offer_id=?
+                      AND (
+                            (state='exception' AND reason_code='telegram_unknown')
+                            OR state='sending'
+                          )""",
+                (clean_offer,),
+            )
+            conn.commit()
 
     def finalize_saved_receipt(self, *, attempt_id: str) -> PublicationCommitResult:
         attempt = self.deliveries.get(attempt_id)

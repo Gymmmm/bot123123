@@ -29,6 +29,7 @@ def _appointment_time_compact(value: object) -> str:
 
 
 def _appointment_public_listing_id(value: object) -> str:
+    """Map appointment listing keys to a public QL id. Never return internal ids."""
     raw = str(value or '').strip()
     if not raw:
         return ''
@@ -38,19 +39,23 @@ def _appointment_public_listing_id(value: object) -> str:
         return public_id
     from .adapters.public_inventory import PublicInventoryAdapter
     try:
-        return PublicInventoryAdapter(DB_PATH).public_id_for_internal(raw) or raw
-    except (FileNotFoundError, sqlite3.Error):
-        return raw
+        mapped = PublicInventoryAdapter(DB_PATH).public_id_for_internal(raw)
+    except (FileNotFoundError, sqlite3.Error, OSError, RuntimeError, TypeError, ValueError):
+        return ''
+    mapped_text = str(mapped or '').strip()
+    if not mapped_text or re.fullmatch(r'(?i)l[_-]?\d+', mapped_text):
+        return ''
+    return mapped_text
 
 
 def _appointment_listing_compact(value: object) -> str:
-    from .utils_formatting import _display_listing_id
-    raw = _appointment_public_listing_id(value) or '待推荐'
-    if not raw or raw in {'-', '未填写'}:
+    """Customer-facing listing label for appointment cards."""
+    public_id = _appointment_public_listing_id(value)
+    if not public_id or public_id in {'-', '未填写', '待推荐'}:
         return '待顾问匹配'
-    if re.fullmatch('(?i)l[_-]?\\d+', raw):
-        return _display_listing_id(raw)
-    return raw
+    if re.fullmatch(r'(?i)l[_-]?\d+', public_id):
+        return '待顾问匹配'
+    return public_id
 
 
 def _appointment_card_keyboard() -> InlineKeyboardMarkup:
@@ -100,12 +105,12 @@ def _appointment_summary_line(row: dict) -> list[str]:
         'cancelled': ('⚪', '已取消'),
     }
     status_icon, status = status_map.get(raw_status, ('🟡', APPOINTMENT_STATUS_LABELS.get(raw_status, '等待确认')))
-    listing_id = _appointment_public_listing_id(row.get('listing_id'))
-    item = listing_context(listing_id) if listing_id else {}
+    public_listing_id = _appointment_public_listing_id(row.get('listing_id'))
+    item = listing_context(public_listing_id) if public_listing_id else {}
     project = str(item.get('project') or item.get('community') or item.get('area') or '').strip()
     layout = _display_layout(item.get('layout') or item.get('property_type'), item.get('property_type')) if item else ''
-    subject = '｜'.join(value for value in (project, layout) if value) or _appointment_listing_compact(listing_id)
-    qc = _appointment_listing_compact(listing_id)
+    subject = '｜'.join(value for value in (project, layout) if value) or _appointment_listing_compact(row.get('listing_id'))
+    qc = _appointment_listing_compact(row.get('listing_id'))
     mode_icon = '🎥' if str(row.get('viewing_mode') or '') == 'video' else '🚶'
     return [
         f'{status_icon} <b>{he(status)}</b>',
@@ -152,7 +157,7 @@ def _appointment_details_keyboard(user_id: int) -> InlineKeyboardMarkup:
                     InlineKeyboardButton('❌ 取消预约', callback_data=f'appointment_menu:cancel:{appt_id}'),
                 ])
                 listing_id = _appointment_public_listing_id(row.get('listing_id'))
-                if listing_id:
+                if listing_id and not re.fullmatch(r'(?i)l[_-]?\d+', listing_id):
                     buttons.append([
                         InlineKeyboardButton('📋 查看房源', callback_data=f'listing:detail:{listing_id}'),
                         InlineKeyboardButton('💬 咨询这套', callback_data=f'listing:consult:{listing_id}'),

@@ -62,13 +62,38 @@ def test_layout_plus_high_floor_river_view_creates_decision_copy_not_disclaimer(
 
     copy = _copy(facts)
 
-    assert "2+1" in copy
     assert "48 楼" in copy
     assert "河景" in copy
-    assert "书房" in copy
     assert "客厅视野" in copy
+    assert "更灵活" not in copy
+    assert "书房" not in copy
+    assert "资料不完整" not in copy
     assert "以现场为准" not in copy
     assert "资料标注" not in copy
+
+
+def test_layout_alone_does_not_create_generic_flexibility_copy():
+    copy = _copy(
+        {
+            "layout": "2+1",
+            "included": ["物业费", "网费"],
+            "house": {"pets": "不允许"},
+        }
+    )
+    assert copy == ""
+    assert "更灵活" not in copy
+
+
+def test_incomplete_reminder_is_not_shown_to_customers():
+    copy = _copy(
+        {
+            "house": {"features": ["全新未入住"], "pets": ""},
+            "amenities": ["私人泳池"],
+        }
+    )
+    assert "资料不完整" not in copy
+    if copy:
+        validate_adviser_copy(copy)
 
 
 def test_single_generic_view_still_does_not_create_copy():
@@ -87,15 +112,15 @@ def test_public_location_is_not_turned_into_adviser_copy():
     copy = _copy(
         {
             "included": ["物业费", "网费"],
-            "amenities": ["停车位"],
             "house": {"pets": "不允许"},
         },
         listing={"public_location_display": "BKK1", "layout": "1房1厅"},
     )
+    assert copy == ""
     assert "BKK1" not in copy
     assert "一带活动" not in copy
-    assert "一个人" in copy or "一房" in copy
-    validate_adviser_copy(copy)
+    assert "一个人" not in copy
+    assert "一房" not in copy
 
 
 def test_forbidden_adviser_phrases_are_rejected():

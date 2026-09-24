@@ -214,22 +214,94 @@ def _plus_layout(value: Any) -> str:
 
 
 def _contextual_lines(facts: dict[str, Any], tags: list[str]) -> list[str]:
+    """Only combine verified listing-specific signals; never invent layout boilerplate."""
     result: list[str] = []
     tagset = set(tags)
     layout = str(facts.get("layout") or "").strip()
-    plus_layout = _plus_layout(layout)
     floor = _floor_number(facts.get("floor"))
     view = "河景" if "river_view" in tagset else "市景" if "city_view" in tagset else ""
 
-    if plus_layout:
-        result.append(f"{plus_layout} 的布局多一个可用空间，做书房、储物或临时房会更灵活。")
-
+    # Require both a verified view signal and another concrete fact for this unit.
     if view and floor:
         result.append(f"{floor} 楼这套又有{view}信息，看房时重点看客厅视野、窗面和采光。")
-    elif view and layout:
+    elif view and layout and ("private_pool" in tagset or "never_lived" in tagset or "pet_allowed" in tagset):
         result.append(f"{layout} 又带{view}信息，这套更值得现场看的是客厅视野、采光和空间怎么分配。")
 
     return result
+
+
+def _decision_insights(facts: dict[str, Any], *, seed: str, max_points: int) -> list[str]:
+    """Build 1–2 short decision points from verified listing-specific facts only.
+
+    Layout alone is not enough. Do not invent location selling points from
+    ``public_location_display``. Do not emit customer-facing incompleteness copy.
+    """
+    insights: list[str] = []
+
+    # Floor: only when explicitly verified high_floor — never invent quietness/view/sun.
+    if facts.get("high_floor") is True or "high_floor" in _explicit_signals(facts):
+        insights.append(
+            "如果比较在意楼层，可以把这套放进优先看房范围，实际视野和采光建议现场确认。"
+        )
+
+    if _kitchen_is_independent(facts):
+        insights.append("有独立厨房，平时自己做饭的话会更实用。")
+
+    # Fill remaining slots with the evidence-driven phrase engine (no marketing fluff).
+    remaining = max(0, max_points - len(insights))
+    if remaining:
+        for line in generate_adviser_lines(facts, seed=seed, max_points=remaining, allow_fallback=False):
+            if line and line not in insights:
+                # Reject leftover layout-only boilerplate if any generator still emits it.
+                if any(phrase in line for phrase in ("更灵活", "资料不完整")):
+                    continue
+                insights.append(line)
+            if len(insights) >= max_points:
+                break
+
+    return insights[:max_points]
+
+
+def build_adviser_copy(
+    facts: dict[str, Any] | None,
+    *,
+    seed: str = "",
+    max_points: int = 2,
+) -> str:
+    """Publisher-side adviser_copy generator.
+
+    Rules:
+    - Only use verified/frozen facts specific to this listing.
+    - Do not invent advantages from layout alone.
+    - Do not show incompleteness disclaimers to customers.
+    - Prefer 1–2 decision-relevant points.
+    - Stay empty when nothing decision-relevant is verified (caller hides the block).
+    - User Bot must only read the frozen adviser_copy (no header here;
+      the detail view adds ``💬 侨联说``).
+    """
+    try:
+        limit = max(0, min(int(max_points), 2))
+    except (TypeError, ValueError):
+        limit = 2
+    if limit == 0:
+        return ""
+
+    clean = verified_canonical_adviser_facts(dict(facts or {}))
+    selected = _decision_insights(clean, seed=seed, max_points=limit)
+    if not selected:
+        return ""
+
+    body = "\n".join(selected)
+    # Prefer dropping the second insight over exceeding the hard length gate.
+    while len(body) > _ADVISER_COPY_MAX_LEN and "\n" in body:
+        body = "\n".join(body.splitlines()[:-1]).strip()
+    if len(body) > _ADVISER_COPY_MAX_LEN:
+        body = body[: _ADVISER_COPY_MAX_LEN - 1].rstrip() + "…"
+    try:
+        validate_adviser_copy(body)
+    except ValueError:
+        return ""
+    return body
 
 
 def _select_tags(tags: list[str], limit: int, *, suppress_generic: bool = False) -> list[str]:
@@ -304,6 +376,9 @@ FORBIDDEN_ADVISER_PHRASES = frozenset(
         "视野无遮挡",
         "采光非常好",
         "非常安静",
+        "空间更灵活",
+        "会更灵活",
+        "资料不完整",
     }
 )
 
@@ -386,90 +461,6 @@ def _incomplete_reminder_labels(facts: dict[str, Any], tags: list[str] | None = 
         reminders.append("网络")
 
     return reminders
-
-
-def _decision_insights(facts: dict[str, Any], *, seed: str, max_points: int) -> list[str]:
-    """Build 1–2 short decision points from verified facts only.
-
-    Location alias tables belong to parse/canonicalize — not adviser prose.
-    Do not invent location selling points from ``public_location_display``.
-    """
-    insights: list[str] = []
-    layout = str(facts.get("layout") or "").strip()
-    bucket = _layout_bucket(layout)
-
-    if bucket == "studio":
-        insights.append("户型比较紧凑，更适合一个人住、想控制整体租房预算的人。")
-    elif bucket == "one":
-        insights.append("一房的空间相对独立，更适合一个人或两个人长期住。")
-    elif bucket == "two":
-        insights.append("两房的使用空间更完整，适合两个人以上居住，或者需要独立工作空间的人。")
-
-    # Floor: only when explicitly verified high_floor — never invent quietness/view/sun.
-    if facts.get("high_floor") is True or "high_floor" in _explicit_signals(facts):
-        insights.append(
-            "如果比较在意楼层，可以把这套放进优先看房范围，实际视野和采光建议现场确认。"
-        )
-
-    if _kitchen_is_independent(facts):
-        insights.append("有独立厨房，平时自己做饭的话会更实用。")
-
-    # Fill remaining slots with the evidence-driven phrase engine (no marketing fluff).
-    remaining = max(0, max_points - len(insights))
-    if remaining:
-        for line in generate_adviser_lines(facts, seed=seed, max_points=remaining, allow_fallback=False):
-            if line and line not in insights:
-                insights.append(line)
-            if len(insights) >= max_points:
-                break
-
-    return insights[:max_points]
-
-
-def build_adviser_copy(
-    facts: dict[str, Any] | None,
-    *,
-    seed: str = "",
-    max_points: int = 2,
-) -> str:
-    """Publisher-side adviser_copy generator.
-
-    Rules:
-    - Only use verified/frozen facts.
-    - Do not invent advantages.
-    - Do not repeat the whole listing detail.
-    - Prefer 1–2 decision-relevant points.
-    - Add confirmation reminder only when needed.
-    - User Bot must only read the frozen adviser_copy (no header here;
-      the detail view adds ``💬 侨联说``).
-    """
-    try:
-        limit = max(0, min(int(max_points), 2))
-    except (TypeError, ValueError):
-        limit = 2
-    if limit == 0:
-        return ""
-
-    clean = verified_canonical_adviser_facts(dict(facts or {}))
-    selected = _decision_insights(clean, seed=seed, max_points=limit)
-    if not selected:
-        # Stay empty when nothing decision-relevant is verified — do not invent filler.
-        return ""
-
-    body = "\n".join(selected)
-    tags = adviser_tags_from_facts(clean)
-    reminders = _incomplete_reminder_labels(clean, tags)
-    if reminders:
-        names = "、".join(reminders[:3])
-        with_reminder = f"{body}\n\n{names}目前资料不完整，看房时建议一起确认。"
-        if len(with_reminder) <= _ADVISER_COPY_MAX_LEN:
-            body = with_reminder
-    # Prefer dropping the second insight over exceeding the hard length gate.
-    while len(body) > _ADVISER_COPY_MAX_LEN and "\n" in body:
-        body = "\n".join(body.splitlines()[:-1]).strip()
-    if len(body) > _ADVISER_COPY_MAX_LEN:
-        body = body[: _ADVISER_COPY_MAX_LEN - 1].rstrip() + "…"
-    return body
 
 
 def validate_adviser_copy(text: str) -> None:

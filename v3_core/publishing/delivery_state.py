@@ -297,17 +297,19 @@ class PublicationDeliveryStateRepository:
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             row = conn.execute(
-                "SELECT state FROM publication_delivery_attempts_v3 WHERE attempt_id=?",
+                "SELECT state, telegram_result_json FROM publication_delivery_attempts_v3 WHERE attempt_id=?",
                 (str(attempt_id),),
             ).fetchone()
             if row is None:
                 raise DeliveryBlocked("delivery attempt does not exist")
-            if str(row["state"]) == "sent":
+            state = str(row["state"])
+            if state in {"sent", "committed"}:
+                # Idempotent: already reconciled / finalized.
                 conn.commit()
                 return self.get(attempt_id)
-            if str(row["state"]) != "unknown":
+            if state != "unknown":
                 raise DeliveryBlocked(
-                    f"cannot reconcile {row['state']} delivery as sent; expected unknown"
+                    f"cannot reconcile {state} delivery as sent; expected unknown"
                 )
             conn.execute(
                 """UPDATE publication_delivery_attempts_v3

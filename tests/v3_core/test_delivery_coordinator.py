@@ -227,3 +227,103 @@ def test_prepare_send_blocks_package_snapshot_listing_identity_mismatch(tmp_path
     monkeypatch.setattr(packages, "verify_frozen", lambda package_id: bad)
     with pytest.raises(DeliveryBlocked, match="channel_identity_mismatch:snapshot_listing_id"):
         coordinator.prepare_send(package_id=package.package_id, channel_chat_id="-100123")
+
+
+def _seed_auto_item(db_path, *, offer_id, listing_id, package_id, state="exception", reason_code="telegram_unknown"):
+    import sqlite3
+
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            """INSERT INTO publisher_auto_items_v3
+               (offer_id, listing_id, review_id, state, reason_code, reason_text, package_id, origin)
+               VALUES (?, ?, 'REV_1', ?, ?, '发送结果待确认，禁止重复发送', ?, 'collector')""",
+            (offer_id, listing_id, state, reason_code, package_id),
+        )
+        conn.commit()
+
+
+def _auto_item(db_path, offer_id):
+    import sqlite3
+
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM publisher_auto_items_v3 WHERE offer_id=?",
+            (offer_id,),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def test_reconcile_unknown_as_sent_marks_auto_item_published_and_is_idempotent(tmp_path):
+    package, coordinator, packages, deliveries, publications = _setup(tmp_path)
+    db_path = packages.db_path
+    _seed_auto_item(
+        db_path,
+        offer_id=package.offer_id,
+        listing_id=package.listing_id,
+        package_id=package.package_id,
+    )
+    command = coordinator.prepare_send(
+        package_id=package.package_id,
+        channel_chat_id="-100123",
+    )
+    coordinator.mark_sending(command.attempt_id)
+    deliveries.mark_unknown(command.attempt_id, "Timed out")
+
+    first = coordinator.reconcile_unknown_as_sent(
+        attempt_id=command.attempt_id,
+        telegram_result=_receipt(3403),
+    )
+    assert first.attempt.state == "committed"
+    assert first.publication.channel_message_id == "3403"
+    item = _auto_item(db_path, package.offer_id)
+    assert item["state"] == "published"
+    assert item["reason_code"] == ""
+    assert item["channel_message_id"] == "3403"
+
+    second = coordinator.reconcile_unknown_as_sent(
+        attempt_id=command.attempt_id,
+        telegram_result=_receipt(3403),
+    )
+    assert second.publication.channel_message_id == "3403"
+    assert packages.get(package.package_id).status == "published"
+    with pytest.raises(DeliveryBlocked, match="already published"):
+        coordinator.prepare_send(
+            package_id=package.package_id,
+            channel_chat_id="-100123",
+        )
+
+
+def test_reconcile_unknown_as_not_sent_clears_telegram_unknown_for_retry(tmp_path):
+    package, coordinator, packages, deliveries, _publications = _setup(tmp_path)
+    db_path = packages.db_path
+    _seed_auto_item(
+        db_path,
+        offer_id=package.offer_id,
+        listing_id=package.listing_id,
+        package_id=package.package_id,
+    )
+    command = coordinator.prepare_send(
+        package_id=package.package_id,
+        channel_chat_id="-100123",
+    )
+    coordinator.mark_sending(command.attempt_id)
+    deliveries.mark_unknown(command.attempt_id, "Timed out")
+
+    unlocked = coordinator.reconcile_unknown_as_not_sent(
+        attempt_id=command.attempt_id,
+        reason="operator_confirmed_not_sent",
+    )
+    assert unlocked.state == "failed_before_send"
+    item = _auto_item(db_path, package.offer_id)
+    assert item["state"] == "queued"
+    assert item["reason_code"] == ""
+
+    # Repeat reconcile stays safe and does not create a publication.
+    again = coordinator.reconcile_unknown_as_not_sent(
+        attempt_id=command.attempt_id,
+        reason="operator_confirmed_not_sent",
+    )
+    assert again.state == "failed_before_send"
+    assert _auto_item(db_path, package.offer_id)["state"] == "queued"
+    assert packages.get(package.package_id).status == "approved"
