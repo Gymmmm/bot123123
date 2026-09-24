@@ -25,9 +25,20 @@
     </div>
   </header>
 
-  <main class="catalog">
-    <div class="catalog-heading"><div><span class="eyebrow">QIAOLIAN PROPERTY</span><h1>出售房源</h1></div><span id="count" class="count">读取中</span></div>
-    <section id="grid" class="listing-grid" aria-live="polite"></section>
+  <main>
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <span class="eyebrow">QIAOLIAN REALTY · PHNOM PENH</span>
+        <h1 id="hero-title">在金边，<br><em>找到值得拥有的房子。</em></h1>
+        <p>精选真实出售房源，照片、价格与核心信息一目了然。<br class="hero-break">从浏览到咨询，只需要一步。</p>
+        <a class="hero-cta" href="#catalog">浏览出售房源 <span aria-hidden="true">↓</span></a>
+      </div>
+      <div class="hero-note"><span>01</span><span>REAL LISTINGS<br>IN PHNOM PENH</span></div>
+    </section>
+
+    <section id="catalog" class="catalog" aria-labelledby="catalog-title">
+      <div class="catalog-heading"><div><span class="eyebrow">AVAILABLE COLLECTION</span><h2 id="catalog-title">精选出售房源</h2></div><span id="count" class="count">读取中</span></div>
+      <section id="grid" class="listing-grid" aria-live="polite"></section>
     <div id="pager" class="pager" hidden><button id="prev" type="button">上一页</button><span id="pageno"></span><button id="next" type="button">下一页</button></div>
   </main>
 
