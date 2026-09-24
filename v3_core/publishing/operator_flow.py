@@ -320,10 +320,7 @@ class OperatorPublisherAdminController(ProductionSimplePublisherAdminController)
         state["review_id"] = str(row["review_id"])
         state["mode"] = "confirm"
         if str(row["offer_type"]) != "rent":
-            self.repository.set_item(
-                str(row["offer_id"]), state="exception", reason_code="sale_store_only",
-                reason_text=ERROR_LABELS["sale_store_only"], origin="manual",
-            )
+            self.repository.mark_sale_store_only(str(row["offer_id"]), origin="manual")
             await message.reply_text(
                 "✅ 已识别为出售房源并保存。出售房源不会发布到租赁频道。",
                 reply_markup=InlineKeyboardMarkup([self.home_row()]),

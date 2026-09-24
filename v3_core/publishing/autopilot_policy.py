@@ -138,11 +138,16 @@ class ProductionAutoPublishRepository(AutoPublishRepository):
                 reason_code = "sale_store_only" if offer_type == "sale" else ""
                 reason_text = ERROR_LABELS.get(reason_code, "")
                 if existing is None:
-                    state = "exception" if reason_code else "queued"
+                    # New sale/store_only offers stay in sale data for sale-api,
+                    # but are archived out of the rent ops exception queue.
+                    if reason_code:
+                        state, ignored = "ignored", 1
+                    else:
+                        state, ignored = "queued", 0
                     conn.execute(
                         """INSERT INTO publisher_auto_items_v3
-                           (offer_id,listing_id,review_id,state,reason_code,reason_text,origin)
-                           VALUES (?,?,?,?,?,?,'collector')""",
+                           (offer_id,listing_id,review_id,state,reason_code,reason_text,ignored,origin)
+                           VALUES (?,?,?,?,?,?,?,'collector')""",
                         (
                             offer_id,
                             str(row["listing_id"]),
@@ -150,6 +155,7 @@ class ProductionAutoPublishRepository(AutoPublishRepository):
                             state,
                             reason_code,
                             reason_text,
+                            ignored,
                         ),
                     )
                 else:
@@ -157,7 +163,46 @@ class ProductionAutoPublishRepository(AutoPublishRepository):
                     current_reason = str(existing["reason_code"] or "")
                     ignored = bool(int(existing["ignored"] or 0))
                     if offer_type == "sale" and current_state != "published":
-                        state, code, text = "exception", "sale_store_only", ERROR_LABELS["sale_store_only"]
+                        # Preserve historical open sale exceptions for one-click
+                        # ignore; archive everything else as store_only.
+                        if (
+                            current_state == "exception"
+                            and current_reason == "sale_store_only"
+                            and not ignored
+                        ):
+                            state, code, text = (
+                                "exception",
+                                "sale_store_only",
+                                ERROR_LABELS["sale_store_only"],
+                            )
+                        else:
+                            state, code, text = (
+                                "ignored",
+                                "sale_store_only",
+                                ERROR_LABELS["sale_store_only"],
+                            )
+                            conn.execute(
+                                """UPDATE publisher_auto_items_v3 SET listing_id=?,review_id=?,
+                                   state=?,reason_code=?,reason_text=?,ignored=1,updated_at=CURRENT_TIMESTAMP
+                                   WHERE offer_id=?""",
+                                (
+                                    str(row["listing_id"]),
+                                    str(row["review_id"]),
+                                    state,
+                                    code,
+                                    text,
+                                    offer_id,
+                                ),
+                            )
+                            conn.execute(
+                                """INSERT INTO publisher_auto_versions_v3(offer_id,canonical_facts_hash,updated_at)
+                                   VALUES (?,?,CURRENT_TIMESTAMP)
+                                   ON CONFLICT(offer_id) DO UPDATE SET
+                                     canonical_facts_hash=excluded.canonical_facts_hash,
+                                     updated_at=CURRENT_TIMESTAMP""",
+                                (offer_id, current_token),
+                            )
+                            continue
                     elif current_state in {"published", "sending", "unknown"} or ignored:
                         state, code, text = current_state, "", ""
                     elif changed or (current_state == "exception" and current_reason == "listing_not_publishable"):

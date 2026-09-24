@@ -519,7 +519,7 @@ class SimplePublisherAdminController:
         review_id = str(row["review_id"])
         state["offer_id"], state["review_id"] = offer_id, review_id
         if str(row["offer_type"]) != "rent":
-            self.repository.set_item(offer_id, state="exception", reason_code="sale_store_only", reason_text=ERROR_LABELS["sale_store_only"], origin="manual")
+            self.repository.mark_sale_store_only(offer_id, origin="manual")
             await update.effective_message.reply_text("✅ 已识别为出售房源并保存归档。出售房源不会发布到租赁频道。", reply_markup=InlineKeyboardMarkup([self.home_row()]))
             return
         await self.prepare_manual_preview(update.effective_message, context, review_id=review_id, offer_id=offer_id)

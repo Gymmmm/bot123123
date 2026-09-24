@@ -330,27 +330,43 @@ class AutoPublishRepository:
                    WHERE o.offer_status='active' AND r.offer_id<>''"""
             ).fetchall()
             for row in rows:
-                reason_code = "sale_store_only" if str(row["offer_type"]) == "sale" else ""
-                state = "exception" if reason_code else "queued"
+                is_sale = str(row["offer_type"]) == "sale"
+                reason_code = "sale_store_only" if is_sale else ""
                 reason_text = ERROR_LABELS.get(reason_code, "")
+                # New sale offers are archived out of the rent ops queue.
+                state = "ignored" if is_sale else "queued"
+                ignored = 1 if is_sale else 0
                 conn.execute(
                     """INSERT INTO publisher_auto_items_v3
-                       (offer_id,listing_id,review_id,state,reason_code,reason_text,origin)
-                       VALUES (?,?,?,?,?,?, 'collector')
+                       (offer_id,listing_id,review_id,state,reason_code,reason_text,ignored,origin)
+                       VALUES (?,?,?,?,?,?,?,'collector')
                        ON CONFLICT(offer_id) DO UPDATE SET
                          listing_id=excluded.listing_id,review_id=excluded.review_id,
                          state=CASE
                            WHEN publisher_auto_items_v3.state='published' THEN 'published'
                            WHEN publisher_auto_items_v3.ignored=1 THEN publisher_auto_items_v3.state
-                           WHEN excluded.reason_code='sale_store_only' THEN 'exception'
+                           WHEN excluded.reason_code='sale_store_only'
+                                AND publisher_auto_items_v3.state='exception'
+                                AND publisher_auto_items_v3.reason_code='sale_store_only'
+                             THEN 'exception'
+                           WHEN excluded.reason_code='sale_store_only' THEN 'ignored'
                            WHEN publisher_auto_items_v3.state='exception' THEN publisher_auto_items_v3.state
                            ELSE 'queued' END,
+                         ignored=CASE
+                           WHEN publisher_auto_items_v3.state='published' THEN publisher_auto_items_v3.ignored
+                           WHEN publisher_auto_items_v3.ignored=1 THEN 1
+                           WHEN excluded.reason_code='sale_store_only'
+                                AND publisher_auto_items_v3.state='exception'
+                                AND publisher_auto_items_v3.reason_code='sale_store_only'
+                             THEN 0
+                           WHEN excluded.reason_code='sale_store_only' THEN 1
+                           ELSE publisher_auto_items_v3.ignored END,
                          reason_code=CASE WHEN excluded.reason_code<>'' THEN excluded.reason_code ELSE publisher_auto_items_v3.reason_code END,
                          reason_text=CASE WHEN excluded.reason_text<>'' THEN excluded.reason_text ELSE publisher_auto_items_v3.reason_text END,
                          updated_at=CURRENT_TIMESTAMP""",
                     (
                         str(row["offer_id"]), str(row["listing_id"]), str(row["review_id"]),
-                        state, reason_code, reason_text,
+                        state, reason_code, reason_text, ignored,
                     ),
                 )
             conn.commit()
@@ -423,6 +439,26 @@ class AutoPublishRepository:
             conn.execute(
                 "UPDATE publisher_auto_items_v3 SET ignored=1,state='ignored',updated_at=CURRENT_TIMESTAMP WHERE offer_id=?",
                 (str(offer_id),),
+            )
+            conn.commit()
+
+    def mark_sale_store_only(self, offer_id: str, *, origin: str | None = None) -> None:
+        """Archive a sale/store_only offer out of the rent ops exception queue.
+
+        Sale data and sale-api visibility are unchanged; only Publisher queue
+        classification is adjusted so operators are not asked to handle it.
+        """
+        with self._connect() as conn:
+            conn.execute(
+                """UPDATE publisher_auto_items_v3
+                      SET state='ignored',
+                          ignored=1,
+                          reason_code='sale_store_only',
+                          reason_text=?,
+                          origin=COALESCE(?, origin),
+                          updated_at=CURRENT_TIMESTAMP
+                    WHERE offer_id=?""",
+                (ERROR_LABELS["sale_store_only"], origin, str(offer_id)),
             )
             conn.commit()
 
@@ -683,6 +719,10 @@ class AutoPublishService:
         return list(dict.fromkeys(blocking))
 
     def _mark_exception(self, offer_id: str, code: str) -> AutoPublishResult:
+        if code == "sale_store_only":
+            self.repository.mark_sale_store_only(offer_id)
+            text = ERROR_LABELS.get(code, code)
+            return AutoPublishResult("store_only", offer_id=offer_id, reason_code=code, reason_text=text)
         text = ERROR_LABELS.get(code, code)
         self.repository.set_item(offer_id, state="exception", reason_code=code, reason_text=text)
         return AutoPublishResult("exception", offer_id=offer_id, reason_code=code, reason_text=text)

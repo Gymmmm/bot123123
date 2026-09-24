@@ -88,18 +88,27 @@ class FinalAutoPublishRepository(ProductionAutoPublishRepository):
                     )
                     continue
                 reason = self._no_offer_reason(dict(row), dict(row))
+                # Sale/store_only is not a rent ops exception: keep a record but
+                # auto-archive so operators are not asked to handle it.
+                ignored_flag = 1 if reason == "sale_store_only" else 0
                 conn.execute(
                     """INSERT INTO publisher_review_exceptions_v3
-                       (review_id,listing_id,reason_code,reason_text,resolved,updated_at)
-                       VALUES (?,?,?,?,0,CURRENT_TIMESTAMP)
+                       (review_id,listing_id,reason_code,reason_text,ignored,resolved,updated_at)
+                       VALUES (?,?,?,?,?,0,CURRENT_TIMESTAMP)
                        ON CONFLICT(review_id) DO UPDATE SET
                          listing_id=excluded.listing_id,reason_code=excluded.reason_code,
-                         reason_text=excluded.reason_text,resolved=0,updated_at=CURRENT_TIMESTAMP""",
+                         reason_text=excluded.reason_text,
+                         ignored=CASE
+                           WHEN excluded.reason_code='sale_store_only' THEN 1
+                           ELSE publisher_review_exceptions_v3.ignored
+                         END,
+                         resolved=0,updated_at=CURRENT_TIMESTAMP""",
                     (
                         review_id,
                         str(row["listing_id"]),
                         reason,
                         ERROR_LABELS.get(reason, reason),
+                        ignored_flag,
                     ),
                 )
             if seen:

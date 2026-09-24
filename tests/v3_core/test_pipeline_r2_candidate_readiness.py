@@ -62,6 +62,9 @@ class FakeRepo:
     def set_item(self, offer_id, *, state, reason_code="", reason_text="", **kwargs):
         self.items.append((offer_id, state, reason_code, reason_text))
 
+    def mark_sale_store_only(self, offer_id, *, origin=None):
+        self.items.append((offer_id, "ignored", "sale_store_only", "出售房源仅保存"))
+
     def set_offer_readiness(self, offer_id, *, publishable, block_reason=""):
         self.readiness.append((offer_id, bool(publishable), block_reason))
 
@@ -163,8 +166,10 @@ def test_insufficient_and_unreadable_media_fail(tmp_path):
 
 def test_sale_only_fails(tmp_path):
     result, workflow, repo = _run(tmp_path, item=_item(offer_type="sale"), facts={**_facts(), "deal_type": "sale"})
+    assert result.status == "store_only"
     assert result.reason_code == "sale_store_only"
     assert repo.readiness[-1] == ("OFF_1", False, "sale_store_only")
+    assert repo.items[-1][:3] == ("OFF_1", "ignored", "sale_store_only")
 
 
 def test_existing_publication_does_not_reenter_pending(tmp_path):
