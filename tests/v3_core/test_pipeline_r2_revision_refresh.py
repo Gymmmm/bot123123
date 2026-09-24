@@ -76,7 +76,7 @@ def test_old_revision_reenters_worker_and_manual_override_is_reapplied(tmp_path)
     listing = reader.listing("l_271")
     refreshed = reader.canonical(str(listing["canonical_record_id"]))
     facts = refreshed["facts"]
-    assert refreshed["parser_revision"] == PARSER_REVISION == "v1.3"
+    assert refreshed["parser_revision"] == PARSER_REVISION == "v1.4"
     assert facts["project_name"] == "The Peak 香格里拉"
     assert facts["monthly_rent_usd"] == 1100
     assert facts["layout"] == "2+1"

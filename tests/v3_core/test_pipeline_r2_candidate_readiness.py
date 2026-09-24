@@ -2,6 +2,7 @@ import asyncio
 from pathlib import Path
 from types import SimpleNamespace
 
+from v3_core.inventory.canonical_facts import PARSER_REVISION
 from v3_core.publishing.autopilot_policy import ProductionAutoPublishService
 
 
@@ -216,7 +217,7 @@ def test_sync_candidates_recovers_only_stale_listing_not_publishable(tmp_path):
     )
     facts = {
         "schema_version": "canonical_facts.v1",
-        "parser_revision": "v1.3",
+        "parser_revision": PARSER_REVISION,
         "canonical_facts_hash": "r2-facts-hash",
         "deal_type": "rent",
         "project_name": "富力城",

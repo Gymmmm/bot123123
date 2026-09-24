@@ -7,7 +7,7 @@ def _parse(raw: str):
 
 
 def test_r2_advances_parser_revision():
-    assert PARSER_REVISION == "v1.3"
+    assert PARSER_REVISION == "v1.4"
 
 
 def test_real_l267_l268_compact_labelled_layouts_are_extracted_without_guesses():
