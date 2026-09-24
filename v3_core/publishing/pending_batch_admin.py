@@ -75,10 +75,18 @@ class PendingBatchOperatorPublisherAdminController(OperatorPublisherAdminControl
                                AND o.offer_status='active'
                                AND o.publication_policy='telegram_rent'
                                AND COALESCE(o.publishable,0)=1
-                             ORDER BY o.rowid DESC LIMIT 1) AS monthly_rent_usd
+                             ORDER BY o.rowid DESC LIMIT 1) AS monthly_rent_usd,
+                           CASE
+                             WHEN EXISTS (
+                               SELECT 1 FROM publication_packages_v3 pp
+                                WHERE pp.listing_id=l.listing_id
+                                  AND pp.status IN ('approved','package_ready')
+                             ) THEN 0
+                             ELSE 1
+                           END AS package_priority
                       FROM listings_v3 l
                      WHERE {_PENDING_ELIGIBLE_WHERE}
-                     ORDER BY l.updated_at ASC,l.listing_id ASC
+                     ORDER BY package_priority ASC, l.updated_at ASC, l.listing_id ASC
                      LIMIT ? OFFSET ?""",
                 (PENDING_BATCH_SIZE, offset),
             ).fetchall()

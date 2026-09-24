@@ -135,18 +135,33 @@ class FinalAutoPublishRepository(ProductionAutoPublishRepository):
             )
         return auto_count + review_count
 
-    def exception_rows(self, *, limit: int = 20) -> list[dict[str, Any]]:
+    def exception_rows(
+        self, *, limit: int = 20, reason_code: str | None = None
+    ) -> list[dict[str, Any]]:
         self.sync_review_exceptions()
-        rows = list(super().exception_rows(limit=limit))
+        code = str(reason_code or "").strip()
+        rows = list(super().exception_rows(limit=limit, reason_code=code or None))
+        review_where = "e.resolved=0 AND e.ignored=0"
+        review_params: list[Any] = []
+        if code and code != "all":
+            if code == "other":
+                review_where += (
+                    " AND e.reason_code NOT IN "
+                    "('sale_store_only','missing_location','canonical_error')"
+                )
+            else:
+                review_where += " AND e.reason_code=?"
+                review_params.append(code)
+        review_params.append(max(1, int(limit)))
         with self._connect() as conn:
             extra = conn.execute(
-                """SELECT e.review_id,e.listing_id,e.reason_code,e.reason_text,e.updated_at,
+                f"""SELECT e.review_id,e.listing_id,e.reason_code,e.reason_text,e.updated_at,
                           l.public_listing_id,l.display_title,l.project_name
                    FROM publisher_review_exceptions_v3 e
                    JOIN listings_v3 l ON l.listing_id=e.listing_id
-                   WHERE e.resolved=0 AND e.ignored=0
+                   WHERE {review_where}
                    ORDER BY e.updated_at DESC LIMIT ?""",
-                (max(1, int(limit)),),
+                review_params,
             ).fetchall()
         for row in extra:
             item = dict(row)
@@ -155,6 +170,25 @@ class FinalAutoPublishRepository(ProductionAutoPublishRepository):
         rows.sort(key=lambda value: str(value.get("updated_at") or ""), reverse=True)
         return rows[: max(1, int(limit))]
 
+    def exception_counts_by_reason(self) -> dict[str, int]:
+        self.sync_review_exceptions()
+        counts = super().exception_counts_by_reason()
+        with self._connect() as conn:
+            rows = conn.execute(
+                """SELECT reason_code, COUNT(*) AS c
+                     FROM publisher_review_exceptions_v3
+                    WHERE resolved=0 AND ignored=0
+                    GROUP BY reason_code"""
+            ).fetchall()
+        for row in rows:
+            code = str(row["reason_code"] or "")
+            amount = int(row["c"] or 0)
+            if code in {"sale_store_only", "missing_location", "canonical_error"}:
+                counts[code] = int(counts.get(code, 0)) + amount
+            else:
+                counts["other"] = int(counts.get("other", 0)) + amount
+            counts["all"] = int(counts.get("all", 0)) + amount
+        return counts
     def review_exception_detail(self, token: str) -> dict[str, Any]:
         review_id = str(token).removeprefix("review:")
         self.sync_review_exceptions()

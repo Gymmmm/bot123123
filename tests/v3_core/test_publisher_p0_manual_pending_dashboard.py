@@ -360,6 +360,8 @@ async def test_dashboard_pending_uses_existing_eligible_ten_at_a_time_queue(tmp_
     pending_label = next(label for label in labels if label.startswith("🔵 待确认 "))
     assert pending_label == "🔵 待确认 11｜10套一组"
     assert "🔵 待确认 17" not in labels
+    assert any(label.startswith("⚠️ 待处理异常") for label in labels)
+    assert "v3smp|exceptions|all" in callbacks
     assert callbacks[0] == "v3smp|pbat|0"
 
     first = controller._pending_batch_rows(0)

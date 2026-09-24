@@ -233,19 +233,64 @@ class SimplePublisherAdminController:
             reply_markup=InlineKeyboardMarkup(rows),
         )
 
-    async def show_exceptions(self, message: Any) -> None:
-        rows = self.repository.exception_rows(limit=20)
-        buttons: list[list[InlineKeyboardButton]] = []
+    _EXCEPTION_TABS = (
+        ("all", "全部"),
+        ("sale_store_only", "出售"),
+        ("missing_location", "缺位置"),
+        ("canonical_error", "规范错"),
+        ("other", "其他"),
+    )
+
+    async def show_exceptions(self, message: Any, reason_code: str = "all") -> None:
+        code = str(reason_code or "all").strip() or "all"
+        if code not in {key for key, _ in self._EXCEPTION_TABS}:
+            code = "all"
+        counts = self.repository.exception_counts_by_reason()
+        rows = self.repository.exception_rows(
+            limit=20, reason_code=None if code == "all" else code
+        )
+        tab_row: list[InlineKeyboardButton] = []
+        for key, label in self._EXCEPTION_TABS:
+            count = int(counts.get(key, 0) or 0)
+            mark = "·" if key == code else ""
+            tab_row.append(
+                InlineKeyboardButton(
+                    f"{mark}{label} {count}".strip()[:18],
+                    callback_data=f"v3smp|exceptions|{key}",
+                )
+            )
+        # Telegram max 8 buttons/row — split into two rows of tabs
+        buttons: list[list[InlineKeyboardButton]] = [tab_row[:3], tab_row[3:]]
+        buttons = [row for row in buttons if row]
         for row in rows:
             public_id = str(row.get("public_listing_id") or "房源")
-            reason = str(row.get("reason_text") or ERROR_LABELS.get(str(row.get("reason_code") or ""), "异常"))
-            buttons.append([
-                InlineKeyboardButton(f"{public_id} · {reason}"[:58], callback_data=f"v3smp|exception|{row['offer_id']}")
-            ])
-        buttons.append([InlineKeyboardButton("⬅️ 返回房源状态", callback_data="v3smp|listings")])
+            reason = str(
+                row.get("reason_text")
+                or ERROR_LABELS.get(str(row.get("reason_code") or ""), "异常")
+            )
+            buttons.append(
+                [
+                    InlineKeyboardButton(
+                        f"{public_id} · {reason}"[:58],
+                        callback_data=f"v3smp|exception|{row['offer_id']}",
+                    )
+                ]
+            )
+        if code == "sale_store_only" and int(counts.get("sale_store_only", 0) or 0) > 0:
+            buttons.append(
+                [
+                    InlineKeyboardButton(
+                        f"✅ 一键忽略全部出售 ({counts['sale_store_only']})",
+                        callback_data="v3smp|ignore_reason|sale_store_only",
+                    )
+                ]
+            )
+        buttons.append([InlineKeyboardButton("⬅️ 返回房态管理", callback_data="v3smp|listings")])
         buttons.append(self.home_row())
+        title = dict(self._EXCEPTION_TABS).get(code, "全部")
         await message.reply_text(
-            "<b>待处理异常</b>\n\n" + ("请选择房源：" if rows else "当前没有异常房源。"),
+            f"<b>待处理异常 · {escape(title)}</b>\n\n"
+            + ("请选择房源：" if rows else "当前没有这类异常。"),
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(buttons),
         )
@@ -269,23 +314,43 @@ class SimplePublisherAdminController:
 
     async def show_exception(self, message: Any, offer_id: str) -> None:
         row = self._exception_detail(offer_id)
-        reason = str(row.get("reason_text") or ERROR_LABELS.get(str(row.get("reason_code") or ""), "异常"))
+        reason_code = str(row.get("reason_code") or "")
+        reason = str(row.get("reason_text") or ERROR_LABELS.get(reason_code, "异常"))
+        review_id = str(row.get("review_id") or "")
+        actions: list[list[InlineKeyboardButton]] = []
+        # Fixable blockers: put 补资料 first
+        if reason_code in {"missing_location", "canonical_error", "missing_rent", "missing_listing_info"} and review_id:
+            actions.append(
+                [InlineKeyboardButton("📝 补充或修改资料", callback_data=f"v3edit|{review_id}")]
+            )
+        actions.append([InlineKeyboardButton("查看原始房源", callback_data=f"v3smp|raw|{offer_id}")])
+        if review_id and reason_code not in {"missing_location", "canonical_error", "missing_rent", "missing_listing_info"}:
+            actions.append(
+                [InlineKeyboardButton("补充或修改资料", callback_data=f"v3edit|{review_id}")]
+            )
+        if reason_code in {"unreadable_media", "insufficient_media"}:
+            actions.append(
+                [InlineKeyboardButton("补充图片", callback_data=f"v3smp|addmedia|{offer_id}")]
+            )
+        elif reason_code != "sale_store_only":
+            actions.append(
+                [InlineKeyboardButton("补充图片", callback_data=f"v3smp|addmedia|{offer_id}")]
+            )
+        actions.append([InlineKeyboardButton("标记忽略", callback_data=f"v3smp|ignore|{offer_id}")])
+        if reason_code != "sale_store_only":
+            actions.append(
+                [InlineKeyboardButton("重新检查并发布", callback_data=f"v3smp|recheck|{offer_id}")]
+            )
+        actions.append(
+            [InlineKeyboardButton("⬅️ 返回异常列表", callback_data=f"v3smp|exceptions|{reason_code or 'all'}")]
+        )
+        actions.append(self.home_row())
         await message.reply_text(
             f"<b>{escape(str(row.get('public_listing_id') or '异常房源'))}</b>\n"
             f"{escape(str(row.get('display_title') or '未命名房源'))}\n\n"
             f"原因：<b>{escape(reason)}</b>",
             parse_mode=ParseMode.HTML,
-            reply_markup=InlineKeyboardMarkup(
-                [
-                    [InlineKeyboardButton("查看原始房源", callback_data=f"v3smp|raw|{offer_id}")],
-                    [InlineKeyboardButton("补充或修改资料", callback_data=f"v3edit|{row['review_id']}")],
-                    [InlineKeyboardButton("补充图片", callback_data=f"v3smp|addmedia|{offer_id}")],
-                    [InlineKeyboardButton("标记忽略", callback_data=f"v3smp|ignore|{offer_id}")],
-                    [InlineKeyboardButton("重新检查并发布", callback_data=f"v3smp|recheck|{offer_id}")],
-                    [InlineKeyboardButton("⬅️ 返回异常列表", callback_data="v3smp|exceptions")],
-                    self.home_row(),
-                ]
-            ),
+            reply_markup=InlineKeyboardMarkup(actions),
         )
 
     async def show_raw(self, message: Any, offer_id: str) -> None:
@@ -596,7 +661,8 @@ class SimplePublisherAdminController:
         elif action == "listing" and len(parts) == 3:
             await self.show_listing(query.message, parts[2])
         elif action == "exceptions":
-            await self.show_exceptions(query.message)
+            reason = parts[2] if len(parts) >= 3 else "all"
+            await self.show_exceptions(query.message, reason)
         elif action == "exception" and len(parts) == 3:
             await self.show_exception(query.message, parts[2])
         elif action == "raw" and len(parts) == 3:
@@ -604,6 +670,24 @@ class SimplePublisherAdminController:
         elif action == "ignore" and len(parts) == 3:
             self.repository.ignore(parts[2])
             await query.message.reply_text("✅ 已忽略该异常房源。", reply_markup=InlineKeyboardMarkup([self.home_row()]))
+        elif action == "ignore_reason" and len(parts) == 3:
+            try:
+                ignored = int(self.repository.ignore_by_reason(parts[2]) or 0)
+            except ValueError:
+                await query.message.reply_text(
+                    "该类异常不能一键忽略。",
+                    reply_markup=InlineKeyboardMarkup([self.home_row()]),
+                )
+            else:
+                await query.message.reply_text(
+                    f"✅ 已忽略 {ignored} 条出售异常。",
+                    reply_markup=InlineKeyboardMarkup(
+                        [
+                            [InlineKeyboardButton("⬅️ 返回异常列表", callback_data="v3smp|exceptions|all")],
+                            self.home_row(),
+                        ]
+                    ),
+                )
         elif action == "addmedia" and len(parts) == 3:
             await self.append_exception_media(query.message, context, parts[2])
         elif action == "recheck" and len(parts) == 3:

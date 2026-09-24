@@ -24,12 +24,15 @@ class PublisherInventoryDashboardController(PublisherInventoryAdminController):
 
     async def show_listing_categories(self, message: Any) -> None:
         c = self._inventory_counts()
+        repo = getattr(self, "repository", None)
+        exception_count = int(repo.exception_count() or 0) if repo is not None else 0
         lines = [
             "<b>🔵 房态工作台</b>",
             "",
             "<b>今天先处理</b>",
             f"🔵 待确认 {c['pending']}｜10套一组　　⏰ 超3天 {c['overdue']}",
             f"🟡 已有预约 {c['reserved']}　　🆕 今日发布 {c['today']}",
+            f"⚠️ 待处理异常 {exception_count}",
             "",
             "<b>当前库存</b>",
             f"🟢 可预约 {c['active']}　　🔴 已租出 {c['rented']}　　⚫ 已下架 {c['offline']}",
@@ -49,6 +52,12 @@ class PublisherInventoryDashboardController(PublisherInventoryAdminController):
                         InlineKeyboardButton(
                             f"🔵 处理待确认 {c['pending']}｜10套一组",
                             callback_data="v3smp|pbat|0",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            f"⚠️ 待处理异常 ({exception_count})",
+                            callback_data="v3smp|exceptions|all",
                         )
                     ],
                     [

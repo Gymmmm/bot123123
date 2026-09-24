@@ -426,18 +426,70 @@ class AutoPublishRepository:
             )
             conn.commit()
 
-    def exception_rows(self, *, limit: int = 20) -> list[dict[str, Any]]:
+    def ignore_by_reason(self, reason_code: str) -> int:
+        """Bulk-ignore open exceptions for one reason (safe ops cleanup)."""
+        code = str(reason_code or "").strip()
+        if code != "sale_store_only":
+            raise ValueError(f"bulk_ignore_not_allowed:{code}")
+        with self._connect() as conn:
+            cur = conn.execute(
+                """UPDATE publisher_auto_items_v3
+                      SET ignored=1,state='ignored',updated_at=CURRENT_TIMESTAMP
+                    WHERE state='exception' AND ignored=0 AND reason_code=?""",
+                (code,),
+            )
+            conn.commit()
+            return int(cur.rowcount or 0)
+
+    def exception_rows(
+        self, *, limit: int = 20, reason_code: str | None = None
+    ) -> list[dict[str, Any]]:
+        code = str(reason_code or "").strip()
+        where = "a.state='exception' AND a.ignored=0"
+        params: list[Any] = []
+        if code and code != "all":
+            if code == "other":
+                where += (
+                    " AND a.reason_code NOT IN "
+                    "('sale_store_only','missing_location','canonical_error')"
+                )
+            else:
+                where += " AND a.reason_code=?"
+                params.append(code)
+        params.append(max(1, int(limit)))
         with self._connect() as conn:
             rows = conn.execute(
-                """SELECT a.*,l.public_listing_id,l.display_title,l.project_name,o.monthly_rent_usd
+                f"""SELECT a.*,l.public_listing_id,l.display_title,l.project_name,o.monthly_rent_usd
                    FROM publisher_auto_items_v3 a
                    JOIN listings_v3 l ON l.listing_id=a.listing_id
                    JOIN listing_offers o ON o.offer_id=a.offer_id
-                   WHERE a.state='exception' AND a.ignored=0
+                   WHERE {where}
                    ORDER BY a.updated_at DESC LIMIT ?""",
-                (max(1, int(limit)),),
+                params,
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def exception_counts_by_reason(self) -> dict[str, int]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """SELECT reason_code, COUNT(*) AS c
+                     FROM publisher_auto_items_v3
+                    WHERE state='exception' AND ignored=0
+                    GROUP BY reason_code"""
+            ).fetchall()
+        raw = {str(row["reason_code"] or ""): int(row["c"] or 0) for row in rows}
+        counts = {
+            "sale_store_only": int(raw.get("sale_store_only", 0)),
+            "missing_location": int(raw.get("missing_location", 0)),
+            "canonical_error": int(raw.get("canonical_error", 0)),
+        }
+        counts["other"] = sum(
+            count
+            for code, count in raw.items()
+            if code not in {"sale_store_only", "missing_location", "canonical_error"}
+        )
+        counts["all"] = sum(raw.values())
+        return counts
 
     def queue_count(self) -> int:
         with self._connect() as conn:
@@ -446,7 +498,6 @@ class AutoPublishRepository:
     def exception_count(self) -> int:
         with self._connect() as conn:
             return int(conn.execute("SELECT COUNT(*) FROM publisher_auto_items_v3 WHERE state='exception' AND ignored=0").fetchone()[0])
-
     def acquire_lock(self, owner: str, *, ttl_seconds: int = 180) -> bool:
         now = datetime.now(timezone.utc)
         until = now + timedelta(seconds=max(30, int(ttl_seconds)))
