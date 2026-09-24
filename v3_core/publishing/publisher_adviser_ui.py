@@ -211,20 +211,15 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
             await asyncio.to_thread(self.workflow.approve_review, review_id=review_id, operator_user_id="system:manual_preview")
 
         original_status = str(detail.listing.get("inventory_status") or "pending")
-        preview_status_changed = original_status == "pending"
-        if preview_status_changed:
-            self.repository.set_listing_status(str(detail.listing["listing_id"]), "active")
-        try:
-            package = await asyncio.to_thread(
-                self.workflow.build_package_for_review,
-                review_id=review_id,
-                cover_style=effective_style,
-                manual_cover_path=cover_path,
-                adviser_copy_override=self._adviser_override(state),
-            )
-        finally:
-            if preview_status_changed:
-                self.repository.mark_listing_pending_for_auto_publish(str(detail.listing["listing_id"]))
+        status_override = "active" if original_status == "pending" else None
+        package = await asyncio.to_thread(
+            self.workflow.build_package_for_review,
+            review_id=review_id,
+            cover_style=effective_style,
+            manual_cover_path=cover_path,
+            adviser_copy_override=self._adviser_override(state),
+            inventory_status_override=status_override,
+        )
 
         self.repository.set_item(offer_id, state="preview_ready", package_id=package.package_id, origin="manual")
         state["package_id"] = package.package_id
@@ -247,6 +242,101 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
                     [InlineKeyboardButton("⬅️ 返回资料确认", callback_data="v3smp|manual_back_confirm")],
                 ]),
             )
+
+    def _preview_ready_rows(self, *, limit: int = 10) -> list[dict[str, Any]]:
+        import sqlite3
+
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """SELECT a.offer_id,a.package_id,a.listing_id,a.updated_at,
+                          l.public_listing_id,l.display_title,p.status AS package_status
+                   FROM publisher_auto_items_v3 a
+                   LEFT JOIN listings_v3 l ON l.listing_id=a.listing_id
+                   LEFT JOIN publication_packages_v3 p ON p.package_id=a.package_id
+                   WHERE a.state='preview_ready' AND a.ignored=0
+                     AND COALESCE(a.package_id,'')<>''
+                   ORDER BY a.updated_at DESC LIMIT ?""",
+                (max(1, int(limit)),),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def _preview_ready_package(self, offer_id: str) -> tuple[str, str]:
+        import sqlite3
+
+        with sqlite3.connect(self.db_path) as conn:
+            row = conn.execute(
+                """SELECT package_id, offer_id FROM publisher_auto_items_v3
+                   WHERE offer_id=? AND state='preview_ready' AND ignored=0
+                     AND COALESCE(package_id,'')<>'' LIMIT 1""",
+                (str(offer_id),),
+            ).fetchone()
+        if row is None:
+            raise ValueError("preview_ready_not_found")
+        return str(row[0]), str(row[1])
+
+    async def show_preview_ready(self, message: Any) -> None:
+        rows = self._preview_ready_rows()
+        if not rows:
+            await message.reply_text(
+                "<b>📤 待确认发布</b>\n\n当前没有可继续发布的预览包。",
+                parse_mode=ParseMode.HTML,
+                reply_markup=InlineKeyboardMarkup([self.home_row()]),
+            )
+            return
+        lines = ["<b>📤 待确认发布</b>", "", "这些预览已冻结在库里，即使会话丢失也可直接发布。", ""]
+        buttons: list[list[InlineKeyboardButton]] = []
+        for row in rows:
+            public_id = str(row.get("public_listing_id") or row.get("listing_id") or "房源")
+            title = str(row.get("display_title") or "")
+            label = " · ".join(value for value in (public_id, title) if value)[:58]
+            offer_id = str(row.get("offer_id") or "")
+            callback = f"v3smp|prsend|{offer_id}"
+            if len(callback.encode("utf-8")) > 64:
+                continue
+            lines.append(f"• {escape(public_id)}｜包状态 {escape(str(row.get('package_status') or ''))}")
+            buttons.append([InlineKeyboardButton(f"📤 {label}", callback_data=callback)])
+        if not buttons:
+            lines.append("当前记录的 offer id 过长，请重新生成预览后再发。")
+        buttons.append(self.home_row())
+        await message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(buttons))
+
+    async def _deliver_preview_package(self, message: Any, context: Any, *, package_id: str, offer_id: str) -> None:
+        package = self.workflow.package(package_id)
+        status = str(getattr(package, "status", "") or "")
+        if status == "package_ready" or not status:
+            package = await asyncio.to_thread(
+                self.workflow.approve_package,
+                package_id=package_id,
+                approved_by="system:manual_publish",
+            )
+        elif status != "approved":
+            raise ValueError(f"package_not_publishable:{status}")
+        if str(getattr(package, "offer_id", "") or "") != str(offer_id):
+            raise ValueError("preview_offer_package_mismatch")
+        result = await deliver_approved_package(
+            coordinator=self.workflow.delivery,
+            adapter=TelegramChannelAdapter(context.bot),
+            package_id=str(getattr(package, "package_id", package_id)),
+            channel_chat_id=self.channel_chat_id,
+            inventory_status_override="active",
+        )
+        listing_id = str(getattr(package, "listing_id", "") or "")
+        if listing_id:
+            self.repository.set_listing_status(listing_id, "active")
+        self.repository.set_item(
+            offer_id,
+            state="published",
+            package_id=str(getattr(package, "package_id", package_id)),
+            channel_message_id=str(result.publication.channel_message_id),
+            origin="manual",
+        )
+        context.user_data.pop(NEW_LISTING_STATE_KEY, None)
+        await message.reply_text(
+            f"✅ 已发布到频道。频道消息：{escape(str(result.publication.channel_message_id))}",
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup([self.home_row()]),
+        )
 
     async def handle_text(self, update: Any, context: Any) -> bool:
         edit = context.user_data.get(SIMPLE_EDIT_STATE_KEY)
@@ -315,6 +405,30 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
             context.user_data.pop(SIMPLE_EDIT_STATE_KEY, None)
             await self.show_manual_confirmation(query.message, context)
             return True
+        if raw == "v3smp|preview_ready":
+            await self.show_preview_ready(query.message)
+            return True
+        if len(parts) == 3 and parts[1] == "prsend":
+            try:
+                package_id, offer_id = self._preview_ready_package(parts[2])
+                await self._deliver_preview_package(
+                    query.message,
+                    context,
+                    package_id=package_id,
+                    offer_id=offer_id,
+                )
+            except Exception as exc:
+                await query.message.reply_text(
+                    "发布失败：\n" + escape(type(exc).__name__ + ": " + str(exc)),
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=InlineKeyboardMarkup(
+                        [
+                            [InlineKeyboardButton("📤 待确认发布", callback_data="v3smp|preview_ready")],
+                            self.home_row(),
+                        ]
+                    ),
+                )
+            return True
         if raw in {"v3smp|manual_send", "v3smp|manual_cover", "v3smp|manual_templates"} or (len(parts) == 3 and parts[1] in {"manual_style", "manual_cover_pick"}):
             state = context.user_data.get(NEW_LISTING_STATE_KEY)
             current_package = str(state.get("package_id") or "") if isinstance(state, dict) else ""
@@ -336,8 +450,13 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
                     valid_session = False
             if not valid_session:
                 await query.message.reply_text(
-                    "⚠️ 这张预览已经失效。侨联说或资料有过调整，请重新生成预览后再发布。",
-                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("👀 重新生成预览", callback_data="v3smp|manual_preview")]]),
+                    "⚠️ 这张预览已经失效。可从「待确认发布」继续，或重新生成预览。",
+                    reply_markup=InlineKeyboardMarkup(
+                        [
+                            [InlineKeyboardButton("📤 待确认发布", callback_data="v3smp|preview_ready")],
+                            [InlineKeyboardButton("👀 重新生成预览", callback_data="v3smp|manual_preview")],
+                        ]
+                    ),
                 )
                 return True
             if raw == "v3smp|manual_cover":
@@ -371,25 +490,21 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
             if len(parts) == 3 and parts[1] == "manual_style":
                 await self.prepare_manual_preview(query.message, context, review_id=current_review, offer_id=current_offer, style=parts[2])
                 return True
-
-            package = await asyncio.to_thread(self.workflow.approve_package, package_id=current_package, approved_by="system:manual_publish")
-            result = await deliver_approved_package(
-                coordinator=self.workflow.delivery,
-                adapter=TelegramChannelAdapter(context.bot),
-                package_id=package.package_id,
-                channel_chat_id=self.channel_chat_id,
-                inventory_status_override="active",
-            )
-            listing_id = str(state.get("listing_id") or package.listing_id) if isinstance(state, dict) else str(package.listing_id)
-            if listing_id:
-                self.repository.set_listing_status(listing_id, "active")
-            self.repository.set_item(current_offer, state="published", package_id=package.package_id, channel_message_id=str(result.publication.channel_message_id), origin="manual")
-            context.user_data.pop(NEW_LISTING_STATE_KEY, None)
-            await query.message.reply_text(
-                f"✅ 已发布到频道。频道消息：{escape(str(result.publication.channel_message_id))}",
-                parse_mode=ParseMode.HTML,
-                reply_markup=InlineKeyboardMarkup([self.home_row()]),
-            )
+            if raw == "v3smp|manual_send":
+                try:
+                    await self._deliver_preview_package(
+                        query.message,
+                        context,
+                        package_id=current_package,
+                        offer_id=current_offer,
+                    )
+                except Exception as exc:
+                    await query.message.reply_text(
+                        "发布失败：\n" + escape(type(exc).__name__ + ": " + str(exc)),
+                        parse_mode=ParseMode.HTML,
+                        reply_markup=InlineKeyboardMarkup([self.home_row()]),
+                    )
+                return True
             return True
         return await super().handle_callback(update, context)
 

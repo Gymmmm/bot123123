@@ -288,6 +288,70 @@ class PublicationDeliveryStateRepository:
         )
         return self.get(attempt_id)
 
+    def reconcile_unknown_as_sent(
+        self, attempt_id: str, telegram_result: dict[str, Any]
+    ) -> DeliveryAttempt:
+        """Operator confirms the channel post exists; store receipt without resending."""
+        result = validate_result(telegram_result)
+        receipt = json.dumps(result, ensure_ascii=False, sort_keys=True)
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute(
+                "SELECT state FROM publication_delivery_attempts_v3 WHERE attempt_id=?",
+                (str(attempt_id),),
+            ).fetchone()
+            if row is None:
+                raise DeliveryBlocked("delivery attempt does not exist")
+            if str(row["state"]) == "sent":
+                conn.commit()
+                return self.get(attempt_id)
+            if str(row["state"]) != "unknown":
+                raise DeliveryBlocked(
+                    f"cannot reconcile {row['state']} delivery as sent; expected unknown"
+                )
+            conn.execute(
+                """UPDATE publication_delivery_attempts_v3
+                   SET state='sent',
+                       telegram_result_json=?,
+                       error_message='',
+                       sent_at=CURRENT_TIMESTAMP,
+                       updated_at=CURRENT_TIMESTAMP
+                 WHERE attempt_id=?""",
+                (receipt, str(attempt_id)),
+            )
+            conn.commit()
+        return self.get(attempt_id)
+
+    def reconcile_unknown_as_not_sent(self, attempt_id: str, reason: str) -> DeliveryAttempt:
+        """Operator confirms nothing was posted; unlock a safe retry path."""
+        note = str(reason or "reconciled_not_sent")[:2000]
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute(
+                "SELECT state FROM publication_delivery_attempts_v3 WHERE attempt_id=?",
+                (str(attempt_id),),
+            ).fetchone()
+            if row is None:
+                raise DeliveryBlocked("delivery attempt does not exist")
+            if str(row["state"]) == "failed_before_send":
+                conn.commit()
+                return self.get(attempt_id)
+            if str(row["state"]) != "unknown":
+                raise DeliveryBlocked(
+                    f"cannot reconcile {row['state']} delivery as not sent; expected unknown"
+                )
+            conn.execute(
+                """UPDATE publication_delivery_attempts_v3
+                   SET state='failed_before_send',
+                       telegram_result_json='',
+                       error_message=?,
+                       updated_at=CURRENT_TIMESTAMP
+                 WHERE attempt_id=?""",
+                (note, str(attempt_id)),
+            )
+            conn.commit()
+        return self.get(attempt_id)
+
 
 __all__ = [
     "DDL",

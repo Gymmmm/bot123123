@@ -77,7 +77,10 @@ class OperatorPublisherAdminController(ProductionSimplePublisherAdminController)
                     InlineKeyboardButton("🔵 房态管理", callback_data="v3smp|listings"),
                     InlineKeyboardButton("📡 采集源", callback_data="v3smp|sources"),
                 ],
-                [InlineKeyboardButton("📚 发布记录", callback_data="v3smp|logs")],
+                [
+                    InlineKeyboardButton("📤 待确认发布", callback_data="v3smp|preview_ready"),
+                    InlineKeyboardButton("📚 发布记录", callback_data="v3smp|logs"),
+                ],
             ]
         )
 

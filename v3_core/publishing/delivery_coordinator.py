@@ -160,6 +160,15 @@ class PublicationDeliveryCoordinator:
         self.deliveries.mark_sent(attempt_id, telegram_result)
         return self.finalize_saved_receipt(attempt_id=attempt_id)
 
+    def reconcile_unknown_as_sent(
+        self, *, attempt_id: str, telegram_result: dict[str, Any]
+    ) -> PublicationCommitResult:
+        self.deliveries.reconcile_unknown_as_sent(attempt_id, telegram_result)
+        return self.finalize_saved_receipt(attempt_id=attempt_id)
+
+    def reconcile_unknown_as_not_sent(self, *, attempt_id: str, reason: str) -> DeliveryAttempt:
+        return self.deliveries.reconcile_unknown_as_not_sent(attempt_id, reason)
+
     def finalize_saved_receipt(self, *, attempt_id: str) -> PublicationCommitResult:
         attempt = self.deliveries.get(attempt_id)
         if attempt.state == "committed":

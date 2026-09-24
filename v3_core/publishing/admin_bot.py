@@ -47,6 +47,7 @@ load_dotenv(REPO_ROOT / ".env")
 PAGE_SIZE = 8
 EDIT_STATE_KEY = "v3_publisher_edit"
 MEDIA_STATE_KEY = "v3_publisher_media"
+RECONCILE_STATE_KEY = "v3_publisher_reconcile"
 
 FIELD_CODES = {
     "pn": "project_name",
@@ -341,7 +342,15 @@ class PublisherAdminBot:
         for row in rows:
             public_id = str(row.get("public_listing_id") or row.get("listing_id") or "房源")
             title = str(row.get("display_title") or "")
-            label = " · ".join(value for value in (public_id, title, _short(row.get("error_text"), 18) if row.get("error_text") else "") if value)
+            label = " · ".join(
+                value
+                for value in (
+                    public_id,
+                    title,
+                    _short(row.get("error_message"), 18) if row.get("error_message") else "",
+                )
+                if value
+            )
             buttons.append([InlineKeyboardButton(label[:58], callback_data=f"v3d|{row['attempt_id']}")])
         nav: list[InlineKeyboardButton] = []
         if page > 0:
@@ -528,24 +537,83 @@ class PublisherAdminBot:
             f"<b>发布发送记录</b>\n"
             f"状态：<b>{escape(label)}</b>\n"
             f"attempt：<code>{escape(attempt.attempt_id)}</code>\n"
-            f"package：<code>{escape(attempt.package_id)}</code>"
+            f"package：<code>{escape(attempt.package_id)}</code>\n"
+            f"listing：<code>{escape(attempt.listing_id)}</code>"
         )
-        if attempt.channel_message_id:
-            text += f"\nmessage：<code>{escape(str(attempt.channel_message_id))}</code>"
-        if attempt.error_text:
-            text += f"\n错误：{escape(str(attempt.error_text))}"
+        message_ids = []
+        if isinstance(attempt.telegram_result, dict):
+            raw_ids = attempt.telegram_result.get("media_message_ids") or []
+            if isinstance(raw_ids, list):
+                message_ids = [str(item) for item in raw_ids if str(item or "").strip()]
+        if message_ids:
+            text += f"\nmessage：<code>{escape(', '.join(message_ids))}</code>"
+        if attempt.error_message:
+            text += f"\n错误：{escape(str(attempt.error_message))}"
         rows: list[list[InlineKeyboardButton]] = []
         if attempt.state == "failed_before_send":
             rows.append([InlineKeyboardButton("🔄 安全重试", callback_data=f"v3retry|{attempt.package_id}")])
         elif attempt.state == "sent":
             rows.append([InlineKeyboardButton("✅ 使用已保存 receipt 完成提交", callback_data=f"v3final|{attempt.attempt_id}")])
         elif attempt.state == "unknown":
-            text += "\n\n⚠️ 发送结果未知，禁止自动重发。请先人工核对频道。"
+            text += (
+                "\n\n⚠️ 发送结果未知，禁止自动重发。\n"
+                "请先核对频道：确认已发出则填写 message id；确认未发出则可安全重试。"
+            )
+            rows.append(
+                [
+                    InlineKeyboardButton(
+                        "✅ 确认已发到频道",
+                        callback_data=f"v3recon|sent|{attempt.attempt_id}",
+                    )
+                ]
+            )
+            rows.append(
+                [
+                    InlineKeyboardButton(
+                        "❌ 确认未发出",
+                        callback_data=f"v3recon|fail|{attempt.attempt_id}",
+                    )
+                ]
+            )
         rows.append([InlineKeyboardButton("⚠️ 返回恢复中心", callback_data="v3err")])
         await message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(rows))
 
     async def on_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not await self._require_admin(update):
+            return
+        reconcile = context.user_data.get(RECONCILE_STATE_KEY)
+        if isinstance(reconcile, dict) and str(reconcile.get("mode") or "") == "sent":
+            attempt_id = str(reconcile.get("attempt_id") or "").strip()
+            raw_value = str(update.effective_message.text or "").strip()
+            message_id = "".join(ch for ch in raw_value if ch.isdigit())
+            if not attempt_id or not message_id:
+                await update.effective_message.reply_text("请输入频道消息 ID（纯数字）。")
+                return
+            try:
+                result = await asyncio.to_thread(
+                    self.workflow.delivery.reconcile_unknown_as_sent,
+                    attempt_id=attempt_id,
+                    telegram_result={
+                        "media_message_ids": [int(message_id)],
+                        "caption_message_id": int(message_id),
+                        "button_message_id": "",
+                        "caption": "",
+                    },
+                )
+            except Exception as exc:
+                await update.effective_message.reply_text(
+                    "结案失败，可重新输入 message id：\n"
+                    + escape(type(exc).__name__ + ": " + str(exc)),
+                    parse_mode=ParseMode.HTML,
+                )
+                return
+            context.user_data.pop(RECONCILE_STATE_KEY, None)
+            await update.effective_message.reply_text(
+                "✅ 已确认频道已发出，并完成提交（未重新发送）。\n"
+                f"message: <code>{escape(str(result.publication.channel_message_id))}</code>",
+                parse_mode=ParseMode.HTML,
+                reply_markup=InlineKeyboardMarkup([self._home_button()]),
+            )
             return
         state = context.user_data.get(EDIT_STATE_KEY)
         if not isinstance(state, dict):
@@ -610,7 +678,8 @@ class PublisherAdminBot:
             if action == "v3err":
                 await query.message.reply_text(
                     "<b>发布恢复中心</b>\n\n"
-                    "发送前失败可以安全重试；已发送待提交只 finalize receipt；状态未知禁止自动重发。",
+                    "发送前失败可以安全重试；已发送待提交只 finalize receipt；"
+                    "状态未知需人工结案（确认已发 / 确认未发）后才能继续。",
                     parse_mode=ParseMode.HTML,
                     reply_markup=InlineKeyboardMarkup(
                         [
@@ -622,6 +691,38 @@ class PublisherAdminBot:
                     ),
                 )
                 return
+            if action == "v3recon" and len(parts) == 3:
+                mode, attempt_id = parts[1], parts[2]
+                if mode == "fail":
+                    attempt = await asyncio.to_thread(
+                        self.workflow.delivery.reconcile_unknown_as_not_sent,
+                        attempt_id=attempt_id,
+                        reason="operator_confirmed_not_sent",
+                    )
+                    context.user_data.pop(RECONCILE_STATE_KEY, None)
+                    await query.message.reply_text(
+                        "✅ 已确认未发出，可安全重试。\n"
+                        f"attempt：<code>{escape(attempt.attempt_id)}</code>",
+                        parse_mode=ParseMode.HTML,
+                        reply_markup=InlineKeyboardMarkup(
+                            [
+                                [InlineKeyboardButton("🔄 安全重试", callback_data=f"v3retry|{attempt.package_id}")],
+                                [InlineKeyboardButton("⚠️ 返回恢复中心", callback_data="v3err")],
+                            ]
+                        ),
+                    )
+                    return
+                if mode == "sent":
+                    context.user_data[RECONCILE_STATE_KEY] = {"mode": "sent", "attempt_id": attempt_id}
+                    await query.message.reply_text(
+                        "请发送频道消息 ID（纯数字）。\n"
+                        "确认后会写入 receipt 并完成提交，不会重新发送。",
+                        reply_markup=InlineKeyboardMarkup(
+                            [[InlineKeyboardButton("⚠️ 取消", callback_data=f"v3d|{attempt_id}")]]
+                        ),
+                    )
+                    return
+                raise ValueError("unsupported_reconcile_mode")
             if action == "v3r" and len(parts) == 2:
                 await self._send_review_detail(query.message, parts[1])
                 return
@@ -769,6 +870,7 @@ class PublisherAdminBot:
                 )
                 return
             if action == "v3d" and len(parts) == 2:
+                context.user_data.pop(RECONCILE_STATE_KEY, None)
                 await self._send_delivery_detail(query.message, parts[1])
                 return
             if action == "v3final" and len(parts) == 2:

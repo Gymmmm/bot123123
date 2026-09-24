@@ -80,6 +80,57 @@ def test_unknown_delivery_requires_reconciliation_before_retry(tmp_path):
         )
 
 
+def test_reconcile_unknown_as_not_sent_unlocks_retry(tmp_path):
+    db = tmp_path / "v3.sqlite3"
+    initialize_v3_storage(db)
+    repo = PublicationDeliveryStateRepository(str(db))
+    attempt = repo.prepare(
+        package_id="PKG_3",
+        listing_id="l_3",
+        offer_id="OFF_3",
+        channel_chat_id="-100123",
+    )
+    repo.mark_sending(attempt.attempt_id)
+    repo.mark_unknown(attempt.attempt_id, "Timed out")
+
+    unlocked = repo.reconcile_unknown_as_not_sent(
+        attempt.attempt_id, "operator_confirmed_not_sent"
+    )
+    assert unlocked.state == "failed_before_send"
+    assert "not_sent" in unlocked.error_message
+
+    again = repo.prepare(
+        package_id="PKG_3",
+        listing_id="l_3",
+        offer_id="OFF_3",
+        channel_chat_id="-100123",
+    )
+    assert again.attempt_id == attempt.attempt_id
+    assert again.state == "failed_before_send"
+    repo.mark_sending(attempt.attempt_id)
+    assert repo.get(attempt.attempt_id).state == "sending"
+
+
+def test_reconcile_unknown_as_sent_stores_receipt(tmp_path):
+    db = tmp_path / "v3.sqlite3"
+    initialize_v3_storage(db)
+    repo = PublicationDeliveryStateRepository(str(db))
+    attempt = repo.prepare(
+        package_id="PKG_4",
+        listing_id="l_4",
+        offer_id="OFF_4",
+        channel_chat_id="-100123",
+    )
+    repo.mark_sending(attempt.attempt_id)
+    repo.mark_unknown(attempt.attempt_id, "Timed out")
+
+    sent = repo.reconcile_unknown_as_sent(attempt.attempt_id, _receipt(3407))
+    assert sent.state == "sent"
+    assert sent.telegram_result["media_message_ids"] == [3407]
+    committed = repo.mark_committed(attempt.attempt_id)
+    assert committed.state == "committed"
+
+
 def test_publication_instance_keeps_exact_telegram_message_identity(tmp_path):
     db = tmp_path / "v3.sqlite3"
     initialize_v3_storage(db)

@@ -235,6 +235,13 @@ async def test_manual_preview_short_callbacks_recover_real_length_session_ids(tm
     assert await controller.handle_callback(update, expired) is True
     assert calls[-1] == {"review_id": real_ids["review_id"], "offer_id": real_ids["offer_id"], "style": "black_gold"}
     assert "已经失效" in expired_message.calls[-1]["text"]
+    expired_callbacks = [
+        button.callback_data
+        for row in expired_message.calls[-1]["reply_markup"].inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
+    assert "v3smp|preview_ready" in expired_callbacks
 
     old = [
         f"v3smp|manual_send|{real_ids['package_id']}|{real_ids['offer_id']}",

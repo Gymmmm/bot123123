@@ -19,6 +19,7 @@ def test_operator_home_is_task_oriented_and_hides_pipeline_internals():
         "📢 广播中心",
         "🔵 房态管理",
         "📡 采集源",
+        "📤 待确认发布",
         "📚 发布记录",
     ]
     assert not any("异常" in label for label in labels)
