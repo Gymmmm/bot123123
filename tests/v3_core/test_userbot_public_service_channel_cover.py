@@ -160,9 +160,10 @@ async def test_channel_deeplink_start_handler_keeps_listing_context(tmp_path, pa
     if expected_kind in {"details", "photos"}:
         assert [call[0] for call in bot.calls] == ["send_photo"]
         caption = bot.calls[0][2]["caption"]
-        assert "🏡 富力城｜2房1厅" in caption
+        assert "🏡 项目：富力城" in caption
+        assert "🛏 户型：2房1厅" in caption
         assert "📸 1/1" in caption
-        assert PUBLIC_ID not in caption
+        assert f"🪧 编号：{PUBLIC_ID}" in caption
     else:
         rendered = message.calls[-1][1]
         assert "预约看房" in rendered
