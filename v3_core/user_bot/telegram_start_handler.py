@@ -194,17 +194,11 @@ def _search_entry_plan() -> TransitionPlan:
     return TransitionPlan(kind="change_search", next_step="search_entry", effects=("render_search_entry",), change_search=ChangeSearchTransition(source="daily_broadcast", goal="any"))
 
 
-def _is_channel_source(value: object) -> bool:
-    source = str(value or "").strip().lower()
-    return source in {"channel", "channel_deeplink", "channel_listing"} or source.startswith("channel")
-
-
 def _listing_keyboard(
     result,
     *,
     advisor_url: str = "",
     channel_url: str = "",
-    show_channel: bool = False,
 ):
     if not result.action_rows:
         return None
@@ -213,8 +207,8 @@ def _listing_keyboard(
         advisor_url=advisor_url,
         channel_url=channel_url,
         listing_summary=str(getattr(result, "listing_summary", "") or ""),
-        add_home=False,
-        add_channel=show_channel,
+        add_home=True,
+        add_channel=False,
     )
 
 
@@ -234,7 +228,6 @@ async def _render_details(
             result.details,
             advisor_url=advisor_url,
             channel_url=channel_url,
-            show_channel=_is_channel_source(result.source),
         ),
     )
 
@@ -255,7 +248,6 @@ async def _render_photos(
         photos,
         advisor_url=advisor_url,
         channel_url=channel_url,
-        show_channel=_is_channel_source(result.source),
     )
     photo_path = str(getattr(photos, "photo_path", "") or "").strip()
     if not photo_path and photos.media_groups:

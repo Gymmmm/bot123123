@@ -2,7 +2,7 @@
 from __future__ import annotations
 from html import escape as he
 from .appointments import display_time
-from .listing_presenter import build_public_listing_details
+from .listing_presenter import booking_subject, build_public_listing_details
 from .public_appointment import PublicAppointmentDraft
 from .public_inventory import PublicInventoryReader
 from .transition_views import TransitionChoice, TransitionView
@@ -24,14 +24,14 @@ def build_appointment_success_view(draft: PublicAppointmentDraft, inventory: Pub
         subject="这套房"
     else:
         details=build_public_listing_details(published)
-        subject=details.subject or details.location or "这套房"
+        subject=booking_subject(details)
     mode="视频代看" if draft.mode=="video" else "实地看房"
     lines=[
         "✅ <b>预约已提交</b>",
         f"房源｜{he(subject)}",
         f"方式｜{he(mode)}",
         f"时间｜{he(_date_display(draft.date))} · {he(_time_display(draft.time))}",
-        "预约信息已经记录。顾问会继续确认具体看房安排。",
+        "侨联已收到预约，顾问会联系你确认具体看房安排。",
     ]
     return TransitionView(
         kind="appointment_success",

@@ -82,7 +82,7 @@ def polish_listing_keyboard(
                 if raw_label in {"💬 联系我们", "💬 联系中文顾问", "问这套房", "联系我们"}:
                     label = "咨询这套"
                 elif raw_label in {"🔍 看相近房源", "✏️ 换个条件找"}:
-                    label = "换条件"
+                    label = "🔍 继续找房"
                 if label != raw_label:
                     upgraded.append(
                         InlineKeyboardButton(
@@ -104,8 +104,8 @@ def polish_listing_keyboard(
     clean_channel = str(channel_url or "").strip()
     if add_channel and clean_channel and not back_search and "返回频道" not in existing_labels:
         rows.append([InlineKeyboardButton("返回频道", url=clean_channel)])
-    if add_home and not back_search and not add_channel and "返回首页" not in existing_labels:
-        rows.append([InlineKeyboardButton("返回首页", callback_data=_HOME_CALLBACK)])
+    if add_home and not back_search and not add_channel and "🏠 返回首页" not in existing_labels:
+        rows.append([InlineKeyboardButton("🏠 返回首页", callback_data=_HOME_CALLBACK)])
     return InlineKeyboardMarkup(rows) if rows else None
 
 

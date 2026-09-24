@@ -59,6 +59,14 @@ class PublicListingDetails:
         return " · ".join(value for value in (self.deposit_terms, self.contract_term) if value)
 
 
+def booking_subject(details: PublicListingDetails) -> str:
+    """Identify the same public listing at every appointment step."""
+    project = str(details.project_name or "").strip()
+    location = str(details.location or "").strip()
+    identity = " · ".join(part for part in (project, location if location != project else "") if part)
+    return "｜".join(part for part in (identity, details.layout) if part) or "这套房"
+
+
 def _visible_text(value: object) -> str:
     text = str(value or "").strip()
     if text.lower() in _HIDDEN_PLACEHOLDERS:
@@ -150,4 +158,4 @@ def build_public_listing_details(view: PublishedListingView) -> PublicListingDet
     )
 
 
-__all__ = ["PublicListingDetails", "build_public_listing_details"]
+__all__ = ["PublicListingDetails", "booking_subject", "build_public_listing_details"]

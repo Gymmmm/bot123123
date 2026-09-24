@@ -257,5 +257,5 @@ async def test_unbookable_property_book_deeplink_shows_lock_copy_then_contextual
     markup = message.calls[1][1]["reply_markup"]
     labels = [button.text for row in markup.inline_keyboard for button in row]
     assert "📅 预约看房" not in labels
-    assert "换条件" in labels
+    assert "🔍 继续找房" in labels
     assert "看相近房源" not in " ".join(labels)

@@ -12,6 +12,7 @@ from v3_core.user_bot.public_flow import PublicListingFlowResult
 from v3_core.user_bot.search_cards import SearchCardResponse
 from v3_core.user_bot.search_session import SearchSessionNavigation
 from v3_core.user_bot.telegram_callback_handler import (
+    LISTING_SOURCE_KEY,
     SEARCH_ANCHOR_KEY,
     SEARCH_SESSION_KEY,
     handle_v3_callback,
@@ -157,6 +158,22 @@ async def test_details_from_search_session_offer_one_tap_return_to_same_card():
     buttons = [button for row in markup.inline_keyboard for button in row]
     back = next(button for button in buttons if button.text == "返回房源")
     assert back.callback_data == "v3u:card:1:QL-RF-A2B3"
+
+
+@pytest.mark.asyncio
+async def test_channel_details_return_home_without_channel_or_change_conditions_button():
+    query = FakeQuery("v3u:listing:details:QL-RF-A2B3", has_photo=True)
+    context = _context()
+    context.user_data[LISTING_SOURCE_KEY] = "channel_deeplink"
+
+    await handle_v3_callback(
+        _update(query), context, router=RouterStub(_details_dispatch()),
+        channel_url="https://t.me/example_channel",
+    )
+
+    buttons = [button for row in query.calls[-1][2]["reply_markup"].inline_keyboard for button in row]
+    assert any(button.text == "🏠 返回首页" and button.callback_data == "v3u:t:home" for button in buttons)
+    assert all(button.text not in {"返回频道", "换条件"} for button in buttons)
 
 
 @pytest.mark.asyncio

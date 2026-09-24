@@ -7,7 +7,7 @@ from html import escape as he
 from typing import Literal
 from zoneinfo import ZoneInfo
 
-from .listing_presenter import build_public_listing_details
+from .listing_presenter import booking_subject, build_public_listing_details
 from .public_appointment import PublicAppointmentDraft
 from .public_inventory import PublicInventoryReader
 from .search_navigation import AREA_OPTIONS, LAYOUT_OPTIONS
@@ -92,13 +92,15 @@ def _resolve_bookable_details(inventory: PublicInventoryReader, public_listing_i
 
 def _appointment_mode_view(draft: PublicAppointmentDraft, inventory: PublicInventoryReader) -> TransitionView:
     details = _resolve_bookable_details(inventory, draft.public_listing_id)
-    subject = details.subject or details.location or "这套房"
+    subject = booking_subject(details)
+    price_line = f"💵 {_format_price(details.monthly_rent_usd)}\n" if details.monthly_rent_usd else ""
     return TransitionView(
         kind="appointment_mode",
         text=(
             "📅 <b>预约看房</b>\n"
-            f"🏠 {he(subject)}\n"
-            "请选择看房方式："
+            f"🏡 {he(subject)}\n"
+            f"{price_line}"
+            "\n请选择看房方式，之后再选日期和时间。"
         ),
         rows=(
             (
@@ -112,7 +114,7 @@ def _appointment_mode_view(draft: PublicAppointmentDraft, inventory: PublicInven
 
 def _appointment_date_view(draft: PublicAppointmentDraft, inventory: PublicInventoryReader, *, today: date) -> TransitionView:
     details = _resolve_bookable_details(inventory, draft.public_listing_id)
-    subject = details.subject or details.location or "这套房"
+    subject = booking_subject(details)
     today_value = today.strftime("%m-%d")
     tomorrow_value = (today + timedelta(days=1)).strftime("%m-%d")
     after_value = (today + timedelta(days=2)).strftime("%m-%d")
@@ -120,7 +122,9 @@ def _appointment_date_view(draft: PublicAppointmentDraft, inventory: PublicInven
         kind="appointment_date",
         text=(
             "📅 <b>选择看房日期</b>\n"
-            f"已选｜{he('视频代看' if draft.mode == 'video' else '实地看房')}"
+            f"🏡 {he(subject)}\n"
+            f"已选：{he('视频代看' if draft.mode == 'video' else '实地看房')}\n"
+            "请选择方便的日期："
         ),
         rows=(
             (TransitionChoice(f"今天 · {today.month}月{today.day}日", "appointment_date", today_value),),
@@ -135,12 +139,14 @@ def _appointment_date_view(draft: PublicAppointmentDraft, inventory: PublicInven
 def _appointment_time_view(draft: PublicAppointmentDraft, inventory: PublicInventoryReader) -> TransitionView:
     if not draft.date:
         raise ValueError("appointment_time_view_requires_date")
-    _resolve_bookable_details(inventory, draft.public_listing_id)
+    details = _resolve_bookable_details(inventory, draft.public_listing_id)
     return TransitionView(
         kind="appointment_time",
         text=(
             "🕐 <b>选择看房时间</b>\n"
-            f"日期｜{he(_date_display(draft.date))}"
+            f"🏡 {he(booking_subject(details))}\n"
+            f"日期：{he(_date_display(draft.date))}\n"
+            "请选择方便的时间："
         ),
         rows=(
             (TransitionChoice("上午 09:00–12:00", "appointment_time", "am"),),

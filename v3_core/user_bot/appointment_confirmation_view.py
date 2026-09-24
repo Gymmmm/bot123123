@@ -2,7 +2,7 @@
 from __future__ import annotations
 from html import escape as he
 from .appointments import display_time
-from .listing_presenter import build_public_listing_details
+from .listing_presenter import booking_subject, build_public_listing_details
 from .public_appointment import PublicAppointmentDraft
 from .public_inventory import PublicInventoryReader
 from .transition_views import TransitionChoice, TransitionView
@@ -27,7 +27,7 @@ def build_appointment_confirmation_view(draft: PublicAppointmentDraft, inventory
     if not published.bookable:
         raise ValueError("listing_not_bookable")
     details=build_public_listing_details(published)
-    subject=details.subject or details.location or "这套房"
+    subject=booking_subject(details)
     mode="视频代看" if draft.mode=="video" else "实地看房"
     lines=[
         "✅ <b>确认预约</b>",
@@ -35,7 +35,7 @@ def build_appointment_confirmation_view(draft: PublicAppointmentDraft, inventory
         f"方式｜{he(mode)}",
         f"日期｜{he(_date_display(draft.date))}",
         f"时间｜{he(_time_display(draft.time))}",
-        "请确认以上信息。",
+        "请核对信息。提交后，顾问会联系你确认具体安排。",
     ]
     return TransitionView(
         kind="appointment_confirmation",

@@ -106,11 +106,11 @@ def _details_actions(
                 SemanticAction("📅 预约看房", "book", target),
                 SemanticAction("💬 中文顾问", "consult", target),
             ),
-            (SemanticAction("🔍 看相近房源", "similar", target),),
+            (SemanticAction("🔍 继续找房", "similar", target),),
         )
     return (
         (SemanticAction("💬 中文顾问", "consult", target),),
-        (SemanticAction("🔍 看相近房源", "similar", target),),
+        (SemanticAction("🔍 继续找房", "similar", target),),
     )
 
 
@@ -153,25 +153,8 @@ def _photo_actions(
         )
     else:
         rows.append((SemanticAction("💬 中文顾问", "consult", target),))
-    rows.append((SemanticAction("🔍 看相近房源", "similar", target),))
+    rows.append((SemanticAction("🔍 继续找房", "similar", target),))
     return tuple(rows)
-
-
-_DETAIL_DIVIDER = "━━━━━━━━━━━━━━━"
-_DETAIL_TITLE = "🏢 金边优质房源出租"
-
-
-def _bullet(label: str, value: object) -> str | None:
-    text = str(value or "").strip()
-    if not text:
-        return None
-    return f"・{label}：{he(text)}"
-
-
-def _section(title: str, bullets: list[str]) -> list[str]:
-    if not bullets:
-        return []
-    return [title, *bullets]
 
 
 def _utilities_line(*, water: str, electric: str) -> str:
@@ -183,32 +166,18 @@ def _utilities_line(*, water: str, electric: str) -> str:
     return " / ".join(parts)
 
 
-def _project_area(details) -> str:
-    project = str(details.project_name or "").strip()
-    location = str(details.location or "").strip()
-    if project and location and project != location:
-        return f"{project} · {location}"
-    return project or location
-
-
-def _detail_rent_line(value: int | None) -> str:
-    if value is None or int(value) <= 0:
-        return ""
-    return f"${int(value):,} / 月"
-
-
 def _detail_status_line(details) -> str:
     status = str(details.inventory_status or "").strip().lower()
     if status == "reserved":
-        return "🟡 房源状态：已有预约，仍可预约"
+        return "🟡 房态：已有预约，仍可预约"
     if status == "active":
-        return "🟢 房源状态：当前可预约"
+        return "🟢 房态：当前可预约"
     if status in {"rented", "leased"}:
-        return "🔴 房源状态：已租出"
+        return "🔴 房态：已租出"
     if status in {"inactive", "offline"}:
-        return "⚫ 房源状态：已下架"
+        return "⚫ 房态：已下架"
     label = str(details.status_label or "").strip() or "待确认"
-    return f"{details.status_icon} 房源状态：{he(label)}"
+    return f"{details.status_icon} 房态：{he(label)}"
 
 
 def _adviser_copy_for_view(view: PublishedListingView) -> str:
@@ -216,61 +185,57 @@ def _adviser_copy_for_view(view: PublishedListingView) -> str:
     return adviser_notes_for_view(view, max_points=2, allow_empty=True).strip()
 
 
+def _listing_fact_lines(details) -> list[str]:
+    """Public snapshot facts plus live availability, omitting unknown fields."""
+    project = str(details.project_name or "").strip()
+    location = str(details.location or "").strip()
+    layout = str(details.layout or "").strip()
+    lines: list[str] = []
+    if project:
+        lines.append(f"🏡 项目：{he(project)}")
+    elif details.property_type:
+        lines.append(f"🏡 类型：{he(details.property_type)}")
+    if location and location != project:
+        lines.append(f"📍 区域：{he(location)}")
+    if layout:
+        lines.append(f"🛏 户型：{he(layout)}")
+    if details.monthly_rent_usd:
+        lines.append(f"💵 租金：{_format_price(details.monthly_rent_usd)}")
+    extra = [part for part in (_format_size(details.size_sqm), display_floor(details.floor)) if part]
+    if extra:
+        lines.append("📐 " + " · ".join(he(part) for part in extra))
+    terms = [he(part) for part in (details.deposit_terms, details.contract_term) if part]
+    if terms:
+        lines.append("🗝 租约：" + " · ".join(terms))
+    lines.append(_detail_status_line(details))
+    if details.public_listing_id:
+        lines.append(f"🪧 编号：{he(details.public_listing_id)}")
+    return lines
+
+
+def _adviser_lines(view: PublishedListingView, *, caption: bool) -> list[str]:
+    notes = _adviser_copy_for_view(view)
+    if not notes:
+        return []
+    # Preserve Publisher wording. Only limit the photo caption to Telegram's
+    # 1024-character boundary; the text fallback carries the complete copy.
+    if caption and len(notes) > 360:
+        notes = notes[:359].rstrip() + "…"
+    return ["", "💬 侨联说", *(he(line) for line in notes.splitlines())]
+
+
 def build_detail_text(view: PublishedListingView) -> str:
-    """Full sectioned listing detail (separate text message; NOT photo caption)."""
+    """Text fallback for listings without a usable photo."""
     details = build_public_listing_details(view)
-    floor = display_floor(details.floor)
-    size = _format_size(details.size_sqm)
-    rent = _detail_rent_line(details.monthly_rent_usd)
     utilities = _utilities_line(
         water=str(details.water_rate or "").strip(),
         electric=str(details.electric_rate or "").strip(),
     )
-
-    lines: list[str] = [_DETAIL_DIVIDER, _DETAIL_TITLE, _DETAIL_DIVIDER]
-
-    basic_header = "📌基本信息"
-    basic_bullets = [
-        bullet
-        for bullet in (
-            _bullet("项目区域", _project_area(details)),
-            _bullet("户型格局", details.layout),
-            _bullet("楼层类型", floor),
-            _bullet("房屋面积", size),
-        )
-        if bullet
-    ]
-    if basic_bullets:
-        lines.extend(_section(basic_header, basic_bullets))
-
-    rent_bullets = [
-        bullet
-        for bullet in (
-            _bullet("月租金额", rent),
-            _bullet("押付方式", details.deposit_terms),
-            _bullet("起租租期", details.contract_term),
-        )
-        if bullet
-    ]
-    lines.extend(_section("💰 租金与付款", rent_bullets))
-
-    fee_bullets = [
-        bullet
-        for bullet in (
-            _bullet("物业管理", details.management_fee),
-            _bullet("水电费用", utilities),
-            _bullet("大楼配套", details.building_amenities),
-        )
-        if bullet
-    ]
-    lines.extend(_section("🧾 费用与配套", fee_bullets))
-
-    notes = _adviser_copy_for_view(view)
-    if notes:
-        safe_notes = "\n".join(he(line) for line in notes.splitlines() if line.strip())
-        lines.extend(["", "💬 侨联说", safe_notes])
-
-    lines.extend(["", _detail_status_line(details)])
+    lines = _listing_fact_lines(details)
+    for label, value in (("物业费", details.management_fee), ("水电", utilities), ("配套", details.building_amenities)):
+        if value:
+            lines.append(f"🧾 {label}：{he(value)}")
+    lines.extend(_adviser_lines(view, caption=False))
     return "\n".join(lines).strip()
 
 
@@ -280,43 +245,17 @@ def build_photo_caption(
     photo_index: int = 0,
     photo_total: int = 0,
 ) -> str:
-    """Essential rental details stay with the photo while browsing the gallery."""
+    """Scan-friendly facts stay with every photo in the listing gallery."""
     details = build_public_listing_details(view)
-    project = str(details.project_name or "").strip()
-    location = str(details.location or "").strip()
-    layout = str(details.layout or "").strip()
-    rent = _format_price(details.monthly_rent_usd)
-    head = "｜".join(he(part) for part in (project or location, layout) if part)
-    if not head:
-        head = he(str(details.location or "房源").strip())
-    lines = [f"🏡 {head}"]
-    if rent:
-        lines.append(f"💵 {rent}")
-    other_location = location if project and location != project else ""
-    facts = [he(part) for part in (other_location, _format_size(details.size_sqm), display_floor(details.floor)) if part]
-    if facts:
-        lines.append("📍 " + " · ".join(facts))
-    terms = [he(part) for part in (details.deposit_terms, details.contract_term) if part]
-    if terms:
-        lines.append("🗝️ " + " · ".join(terms))
-    fees = [he(str(details.management_fee or "").strip()), he(_utilities_line(water=str(details.water_rate or "").strip(), electric=str(details.electric_rate or "").strip()))]
-    fees = [part for part in fees if part]
-    if fees and len("\n".join([*lines, *fees])) < 700:
-        lines.append("🧾 " + " · ".join(fees))
-    notes = _adviser_copy_for_view(view)
-    if notes:
-        excerpt = " ".join(line.strip() for line in notes.splitlines() if line.strip())
-        if len(excerpt) > 85:
-            excerpt = excerpt[:84].rstrip() + "…"
-        note_line = "💬 " + he(excerpt)
-        if len("\n".join([*lines, note_line])) < 850:
-            lines.append(note_line)
+    lines = _listing_fact_lines(details)
+    # Keep enough space for the photo index even with unusually long copy.
+    adviser = _adviser_lines(view, caption=True)
+    if len("\n".join([*lines, *adviser])) < 850:
+        lines.extend(adviser)
     total = max(0, int(photo_total or 0))
     if total > 0:
         index = max(0, int(photo_index or 0)) % total
-        lines.append(f"{_detail_status_line(details)} · 📸 {index + 1}/{total}")
-    else:
-        lines.append(_detail_status_line(details))
+        lines.extend(["", f"📸 {index + 1}/{total}"])
     return "\n".join(lines)
 
 
