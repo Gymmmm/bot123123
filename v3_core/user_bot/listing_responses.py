@@ -1,8 +1,7 @@
 """Telegram-neutral public listing responses for the V3 User Bot.
 
 Merged listing view: one entry opens a single-photo flipper (上一张 / 下一张)
-with a SHORT photo caption. Full sectioned detail is available as a separate
-text payload — never dumped onto the photo caption (keeps image + buttons close).
+with the rental essentials in its caption and no extra text bubble.
 """
 from __future__ import annotations
 
@@ -47,7 +46,7 @@ class PublicDetailsResponse:
 
 @dataclass(frozen=True)
 class PublicPhotosResponse:
-    """Single-photo flipper payload (short caption + one current frame)."""
+    """Single-photo flipper payload (rental caption + one current frame)."""
 
     media_groups: tuple[tuple[str, ...], ...]
     text: str
@@ -281,19 +280,43 @@ def build_photo_caption(
     photo_index: int = 0,
     photo_total: int = 0,
 ) -> str:
-    """SHORT photo caption: project · layout · rent · 📸 N/M."""
+    """Essential rental details stay with the photo while browsing the gallery."""
     details = build_public_listing_details(view)
     project = str(details.project_name or "").strip()
     layout = str(details.layout or "").strip()
     rent = _format_price(details.monthly_rent_usd)
-    head = " · ".join(part for part in (project, layout, rent) if part)
+    head = "｜".join(he(part) for part in (project, layout) if part)
     if not head:
-        head = str(details.location or "房源").strip()
+        head = he(str(details.location or "房源").strip())
+    lines = [f"🏡 {head}"]
+    if rent:
+        lines.append(f"💵 {rent}")
+    location = str(details.location or "").strip()
+    facts = [he(part) for part in (location, _format_size(details.size_sqm), display_floor(details.floor)) if part]
+    if facts:
+        lines.append("📍 " + " · ".join(facts))
+    terms = [he(part) for part in (details.deposit_terms, details.contract_term) if part]
+    if terms:
+        lines.append("🗝️ " + " · ".join(terms))
+    fees = [he(str(details.management_fee or "").strip()), he(_utilities_line(water=str(details.water_rate or "").strip(), electric=str(details.electric_rate or "").strip()))]
+    fees = [part for part in fees if part]
+    if fees and len("\n".join([*lines, *fees])) < 700:
+        lines.append("🧾 " + " · ".join(fees))
+    notes = _adviser_copy_for_view(view)
+    if notes:
+        excerpt = " ".join(line.strip() for line in notes.splitlines() if line.strip())
+        if len(excerpt) > 85:
+            excerpt = excerpt[:84].rstrip() + "…"
+        note_line = "💬 " + he(excerpt)
+        if len("\n".join([*lines, note_line])) < 850:
+            lines.append(note_line)
     total = max(0, int(photo_total or 0))
     if total > 0:
         index = max(0, int(photo_index or 0)) % total
-        return f"{he(head)} · 📸 {index + 1}/{total}"
-    return he(head)
+        lines.append(f"{_detail_status_line(details)} · 📸 {index + 1}/{total}")
+    else:
+        lines.append(_detail_status_line(details))
+    return "\n".join(lines)
 
 
 def build_details_response(view: PublishedListingView) -> PublicDetailsResponse:
@@ -472,7 +495,7 @@ def build_photos_response(
     offset: int = 0,
     page_size: int | None = None,
 ) -> PublicPhotosResponse:
-    """Merged one-photo flipper with SHORT caption (上一张 / 下一张).
+    """Merged one-photo flipper with rental essentials (上一张 / 下一张).
 
     Photo 1/N is always the listing cover when available; gallery follows.
     ``page_size`` is ignored (kept for call-site compatibility).
@@ -492,8 +515,8 @@ def build_photos_response(
 
     return PublicPhotosResponse(
         media_groups=groups,
-        text=build_photo_caption(view, photo_index=index, photo_total=total),
-        detail_text=build_detail_text(view),
+        text=build_photo_caption(view, photo_index=index, photo_total=total) if total else build_detail_text(view),
+        detail_text="",
         photo_path=current,
         photo_index=index,
         photo_total=total,

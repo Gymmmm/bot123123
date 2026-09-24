@@ -279,12 +279,6 @@ async def _render_photos(
             parse_mode=ParseMode.HTML,
             reply_markup=keyboard,
         )
-    detail = str(getattr(photos, "detail_text", "") or "").strip()
-    if detail:
-        await context.bot.send_message(
-            chat_id=chat_id, text=detail, parse_mode=ParseMode.HTML
-        )
-
 
 
 def _support_keyboard(*, advisor_url: str = "", channel_url: str = "") -> InlineKeyboardMarkup:

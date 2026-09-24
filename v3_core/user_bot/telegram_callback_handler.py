@@ -89,13 +89,7 @@ async def _render_photos(
     *,
     query: Any | None = None,
 ) -> None:
-    """Render one photo + short caption; flip in place via editMessageMedia.
-
-    Full sectioned detail (build_detail_caption / detail_text) is sent as a
-    separate text bubble when ``response.send_detail`` is set — typically the
-    📷 房源详情 open path. Flipper prev/next must not re-send that bubble, even
-    though those edits also land on a photo message.
-    """
+    """Render one photo + rental caption; flip in place via editMessageMedia."""
     chat_id = _chat_id(update)
     bot = context.bot
     photo_path = str(getattr(response, "photo_path", "") or "").strip()
@@ -109,8 +103,6 @@ async def _render_photos(
 
     message = getattr(query, "message", None) if query is not None else None
     has_photo = bool(getattr(message, "photo", None))
-    edited_in_place = False
-
     if query is not None and has_photo and path is not None:
         await query.edit_message_media(
             media=InputMediaPhoto(
@@ -120,14 +112,12 @@ async def _render_photos(
             ),
             reply_markup=response.keyboard,
         )
-        edited_in_place = True
     elif query is not None and has_photo and path is None:
         await query.edit_message_caption(
             caption=response.text,
             parse_mode=ParseMode.HTML,
             reply_markup=response.keyboard,
         )
-        edited_in_place = True
     elif path is not None:
         with path.open("rb") as handle:
             await bot.send_photo(
@@ -144,13 +134,6 @@ async def _render_photos(
             parse_mode=ParseMode.HTML,
             reply_markup=response.keyboard,
         )
-
-    detail = str(getattr(response, "detail_text", "") or "").strip()
-    # Send sectioned detail when opening 房源详情 (send_detail), or on the first
-    # fresh photo/text delivery. Never re-send while flipping via editMessageMedia.
-    should_send_detail = bool(getattr(response, "send_detail", False)) or not edited_in_place
-    if detail and should_send_detail:
-        await bot.send_message(chat_id=chat_id, text=detail, parse_mode=ParseMode.HTML)
 
 
 async def _render_transition_view(query: Any, view: TransitionView) -> None:

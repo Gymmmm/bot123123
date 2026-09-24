@@ -158,12 +158,11 @@ async def test_channel_deeplink_start_handler_keeps_listing_context(tmp_path, pa
     assert "old_listing_session" not in context.user_data
 
     if expected_kind in {"details", "photos"}:
-        # Merged 📷 房源详情 flipper: photo + sectioned detail text.
-        assert any(call[0] == "send_photo" for call in bot.calls)
-        detail = next(call for call in bot.calls if call[0] == "send_message")
-        assert PUBLIC_ID not in detail[1]
-        assert "🏢 金边优质房源出租" in detail[1]
-        assert "侨联地产｜您在金边的自己人" not in detail[1]
+        assert [call[0] for call in bot.calls] == ["send_photo"]
+        caption = bot.calls[0][2]["caption"]
+        assert "🏡 富力城｜2房1厅" in caption
+        assert "📸 1/1" in caption
+        assert PUBLIC_ID not in caption
     else:
         rendered = message.calls[-1][1]
         assert "预约看房" in rendered

@@ -146,16 +146,22 @@ def test_details_response_uses_live_rented_state_but_keeps_frozen_public_facts()
     ]
 
 
-def test_photo_caption_is_short_not_sectioned():
+def test_photo_caption_keeps_rental_essentials_with_photo():
     view = _view()
     caption = build_photo_caption(view, photo_index=0, photo_total=3)
-    assert caption == "富力城 · 2房1厅 · $800/月 · 📸 1/3"
+    assert caption == (
+        "🏡 富力城｜2房1厅\n"
+        "💵 $800/月\n"
+        "📍 BKK1 · 95㎡ · 19楼\n"
+        "🗝️ 押1付1 · 1年\n"
+        "🟢 房源状态：当前可预约 · 📸 1/3"
+    )
     assert "基本信息" not in caption
     assert "金边优质房源出租" not in caption
     assert "侨联说" not in caption
 
 
-def test_photos_response_single_flipper_with_short_caption(tmp_path):
+def test_photos_response_single_flipper_with_details_on_photo(tmp_path):
     files = []
     for index in range(12):
         path = tmp_path / f"room-{index}.jpg"
@@ -173,16 +179,15 @@ def test_photos_response_single_flipper_with_short_caption(tmp_path):
     assert first.photo_index == 0
     assert first.photo_total == 13  # cover + 12 unique rooms
     assert first.media_groups == ((str(cover),),)
-    # SHORT caption on the photo
-    assert first.text == "富力城 · 2房1厅 · $800/月 · 📸 1/13"
+    assert "🏡 富力城｜2房1厅" in first.text
+    assert "📍 BKK1 · 95㎡ · 19楼" in first.text
+    assert first.text.endswith("📸 1/13")
     assert "🏢 金边优质房源出租" not in first.text
     assert "基本信息" not in first.text
     assert "📋" not in first.text
     assert "租赁详情" not in first.text
     assert "再看更多" not in first.text
-    # Full sectioned detail lives on detail_text (separate message)
-    assert "🏢 金边优质房源出租" in first.detail_text
-    assert "QL-RF-A2B3" not in first.detail_text
+    assert first.detail_text == ""
     assert _actions(first.action_rows) == [["photos", "photos"], ["book", "consult"], ["similar"]]
     assert _labels(first.action_rows) == [
         ["⬅️ 上一张", "下一张 ➡️"],
@@ -205,16 +210,17 @@ def test_photos_response_single_flipper_with_short_caption(tmp_path):
     assert last.action_rows[0][1].target_index == 0
 
 
-def test_photos_response_drops_missing_files_and_keeps_short_fallback(tmp_path):
+def test_photos_response_drops_missing_files_and_keeps_text_fallback(tmp_path):
     missing = tmp_path / "missing.jpg"
     response = build_photos_response(_view(gallery=[str(missing)]))
 
     assert not response.has_media
     assert response.media_groups == ()
     assert response.photo_path == ""
-    assert response.text == "富力城 · 2房1厅 · $800/月"
+    assert "・月租金额：$800 / 月" in response.text
     assert "📸 " not in response.text
-    assert "🏢 金边优质房源出租" in response.detail_text
+    assert "🏢 金边优质房源出租" in response.text
+    assert response.detail_text == ""
 
 
 def test_flipper_starts_on_package_cover_path(tmp_path):

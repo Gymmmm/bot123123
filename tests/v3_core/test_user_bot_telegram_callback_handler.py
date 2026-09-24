@@ -207,13 +207,8 @@ async def test_photos_send_frozen_media_then_action_message(tmp_path):
 
     assert outcome.handled and outcome.response is not None
     assert outcome.response.kind == "photos"
-    # One photo + short caption/keyboard, then optional separate detail text.
-    assert [call[0] for call in context.bot.calls] == [
-        "send_photo",
-        "send_message",
-    ]
+    assert [call[0] for call in context.bot.calls] == ["send_photo"]
     assert "📸 1/3" in context.bot.calls[0][1]["caption"]
-    assert context.bot.calls[1][1]["text"] == "🏢 金边优质房源出租"
     assert [call[0] for call in query.calls] == ["answer"]
 
 
@@ -360,8 +355,8 @@ async def test_expired_listing_or_card_action_shows_visible_alert():
 
 
 
-def test_details_from_photo_card_edits_media_and_sends_detail_bubble(tmp_path):
-    """Opening 📷 房源详情 from a search card must edit media AND send sectioned detail."""
+def test_details_from_photo_card_edits_media_without_extra_bubble(tmp_path):
+    """Opening 📷 房源详情 updates the photo with its caption in place."""
     import asyncio
 
     cover = tmp_path / "cover.png"
@@ -403,10 +398,8 @@ def test_details_from_photo_card_edits_media_and_sends_detail_bubble(tmp_path):
 
     outcome = asyncio.run(handle_v3_callback(_update(query), context, router=router))
     assert outcome.handled and outcome.response is not None
-    assert outcome.response.send_detail is True
     assert [call[0] for call in query.calls] == ["answer", "edit_media"]
-    assert [call[0] for call in context.bot.calls] == ["send_message"]
-    assert "🏢 金边优质房源出租" in context.bot.calls[0][1]["text"]
+    assert context.bot.calls == []
 
 
 def test_photo_flip_edits_media_without_resending_detail(tmp_path):
@@ -448,6 +441,5 @@ def test_photo_flip_edits_media_without_resending_detail(tmp_path):
         handle_v3_callback(_update(query), context, router=RouterStub(result))
     )
     assert outcome.handled and outcome.response is not None
-    assert outcome.response.send_detail is False
     assert [call[0] for call in query.calls] == ["answer", "edit_media"]
     assert context.bot.calls == []
