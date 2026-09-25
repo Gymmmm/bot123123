@@ -18,8 +18,21 @@ os.environ.setdefault(
 )
 
 
-def _file_to_data_url(path: str) -> str:
+def _file_to_data_url(path: str, *, enhance: bool = False) -> str:
     source = Path(path)
+    if enhance:
+        from io import BytesIO
+
+        from PIL import Image, ImageOps
+
+        from v3_core.media.photo_formatter import enhance_property_photo
+
+        with Image.open(source) as raw:
+            polished = enhance_property_photo(ImageOps.exif_transpose(raw).convert("RGB"))
+        buffer = BytesIO()
+        polished.save(buffer, format="JPEG", quality=94, optimize=True)
+        encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+        return f"data:image/jpeg;base64,{encoded}"
     mime = mimetypes.guess_type(source.name)[0] or "image/jpeg"
     encoded = base64.b64encode(source.read_bytes()).decode("ascii")
     return f"data:{mime};base64,{encoded}"
@@ -200,7 +213,7 @@ def render_html_cover(
                     theme,
                 )
             token_values = {
-                "BG_SRC": _file_to_data_url(source_image),
+                "BG_SRC": _file_to_data_url(source_image, enhance=True),
                 "LOGO_SRC": logo_src,
                 "REF": fields["ref"],
                 "PROJECT": fields["project"],
@@ -235,7 +248,7 @@ def render_html_cover(
                 token_values,
             )
             bg_locator = page.locator("#bg, .bg").first
-            bg_locator.evaluate("(el, src) => el.src = src", _file_to_data_url(source_image))
+            bg_locator.evaluate("(el, src) => el.src = src", _file_to_data_url(source_image, enhance=True))
             bg_locator.evaluate(
                 """async el => {
                     if (!el.complete) {

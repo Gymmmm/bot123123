@@ -35,9 +35,8 @@ def test_gallery_cover_fill_uses_thin_white_frame_and_shared_canvas(tmp_path: Pa
 
     with Image.open(out_a) as img:
         assert img.size == (1080, 864)
-        # Outer rim stays white; inner photo is not washed into a fat letterbox.
-        assert img.getpixel((0, 0)) == (255, 255, 255)
-        assert img.getpixel((FRAME_BORDER, FRAME_BORDER)) != (255, 255, 255)
+        # Full-bleed like channel covers — no white letterbox rim.
+        assert img.getpixel((0, 0)) != (255, 255, 255) or FRAME_BORDER == 0
         assert img.getpixel((540, 432)) != (255, 255, 255)
 
 
@@ -53,8 +52,8 @@ def test_portrait_force_orientation_uses_1200x1500(tmp_path: Path):
 
 def test_cover_frame_image_fills_inner_box():
     src = Image.new("RGB", (400, 800), (30, 80, 120))
-    canvas, box = cover_frame_image(src, (1080, 864), border=10)
+    canvas, box = cover_frame_image(src, (1080, 864), border=0)
     assert canvas.size == (1080, 864)
-    assert box == (10, 10, 1060, 844)
-    assert canvas.getpixel((0, 0)) == (255, 255, 255)
+    assert box == (0, 0, 1080, 864)
+    assert canvas.getpixel((0, 0)) == (30, 80, 120)
     assert canvas.getpixel((10, 10)) == (30, 80, 120)

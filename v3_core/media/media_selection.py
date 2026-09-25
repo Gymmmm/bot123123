@@ -26,15 +26,21 @@ def _sha256(path: Path) -> str:
 def _pick_auto_cover(ranking: list[dict[str, Any]], gallery: list[str]) -> str:
     """Choose channel cover source: best ranked shot that is safe to show first.
 
-    Skips hard rejects, soft rejects (text-heavy / toilet-like), and toilet labels
-    when any better alternative exists in the usable gallery.
+    Skips hard rejects, soft rejects (text-heavy / toilet-like), toilet and
+    bedroom labels when any better living/exterior/kitchen alternative exists.
     """
     gallery_set = {str(Path(path).resolve()) for path in gallery}
 
     def _path(item: dict[str, Any]) -> str:
         return str(Path(str(item.get("file") or "")).resolve())
 
-    def _usable(item: dict[str, Any], *, allow_soft: bool, allow_toilet: bool) -> bool:
+    def _usable(
+        item: dict[str, Any],
+        *,
+        allow_soft: bool,
+        allow_toilet: bool,
+        allow_bedroom: bool,
+    ) -> bool:
         path = _path(item)
         if not path or path not in gallery_set or item.get("reject"):
             return False
@@ -43,15 +49,23 @@ def _pick_auto_cover(ranking: list[dict[str, Any]], gallery: list[str]) -> str:
         label = str(item.get("room_label") or "")
         if not allow_toilet and label == "toilet":
             return False
+        if not allow_bedroom and label == "bedroom":
+            return False
         return True
 
-    for allow_soft, allow_toilet in (
-        (False, False),
-        (True, False),
-        (True, True),
+    for allow_soft, allow_toilet, allow_bedroom in (
+        (False, False, False),
+        (True, False, False),
+        (True, False, True),
+        (True, True, True),
     ):
         for item in ranking:
-            if _usable(item, allow_soft=allow_soft, allow_toilet=allow_toilet):
+            if _usable(
+                item,
+                allow_soft=allow_soft,
+                allow_toilet=allow_toilet,
+                allow_bedroom=allow_bedroom,
+            ):
                 return _path(item)
     return gallery[0]
 

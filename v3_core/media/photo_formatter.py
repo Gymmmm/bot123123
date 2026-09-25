@@ -10,8 +10,8 @@ from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont, ImageOps
 
 JPEG_QUALITY = 94
 BG_COLOR = (255, 255, 255)
-# Thin clean white frame around the photo — not letterbox bars.
-FRAME_BORDER = 10
+# No white frame — channel covers are full-bleed; gallery matches that look.
+FRAME_BORDER = 0
 # Legacy alias kept for callers/tests that still pass padding=.
 PADDING = FRAME_BORDER
 LANDSCAPE_THRESHOLD = 1.10
@@ -19,17 +19,17 @@ PORTRAIT_THRESHOLD = 0.90
 
 # Gallery canvases match cover standards so 更多实拍 flips stay size-stable.
 CANVAS_PRESETS = {
-    "landscape": {"size": (1080, 864), "logo_width_ratio": 0.32},
-    "portrait": {"size": (1200, 1500), "logo_width_ratio": 0.34},
+    "landscape": {"size": (1080, 864), "logo_width_ratio": 0.26},
+    "portrait": {"size": (1200, 1500), "logo_width_ratio": 0.26},
     # Near-square sources join the landscape family for flipper continuity.
-    "square": {"size": (1080, 864), "logo_width_ratio": 0.32},
+    "square": {"size": (1080, 864), "logo_width_ratio": 0.26},
 }
 
-LOGO_MARGIN_X_RATIO = 0.030
-LOGO_MARGIN_Y_RATIO = 0.030
+LOGO_MARGIN_X_RATIO = 0.028
+LOGO_MARGIN_Y_RATIO = 0.028
 LOGO_OPACITY = 0.98
-LOGO_MAX_PHOTO_WIDTH_RATIO = 0.42
-LOGO_MAX_PHOTO_HEIGHT_RATIO = 0.30
+LOGO_MAX_PHOTO_WIDTH_RATIO = 0.34
+LOGO_MAX_PHOTO_HEIGHT_RATIO = 0.22
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 
 ROOT = Path(__file__).resolve().parent
@@ -72,16 +72,16 @@ def gallery_canvas_key(orientation: str | None) -> str:
 
 
 def enhance_property_photo(image: Image.Image) -> Image.Image:
-    """Production gallery polish — brighten, lift contrast, light sharpen.
+    """Production polish — brighten dim phone shots, lift contrast, light sharpen.
 
-    Geometry is handled separately by the white-frame cover-fill step.
+    Geometry is handled separately by the cover-fill framing step.
     """
-    image = ImageOps.autocontrast(image, cutoff=0.6)
-    image = ImageEnhance.Brightness(image).enhance(1.09)
-    image = ImageEnhance.Contrast(image).enhance(1.07)
-    image = ImageEnhance.Color(image).enhance(1.05)
-    image = ImageEnhance.Sharpness(image).enhance(1.15)
-    return image.filter(ImageFilter.UnsharpMask(radius=1.2, percent=60, threshold=3))
+    image = ImageOps.autocontrast(image, cutoff=0.8)
+    image = ImageEnhance.Brightness(image).enhance(1.14)
+    image = ImageEnhance.Contrast(image).enhance(1.10)
+    image = ImageEnhance.Color(image).enhance(1.06)
+    image = ImageEnhance.Sharpness(image).enhance(1.18)
+    return image.filter(ImageFilter.UnsharpMask(radius=1.3, percent=70, threshold=2))
 
 
 def apply_logo_opacity(logo: Image.Image, opacity: float = LOGO_OPACITY) -> Image.Image:

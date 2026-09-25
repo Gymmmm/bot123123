@@ -178,10 +178,10 @@ def _room_cover_tier(label: object) -> int:
 
 
 def _room_heuristic(img) -> dict[str, Any]:
-    """Cheap room-type hints: prefer living / kitchen / exterior over toilet.
+    """Cheap room-type hints: prefer living / kitchen / exterior over toilet/bedroom.
 
-    Color/structure heuristics only — not a trained classifier. Living vs bedroom
-    often share the same pool; kitchen gets a mild positive (user cover pick lock).
+    Color/structure heuristics only — not a trained classifier. Beds are explicitly
+    demoted so bedroom shots stop winning the "living" cover slot.
     """
     h, w = img.shape[:2]
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
@@ -204,6 +204,7 @@ def _room_heuristic(img) -> dict[str, Any]:
     edges = cv2.Canny(gray, 50, 120)
     mid = edges[int(h * 0.25) : int(h * 0.75), :]
     sobely = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)
+    sobelx = cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3)
     horiz = float(np.mean(np.abs(sobely) > 40))
     kitchen_score = min(1.0, warm_frac * 1.5 + horiz * 0.8 + float(mid.mean() / 255) * 0.5)
 
@@ -212,6 +213,19 @@ def _room_heuristic(img) -> dict[str, Any]:
     blue_frac = float(np.mean(blue))
     sat_mean = float(hsv[:, :, 1].mean())
     exterior_score = min(1.0, blue_frac * 2.2 + (sat_mean / 120.0) * 0.25)
+
+    # Bed cue: soft mid-lower bedding + strong horizontal headboard edge.
+    bed_band = gray[int(h * 0.38) : int(h * 0.82), int(w * 0.12) : int(w * 0.88)]
+    bed_horiz = float(np.mean(np.abs(sobely[int(h * 0.28) : int(h * 0.72), :]) > 35))
+    bed_soft = float(np.mean((bed_band > 70) & (bed_band < 210))) if bed_band.size else 0.0
+    bed_flat = 1.0 - min(1.0, float(bed_band.std() / 55.0)) if bed_band.size else 0.0
+    side_vert = float(np.mean(np.abs(sobelx[:, : int(w * 0.22)]) > 40)) + float(
+        np.mean(np.abs(sobelx[:, int(w * 0.78) :]) > 40)
+    )
+    bed_score = min(
+        1.0,
+        bed_soft * 0.45 + bed_horiz * 0.85 + bed_flat * 0.35 + min(side_vert, 0.8) * 0.25,
+    )
 
     edge_d = float(edges.mean() / 255.0)
     mean_b = float(gray.mean())
@@ -228,16 +242,19 @@ def _room_heuristic(img) -> dict[str, Any]:
                 - exterior_score * 0.15,
             ),
         )
-    # Warm mid-frame furniture tones push living above bare/white rooms.
     if mid_warm > 0.07 and toilet_score < 0.48 and exterior_score < 0.55:
         living_score = max(
             living_score,
             min(1.0, 0.42 + mid_warm * 1.35 - toilet_score * 0.55),
         )
 
-    bedroom_score = living_score * 0.85
+    bedroom_score = living_score * 0.55
     if sat_mean < 55 and living_score > 0.25:
         bedroom_score = min(1.0, bedroom_score + 0.1)
+    bedroom_score = max(bedroom_score, bed_score)
+    if bed_score >= 0.42:
+        living_score *= 0.25
+        bedroom_score = max(bedroom_score, min(1.0, 0.55 + bed_score * 0.45))
 
     scores: dict[str, Any] = {
         "toilet": round(float(toilet_score), 3),
@@ -245,6 +262,7 @@ def _room_heuristic(img) -> dict[str, Any]:
         "exterior": round(float(exterior_score), 3),
         "living": round(float(living_score), 3),
         "bedroom": round(float(max(0.0, bedroom_score)), 3),
+        "bed": round(float(bed_score), 3),
     }
     preferred = max(
         [
@@ -258,6 +276,8 @@ def _room_heuristic(img) -> dict[str, Any]:
     label = preferred[0]
     if scores["toilet"] > preferred[1] + 0.08 and scores["toilet"] > 0.45:
         label = "toilet"
+    if bed_score >= 0.48 and scores["bedroom"] >= scores["living"]:
+        label = "bedroom"
     scores["label"] = label
     return scores
 
@@ -271,7 +291,8 @@ def _cover_room_bonus(room: dict[str, Any]) -> float:
     if label == "kitchen":
         return 7.0 + 4.0 * float(room.get("kitchen") or 0)
     if label == "bedroom":
-        return 3.0 + 2.0 * float(room.get("bedroom") or 0)
+        # Bedroom is usable gallery material but a weak channel-cover lead.
+        return -2.0 + 1.5 * float(room.get("bedroom") or 0) - 8.0 * float(room.get("bed") or 0)
     if label == "toilet":
         return -24.0 - 14.0 * float(room.get("toilet") or 0)
     return 0.0
@@ -320,6 +341,7 @@ def _cv_metrics(path: Path) -> dict[str, Any] | None:
     soft_reject = bool(
         text_soft
         or (label == "toilet" and float(room.get("toilet") or 0) > 0.48)
+        or (label == "bedroom" and float(room.get("bed") or 0) >= 0.55)
     )
 
     total = (

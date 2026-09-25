@@ -56,7 +56,7 @@ class CoverRenderData:
         logo_path = resolve_gallery_logo_path(cover_style_family(style))
         logo_src = _file_to_data_url(str(logo_path)) if logo_path and logo_path.is_file() else ""
         return {
-            "BG_SRC": _file_to_data_url(source_image),
+            "BG_SRC": _file_to_data_url(source_image, enhance=True),
             "LOGO_SRC": logo_src,
             "REF": str(self.public_listing_id or ""),
             "PROJECT": str(self.project or self.property_type or "优质房源"),
@@ -91,10 +91,23 @@ def _display_size(value: Any) -> str:
     return text
 
 
-def _file_to_data_url(path: str) -> str:
+def _file_to_data_url(path: str, *, enhance: bool = False) -> str:
     source = Path(path)
     if not source.is_file():
         raise FileNotFoundError(f"cover_source_not_found:{source}")
+    if enhance:
+        from io import BytesIO
+
+        from PIL import Image, ImageOps
+
+        from .photo_formatter import enhance_property_photo
+
+        with Image.open(source) as raw:
+            polished = enhance_property_photo(ImageOps.exif_transpose(raw).convert("RGB"))
+        buffer = BytesIO()
+        polished.save(buffer, format="JPEG", quality=94, optimize=True)
+        encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+        return f"data:image/jpeg;base64,{encoded}"
     mime = mimetypes.guess_type(source.name)[0] or "image/jpeg"
     encoded = base64.b64encode(source.read_bytes()).decode("ascii")
     return f"data:{mime};base64,{encoded}"
