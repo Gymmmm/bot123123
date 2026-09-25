@@ -13,7 +13,12 @@ import os
 from pathlib import Path
 from typing import Mapping, Sequence
 
-from v3_core.media.cover_styles import FINAL_COVER_STYLES, cover_template_path
+from v3_core.media.cover_styles import (
+    FINAL_COVER_STYLES,
+    PORTRAIT_COVER_STYLES,
+    VIDEO_COVER_STYLES,
+    cover_template_path,
+)
 from v3_core.storage.bootstrap import REQUIRED_V3_TABLES, existing_tables
 
 
@@ -207,7 +212,7 @@ def run_preflight(
         )
         checks.append(_admin_ids_check(values, "publisher"))
 
-        styles = (*FINAL_COVER_STYLES, "video_vertical")
+        styles = (*FINAL_COVER_STYLES, *PORTRAIT_COVER_STYLES, *VIDEO_COVER_STYLES)
         for style in styles:
             template = cover_template_path(style, allow_video=True).resolve()
             checks.append(_check(f"template:{style}", template.is_file(), str(template)))

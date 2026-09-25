@@ -10,21 +10,26 @@ from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont, ImageOps
 
 JPEG_QUALITY = 94
 BG_COLOR = (255, 255, 255)
-PADDING = 24
+# Thin clean white frame around the photo — not letterbox bars.
+FRAME_BORDER = 10
+# Legacy alias kept for callers/tests that still pass padding=.
+PADDING = FRAME_BORDER
 LANDSCAPE_THRESHOLD = 1.10
 PORTRAIT_THRESHOLD = 0.90
 
+# Gallery canvases match cover standards so 更多实拍 flips stay size-stable.
 CANVAS_PRESETS = {
-    "landscape": {"size": (1200, 900), "logo_width_ratio": 0.30},
-    "portrait": {"size": (900, 1200), "logo_width_ratio": 0.30},
-    "square": {"size": (1080, 1080), "logo_width_ratio": 0.30},
+    "landscape": {"size": (1080, 864), "logo_width_ratio": 0.32},
+    "portrait": {"size": (1200, 1500), "logo_width_ratio": 0.34},
+    # Near-square sources join the landscape family for flipper continuity.
+    "square": {"size": (1080, 864), "logo_width_ratio": 0.32},
 }
 
-LOGO_MARGIN_X_RATIO = 0.028
-LOGO_MARGIN_Y_RATIO = 0.028
+LOGO_MARGIN_X_RATIO = 0.030
+LOGO_MARGIN_Y_RATIO = 0.030
 LOGO_OPACITY = 0.98
-LOGO_MAX_PHOTO_WIDTH_RATIO = 0.40
-LOGO_MAX_PHOTO_HEIGHT_RATIO = 0.28
+LOGO_MAX_PHOTO_WIDTH_RATIO = 0.42
+LOGO_MAX_PHOTO_HEIGHT_RATIO = 0.30
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 
 ROOT = Path(__file__).resolve().parent
@@ -58,17 +63,25 @@ def detect_orientation(width: int, height: int) -> str:
     return "square"
 
 
-def enhance_property_photo(image: Image.Image) -> Image.Image:
-    """Mild production enhance only — subtle lift, no heavy sharpen/saturate.
+def gallery_canvas_key(orientation: str | None) -> str:
+    """Map detected orientation onto the two production gallery canvases."""
+    key = str(orientation or "landscape").strip().lower()
+    if key == "portrait":
+        return "portrait"
+    return "landscape"
 
-    Geometry and scene contents stay untouched. Safe default for gallery / scrub
-    derivatives; skip when callers pass enhance=False.
+
+def enhance_property_photo(image: Image.Image) -> Image.Image:
+    """Production gallery polish — brighten, lift contrast, light sharpen.
+
+    Geometry is handled separately by the white-frame cover-fill step.
     """
-    image = ImageOps.autocontrast(image, cutoff=0.4)
-    image = ImageEnhance.Brightness(image).enhance(1.025)
-    image = ImageEnhance.Contrast(image).enhance(1.03)
-    image = ImageEnhance.Color(image).enhance(1.02)
-    return image.filter(ImageFilter.UnsharpMask(radius=1.0, percent=40, threshold=5))
+    image = ImageOps.autocontrast(image, cutoff=0.6)
+    image = ImageEnhance.Brightness(image).enhance(1.09)
+    image = ImageEnhance.Contrast(image).enhance(1.07)
+    image = ImageEnhance.Color(image).enhance(1.05)
+    image = ImageEnhance.Sharpness(image).enhance(1.15)
+    return image.filter(ImageFilter.UnsharpMask(radius=1.2, percent=60, threshold=3))
 
 
 def apply_logo_opacity(logo: Image.Image, opacity: float = LOGO_OPACITY) -> Image.Image:
@@ -79,25 +92,42 @@ def apply_logo_opacity(logo: Image.Image, opacity: float = LOGO_OPACITY) -> Imag
     return logo
 
 
+def cover_frame_image(
+    src: Image.Image,
+    canvas_size: tuple[int, int],
+    border: int = FRAME_BORDER,
+    bg_color: tuple[int, int, int] = BG_COLOR,
+) -> tuple[Image.Image, tuple[int, int, int, int]]:
+    """Fill the set canvas ratio (center-crop), leaving only a thin white frame.
+
+    Avoids large letterbox bars so 更多实拍 flips stay visually continuous.
+    """
+    canvas_w, canvas_h = canvas_size
+    border = max(0, int(border))
+    inner_w = max(1, canvas_w - border * 2)
+    inner_h = max(1, canvas_h - border * 2)
+    scale = max(inner_w / max(1, src.width), inner_h / max(1, src.height))
+    new_w = max(1, int(round(src.width * scale)))
+    new_h = max(1, int(round(src.height * scale)))
+    resized = src.resize((new_w, new_h), Image.Resampling.LANCZOS)
+    left = max(0, (new_w - inner_w) // 2)
+    top = max(0, (new_h - inner_h) // 2)
+    cropped = resized.crop((left, top, left + inner_w, top + inner_h))
+    if cropped.size != (inner_w, inner_h):
+        cropped = cropped.resize((inner_w, inner_h), Image.Resampling.LANCZOS)
+    canvas = Image.new("RGB", canvas_size, bg_color)
+    canvas.paste(cropped, (border, border))
+    return canvas, (border, border, inner_w, inner_h)
+
+
 def contain_image(
     src: Image.Image,
     canvas_size: tuple[int, int],
     padding: int = PADDING,
     bg_color: tuple[int, int, int] = BG_COLOR,
 ) -> tuple[Image.Image, tuple[int, int, int, int]]:
-    """Contain the complete source without crop/stretch and return its real image box."""
-    canvas_w, canvas_h = canvas_size
-    max_w = max(1, canvas_w - padding * 2)
-    max_h = max(1, canvas_h - padding * 2)
-    scale = min(max_w / max(1, src.width), max_h / max(1, src.height))
-    new_w = max(1, int(round(src.width * scale)))
-    new_h = max(1, int(round(src.height * scale)))
-    resized = src.resize((new_w, new_h), Image.Resampling.LANCZOS)
-    canvas = Image.new("RGB", canvas_size, bg_color)
-    x = (canvas_w - new_w) // 2
-    y = (canvas_h - new_h) // 2
-    canvas.paste(resized, (x, y))
-    return canvas, (x, y, new_w, new_h)
+    """Deprecated letterbox path — gallery production uses ``cover_frame_image``."""
+    return cover_frame_image(src, canvas_size, border=padding, bg_color=bg_color)
 
 
 def _load_font(size: int) -> ImageFont.ImageFont:
@@ -151,19 +181,31 @@ def _fallback_brand_logo(canvas_width: int, *, tone: str = "white") -> Image.Ima
 def resolve_gallery_logo_path(cover_style: str | None) -> Path | None:
     """Map cover style to the matching gallery corner mark asset.
 
-    classic_blue / right_price → white text mark
+    classic_blue / right_price / video → white text mark
     premium_photo / black_gold → champagne gold mark (matches cover brand)
+    Portrait variants reuse the same family logo as their landscape twin.
+    Empty style keeps the historical right_price (日常白) default.
     """
-    key = str(cover_style or "").strip().lower()
-    if key in _BLACK_GOLD_STYLE_KEYS or key in {"premium_photo", "premium"}:
-        path = BLACK_GOLD_LOGO
-    elif key in _CLASSIC_BLUE_STYLE_KEYS:
-        path = CLASSIC_BLUE_LOGO
-    else:
+    raw = str(cover_style or "").strip().lower()
+    if not raw:
         path = RIGHT_PRICE_LOGO
+    else:
+        try:
+            from .cover_styles import cover_style_family
+
+            key = cover_style_family(cover_style)
+        except Exception:
+            key = raw
+            if key.endswith("_portrait"):
+                key = key[: -len("_portrait")]
+        if key in _BLACK_GOLD_STYLE_KEYS or key in {"premium_photo", "premium"}:
+            path = BLACK_GOLD_LOGO
+        elif key in _CLASSIC_BLUE_STYLE_KEYS or key.startswith("video_"):
+            path = CLASSIC_BLUE_LOGO
+        else:
+            path = RIGHT_PRICE_LOGO
     if path.is_file():
         return path
-    # Fallbacks keep gallery branding available if one asset is missing.
     for candidate in (BLACK_GOLD_LOGO, RIGHT_PRICE_LOGO, CLASSIC_BLUE_LOGO):
         if candidate.is_file():
             return candidate
@@ -257,7 +299,11 @@ def format_gallery_photo(
     add_logo: bool = True,
     enhance: bool = True,
     cover_style: str | None = None,
+    *,
+    force_orientation: str | None = None,
+    border: int = FRAME_BORDER,
 ) -> dict:
+    """Polish one gallery photo onto the shared canvas with a thin white frame."""
     input_path = Path(input_path)
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -266,10 +312,11 @@ def format_gallery_photo(
         src = ImageOps.exif_transpose(source).convert("RGB")
         if enhance:
             src = enhance_property_photo(src)
-        orientation = detect_orientation(src.width, src.height)
+        detected = detect_orientation(src.width, src.height)
+        orientation = gallery_canvas_key(force_orientation or detected)
         preset = CANVAS_PRESETS[orientation]
         canvas_size = preset["size"]
-        canvas, image_box = contain_image(src, canvas_size)
+        canvas, image_box = cover_frame_image(src, canvas_size, border=border)
 
     logo_box = None
     if add_logo:
@@ -298,7 +345,9 @@ def format_gallery_photo(
         "input": str(input_path),
         "output": str(output_path),
         "orientation": orientation,
+        "source_orientation": detected,
         "canvas": {"width": canvas_size[0], "height": canvas_size[1]},
+        "border": int(border),
         "image_box": {"x": image_box[0], "y": image_box[1], "width": image_box[2], "height": image_box[3]},
         "logo_box": (
             {"x": logo_box[0], "y": logo_box[1], "width": logo_box[2], "height": logo_box[3]}
@@ -388,6 +437,7 @@ def format_gallery_folder(
     source_manifest: str | Path | None = None,
     enhance: bool = True,
     cover_style: str | None = None,
+    force_orientation: str | None = None,
 ) -> list[dict]:
     output_folder = Path(output_folder)
     output_folder.mkdir(parents=True, exist_ok=True)
@@ -406,6 +456,7 @@ def format_gallery_folder(
             logo_position=logo_position,
             enhance=enhance,
             cover_style=cover_style,
+            force_orientation=force_orientation,
         )
         info["order"] = index
         info["source_order"] = src.name

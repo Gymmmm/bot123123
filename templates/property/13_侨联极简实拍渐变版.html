@@ -32,14 +32,14 @@ body{
 
 /* =========================================================
    PRODUCTION POSTER
-   4:3，适合手机频道里查看室内空间
+   5:4 横版标准 1080×864
    html_cover_renderer.py 会直接截图 .poster
    ========================================================= */
 
 .poster{
   position:relative;
-  width:1600px;
-  height:1200px;
+  width:1080px;
+  height:864px;
   overflow:hidden;
   background:#111;
 }
@@ -74,23 +74,23 @@ body{
 
 .brand{
   position:absolute;
-  left:42px;
-  top:38px;
+  left:28.35px;
+  top:25.65px;
 
   display:flex;
   align-items:stretch;
-  gap:20px;
+  gap:13.5px;
 
   color:#f4ddb0;
-  text-shadow:0 2px 14px rgba(0,0,0,.68);
+  text-shadow:0 1.35px 9.45px rgba(0,0,0,.68);
 }
 
 .brand-logo{
-  height:128px;
+  height:86.4px;
   width:auto;
-  max-width:380px;
+  max-width:256.5px;
   object-fit:contain;
-  filter: drop-shadow(0 2px 10px rgba(0,0,0,.55));
+  filter: drop-shadow(0 1.35px 6.75px rgba(0,0,0,.55));
 }
 
 .brand-logo[src=""],
@@ -105,9 +105,9 @@ body{
 }
 
 .brand-line{
-  width:4px;
-  min-height:92px;
-  border-radius:99px;
+  width:2.7px;
+  min-height:62.1px;
+  border-radius:66.83px;
 
   background:linear-gradient(
     180deg,
@@ -115,7 +115,7 @@ body{
     #c69a43
   );
 
-  box-shadow:0 0 14px rgba(205,164,78,.18);
+  box-shadow:0 0 9.45px rgba(205,164,78,.18);
 }
 
 .brand-text{
@@ -125,19 +125,19 @@ body{
 }
 
 .brand-cn{
-  font-size:50px;
+  font-size:33.75px;
   line-height:1;
   font-weight:900;
-  letter-spacing:5px;
+  letter-spacing:3.38px;
 }
 
 .brand-en{
-  margin-top:12px;
+  margin-top:8.1px;
 
-  font-size:19px;
+  font-size:12.83px;
   line-height:1;
   font-weight:600;
-  letter-spacing:2px;
+  letter-spacing:1.35px;
 
   color:rgba(244,221,176,.92);
 }
@@ -173,10 +173,10 @@ body{
 
 .content{
   position:absolute;
-  left:54px;
-  bottom:56px;
+  left:36.45px;
+  bottom:37.8px;
 
-  width:calc(100% - 108px);
+  width:calc(100% - 72.9px);
 
   display:flex;
   flex-direction:column;
@@ -189,16 +189,16 @@ body{
 .title{
   max-width:100%;
 
-  font-size:80px;
+  font-size:54px;
   line-height:1.15;
   font-weight:800;
-  letter-spacing:.3px;
+  letter-spacing:.2.03px;
 
   color:#f3e1bd;
 
   text-shadow:
-    0 3px 10px rgba(0,0,0,.75),
-    0 1px 2px rgba(0,0,0,.9);
+    0 2.03px 6.75px rgba(0,0,0,.75),
+    0 0.68px 1.35px rgba(0,0,0,.9);
 
   white-space:nowrap;
   overflow:hidden;
@@ -206,13 +206,13 @@ body{
 }
 
 .details{
-  margin-top:11px;
+  margin-top:7.43px;
   max-width:100%;
-  font-size:46px;
+  font-size:31.05px;
   line-height:1.2;
   font-weight:700;
   color:#f3e1bd;
-  text-shadow:0 2px 9px rgba(0,0,0,.85);
+  text-shadow:0 1.35px 6.08px rgba(0,0,0,.85);
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
@@ -220,25 +220,25 @@ body{
 
 /* 价格 */
 .price{
-  margin-top:18px;
+  margin-top:12.15px;
 
-  font-size:110px;
+  font-size:74.25px;
   line-height:.96;
   font-weight:900;
-  letter-spacing:1px;
+  letter-spacing:0.68px;
 
   color:#fff;
 
   text-shadow:
-    0 4px 16px rgba(0,0,0,.68),
-    0 2px 4px rgba(0,0,0,.8);
+    0 2.7px 10.8px rgba(0,0,0,.68),
+    0 1.35px 2.7px rgba(0,0,0,.8);
 
   white-space:nowrap;
 }
 
 /* 详情行 */
 .meta{
-  margin-top:18px;
+  margin-top:12.15px;
 
   display:flex;
   justify-content:flex-start;
@@ -246,13 +246,13 @@ body{
   flex-wrap:wrap;
   gap:0;
 
-  font-size:28px;
+  font-size:18.9px;
   line-height:1.3;
   font-weight:600;
 
   color:rgba(255,255,255,.83);
 
-  text-shadow:0 2px 6px rgba(0,0,0,.8);
+  text-shadow:0 1.35px 4.05px rgba(0,0,0,.8);
 }
 
 .meta-item{
@@ -263,7 +263,7 @@ body{
 
 .meta-item + .meta-item::before{
   content:"·";
-  margin:0 13px;
+  margin:0 8.78px;
   color:rgba(238,211,158,.8);
 }
 
@@ -273,29 +273,29 @@ body{
    ========================================================= */
 
 .highlights{
-  margin-top:15px;
+  margin-top:10.12px;
 
   display:flex;
   justify-content:flex-start;
   flex-wrap:wrap;
-  gap:9px;
+  gap:6.08px;
 }
 
 .highlight{
-  padding:7px 14px;
+  padding:4.73px 9.45px;
 
-  border:1px solid rgba(238,211,158,.28);
-  border-radius:999px;
+  border:0.68px solid rgba(238,211,158,.28);
+  border-radius:674.33px;
 
   background:rgba(0,0,0,.20);
 
-  font-size:21px;
+  font-size:14.18px;
   line-height:1;
   font-weight:600;
 
   color:rgba(255,255,255,.83);
 
-  backdrop-filter:blur(4px);
+  backdrop-filter:blur(2.7px);
 }
 
 /* 没值时由 renderer 的 data-field 自动隐藏 */
@@ -435,7 +435,7 @@ body{
   function fitTitle(){
 
     /*
-      先按正常 80px；
+      先按正常 54px；
       太长再逐步缩小。
     */
 

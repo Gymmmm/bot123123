@@ -13,7 +13,12 @@ import os
 from pathlib import Path
 from typing import Any
 
-from .cover_styles import cover_template_path, normalize_cover_style
+from .cover_styles import (
+    cover_style_family,
+    cover_template_path,
+    cover_viewport,
+    normalize_cover_style,
+)
 from .photo_formatter import resolve_gallery_logo_path
 
 
@@ -48,7 +53,7 @@ class CoverRenderData:
         if price and not price.startswith("$") and not negotiable:
             price = f"${price}"
         suffix = "/月" if deal_type == "rent" and price and not negotiable else ""
-        logo_path = resolve_gallery_logo_path(style)
+        logo_path = resolve_gallery_logo_path(cover_style_family(style))
         logo_src = _file_to_data_url(str(logo_path)) if logo_path and logo_path.is_file() else ""
         return {
             "BG_SRC": _file_to_data_url(source_image),
@@ -108,7 +113,8 @@ def render_cover(
     except ImportError as exc:
         raise RuntimeError("cover_renderer_requires_playwright") from exc
 
-    template = cover_template_path(normalize_cover_style(style, allow_video=True)).resolve()
+    normalized_style = normalize_cover_style(style, allow_video=True)
+    template = cover_template_path(normalized_style, allow_video=True).resolve()
     source = Path(source_image).resolve()
     output = Path(output_path).resolve()
     if not template.is_file():
@@ -116,7 +122,9 @@ def render_cover(
     if not source.is_file():
         raise FileNotFoundError(f"cover_source_not_found:{source}")
     output.parent.mkdir(parents=True, exist_ok=True)
-    tokens = data.tokens(str(source), style=style)
+    tokens = data.tokens(str(source), style=normalized_style)
+    viewport = cover_viewport(normalized_style)
+    theme = cover_style_family(normalized_style)
 
     with sync_playwright() as playwright:
         launch_options: dict[str, Any] = {
@@ -135,10 +143,17 @@ def render_cover(
         browser = playwright.chromium.launch(**launch_options)
         try:
             page = browser.new_page(
-                viewport={"width": 1900, "height": 1500},
+                viewport=viewport,
                 device_scale_factor=1,
             )
             page.goto(template.as_uri(), wait_until="domcontentloaded")
+            page.evaluate(
+                """(theme) => {
+                    const poster = document.querySelector('.poster');
+                    if (poster) poster.setAttribute('data-style', theme);
+                }""",
+                theme if not str(normalized_style).startswith("video_") else normalized_style,
+            )
             page.evaluate(
                 r"""(values) => {
                     const replace = value => String(value || '').replace(

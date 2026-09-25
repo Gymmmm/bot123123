@@ -113,6 +113,7 @@ def render_html_cover(
     source_image: str,
     output_path: str,
     data: dict[str, Any],
+    style: str | None = None,
 ) -> None:
     """Inject listing data into a template and capture the unscaled `.poster`."""
     try:
@@ -129,6 +130,40 @@ def render_html_cover(
     output.parent.mkdir(parents=True, exist_ok=True)
 
     fields = _canonical_cover_fields(data)
+    logo_src = ""
+    theme = "premium_photo"
+    try:
+        from v3_core.media.cover_styles import (
+            cover_style_family,
+            normalize_cover_style,
+        )
+        from v3_core.media.photo_formatter import resolve_gallery_logo_path
+
+        style_hint = str(style or "").strip()
+        if not style_hint:
+            hint = str(Path(template_path).name)
+            name_map = (
+                ("01_", "classic_blue"),
+                ("03_", "right_price"),
+                ("04_黑金", "black_gold"),
+                ("13_", "premium_photo"),
+                ("14_", "premium_photo"),
+                ("15_", "video_landscape"),
+                ("16_", "video_portrait"),
+            )
+            for prefix, key in name_map:
+                if prefix in hint:
+                    style_hint = key
+                    break
+            if "竖版视频" in hint:
+                style_hint = "video_portrait"
+        normalized = normalize_cover_style(style_hint or "premium_photo", allow_video=True)
+        theme = normalized if str(normalized).startswith("video_") else cover_style_family(normalized)
+        logo_path = resolve_gallery_logo_path(theme)
+        if logo_path and logo_path.is_file():
+            logo_src = _file_to_data_url(str(logo_path))
+    except Exception:
+        logo_src = ""
 
     with sync_playwright() as playwright:
         launch_options: dict[str, Any] = {
@@ -140,13 +175,33 @@ def render_html_cover(
             launch_options["executable_path"] = explicit_browser
         browser = playwright.chromium.launch(**launch_options)
         try:
+            # Must fully contain landscape (1600×1200), portrait (1080×1350),
+            # and video posters (1600×900 / 1080×1920).
             page = browser.new_page(
-                viewport={"width": 1900, "height": 1500},
+                viewport={"width": 2000, "height": 2100},
                 device_scale_factor=1,
             )
             page.goto(template.as_uri(), wait_until="domcontentloaded")
+            poster_box = page.locator(".poster").first
+            if poster_box.count():
+                size = poster_box.evaluate(
+                    "el => ({width: Math.ceil(el.getBoundingClientRect().width), "
+                    "height: Math.ceil(el.getBoundingClientRect().height)})"
+                )
+                page.set_viewport_size({
+                    "width": max(int(size.get("width") or 1600) + 80, 400),
+                    "height": max(int(size.get("height") or 1200) + 80, 400),
+                })
+                page.evaluate(
+                    """(theme) => {
+                        const poster = document.querySelector('.poster');
+                        if (poster) poster.setAttribute('data-style', theme);
+                    }""",
+                    theme,
+                )
             token_values = {
                 "BG_SRC": _file_to_data_url(source_image),
+                "LOGO_SRC": logo_src,
                 "REF": fields["ref"],
                 "PROJECT": fields["project"],
                 "PROJECT_ALIAS": fields["project_alias"],
@@ -194,6 +249,19 @@ def render_html_cover(
                     }
                 }"""
             )
+            brand_logo = page.locator("#brandLogo").first
+            if brand_logo.count():
+                if logo_src:
+                    brand_logo.evaluate("(el, src) => el.src = src", logo_src)
+                    brand_logo.evaluate(
+                        """async el => {
+                            if (!el.complete) await new Promise(resolve => {
+                                el.onload = resolve; el.onerror = resolve;
+                            });
+                        }"""
+                    )
+                else:
+                    brand_logo.evaluate("el => { el.removeAttribute('src'); el.style.display = 'none'; }")
             for element_id, value in fields.items():
                 locator = page.locator(f"#{element_id}")
                 if locator.count():

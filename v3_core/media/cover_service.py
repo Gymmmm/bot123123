@@ -13,7 +13,11 @@ from typing import Callable
 from v3_core.publishing.formatting import display_floor, display_layout, display_property_type
 from v3_core.storage.inventory_reader import InventoryReader
 from .cover_renderer import CoverRenderData, render_cover
-from .cover_styles import normalize_cover_style, recommended_cover_style
+from .cover_styles import (
+    is_video_cover_style,
+    recommended_cover_style,
+    resolve_cover_style_for_source,
+)
 from .service import PreparedSourceMedia
 
 
@@ -78,12 +82,18 @@ class CoverRenderService:
             facts.get("property_type"),
             facts.get("property_subtype"),
         )
-        normalized_style = normalize_cover_style(selected_style, allow_video=False)
         public_id = str(listing.get("public_listing_id") or "").strip()
         if not public_id:
             raise ValueError("cover_requires_public_listing_id")
-        if not Path(media.cover_source_path).is_file():
+        cover_source = Path(media.cover_source_path).resolve()
+        if not cover_source.is_file():
             raise FileNotFoundError(f"cover_source_not_found:{media.cover_source_path}")
+        # Style family from admin/default; canvas orientation follows the main photo.
+        normalized_style = resolve_cover_style_for_source(
+            selected_style,
+            cover_source,
+            allow_video=is_video_cover_style(selected_style),
+        )
 
         property_type = display_property_type(listing.get("property_type") or "")
         layout = display_layout(listing.get("layout") or "", property_type)
@@ -117,7 +127,7 @@ class CoverRenderService:
         target.parent.mkdir(parents=True, exist_ok=True)
         rendered = self.renderer(
             style=normalized_style,
-            source_image=str(Path(media.cover_source_path).resolve()),
+            source_image=str(cover_source),
             output_path=str(target),
             data=data,
         )
@@ -128,7 +138,7 @@ class CoverRenderService:
             listing_id=str(listing_id),
             offer_id=str(offer_id),
             style=normalized_style,
-            source_image=str(Path(media.cover_source_path).resolve()),
+            source_image=str(cover_source),
             output_path=str(rendered_path),
             data=data,
         )

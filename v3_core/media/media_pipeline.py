@@ -71,6 +71,16 @@ def process_listing_media(
     gallery: list[dict[str, Any]] = []
     order = 1
     usable = {Path(path).resolve() for path in selected.get("gallery_paths", [])}
+    cover_path = str(selected.get("cover_path") or "")
+    force_orientation = None
+    if cover_path and Path(cover_path).is_file():
+        try:
+            from .cover_styles import source_image_orientation
+            from .photo_formatter import gallery_canvas_key
+
+            force_orientation = gallery_canvas_key(source_image_orientation(cover_path))
+        except Exception:
+            force_orientation = None
     for src in source_files:
         resolved = src.resolve()
         if resolved not in usable:
@@ -81,13 +91,13 @@ def process_listing_media(
             output_path=dst,
             logo_path=logo_path,
             logo_position=logo_position,
+            force_orientation=force_orientation,
         )
         info["order"] = order
         info["source_order"] = src.name
         gallery.append(info)
         order += 1
 
-    cover_path = str(selected.get("cover_path") or "")
     cover_candidate = next(
         (
             item

@@ -23,6 +23,8 @@ from qiaolian_dual.utils_formatting import _display_layout, _display_floor
 from qiaolian_dual.cover_styles import (
     ACCEPTED_COVER_STYLE_KEYS,
     FINAL_COVER_STYLES,
+    PORTRAIT_COVER_STYLES,
+    VIDEO_COVER_STYLES,
     cover_template_path,
     normalize_cover_style,
 )
@@ -30,8 +32,8 @@ from qiaolian_dual.cover_styles import (
 ROOT = Path(__file__).resolve().parent
 PACKAGE_ROOT = ROOT / "media" / "publication_packages"
 COVER_TEMPLATE_MAP = {
-    key: cover_template_path(key)
-    for key in (*FINAL_COVER_STYLES, "video_vertical")
+    key: cover_template_path(key, allow_video=True)
+    for key in (*FINAL_COVER_STYLES, *PORTRAIT_COVER_STYLES, *VIDEO_COVER_STYLES, "video_vertical")
 }
 
 PACKAGE_ADDITIVE_COLUMNS = {
@@ -154,7 +156,8 @@ def classify(*, source_type: str, source_name: str, property_type: str,
       - ordinary still listings -> premium photo (极简实拍渐变)
       - villa / townhouse / monthly rent >= 1200 -> black gold
       - right-price / classic-blue remain operator-selectable; not auto-routed
-      - video keeps the dedicated vertical template
+      - video defaults to the dedicated portrait video template
+        (operators can switch to landscape video cover)
 
     Property classification never changes just because the visual template does.
     """
@@ -169,7 +172,7 @@ def classify(*, source_type: str, source_name: str, property_type: str,
             "source_type": normalized_source,
             "listing_type": "video",
             "media_type": "video",
-            "cover_template": "video_vertical",
+            "cover_template": "video_portrait",
         }
 
     is_villa = "别墅" in listing or "villa" in listing
@@ -355,7 +358,9 @@ def ensure_source_media_assets(conn: sqlite3.Connection, source_post_id: Any) ->
 
 def _render_cover(d: dict, source: str, output: str, template: str) -> None:
     from html_cover_renderer import render_html_cover
-    template = _canonical_cover_template(template)
+    from qiaolian_dual.cover_styles import resolve_cover_style_for_source
+
+    template = resolve_cover_style_for_source(template, source, allow_video=True)
     try:
         normalized = json.loads(d.get("normalized_data") or "{}")
     except Exception:
@@ -403,8 +408,8 @@ def _render_cover(d: dict, source: str, output: str, template: str) -> None:
     if not raw_price:
         raw_price = "售价面议" if deal_type == "sale" else "租金面议"
     price_suffix = "/月" if deal_type == "rent" else ""
-    # 经典蓝卡使用独立 PRICE_SUFFIX；其余模板把单位放入价格行。
-    display_price = raw_price if template == "classic_blue" else (
+    # 经典蓝卡（横/竖）使用独立 PRICE_SUFFIX；其余模板把单位放入价格行。
+    display_price = raw_price if str(template).startswith("classic_blue") else (
         f"{raw_price}{price_suffix}" if raw_price and price_suffix and "/月" not in raw_price else raw_price
     )
     selected_template = COVER_TEMPLATE_MAP.get(template)
@@ -435,6 +440,7 @@ def _render_cover(d: dict, source: str, output: str, template: str) -> None:
         source_image=source,
         output_path=output,
         data=render_data,
+        style=template,
     )
 
 

@@ -139,7 +139,10 @@ def test_all_formal_cover_templates_are_preflighted(tmp_path):
         "template:classic_blue",
         "template:right_price",
         "template:black_gold",
-        "template:video_vertical",
+        "template:premium_photo",
+        "template:premium_photo_portrait",
+        "template:video_landscape",
+        "template:video_portrait",
     }.issubset(names)
 
 

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>侨联地产 · 图片竖版标准封面</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{
+  background:#111;
+  font-family:"Noto Sans SC","Noto Sans CJK SC","PingFang SC","Microsoft YaHei",sans-serif;
+}
+@font-face{
+  font-family:"Noto Sans SC";
+  src:local("Noto Sans SC"),local("Noto Sans CJK SC");
+  font-weight:400 900;
+  font-display:block;
+}
+
+/* 竖版标准画布 1200×1500（5:4 竖向） */
+.poster{
+  position:relative;
+  width:1200px;
+  height:1500px;
+  overflow:hidden;
+  background:#0b1220;
+  color:#fff;
+}
+.bg{
+  position:absolute;inset:0;
+  width:100%;height:100%;
+  object-fit:cover;object-position:center;
+}
+.shade{
+  position:absolute;inset:0;pointer-events:none;
+  background:
+    linear-gradient(180deg,rgba(0,0,0,.42) 0%,rgba(0,0,0,.08) 28%,rgba(0,0,0,.18) 55%,rgba(0,0,0,.82) 100%);
+}
+
+.brand{
+  position:absolute;left:40px;top:37.78px;z-index:3;
+  display:flex;align-items:center;gap:17.78px;
+}
+.brand-logo{
+  height:106.67px;width:auto;max-width:355.56px;object-fit:contain;
+  filter:drop-shadow(0 2.22px 11.11px rgba(0,0,0,.55));
+}
+.brand-logo[src=""],
+.brand-logo:not([src]){display:none}
+.brand:has(.brand-logo[src^="data:"]) .brand-text{display:none}
+.brand-text .cn{
+  font-size:48.89px;font-weight:800;letter-spacing:.06em;line-height:1;
+  text-shadow:0 2.22px 11.11px rgba(0,0,0,.55);
+}
+.brand-text .en{
+  margin-top:8.89px;font-size:16.67px;font-weight:700;letter-spacing:.16em;opacity:.92;
+  text-shadow:0 2.22px 8.89px rgba(0,0,0,.5);
+}
+
+.content{
+  position:absolute;left:44.44px;right:44.44px;bottom:48.89px;z-index:3;
+  display:flex;flex-direction:column;gap:15.56px;
+}
+.title{
+  font-size:71.11px;font-weight:800;line-height:1.12;
+  text-shadow:0 3.33px 13.33px rgba(0,0,0,.75);
+  white-space:nowrap;overflow:hidden;
+}
+.details{
+  font-size:37.78px;font-weight:700;opacity:.95;
+  text-shadow:0 2.22px 8.89px rgba(0,0,0,.7);
+  white-space:nowrap;overflow:hidden;
+}
+.price{
+  font-size:86.67px;font-weight:900;line-height:1;
+  text-shadow:0 4.44px 17.78px rgba(0,0,0,.7);
+  white-space:nowrap;
+}
+.meta{
+  display:flex;flex-wrap:wrap;gap:0 4.44px;
+  font-size:28.89px;font-weight:600;opacity:.88;
+}
+.meta-item + .meta-item::before{content:"·";margin:0 11.11px;opacity:.7}
+
+/* —— theme: premium_photo (default champagne) —— */
+.poster,
+.poster[data-style="premium_photo"]{--accent:#f3e1bd;--price:#fff;--chip-border:rgba(238,211,158,.28)}
+.poster[data-style="premium_photo"] .title,
+.poster[data-style="premium_photo"] .details{color:var(--accent)}
+.poster[data-style="premium_photo"] .price{color:var(--price)}
+.poster[data-style="premium_photo"] .brand-text{color:#f4ddb0}
+
+/* —— theme: classic_blue —— */
+.poster[data-style="classic_blue"] .shade{
+  background:
+    linear-gradient(180deg,rgba(4,14,36,.55) 0%,rgba(4,14,36,.12) 30%,rgba(4,14,36,.2) 55%,rgba(4,14,36,.88) 100%);
+}
+.poster[data-style="classic_blue"] .content{
+  background:linear-gradient(135deg,rgba(10,42,110,.94),rgba(14,56,140,.90));
+  border:1.11px solid rgba(255,255,255,.18);
+  border-radius:31.11px;padding:31.11px 33.33px 28.89px;
+  left:31.11px;right:31.11px;bottom:31.11px;
+}
+.poster[data-style="classic_blue"] .title{color:#fff;font-size:57.78px}
+.poster[data-style="classic_blue"] .details{color:rgba(255,255,255,.94);font-size:31.11px}
+.poster[data-style="classic_blue"] .price{color:#ffd45e;font-size:71.11px}
+.poster[data-style="classic_blue"] .brand-text{color:#fff}
+
+/* —— theme: right_price —— */
+.poster[data-style="right_price"] .shade{
+  background:
+    linear-gradient(180deg,rgba(12,20,40,.5) 0%,rgba(12,20,40,.1) 35%,rgba(12,20,40,.75) 100%),
+    linear-gradient(90deg,rgba(12,20,40,.72) 0%,rgba(12,20,40,.2) 55%,transparent 100%);
+}
+.poster[data-style="right_price"] .title{color:#fff;font-size:64.44px}
+.poster[data-style="right_price"] .details{
+  display:inline-block;width:fit-content;max-width:100%;
+  margin-top:4.44px;padding:8.89px 24.44px;border-radius:1110px;
+  background:rgba(255,255,255,.96);color:#1d4ed8;border:2.22px solid #2563eb;font-size:31.11px;
+  text-shadow:none;
+}
+.poster[data-style="right_price"] .price{
+  align-self:flex-start;margin-top:8.89px;padding:20px 31.11px;border-radius:31.11px;
+  background:#FFF6EC;color:#1E4FD6;font-size:62.22px;text-shadow:none;
+}
+.poster[data-style="right_price"] .brand-text{color:#fff}
+
+/* —— theme: black_gold —— */
+.poster[data-style="black_gold"] .shade{
+  background:
+    linear-gradient(180deg,rgba(5,5,5,.55) 0%,rgba(5,5,5,.12) 32%,rgba(5,5,5,.82) 100%),
+    linear-gradient(90deg,rgba(5,5,5,.55) 0%,transparent 60%);
+}
+.poster[data-style="black_gold"] .title{color:#fff8e8;font-size:64.44px}
+.poster[data-style="black_gold"] .details{
+  display:inline-block;width:fit-content;max-width:100%;
+  padding:11.11px 24.44px;border-radius:1110px;
+  border:2.22px solid rgba(242,207,121,.75);background:rgba(24,24,24,.9);
+  color:#f2cf79;font-size:31.11px;text-shadow:none;
+}
+.poster[data-style="black_gold"] .price{
+  align-self:flex-start;margin-top:6.67px;padding:17.78px 31.11px;border-radius:31.11px;
+  border:2.22px solid rgba(242,207,121,.78);background:rgba(14,14,14,.88);
+  color:#f2cf79;font-size:62.22px;text-shadow:none;
+}
+.poster[data-style="black_gold"] .brand-text{color:#f2cf79}
+.poster[data-style="black_gold"] .brand-text .en{color:#dbc28e}
+</style>
+</head>
+<body>
+<div class="poster" id="poster" data-style="premium_photo">
+  <img id="bg" class="bg" src="{{BG_SRC}}" alt="">
+  <div class="shade"></div>
+
+  <div class="brand">
+    <img id="brandLogo" class="brand-logo" src="{{LOGO_SRC}}" alt="侨联地产">
+    <div class="brand-text">
+      <div class="cn">侨联地产</div>
+      <div class="en">QIAO LIAN</div>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="title" id="project" data-autofit="40">{{PROJECT}}</div>
+    <div class="details" data-fields="layout,area">
+      <span id="layout" data-field="layout">{{LAYOUT}}</span>
+      <span data-field="area"> · <span id="area">{{AREA}}</span></span>
+    </div>
+    <div class="price" id="price_line" data-autofit="48">{{PRICE_LINE}}</div>
+    <div class="meta" data-fields="size,floor">
+      <span class="meta-item" data-field="size" id="size">{{SIZE}}</span>
+      <span class="meta-item" data-field="floor" id="floor">{{FLOOR}}</span>
+    </div>
+  </div>
+</div>
+</body>
+</html>

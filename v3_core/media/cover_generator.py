@@ -116,8 +116,15 @@ def generate_cover(
     output_path: str,
     data: CoverRenderData,
 ) -> str:
-    """Generate one 1200x900 listing cover using Pillow only."""
-    style = str(style or "right_price").strip().lower()
+    """Generate one listing cover using Pillow only.
+
+    Landscape image styles render at 1080×864. Portrait / video style keys
+    fall back to their visual family on the landscape canvas so callers never
+    crash; production HTML renderer owns true portrait/video canvases.
+    """
+    from .cover_styles import cover_style_family, normalize_cover_style
+
+    style = cover_style_family(normalize_cover_style(style, allow_video=True))
     if style not in {"classic_blue", "right_price", "black_gold", "premium_photo"}:
         style = "right_price"
     source = Path(source_image).expanduser().resolve()
@@ -126,7 +133,7 @@ def generate_cover(
         raise FileNotFoundError(f"cover_source_not_found:{source}")
     output.parent.mkdir(parents=True, exist_ok=True)
 
-    target_width, target_height = 1200, 900
+    target_width, target_height = 1080, 864
     bg = Image.open(source).convert("RGBA")
     bg_ratio = bg.width / bg.height
     target_ratio = target_width / target_height

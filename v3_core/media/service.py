@@ -17,13 +17,13 @@ from typing import Any
 
 from v3_core.ingest.source_reader import SourceReader
 from .media_selection import select_publication_media
-from .photo_formatter import format_gallery_photo, resolve_gallery_logo_path
+from .photo_formatter import format_gallery_photo, gallery_canvas_key, resolve_gallery_logo_path
 from .source_scrub import scrub_file
 
 
 MAX_SCRUB_COVERAGE = 0.08
 SCRUB_REVISION = "source_scrub_v3_force_bottom_contact_crop_20260925"
-GALLERY_BRAND_REVISION = "qiaolian_gallery_logo_v6_larger_premium_gold_20260925"
+GALLERY_BRAND_REVISION = "qiaolian_gallery_frame_v8_coverfill_bright_20260925"
 
 
 @dataclass(frozen=True)
@@ -70,7 +70,14 @@ class MediaPreparationService:
     @staticmethod
     def _gallery_style_key(cover_style: str | None) -> str:
         """Stable cache key per cover mark: classic_blue / right_price / black_gold."""
-        key = str(cover_style or "").strip().lower()
+        try:
+            from .cover_styles import cover_style_family
+
+            key = cover_style_family(cover_style)
+        except Exception:
+            key = str(cover_style or "").strip().lower()
+            if key.endswith("_portrait"):
+                key = key[: -len("_portrait")]
         if key in {"black_gold", "villa_premium", "dark_glass", "premium_photo", "premium"}:
             return "black_gold"
         if key in {
@@ -81,19 +88,41 @@ class MediaPreparationService:
             "minimal_white",
             "blue_banner",
             "premium_4image",
-        }:
+        } or str(key).startswith("video_"):
             return "classic_blue"
         return "right_price"
 
     @classmethod
-    def _gallery_digest(cls, path: Path, cover_style: str | None = None) -> str:
+    def _gallery_digest(
+        cls,
+        path: Path,
+        cover_style: str | None = None,
+        *,
+        gallery_orientation: str | None = None,
+    ) -> str:
         digest = hashlib.sha256()
         style_key = cls._gallery_style_key(cover_style)
-        digest.update((GALLERY_BRAND_REVISION + "\0" + style_key + "\0").encode("utf-8"))
+        orient_key = gallery_canvas_key(gallery_orientation)
+        digest.update(
+            (GALLERY_BRAND_REVISION + "\0" + style_key + "\0" + orient_key + "\0").encode("utf-8")
+        )
         with path.open("rb") as handle:
             for chunk in iter(lambda: handle.read(1024 * 1024), b""):
                 digest.update(chunk)
         return digest.hexdigest()
+
+    @staticmethod
+    def _gallery_orientation_for_cover(cover_source_path: str | Path | None) -> str:
+        """Lock every 更多实拍 frame to the main-cover orientation for smooth flips."""
+        if not cover_source_path:
+            return "landscape"
+        try:
+            from .cover_styles import source_image_orientation
+
+            detected = source_image_orientation(cover_source_path)
+        except Exception:
+            return "landscape"
+        return gallery_canvas_key(detected)
 
     def _branded_gallery(
         self,
@@ -101,25 +130,31 @@ class MediaPreparationService:
         source_post_id: int | str,
         paths: list[str],
         cover_style: str | None = None,
+        cover_source_path: str | Path | None = None,
     ) -> list[str]:
         """Create deterministic logo-bearing gallery copies without touching evidence.
 
         Cover rendering intentionally keeps using the clean selected source.  The
         returned files are only for the public ``更多实拍`` gallery, preventing a
         second brand mark from appearing underneath the cover template.
-        Gallery corner marks follow the listing cover brand
-        (经典蓝白标 / 日常白 / 极简实拍与黑金用香槟金角标).
+        All frames share the cover's landscape/portrait canvas so flips stay
+        size-stable, with a thin white frame + brighten polish.
         """
         target_dir = self.prepared_dir / str(int(source_post_id)) / "gallery"
         target_dir.mkdir(parents=True, exist_ok=True)
         style_key = self._gallery_style_key(cover_style)
+        gallery_orientation = self._gallery_orientation_for_cover(cover_source_path)
         branded: list[str] = []
         for raw in paths:
             source = Path(str(raw)).expanduser().resolve()
             if not source.is_file():
                 raise FileNotFoundError(f"gallery_source_not_found:{source}")
-            digest = self._gallery_digest(source, cover_style=cover_style)
-            target = target_dir / f"{style_key}_{digest[:20]}_gallery.jpg"
+            digest = self._gallery_digest(
+                source,
+                cover_style=cover_style,
+                gallery_orientation=gallery_orientation,
+            )
+            target = target_dir / f"{style_key}_{gallery_orientation}_{digest[:16]}_gallery.jpg"
             if not target.is_file():
                 format_gallery_photo(
                     source,
@@ -127,8 +162,9 @@ class MediaPreparationService:
                     logo_path=resolve_gallery_logo_path(cover_style),
                     logo_position="top_left",
                     add_logo=True,
-                    enhance=True,  # mild enhance_property_photo only
+                    enhance=True,
                     cover_style=cover_style,
+                    force_orientation=gallery_orientation,
                 )
             branded.append(str(target.resolve()))
         return branded
@@ -212,9 +248,11 @@ class MediaPreparationService:
             source_post_id=source_post_id,
             paths=[str(path) for path in selected["gallery_paths"]],
             cover_style=cover_style,
+            cover_source_path=selected["cover_path"],
         )
         rejected = [str(path) for path in scrub_rejected]
         rejected.extend(str(path) for path in selected["rejected_paths"])
+        gallery_orientation = self._gallery_orientation_for_cover(selected["cover_path"])
         return PreparedSourceMedia(
             source_post_id=int(source_post_id),
             cover_source_path=str(selected["cover_path"]),
@@ -223,6 +261,7 @@ class MediaPreparationService:
                 **self.reader.source_identity(source_post_id),
                 "gallery_brand_revision": GALLERY_BRAND_REVISION,
                 "gallery_cover_style": self._gallery_style_key(cover_style),
+                "gallery_orientation": gallery_orientation,
             },
             duplicates=tuple(dict(item) for item in selected["duplicates"]),
             rejected_paths=tuple(rejected),

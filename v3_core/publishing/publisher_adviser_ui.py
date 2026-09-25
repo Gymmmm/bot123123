@@ -441,7 +441,9 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
                     ),
                 )
             return True
-        if raw in {"v3smp|manual_send", "v3smp|manual_cover", "v3smp|manual_templates"} or (len(parts) == 3 and parts[1] in {"manual_style", "manual_cover_pick"}):
+        if raw in {"v3smp|manual_send", "v3smp|manual_cover", "v3smp|manual_templates"} or (
+            len(parts) == 3 and parts[1] in {"manual_style", "manual_cover_pick"}
+        ):
             state = context.user_data.get(NEW_LISTING_STATE_KEY)
             current_package = str(state.get("package_id") or "") if isinstance(state, dict) else ""
             current_offer = str(state.get("offer_id") or "") if isinstance(state, dict) else ""
@@ -490,7 +492,8 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
             if raw == "v3smp|manual_templates":
                 await query.message.reply_text(
                     "<b>🎨 选择封面格式</b>\n\n"
-                    "横版 1200×900，套在你选的主图上生成频道封面。\n"
+                    "四套风格；画幅跟主图自动走：\n"
+                    "横图 → 1080×864 · 竖图 → 1200×1500\n"
                     "普通房默认「极简实拍」；别墅建议「黑金」。",
                     parse_mode=ParseMode.HTML,
                     reply_markup=InlineKeyboardMarkup([

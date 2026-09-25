@@ -2,17 +2,50 @@ from pathlib import Path
 
 from publication_package import COVER_TEMPLATE_MAP, classify
 from qiaolian_dual.cover_styles import (
+    COVER_CANVAS,
     FINAL_COVER_STYLES,
+    PORTRAIT_COVER_STYLES,
+    VIDEO_COVER_STYLES,
+    cover_orientation,
+    cover_style_family,
     cover_template_path,
     normalize_cover_style,
+    resolve_cover_style_for_source,
 )
 
 
-def test_only_three_horizontal_cover_styles_are_active():
+def test_only_four_horizontal_cover_styles_are_active():
     assert FINAL_COVER_STYLES == ("classic_blue", "right_price", "black_gold", "premium_photo")
-    assert set(COVER_TEMPLATE_MAP) == {*FINAL_COVER_STYLES, "video_vertical"}
+    assert COVER_CANVAS["landscape"] == (1080, 864)
+    assert COVER_CANVAS["portrait"] == (1200, 1500)
+    assert set(COVER_TEMPLATE_MAP) == {
+        *FINAL_COVER_STYLES,
+        *PORTRAIT_COVER_STYLES,
+        *VIDEO_COVER_STYLES,
+        "video_vertical",
+    }
     for style in FINAL_COVER_STYLES:
         assert cover_template_path(style).is_file()
+    for style in PORTRAIT_COVER_STYLES:
+        assert cover_template_path(style).is_file()
+        assert cover_orientation(style) == "portrait"
+        assert cover_style_family(style) == style.removesuffix("_portrait")
+    for style in VIDEO_COVER_STYLES:
+        assert cover_template_path(style, allow_video=True).is_file()
+
+
+def test_cover_style_follows_main_photo_orientation(tmp_path: Path):
+    from PIL import Image
+
+    landscape = tmp_path / "land.jpg"
+    portrait = tmp_path / "port.jpg"
+    Image.new("RGB", (1200, 900), (10, 20, 30)).save(landscape)
+    Image.new("RGB", (900, 1200), (10, 20, 30)).save(portrait)
+
+    assert resolve_cover_style_for_source("premium_photo", landscape) == "premium_photo"
+    assert resolve_cover_style_for_source("premium_photo", portrait) == "premium_photo_portrait"
+    assert resolve_cover_style_for_source("classic_blue_portrait", landscape) == "classic_blue"
+    assert resolve_cover_style_for_source("black_gold", portrait) == "black_gold_portrait"
 
 
 def test_legacy_names_collapse_into_final_styles():
@@ -21,6 +54,8 @@ def test_legacy_names_collapse_into_final_styles():
     assert normalize_cover_style("price_tag") == "right_price"
     assert normalize_cover_style("villa_premium") == "black_gold"
     assert normalize_cover_style("unknown") == "classic_blue"
+    assert normalize_cover_style("vertical", allow_video=True) == "video_portrait"
+    assert normalize_cover_style("video_vertical", allow_video=True) == "video_portrait"
 
 
 def test_launch_default_cover_routing_is_deterministic():
@@ -40,6 +75,18 @@ def test_launch_default_cover_routing_is_deterministic():
             price=price,
         )
         assert routed["cover_template"] == expected
+
+
+def test_video_routing_uses_portrait_video_template():
+    routed = classify(
+        source_type="telegram",
+        source_name="collector",
+        property_type="公寓",
+        project="示例房源",
+        media_type="video",
+    )
+    assert routed["cover_template"] == "video_portrait"
+    assert routed["media_type"] == "video"
 
 
 def test_right_price_is_manual_only():
@@ -84,3 +131,13 @@ def test_final_templates_opt_in_to_overflow_autofit():
     for style in FINAL_COVER_STYLES:
         template = cover_template_path(style).read_text(encoding="utf-8")
         assert "data-autofit" in template
+        assert 'id="brandLogo"' in template
+        assert "1080px" in template and "864px" in template
+    portrait = cover_template_path("premium_photo_portrait").read_text(encoding="utf-8")
+    assert "data-autofit" in portrait
+    assert 'id="brandLogo"' in portrait
+    assert "1200px" in portrait and "1500px" in portrait
+    for style in VIDEO_COVER_STYLES:
+        template = cover_template_path(style, allow_video=True).read_text(encoding="utf-8")
+        assert "data-autofit" in template
+        assert 'id="brandLogo"' in template

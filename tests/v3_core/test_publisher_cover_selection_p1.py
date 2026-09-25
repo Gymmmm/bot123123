@@ -168,6 +168,7 @@ def test_cover_related_callbacks_stay_within_telegram_contract():
         "v3smp|manual_style|classic_blue",
         "v3smp|manual_style|right_price",
         "v3smp|manual_style|black_gold",
+        "v3smp|manual_style|premium_photo",
         "v3smp|manual_cover_pick|999",
     ]
     assert all(len(value.encode("utf-8")) <= 64 for value in callbacks)
