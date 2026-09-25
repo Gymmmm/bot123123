@@ -1,8 +1,8 @@
 """Prepare immutable derived media for V3 publication packaging.
 
 Raw source evidence is never modified. Publication media first goes through the
-conservative source-mark scrubber (prefer bottom-crop for slogan/contact bands;
-abandon scrub when coverage exceeds the safety budget), then dedupe / quality
+source-mark scrubber (crop bottom contact/slogan bands off, then light corner
+inpaint; abandon only unsafe inpaint-only results), then dedupe / quality
 ranking / cover selection runs on derived files. Gallery derivatives get a mild
 enhance + cover-style corner mark. Cover rendering remains owned by
 ``CoverRenderService``.
@@ -22,7 +22,7 @@ from .source_scrub import scrub_file
 
 
 MAX_SCRUB_COVERAGE = 0.08
-SCRUB_REVISION = "source_scrub_v2_crop_mild_enhance_20260920"
+SCRUB_REVISION = "source_scrub_v3_force_bottom_contact_crop_20260925"
 GALLERY_BRAND_REVISION = "qiaolian_gallery_logo_v6_larger_premium_gold_20260925"
 
 
@@ -158,9 +158,15 @@ class MediaPreparationService:
                     chosen = dst
                 else:
                     info = scrub_file(src, dst, prefer_crop=True)
-                    actual = info.get("inpaint_coverage")
-                    coverage = float(actual if actual is not None else info.get("coverage") or 0.0)
-                    if coverage <= MAX_SCRUB_COVERAGE:
+                    methods = [str(item) for item in (info.get("methods") or [])]
+                    cropped = any(item.startswith("crop_bottom") for item in methods)
+                    inpaint_cov = float(info.get("inpaint_coverage") or 0.0)
+                    detect_cov = float(info.get("coverage") or 0.0)
+                    # Bottom contact/slogan crop must stick — never fall back to the
+                    # watermarked original after the strip was already cut off.
+                    if cropped:
+                        chosen = dst
+                    elif max(inpaint_cov, detect_cov if "inpaint_telea" in methods else 0.0) <= MAX_SCRUB_COVERAGE:
                         chosen = dst
                     else:
                         dst.unlink(missing_ok=True)

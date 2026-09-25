@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Neutralize source watermarks / contact overlays / competitor logos on listing photos.
 
-v1 practical approach (no OCR dependency):
-  1) Heuristic detection of bottom banners, corner logos, and high text-density bands
-  2) OpenCV inpaint on detected masks (TELEA)
-  3) Optional fixed crop of bottom 8–12% when text density is high and crop is safer
+v3 practical approach (no OCR dependency):
+  1) Heuristic detection of bottom contact banners, corner logos, and slogan bands
+  2) Prefer cropping the bottom contact/slogan strip off (“P off”) before inpaint
+  3) OpenCV inpaint on remaining corner marks (TELEA)
   4) Never invent furniture — soft inpaint or crop only
 
 Demo CLI writes before/after into an output folder.
@@ -114,8 +114,8 @@ def detect_source_marks(img_bgr: np.ndarray) -> dict[str, Any]:
                 out[labels == i] = 255
         return out
 
-    # --- Bottom slogan / banner (prefer crop when heavy) ---
-    y_bot = int(h * 0.82)
+    # --- Bottom slogan / contact banner (prefer crop — “P off” the strip) ---
+    y_bot = int(h * 0.78)
     bottom = gray[y_bot:, :]
     bright_lines = text_line_mask(bottom, bright=True)
     dark_lines = text_line_mask(bottom, bright=False)
@@ -125,43 +125,56 @@ def detect_source_marks(img_bgr: np.ndarray) -> dict[str, Any]:
     bottom_glyph_density = float(bottom_glyphs.mean() / 255.0)
     bottom_text_density = float(bottom_text.mean() / 255.0)
 
-    # Row-peak: concentrated bright text band
+    # Row-peak: concentrated bright text band / flat contact bar
     row_bright = (bottom > 175).mean(axis=1)
-    peak_rows = row_bright > 0.03
+    row_dark = (bottom < 40).mean(axis=1)
+    peak_rows = (row_bright > 0.025) | (row_dark > 0.55)
     peak_frac = float(np.mean(peak_rows)) if peak_rows.size else 0.0
+    # Flat dark/bright strip across most of the width (classic contact footer)
+    row_std = bottom.std(axis=1)
+    flat_banner_rows = (row_std < 28) & ((row_bright > 0.02) | (row_dark > 0.35) | (np.abs(bottom.mean(axis=1) - gray[: max(1, y_bot)].mean()) > 28))
+    flat_banner_frac = float(np.mean(flat_banner_rows)) if flat_banner_rows.size else 0.0
 
     crop_bottom = False
     crop_frac = 0.0
-    if bottom_text_density > 0.01 or peak_frac > 0.08 or bottom_glyph_density > 0.06:
+    if (
+        bottom_text_density > 0.006
+        or peak_frac > 0.05
+        or bottom_glyph_density > 0.04
+        or flat_banner_frac > 0.12
+    ):
         local = cv2.bitwise_or(bottom_text, bottom_glyphs)
-        # Expand to full-width strip covering active text rows
-        if np.any(local > 0) or peak_frac > 0.08:
-            row_active = (local.mean(axis=1) > 1) | (row_bright > 0.025)
+        # Expand to full-width strip covering active text / banner rows
+        row_active = (
+            (local.mean(axis=1) > 0.8)
+            | (row_bright > 0.02)
+            | (row_dark > 0.45)
+            | flat_banner_rows
+        )
+        if np.any(row_active) or peak_frac > 0.05 or flat_banner_frac > 0.12:
             if np.any(row_active):
                 idxs = np.where(row_active)[0]
                 first, last = int(idxs.min()), int(idxs.max())
-                first = max(0, first - 6)
-                last = min(bottom.shape[0] - 1, last + 6)
-                # Full-width band — safer than speckled inpaint for slogans
-                band = np.zeros_like(bottom, dtype=np.uint8)
-                band[first : last + 1, :] = 255
-                # Soft feather via slight vertical shrink if band is huge
-                used_h = (last - first + 1) / float(h)
-                if used_h >= 0.045 and (
-                    bottom_text_density > 0.008 or peak_frac > 0.06 or bottom_glyph_density > 0.05
-                ):
-                    crop_bottom = True
-                    # Crop from first text row in bottom band (+ small pad)
-                    crop_frac = min(0.16, max(0.08, (bottom.shape[0] - first) / float(h) + 0.015))
-                add_region(
-                    "bottom_banner",
-                    band,
-                    y_bot,
-                    0,
-                    glyph_density=round(bottom_glyph_density, 4),
-                    text_density=round(bottom_text_density, 4),
-                    peak_frac=round(peak_frac, 4),
-                )
+            else:
+                first, last = 0, bottom.shape[0] - 1
+            first = max(0, first - 8)
+            last = min(bottom.shape[0] - 1, last + 8)
+            # Full-width band — safer than speckled inpaint for slogans/contacts
+            band = np.zeros_like(bottom, dtype=np.uint8)
+            band[first : last + 1, :] = 255
+            # Contact / slogan bars are always cropped off when detected.
+            crop_bottom = True
+            crop_frac = min(0.22, max(0.08, (bottom.shape[0] - first) / float(h) + 0.02))
+            add_region(
+                "bottom_banner",
+                band,
+                y_bot,
+                0,
+                glyph_density=round(bottom_glyph_density, 4),
+                text_density=round(bottom_text_density, 4),
+                peak_frac=round(peak_frac, 4),
+                flat_banner_frac=round(flat_banner_frac, 4),
+            )
 
     # --- Corner logos ---
     corner_boxes = [
@@ -325,10 +338,10 @@ def scrub_image(
     out = img_bgr.copy()
     h, w = out.shape[:2]
 
-    # Prefer crop when bottom slogan/banner detected — avoids smeared inpaint
-    if prefer_crop and det["crop_bottom"] and det["crop_frac"] >= 0.07:
+    # Prefer crop when bottom slogan/contact banner detected — surgically “P off”
+    if prefer_crop and det["crop_bottom"] and det["crop_frac"] >= 0.06:
         cut = int(h * (1.0 - det["crop_frac"]))
-        cut = max(int(h * 0.78), min(cut, int(h * 0.94)))
+        cut = max(int(h * 0.75), min(cut, int(h * 0.94)))
         out = out[:cut, :, :].copy()
         meta["method"].append(f"crop_bottom_{det['crop_frac']:.2f}")
         meta["crop_frac"] = det["crop_frac"]
@@ -347,7 +360,7 @@ def scrub_image(
         meta["regions"] = det["regions"] + [{**r, "after_crop": True} for r in keep_regions]
         meta["coverage"] = round(float(mask.mean() / 255.0), 5)
     else:
-        # If center slogan present but not cropped, force a conservative bottom crop
+        # If center slogan / bottom banner present but not cropped, force crop
         has_slogan = any(r.get("kind") == "center_slogan" for r in det["regions"])
         has_bottom = any(r.get("kind") == "bottom_banner" for r in det["regions"])
         if prefer_crop and (has_slogan or has_bottom):
@@ -359,9 +372,9 @@ def scrub_image(
             ]
             if ys:
                 y0 = min(ys)
-                # only crop if mark is in lower 20%
-                if y0 >= int(h * 0.78):
-                    cut = max(int(h * 0.78), y0 - 12)
+                # only crop if mark is in lower 25%
+                if y0 >= int(h * 0.75):
+                    cut = max(int(h * 0.75), y0 - 16)
                     out = out[:cut, :, :].copy()
                     meta["method"].append("crop_bottom_auto")
                     meta["crop_frac"] = round(1.0 - cut / h, 4)

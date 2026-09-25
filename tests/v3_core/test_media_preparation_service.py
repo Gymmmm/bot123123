@@ -100,7 +100,7 @@ def test_scrub_over_eight_percent_falls_back_to_untouched_derived_copy(tmp_path,
 
     def fake_scrub(src, dst, *, prefer_crop=False):
         Path(dst).write_bytes(Path(src).read_bytes())
-        return {"coverage": 0.081, "methods": ["inpaint_telea"]}
+        return {"coverage": 0.081, "methods": ["inpaint_telea"], "inpaint_coverage": 0.081}
 
     monkeypatch.setattr("v3_core.media.service.scrub_file", fake_scrub)
     prepared_dir = tmp_path / "risky"
@@ -112,6 +112,47 @@ def test_scrub_over_eight_percent_falls_back_to_untouched_derived_copy(tmp_path,
     assert all(Path(path).name.endswith("_gallery.jpg") for path in prepared.gallery_paths)
     assert all(prepared_dir in Path(path).parents for path in prepared.gallery_paths)
     assert [_sha(path) for path in paths] == before
+
+
+def test_bottom_contact_crop_is_kept_even_when_residual_inpaint_is_large(tmp_path, monkeypatch):
+    db, source_id, paths = _source(tmp_path, "cropkeep")
+
+    def fake_scrub(src, dst, *, prefer_crop=False):
+        Path(dst).write_bytes(b"cropped-clean")
+        return {
+            "coverage": 0.20,
+            "methods": ["crop_bottom_0.12", "inpaint_telea"],
+            "inpaint_coverage": 0.20,
+            "crop_frac": 0.12,
+        }
+
+    monkeypatch.setattr("v3_core.media.service.scrub_file", fake_scrub)
+    prepared_dir = tmp_path / "crop-keep"
+    service = MediaPreparationService(SourceReader(str(db)), prepared_dir=prepared_dir)
+    cleaned, mapping, _ = service._scrubbed_paths(source_post_id=source_id, paths=paths)
+    assert cleaned
+    assert all(Path(path).read_bytes() == b"cropped-clean" for path in cleaned)
+    assert all(Path(path).name.endswith("_clean.jpg") for path in cleaned)
+
+
+def test_source_scrub_crops_bottom_contact_banner(tmp_path):
+    from PIL import Image, ImageDraw
+
+    from v3_core.media.source_scrub import scrub_file
+
+    src = tmp_path / "banner.jpg"
+    img = Image.new("RGB", (1200, 900), (90, 120, 150))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle([80, 60, 1120, 720], fill=(150, 130, 110))
+    draw.rectangle([0, 780, 1200, 900], fill=(15, 15, 15))
+    draw.text((36, 812), "Tel 012 345 678  WeChat agent_xx  非侨联", fill=(255, 255, 255))
+    img.save(src, quality=95)
+
+    dst = tmp_path / "scrubbed.jpg"
+    info = scrub_file(src, dst, prefer_crop=True)
+    assert any(str(m).startswith("crop_bottom") for m in (info.get("methods") or []))
+    assert info["size_out"][1] < info["size_in"][1]
+    assert Path(dst).is_file()
 
 
 def test_resolve_gallery_logo_path_maps_three_cover_styles():
