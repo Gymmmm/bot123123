@@ -20,15 +20,27 @@
     <div class="filters" aria-label="房源筛选">
       <select id="area" aria-label="区域"><option value="">全部区域</option></select>
       <select id="type" aria-label="物业类型"><option value="">全部类型</option></select>
-      <select id="bedrooms" aria-label="卧室"><option value="">卧室不限</option></select>
       <select id="price" aria-label="总价"><option value="">总价不限</option><option value="0-100000">$10万内</option><option value="100000-200000">$10–20万</option><option value="200000-500000">$20–50万</option><option value="500000-1000000">$50–100万</option><option value="1000000-999999999">$100万以上</option></select>
       <button id="resetButton" type="button">重置</button>
     </div>
   </header>
 
-  <main class="catalog">
-    <div class="catalog-heading"><div><span class="eyebrow">QIAOLIAN PROPERTY</span><h1>出售房源</h1></div><span id="count" class="count">读取中</span></div>
-    <section id="grid" class="listing-grid" aria-live="polite"></section>
+  <main>
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-media" aria-hidden="true"><img id="heroImage" alt="" /></div>
+      <div class="hero-copy">
+        <span class="eyebrow">QIAOLIAN REALTY · PHNOM PENH</span>
+        <h1 id="hero-title">把理想的家，<br><em>留在金边。</em></h1>
+        <p>在金边，找到真正适合你的家。<br class="hero-break">精选房源、真实信息、中文服务，让每一次置业选择都更清晰。</p>
+        <div class="hero-trust" aria-label="服务特点"><span>真实房源</span><span>中文顾问</span><span>金边服务</span></div>
+        <a class="hero-cta" href="#catalog">探索出售房源 <span aria-hidden="true">↓</span></a>
+      </div>
+      <div class="hero-note"><span>01</span><span>CURATED SALE<br>LISTINGS · PHNOM PENH</span></div>
+    </section>
+
+    <section id="catalog" class="catalog" aria-labelledby="catalog-title">
+      <div class="catalog-heading"><div><span class="eyebrow">AVAILABLE COLLECTION</span><h2 id="catalog-title">精选出售房源</h2></div><span id="count" class="count">读取中</span></div>
+      <section id="grid" class="listing-grid" aria-live="polite"></section>
     <div id="pager" class="pager" hidden><button id="prev" type="button">上一页</button><span id="pageno"></span><button id="next" type="button">下一页</button></div>
   </main>
 
