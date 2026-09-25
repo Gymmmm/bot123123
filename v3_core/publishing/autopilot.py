@@ -784,10 +784,15 @@ class AutoPublishService:
             blocking.append("missing_location")
         if not str(item.get("layout") or facts.get("layout") or "").strip() and not facts.get("bedrooms"):
             blocking.append("missing_listing_info")
-        if len(tuple(getattr(media, "gallery_paths", ()) or ())) < cfg.min_media:
-            blocking.append("insufficient_media")
         cover = str(getattr(media, "cover_source_path", "") or "")
-        if not cover or not Path(cover).is_file():
+        cover_ok = bool(cover) and Path(cover).is_file()
+        # Gallery excludes the cover-source frame; count cover + other shots.
+        public_photos = len(tuple(getattr(media, "gallery_paths", ()) or ())) + (
+            1 if cover_ok else 0
+        )
+        if public_photos < cfg.min_media:
+            blocking.append("insufficient_media")
+        if not cover_ok:
             blocking.append("unreadable_media")
         allowed_statuses = {"active", "reserved"}
         if allow_pending:

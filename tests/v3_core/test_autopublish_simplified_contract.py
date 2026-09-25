@@ -265,7 +265,8 @@ def test_strict_autopublish_blockers_cover_required_failures(tmp_path):
     assert "missing_location" in service._strict_blockers(item, base_facts, good_media)
     item = dict(base_item, layout="")
     assert "missing_listing_info" in service._strict_blockers(item, base_facts, good_media)
-    short_media = SimpleNamespace(gallery_paths=(str(good_cover),) * 3, cover_source_path=str(good_cover))
+    # Gallery excludes cover-source; 2 other shots + cover = 3 < min_media(4).
+    short_media = SimpleNamespace(gallery_paths=(str(good_cover),) * 2, cover_source_path=str(good_cover))
     assert "insufficient_media" in service._strict_blockers(base_item, base_facts, short_media)
     missing_media = SimpleNamespace(gallery_paths=(str(good_cover),) * 4, cover_source_path=str(tmp_path / "missing.jpg"))
     assert "unreadable_media" in service._strict_blockers(base_item, base_facts, missing_media)

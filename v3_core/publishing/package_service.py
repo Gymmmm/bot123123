@@ -228,12 +228,14 @@ class PackageApprovalService:
             raise ValueError("package_offer_listing_mismatch")
 
         review_approved = self.reader.review_approved(offer_id=package.offer_id)
+        # Flipper = rendered cover + gallery (gallery already excludes cover-source).
+        cover_ok = Path(package.cover_path).is_file()
         eligibility = evaluate_offer_eligibility(
             facts=dict(canonical["facts"]),
             offer=offer,
             review_approved=review_approved,
-            media_count=len(package.gallery),
-            cover_exists=Path(package.cover_path).is_file(),
+            media_count=len(package.gallery) + (1 if cover_ok else 0),
+            cover_exists=cover_ok,
         )
         if not eligibility.ok:
             raise ValueError(

@@ -128,7 +128,7 @@ async def run(args):
                 media = await asyncio.to_thread(media_service.prepare, source_post_id=source_id, cover_style=style)
                 gate = evaluate_offer_eligibility(facts=canonical["facts"], offer=offer,
                     review_approved=bool(replacement) or reader.review_approved(offer_id=pub["offer_id"]),
-                    media_count=len(media.gallery_paths), cover_exists=True)
+                    media_count=len(media.gallery_paths) + 1, cover_exists=True)
                 if not gate.ok:
                     raise ValueError("quality:" + ",".join(gate.blocking))
                 cover = await asyncio.to_thread(covers.render, listing_id=pub["listing_id"], offer_id=pub["offer_id"],
