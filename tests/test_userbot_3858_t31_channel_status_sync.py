@@ -123,7 +123,7 @@ async def test_modern_channel_sync_uses_publication_instances_and_does_not_mutat
     assert any(f"property_{PUBLIC_ID}_book" in url for url in urls)
     assert any(f"property_{PUBLIC_ID}_contact" in url for url in urls)
     button_texts = [button.text for row in buttons for button in row]
-    assert button_texts == ["📷 房源详情", "📅 预约看房", "💬 中文顾问"]
+    assert button_texts == ["📷 更多实拍", "📅 预约看房", "💬 中文顾问"]
 
     with sqlite3.connect(path) as conn:
         inventory_status = conn.execute(

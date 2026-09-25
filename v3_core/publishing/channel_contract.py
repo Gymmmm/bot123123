@@ -16,7 +16,7 @@ from .public_ids import normalize_public_id
 
 CHANNEL_ACTION_ORDER = ("details", "photos", "book", "consult")
 CHANNEL_CTA_LABELS = {
-    "details": "📷 房源详情",
+    "details": "📷 更多实拍",
     "photos": "📸 更多实拍",  # kept for package/compat; not shown on channel keyboard
     "book": "📅 预约看房",
     "consult": "💬 中文顾问",
@@ -184,7 +184,7 @@ def official_channel_button_spec(
     del area
     verified = official_channel_action_identity(actions)
     status = str(inventory_status or "").strip().lower()
-    # Label stays 📷 房源详情; deep link opens the photo flipper (_photos).
+    # Label is 📷 更多实拍; deep link opens the photo flipper (_photos).
     details_btn = (CHANNEL_CTA_LABELS["details"], verified["photos"])
     consult_btn = (CHANNEL_CTA_LABELS["consult"], verified["consult"])
 

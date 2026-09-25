@@ -23,7 +23,7 @@ from .source_scrub import scrub_file
 
 MAX_SCRUB_COVERAGE = 0.08
 SCRUB_REVISION = "source_scrub_v3_center_watermark_20260925"
-GALLERY_BRAND_REVISION = "qiaolian_gallery_v10_tone_overexp_wm_20260925"
+GALLERY_BRAND_REVISION = "qiaolian_gallery_v11_no_cover_dup_20260925"
 
 
 @dataclass(frozen=True)
@@ -253,9 +253,17 @@ class MediaPreparationService:
             manual_cover_path=manual_clean or None,
             cover_preference=preference,
         )
+        cover_resolved = str(Path(str(selected["cover_path"])).resolve())
+        # Public flipper is: 1) rendered cover, 2+) other real shots.
+        # Never brand the cover-source again — that duplicates the same room as #2.
+        gallery_sources = [
+            str(path)
+            for path in selected["gallery_paths"]
+            if str(Path(str(path)).resolve()) != cover_resolved
+        ]
         branded_gallery = self._branded_gallery(
             source_post_id=source_post_id,
-            paths=[str(path) for path in selected["gallery_paths"]],
+            paths=gallery_sources,
             cover_style=cover_style,
             cover_source_path=selected["cover_path"],
         )

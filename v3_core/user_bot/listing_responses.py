@@ -398,26 +398,45 @@ def _frozen_cover_path(view: PublishedListingView) -> str:
 
 
 def _flipper_photo_paths(view: PublishedListingView) -> tuple[str, ...]:
-    """Cover first, then remaining real/gallery photos (deduped by resolved path).
+    """Cover first, then remaining real/gallery photos (deduped by path / near-dup).
 
-    Product lock: 📷 房源详情 opens at 📸 1/N = cover render, then gallery shots.
+    Product lock: 📷 更多实拍 opens at 📸 1/N = cover render, then *other* gallery
+    shots — never the same room again as a logo-only frame.
     """
     output: list[str] = []
     seen: set[str] = set()
+    cover_hash: int | None = None
 
-    def _append(path: str) -> None:
+    def _append(path: str, *, skip_near_cover: bool = False) -> None:
+        nonlocal cover_hash
         existing = _existing_file(path)
         if not existing:
             return
         key = existing
         if key in seen:
             return
+        if skip_near_cover and cover_hash is not None:
+            try:
+                from v3_core.media.ranker import NEAR_DUPLICATE_HAMMING, _dhash, _hamming
+
+                gallery_hash = _dhash(Path(existing))
+                # Cover has template overlays; allow a looser match than gallery dedupe.
+                if _hamming(cover_hash, gallery_hash) <= max(NEAR_DUPLICATE_HAMMING + 10, 12):
+                    return
+            except Exception:
+                pass
         seen.add(key)
         output.append(existing)
 
     cover = _frozen_cover_path(view)
     if cover:
         _append(cover)
+        try:
+            from v3_core.media.ranker import _dhash
+
+            cover_hash = _dhash(Path(cover))
+        except Exception:
+            cover_hash = None
 
     for raw in getattr(view, "gallery", ()) or ():
         path = str(raw or "").strip()
@@ -431,7 +450,7 @@ def _flipper_photo_paths(view: PublishedListingView) -> tuple[str, ...]:
             "cover.webp",
         }:
             continue
-        _append(path)
+        _append(path, skip_near_cover=bool(cover))
     return tuple(output)
 
 

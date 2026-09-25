@@ -91,7 +91,7 @@ def _caption_with_status(caption: str, status: str, appointment_count: int = 0, 
 
 
 def _keyboard(username: str, public_listing_id: str, status: str) -> InlineKeyboardMarkup:
-    photos = InlineKeyboardButton("📷 房源详情", url=channel_action_url(username, public_listing_id, "photos"))
+    photos = InlineKeyboardButton("📷 更多实拍", url=channel_action_url(username, public_listing_id, "photos"))
     consult = InlineKeyboardButton("💬 中文顾问", url=channel_action_url(username, public_listing_id, "contact"))
     if status in {"active", "reserved"}:
         return InlineKeyboardMarkup([

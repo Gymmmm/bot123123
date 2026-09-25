@@ -91,7 +91,7 @@ def test_recommendation_card_navigation_and_more_photos_stay_locked(monkeypatch)
     callbacks = _callbacks(kb)
     assert "⬅️ 上一套" in labels
     assert "下一套 ➡️" in labels
-    assert "📷 房源详情" in labels
+    assert "📷 更多实拍" in labels
     assert "📸 更多实拍" not in labels
     assert "🏠 房源详情" not in labels
     assert "📅 预约看房" in labels

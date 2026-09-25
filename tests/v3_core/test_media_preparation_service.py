@@ -73,7 +73,7 @@ def test_media_preparation_scrubs_to_derived_files_before_selection(tmp_path):
     assert all(prepared_dir in Path(path).parents for path in prepared.gallery_paths)
     assert all(Path(path).parent.name == "gallery" for path in prepared.gallery_paths)
     assert all(Path(path).name.endswith("_gallery.jpg") for path in prepared.gallery_paths)
-    assert prepared.source_identity["gallery_brand_revision"] == "qiaolian_gallery_v10_tone_overexp_wm_20260925"
+    assert prepared.source_identity["gallery_brand_revision"] == "qiaolian_gallery_v11_no_cover_dup_20260925"
     assert all(str(Path(path).resolve()) not in prepared.gallery_paths for path in paths)
     assert [_sha(path) for path in paths] == before
 
@@ -200,3 +200,16 @@ def test_prepare_classic_blue_uses_style_keyed_gallery_filenames(tmp_path):
 
     assert prepared.source_identity["gallery_cover_style"] == "classic_blue"
     assert all("classic_blue_" in Path(path).name for path in prepared.gallery_paths)
+
+
+def test_branded_gallery_excludes_cover_source(tmp_path):
+    """Flipper is cover render + other shots — never the same room as logo-only #2."""
+    db, source_id, paths = _source(tmp_path, "nodup")
+    prepared_dir = tmp_path / "prepared-nodup"
+    service = MediaPreparationService(SourceReader(str(db)), prepared_dir=prepared_dir)
+    prepared = service.prepare(source_post_id=source_id, cover_style="premium_photo")
+    cover = Path(prepared.cover_source_path).resolve()
+    gallery = [Path(p).resolve() for p in prepared.gallery_paths]
+    assert cover not in gallery
+    # Still keep other framed shots when multiple sources exist.
+    assert len(prepared.gallery_paths) == len(paths) - 1

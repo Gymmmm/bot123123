@@ -25,7 +25,7 @@ def test_unavailable_callback_paths_use_html_parse_mode():
 
 def test_recommendation_card_uses_unified_photo_detail():
     source = Path('qiaolian_dual/results_admin.py').read_text(encoding='utf-8')
-    assert "📷 房源详情" in source or "search_card_keyboard" in source
+    assert "📷 更多实拍" in source or "search_card_keyboard" in source
     assert "InlineKeyboardButton('📋 租赁详情', callback_data=f'listing:detail:{listing_id}')" not in source
     assert "📸 更多实拍" not in Path('qiaolian_dual/media_flipper.py').read_text(encoding='utf-8')
 

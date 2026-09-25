@@ -100,7 +100,7 @@ async def test_sync_edits_only_latest_exact_publication_message_and_locks_at_fiv
     assert call["message_id"] == 222
     assert "🟡" in call["caption"]
     buttons = [button.text for row in call["reply_markup"].inline_keyboard for button in row]
-    assert buttons == ["📷 房源详情", "📅 预约看房", "💬 中文顾问"]
+    assert buttons == ["📷 更多实拍", "📅 预约看房", "💬 中文顾问"]
 
     with sqlite3.connect(db_path) as conn:
         status = conn.execute(

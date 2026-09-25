@@ -167,11 +167,11 @@ def search_card_keyboard(
     available: bool,
     listing_nav: list[InlineKeyboardButton] | None = None,
 ) -> InlineKeyboardMarkup:
-    """Search result card: 上一套/下一套 for listings; 📷 房源详情 opens flipper."""
+    """Search result card: 上一套/下一套 for listings; 📷 更多实拍 opens flipper."""
     rows: list[list[InlineKeyboardButton]] = []
     if listing_nav:
         rows.append(listing_nav)
-    rows.append([InlineKeyboardButton('📷 房源详情', callback_data=f'listing:photos:{listing_id}')])
+    rows.append([InlineKeyboardButton('📷 更多实拍', callback_data=f'listing:photos:{listing_id}')])
     if available:
         rows.append([InlineKeyboardButton('📅 预约看房', callback_data=f'listing:appoint:{listing_id}')])
     rows.append([InlineKeyboardButton('💬 咨询这套', callback_data=f'listing:consult:{listing_id}')])
@@ -234,7 +234,7 @@ async def send_or_edit_photo_flipper(
             photo_total=0,
             return_to_results=return_to_results,
         )
-        text = '📷 <b>房源详情</b>\n\n这套房的实拍暂时没有加载出来。\n可以稍后再试，或直接咨询中文顾问。'
+        text = '📷 <b>更多实拍</b>\n\n这套房的实拍暂时没有加载出来。\n可以稍后再试，或直接咨询中文顾问。'
         if query is not None:
             try:
                 if getattr(query.message, 'photo', None):
