@@ -29,9 +29,9 @@ def test_search_entry_is_direct_filter_panel():
 
 def test_listing_surface_source_contains_final_first_layer_actions():
     source = open(build_search_card.__code__.co_filename, encoding="utf-8").read()
-    for label in ("上一套", "下一套", "看实拍", "预约看房", "换搜索条件"):
+    for label in ("上一套", "下一套", "更多实拍", "预约看房", "换搜索条件"):
         assert label in source
-    for label in ("更多实拍", "咨询这套"):
+    for label in ("看实拍", "咨询这套"):
         assert label not in source
 
 

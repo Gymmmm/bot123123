@@ -43,9 +43,9 @@ def _card_actions(views: tuple[PublishedListingView, ...], *, index: int, bookab
             SemanticAction("下一套","next",views[next_i].public_listing_id,next_i),
         ))
     if bookable:
-        rows.append((SemanticAction("📷 看实拍","details",target),SemanticAction("📅 预约看房","book",target)))
+        rows.append((SemanticAction("📷 更多实拍","details",target),SemanticAction("📅 预约看房","book",target)))
     else:
-        rows.append((SemanticAction("📷 看实拍","details",target),))
+        rows.append((SemanticAction("📷 更多实拍","details",target),))
     rows.append((SemanticAction("换搜索条件","change_search"),))
     return tuple(rows)
 
