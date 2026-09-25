@@ -165,6 +165,18 @@ def _text_band_score(img) -> dict[str, float]:
     }
 
 
+def _room_cover_tier(label: object) -> int:
+    """Cover preference tiers: living > exterior > kitchen > bedroom > other > toilet."""
+    key = str(label or "").strip().lower()
+    return {
+        "living": 5,
+        "exterior": 4,
+        "kitchen": 3,
+        "bedroom": 2,
+        "toilet": -2,
+    }.get(key, 1)
+
+
 def _room_heuristic(img) -> dict[str, Any]:
     """Cheap room-type hints: prefer living / kitchen / exterior over toilet.
 
@@ -188,6 +200,7 @@ def _room_heuristic(img) -> dict[str, Any]:
         & (hsv[:, :, 2] < 220)
     )
     warm_frac = float(np.mean(warm))
+    mid_warm = float(np.mean(warm[int(h * 0.28) : int(h * 0.88), :]))
     edges = cv2.Canny(gray, 50, 120)
     mid = edges[int(h * 0.25) : int(h * 0.75), :]
     sobely = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)
@@ -215,6 +228,12 @@ def _room_heuristic(img) -> dict[str, Any]:
                 - exterior_score * 0.15,
             ),
         )
+    # Warm mid-frame furniture tones push living above bare/white rooms.
+    if mid_warm > 0.07 and toilet_score < 0.48 and exterior_score < 0.55:
+        living_score = max(
+            living_score,
+            min(1.0, 0.42 + mid_warm * 1.35 - toilet_score * 0.55),
+        )
 
     bedroom_score = living_score * 0.85
     if sat_mean < 55 and living_score > 0.25:
@@ -241,6 +260,31 @@ def _room_heuristic(img) -> dict[str, Any]:
         label = "toilet"
     scores["label"] = label
     return scores
+
+
+def _cover_room_bonus(room: dict[str, Any]) -> float:
+    label = str(room.get("label") or "")
+    if label == "living":
+        return 14.0 + 6.0 * float(room.get("living") or 0)
+    if label == "exterior":
+        return 10.0 + 5.0 * float(room.get("exterior") or 0)
+    if label == "kitchen":
+        return 7.0 + 4.0 * float(room.get("kitchen") or 0)
+    if label == "bedroom":
+        return 3.0 + 2.0 * float(room.get("bedroom") or 0)
+    if label == "toilet":
+        return -24.0 - 14.0 * float(room.get("toilet") or 0)
+    return 0.0
+
+
+def _cover_text_penalty(text: dict[str, float]) -> tuple[float, bool]:
+    """Bottom/contact bands are especially toxic for channel covers."""
+    bottom = float(text.get("bottom_text") or 0)
+    heavy = float(text.get("text_heavy") or 0)
+    penalty = heavy * 24.0 + bottom * 12.0
+    soft = heavy >= 0.48 or bottom >= 0.52
+    return penalty, soft
+
 
 
 def _cv_metrics(path: Path) -> dict[str, Any] | None:
@@ -271,41 +315,33 @@ def _cv_metrics(path: Path) -> dict[str, Any] | None:
     text = _text_band_score(img)
     room = _room_heuristic(img)
     label = str(room.get("label") or "")
-    # Cover pick lock: prefer living / kitchen / exterior; soft-penalize toilet + text-heavy.
-    if label in ("living", "exterior"):
-        room_bonus = 8.0 + 4.0 * float(room.get(label) or 0)
-    elif label == "kitchen":
-        room_bonus = 5.0 + 3.0 * float(room.get("kitchen") or 0)
-    elif label == "bedroom":
-        room_bonus = 3.5 + 2.0 * float(room.get("bedroom") or 0)
-    elif label == "toilet":
-        room_bonus = -14.0 - 8.0 * float(room.get("toilet") or 0)
-    else:
-        room_bonus = 0.0
-    text_penalty = float(text.get("text_heavy") or 0) * 18.0
+    room_bonus = _cover_room_bonus(room)
+    text_penalty, text_soft = _cover_text_penalty(text)
     soft_reject = bool(
-        float(text.get("text_heavy") or 0) >= 0.55
-        or (label == "toilet" and float(room.get("toilet") or 0) > 0.6)
+        text_soft
+        or (label == "toilet" and float(room.get("toilet") or 0) > 0.48)
     )
 
     total = (
-        sharpness * 0.20
-        + brightness * 0.12
-        + contrast * 0.08
-        + resolution * 0.08
-        + exposure * 0.14
-        + orientation * 0.22
-        + space * 0.11
+        sharpness * 0.18
+        + brightness * 0.10
+        + contrast * 0.07
+        + resolution * 0.07
+        + exposure * 0.12
+        + orientation * 0.18
+        + space * 0.10
         + color * 0.05
         + room_bonus
         - text_penalty
     )
     if ratio < 0.90:
-        total -= 18
+        total -= 22
     if ratio > 2.0:
-        total -= 6
+        total -= 8
     if soft_reject:
-        total -= 12
+        total -= 16
+    if label == "toilet":
+        total -= 10
     if rejected:
         total -= 50
 
@@ -319,6 +355,7 @@ def _cv_metrics(path: Path) -> dict[str, Any] | None:
         "text": text,
         "room_bonus": round(room_bonus, 2),
         "text_penalty": round(text_penalty, 2),
+        "room_tier": _room_cover_tier(label),
         "sharpness": round(sharpness, 2),
         "brightness": round(brightness, 2),
         "contrast": round(contrast, 2),
@@ -346,6 +383,9 @@ def _score_one(path: Path, source_order: int) -> dict[str, Any]:
             "score": float(legacy_score),
             "reject": bool(reject),
             "reason": legacy_reason,
+            "soft_reject": False,
+            "room_label": "",
+            "room_tier": _room_cover_tier(""),
             "sharpness": 0.0,
             "brightness": 0.0,
             "contrast": 0.0,
@@ -376,20 +416,17 @@ def rank_photo_paths(paths: Iterable[str | Path]) -> list[dict[str, Any]]:
     def sort_key(item: dict[str, Any]) -> tuple:
         ratio = float(item.get("ratio") or 0)
         landscape = ratio >= 1.05
-        label = str(item.get("room_label") or "")
-        preferred_room = 1 if label in {"living", "kitchen", "exterior"} else (
-            0 if label == "bedroom" else -1
-        )
+        tier = int(item.get("room_tier") or _room_cover_tier(item.get("room_label")))
         return (
             0 if item.get("reject") else 1,
             0 if item.get("soft_reject") else 1,
-            preferred_room,
+            tier,
             1 if landscape else 0,
+            float(item.get("score") or 0),
             float(item.get("orientation") or 0),
             float(item.get("sharpness") or 0),
             float(item.get("exposure") or 0),
             float(item.get("resolution") or 0),
-            float(item.get("score") or 0),
             -int(item.get("source_order") or 0),
         )
 
@@ -402,5 +439,6 @@ __all__ = [
     "SEVERE_REJECT_SCORE",
     "_dhash",
     "_hamming",
+    "_room_cover_tier",
     "rank_photo_paths",
 ]

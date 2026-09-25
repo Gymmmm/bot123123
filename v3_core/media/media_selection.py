@@ -22,6 +22,39 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _pick_auto_cover(ranking: list[dict[str, Any]], gallery: list[str]) -> str:
+    """Choose channel cover source: best ranked shot that is safe to show first.
+
+    Skips hard rejects, soft rejects (text-heavy / toilet-like), and toilet labels
+    when any better alternative exists in the usable gallery.
+    """
+    gallery_set = {str(Path(path).resolve()) for path in gallery}
+
+    def _path(item: dict[str, Any]) -> str:
+        return str(Path(str(item.get("file") or "")).resolve())
+
+    def _usable(item: dict[str, Any], *, allow_soft: bool, allow_toilet: bool) -> bool:
+        path = _path(item)
+        if not path or path not in gallery_set or item.get("reject"):
+            return False
+        if not allow_soft and item.get("soft_reject"):
+            return False
+        label = str(item.get("room_label") or "")
+        if not allow_toilet and label == "toilet":
+            return False
+        return True
+
+    for allow_soft, allow_toilet in (
+        (False, False),
+        (True, False),
+        (True, True),
+    ):
+        for item in ranking:
+            if _usable(item, allow_soft=allow_soft, allow_toilet=allow_toilet):
+                return _path(item)
+    return gallery[0]
+
+
 def select_publication_media(
     paths: Iterable[str | Path],
     *,
@@ -85,15 +118,7 @@ def select_publication_media(
     if manual and manual in gallery:
         cover = manual
     else:
-        cover = next(
-            (
-                str(Path(item["file"]).resolve())
-                for item in ranking
-                if not item.get("reject")
-                and str(Path(item["file"]).resolve()) in gallery
-            ),
-            gallery[0],
-        )
+        cover = _pick_auto_cover(ranking, gallery)
 
     return {
         "cover_path": cover,
@@ -103,7 +128,7 @@ def select_publication_media(
         "ranking": ranking,
         "source_count": len(source_paths),
         "usable_count": len(gallery),
-        "policy": "source_order_after_dedup_severe_reject_cover_prefer_living_kitchen_exterior",
+        "policy": "source_order_after_dedup_severe_reject_cover_prefer_living_skip_toilet_text",
     }
 
 
