@@ -23,7 +23,7 @@ from .source_scrub import scrub_file
 
 MAX_SCRUB_COVERAGE = 0.08
 SCRUB_REVISION = "source_scrub_v2_crop_mild_enhance_20260920"
-GALLERY_BRAND_REVISION = "qiaolian_gallery_logo_v5_premium_photo_20260923"
+GALLERY_BRAND_REVISION = "qiaolian_gallery_logo_v6_larger_premium_gold_20260925"
 
 
 @dataclass(frozen=True)
@@ -71,7 +71,7 @@ class MediaPreparationService:
     def _gallery_style_key(cover_style: str | None) -> str:
         """Stable cache key per cover mark: classic_blue / right_price / black_gold."""
         key = str(cover_style or "").strip().lower()
-        if key in {"black_gold", "villa_premium", "dark_glass"}:
+        if key in {"black_gold", "villa_premium", "dark_glass", "premium_photo", "premium"}:
             return "black_gold"
         if key in {
             "classic_blue",
@@ -81,8 +81,6 @@ class MediaPreparationService:
             "minimal_white",
             "blue_banner",
             "premium_4image",
-            "premium_photo",
-            "premium",
         }:
             return "classic_blue"
         return "right_price"
@@ -109,7 +107,8 @@ class MediaPreparationService:
         Cover rendering intentionally keeps using the clean selected source.  The
         returned files are only for the public ``更多实拍`` gallery, preventing a
         second brand mark from appearing underneath the cover template.
-        Gallery corner marks follow the listing cover brand (经典蓝白标 / 日常白 / 黑金香槟金).
+        Gallery corner marks follow the listing cover brand
+        (经典蓝白标 / 日常白 / 极简实拍与黑金用香槟金角标).
         """
         target_dir = self.prepared_dir / str(int(source_post_id)) / "gallery"
         target_dir.mkdir(parents=True, exist_ok=True)

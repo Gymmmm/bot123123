@@ -164,15 +164,24 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
             return
         state["cover_candidates"] = list(candidates)
         selected = str(state.get("selected_cover_path") or "")
-        await message.reply_text("<b>🖼 选择封面照片</b>\n\n点击图片下方按钮选择。", parse_mode=ParseMode.HTML)
+        await message.reply_text(
+            "<b>🖼 选择主图</b>\n\n"
+            "点下方按钮，选一张原图作为频道封面底图。\n"
+            "系统会按所选「封面格式」生成封面（横版 1200×900）。\n"
+            "更多实拍相册仍用全部照片，并加上侨联角标。",
+            parse_mode=ParseMode.HTML,
+        )
         for index, path in enumerate(candidates):
             with Path(path).open("rb") as handle:
-                marker = " · 当前" if path == selected or (not selected and index == 0) else ""
+                marker = " · 当前主图" if path == selected or (not selected and index == 0) else ""
                 await message.reply_photo(
                     photo=handle,
-                    caption=f"封面候选 {index + 1}/{len(candidates)}{marker}",
+                    caption=f"候选 {index + 1}/{len(candidates)}{marker}",
                     reply_markup=InlineKeyboardMarkup([[
-                        InlineKeyboardButton(f"选择第 {index + 1} 张", callback_data=f"v3smp|manual_cover_pick|{index}")
+                        InlineKeyboardButton(
+                            f"✅ 设为主图 {index + 1}",
+                            callback_data=f"v3smp|manual_cover_pick|{index}",
+                        )
                     ]]),
                 )
 
@@ -238,7 +247,10 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
                 reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton("📤 确认发布到频道", callback_data="v3smp|manual_send")],
                     [InlineKeyboardButton("💬 调整侨联说", callback_data="v3smp|manual_adviser")],
-                    [InlineKeyboardButton("🖼 更换封面图片", callback_data="v3smp|manual_cover"), InlineKeyboardButton("🎨 更换封面模板", callback_data="v3smp|manual_templates")],
+                    [
+                        InlineKeyboardButton("🖼 选主图", callback_data="v3smp|manual_cover"),
+                        InlineKeyboardButton("🎨 选封面格式", callback_data="v3smp|manual_templates"),
+                    ],
                     [InlineKeyboardButton("⬅️ 返回资料确认", callback_data="v3smp|manual_back_confirm")],
                 ]),
             )
@@ -477,11 +489,14 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
                 return True
             if raw == "v3smp|manual_templates":
                 await query.message.reply_text(
-                    "选择封面模板：",
+                    "<b>🎨 选择封面格式</b>\n\n"
+                    "横版 1200×900，套在你选的主图上生成频道封面。\n"
+                    "普通房默认「极简实拍」；别墅建议「黑金」。",
+                    parse_mode=ParseMode.HTML,
                     reply_markup=InlineKeyboardMarkup([
-                        [InlineKeyboardButton("极简实拍渐变", callback_data="v3smp|manual_style|premium_photo")],
+                        [InlineKeyboardButton("极简实拍渐变（默认）", callback_data="v3smp|manual_style|premium_photo")],
                         [InlineKeyboardButton("右侧价格牌", callback_data="v3smp|manual_style|right_price")],
-                        [InlineKeyboardButton("黑金模板", callback_data="v3smp|manual_style|black_gold")],
+                        [InlineKeyboardButton("黑金高级感（别墅）", callback_data="v3smp|manual_style|black_gold")],
                         [InlineKeyboardButton("经典蓝卡", callback_data="v3smp|manual_style|classic_blue")],
                         self.home_row(),
                     ]),

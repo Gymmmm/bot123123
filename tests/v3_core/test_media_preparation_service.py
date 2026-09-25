@@ -73,7 +73,7 @@ def test_media_preparation_scrubs_to_derived_files_before_selection(tmp_path):
     assert all(prepared_dir in Path(path).parents for path in prepared.gallery_paths)
     assert all(Path(path).parent.name == "gallery" for path in prepared.gallery_paths)
     assert all(Path(path).name.endswith("_gallery.jpg") for path in prepared.gallery_paths)
-    assert prepared.source_identity["gallery_brand_revision"] == "qiaolian_gallery_logo_v5_premium_photo_20260923"
+    assert prepared.source_identity["gallery_brand_revision"] == "qiaolian_gallery_logo_v6_larger_premium_gold_20260925"
     assert all(str(Path(path).resolve()) not in prepared.gallery_paths for path in paths)
     assert [_sha(path) for path in paths] == before
 
@@ -126,10 +126,12 @@ def test_resolve_gallery_logo_path_maps_three_cover_styles():
     classic = resolve_gallery_logo_path("classic_blue")
     gold = resolve_gallery_logo_path("black_gold")
     alias = resolve_gallery_logo_path("villa_premium")
+    premium = resolve_gallery_logo_path("premium_photo")
     assert right == RIGHT_PRICE_LOGO
     assert classic == CLASSIC_BLUE_LOGO
     assert gold == BLACK_GOLD_LOGO
     assert alias == BLACK_GOLD_LOGO
+    assert premium == BLACK_GOLD_LOGO
     assert classic != right
     assert gold != right
     assert CLASSIC_BLUE_LOGO.is_file()

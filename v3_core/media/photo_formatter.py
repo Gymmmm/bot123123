@@ -15,16 +15,16 @@ LANDSCAPE_THRESHOLD = 1.10
 PORTRAIT_THRESHOLD = 0.90
 
 CANVAS_PRESETS = {
-    "landscape": {"size": (1200, 900), "logo_width_ratio": 0.22},
-    "portrait": {"size": (900, 1200), "logo_width_ratio": 0.22},
-    "square": {"size": (1080, 1080), "logo_width_ratio": 0.22},
+    "landscape": {"size": (1200, 900), "logo_width_ratio": 0.30},
+    "portrait": {"size": (900, 1200), "logo_width_ratio": 0.30},
+    "square": {"size": (1080, 1080), "logo_width_ratio": 0.30},
 }
 
-LOGO_MARGIN_X_RATIO = 0.03
-LOGO_MARGIN_Y_RATIO = 0.03
-LOGO_OPACITY = 0.94
-LOGO_MAX_PHOTO_WIDTH_RATIO = 0.32
-LOGO_MAX_PHOTO_HEIGHT_RATIO = 0.22
+LOGO_MARGIN_X_RATIO = 0.028
+LOGO_MARGIN_Y_RATIO = 0.028
+LOGO_OPACITY = 0.98
+LOGO_MAX_PHOTO_WIDTH_RATIO = 0.40
+LOGO_MAX_PHOTO_HEIGHT_RATIO = 0.28
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 
 ROOT = Path(__file__).resolve().parent
@@ -113,10 +113,10 @@ def _load_font(size: int) -> ImageFont.ImageFont:
     return ImageFont.load_default()
 
 
-def _fallback_brand_logo(canvas_width: int) -> Image.Image:
+def _fallback_brand_logo(canvas_width: int, *, tone: str = "white") -> Image.Image:
     """Two-line cover-matching mark when PNG assets are missing."""
-    cn_font = _load_font(max(28, int(canvas_width * 0.045)))
-    en_font = _load_font(max(14, int(canvas_width * 0.014)))
+    cn_font = _load_font(max(32, int(canvas_width * 0.052)))
+    en_font = _load_font(max(15, int(canvas_width * 0.016)))
     cn, en = "侨联地产", "QIAO LIAN"
     probe = Image.new("RGBA", (8, 8), (0, 0, 0, 0))
     probe_draw = ImageDraw.Draw(probe)
@@ -125,7 +125,7 @@ def _fallback_brand_logo(canvas_width: int) -> Image.Image:
     cn_w, cn_h = cn_box[2] - cn_box[0], cn_box[3] - cn_box[1]
     en_w, en_h = en_box[2] - en_box[0], en_box[3] - en_box[1]
     gap = max(6, int(canvas_width * 0.006))
-    pad_x, pad_y = 14, 10
+    pad_x, pad_y = 16, 12
     width = max(cn_w, en_w) + pad_x * 2
     height = cn_h + gap + en_h + pad_y * 2
     out = Image.new("RGBA", (width, height), (0, 0, 0, 0))
@@ -134,38 +134,43 @@ def _fallback_brand_logo(canvas_width: int) -> Image.Image:
     en_x = pad_x + (max(cn_w, en_w) - en_w) // 2
     cn_y = pad_y - cn_box[1]
     en_y = pad_y + cn_h + gap - en_box[1]
-    for dx, dy, a in ((2, 2, 100), (1, 1, 120)):
+    for dx, dy, a in ((2, 2, 110), (1, 1, 140)):
         d.text((cn_x + dx, cn_y + dy), cn, font=cn_font, fill=(0, 0, 0, a))
         d.text((en_x + dx, en_y + dy), en, font=en_font, fill=(0, 0, 0, a))
-    d.text((cn_x, cn_y), cn, font=cn_font, fill=(255, 255, 255, 245))
-    d.text((en_x, en_y), en, font=en_font, fill=(255, 255, 255, 235))
+    if tone == "gold":
+        cn_fill = (232, 201, 140, 250)
+        en_fill = (214, 184, 122, 240)
+    else:
+        cn_fill = (255, 255, 255, 250)
+        en_fill = (255, 255, 255, 240)
+    d.text((cn_x, cn_y), cn, font=cn_font, fill=cn_fill)
+    d.text((en_x, en_y), en, font=en_font, fill=en_fill)
     return out
 
 
 def resolve_gallery_logo_path(cover_style: str | None) -> Path | None:
     """Map cover style to the matching gallery corner mark asset.
 
-    classic_blue / premium_photo → white/brand-matched text mark
-    right_price  → white text mark
-    black_gold   → champagne gold mark
+    classic_blue / right_price → white text mark
+    premium_photo / black_gold → champagne gold mark (matches cover brand)
     """
     key = str(cover_style or "").strip().lower()
-    if key in _BLACK_GOLD_STYLE_KEYS:
+    if key in _BLACK_GOLD_STYLE_KEYS or key in {"premium_photo", "premium"}:
         path = BLACK_GOLD_LOGO
-    elif key in _CLASSIC_BLUE_STYLE_KEYS or key in {"premium_photo", "premium"}:
+    elif key in _CLASSIC_BLUE_STYLE_KEYS:
         path = CLASSIC_BLUE_LOGO
     else:
         path = RIGHT_PRICE_LOGO
     if path.is_file():
         return path
     # Fallbacks keep gallery branding available if one asset is missing.
-    for candidate in (RIGHT_PRICE_LOGO, CLASSIC_BLUE_LOGO, BLACK_GOLD_LOGO):
+    for candidate in (BLACK_GOLD_LOGO, RIGHT_PRICE_LOGO, CLASSIC_BLUE_LOGO):
         if candidate.is_file():
             return candidate
     return None
 
 
-def resolve_logo(logo_path: str | Path | None, canvas_width: int) -> Image.Image:
+def resolve_logo(logo_path: str | Path | None, canvas_width: int, *, cover_style: str | None = None) -> Image.Image:
     candidates: list[Path] = []
     env_path = str(os.getenv("QIAOLIAN_GALLERY_LOGO", "") or "").strip()
     if logo_path:
@@ -180,7 +185,10 @@ def resolve_logo(logo_path: str | Path | None, canvas_width: int) -> Image.Image
                     return raw.convert("RGBA")
             except Exception:
                 continue
-    return _fallback_brand_logo(canvas_width)
+    tone = "gold" if str(cover_style or "").strip().lower() in {
+        *_BLACK_GOLD_STYLE_KEYS, "premium_photo", "premium"
+    } else "white"
+    return _fallback_brand_logo(canvas_width, tone=tone)
 
 
 def _resize_gallery_logo(
@@ -268,7 +276,7 @@ def format_gallery_photo(
         effective_logo = logo_path
         if effective_logo is None:
             effective_logo = resolve_gallery_logo_path(cover_style)
-        logo = resolve_logo(effective_logo, canvas_size[0])
+        logo = resolve_logo(effective_logo, canvas_size[0], cover_style=cover_style)
         logo = _resize_gallery_logo(
             logo,
             canvas_width=canvas_size[0],
