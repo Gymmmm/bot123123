@@ -181,3 +181,37 @@ def test_auto_cover_villa_prefers_exterior(tmp_path, monkeypatch):
     )
     assert result["cover_path"] == str(exterior.resolve())
     assert result["cover_preference"] == "exterior"
+
+
+def test_auto_cover_villa_prefers_soft_exterior_over_living(tmp_path, monkeypatch):
+    living = tmp_path / "living.jpg"
+    exterior = tmp_path / "exterior.jpg"
+    for path, payload in ((living, b"L"), (exterior, b"E")):
+        path.write_bytes(payload)
+
+    monkeypatch.setattr(media_selection, "_dhash", lambda path: None)
+    monkeypatch.setattr(
+        media_selection,
+        "rank_photo_paths",
+        lambda paths, cover_preference="living": [
+            {
+                "file": str(exterior.resolve()),
+                "reject": False,
+                "soft_reject": True,
+                "room_label": "exterior",
+                "score": 64,
+            },
+            {
+                "file": str(living.resolve()),
+                "reject": False,
+                "soft_reject": False,
+                "room_label": "living",
+                "score": 90,
+            },
+        ],
+    )
+    result = media_selection.select_publication_media(
+        [living, exterior],
+        cover_preference="exterior",
+    )
+    assert result["cover_path"] == str(exterior.resolve())

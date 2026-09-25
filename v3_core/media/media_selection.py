@@ -73,12 +73,14 @@ def _pick_auto_cover(
         return True
 
     passes: list[tuple[bool, bool, bool, tuple[str, ...] | None]] = []
+    # Try each preferred label first without soft-reject, then with soft-reject,
+    # before dropping down the ladder (so watermarked exteriors still beat living).
     for label in label_ladder:
         passes.append((False, False, False, (label,)))
+        passes.append((True, False, False, (label,)))
     passes.extend(
         [
             (False, False, False, None),
-            (True, False, False, tuple(label_ladder)),
             (True, False, False, None),
             (True, False, True, None),
             (True, True, True, None),
