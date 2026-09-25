@@ -23,13 +23,25 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _pick_auto_cover(ranking: list[dict[str, Any]], gallery: list[str]) -> str:
+def _normalize_cover_preference(preference: object) -> str:
+    value = str(preference or "").strip().lower()
+    return "exterior" if value == "exterior" else "living"
+
+
+def _pick_auto_cover(
+    ranking: list[dict[str, Any]],
+    gallery: list[str],
+    *,
+    cover_preference: object = "living",
+) -> str:
     """Choose channel cover source: best ranked shot that is safe to show first.
 
-    Skips hard rejects, soft rejects (text-heavy / toilet-like), toilet and
-    bedroom labels when any better living/exterior/kitchen alternative exists.
+    Apartments prefer living; villas prefer exterior. Skips hard rejects, soft
+    rejects (text-heavy / toilet-like), toilet and bedroom labels when any better
+    living/exterior/kitchen alternative exists.
     """
     gallery_set = {str(Path(path).resolve()) for path in gallery}
+    preferred = _normalize_cover_preference(cover_preference)
 
     def _path(item: dict[str, Any]) -> str:
         return str(Path(str(item.get("file") or "")).resolve())
@@ -40,6 +52,7 @@ def _pick_auto_cover(ranking: list[dict[str, Any]], gallery: list[str]) -> str:
         allow_soft: bool,
         allow_toilet: bool,
         allow_bedroom: bool,
+        require_preferred: bool,
     ) -> bool:
         path = _path(item)
         if not path or path not in gallery_set or item.get("reject"):
@@ -47,17 +60,21 @@ def _pick_auto_cover(ranking: list[dict[str, Any]], gallery: list[str]) -> str:
         if not allow_soft and item.get("soft_reject"):
             return False
         label = str(item.get("room_label") or "")
+        if require_preferred and label != preferred:
+            return False
         if not allow_toilet and label == "toilet":
             return False
         if not allow_bedroom and label == "bedroom":
             return False
         return True
 
-    for allow_soft, allow_toilet, allow_bedroom in (
-        (False, False, False),
-        (True, False, False),
-        (True, False, True),
-        (True, True, True),
+    for allow_soft, allow_toilet, allow_bedroom, require_preferred in (
+        (False, False, False, True),
+        (False, False, False, False),
+        (True, False, False, True),
+        (True, False, False, False),
+        (True, False, True, False),
+        (True, True, True, False),
     ):
         for item in ranking:
             if _usable(
@@ -65,6 +82,7 @@ def _pick_auto_cover(ranking: list[dict[str, Any]], gallery: list[str]) -> str:
                 allow_soft=allow_soft,
                 allow_toilet=allow_toilet,
                 allow_bedroom=allow_bedroom,
+                require_preferred=require_preferred,
             ):
                 return _path(item)
     return gallery[0]
@@ -93,15 +111,18 @@ def select_publication_media(
     paths: Iterable[str | Path],
     *,
     manual_cover_path: str | Path | None = None,
+    cover_preference: object = "living",
 ) -> dict[str, Any]:
     """Return one cover source plus a ranking-ordered usable gallery.
 
     Exact and near duplicates keep the first source occurrence. Severe rejects
     are removed from the gallery. Remaining shots follow cover ranking so living /
     exterior / kitchen lead the album; toilets and text-heavy frames sink. Cover
-    auto-pick prefers the same ranking and skips soft-reject / toilet when possible.
-    A manually selected cover is honoured only when it survives safety gates.
+    auto-pick prefers living for apartments and exterior for villas, and skips
+    soft-reject / toilet when possible. A manually selected cover is honoured
+    only when it survives safety gates.
     """
+    preference = _normalize_cover_preference(cover_preference)
     source_paths: list[Path] = []
     for raw in paths:
         path = Path(str(raw or "")).expanduser().resolve()
@@ -134,7 +155,7 @@ def select_publication_media(
         seen_near.append((dhash, path))
         unique.append(path)
 
-    ranking = rank_photo_paths(unique)
+    ranking = rank_photo_paths(unique, cover_preference=preference)
     rejected = {
         str(Path(item["file"]).resolve())
         for item in ranking
@@ -152,7 +173,7 @@ def select_publication_media(
     if manual and manual in gallery:
         cover = manual
     else:
-        cover = _pick_auto_cover(ranking, gallery)
+        cover = _pick_auto_cover(ranking, gallery, cover_preference=preference)
 
     return {
         "cover_path": cover,
@@ -162,7 +183,8 @@ def select_publication_media(
         "ranking": ranking,
         "source_count": len(source_paths),
         "usable_count": len(gallery),
-        "policy": "rank_ordered_gallery_cover_from_best_skip_toilet_text",
+        "cover_preference": preference,
+        "policy": f"rank_ordered_gallery_cover_{preference}_first_skip_toilet_text",
     }
 
 

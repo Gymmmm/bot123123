@@ -144,6 +144,11 @@ class PublisherWorkflowService:
         return self.media.prepare(
             source_post_id=source_post_id,
             manual_cover_path=manual_cover_path,
+            property_hints=(
+                detail.listing.get("property_type"),
+                detail.listing.get("property_subtype"),
+                detail.listing.get("display_title"),
+            ),
         )
 
     def build_package_for_review(
@@ -167,15 +172,17 @@ class PublisherWorkflowService:
         source_post_id = str(detail.canonical.get("source_post_id") or "").strip()
         if not source_post_id:
             raise ValueError("canonical_record_missing_source_post_id")
-        style_for_gallery = cover_style or recommended_cover_style(
+        property_hints = (
             detail.listing.get("property_type"),
             detail.listing.get("property_subtype"),
             detail.listing.get("display_title"),
         )
+        style_for_gallery = cover_style or recommended_cover_style(*property_hints)
         media = self.media.prepare(
             source_post_id=source_post_id,
             manual_cover_path=manual_cover_path,
             cover_style=style_for_gallery,
+            property_hints=property_hints,
         )
         excluded = {str(path) for path in excluded_gallery_paths if str(path).strip()}
         gallery = [path for path in media.gallery_paths if str(path) not in excluded]

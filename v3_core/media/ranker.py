@@ -165,9 +165,27 @@ def _text_band_score(img) -> dict[str, float]:
     }
 
 
-def _room_cover_tier(label: object) -> int:
-    """Cover preference tiers: living > exterior > kitchen > bedroom > other > toilet."""
+def _normalize_cover_preference(preference: object) -> str:
+    value = str(preference or "").strip().lower()
+    return "exterior" if value == "exterior" else "living"
+
+
+def _room_cover_tier(label: object, *, preference: object = "living") -> int:
+    """Cover preference tiers.
+
+    Apartment default: living > exterior > kitchen > bedroom > other > toilet.
+    Villa preference: exterior > living > kitchen > bedroom > other > toilet.
+    """
     key = str(label or "").strip().lower()
+    pref = _normalize_cover_preference(preference)
+    if pref == "exterior":
+        return {
+            "exterior": 5,
+            "living": 4,
+            "kitchen": 3,
+            "bedroom": 2,
+            "toilet": -2,
+        }.get(key, 1)
     return {
         "living": 5,
         "exterior": 4,
@@ -282,12 +300,19 @@ def _room_heuristic(img) -> dict[str, Any]:
     return scores
 
 
-def _cover_room_bonus(room: dict[str, Any]) -> float:
+def _cover_room_bonus(room: dict[str, Any], *, preference: object = "living") -> float:
     label = str(room.get("label") or "")
+    pref = _normalize_cover_preference(preference)
     if label == "living":
-        return 14.0 + 6.0 * float(room.get("living") or 0)
+        # Apartments lead with living; villas still keep living as a strong fallback.
+        base = 12.0 if pref == "exterior" else 14.0
+        weight = 5.0 if pref == "exterior" else 6.0
+        return base + weight * float(room.get("living") or 0)
     if label == "exterior":
-        return 10.0 + 5.0 * float(room.get("exterior") or 0)
+        # Villas lead with facade/exterior; apartments keep exterior as secondary.
+        base = 16.0 if pref == "exterior" else 10.0
+        weight = 7.0 if pref == "exterior" else 5.0
+        return base + weight * float(room.get("exterior") or 0)
     if label == "kitchen":
         return 7.0 + 4.0 * float(room.get("kitchen") or 0)
     if label == "bedroom":
@@ -308,10 +333,11 @@ def _cover_text_penalty(text: dict[str, float]) -> tuple[float, bool]:
 
 
 
-def _cv_metrics(path: Path) -> dict[str, Any] | None:
+def _cv_metrics(path: Path, *, cover_preference: object = "living") -> dict[str, Any] | None:
     img = _read_cv(path)
     if img is None:
         return None
+    pref = _normalize_cover_preference(cover_preference)
     h, w = img.shape[:2]
     sharpness = _sharpness(img)
     brightness = _brightness(img)
@@ -336,7 +362,7 @@ def _cv_metrics(path: Path) -> dict[str, Any] | None:
     text = _text_band_score(img)
     room = _room_heuristic(img)
     label = str(room.get("label") or "")
-    room_bonus = _cover_room_bonus(room)
+    room_bonus = _cover_room_bonus(room, preference=pref)
     text_penalty, text_soft = _cover_text_penalty(text)
     soft_reject = bool(
         text_soft
@@ -377,7 +403,8 @@ def _cv_metrics(path: Path) -> dict[str, Any] | None:
         "text": text,
         "room_bonus": round(room_bonus, 2),
         "text_penalty": round(text_penalty, 2),
-        "room_tier": _room_cover_tier(label),
+        "room_tier": _room_cover_tier(label, preference=pref),
+        "cover_preference": pref,
         "sharpness": round(sharpness, 2),
         "brightness": round(brightness, 2),
         "contrast": round(contrast, 2),
@@ -390,8 +417,9 @@ def _cv_metrics(path: Path) -> dict[str, Any] | None:
     }
 
 
-def _score_one(path: Path, source_order: int) -> dict[str, Any]:
-    metrics = _cv_metrics(path)
+def _score_one(path: Path, source_order: int, *, cover_preference: object = "living") -> dict[str, Any]:
+    pref = _normalize_cover_preference(cover_preference)
+    metrics = _cv_metrics(path, cover_preference=pref)
     if metrics is None:
         legacy_score, legacy_reason = score_image(str(path))
         reject = legacy_score <= -900 or legacy_score < SEVERE_REJECT_SCORE
@@ -407,7 +435,8 @@ def _score_one(path: Path, source_order: int) -> dict[str, Any]:
             "reason": legacy_reason,
             "soft_reject": False,
             "room_label": "",
-            "room_tier": _room_cover_tier(""),
+            "room_tier": _room_cover_tier("", preference=pref),
+            "cover_preference": pref,
             "sharpness": 0.0,
             "brightness": 0.0,
             "contrast": 0.0,
@@ -427,18 +456,23 @@ def _score_one(path: Path, source_order: int) -> dict[str, Any]:
     }
 
 
-def rank_photo_paths(paths: Iterable[str | Path]) -> list[dict[str, Any]]:
+def rank_photo_paths(
+    paths: Iterable[str | Path],
+    *,
+    cover_preference: object = "living",
+) -> list[dict[str, Any]]:
+    pref = _normalize_cover_preference(cover_preference)
     ranked: list[dict[str, Any]] = []
     for index, raw in enumerate(paths, start=1):
         path = Path(raw).resolve()
         if not path.is_file() or path.suffix.lower() not in IMAGE_EXTS:
             continue
-        ranked.append(_score_one(path, index))
+        ranked.append(_score_one(path, index, cover_preference=pref))
 
     def sort_key(item: dict[str, Any]) -> tuple:
         ratio = float(item.get("ratio") or 0)
         landscape = ratio >= 1.05
-        tier = int(item.get("room_tier") or _room_cover_tier(item.get("room_label")))
+        tier = int(item.get("room_tier") or _room_cover_tier(item.get("room_label"), preference=pref))
         return (
             0 if item.get("reject") else 1,
             0 if item.get("soft_reject") else 1,

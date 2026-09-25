@@ -19,11 +19,26 @@ def test_room_cover_tier_orders_living_above_toilet():
     assert _room_cover_tier("") > _room_cover_tier("toilet")
 
 
+def test_room_cover_tier_villa_prefers_exterior():
+    assert _room_cover_tier("exterior", preference="exterior") > _room_cover_tier(
+        "living", preference="exterior"
+    )
+    assert _room_cover_tier("living", preference="exterior") > _room_cover_tier(
+        "kitchen", preference="exterior"
+    )
+
+
 def test_cover_room_bonus_rewards_living_and_penalizes_toilet():
     living = _cover_room_bonus({"label": "living", "living": 0.8})
     toilet = _cover_room_bonus({"label": "toilet", "toilet": 0.8})
     assert living > 15
     assert toilet < -30
+
+
+def test_cover_room_bonus_villa_prefers_exterior():
+    exterior = _cover_room_bonus({"label": "exterior", "exterior": 0.8}, preference="exterior")
+    living = _cover_room_bonus({"label": "living", "living": 0.8}, preference="exterior")
+    assert exterior > living
 
 
 def test_cover_text_penalty_flags_bottom_contact_band():
@@ -38,7 +53,7 @@ def test_rank_sort_prefers_living_over_sharper_toilet(monkeypatch, tmp_path: Pat
     living.write_bytes(b"LIV")
     toilet.write_bytes(b"TOI")
 
-    def fake_score(path: Path, source_order: int):
+    def fake_score(path: Path, source_order: int, *, cover_preference: object = "living"):
         name = path.name
         if name.startswith("living"):
             return {
@@ -90,7 +105,7 @@ def test_auto_cover_skips_toilet_and_soft_reject(tmp_path, monkeypatch):
     monkeypatch.setattr(
         media_selection,
         "rank_photo_paths",
-        lambda paths: [
+        lambda paths, cover_preference="living": [
             {
                 "file": str(toilet.resolve()),
                 "reject": False,
@@ -117,8 +132,52 @@ def test_auto_cover_skips_toilet_and_soft_reject(tmp_path, monkeypatch):
     result = media_selection.select_publication_media([toilet, texty, living])
     # 主图/封面 = living；相册按打分序，厕所仍可留在相册但不做封面。
     assert result["cover_path"] == str(living.resolve())
+    assert result["cover_preference"] == "living"
     assert result["gallery_paths"] == [
         str(toilet.resolve()),
         str(texty.resolve()),
         str(living.resolve()),
     ]
+
+
+def test_auto_cover_villa_prefers_exterior(tmp_path, monkeypatch):
+    living = tmp_path / "living.jpg"
+    exterior = tmp_path / "exterior.jpg"
+    bedroom = tmp_path / "bedroom.jpg"
+    for path, payload in ((living, b"L"), (exterior, b"E"), (bedroom, b"B")):
+        path.write_bytes(payload)
+
+    monkeypatch.setattr(media_selection, "_dhash", lambda path: None)
+    monkeypatch.setattr(
+        media_selection,
+        "rank_photo_paths",
+        lambda paths, cover_preference="living": [
+            {
+                "file": str(living.resolve()),
+                "reject": False,
+                "soft_reject": False,
+                "room_label": "living",
+                "score": 95,
+            },
+            {
+                "file": str(exterior.resolve()),
+                "reject": False,
+                "soft_reject": False,
+                "room_label": "exterior",
+                "score": 80,
+            },
+            {
+                "file": str(bedroom.resolve()),
+                "reject": False,
+                "soft_reject": False,
+                "room_label": "bedroom",
+                "score": 70,
+            },
+        ],
+    )
+    result = media_selection.select_publication_media(
+        [living, exterior, bedroom],
+        cover_preference="exterior",
+    )
+    assert result["cover_path"] == str(exterior.resolve())
+    assert result["cover_preference"] == "exterior"

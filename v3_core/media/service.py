@@ -13,7 +13,7 @@ from dataclasses import dataclass
 import hashlib
 from pathlib import Path
 import shutil
-from typing import Any
+from typing import Any, Iterable
 
 from v3_core.ingest.source_reader import SourceReader
 from .media_selection import select_publication_media
@@ -226,7 +226,11 @@ class MediaPreparationService:
         source_post_id: int | str,
         manual_cover_path: str | None = None,
         cover_style: str | None = None,
+        cover_preference: str | None = None,
+        property_hints: Iterable[object] = (),
     ) -> PreparedSourceMedia:
+        from .cover_styles import resolve_cover_room_preference
+
         raw_paths = self.reader.source_image_paths(source_post_id)
         cleaned_paths, raw_to_clean, scrub_rejected = self._scrubbed_paths(
             source_post_id=source_post_id,
@@ -240,9 +244,14 @@ class MediaPreparationService:
             manual_raw = str(Path(manual_cover_path).expanduser().resolve())
             manual_clean = raw_to_clean.get(manual_raw, "")
 
+        preference = str(cover_preference or "").strip().lower()
+        if preference not in {"living", "exterior"}:
+            preference = resolve_cover_room_preference(*tuple(property_hints))
+
         selected = select_publication_media(
             cleaned_paths,
             manual_cover_path=manual_clean or None,
+            cover_preference=preference,
         )
         branded_gallery = self._branded_gallery(
             source_post_id=source_post_id,
@@ -262,6 +271,7 @@ class MediaPreparationService:
                 "gallery_brand_revision": GALLERY_BRAND_REVISION,
                 "gallery_cover_style": self._gallery_style_key(cover_style),
                 "gallery_orientation": gallery_orientation,
+                "cover_room_preference": preference,
             },
             duplicates=tuple(dict(item) for item in selected["duplicates"]),
             rejected_paths=tuple(rejected),

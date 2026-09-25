@@ -89,10 +89,27 @@ _ALL_PRODUCTION_STYLES = frozenset(
 ACCEPTED_COVER_STYLE_KEYS = frozenset({*_ALL_PRODUCTION_STYLES, *_ALIASES.keys()})
 
 
+def _listing_identity(*values: object) -> str:
+    return " ".join(str(value or "").strip().lower() for value in values)
+
+
+def is_villa_listing(*values: object) -> bool:
+    """True for villa / townhouse style homes (not ordinary apartments)."""
+    identity = _listing_identity(*values)
+    return any(
+        token in identity
+        for token in ("别墅", "villa", "排屋", "townhouse", "town house", "独栋", "双拼", "联排")
+    )
+
+
 def recommended_cover_style(*values: object) -> str:
     """Return the production default: premium photo for ordinary, black gold for villas."""
-    identity = " ".join(str(value or "").strip().lower() for value in values)
-    return "black_gold" if ("别墅" in identity or "villa" in identity) else "premium_photo"
+    return "black_gold" if is_villa_listing(*values) else "premium_photo"
+
+
+def resolve_cover_room_preference(*values: object) -> str:
+    """Channel cover room priority: villa → exterior; apartment → living."""
+    return "exterior" if is_villa_listing(*values) else "living"
 
 
 def is_video_cover_style(style: str | None) -> bool:
@@ -233,10 +250,12 @@ __all__ = [
     "cover_viewport",
     "is_portrait_cover_style",
     "is_video_cover_style",
+    "is_villa_listing",
     "landscape_style_for",
     "normalize_cover_style",
     "portrait_style_for",
     "recommended_cover_style",
+    "resolve_cover_room_preference",
     "resolve_cover_style_for_source",
     "source_image_orientation",
 ]
