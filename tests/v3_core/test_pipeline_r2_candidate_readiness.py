@@ -154,7 +154,8 @@ def test_canonical_blocking_flag_fails(tmp_path):
 
 
 def test_insufficient_and_unreadable_media_fail(tmp_path):
-    result, workflow, repo = _run(tmp_path, media=_media(tmp_path, count=3))
+    # Gallery excludes cover-source; 2 other shots + cover = 3 < min_media(4).
+    result, workflow, repo = _run(tmp_path, media=_media(tmp_path, count=2))
     assert result.reason_code == "insufficient_media"
     assert repo.readiness[-1] == ("OFF_1", False, "insufficient_media")
 
