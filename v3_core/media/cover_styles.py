@@ -94,12 +94,9 @@ def _listing_identity(*values: object) -> str:
 
 
 def is_villa_listing(*values: object) -> bool:
-    """True for villa / townhouse style homes (not ordinary apartments)."""
+    """True when listing identity clearly indicates a villa (for black-gold style)."""
     identity = _listing_identity(*values)
-    return any(
-        token in identity
-        for token in ("别墅", "villa", "排屋", "townhouse", "town house", "独栋", "双拼", "联排")
-    )
+    return "别墅" in identity or "villa" in identity
 
 
 def recommended_cover_style(*values: object) -> str:
@@ -108,8 +105,14 @@ def recommended_cover_style(*values: object) -> str:
 
 
 def resolve_cover_room_preference(*values: object) -> str:
-    """Channel cover room priority: villa → exterior; apartment → living."""
-    return "exterior" if is_villa_listing(*values) else "living"
+    """Channel cover room priority: low-density homes → exterior; apartments → living."""
+    identity = _listing_identity(*values)
+    if any(
+        token in identity
+        for token in ("别墅", "villa", "排屋", "townhouse", "town house", "独栋", "双拼", "联排")
+    ):
+        return "exterior"
+    return "living"
 
 
 def is_video_cover_style(style: str | None) -> bool:
