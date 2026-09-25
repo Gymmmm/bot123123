@@ -36,12 +36,16 @@ def _pick_auto_cover(
 ) -> str:
     """Choose channel cover source: best ranked shot that is safe to show first.
 
-    Apartments prefer living; villas prefer exterior. Skips hard rejects, soft
-    rejects (text-heavy / toilet-like), toilet and bedroom labels when any better
-    living/exterior/kitchen alternative exists.
+    Apartments prefer living; villas prefer exterior then living. Skips hard rejects,
+    soft rejects, toilet and bedroom labels while any better alternative exists.
     """
     gallery_set = {str(Path(path).resolve()) for path in gallery}
     preferred = _normalize_cover_preference(cover_preference)
+    # Fallback ladder after the preferred label.
+    if preferred == "exterior":
+        label_ladder = ("exterior", "living", "kitchen")
+    else:
+        label_ladder = ("living", "exterior", "kitchen")
 
     def _path(item: dict[str, Any]) -> str:
         return str(Path(str(item.get("file") or "")).resolve())
@@ -52,7 +56,7 @@ def _pick_auto_cover(
         allow_soft: bool,
         allow_toilet: bool,
         allow_bedroom: bool,
-        require_preferred: bool,
+        require_labels: tuple[str, ...] | None,
     ) -> bool:
         path = _path(item)
         if not path or path not in gallery_set or item.get("reject"):
@@ -60,7 +64,7 @@ def _pick_auto_cover(
         if not allow_soft and item.get("soft_reject"):
             return False
         label = str(item.get("room_label") or "")
-        if require_preferred and label != preferred:
+        if require_labels is not None and label not in require_labels:
             return False
         if not allow_toilet and label == "toilet":
             return False
@@ -68,21 +72,26 @@ def _pick_auto_cover(
             return False
         return True
 
-    for allow_soft, allow_toilet, allow_bedroom, require_preferred in (
-        (False, False, False, True),
-        (False, False, False, False),
-        (True, False, False, True),
-        (True, False, False, False),
-        (True, False, True, False),
-        (True, True, True, False),
-    ):
+    passes: list[tuple[bool, bool, bool, tuple[str, ...] | None]] = []
+    for label in label_ladder:
+        passes.append((False, False, False, (label,)))
+    passes.extend(
+        [
+            (False, False, False, None),
+            (True, False, False, tuple(label_ladder)),
+            (True, False, False, None),
+            (True, False, True, None),
+            (True, True, True, None),
+        ]
+    )
+    for allow_soft, allow_toilet, allow_bedroom, require_labels in passes:
         for item in ranking:
             if _usable(
                 item,
                 allow_soft=allow_soft,
                 allow_toilet=allow_toilet,
                 allow_bedroom=allow_bedroom,
-                require_preferred=require_preferred,
+                require_labels=require_labels,
             ):
                 return _path(item)
     return gallery[0]

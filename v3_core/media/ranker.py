@@ -230,7 +230,36 @@ def _room_heuristic(img) -> dict[str, Any]:
     blue = (top[:, :, 0] > 90) & (top[:, :, 0] < 135) & (top[:, :, 1] > 40) & (top[:, :, 2] > 80)
     blue_frac = float(np.mean(blue))
     sat_mean = float(hsv[:, :, 1].mean())
-    exterior_score = min(1.0, blue_frac * 2.2 + (sat_mean / 120.0) * 0.25)
+    green = (
+        (hsv[:, :, 0] > 35)
+        & (hsv[:, :, 0] < 95)
+        & (hsv[:, :, 1] > 40)
+        & (hsv[:, :, 2] > 50)
+    )
+    green_frac = float(np.mean(green))
+    # Indoor ceiling / tray-light cue — suppresses false "exterior" from bright windows/ceilings.
+    top_gray = gray[: int(h * 0.20), :]
+    top_edge = float(edges[: int(h * 0.22), :].mean() / 255.0)
+    indoor_ceiling = bool(
+        (float(top_gray.mean()) > 145.0 and blue_frac < 0.10)
+        or (
+            float(top_gray.std()) < 42.0
+            and float(top_gray.mean()) > 70.0
+            and top_edge < 0.085
+            and blue_frac < 0.12
+        )
+    )
+    exterior_score = min(
+        1.0,
+        blue_frac * 2.2
+        + green_frac * 1.55
+        + (sat_mean / 130.0) * 0.15,
+    )
+    if indoor_ceiling:
+        exterior_score *= 0.2
+    elif blue_frac > 0.10 and green_frac < 0.04:
+        # Sky through a window, no garden — weak outdoor signal only.
+        exterior_score *= 0.5
 
     # Bed cue: soft mid-lower bedding + strong horizontal headboard edge.
     bed_band = gray[int(h * 0.38) : int(h * 0.82), int(w * 0.12) : int(w * 0.88)]
@@ -244,6 +273,12 @@ def _room_heuristic(img) -> dict[str, Any]:
         1.0,
         bed_soft * 0.45 + bed_horiz * 0.85 + bed_flat * 0.35 + min(side_vert, 0.8) * 0.25,
     )
+    # Outdoor fence / facade horizontals must not look like a bed.
+    if blue_frac >= 0.10 or green_frac >= 0.10:
+        bed_score *= 0.28
+    # Kitchen counters / dining tables create soft mid bands; don't call them beds.
+    if kitchen_score >= 0.28 and bed_score < 0.55:
+        bed_score *= 0.45
 
     edge_d = float(edges.mean() / 255.0)
     mean_b = float(gray.mean())
@@ -270,8 +305,9 @@ def _room_heuristic(img) -> dict[str, Any]:
     if sat_mean < 55 and living_score > 0.25:
         bedroom_score = min(1.0, bedroom_score + 0.1)
     bedroom_score = max(bedroom_score, bed_score)
-    if bed_score >= 0.42:
-        living_score *= 0.25
+    # Beds win over "living" even at moderate confidence (dark bedding / TV-wall bedrooms).
+    if bed_score >= 0.32:
+        living_score *= 0.22
         bedroom_score = max(bedroom_score, min(1.0, 0.55 + bed_score * 0.45))
 
     scores: dict[str, Any] = {
@@ -281,6 +317,8 @@ def _room_heuristic(img) -> dict[str, Any]:
         "living": round(float(living_score), 3),
         "bedroom": round(float(max(0.0, bedroom_score)), 3),
         "bed": round(float(bed_score), 3),
+        "sky": round(float(blue_frac), 3),
+        "green": round(float(green_frac), 3),
     }
     preferred = max(
         [
@@ -294,8 +332,12 @@ def _room_heuristic(img) -> dict[str, Any]:
     label = preferred[0]
     if scores["toilet"] > preferred[1] + 0.08 and scores["toilet"] > 0.45:
         label = "toilet"
-    if bed_score >= 0.48 and scores["bedroom"] >= scores["living"]:
+    if bed_score >= 0.36 and scores["bedroom"] >= scores["living"]:
         label = "bedroom"
+    # Strong outdoor blue sky (+ garden when available) beats a false bed from fence lines.
+    if exterior_score >= 0.48 and blue_frac >= 0.10 and not indoor_ceiling:
+        if green_frac >= 0.06 or blue_frac >= 0.18:
+            label = "exterior"
     scores["label"] = label
     return scores
 
@@ -367,7 +409,7 @@ def _cv_metrics(path: Path, *, cover_preference: object = "living") -> dict[str,
     soft_reject = bool(
         text_soft
         or (label == "toilet" and float(room.get("toilet") or 0) > 0.48)
-        or (label == "bedroom" and float(room.get("bed") or 0) >= 0.55)
+        or (label == "bedroom" and float(room.get("bed") or 0) >= 0.36)
     )
 
     total = (
@@ -473,10 +515,11 @@ def rank_photo_paths(
         ratio = float(item.get("ratio") or 0)
         landscape = ratio >= 1.05
         tier = int(item.get("room_tier") or _room_cover_tier(item.get("room_label"), preference=pref))
+        # Room tier before soft-reject so a soft living/exterior still beats a sharp bedroom.
         return (
             0 if item.get("reject") else 1,
-            0 if item.get("soft_reject") else 1,
             tier,
+            0 if item.get("soft_reject") else 1,
             1 if landscape else 0,
             float(item.get("score") or 0),
             float(item.get("orientation") or 0),
