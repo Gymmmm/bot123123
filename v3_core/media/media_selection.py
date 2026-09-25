@@ -86,8 +86,7 @@ def select_publication_media(
     are removed from the gallery. Remaining shots follow cover ranking so living /
     exterior / kitchen lead the album; toilets and text-heavy frames sink. Cover
     auto-pick prefers the same ranking and skips soft-reject / toilet when possible.
-    A manually selected cover is honoured only when it survives safety gates, and
-    is moved to the front of the gallery when present.
+    A manually selected cover is honoured only when it survives safety gates.
     """
     source_paths: list[Path] = []
     for raw in paths:
@@ -141,10 +140,6 @@ def select_publication_media(
     else:
         cover = _pick_auto_cover(ranking, gallery)
 
-    # Keep cover as the first album frame so 更多实拍 opens on the hero shot.
-    if cover in gallery:
-        gallery = [cover] + [path for path in gallery if path != cover]
-
     return {
         "cover_path": cover,
         "gallery_paths": gallery,
@@ -153,7 +148,7 @@ def select_publication_media(
         "ranking": ranking,
         "source_count": len(source_paths),
         "usable_count": len(gallery),
-        "policy": "rank_ordered_gallery_cover_first_skip_toilet_text",
+        "policy": "rank_ordered_gallery_cover_from_best_skip_toilet_text",
     }
 
 

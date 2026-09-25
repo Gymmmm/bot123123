@@ -92,9 +92,6 @@ def select_publication_media(
             gallery[0],
         )
 
-    if cover in gallery:
-        gallery = [cover] + [path for path in gallery if path != cover]
-
     return {
         "cover_path": cover,
         "gallery_paths": gallery,
@@ -103,7 +100,7 @@ def select_publication_media(
         "ranking": ranking,
         "source_count": len(source_paths),
         "usable_count": len(gallery),
-        "policy": "rank_ordered_gallery_cover_first",
+        "policy": "rank_ordered_gallery_cover_from_best",
     }
 
 

@@ -17,9 +17,9 @@ def test_media_selection_reorders_gallery_by_rank_filters_rejects_and_honours_ma
     ])
 
     result = media_selection.select_publication_media([a, dup, b, bad], manual_cover_path=a)
-    # Manual cover wins and is forced to the front; remaining follow rank order.
-    assert result["gallery_paths"] == [str(a.resolve()), str(b.resolve())]
+    # Manual cover wins the channel cover; gallery still follows rank order.
     assert result["cover_path"] == str(a.resolve())
+    assert result["gallery_paths"] == [str(b.resolve()), str(a.resolve())]
     assert result["duplicates"][0]["kind"] == "exact"
     assert str(bad.resolve()) in result["rejected_paths"]
 

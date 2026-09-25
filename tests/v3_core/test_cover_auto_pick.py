@@ -115,9 +115,10 @@ def test_auto_cover_skips_toilet_and_soft_reject(tmp_path, monkeypatch):
         ],
     )
     result = media_selection.select_publication_media([toilet, texty, living])
+    # 主图/封面 = living；相册按打分序，厕所仍可留在相册但不做封面。
     assert result["cover_path"] == str(living.resolve())
-    assert result["gallery_paths"][0] == str(living.resolve())
-    assert str(toilet.resolve()) in result["gallery_paths"]
-    assert result["gallery_paths"].index(str(living.resolve())) < result["gallery_paths"].index(
-        str(toilet.resolve())
-    )
+    assert result["gallery_paths"] == [
+        str(toilet.resolve()),
+        str(texty.resolve()),
+        str(living.resolve()),
+    ]
