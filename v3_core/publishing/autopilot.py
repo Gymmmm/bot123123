@@ -98,6 +98,7 @@ ERROR_LABELS = {
     "telegram_unknown": "发送结果待确认，禁止重复发送",
     "canonical_error": "房源资料校验未通过",
     "admin_hold": "房源已暂停，等待管理员处理",
+    "legacy_backlog": "旧库存已暂停自动投递",
 }
 
 
@@ -345,6 +346,9 @@ class AutoPublishRepository:
                          state=CASE
                            WHEN publisher_auto_items_v3.state='published' THEN 'published'
                            WHEN publisher_auto_items_v3.ignored=1 THEN publisher_auto_items_v3.state
+                           WHEN publisher_auto_items_v3.state='held' THEN 'held'
+                           WHEN publisher_auto_items_v3.state IN ('preview_ready','sending','unknown')
+                             THEN publisher_auto_items_v3.state
                            WHEN excluded.reason_code='sale_store_only'
                                 AND publisher_auto_items_v3.state='exception'
                                 AND publisher_auto_items_v3.reason_code='sale_store_only'
@@ -530,6 +534,64 @@ class AutoPublishRepository:
     def queue_count(self) -> int:
         with self._connect() as conn:
             return int(conn.execute("SELECT COUNT(*) FROM publisher_auto_items_v3 WHERE state='queued' AND ignored=0").fetchone()[0])
+
+    def held_count(self) -> int:
+        with self._connect() as conn:
+            return int(
+                conn.execute(
+                    "SELECT COUNT(*) FROM publisher_auto_items_v3 WHERE state='held' AND ignored=0"
+                ).fetchone()[0]
+            )
+
+    def hold_queued_backlog(self, *, reason_code: str = "legacy_backlog") -> int:
+        """Pause every currently queued auto item so ops can clear old inventory first.
+
+        New collector inserts still land in ``queued`` and keep the normal autopilot path.
+        """
+        code = str(reason_code or "legacy_backlog").strip() or "legacy_backlog"
+        text = ERROR_LABELS.get(code, "旧库存已暂停自动投递")
+        with self._connect() as conn:
+            cur = conn.execute(
+                """UPDATE publisher_auto_items_v3
+                      SET state='held',
+                          reason_code=?,
+                          reason_text=?,
+                          updated_at=CURRENT_TIMESTAMP
+                    WHERE state='queued' AND ignored=0""",
+                (code, text),
+            )
+            conn.commit()
+            return int(cur.rowcount or 0)
+
+    def release_held_backlog(self, *, reason_code: str = "legacy_backlog") -> int:
+        """Return held backlog items to the automatic queue."""
+        code = str(reason_code or "legacy_backlog").strip() or "legacy_backlog"
+        with self._connect() as conn:
+            cur = conn.execute(
+                """UPDATE publisher_auto_items_v3
+                      SET state='queued',
+                          reason_code='',
+                          reason_text='',
+                          updated_at=CURRENT_TIMESTAMP
+                    WHERE state='held' AND ignored=0 AND reason_code=?""",
+                (code,),
+            )
+            conn.commit()
+            return int(cur.rowcount or 0)
+
+    def held_rows(self, *, limit: int = 20) -> list[dict[str, Any]]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """SELECT a.*,l.public_listing_id,l.display_title,l.project_name,o.monthly_rent_usd
+                     FROM publisher_auto_items_v3 a
+                     JOIN listings_v3 l ON l.listing_id=a.listing_id
+                     JOIN listing_offers o ON o.offer_id=a.offer_id
+                    WHERE a.state='held' AND a.ignored=0
+                    ORDER BY a.created_at ASC, a.offer_id ASC
+                    LIMIT ?""",
+                (max(1, int(limit)),),
+            ).fetchall()
+        return [dict(row) for row in rows]
 
     def exception_count(self) -> int:
         with self._connect() as conn:

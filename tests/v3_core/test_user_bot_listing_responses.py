@@ -20,6 +20,8 @@ def _view(
     canonical_facts=None,
     adviser_copy="",
     project_name="富力城",
+    size_sqm=95,
+    floor="19",
 ):
     snapshot = {
         "schema": "v3_publication_snapshot.v1",
@@ -35,8 +37,8 @@ def _view(
             "property_type": "公寓",
             "layout": "2房1厅",
             "public_location_display": "BKK1",
-            "size_sqm": 95,
-            "floor": "19",
+            "size_sqm": size_sqm,
+            "floor": floor,
         },
         "offer": {
             "offer_type": "rent",
@@ -102,6 +104,13 @@ def test_detail_text_shows_public_facts_and_full_publisher_copy():
     assert "🟢 当前可预约\n🪧 编号：QL-RF-A2B3" in text
     assert text.strip().endswith("楼下配套成熟。")
     assert "钥匙已备" not in text
+
+
+def test_detail_text_floor_only_does_not_use_area_floor_label():
+    text = build_detail_text(_view(size_sqm=None, floor="19"))
+    assert "🏙 楼层：19楼" in text
+    assert "面积/楼层" not in text
+    assert "面积：" not in text
 
 
 def test_detail_text_omits_missing_bullets_and_adviser_without_copy():

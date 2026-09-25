@@ -202,9 +202,14 @@ def _listing_fact_lines(details) -> list[str]:
         lines.append(f"🛏 户型：{he(layout)}")
     if details.monthly_rent_usd:
         lines.append(f"💵 租金：{_format_price(details.monthly_rent_usd)}")
-    extra = [part for part in (_format_size(details.size_sqm), display_floor(details.floor)) if part]
-    if extra:
-        lines.append("📐 面积/楼层：" + " · ".join(he(part) for part in extra))
+    size = _format_size(details.size_sqm)
+    floor = display_floor(details.floor)
+    if size and floor:
+        lines.append(f"📐 面积/楼层：{he(size)} · {he(floor)}")
+    elif size:
+        lines.append(f"📐 面积：{he(size)}")
+    elif floor:
+        lines.append(f"🏙 楼层：{he(floor)}")
     terms = [he(part) for part in (details.deposit_terms, details.contract_term) if part]
     if terms:
         lines.append("🗝 租约：" + " · ".join(terms))

@@ -26,6 +26,8 @@ class PublisherInventoryDashboardController(PublisherInventoryAdminController):
         c = self._inventory_counts()
         repo = getattr(self, "repository", None)
         exception_count = int(repo.exception_count() or 0) if repo is not None else 0
+        queued_n = int(repo.queue_count() or 0) if repo is not None else 0
+        held_n = int(repo.held_count() or 0) if repo is not None and hasattr(repo, "held_count") else 0
         lines = [
             "<b>🔵 房态工作台</b>",
             "",
@@ -33,6 +35,9 @@ class PublisherInventoryDashboardController(PublisherInventoryAdminController):
             f"🔵 待确认 {c['pending']}｜10套一组　　⏰ 超3天 {c['overdue']}",
             f"🟡 已有预约 {c['reserved']}　　🆕 今日发布 {c['today']}",
             f"⚠️ 待处理异常 {exception_count}",
+            "",
+            "<b>自动投递</b>",
+            f"🚀 自动待发 {queued_n}　　📦 旧库存暂停 {held_n}",
             "",
             "<b>当前库存</b>",
             f"🟢 可预约 {c['active']}　　🔴 已租出 {c['rented']}　　⚫ 已下架 {c['offline']}",
@@ -53,6 +58,10 @@ class PublisherInventoryDashboardController(PublisherInventoryAdminController):
                             f"⚠️ 待处理异常 ({exception_count})",
                             callback_data="v3smp|exceptions|all",
                         )
+                    ],
+                    [
+                        InlineKeyboardButton(f"🚀 自动待发 {queued_n}", callback_data="v3smp|auto_queue"),
+                        InlineKeyboardButton(f"📦 旧库存 {held_n}", callback_data="v3smp|held_queue"),
                     ],
                     [
                         InlineKeyboardButton(f"🟡 已有预约 {c['reserved']}", callback_data="v3smp|inv_rows|reserved"),

@@ -39,10 +39,24 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
             return 0
         return int(repo.exception_count() or 0)
 
+    def _queued_count(self) -> int:
+        repo = getattr(self, "repository", None)
+        if repo is None:
+            return 0
+        return int(repo.queue_count() or 0)
+
+    def _held_count(self) -> int:
+        repo = getattr(self, "repository", None)
+        if repo is None or not hasattr(repo, "held_count"):
+            return 0
+        return int(repo.held_count() or 0)
+
     def home_keyboard(self) -> InlineKeyboardMarkup:
         preview_n = self._preview_ready_count()
         exception_n = self._open_exception_count()
         pending_n = int(self._pending_count() or 0)
+        queued_n = self._queued_count()
+        held_n = self._held_count()
         rows: list[list[InlineKeyboardButton]] = [
             [
                 InlineKeyboardButton("➕ 发布房源", callback_data="v3smp|new"),
@@ -52,6 +66,16 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
                 InlineKeyboardButton(
                     f"🔵 房态工作台 · 待确认 {pending_n}",
                     callback_data="v3smp|listings",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    f"🚀 自动待发 {queued_n}",
+                    callback_data="v3smp|auto_queue",
+                ),
+                InlineKeyboardButton(
+                    f"📦 旧库存 {held_n}",
+                    callback_data="v3smp|held_queue",
                 ),
             ],
         ]
@@ -84,17 +108,106 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
         pending_n = int(self._pending_count() or 0)
         exception_n = self._open_exception_count()
         preview_n = self._preview_ready_count()
+        queued_n = self._queued_count()
+        held_n = self._held_count()
         lines = [
             "<b>📣 侨联发布助手</b>",
             "",
             "发布房源、处理待确认，并管理频道房态。",
             "",
+            f"🚀 自动待发 <b>{queued_n}</b>　📦 旧库存暂停 <b>{held_n}</b>",
             f"🔵 待确认 {pending_n}　⚠️ 异常 {exception_n}　📤 待发预览 {preview_n}",
         ]
+        if queued_n > 0 and held_n == 0:
+            lines.extend(
+                [
+                    "",
+                    "处理旧库存前，请先暂停当前自动待发；新采集仍会正常入队。",
+                ]
+            )
         await message.reply_text(
             "\n".join(lines),
             parse_mode=ParseMode.HTML,
             reply_markup=self.home_keyboard(),
+        )
+
+    async def show_auto_queue(self, message: Any) -> None:
+        queued_n = self._queued_count()
+        held_n = self._held_count()
+        lines = [
+            "<b>🚀 自动待发</b>",
+            "",
+            f"当前自动投递队列：<b>{queued_n}</b> 套",
+            f"已暂停旧库存：<b>{held_n}</b> 套",
+            "",
+            "新采集房源会继续进入「自动待发」，按现有窗口与间隔发布。",
+        ]
+        buttons: list[list[InlineKeyboardButton]] = []
+        if queued_n > 0:
+            lines.extend(
+                [
+                    "",
+                    "若要先处理旧库存，请暂停当前整批自动待发。",
+                ]
+            )
+            buttons.append(
+                [
+                    InlineKeyboardButton(
+                        f"⏸ 暂停当前自动待发（{queued_n}）",
+                        callback_data="v3smp|hold_queued",
+                    )
+                ]
+            )
+        if held_n > 0:
+            buttons.append(
+                [InlineKeyboardButton(f"📦 查看旧库存 {held_n}", callback_data="v3smp|held_queue")]
+            )
+        buttons.append(self.home_row())
+        await message.reply_text(
+            "\n".join(lines),
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup(buttons),
+        )
+
+    async def show_held_queue(self, message: Any) -> None:
+        repo = getattr(self, "repository", None)
+        held_n = self._held_count()
+        rows = list(repo.held_rows(limit=15)) if repo is not None and hasattr(repo, "held_rows") else []
+        lines = [
+            "<b>📦 旧库存（已暂停自动投递）</b>",
+            "",
+            f"共 <b>{held_n}</b> 套，不会进入自动发帖。",
+            "新采集房源不受影响，仍走「自动待发」。",
+            "",
+        ]
+        if not rows:
+            lines.append("当前没有已暂停的旧库存。")
+        else:
+            lines.append("最近几套：")
+            for row in rows[:10]:
+                public_id = escape(str(row.get("public_listing_id") or row.get("listing_id") or ""))
+                title = escape(str(row.get("display_title") or row.get("project_name") or "房源")[:28])
+                lines.append(f"• {public_id} · {title}")
+            if held_n > 10:
+                lines.append(f"…另有 {held_n - 10} 套")
+        buttons: list[list[InlineKeyboardButton]] = []
+        if held_n > 0:
+            buttons.append(
+                [
+                    InlineKeyboardButton(
+                        f"▶️ 恢复旧库存自动投递（{held_n}）",
+                        callback_data="v3smp|release_held",
+                    )
+                ]
+            )
+        buttons.append(
+            [InlineKeyboardButton("🚀 自动待发", callback_data="v3smp|auto_queue")]
+        )
+        buttons.append(self.home_row())
+        await message.reply_text(
+            "\n".join(lines),
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup(buttons),
         )
 
     def _inventory_counts(self) -> dict[str, int]:
@@ -478,6 +591,40 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
         raw = str(getattr(query, "data", "") or "") if query is not None else ""
         parts = raw.split("|")
         action = parts[1] if len(parts) > 1 else ""
+        if action == "auto_queue":
+            await self.show_auto_queue(query.message)
+            return True
+        if action == "held_queue":
+            await self.show_held_queue(query.message)
+            return True
+        if action == "hold_queued":
+            repo = getattr(self, "repository", None)
+            held = int(repo.hold_queued_backlog() or 0) if repo is not None else 0
+            await query.message.reply_text(
+                f"⏸ 已暂停 {held} 套自动待发，转入旧库存。\n"
+                "新采集房源仍会进入「自动待发」，按原规则发布。",
+                reply_markup=InlineKeyboardMarkup(
+                    [
+                        [InlineKeyboardButton("📦 查看旧库存", callback_data="v3smp|held_queue")],
+                        self.home_row(),
+                    ]
+                ),
+            )
+            return True
+        if action == "release_held":
+            repo = getattr(self, "repository", None)
+            released = int(repo.release_held_backlog() or 0) if repo is not None else 0
+            await query.message.reply_text(
+                f"▶️ 已恢复 {released} 套旧库存到自动待发。\n"
+                "到自动发帖窗口后会按原节奏投递。",
+                reply_markup=InlineKeyboardMarkup(
+                    [
+                        [InlineKeyboardButton("🚀 自动待发", callback_data="v3smp|auto_queue")],
+                        self.home_row(),
+                    ]
+                ),
+            )
+            return True
         if action == "inv_rows" and len(parts) == 3:
             if parts[2] == "pending":
                 await self.show_pending_batch(query.message, 0)

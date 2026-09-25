@@ -203,7 +203,10 @@ class ProductionAutoPublishRepository(AutoPublishRepository):
                                 (offer_id, current_token),
                             )
                             continue
-                    elif current_state in {"published", "sending", "unknown"} or ignored:
+                    elif current_state == "held" or ignored:
+                        # Ops pause for old backlog: keep state + reason, never auto-requeue.
+                        state, code, text = current_state or "held", None, None
+                    elif current_state in {"published", "sending", "unknown"}:
                         state, code, text = current_state, "", ""
                     elif changed or (current_state == "exception" and current_reason == "listing_not_publishable"):
                         # ``listing_not_publishable`` was previously produced for
