@@ -72,16 +72,32 @@ def gallery_canvas_key(orientation: str | None) -> str:
 
 
 def enhance_property_photo(image: Image.Image) -> Image.Image:
-    """Production polish — brighten dim phone shots, lift contrast, light sharpen.
+    """Production polish — crush highlights, lift shadows, then contrast/vibrance/sharpen.
 
-    Geometry is handled separately by the cover-fill framing step.
+    Avoids the old global brightness push that blew out windows. Tone targets
+    roughly: exposure mild down on bright shots, highlights -40..-60 equivalent,
+    shadows +20..+30, contrast +15..+25, vibrance ~+10, light sharpen.
     """
-    image = ImageOps.autocontrast(image, cutoff=0.8)
-    image = ImageEnhance.Brightness(image).enhance(1.14)
-    image = ImageEnhance.Contrast(image).enhance(1.10)
-    image = ImageEnhance.Color(image).enhance(1.06)
-    image = ImageEnhance.Sharpness(image).enhance(1.18)
-    return image.filter(ImageFilter.UnsharpMask(radius=1.3, percent=70, threshold=2))
+    import numpy as np
+
+    arr = np.asarray(image.convert("RGB"), dtype=np.float32)
+    gray = arr.mean(axis=2)
+    # Highlights: pull values above ~185 back toward midtones.
+    highlight = np.clip((gray - 185.0) / 70.0, 0.0, 1.0)[..., None]
+    arr = arr - highlight * (arr - 185.0) * 0.48
+    # Shadows: lift crushed darks without flattening the whole frame.
+    shadow = np.clip((90.0 - gray) / 90.0, 0.0, 1.0)[..., None]
+    arr = arr + shadow * (90.0 - arr) * 0.24
+    mean = float(arr.mean())
+    if mean > 145:
+        arr *= 0.90  # ~-0.15 stop on already-bright frames
+    elif mean < 95:
+        arr *= 1.05  # keep dim phone shots readable
+    image = Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8), mode="RGB")
+    image = ImageEnhance.Contrast(image).enhance(1.18)
+    image = ImageEnhance.Color(image).enhance(1.08)
+    image = ImageEnhance.Sharpness(image).enhance(1.14)
+    return image.filter(ImageFilter.UnsharpMask(radius=1.2, percent=55, threshold=2))
 
 
 def apply_logo_opacity(logo: Image.Image, opacity: float = LOGO_OPACITY) -> Image.Image:

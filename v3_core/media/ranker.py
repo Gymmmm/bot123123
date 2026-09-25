@@ -374,6 +374,28 @@ def _cover_text_penalty(text: dict[str, float]) -> tuple[float, bool]:
     return penalty, soft
 
 
+def _overexposure_stats(img) -> dict[str, float]:
+    """Fraction of blown whites overall and in the upper half (window blowouts)."""
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    h = gray.shape[0]
+    overall = float(np.mean(gray > 245))
+    upper = float(np.mean(gray[: max(1, int(h * 0.55)), :] > 248))
+    return {"overall": round(overall, 4), "upper": round(upper, 4)}
+
+
+def _overexposure_penalty(stats: dict[str, float], *, room_label: str) -> tuple[float, bool]:
+    """Demote covers with blown windows / clipped whites; soft-reject severe cases."""
+    overall = float(stats.get("overall") or 0)
+    upper = float(stats.get("upper") or 0)
+    penalty = 0.0
+    if overall > 0.15:
+        penalty += (overall - 0.15) * 100.0
+    # Indoor rooms with a blown upper window are especially bad channel covers.
+    if room_label in {"bedroom", "living", "kitchen"} and upper > 0.08:
+        penalty += (upper - 0.08) * 120.0
+    soft = overall >= 0.28 or (room_label in {"bedroom", "living"} and upper >= 0.18)
+    return penalty, soft
+
 
 def _cv_metrics(path: Path, *, cover_preference: object = "living") -> dict[str, Any] | None:
     img = _read_cv(path)
@@ -406,8 +428,11 @@ def _cv_metrics(path: Path, *, cover_preference: object = "living") -> dict[str,
     label = str(room.get("label") or "")
     room_bonus = _cover_room_bonus(room, preference=pref)
     text_penalty, text_soft = _cover_text_penalty(text)
+    overexp = _overexposure_stats(img)
+    overexp_penalty, overexp_soft = _overexposure_penalty(overexp, room_label=label)
     soft_reject = bool(
         text_soft
+        or overexp_soft
         or (label == "toilet" and float(room.get("toilet") or 0) > 0.48)
         or (label == "bedroom" and float(room.get("bed") or 0) >= 0.36)
     )
@@ -423,6 +448,7 @@ def _cv_metrics(path: Path, *, cover_preference: object = "living") -> dict[str,
         + color * 0.05
         + room_bonus
         - text_penalty
+        - overexp_penalty
     )
     if ratio < 0.90:
         total -= 22
@@ -445,6 +471,8 @@ def _cv_metrics(path: Path, *, cover_preference: object = "living") -> dict[str,
         "text": text,
         "room_bonus": round(room_bonus, 2),
         "text_penalty": round(text_penalty, 2),
+        "overexposure": overexp,
+        "overexposure_penalty": round(overexp_penalty, 2),
         "room_tier": _room_cover_tier(label, preference=pref),
         "cover_preference": pref,
         "sharpness": round(sharpness, 2),

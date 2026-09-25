@@ -22,8 +22,8 @@ from .source_scrub import scrub_file
 
 
 MAX_SCRUB_COVERAGE = 0.08
-SCRUB_REVISION = "source_scrub_v3_force_bottom_contact_crop_20260925"
-GALLERY_BRAND_REVISION = "qiaolian_gallery_v9_no_frame_bright_logo_20260925"
+SCRUB_REVISION = "source_scrub_v3_center_watermark_20260925"
+GALLERY_BRAND_REVISION = "qiaolian_gallery_v10_tone_overexp_wm_20260925"
 
 
 @dataclass(frozen=True)

@@ -308,6 +308,55 @@ def detect_source_marks(img_bgr: np.ndarray) -> dict[str, Any]:
                 crop_bottom = True
                 crop_frac = min(0.18, max(0.08, 1.0 - (slogan_top - 12) / float(h)))
 
+    # --- Center translucent watermark (Khmer24-style mid-frame text) ---
+    # Keep only small elongated glyph bands; skip large bright windows.
+    wy0, wy1 = int(h * 0.28), int(h * 0.72)
+    wx0, wx1 = int(w * 0.18), int(w * 0.82)
+    center = gray[wy0:wy1, wx0:wx1]
+    if center.size:
+        bright = (center > 205).astype(np.uint8) * 255
+        # Soft local contrast lift catches faint translucent white marks.
+        blur = cv2.GaussianBlur(center, (0, 0), 2.5)
+        diff = cv2.subtract(center, blur)
+        soft = ((diff > 12) & (center > 160)).astype(np.uint8) * 255
+        cand = cv2.bitwise_or(bright, soft)
+        cand = cv2.morphologyEx(
+            cand,
+            cv2.MORPH_CLOSE,
+            cv2.getStructuringElement(cv2.MORPH_RECT, (max(11, center.shape[1] // 50), 3)),
+            iterations=1,
+        )
+        nlab, labels, stats, _ = cv2.connectedComponentsWithStats(cand, 8)
+        local = np.zeros_like(center, dtype=np.uint8)
+        kept_area = 0
+        max_comp = int(center.size * 0.035)  # reject window-sized blobs
+        for i in range(1, nlab):
+            area = int(stats[i, cv2.CC_STAT_AREA])
+            ww = int(stats[i, cv2.CC_STAT_WIDTH])
+            hh = int(stats[i, cv2.CC_STAT_HEIGHT])
+            if area < 50 or area > max_comp:
+                continue
+            aspect = ww / max(hh, 1)
+            # Watermark glyphs / URL lines are wide-short; skip square panes.
+            if not ((aspect >= 2.2 and 4 <= hh <= 48 and ww >= 28) or (aspect >= 1.4 and 8 <= hh <= 36 and 40 <= ww)):
+                continue
+            local[labels == i] = 255
+            kept_area += area
+        dens = float(local.mean() / 255.0)
+        # Area gate: enough to be a mark, not so much we ate the facade/window.
+        if 0.003 <= dens <= 0.07 and kept_area >= 120:
+            local = cv2.dilate(
+                local, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)), iterations=2
+            )
+            add_region(
+                "center_watermark",
+                local,
+                wy0,
+                wx0,
+                glyph_density=round(dens, 4),
+                kept_area=kept_area,
+            )
+
     coverage = float(mask.mean() / 255.0)
     return {
         "mask": mask,
@@ -346,11 +395,12 @@ def scrub_image(
         meta["method"].append(f"crop_bottom_{det['crop_frac']:.2f}")
         meta["crop_frac"] = det["crop_frac"]
         det2 = detect_source_marks(out)
-        # Drop bottom_* regions already handled by crop; keep corner logos
+        # Drop bottom_* regions already handled by crop; keep corner logos + mid watermarks
         keep_regions = [
             r
             for r in det2["regions"]
-            if str(r.get("kind", "")).startswith("corner_top")
+            if str(r.get("kind", "")).startswith("corner_")
+            or r.get("kind") == "center_watermark"
         ]
         mask = np.zeros(out.shape[:2], dtype=np.uint8)
         for r in keep_regions:
