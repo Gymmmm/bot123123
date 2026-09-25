@@ -1,8 +1,9 @@
 """Single media-selection contract for publication packages.
 
 This module does not alter raw media. It reuses the extracted photo-ranking
-rules for quality/reject decisions, preserves source-order gallery semantics,
-and returns original source paths.
+rules for quality/reject decisions, reorders the usable gallery by the same
+cover ranking (best living/exterior shots first), and returns original source
+paths.
 """
 from __future__ import annotations
 
@@ -55,18 +56,38 @@ def _pick_auto_cover(ranking: list[dict[str, Any]], gallery: list[str]) -> str:
     return gallery[0]
 
 
+def _ordered_gallery(ranking: list[dict[str, Any]], unique: list[Path], rejected: set[str]) -> list[str]:
+    """Usable gallery in ranking order (best first), then any unscored leftovers."""
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for item in ranking:
+        path = str(Path(str(item.get("file") or "")).resolve())
+        if not path or path in rejected or path in seen or item.get("reject"):
+            continue
+        ordered.append(path)
+        seen.add(path)
+    for path in unique:
+        resolved = str(path.resolve())
+        if resolved in rejected or resolved in seen:
+            continue
+        ordered.append(resolved)
+        seen.add(resolved)
+    return ordered
+
+
 def select_publication_media(
     paths: Iterable[str | Path],
     *,
     manual_cover_path: str | Path | None = None,
 ) -> dict[str, Any]:
-    """Return one cover source plus a source-ordered usable gallery.
+    """Return one cover source plus a ranking-ordered usable gallery.
 
     Exact and near duplicates keep the first source occurrence. Severe rejects
-    are removed from the gallery. Cover auto-pick prefers living / kitchen /
-    exterior frames and soft-penalizes watermark/contact-heavy or toilet-like
-    shots (see ``ranker.rank_photo_paths``). A manually selected cover is
-    honoured only when it survives safety gates.
+    are removed from the gallery. Remaining shots follow cover ranking so living /
+    exterior / kitchen lead the album; toilets and text-heavy frames sink. Cover
+    auto-pick prefers the same ranking and skips soft-reject / toilet when possible.
+    A manually selected cover is honoured only when it survives safety gates, and
+    is moved to the front of the gallery when present.
     """
     source_paths: list[Path] = []
     for raw in paths:
@@ -106,7 +127,7 @@ def select_publication_media(
         for item in ranking
         if item.get("reject")
     }
-    gallery = [str(path) for path in unique if str(path) not in rejected]
+    gallery = _ordered_gallery(ranking, unique, rejected)
     if not gallery:
         raise ValueError("missing_usable_images")
 
@@ -120,6 +141,10 @@ def select_publication_media(
     else:
         cover = _pick_auto_cover(ranking, gallery)
 
+    # Keep cover as the first album frame so 更多实拍 opens on the hero shot.
+    if cover in gallery:
+        gallery = [cover] + [path for path in gallery if path != cover]
+
     return {
         "cover_path": cover,
         "gallery_paths": gallery,
@@ -128,7 +153,7 @@ def select_publication_media(
         "ranking": ranking,
         "source_count": len(source_paths),
         "usable_count": len(gallery),
-        "policy": "source_order_after_dedup_severe_reject_cover_prefer_living_skip_toilet_text",
+        "policy": "rank_ordered_gallery_cover_first_skip_toilet_text",
     }
 
 

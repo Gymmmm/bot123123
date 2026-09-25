@@ -116,4 +116,8 @@ def test_auto_cover_skips_toilet_and_soft_reject(tmp_path, monkeypatch):
     )
     result = media_selection.select_publication_media([toilet, texty, living])
     assert result["cover_path"] == str(living.resolve())
-    assert result["gallery_paths"][0] == str(toilet.resolve())
+    assert result["gallery_paths"][0] == str(living.resolve())
+    assert str(toilet.resolve()) in result["gallery_paths"]
+    assert result["gallery_paths"].index(str(living.resolve())) < result["gallery_paths"].index(
+        str(toilet.resolve())
+    )

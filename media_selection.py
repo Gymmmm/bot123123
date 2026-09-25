@@ -1,9 +1,7 @@
 """Single media-selection contract for publication packages.
 
-This module does not alter raw media.  It reuses the existing photo ranker for
-quality/reject decisions, applies the same source-order gallery policy as
-``media_pipeline_v1_1``, and returns original source paths.  Final gallery bytes
-remain the responsibility of ``photo_formatter_v1_1`` in the package builder.
+Legacy top-level shim kept for older tests/tools. Production V3 uses
+``v3_core.media.media_selection``; keep gallery ordering behavior aligned.
 """
 from __future__ import annotations
 
@@ -23,18 +21,30 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _ordered_gallery(ranking: list[dict[str, Any]], unique: list[Path], rejected: set[str]) -> list[str]:
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for item in ranking:
+        path = str(Path(str(item.get("file") or "")).resolve())
+        if not path or path in rejected or path in seen or item.get("reject"):
+            continue
+        ordered.append(path)
+        seen.add(path)
+    for path in unique:
+        resolved = str(path.resolve())
+        if resolved in rejected or resolved in seen:
+            continue
+        ordered.append(resolved)
+        seen.add(resolved)
+    return ordered
+
+
 def select_publication_media(
     paths: Iterable[str | Path],
     *,
     manual_cover_path: str | Path | None = None,
 ) -> dict[str, Any]:
-    """Return one cover source plus a source-ordered usable gallery.
-
-    Exact and near duplicates keep the first source occurrence. Severe rejects
-    are removed from the gallery.  A manually selected cover is honoured only
-    when it survives those safety gates; otherwise the best ranked usable photo
-    is selected automatically.
-    """
+    """Return one cover source plus a ranking-ordered usable gallery."""
     source_paths: list[Path] = []
     for raw in paths:
         path = Path(str(raw or "")).expanduser().resolve()
@@ -65,7 +75,7 @@ def select_publication_media(
 
     ranking = rank_photo_paths(unique)
     rejected = {str(Path(item["file"]).resolve()) for item in ranking if item.get("reject")}
-    gallery = [str(path) for path in unique if str(path) not in rejected]
+    gallery = _ordered_gallery(ranking, unique, rejected)
     if not gallery:
         raise ValueError("missing_usable_images")
 
@@ -74,9 +84,16 @@ def select_publication_media(
         cover = manual
     else:
         cover = next(
-            (str(Path(item["file"]).resolve()) for item in ranking if not item.get("reject") and str(Path(item["file"]).resolve()) in gallery),
+            (
+                str(Path(item["file"]).resolve())
+                for item in ranking
+                if not item.get("reject") and str(Path(item["file"]).resolve()) in gallery
+            ),
             gallery[0],
         )
+
+    if cover in gallery:
+        gallery = [cover] + [path for path in gallery if path != cover]
 
     return {
         "cover_path": cover,
@@ -86,7 +103,7 @@ def select_publication_media(
         "ranking": ranking,
         "source_count": len(source_paths),
         "usable_count": len(gallery),
-        "policy": "source_order_after_dedup_and_severe_reject",
+        "policy": "rank_ordered_gallery_cover_first",
     }
 
 
