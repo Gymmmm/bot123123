@@ -90,7 +90,7 @@ def test_detail_text_shows_public_facts_and_full_publisher_copy():
     text = build_detail_text(view)
 
     assert text.startswith("🏡 项目：富力城\n📍 区域：BKK1\n🛏 户型：2房1厅")
-    assert "📐 95㎡ · 19楼" in text
+    assert "📐 面积/楼层：95㎡ · 19楼" in text
     assert "💵 租金：$800/月" in text
     assert "🗝 租约：押1付1 · 1年" in text
     assert "🧾 物业费：含物业费" in text
@@ -99,7 +99,7 @@ def test_detail_text_shows_public_facts_and_full_publisher_copy():
     assert "💬 侨联说" in text
     assert "采光面宽，适合长期住。" in text
     assert "楼下配套成熟。" in text
-    assert "🟢 房态：当前可预约\n🪧 编号：QL-RF-A2B3" in text
+    assert "🟢 当前可预约\n🪧 编号：QL-RF-A2B3" in text
     assert text.strip().endswith("楼下配套成熟。")
     assert "钥匙已备" not in text
 
@@ -117,7 +117,7 @@ def test_detail_text_omits_missing_bullets_and_adviser_without_copy():
     assert "水电费用" not in text
     assert "大楼配套" not in text
     assert "💬 侨联说" not in text
-    assert "🟢 房态：当前可预约" in text
+    assert "🟢 当前可预约" in text
     assert _actions(response.action_rows) == [["book", "consult"], ["similar"]]
     assert _labels(response.action_rows) == [
         ["📅 预约看房", "💬 中文顾问"],
@@ -130,7 +130,7 @@ def test_details_response_uses_live_rented_state_but_keeps_frozen_public_facts()
     response = build_details_response(view)
 
     assert "💵 租金：$800/月" in response.text
-    assert "🔴 房态：已租出" in response.text
+    assert "🔴 已租出" in response.text
     assert _actions(response.action_rows) == [["consult"], ["similar"]]
     assert _labels(response.action_rows) == [
         ["💬 中文顾问"],
@@ -146,9 +146,9 @@ def test_photo_caption_keeps_rental_essentials_with_photo():
         "📍 区域：BKK1\n"
         "🛏 户型：2房1厅\n"
         "💵 租金：$800/月\n"
-        "📐 95㎡ · 19楼\n"
+        "📐 面积/楼层：95㎡ · 19楼\n"
         "🗝 租约：押1付1 · 1年\n"
-        "🟢 房态：当前可预约\n"
+        "🟢 当前可预约\n"
         "🪧 编号：QL-RF-A2B3\n\n"
         "📸 1/3"
     )

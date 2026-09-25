@@ -130,7 +130,7 @@ def test_search_card_order_and_public_identity(monkeypatch):
     monkeypatch.setattr(mod, "build_public_listing_details", lambda view: D())
     card = build_search_card((V(),), 0)
     labels = [choice.label for row in card.action_rows for choice in row]
-    assert labels == ["📷 房源详情", "📅 预约看房", "换条件"]
+    assert labels == ["📷 看实拍", "📅 预约看房", "换搜索条件"]
     assert "l_" not in repr(card).lower()
 
 

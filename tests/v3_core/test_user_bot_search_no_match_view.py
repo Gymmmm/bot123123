@@ -26,6 +26,6 @@ def test_no_match_keeps_conditions_strict_and_offers_adjust_or_advisor_only():
     assert "BKK1｜&lt;= 800 USD/月" in view.text
     assert "没有自动放宽条件" in view.text
     labels = [choice.label for row in view.rows for choice in row]
-    assert labels == ["换条件", "中文顾问", "返回首页"]
+    assert labels == ["换搜索条件", "中文顾问", "返回首页"]
     assert "当前可约" not in " ".join(labels)
     assert [choice.kind for row in view.rows for choice in row] == ["change_search", "home", "home"]

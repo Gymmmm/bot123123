@@ -462,24 +462,7 @@ class ProductionSimplePublisherAdminController(SimplePublisherAdminController):
             bot=context.bot,
             force_offer_id=offer_id,
         )
-        if result.status == "published":
-            await message.reply_text(
-                f"✅ 已重新检查并发布。频道消息：{escape(result.channel_message_id)}",
-                parse_mode=ParseMode.HTML,
-                reply_markup=InlineKeyboardMarkup([self.home_row()]),
-            )
-            return
-        if result.status == "already_published":
-            await message.reply_text(
-                "该房源已经发布，不会重复发送。",
-                reply_markup=InlineKeyboardMarkup([self.home_row()]),
-            )
-            return
-        await message.reply_text(
-            f"未发布：{escape(result.reason_text or result.status)}",
-            parse_mode=ParseMode.HTML,
-            reply_markup=InlineKeyboardMarkup([self.home_row()]),
-        )
+        await self._reply_recheck_result(message, result)
 
     async def handle_callback(self, update: Any, context: Any) -> bool:
         query = getattr(update, "callback_query", None)

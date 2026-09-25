@@ -194,7 +194,7 @@ class PendingBatchOperatorPublisherAdminController(OperatorPublisherAdminControl
         buttons: list[list[InlineKeyboardButton]] = [
             [
                 InlineKeyboardButton(
-                    f"✅ 这{current_count}套全部可租",
+                    f"✅ 这{current_count}套全部设为可预约",
                     callback_data=f"v3smp|pbapply|active|{clean_page}",
                 )
             ],
@@ -270,7 +270,7 @@ class PendingBatchOperatorPublisherAdminController(OperatorPublisherAdminControl
                 [
                     [
                         InlineKeyboardButton(
-                            "🟢 确认可租",
+                            "🟢 设为可预约",
                             callback_data=f"v3smp|pboneapply|active|{listing_id}|{max(0, int(page or 0))}",
                         ),
                         InlineKeyboardButton(
@@ -333,7 +333,7 @@ class PendingBatchOperatorPublisherAdminController(OperatorPublisherAdminControl
         skipped: list[str],
         page: int,
     ) -> None:
-        labels = {"active": "🟢 可租", "offline": "⚫ 已下架"}
+        labels = {"active": "🟢 可预约", "offline": "⚫ 已下架"}
         remaining = self._pending_count()
         lines = [
             "<b>✅ 本组已处理</b>",

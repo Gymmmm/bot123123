@@ -80,6 +80,40 @@ class SimplePublisherAdminController:
     def home_row() -> list[InlineKeyboardButton]:
         return [InlineKeyboardButton("🏠 返回首页", callback_data="v3h")]
 
+    async def _reply_recheck_result(self, message: Any, result: Any) -> None:
+        """Operator-facing outcome after force recheck / republish."""
+        status = str(getattr(result, "status", "") or "")
+        reason = str(getattr(result, "reason_text", "") or getattr(result, "reason_code", "") or status)
+        if status == "published":
+            await message.reply_text(
+                f"✅ 已重新检查并发布。频道消息：{escape(str(getattr(result, 'channel_message_id', '') or ''))}",
+                parse_mode=ParseMode.HTML,
+                reply_markup=InlineKeyboardMarkup([self.home_row()]),
+            )
+            return
+        if status == "already_published":
+            await message.reply_text(
+                "该房源已经发布，不会重复发送。",
+                reply_markup=InlineKeyboardMarkup([self.home_row()]),
+            )
+            return
+        if status in {"queued", "idle"}:
+            await message.reply_text(
+                "✅ 已重新放入发布队列，等待自动发帖窗口。\n不会立刻重复发到频道。",
+                reply_markup=InlineKeyboardMarkup([self.home_row()]),
+            )
+            return
+        await message.reply_text(
+            f"仍未发布：{escape(reason)}\n可补资料后再点「重新检查并发布」。",
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup(
+                [
+                    [InlineKeyboardButton("⬅️ 返回异常列表", callback_data="v3smp|exceptions|all")],
+                    self.home_row(),
+                ]
+            ),
+        )
+
     async def show_home(self, message: Any) -> None:
         cfg = self.repository.config()
         await message.reply_text(
@@ -235,9 +269,9 @@ class SimplePublisherAdminController:
 
     _EXCEPTION_TABS = (
         ("all", "全部"),
-        ("sale_store_only", "出售"),
+        ("sale_store_only", "出售存档"),
         ("missing_location", "缺位置"),
-        ("canonical_error", "规范错"),
+        ("canonical_error", "资料校验"),
         ("other", "其他"),
     )
 
@@ -692,18 +726,24 @@ class SimplePublisherAdminController:
             await self.append_exception_media(query.message, context, parts[2])
         elif action == "recheck" and len(parts) == 3:
             result = await self.autopilot.process_one(bot=context.bot, force_offer_id=parts[2])
-            if result.status == "published":
-                await query.message.reply_text(f"✅ 已重新检查并发布。频道消息：{escape(result.channel_message_id)}", parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([self.home_row()]))
-            elif result.status == "already_published":
-                await query.message.reply_text("该房源已经发布，不会重复发送。", reply_markup=InlineKeyboardMarkup([self.home_row()]))
-            else:
-                await query.message.reply_text(f"未发布：{escape(result.reason_text or result.status)}", parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup([self.home_row()]))
+            await self._reply_recheck_result(query.message, result)
         elif action == "status" and len(parts) == 4:
             status, listing_id = parts[2], parts[3]
             self.repository.set_listing_status(listing_id, status)
             row = self._listing_detail(listing_id)
             if status == "active" and row.get("offer_id"):
                 self.repository.requeue(str(row["offer_id"]))
+                await query.message.reply_text(
+                    "✅ 已设为可预约，并重新放入发布队列。\n"
+                    "到自动发帖窗口后才会发到频道（不会立刻重发）。",
+                    reply_markup=InlineKeyboardMarkup(
+                        [
+                            [InlineKeyboardButton("查看房源", callback_data=f"v3smp|listing|{listing_id}")],
+                            self.home_row(),
+                        ]
+                    ),
+                )
+                return
             await self.show_listing(query.message, listing_id)
         elif action == "windows":
             await self.show_windows(query.message)

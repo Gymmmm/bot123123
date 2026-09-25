@@ -145,7 +145,7 @@ def test_pending_batch_screen_has_one_tap_group_actions(tmp_path: Path):
     assert "待确认共 12 套" in call["text"]
     labels = _labels(call["reply_markup"])
     callbacks = _callbacks(call["reply_markup"])
-    assert "✅ 这10套全部可租" in labels
+    assert "✅ 这10套全部设为可预约" in labels
     assert "⚫ 这10套全部下架" in labels
     assert "🔎 单独处理本组" in labels
     assert "v3smp|pbapply|active|0" in callbacks

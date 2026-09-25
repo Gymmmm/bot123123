@@ -25,26 +25,74 @@ _LOCAL_TZ = ZoneInfo("Asia/Phnom_Penh")
 class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminController):
     """Compact daily inventory console for a non-technical operator."""
 
-    @staticmethod
-    def home_keyboard() -> InlineKeyboardMarkup:
-        return InlineKeyboardMarkup(
+    def _preview_ready_count(self) -> int:
+        with sqlite3.connect(self.db_path) as conn:
+            row = conn.execute(
+                """SELECT COUNT(*) FROM publisher_auto_items_v3
+                    WHERE state='preview_ready' AND ignored=0"""
+            ).fetchone()
+        return int((row or [0])[0] or 0)
+
+    def _open_exception_count(self) -> int:
+        repo = getattr(self, "repository", None)
+        if repo is None:
+            return 0
+        return int(repo.exception_count() or 0)
+
+    def home_keyboard(self) -> InlineKeyboardMarkup:
+        preview_n = self._preview_ready_count()
+        exception_n = self._open_exception_count()
+        pending_n = int(self._pending_count() or 0)
+        rows: list[list[InlineKeyboardButton]] = [
             [
-                [
-                    InlineKeyboardButton("➕ 发布房源", callback_data="v3smp|new"),
-                    InlineKeyboardButton("📢 发布中心", callback_data="v3bc"),
-                ],
-                [
-                    InlineKeyboardButton("🔵 房态管理", callback_data="v3smp|listings"),
-                    InlineKeyboardButton("📡 采集源", callback_data="v3smp|sources"),
-                ],
-                [InlineKeyboardButton("📚 发布记录", callback_data="v3smp|logs")],
+                InlineKeyboardButton("➕ 发布房源", callback_data="v3smp|new"),
+                InlineKeyboardButton("📢 发布中心", callback_data="v3bc"),
+            ],
+            [
+                InlineKeyboardButton(
+                    f"🔵 房态工作台 · 待确认 {pending_n}",
+                    callback_data="v3smp|listings",
+                ),
+            ],
+        ]
+        todo: list[InlineKeyboardButton] = []
+        if exception_n > 0:
+            todo.append(
+                InlineKeyboardButton(
+                    f"⚠️ 异常 {exception_n}",
+                    callback_data="v3smp|exceptions|all",
+                )
+            )
+        if preview_n > 0:
+            todo.append(
+                InlineKeyboardButton(
+                    f"📤 待确认发布 {preview_n}",
+                    callback_data="v3smp|preview_ready",
+                )
+            )
+        if todo:
+            rows.append(todo)
+        rows.append(
+            [
+                InlineKeyboardButton("📡 采集源", callback_data="v3smp|sources"),
+                InlineKeyboardButton("📚 发布记录", callback_data="v3smp|logs"),
             ]
         )
+        return InlineKeyboardMarkup(rows)
 
     async def show_home(self, message: Any) -> None:
+        pending_n = int(self._pending_count() or 0)
+        exception_n = self._open_exception_count()
+        preview_n = self._preview_ready_count()
+        lines = [
+            "<b>📣 侨联发布助手</b>",
+            "",
+            "发布房源、处理待确认，并管理频道房态。",
+            "",
+            f"🔵 待确认 {pending_n}　⚠️ 异常 {exception_n}　📤 待发预览 {preview_n}",
+        ]
         await message.reply_text(
-            "<b>📣 侨联发布助手</b>\n\n"
-            "发布房源、管理频道内容和房态。",
+            "\n".join(lines),
             parse_mode=ParseMode.HTML,
             reply_markup=self.home_keyboard(),
         )

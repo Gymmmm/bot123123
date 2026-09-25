@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from html import escape as he
 from pathlib import Path
 from typing import Iterable
+from v3_core.inventory.listing_taxonomy import location_display_overlaps_project
 from v3_core.publishing.formatting import display_floor
 from .listing_presenter import build_public_listing_details
 from .listing_responses import SemanticAction, _frozen_cover_path
@@ -42,10 +43,10 @@ def _card_actions(views: tuple[PublishedListingView, ...], *, index: int, bookab
             SemanticAction("下一套","next",views[next_i].public_listing_id,next_i),
         ))
     if bookable:
-        rows.append((SemanticAction("📷 房源详情","details",target),SemanticAction("📅 预约看房","book",target)))
+        rows.append((SemanticAction("📷 看实拍","details",target),SemanticAction("📅 预约看房","book",target)))
     else:
-        rows.append((SemanticAction("📷 房源详情","details",target),))
-    rows.append((SemanticAction("换条件","change_search"),))
+        rows.append((SemanticAction("📷 看实拍","details",target),))
+    rows.append((SemanticAction("换搜索条件","change_search"),))
     return tuple(rows)
 
 def build_search_card(views: Iterable[PublishedListingView], index: int) -> SearchCardResponse:
@@ -56,6 +57,7 @@ def build_search_card(views: Iterable[PublishedListingView], index: int) -> Sear
     view=items[position]
     details=build_public_listing_details(view)
     floor=display_floor(details.floor)
+    project=str(details.project_name or "").strip()
     area=str(details.location or "").strip()
     layout=str(details.layout or "").strip()
     rent=(
@@ -63,10 +65,17 @@ def build_search_card(views: Iterable[PublishedListingView], index: int) -> Sear
         if details.monthly_rent_usd is not None and int(details.monthly_rent_usd)>0
         else ""
     )
-    title=" · ".join(v for v in (area,layout,rent) if v) or "房源"
+    # Prefer project in the title so same-area cards are distinguishable.
+    headline_bits = [project or area, layout, rent]
+    title=" · ".join(v for v in headline_bits if v) or "房源"
     lines=[f"<b>💰 {he(title)}</b>"]
+    meta=[]
+    if project and area and not location_display_overlaps_project(project, area):
+        meta.append(area)
     if floor:
-        lines.append(he(floor))
+        meta.append(floor)
+    if meta:
+        lines.append(he(" · ".join(meta)))
     lines.append(f"{details.status_icon} {he(details.status_label)} · {position+1}/{len(items)}")
     return SearchCardResponse(
         public_listing_id=details.public_listing_id,

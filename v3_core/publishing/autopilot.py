@@ -96,7 +96,7 @@ ERROR_LABELS = {
     "sale_store_only": "出售房源仅保存",
     "telegram_failed": "Telegram 发布失败",
     "telegram_unknown": "发送结果待确认，禁止重复发送",
-    "canonical_error": "房源信息存在关键错误",
+    "canonical_error": "房源资料校验未通过",
     "admin_hold": "房源已暂停，等待管理员处理",
 }
 

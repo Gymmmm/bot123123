@@ -50,12 +50,6 @@ class PublisherInventoryDashboardController(PublisherInventoryAdminController):
                     ],
                     [
                         InlineKeyboardButton(
-                            f"🔵 处理待确认 {c['pending']}｜10套一组",
-                            callback_data="v3smp|pbat|0",
-                        )
-                    ],
-                    [
-                        InlineKeyboardButton(
                             f"⚠️ 待处理异常 ({exception_count})",
                             callback_data="v3smp|exceptions|all",
                         )

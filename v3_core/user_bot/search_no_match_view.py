@@ -25,10 +25,10 @@ def build_search_no_match_view(intent: SearchSubmitIntent) -> TransitionView:
             "<b>这组条件暂时没有对上的房源</b>"
             f"{summary_block}\n\n"
             "没有自动放宽条件。\n"
-            "可以换条件再找，或把原条件发给中文顾问。"
+            "可以换搜索条件再找，或把原条件发给中文顾问。"
         ),
         rows=(
-            (TransitionChoice("换条件", "change_search"),),
+            (TransitionChoice("换搜索条件", "change_search"),),
             (TransitionChoice("中文顾问", "home", value="contact"),),
             (TransitionChoice("返回首页", "home"),),
         ),

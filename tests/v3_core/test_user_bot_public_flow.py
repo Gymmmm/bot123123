@@ -158,7 +158,7 @@ def test_rented_book_is_blocked_before_appointment_flow_is_created():
         assert result.reason == "listing_not_bookable"
         assert result.book is None
         assert result.details is not None
-        assert "🔴 房态：已租出" in result.details.text
+        assert "🔴 已租出" in result.details.text
         actions = [action for row in result.details.action_rows for action in row]
         labels = [action.label for action in actions]
         assert "📅 预约看房" not in labels

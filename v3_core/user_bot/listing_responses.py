@@ -170,15 +170,15 @@ def _utilities_line(*, water: str, electric: str) -> str:
 def _detail_status_line(details) -> str:
     status = str(details.inventory_status or "").strip().lower()
     if status == "reserved":
-        return "🟡 房态：已有预约，仍可预约"
+        return "🟡 已有预约，仍可预约"
     if status == "active":
-        return "🟢 房态：当前可预约"
+        return "🟢 当前可预约"
     if status in {"rented", "leased"}:
-        return "🔴 房态：已租出"
+        return "🔴 已租出"
     if status in {"inactive", "offline"}:
-        return "⚫ 房态：已下架"
+        return "⚫ 已下架"
     label = str(details.status_label or "").strip() or "待确认"
-    return f"{details.status_icon} 房态：{he(label)}"
+    return f"{details.status_icon} {he(label)}"
 
 
 def _adviser_copy_for_view(view: PublishedListingView) -> str:
@@ -204,7 +204,7 @@ def _listing_fact_lines(details) -> list[str]:
         lines.append(f"💵 租金：{_format_price(details.monthly_rent_usd)}")
     extra = [part for part in (_format_size(details.size_sqm), display_floor(details.floor)) if part]
     if extra:
-        lines.append("📐 " + " · ".join(he(part) for part in extra))
+        lines.append("📐 面积/楼层：" + " · ".join(he(part) for part in extra))
     terms = [he(part) for part in (details.deposit_terms, details.contract_term) if part]
     if terms:
         lines.append("🗝 租约：" + " · ".join(terms))

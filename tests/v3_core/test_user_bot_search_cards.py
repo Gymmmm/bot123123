@@ -90,7 +90,7 @@ def test_search_card_preserves_fixed_sha_copy_and_uses_frozen_cover(tmp_path):
 
     card = build_search_card((first, second), 0)
 
-    assert card.text == "<b>💰 BKK1 · 2房1厅 · $800/月</b>\n19楼\n🟢 当前可预约 · 1/2"
+    assert card.text == "<b>💰 富力城 · 2房1厅 · $800/月</b>\nBKK1 · 19楼\n🟢 当前可预约 · 1/2"
     assert card.photo_path == str(cover)
     assert _actions(card) == [
         ["previous", "next"],
@@ -188,7 +188,7 @@ def test_live_reserved_status_changes_badge_without_changing_frozen_facts():
 
     card = build_search_card((view,), 0)
 
-    assert "<b>💰 BKK1 · 2房1厅 · $800/月</b>" in card.text
+    assert "<b>💰 富力城 · 2房1厅 · $800/月</b>" in card.text
     assert "$800/月" in card.text
     assert "19楼" in card.text
     assert "🟡 已有预约，仍可预约" in card.text
