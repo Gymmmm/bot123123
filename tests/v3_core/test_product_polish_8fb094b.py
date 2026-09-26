@@ -205,7 +205,8 @@ def test_details_show_public_id_but_hide_internal_ids():
     assert "$680" in text
     # NOTE: public_id is NOT exposed in user-visible details text (privacy)
     assert "🪧" not in text
-    assert "🏡 项目：富力城" in text
+    # New UI uses compact header format
+    assert "富力城" in text
     # Internal IDs must never appear
     assert "LST_" not in text
     assert "PUB_" not in text

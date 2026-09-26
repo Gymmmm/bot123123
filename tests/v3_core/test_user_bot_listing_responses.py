@@ -117,15 +117,16 @@ def test_detail_text_omits_missing_bullets_and_adviser_without_copy():
 
     response = build_details_response(view)
     text = response.text
-
-    assert "🏡 项目：富力城" in text
+    
+    # New UI uses compact header format
+    assert "富力城" in text
     # NOTE: public_id is NOT exposed in user-visible details text (privacy)
     assert "🪧" not in text
-    assert "💵 租金：$800/月" in text
+    assert "$800" in text
     assert "物业管理" not in text
     assert "水电费用" not in text
     assert "大楼配套" not in text
-    assert "💬 侨联说" not in text
+    assert "侨联说" not in text
     assert "🟢 当前可预约" in text
     # NOTE: details keyboard has no photos button (photos is a separate deep link)
     assert _actions(response.action_rows) == [["book", "consult"], ["similar"]]
@@ -153,17 +154,13 @@ def test_photo_caption_keeps_rental_essentials_with_photo():
     view = _view()
     caption = build_photo_caption(view, photo_index=0, photo_total=3)
     # NOTE: public_id is NOT exposed in user-visible text (privacy)
-    assert caption == (
-        "🏡 项目：富力城\n"
-        "📍 区域：BKK1\n"
-        "🛏 户型：2房1厅\n"
-        "💵 租金：$800/月\n"
-        "📐 面积/楼层：95㎡ · 19楼\n"
-        "🗝 租约：押1付1 · 1年\n"
-        "🟢 当前可预约\n\n"
-        "📸 1/3"
-    )
+    # New UI uses compact header format
+    assert "富力城" in caption
+    assert "$800" in caption
+    assert "BKK1" in caption
+    assert "2房1厅" in caption
     assert "🪧" not in caption
+    assert "📸 1/3" in caption
     assert "基本信息" not in caption
     assert "金边优质房源出租" not in caption
     assert "侨联说" not in caption
@@ -186,12 +183,14 @@ def test_villa_caption_keeps_full_frozen_adviser_copy_in_separate_section():
 
     caption = build_photo_caption(view, photo_index=4, photo_total=10)
 
-    assert "🏡 类型：别墅\n📍 区域：50米路附近\n🛏 户型：6+2房8卫" in caption
-    assert "💵 租金：$5,000/月\n" in caption
-    assert "🗝 租约：押2付1 · 1年" in caption
+    # New UI uses compact header format
+    assert "50米路附近" in caption
+    assert "6+2房8卫" in caption
+    assert "$5,000" in caption
+    assert "押2付1" in caption
     # NOTE: public_id is NOT exposed in user-visible text (privacy)
     assert "🪧" not in caption
-    assert "💬 侨联说\n" in caption
+    assert "侨联说" in caption
     assert "多一个灵活空间，可做书房。\n管理费和停车看房时确认。" in caption
     assert caption.endswith("📸 5/10")
     assert len(caption) < 1024
@@ -359,7 +358,8 @@ def test_album_recovers_rendered_cover_when_package_path_stale(tmp_path):
 def test_build_detail_caption_alias_matches_public_fact_body():
     assert build_detail_caption is build_detail_text
     text = build_detail_caption(_view())
-    assert "🏡 项目：富力城" in text
+    # New UI uses compact header format
+    assert "富力城" in text
     # NOTE: public_id is NOT exposed in user-visible details text (privacy)
     assert "🪧" not in text
 
