@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from v3_core.user_bot.listing_responses import (
     build_detail_caption,
@@ -127,10 +128,10 @@ def test_detail_text_omits_missing_bullets_and_adviser_without_copy():
     assert "大楼配套" not in text
     assert "💬 侨联说" not in text
     assert "🟢 当前可预约" in text
-    assert _actions(response.action_rows) == [["book", "consult"], ["similar"]]
+    assert _actions(response.action_rows) == [["book", "consult"], ["photos", "similar"]]
     assert _labels(response.action_rows) == [
         ["📅 预约看房", "💬 中文顾问"],
-        ["🔍 继续找房"],
+        ["📷 更多实拍", "🔍 继续找房"],
     ]
 
 
@@ -140,10 +141,10 @@ def test_details_response_uses_live_rented_state_but_keeps_frozen_public_facts()
 
     assert "💵 租金：$800/月" in response.text
     assert "🔴 已租出" in response.text
-    assert _actions(response.action_rows) == [["consult"], ["similar"]]
+    assert _actions(response.action_rows) == [["consult"], ["photos", "similar"]]
     assert _labels(response.action_rows) == [
         ["💬 中文顾问"],
-        ["🔍 继续找房"],
+        ["📷 更多实拍", "🔍 继续找房"],
     ]
 
 
@@ -192,53 +193,80 @@ def test_villa_caption_keeps_full_frozen_adviser_copy_in_separate_section():
     assert len(caption) < 1024
 
 
-def test_photos_response_single_flipper_with_details_on_photo(tmp_path):
+def test_photos_response_first_batch_album_with_expand(tmp_path):
+    from pathlib import Path
+    from PIL import Image
+
     files = []
     for index in range(12):
         path = tmp_path / f"room-{index}.jpg"
-        path.write_bytes(str(index).encode())
+        Image.new("RGB", (640, 480), (20 * index, 40, 80)).save(path, quality=85)
         files.append(str(path))
     cover = tmp_path / "cover.jpg"
-    cover.write_bytes(b"cover")
+    Image.new("RGB", (640, 480), (200, 160, 100)).save(cover, quality=85)
     gallery = [str(cover), *files, files[0]]
 
     first = build_photos_response(_view(gallery=gallery))
 
     assert first.has_media
-    # LOCK: index 1/N is the listing COVER, then gallery rooms.
-    assert first.photo_path == str(cover)
+    assert not first.expand_only
+    # First screen is one side-stack collage JPG (not a 4-frame MediaGroup).
     assert first.photo_index == 0
-    assert first.photo_total == 13  # cover + 12 unique rooms
-    assert first.media_groups == ((str(cover),),)
-    assert "🏡 项目：富力城" in first.text
-    assert "📍 区域：BKK1" in first.text
-    assert first.text.endswith("📸 1/13")
-    assert "🏢 金边优质房源出租" not in first.text
-    assert "基本信息" not in first.text
-    assert "📋" not in first.text
-    assert "租赁详情" not in first.text
-    assert "再看更多" not in first.text
-    assert first.detail_text == ""
-    assert _actions(first.action_rows) == [["photos", "photos"], ["book", "consult"], ["similar"]]
+    assert first.photo_total == 10  # capped at PHOTOS_MAX_TOTAL
+    assert len(first.media_groups) == 1
+    assert len(first.media_groups[0]) == 1
+    assert Path(first.media_groups[0][0]).is_file()
+    assert first.text.startswith("🟢 当前可预约")
+    assert "以上是这套房" not in first.text
+    assert "⬅️ 上一张" not in str(_labels(first.action_rows))
+    assert _actions(first.action_rows) == [["photos", "book"], ["consult"]]
     assert _labels(first.action_rows) == [
-        ["⬅️ 上一张", "下一张 ➡️"],
-        ["📅 预约看房", "💬 中文顾问"],
-        ["🔍 继续找房"],
+        ["📷 查看全部实拍", "📅 预约看房"],
+        ["💬 中文顾问"],
     ]
-    prev_btn, next_btn = first.action_rows[0]
-    assert prev_btn.target_index == 12
-    assert next_btn.target_index == 1
+    expand_btn = first.action_rows[0][0]
+    assert expand_btn.target_index == 4
 
-    second = build_photos_response(_view(gallery=gallery), offset=1)
-    assert second.photo_path == files[0]
-    assert second.text.endswith("📸 2/13")
-    assert second.action_rows[0][0].target_index == 0
-    assert second.action_rows[0][1].target_index == 2
+    expanded = build_photos_response(_view(gallery=gallery), offset=4)
+    assert expanded.expand_only
+    assert expanded.action_rows == ()
+    # Expand sends original frames (cap 10), not "remaining after collage".
+    assert len(expanded.media_groups[0]) == 10
+    assert expanded.media_groups[0][0] == str(cover)
 
-    last = build_photos_response(_view(gallery=gallery), offset=12)
-    assert last.photo_path == files[11]
-    assert last.text.endswith("📸 13/13")
-    assert last.action_rows[0][1].target_index == 0
+
+def test_photos_response_pending_has_no_book_button(tmp_path):
+    from PIL import Image
+
+    files = []
+    for index in range(8):
+        path = tmp_path / f"room-{index}.jpg"
+        Image.new("RGB", (640, 480), (10 * index, 50, 90)).save(path, quality=85)
+        files.append(str(path))
+
+    response = build_photos_response(_view(status="pending", gallery=files))
+
+    assert response.text.startswith("🔵 房态待确认")
+    assert _labels(response.action_rows) == [
+        ["📷 查看全部实拍", "💬 中文顾问"],
+        ["🏠 帮我找房", "🔎 看相近房源"],
+    ]
+    assert all(action.action != "book" for row in response.action_rows for action in row)
+
+
+def test_photos_response_single_photo_uses_details_not_expand(tmp_path):
+    from PIL import Image
+
+    one = tmp_path / "only.jpg"
+    Image.new("RGB", (640, 480), (90, 90, 90)).save(one, quality=85)
+    response = build_photos_response(_view(gallery=[str(one)]))
+
+    assert response.media_groups == ((str(one),),)
+    assert response.photo_total == 1
+    assert _labels(response.action_rows) == [
+        ["📷 房源详情", "📅 预约看房"],
+        ["💬 中文顾问"],
+    ]
 
 
 def test_photos_response_drops_missing_files_and_keeps_text_fallback(tmp_path):
@@ -248,13 +276,13 @@ def test_photos_response_drops_missing_files_and_keeps_text_fallback(tmp_path):
     assert not response.has_media
     assert response.media_groups == ()
     assert response.photo_path == ""
-    assert "💵 租金：$800/月" in response.text
-    assert "📸 " not in response.text
+    assert response.text.startswith("🟢 当前可预约")
+    assert "实拍暂时没有加载出来" in response.text
     assert "🏢 金边优质房源出租" not in response.text
     assert response.detail_text == ""
 
 
-def test_flipper_starts_on_package_cover_path(tmp_path):
+def test_album_starts_on_package_cover_path(tmp_path):
     cover = tmp_path / "frozen-cover.png"
     cover.write_bytes(b"COVER")
     room = tmp_path / "living.jpg"
@@ -270,18 +298,22 @@ def test_flipper_starts_on_package_cover_path(tmp_path):
         package=package,
     )
     response = build_photos_response(view)
-    assert response.photo_path == str(cover)
     assert response.photo_total == 2
-    assert response.text.endswith("📸 1/2")
-    second = build_photos_response(view, offset=1)
-    assert second.photo_path == str(room)
-    assert second.text.endswith("📸 2/2")
+    assert response.has_media
+    # Prefer collage when images are readable; tiny non-image fixtures fall back.
+    assert len(response.media_groups[0]) in {1, 2}
+    expanded = build_photos_response(view, offset=4)
+    assert expanded.expand_only
+    assert expanded.has_media
+    assert str(Path(cover).resolve()) in {
+        str(Path(p).resolve()) for p in expanded.media_groups[0]
+    }
 
 
-def test_flipper_recovers_rendered_cover_when_package_path_stale(tmp_path):
+def test_album_recovers_rendered_cover_when_package_path_stale(tmp_path):
     """Runtime often has gallery files but a stale absolute cover_path.
 
-    Flipper 1/N must still open on the rendered cover under covers_v3, not gallery[0].
+    Album frame 1 must still open on the rendered cover under covers_v3, not gallery[0].
     """
     public_id = "QL-RF-A2B3"
     style = "classic_blue"
@@ -309,11 +341,15 @@ def test_flipper_recovers_rendered_cover_when_package_path_stale(tmp_path):
     )
 
     response = build_photos_response(view)
-    assert response.photo_path == str(rendered.resolve())
+    # First screen may be a collage; cover must still be in the source set.
     assert response.photo_total == 2
-    assert response.text.endswith("📸 1/2")
-    second = build_photos_response(view, offset=1)
-    assert second.photo_path == str(room.resolve())
+    assert response.has_media
+    expanded = build_photos_response(view, offset=4)
+    assert expanded.expand_only
+    assert expanded.has_media
+    assert str(rendered.resolve()) in {
+        str(Path(p).resolve()) for p in expanded.media_groups[0]
+    }
 
 
 def test_build_detail_caption_alias_matches_public_fact_body():

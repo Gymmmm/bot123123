@@ -83,8 +83,8 @@ class PublishedListingView:
         if clean in {"details", "consult", "contact"}:
             return True
         if clean == "photos":
-            # Photos deeplink aliases to the merged detail+flipper view even when
-            # the frozen gallery is empty (text-only fallback).
+            # Photos opens the native album + status bar even when the frozen
+            # gallery is empty (text-only fallback still shows correct status).
             return True
         return False
 

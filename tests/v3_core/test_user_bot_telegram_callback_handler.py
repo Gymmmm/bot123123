@@ -191,25 +191,22 @@ async def test_photos_send_frozen_media_then_action_message(tmp_path):
             action="photos",
             public_listing_id="QL-RF-A2B3",
             photos=PublicPhotosResponse(
-                media_groups=((str(one),),),
-                text="富力城 · 2房1厅 · $800/月 · 📸 1/3",
+                media_groups=((str(one), str(two), str(three)),),
+                text="🟢 当前可预约",
+                media_caption="📷 QL-RF-A2B3｜实拍相册\n共 3 张",
                 photo_path=str(one),
-                photo_index=0,
                 photo_total=3,
-                detail_text="🏢 金边优质房源出租",
                 action_rows=(
                     (
                         SemanticAction(
-                            "⬅️ 上一张",
-                            "photos",
+                            "📷 房源详情",
+                            "details",
                             target_public_listing_id="QL-RF-A2B3",
-                            target_index=2,
                         ),
                         SemanticAction(
-                            "下一张 ➡️",
-                            "photos",
+                            "📅 预约看房",
+                            "book",
                             target_public_listing_id="QL-RF-A2B3",
-                            target_index=1,
                         ),
                     ),
                 ),
@@ -224,8 +221,12 @@ async def test_photos_send_frozen_media_then_action_message(tmp_path):
 
     assert outcome.handled and outcome.response is not None
     assert outcome.response.kind == "photos"
-    assert [call[0] for call in context.bot.calls] == ["send_photo"]
-    assert "📸 1/3" in context.bot.calls[0][1]["caption"]
+    assert [call[0] for call in context.bot.calls] == ["send_media_group", "send_message"]
+    media = context.bot.calls[0][1]["media"]
+    assert len(media) == 3
+    assert getattr(media[0], "caption", None)
+    assert not getattr(media[1], "caption", None)
+    assert "🟢 当前可预约" in context.bot.calls[1][1]["text"]
     assert [call[0] for call in query.calls] == ["answer"]
 
 
@@ -372,12 +373,10 @@ async def test_expired_listing_or_card_action_shows_visible_alert():
 
 
 
-def test_details_from_photo_card_edits_media_without_extra_bubble(tmp_path):
-    """Opening 📷 房源详情 updates the photo with its caption in place."""
+def test_details_from_album_edits_caption_or_text(tmp_path):
+    """Opening 📷 房源详情 edits the current message to text details."""
     import asyncio
 
-    cover = tmp_path / "cover.png"
-    cover.write_bytes(b"COVER")
     result = CallbackDispatchResult(
         status="ok",
         callback=parse_callback("v3u:listing:details:QL-RF-A2B3"),
@@ -386,13 +385,8 @@ def test_details_from_photo_card_edits_media_without_extra_bubble(tmp_path):
             status="ok",
             action="details",
             public_listing_id="QL-RF-A2B3",
-            photos=PublicPhotosResponse(
-                media_groups=((str(cover),),),
-                text="富力城 · 2房1厅 · $800/月 · 📸 1/2",
-                photo_path=str(cover),
-                photo_index=0,
-                photo_total=2,
-                detail_text="🏢 金边优质房源出租\n📌基本信息  房源编号：QL-RF-A2B3",
+            details=PublicDetailsResponse(
+                text="details-body",
                 action_rows=(
                     (
                         SemanticAction(
@@ -402,10 +396,6 @@ def test_details_from_photo_card_edits_media_without_extra_bubble(tmp_path):
                         ),
                     ),
                 ),
-            ),
-            details=PublicDetailsResponse(
-                text="details-fallback",
-                action_rows=(),
             ),
         ),
     )
@@ -415,48 +405,46 @@ def test_details_from_photo_card_edits_media_without_extra_bubble(tmp_path):
 
     outcome = asyncio.run(handle_v3_callback(_update(query), context, router=router))
     assert outcome.handled and outcome.response is not None
-    assert [call[0] for call in query.calls] == ["answer", "edit_media"]
+    assert outcome.response.kind == "details"
+    assert [call[0] for call in query.calls] == ["answer", "edit_caption"]
     assert context.bot.calls == []
 
 
-def test_photo_flip_edits_media_without_resending_detail(tmp_path):
+def test_photos_expand_sends_remaining_without_action_bar(tmp_path):
     import asyncio
 
-    frame = tmp_path / "2.jpg"
-    frame.write_bytes(b"two")
+    frame_a = tmp_path / "5.jpg"
+    frame_b = tmp_path / "6.jpg"
+    frame_a.write_bytes(b"five")
+    frame_b.write_bytes(b"six")
     result = CallbackDispatchResult(
         status="ok",
-        callback=parse_callback("v3u:listing:photos:QL-RF-A2B3:1"),
+        callback=parse_callback("v3u:listing:photos:QL-RF-A2B3:4"),
         action="photos",
         listing=PublicListingFlowResult(
             status="ok",
             action="photos",
             public_listing_id="QL-RF-A2B3",
             photos=PublicPhotosResponse(
-                media_groups=((str(frame),),),
-                text="富力城 · 2房1厅 · $800/月 · 📸 2/3",
-                photo_path=str(frame),
-                photo_index=1,
-                photo_total=3,
-                detail_text="🏢 金边优质房源出租",
-                action_rows=(
-                    (
-                        SemanticAction(
-                            "📅 预约看房",
-                            "book",
-                            target_public_listing_id="QL-RF-A2B3",
-                        ),
-                    ),
-                ),
+                media_groups=((str(frame_a), str(frame_b)),),
+                text="",
+                media_caption="📷 QL-RF-A2B3｜全部实拍\n续 2 张",
+                photo_path=str(frame_a),
+                photo_index=4,
+                photo_total=6,
+                action_rows=(),
+                expand_only=True,
             ),
         ),
     )
-    query = FakeQuery("v3u:listing:photos:QL-RF-A2B3:1", has_photo=True)
+    query = FakeQuery("v3u:listing:photos:QL-RF-A2B3:4", has_photo=False)
     context = _context()
 
     outcome = asyncio.run(
         handle_v3_callback(_update(query), context, router=RouterStub(result))
     )
     assert outcome.handled and outcome.response is not None
-    assert [call[0] for call in query.calls] == ["answer", "edit_media"]
-    assert context.bot.calls == []
+    assert outcome.response.expand_only
+    assert [call[0] for call in query.calls] == ["answer"]
+    assert [call[0] for call in context.bot.calls] == ["send_media_group"]
+    assert context.user_data.get("v3_listing_touchpoint") == "listing_photos_expand"
