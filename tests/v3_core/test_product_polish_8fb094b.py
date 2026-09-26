@@ -203,8 +203,13 @@ def test_details_show_public_id_but_hide_internal_ids():
     text = build_details_response(_published_view()).text
     assert "富力城" in text and "1房" in text
     assert "$680" in text
-    assert "🪧 编号：QL-RF-A2B3" in text
+    # NOTE: public_id is NOT exposed in user-visible details text (privacy)
+    assert "🪧" not in text
     assert "🏡 项目：富力城" in text
+    # Internal IDs must never appear
+    assert "LST_" not in text
+    assert "PUB_" not in text
+    assert "OFF_" not in text
 
 
 def test_rfcity_category_returns_to_rfcity_navigation():

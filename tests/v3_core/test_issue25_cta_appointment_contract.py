@@ -150,9 +150,11 @@ def test_details_and_photos_contract_has_real_fields_three_entries_and_no_intern
     view = _published(bookable=True)
     details = build_details_response(view)
     labels = _labels(details.action_rows)
+    # NOTE: details keyboard has no photos button (photos is a separate deep link)
     assert "📅 预约看房" in labels and "💬 中文顾问" in labels
     assert "富力城" in details.text
-    assert f"🪧 编号：{PUBLIC_ID}" in details.text
+    # NOTE: public_id is NOT exposed in user-visible details text (privacy)
+    assert "🪧" not in details.text
     assert "LST_INTERNAL_1" not in details.text
     assert not any(token in details.text.lower() for token in ("none", "null", "unknown"))
 

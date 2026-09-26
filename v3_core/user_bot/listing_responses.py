@@ -112,7 +112,7 @@ def _details_actions(
     bookable: bool,
     public_listing_id: str,
 ) -> tuple[tuple[SemanticAction, ...], ...]:
-    """Text details actions (photos opens the album surface separately)."""
+    """Details page actions: book/consult/similar — no photos button (photos is a separate deep link)."""
     target = str(public_listing_id or "").strip()
     if bookable:
         return (
@@ -120,17 +120,11 @@ def _details_actions(
                 SemanticAction("📅 预约看房", "book", target),
                 SemanticAction("💬 中文顾问", "consult", target),
             ),
-            (
-                SemanticAction("📷 更多实拍", "photos", target),
-                SemanticAction("🔍 继续找房", "similar", target),
-            ),
+            (SemanticAction("🔍 继续找房", "similar", target),),
         )
     return (
         (SemanticAction("💬 中文顾问", "consult", target),),
-        (
-            SemanticAction("📷 更多实拍", "photos", target),
-            SemanticAction("🔍 继续找房", "similar", target),
-        ),
+        (SemanticAction("🔍 继续找房", "similar", target),),
     )
 
 
@@ -258,8 +252,7 @@ def _listing_fact_lines(details) -> list[str]:
     if terms:
         lines.append("🗝 租约：" + " · ".join(terms))
     lines.append(_detail_status_line(details))
-    if details.public_listing_id:
-        lines.append(f"🪧 编号：{he(details.public_listing_id)}")
+    # NOTE: public_id is NOT exposed in user-visible details text (privacy)
     return lines
 
 

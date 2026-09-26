@@ -62,6 +62,7 @@ def _callback_rows(markup):
 
 
 def test_details_keyboard_is_encoded_from_public_listing_identity():
+    """Details keyboard has book/consult/similar — no photos button (photos is a separate deep link)."""
     response = build_details_response(_view())
 
     markup = build_action_keyboard(response.action_rows)

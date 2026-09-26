@@ -157,14 +157,34 @@ async def test_channel_deeplink_start_handler_keeps_listing_context(tmp_path, pa
     assert context.user_data[LISTING_SOURCE_KEY] == "channel_listing"
     assert "old_listing_session" not in context.user_data
 
-    if expected_kind in {"details", "photos"}:
-        assert [call[0] for call in bot.calls] == ["send_photo"]
+    # Verify deep link behavior per action type
+    if expected_kind == "details":
+        # details deep link: sends text message with inline keyboard (no bot photo)
+        # Public_id is NOT exposed in the user-visible text for privacy
+        assert message.calls  # reply_text called
+        rendered = message.calls[-1][1]
+        # Text contains listing info but no public_id (keyboard has action buttons)
+        assert "富力城" in rendered
+        assert "🪧" not in rendered  # public_id NOT exposed to user in details text
+        # Verify keyboard was attached (contains action buttons)
+        reply_markup = message.calls[-1][2].get("reply_markup")
+        assert reply_markup is not None
+        keyboard_data = repr(reply_markup)
+        assert "book" in keyboard_data or "consult" in keyboard_data
+    elif expected_kind == "photos":
+        # photos deep link: sends photo (send_photo) + action bar message (send_message)
+        # Caption shows public_id for reference; action bar message shows full details
+        assert [call[0] for call in bot.calls] == ["send_photo", "send_message"]
         caption = bot.calls[0][2]["caption"]
-        assert "🏡 项目：富力城" in caption
-        assert "🛏 户型：2房1厅" in caption
-        assert "📸 1/1" in caption
-        assert f"🪧 编号：{PUBLIC_ID}" in caption
+        # Caption contains public_id reference (for user to identify the listing)
+        assert "📷" in caption
+        assert PUBLIC_ID in caption  # public_id in caption for listing identification
+        # Action bar shows listing details (no public_id exposure)
+        action_bar = bot.calls[1][2]["text"]
+        assert "富力城" in action_bar
+        assert "🪧" not in action_bar  # public_id NOT in action bar
     else:
+        # book deep link: sends text message with transition keyboard
         rendered = message.calls[-1][1]
         assert "预约看房" in rendered
         assert "富力城｜2房1厅" in rendered
