@@ -71,12 +71,12 @@ def build_listing_contact_view(
     )
     identity = "｜".join(part for part in (subject, price) if part)
     lines = [
-        "<b>咨询这套</b>",
+        "💬 <b>咨询这套</b>",
         "",
         he(identity),
         "",
-        "这套房的信息已经带上。",
-        "直接说想确认的事情即可。",
+        "房源信息已经带上。",
+        "直接说想确认的问题就可以。",
     ]
     return ListingContactView(
         text="\n".join(lines),

@@ -1,4 +1,3 @@
-
 import sqlite3
 from types import SimpleNamespace
 import pytest
@@ -117,7 +116,7 @@ async def test_unbound_repair_collects_full_need_then_uses_real_handoff(tmp_path
     outcome=await handle_v3_service_callback(_callback_update(confirm),context,service=service,effects=effects)
     assert outcome.handled and outcome.ticket_id is None
     assert len(leads.calls)==1 and len(admins.calls)==1
-    assert "问题已记录" in confirm.calls[-1][1][0]
+    assert "报修已记录" in confirm.calls[-1][1][0]
     assert SERVICE_REQUEST_SESSION_KEY not in context.user_data
     with sqlite3.connect(str(service.repository.db_path)) as conn:
         assert conn.execute("SELECT COUNT(*) FROM repair_tickets_v3").fetchone()[0]==0
@@ -135,7 +134,7 @@ async def test_bound_repair_creates_real_ticket_only_on_confirm(tmp_path):
     confirm=FakeQuery("v3u:service:repair_confirm")
     outcome=await handle_v3_service_callback(_callback_update(confirm),context,service=service)
     assert outcome.ticket_id is not None
-    assert "报修信息已记录" in confirm.calls[-1][1][0]
+    assert "报修已记录" in confirm.calls[-1][1][0]
     with sqlite3.connect(str(service.repository.db_path)) as conn:
         assert conn.execute("SELECT COUNT(*) FROM repair_tickets_v3").fetchone()[0]==1
 

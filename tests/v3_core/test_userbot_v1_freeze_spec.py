@@ -1,4 +1,3 @@
-
 from v3_core.user_bot.adviser_notes import adviser_notes_for_view
 from v3_core.user_bot.home_views import build_home_view
 from v3_core.user_bot.search_cards import build_search_card
@@ -13,7 +12,7 @@ def _labels(view):
 
 def test_home_matches_final_service_surface():
     view = build_home_view(channel_url="https://t.me/example")
-    assert _labels(view) == ["🔍 智能找房", "📖 关于侨联地产", "📅 预约看房", "💎 直接问顾问", "⚡ 入住管家", "🧭 周边服务"]
+    assert _labels(view) == ["🔍 开始找房", "🛎️ 侨联服务", "📢 最新房源", "💬 中文顾问"]
     assert "金边中文租房" in view.text
 
 
@@ -29,10 +28,9 @@ def test_search_entry_is_direct_filter_panel():
 
 def test_listing_surface_source_contains_final_first_layer_actions():
     source = open(build_search_card.__code__.co_filename, encoding="utf-8").read()
-    for label in ("上一套", "下一套", "更多实拍", "预约看房", "换搜索条件"):
+    for label in ("上一套", "下一套", "看实拍", "预约看房", "调整条件"):
         assert label in source
-    for label in ("看实拍", "咨询这套"):
-        assert label not in source
+    assert "更多实拍" not in source
 
 
 def test_service_hubs_match_final_layouts():
@@ -58,8 +56,8 @@ class _Service:
 
 
 def test_renew_terminate_are_safe_intent_surfaces():
-    assert _labels(renew_view(_Service(), 1)) == ["提交续租意向", "中文顾问"]
-    assert _labels(terminate_view(_Service(), 1)) == ["提交退租意向", "中文顾问"]
+    assert _labels(renew_view(_Service(), 1)) == ["提交续租意向", "💬 中文顾问", "⬅️ 返回我的租约"]
+    assert _labels(terminate_view(_Service(), 1)) == ["提交退租意向", "💬 中文顾问", "⬅️ 返回我的租约"]
 
 
 def test_adviser_notes_remain_publisher_read_only():

@@ -176,7 +176,7 @@ def test_no_match_page_has_existing_contact_flow_action():
     )
     view = build_search_no_match_view(intent)
     choices = [choice for row in view.rows for choice in row]
-    contact = next(choice for choice in choices if choice.label == "中文顾问")
+    contact = next(choice for choice in choices if choice.label == "💬 中文顾问")
     assert contact.kind == "home"
     assert contact.value == "contact"
 
@@ -203,13 +203,13 @@ def test_details_show_public_id_but_hide_internal_ids():
     text = build_details_response(_published_view()).text
     assert "富力城" in text and "1房" in text
     assert "$680" in text
-    assert "🪧 编号：QL-RF-A2B3" in text
-    assert "🏡 项目：富力城" in text
+    assert "QL-RF-A2B3" not in text
+    assert "🏠 <b>富力城" in text
 
 
 def test_rfcity_category_returns_to_rfcity_navigation():
     view = _rfcity_category_product_view("restaurant")
-    assert view.rows[-1][0].label == "返回富力导航"
+    assert view.rows[-1][0].label == "⬅️ 返回富力城导航"
     assert view.rows[-1][0].callback_data == "v3u:service:rfcity"
 
 
@@ -217,7 +217,7 @@ def test_missing_channel_url_does_not_create_channel_button():
     view = build_home_view(channel_url="")
     choices = [choice for row in view.rows for choice in row]
     assert all(choice.label != "📢 房源频道" for choice in choices)
-    assert any(choice.label == "💎 直接问顾问" for choice in choices)
+    assert any(choice.label == "💬 中文顾问" for choice in choices)
 
 
 def test_missing_advisor_url_uses_internal_contact_callback_not_dead_url():

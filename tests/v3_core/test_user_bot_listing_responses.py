@@ -91,26 +91,24 @@ def test_detail_text_shows_public_facts_and_full_publisher_copy():
 
     text = build_detail_text(view)
 
-    assert text.startswith("🏡 项目：富力城\n📍 区域：BKK1\n🛏 户型：2房1厅")
-    assert "📐 面积/楼层：95㎡ · 19楼" in text
-    assert "💵 租金：$800/月" in text
-    assert "🗝 租约：押1付1 · 1年" in text
-    assert "🧾 物业费：含物业费" in text
-    assert "🧾 水电：水 按表 / 电 0.25$/度" in text
-    assert "🧾 配套：泳池、健身房" in text
-    assert "💬 侨联说" in text
+    assert text.startswith("🏠 <b>富力城｜2房1厅</b>\n💰 $800/月\n📍 BKK1\n🏢 公寓｜95㎡｜19楼")
+    assert "🔑 押1付1｜1年" in text
+    assert "物业费｜含物业费" in text
+    assert "水电｜水 按表 / 电 0.25$/度" in text
+    assert "配套｜泳池、健身房" in text
+    assert "💬 <b>侨联说</b>" in text
     assert "采光面宽，适合长期住。" in text
     assert "楼下配套成熟。" in text
-    assert "🟢 当前可预约\n🪧 编号：QL-RF-A2B3" in text
+    assert "🟢 当前可预约" in text
+    assert "QL-RF-A2B3" not in text
     assert text.strip().endswith("楼下配套成熟。")
     assert "钥匙已备" not in text
 
 
 def test_detail_text_floor_only_does_not_use_area_floor_label():
     text = build_detail_text(_view(size_sqm=None, floor="19"))
-    assert "🏙 楼层：19楼" in text
-    assert "面积/楼层" not in text
-    assert "面积：" not in text
+    assert "🏢 公寓｜19楼" in text
+    assert "㎡" not in text
 
 
 def test_detail_text_omits_missing_bullets_and_adviser_without_copy():
@@ -119,9 +117,9 @@ def test_detail_text_omits_missing_bullets_and_adviser_without_copy():
     response = build_details_response(view)
     text = response.text
 
-    assert "🏡 项目：富力城" in text
-    assert "🪧 编号：QL-RF-A2B3" in text
-    assert "💵 租金：$800/月" in text
+    assert "🏠 <b>富力城｜2房1厅</b>" in text
+    assert "QL-RF-A2B3" not in text
+    assert "💰 $800/月" in text
     assert "物业管理" not in text
     assert "水电费用" not in text
     assert "大楼配套" not in text
@@ -129,7 +127,7 @@ def test_detail_text_omits_missing_bullets_and_adviser_without_copy():
     assert "🟢 当前可预约" in text
     assert _actions(response.action_rows) == [["book", "consult"], ["similar"]]
     assert _labels(response.action_rows) == [
-        ["📅 预约看房", "💬 中文顾问"],
+        ["📅 预约看房", "💬 咨询这套"],
         ["🔍 继续找房"],
     ]
 
@@ -138,11 +136,11 @@ def test_details_response_uses_live_rented_state_but_keeps_frozen_public_facts()
     view = _view(status="rented", offer_status="inactive")
     response = build_details_response(view)
 
-    assert "💵 租金：$800/月" in response.text
+    assert "💰 $800/月" in response.text
     assert "🔴 已租出" in response.text
     assert _actions(response.action_rows) == [["consult"], ["similar"]]
     assert _labels(response.action_rows) == [
-        ["💬 中文顾问"],
+        ["💬 咨询这套"],
         ["🔍 继续找房"],
     ]
 
@@ -151,14 +149,12 @@ def test_photo_caption_keeps_rental_essentials_with_photo():
     view = _view()
     caption = build_photo_caption(view, photo_index=0, photo_total=3)
     assert caption == (
-        "🏡 项目：富力城\n"
-        "📍 区域：BKK1\n"
-        "🛏 户型：2房1厅\n"
-        "💵 租金：$800/月\n"
-        "📐 面积/楼层：95㎡ · 19楼\n"
-        "🗝 租约：押1付1 · 1年\n"
-        "🟢 当前可预约\n"
-        "🪧 编号：QL-RF-A2B3\n\n"
+        "🏠 <b>富力城｜2房1厅</b>\n"
+        "💰 $800/月\n"
+        "📍 BKK1\n"
+        "🏢 公寓｜95㎡｜19楼\n"
+        "🔑 押1付1｜1年\n"
+        "🟢 当前可预约\n\n"
         "📸 1/3"
     )
     assert "基本信息" not in caption
@@ -168,7 +164,7 @@ def test_photo_caption_keeps_rental_essentials_with_photo():
 
 def test_photo_caption_uses_location_when_project_is_missing():
     caption = build_photo_caption(_view(project_name=""), photo_index=0, photo_total=10)
-    assert caption.startswith("🏡 类型：公寓\n📍 区域：BKK1\n🛏 户型：2房1厅")
+    assert caption.startswith("🏠 <b>BKK1｜2房1厅</b>\n💰 $800/月\n🏢 公寓｜95㎡｜19楼")
     assert caption.endswith("📸 1/10")
 
 
@@ -183,10 +179,11 @@ def test_villa_caption_keeps_full_frozen_adviser_copy_in_separate_section():
 
     caption = build_photo_caption(view, photo_index=4, photo_total=10)
 
-    assert "🏡 类型：别墅\n📍 区域：50米路附近\n🛏 户型：6+2房8卫" in caption
-    assert "💵 租金：$5,000/月\n" in caption
-    assert "🗝 租约：押2付1 · 1年" in caption
-    assert "🪧 编号：QL-RF-A2B3\n\n💬 侨联说\n" in caption
+    assert "🏠 <b>50米路附近｜6+2房8卫</b>" in caption
+    assert "💰 $5,000/月\n" in caption
+    assert "🔑 押2付1｜1年" in caption
+    assert "QL-RF-A2B3" not in caption
+    assert "💬 <b>侨联说</b>\n" in caption
     assert "多一个灵活空间，可做书房。\n管理费和停车看房时确认。" in caption
     assert caption.endswith("📸 5/10")
     assert len(caption) < 1024
@@ -210,8 +207,8 @@ def test_photos_response_single_flipper_with_details_on_photo(tmp_path):
     assert first.photo_index == 0
     assert first.photo_total == 13  # cover + 12 unique rooms
     assert first.media_groups == ((str(cover),),)
-    assert "🏡 项目：富力城" in first.text
-    assert "📍 区域：BKK1" in first.text
+    assert "🏠 <b>富力城｜2房1厅</b>" in first.text
+    assert "📍 BKK1" in first.text
     assert first.text.endswith("📸 1/13")
     assert "🏢 金边优质房源出租" not in first.text
     assert "基本信息" not in first.text
@@ -222,7 +219,7 @@ def test_photos_response_single_flipper_with_details_on_photo(tmp_path):
     assert _actions(first.action_rows) == [["photos", "photos"], ["book", "consult"], ["similar"]]
     assert _labels(first.action_rows) == [
         ["⬅️ 上一张", "下一张 ➡️"],
-        ["📅 预约看房", "💬 中文顾问"],
+        ["📅 预约看房", "💬 咨询这套"],
         ["🔍 继续找房"],
     ]
     prev_btn, next_btn = first.action_rows[0]
@@ -248,7 +245,7 @@ def test_photos_response_drops_missing_files_and_keeps_text_fallback(tmp_path):
     assert not response.has_media
     assert response.media_groups == ()
     assert response.photo_path == ""
-    assert "💵 租金：$800/月" in response.text
+    assert "💰 $800/月" in response.text
     assert "📸 " not in response.text
     assert "🏢 金边优质房源出租" not in response.text
     assert response.detail_text == ""
@@ -319,8 +316,8 @@ def test_flipper_recovers_rendered_cover_when_package_path_stale(tmp_path):
 def test_build_detail_caption_alias_matches_public_fact_body():
     assert build_detail_caption is build_detail_text
     text = build_detail_caption(_view())
-    assert "🏡 项目：富力城" in text
-    assert "🪧 编号：QL-RF-A2B3" in text
+    assert "🏠 <b>富力城｜2房1厅</b>" in text
+    assert "QL-RF-A2B3" not in text
 
 
 def _with_package(view, **changes):

@@ -158,7 +158,7 @@ def test_home_handler_no_longer_constructs_v3_tenant_shadow_repository():
 def test_home_local_life_can_return_directly_to_home_without_changing_service_path():
     home_view = local_life_view(back_to_home=True)
     service_view = local_life_view()
-    assert home_view.rows[-1][0].label == "返回首页"
+    assert home_view.rows[-1][0].label == "⬅️ 返回首页"
     assert home_view.rows[-1][0].callback_data == "v3u:t:home"
-    assert service_view.rows[-1][0].label == "返回侨联服务"
+    assert service_view.rows[-1][0].label == "⬅️ 返回侨联服务"
     assert service_view.rows[-1][0].callback_data == "v3u:home:service"

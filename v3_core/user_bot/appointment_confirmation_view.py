@@ -31,11 +31,14 @@ def build_appointment_confirmation_view(draft: PublicAppointmentDraft, inventory
     mode="视频代看" if draft.mode=="video" else "实地看房"
     lines=[
         "✅ <b>确认预约</b>",
-        f"房源｜{he(subject)}",
+        "",
+        f"🏠 {he(subject)}",
         f"方式｜{he(mode)}",
         f"日期｜{he(_date_display(draft.date))}",
         f"时间｜{he(_time_display(draft.time))}",
-        "请核对信息。提交后，顾问会联系你确认具体安排。",
+        "",
+        "请确认以上信息。",
+        "提交后，中文顾问会联系你确认具体安排。",
     ]
     return TransitionView(
         kind="appointment_confirmation",

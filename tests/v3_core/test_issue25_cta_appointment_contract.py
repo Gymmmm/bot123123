@@ -150,15 +150,15 @@ def test_details_and_photos_contract_has_real_fields_three_entries_and_no_intern
     view = _published(bookable=True)
     details = build_details_response(view)
     labels = _labels(details.action_rows)
-    assert "📅 预约看房" in labels and "💬 中文顾问" in labels
+    assert "📅 预约看房" in labels and "💬 咨询这套" in labels
     assert "富力城" in details.text
-    assert f"🪧 编号：{PUBLIC_ID}" in details.text
+    assert PUBLIC_ID not in details.text
     assert "LST_INTERNAL_1" not in details.text
     assert not any(token in details.text.lower() for token in ("none", "null", "unknown"))
 
     photos = build_photos_response(view)
     photo_labels = _labels(photos.action_rows)
-    assert "💬 中文顾问" in photo_labels
+    assert "💬 咨询这套" in photo_labels
     assert "返回房源详情" not in photo_labels
     assert "LST_INTERNAL_1" not in photos.text
     # Photo caption stays short
@@ -168,7 +168,7 @@ def test_details_and_photos_contract_has_real_fields_three_entries_and_no_intern
 def test_contact_entries_have_real_callbacks_when_external_config_is_missing():
     home = build_home_view(channel_url="")
     contact = next(choice for row in home.rows for choice in row if choice.kind == "contact")
-    assert contact.label == "💎 直接问顾问"
+    assert contact.label == "💬 中文顾问"
 
     intent = SearchSubmitIntent(
         criteria=SearchCriteria(location_keys=("BKK1",), budget_max=800),
@@ -179,14 +179,14 @@ def test_contact_entries_have_real_callbacks_when_external_config_is_missing():
         touch_payload={},
     )
     no_match = build_search_no_match_view(intent)
-    contact = next(choice for row in no_match.rows for choice in row if choice.label == "中文顾问")
+    contact = next(choice for row in no_match.rows for choice in row if choice.label == "💬 中文顾问")
     assert contact.kind == "home" and contact.value == "contact"
 
 
 def test_deeplink_invalid_copy_and_reason_missing_compatibility_are_locked():
     source = inspect.getsource(_render_invalid_link)
-    assert "这套房的入口已经失效，或信息刚刚更新过。" in source
-    assert "可以重新找房，或让顾问按你的条件接着看。" in source
+    assert "这套房的信息已经更新" in source
+    assert "可以重新查看最新房源，或让中文顾问继续帮你找。" in source
     assert _failure_reason(SimpleNamespace()) == ""
     assert _failure_reason(SimpleNamespace(reason="listing_not_bookable")) == "listing_not_bookable"
 

@@ -140,7 +140,7 @@ async def test_latest_shortcut_uses_published_search_executor_not_property_resol
     assert limit == 5
     assert intent.source == "daily_broadcast_latest"
     assert intent.touch_payload == {"daily_broadcast": True, "latest": True}
-    assert "这组条件暂时没有对上的房源" in message.calls[-1][0][0]
+    assert "暂时没有完全符合的房源" in message.calls[-1][0][0]
 
 
 @pytest.mark.asyncio
@@ -159,7 +159,7 @@ async def test_appointments_shortcut_uses_real_appointment_history():
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("payload", "expected_kind", "expected_text"),
-    [("assurance", "broadcast_assurance", "侨联地产｜金边中文租房"), ("service", "broadcast_service", "侨联服务")],
+    [("assurance", "broadcast_assurance", "安心租房"), ("service", "broadcast_service", "侨联服务")],
 )
 async def test_service_shortcuts_land_on_real_user_surfaces(payload, expected_kind, expected_text):
     message = FakeMessage()
@@ -170,7 +170,7 @@ async def test_service_shortcuts_land_on_real_user_surfaces(payload, expected_ki
     assert listings.calls == []
     assert expected_text in message.calls[-1][0][0]
     if payload == "assurance":
-        assert "签约不是服务的结束。" in message.calls[-1][0][0]
+        assert "入住交接、费用确认和住房问题" in message.calls[-1][0][0]
         assert "关于侨联" not in message.calls[-1][0][0]
 
 
@@ -231,7 +231,7 @@ async def test_unknown_start_payload_without_reason_still_falls_through_without_
     assert outcome.handled and outcome.kind == "invalid_link"
     assert listings.calls == ["not_a_real_shortcut"]
     assert message.calls[-1][0][0] == (
-        "这套房的入口已经失效，或信息刚刚更新过。\n\n可以重新找房，或让顾问按你的条件接着看。"
+        "⚠️ <b>这套房的信息已经更新</b>\n\n可以重新查看最新房源，或让中文顾问继续帮你找。"
     )
 
 
@@ -252,7 +252,7 @@ async def test_unbookable_property_book_deeplink_shows_lock_copy_then_contextual
     outcome = await handle_v3_start(_update(message), context, listings=listings, transition_views=_views())
     assert outcome.handled and outcome.kind == "unbookable"
     assert listings.calls == [f"property_{public_id}_book"]
-    assert message.calls[0][0][0] == "这套房现在暂时不能预约。\n\n可以先看详情，或让顾问帮你看别的选择。"
+    assert message.calls[0][0][0] == "⚠️ <b>这套房暂时不能预约</b>\n\n可以先看实拍，或让中文顾问确认最新房态。"
     assert "🔴 房态：已租出" in message.calls[1][0][0]
     markup = message.calls[1][1]["reply_markup"]
     labels = [button.text for row in markup.inline_keyboard for button in row]

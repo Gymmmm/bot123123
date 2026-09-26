@@ -57,8 +57,7 @@ def test_rental_details_use_publisher_frozen_copy_only(source):
         adviser_copy_source=source,
     )
     text = build_details_response(listing).text
-    assert "💬 侨联说" in text
-    assert "<b>侨联说</b>" not in text
+    assert "💬 <b>侨联说</b>" in text
     assert "Publisher 第一句。" in text
     assert "Publisher 第二句。" in text
     assert "<blockquote>" not in text

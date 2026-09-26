@@ -285,7 +285,7 @@ def _support_keyboard(*, advisor_url: str = "", channel_url: str = "") -> Inline
     clean_channel = str(channel_url or "").strip()
     if clean_channel:
         rows.append([InlineKeyboardButton("📢 最新房源", url=clean_channel)])
-    rows.append([InlineKeyboardButton("⬅️ 回首页", callback_data="v3u:t:home")])
+    rows.append([InlineKeyboardButton("⬅️ 返回首页", callback_data="v3u:t:home")])
     return InlineKeyboardMarkup(rows)
 
 
@@ -293,7 +293,7 @@ async def _render_invalid_link(
     message: Any, *, advisor_url: str = "", channel_url: str = ""
 ) -> None:
     await message.reply_text(
-        "这套房的入口已经失效，或信息刚刚更新过。\n\n可以重新找房，或让顾问按你的条件接着看。",
+        "⚠️ <b>这套房的信息已经更新</b>\n\n可以重新查看最新房源，或让中文顾问继续帮你找。",
         parse_mode=ParseMode.HTML,
         reply_markup=_support_keyboard(
             advisor_url=advisor_url, channel_url=channel_url
@@ -309,7 +309,7 @@ async def _render_unbookable(
     channel_url: str = "",
 ) -> None:
     await message.reply_text(
-        "这套房现在暂时不能预约。\n\n可以先看详情，或让顾问帮你看别的选择。",
+        "⚠️ <b>这套房暂时不能预约</b>\n\n可以先看实拍，或让中文顾问确认最新房态。",
         parse_mode=ParseMode.HTML,
     )
     if getattr(result, "details", None) is not None:
@@ -514,7 +514,7 @@ async def _handle_listing_contact_start(
     from .callbacks import encode_listing_callback
     rows.append(
         [InlineKeyboardButton(
-            "⬅️ 返回房源详情",
+            "⬅️ 返回房源",
             callback_data=encode_listing_callback("details", view.public_listing_id),
         )]
     )
@@ -587,20 +587,15 @@ async def _handle_video_inventory_start(
             mode = relaxed.mode
 
     lines = [
-        "🎥 可以，侨联可以先帮你视频代看。",
-        "适合这些情况：",
-        "✔ 人还没到金边",
-        "✔ 没时间一套套跑",
-        "✔ 想先确认房子真实情况",
-        "✔ 想看看周边环境",
-        "✔ 想提前了解家具家电状态",
+        "🎥 <b>视频代看</b>",
         "",
-        "正在为你从侨联房源库中匹配合适房源：",
-        f"区域：{area}",
-        f"预算：{budget}",
-        f"户型：{layout}",
+        "没时间到现场，可以先通过视频确认房屋和周边情况。",
         "",
-        "已先为你匹配 1-2 套：",
+        f"区域｜{area}",
+        f"预算｜{budget}",
+        f"户型｜{layout}",
+        "",
+        "先为你匹配 1–2 套：",
     ]
     for index, card in enumerate(cards[:2], start=1):
         published = transition_views.inventory.resolve(card.public_listing_id)
@@ -613,14 +608,13 @@ async def _handle_video_inventory_start(
         ])
     lines.extend([
         "",
-        "如果完全符合条件的房源较少，系统会先为你放宽条件匹配相近房源，顾问再继续人工精筛。",
-        "👇 你可以直接咨询房源，或安排视频代看",
+        "可以先咨询房源，或直接安排视频代看。",
     ])
 
     rows: list[list[InlineKeyboardButton]] = []
     if cards:
         first_id = cards[0].public_listing_id
-        rows.append([InlineKeyboardButton("💬 咨询这套房", callback_data=encode_listing_callback("consult", first_id))])
+        rows.append([InlineKeyboardButton("💬 咨询这套", callback_data=encode_listing_callback("consult", first_id))])
         user_data[APPOINTMENT_SESSION_KEY] = {
             "public_listing_id": first_id,
             "mode": "video",
@@ -629,7 +623,7 @@ async def _handle_video_inventory_start(
             "source": "video_deeplink",
         }
         rows.append([InlineKeyboardButton("📅 安排视频代看", callback_data="v3u:t:appointment_mode:video")])
-    rows.append([InlineKeyboardButton("🏠 查看更多房源", callback_data=encode_home_callback("search"))])
+    rows.append([InlineKeyboardButton("🔍 继续找房", callback_data=encode_home_callback("search"))])
     await message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(rows))
     user_data["v3_video_booking_preferred"] = True
     return TelegramStartOutcome(True, f"video_{mode}", "video")

@@ -94,23 +94,23 @@ def _format_size(value: float | None) -> str:
     return f"{numeric}㎡"
 
 
+
 def _details_actions(
     *,
     bookable: bool,
     public_listing_id: str,
 ) -> tuple[tuple[SemanticAction, ...], ...]:
-    """Text-only fallback actions (no separate 更多实拍 — merged into primary CTA)."""
     target = str(public_listing_id or "").strip()
     if bookable:
         return (
             (
                 SemanticAction("📅 预约看房", "book", target),
-                SemanticAction("💬 中文顾问", "consult", target),
+                SemanticAction("💬 咨询这套", "consult", target),
             ),
             (SemanticAction("🔍 继续找房", "similar", target),),
         )
     return (
-        (SemanticAction("💬 中文顾问", "consult", target),),
+        (SemanticAction("💬 咨询这套", "consult", target),),
         (SemanticAction("🔍 继续找房", "similar", target),),
     )
 
@@ -131,32 +131,21 @@ def _photo_actions(
         next_index = (index + 1) % total
         rows.append(
             (
-                SemanticAction(
-                    "⬅️ 上一张",
-                    "photos",
-                    target,
-                    target_index=prev_index,
-                ),
-                SemanticAction(
-                    "下一张 ➡️",
-                    "photos",
-                    target,
-                    target_index=next_index,
-                ),
+                SemanticAction("⬅️ 上一张", "photos", target, target_index=prev_index),
+                SemanticAction("下一张 ➡️", "photos", target, target_index=next_index),
             )
         )
     if bookable:
         rows.append(
             (
                 SemanticAction("📅 预约看房", "book", target),
-                SemanticAction("💬 中文顾问", "consult", target),
+                SemanticAction("💬 咨询这套", "consult", target),
             )
         )
     else:
-        rows.append((SemanticAction("💬 中文顾问", "consult", target),))
+        rows.append((SemanticAction("💬 咨询这套", "consult", target),))
     rows.append((SemanticAction("🔍 继续找房", "similar", target),))
     return tuple(rows)
-
 
 def _utilities_line(*, water: str, electric: str) -> str:
     parts: list[str] = []
@@ -186,36 +175,34 @@ def _adviser_copy_for_view(view: PublishedListingView) -> str:
     return adviser_notes_for_view(view, max_points=2, allow_empty=True).strip()
 
 
+
 def _listing_fact_lines(details) -> list[str]:
-    """Public snapshot facts plus live availability, omitting unknown fields."""
+    """Consumer-facing listing facts plus live availability."""
     project = str(details.project_name or "").strip()
     location = str(details.location or "").strip()
     layout = str(details.layout or "").strip()
-    lines: list[str] = []
-    if project:
-        lines.append(f"🏡 项目：{he(project)}")
-    elif details.property_type:
-        lines.append(f"🏡 类型：{he(details.property_type)}")
-    if location and not location_display_overlaps_project(project, location):
-        lines.append(f"📍 区域：{he(location)}")
-    if layout:
-        lines.append(f"🛏 户型：{he(layout)}")
+    property_type = str(details.property_type or "").strip()
+    identity = project or location or property_type
+    title = "｜".join(part for part in (identity, layout) if part) or "房源"
+
+    lines: list[str] = [f"🏠 <b>{he(title)}</b>"]
     if details.monthly_rent_usd:
-        lines.append(f"💵 租金：{_format_price(details.monthly_rent_usd)}")
+        lines.append(f"💰 {_format_price(details.monthly_rent_usd)}")
+
+    if project and location and not location_display_overlaps_project(project, location):
+        lines.append(f"📍 {he(location)}")
+
     size = _format_size(details.size_sqm)
     floor = display_floor(details.floor)
-    if size and floor:
-        lines.append(f"📐 面积/楼层：{he(size)} · {he(floor)}")
-    elif size:
-        lines.append(f"📐 面积：{he(size)}")
-    elif floor:
-        lines.append(f"🏙 楼层：{he(floor)}")
+    meta = [part for part in (property_type, size, floor) if part]
+    if meta:
+        lines.append("🏢 " + "｜".join(he(part) for part in meta))
+
     terms = [he(part) for part in (details.deposit_terms, details.contract_term) if part]
     if terms:
-        lines.append("🗝 租约：" + " · ".join(terms))
+        lines.append("🔑 " + "｜".join(terms))
+
     lines.append(_detail_status_line(details))
-    if details.public_listing_id:
-        lines.append(f"🪧 编号：{he(details.public_listing_id)}")
     return lines
 
 
@@ -223,11 +210,9 @@ def _adviser_lines(view: PublishedListingView, *, caption: bool) -> list[str]:
     notes = _adviser_copy_for_view(view)
     if not notes:
         return []
-    # Preserve Publisher wording. Only limit the photo caption to Telegram's
-    # 1024-character boundary; the text fallback carries the complete copy.
     if caption and len(notes) > 360:
         notes = notes[:359].rstrip() + "…"
-    return ["", "💬 侨联说", *(he(line) for line in notes.splitlines())]
+    return ["", "💬 <b>侨联说</b>", *(he(line) for line in notes.splitlines())]
 
 
 def build_detail_text(view: PublishedListingView) -> str:
@@ -238,12 +223,15 @@ def build_detail_text(view: PublishedListingView) -> str:
         electric=str(details.electric_rate or "").strip(),
     )
     lines = _listing_fact_lines(details)
-    for label, value in (("物业费", details.management_fee), ("水电", utilities), ("配套", details.building_amenities)):
+    for label, value in (
+        ("物业费", details.management_fee),
+        ("水电", utilities),
+        ("配套", details.building_amenities),
+    ):
         if value:
-            lines.append(f"🧾 {label}：{he(value)}")
+            lines.append(f"{label}｜{he(value)}")
     lines.extend(_adviser_lines(view, caption=False))
     return "\n".join(lines).strip()
-
 
 def build_photo_caption(
     view: PublishedListingView,

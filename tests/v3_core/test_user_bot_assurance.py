@@ -53,19 +53,19 @@ def test_rental_service_home_is_public_content_center_with_final_labels():
     view = build_assurance_home_view()
     callbacks = [choice.callback_data for row in view.rows for choice in row if choice.callback_data]
     assert callbacks == [
-        "v3u:home:search",
+        "v3u:assure:handover",
         "v3u:home:contact",
-        "v3u:t:home",
+        "v3u:home:service",
     ]
     labels = [choice.label for row in view.rows for choice in row]
     assert labels == [
-        "🔍 开始找房",
+        "📋 入住交接留档",
         "💬 中文顾问",
-        "⬅️ 返回首页",
+        "⬅️ 返回侨联服务",
     ]
-    assert "侨联地产｜金边中文租房" in view.text
-    assert "金边本地6年经验" in view.text
-    assert "签约不是服务的结束" in view.text
+    assert "安心租房" in view.text
+    assert "重要信息尽量提前确认并留档" in view.text
+    assert "入住交接、费用确认和住房问题" in view.text
 
     markup = build_assurance_keyboard(view, advisor_url="https://t.me/advisor")
     contact = markup.inline_keyboard[1][0]

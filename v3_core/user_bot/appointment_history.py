@@ -162,7 +162,7 @@ def _item(record: AppointmentHistoryRecord, inventory: PublicInventoryReader) ->
 
 
 def _lines(item: AppointmentHistoryItem) -> list[str]:
-    status_icon, status_label = {"pending": ("🟡", "待顾问确认"), "confirmed": ("🟢", "看房已确认")}.get(item.status, ("🟡", "待顾问确认"))
+    status_icon, status_label = {"pending": ("🟡", "待确认"), "confirmed": ("🟢", "已确认"), "cancelled": ("🔴", "已取消"), "canceled": ("🔴", "已取消")}.get(item.status, ("🟡", "待确认"))
     mode = APPOINTMENT_MODE_LABELS.get(item.viewing_mode, item.viewing_mode or "待确认")
     return [
         f"🏠 {he(item.subject)}",
@@ -187,9 +187,9 @@ class AppointmentHistoryService:
         if not records:
             return AppointmentHistoryView(
                 text=(
-                    "<b>我的预约</b>\n\n"
-                    "目前没有待进行的看房预约。\n"
-                    "您可以继续找房，看到合适的房源后直接预约。"
+                    "📅 <b>我的预约</b>\n\n"
+                    "目前没有待进行的预约。\n\n"
+                    "看到合适的房源后，可以直接预约看房。"
                 ),
                 items=(),
                 history_count=0,
@@ -201,9 +201,9 @@ class AppointmentHistoryService:
         if not upcoming_records:
             return AppointmentHistoryView(
                 text=(
-                    "<b>我的预约</b>\n\n"
-                    "目前没有待进行的看房预约。\n"
-                    "您可以继续找房，看到合适的房源后直接预约。"
+                    "📅 <b>我的预约</b>\n\n"
+                    "目前没有待进行的预约。\n\n"
+                    "看到合适的房源后，可以直接预约看房。"
                 ),
                 items=(),
                 history_count=len(history_records),

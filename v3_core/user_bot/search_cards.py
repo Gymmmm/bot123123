@@ -43,10 +43,10 @@ def _card_actions(views: tuple[PublishedListingView, ...], *, index: int, bookab
             SemanticAction("下一套","next",views[next_i].public_listing_id,next_i),
         ))
     if bookable:
-        rows.append((SemanticAction("📷 更多实拍","details",target),SemanticAction("📅 预约看房","book",target)))
+        rows.append((SemanticAction("📷 看实拍","details",target),SemanticAction("📅 预约看房","book",target)))
     else:
-        rows.append((SemanticAction("📷 更多实拍","details",target),))
-    rows.append((SemanticAction("换搜索条件","change_search"),))
+        rows.append((SemanticAction("📷 看实拍","details",target),))
+    rows.append((SemanticAction("🔄 调整条件","change_search"),))
     return tuple(rows)
 
 def build_search_card(views: Iterable[PublishedListingView], index: int) -> SearchCardResponse:
@@ -65,17 +65,18 @@ def build_search_card(views: Iterable[PublishedListingView], index: int) -> Sear
         if details.monthly_rent_usd is not None and int(details.monthly_rent_usd)>0
         else ""
     )
-    # Prefer project in the title so same-area cards are distinguishable.
-    headline_bits = [project or area, layout, rent]
-    title=" · ".join(v for v in headline_bits if v) or "房源"
-    lines=[f"<b>💰 {he(title)}</b>"]
+    headline = "｜".join(v for v in (project or area, layout) if v) or "房源"
+    lines=[f"🏠 <b>{he(headline)}</b>"]
+    if rent:
+        lines.append(f"💰 {he(rent)}")
     meta=[]
     if project and area and not location_display_overlaps_project(project, area):
         meta.append(area)
     if floor:
         meta.append(floor)
     if meta:
-        lines.append(he(" · ".join(meta)))
+        prefix = "📍" if project and area and not location_display_overlaps_project(project, area) else "🏢"
+        lines.append(f"{prefix} {he('｜'.join(meta))}")
     lines.append(f"{details.status_icon} {he(details.status_label)} · {position+1}/{len(items)}")
     return SearchCardResponse(
         public_listing_id=details.public_listing_id,

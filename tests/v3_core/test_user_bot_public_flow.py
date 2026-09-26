@@ -76,7 +76,7 @@ def test_details_payload_resolves_all_the_way_to_frozen_public_response():
     assert result.public_listing_id == "QL-RF-A2B3"
     assert result.details is not None
     assert "富力城" in result.details.text and "2房1厅" in result.details.text
-    assert "🏡 项目：富力城" in result.details.text
+    assert "🏠 <b>富力城｜2房1厅</b>" in result.details.text
     # details deeplink also carries merged flipper photos payload
     assert result.photos is not None
     assert result.book is None
@@ -162,7 +162,7 @@ def test_rented_book_is_blocked_before_appointment_flow_is_created():
         actions = [action for row in result.details.action_rows for action in row]
         labels = [action.label for action in actions]
         assert "📅 预约看房" not in labels
-        assert "💬 中文顾问" in labels
+        assert "💬 咨询这套" in labels
         assert "更多实拍" not in labels
 
 

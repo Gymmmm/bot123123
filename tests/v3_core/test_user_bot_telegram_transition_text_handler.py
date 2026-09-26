@@ -314,7 +314,7 @@ async def test_custom_budget_no_match_offers_strict_recovery_and_contact_followu
     assert outcome.search_presentation is not None and not outcome.search_presentation.matched
     markup = message.calls[-1][2]["reply_markup"]
     callbacks = [button.callback_data for row in markup.inline_keyboard for button in row]
-    assert callbacks == ["v3u:change_search", "v3u:home:contact", "v3u:t:home"]
+    assert callbacks == ["v3u:t:search_budget", "v3u:t:search_area", "v3u:t:search_layout", "v3u:home:contact", "v3u:t:home"]
     assert "v3u:t:search_available" not in callbacks
     assert SEARCH_PREF_SESSION_KEY not in user_data
     assert SEARCH_AWAITING_BUDGET_KEY not in user_data

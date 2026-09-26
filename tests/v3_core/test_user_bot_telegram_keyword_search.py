@@ -183,11 +183,11 @@ async def test_keyword_no_match_stays_strict_and_offers_recovery_actions_then_re
         search_executor=FakeSearchExecutor(matched=False), lead_effects=effects,
     )
     assert outcome.presentation is not None and not outcome.presentation.matched
-    assert "这组条件暂时没有对上" in message.calls[-1][1][0]
-    assert "没有自动放宽条件" in message.calls[-1][1][0]
+    assert "暂时没有完全符合的房源" in message.calls[-1][1][0]
+    assert "可以调整条件继续找" in message.calls[-1][1][0]
     markup = message.calls[-1][2]["reply_markup"]
     callbacks = [button.callback_data for row in markup.inline_keyboard for button in row]
-    assert callbacks == ["v3u:change_search", "v3u:home:contact", "v3u:t:home"]
+    assert callbacks == ["v3u:t:search_budget", "v3u:t:search_area", "v3u:t:search_layout", "v3u:home:contact", "v3u:t:home"]
     assert "v3u:t:search_available" not in callbacks
     assert effects.calls[0][2] == "no_match"
     assert AWAITING_KEYWORD_SESSION_KEY not in user_data

@@ -110,8 +110,12 @@ def _view_for_result(views: TransitionViewService, result: TransitionActionResul
         return TransitionView(
             kind="search_custom_budget",
             text=(
-                "💰 <b>自己输入预算</b>\n\n"
-                "直接发每月预算，例如：<code>800以内</code> 或 <code>600-900</code>。"
+                "💰 <b>输入预算</b>\n\n"
+                "直接发送每月预算。\n\n"
+                "例如：\n"
+                "<code>800以内</code>\n"
+                "<code>600-900</code>\n"
+                "<code>1200</code>"
             ),
             rows=(),
         )
@@ -292,7 +296,7 @@ async def handle_v3_transition_action(
             query,
             TransitionView(
                 kind="appointment_exit",
-                text="<b>已退出本次预约</b>\n\n您可以继续查看上方房源。",
+                text="<b>已退出本次预约</b>\n\n可以继续查看这套房或返回找房。",
                 rows=(),
             ),
         )
