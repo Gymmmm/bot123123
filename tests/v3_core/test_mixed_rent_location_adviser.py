@@ -108,6 +108,6 @@ def test_detail_hides_region_when_it_only_restates_project() -> None:
         building_amenities="",
     )
     text = "\n".join(_listing_fact_lines(details))
-    assert "🏡 项目：The Pinnacle 幸福广场" in text
+    assert "🏠 <b>The Pinnacle 幸福广场" in text
     assert "📍 区域" not in text
     assert "莫尼旺" not in text  # hidden until location is fixed upstream

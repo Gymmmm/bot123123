@@ -92,14 +92,12 @@ def test_detail_text_shows_public_facts_and_full_publisher_copy():
 
     text = build_detail_text(view)
 
-    assert text.startswith("🏡 项目：富力城\n📍 区域：BKK1\n🛏 户型：2房1厅")
-    assert "📐 面积/楼层：95㎡ · 19楼" in text
-    assert "💵 租金：$800/月" in text
-    assert "🗝 租约：押1付1 · 1年" in text
-    assert "🧾 物业费：含物业费" in text
-    assert "🧾 水电：水 按表 / 电 0.25$/度" in text
-    assert "🧾 配套：泳池、健身房" in text
-    assert "💬 侨联说" in text
+    assert text.startswith("🏠 <b>富力城｜2房1厅</b>\n💰 $800/月\n📍 BKK1\n🏢 公寓｜95㎡｜19楼")
+    assert "🔑 押1付1｜1年" in text
+    assert "物业费｜含物业费" in text
+    assert "水电｜水 按表 / 电 0.25$/度" in text
+    assert "配套｜泳池、健身房" in text
+    assert "💬 <b>侨联说</b>" in text
     assert "采光面宽，适合长期住。" in text
     assert "楼下配套成熟。" in text
     assert "🟢 当前可预约" in text
@@ -110,9 +108,8 @@ def test_detail_text_shows_public_facts_and_full_publisher_copy():
 
 def test_detail_text_floor_only_does_not_use_area_floor_label():
     text = build_detail_text(_view(size_sqm=None, floor="19"))
-    assert "🏙 楼层：19楼" in text
-    assert "面积/楼层" not in text
-    assert "面积：" not in text
+    assert "🏢 公寓｜19楼" in text
+    assert "㎡" not in text
 
 
 def test_detail_text_omits_missing_bullets_and_adviser_without_copy():
@@ -133,7 +130,7 @@ def test_detail_text_omits_missing_bullets_and_adviser_without_copy():
     # NOTE: details keyboard has no photos button (photos is a separate deep link)
     assert _actions(response.action_rows) == [["book", "consult"], ["similar"]]
     assert _labels(response.action_rows) == [
-        ["📅 预约看房", "💬 中文顾问"],
+        ["📅 预约看房", "💬 咨询这套"],
         ["🔍 继续找房"],
     ]
 
@@ -142,12 +139,12 @@ def test_details_response_uses_live_rented_state_but_keeps_frozen_public_facts()
     view = _view(status="rented", offer_status="inactive")
     response = build_details_response(view)
 
-    assert "💵 租金：$800/月" in response.text
+    assert "💰 $800/月" in response.text
     assert "🔴 已租出" in response.text
     # NOTE: details keyboard has no photos button (photos is a separate deep link)
     assert _actions(response.action_rows) == [["consult"], ["similar"]]
     assert _labels(response.action_rows) == [
-        ["💬 中文顾问"],
+        ["💬 咨询这套"],
         ["🔍 继续找房"],
     ]
 
@@ -174,7 +171,7 @@ def test_photo_caption_keeps_rental_essentials_with_photo():
 
 def test_photo_caption_uses_location_when_project_is_missing():
     caption = build_photo_caption(_view(project_name=""), photo_index=0, photo_total=10)
-    assert caption.startswith("🏡 类型：公寓\n📍 区域：BKK1\n🛏 户型：2房1厅")
+    assert caption.startswith("🏠 <b>BKK1｜2房1厅</b>\n💰 $800/月\n🏢 公寓｜95㎡｜19楼")
     assert caption.endswith("📸 1/10")
 
 

@@ -104,13 +104,13 @@ async def test_property_advisor_buttons_are_only_handoff_and_return():
     await _render_contact(query, text="QL-RF-A2B3", public_listing_id="QL-RF-A2B3", advisor_url="https://t.me/advisor")
     labels = [button.text for row in query.markup.inline_keyboard for button in row]
     callbacks = [button.callback_data for row in query.markup.inline_keyboard for button in row if button.callback_data]
-    assert labels == ["中文顾问", "返回房源详情"]
+    assert labels == ["💬 中文顾问", "⬅️ 返回房源"]
     assert callbacks == ["v3u:listing:details:QL-RF-A2B3"]
     assert all(term not in labels for term in ("预约看房", "更多实拍", "继续找房"))
 
 
 def test_aftercare_and_public_resident_buttons_stay_frozen():
-    assert _labels(build_assurance_home_view()) == ["🔍 开始找房", "💬 中文顾问", "⬅️ 返回首页"]
+    assert _labels(build_assurance_home_view()) == ["📋 入住交接留档", "💬 中文顾问", "⬅️ 返回侨联服务"]
     expected = [
         "📋 我的租约", "🛡️ 入住服务", "🏠 安心租房",
         "💬 中文顾问", "⬅️ 返回首页",
@@ -130,7 +130,7 @@ def test_search_card_order_and_public_identity(monkeypatch):
     monkeypatch.setattr(mod, "build_public_listing_details", lambda view: D())
     card = build_search_card((V(),), 0)
     labels = [choice.label for row in card.action_rows for choice in row]
-    assert labels == ["📷 更多实拍", "📅 预约看房", "换搜索条件"]
+    assert labels == ["📷 看实拍", "📅 预约看房", "🔄 调整条件"]
     assert "l_" not in repr(card).lower()
 
 
@@ -221,6 +221,6 @@ def test_legacy_contact_and_aftercare_destinations_render_new_names():
     assert "中文顾问" in contact.text
     assert "联系顾问" not in _labels(contact)
     rental = build_assurance_home_view()
-    assert "侨联地产｜金边中文租房" in rental.text
-    assert "签约不是服务的结束。" in rental.text
+    assert "安心租房" in rental.text
+    assert "入住交接、费用确认和住房问题" in rental.text
     assert "关于侨联" not in rental.text

@@ -25,18 +25,15 @@ def test_v3_home_uses_final_conversion_navigation():
     view = build_home_view(channel_url="https://t.me/qiaolian")
     labels = _labels(view)
     assert labels == [
-        "🔍 智能找房", "📖 关于侨联地产",
-        "📅 预约看房", "💎 直接问顾问",
-        "⚡ 入住管家", "🧭 周边服务",
+        "🔍 开始找房", "🛎️ 侨联服务",
+        "📢 最新房源", "💬 中文顾问",
     ]
 
 
 def test_home_without_channel_keeps_core_conversion_actions():
     labels = _labels(build_home_view())
     assert labels == [
-        "🔍 智能找房", "📖 关于侨联地产",
-        "📅 预约看房", "💎 直接问顾问",
-        "⚡ 入住管家", "🧭 周边服务",
+        "🔍 开始找房", "🛎️ 侨联服务", "💬 中文顾问",
     ]
 
 
@@ -69,18 +66,13 @@ def test_service_hub_is_public_and_does_not_require_binding():
 def test_rental_service_is_public_parent_content_center():
     view = build_assurance_home_view()
     assert view.text == (
-        "🏠 <b>侨联地产｜金边中文租房</b>\n"
-        "⭐ 金边本地6年经验\n"
-        "📍 富力城｜炳发城｜BKK1｜钻石岛\n"
-        "💬 专业中文顾问\n"
-        "📸 真实房源｜实拍更新\n"
-        "📹 实地看房 / 视频代看\n"
-        "找房 · 看房 · 签约 · 入住 · 售后\n"
-        "签约不是服务的结束。"
+        "🏠 <b>安心租房</b>\n\n"
+        "从看房到入住，重要信息尽量提前确认并留档。\n\n"
+        "入住交接、费用确认和住房问题，都可以继续找侨联。"
     )
-    assert _labels(view) == ["🔍 开始找房", "💬 中文顾问", "⬅️ 返回首页"]
+    assert _labels(view) == ["📋 入住交接留档", "💬 中文顾问", "⬅️ 返回侨联服务"]
     assert _callbacks(view) == [
-        "v3u:home:search", "v3u:home:contact", "v3u:t:home",
+        "v3u:assure:handover", "v3u:home:contact", "v3u:home:service",
     ]
 
 

@@ -47,12 +47,12 @@ def _lead_user(update: Any) -> LeadUser:
 async def _render_contact(query: Any, *, text: str, public_listing_id: str, advisor_url: str) -> None:
     direct_advisor = advisor_handoff_url(advisor_url, public_listing_id=public_listing_id)
     contact_button = (
-        InlineKeyboardButton("中文顾问", url=direct_advisor)
-        if direct_advisor else InlineKeyboardButton("中文顾问", callback_data="v3u:home:contact")
+        InlineKeyboardButton("💬 中文顾问", url=direct_advisor)
+        if direct_advisor else InlineKeyboardButton("💬 中文顾问", callback_data="v3u:home:contact")
     )
     markup = InlineKeyboardMarkup([
         [contact_button],
-        [InlineKeyboardButton("返回房源详情", callback_data=encode_listing_callback("details", public_listing_id))],
+        [InlineKeyboardButton("⬅️ 返回房源", callback_data=encode_listing_callback("details", public_listing_id))],
     ])
     await edit_query_panel(
         query,
@@ -75,14 +75,14 @@ def _is_historical_callback(raw: str) -> bool:
 async def _render_updated_entry(query: Any, *, advisor_url: str = "") -> None:
     direct = advisor_handoff_url(advisor_url)
     advisor_button = (
-        InlineKeyboardButton("中文顾问", url=direct)
-        if direct else InlineKeyboardButton("中文顾问", callback_data="v3u:home:contact")
+        InlineKeyboardButton("💬 中文顾问", url=direct)
+        if direct else InlineKeyboardButton("💬 中文顾问", callback_data="v3u:home:contact")
     )
     markup = InlineKeyboardMarkup([
-        [InlineKeyboardButton("返回首页", callback_data="v3u:t:home")],
+        [InlineKeyboardButton("⬅️ 返回首页", callback_data="v3u:t:home")],
         [advisor_button],
     ])
-    text = "<b>入口已更新</b>\n\n请使用下面的最新入口。"
+    text = "⚠️ <b>这套房的信息已经更新</b>\n\n请使用下面的最新入口。"
     await edit_query_panel(query, text=text, reply_markup=markup)
 
 

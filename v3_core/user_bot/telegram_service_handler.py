@@ -246,7 +246,7 @@ def _store_draft(user_data: dict[str, Any], draft: ServiceRequestDraft, **extra:
 
 def _rfcity_category_product_view(category: str) -> ServiceView:
     view = rfcity_category_view(category)
-    return ServiceView(view.kind, view.text, ((ServiceChoice("返回富力导航", "v3u:service:rfcity"),),))
+    return ServiceView(view.kind, view.text, ((ServiceChoice("⬅️ 返回富力城导航", "v3u:service:rfcity"),),))
 
 
 def _requires_binding(action: str) -> bool:
@@ -257,7 +257,7 @@ def _updated_entry_view() -> ServiceView:
     return ServiceView(
         "historical_updated",
         "<b>这个入口已经更新</b>\n\n请使用下面的最新服务入口。",
-        ((ServiceChoice("回首页", "v3u:t:home"), ServiceChoice("中文顾问", "v3u:home:contact")),),
+        ((ServiceChoice("⬅️ 返回首页", "v3u:t:home"), ServiceChoice("💬 中文顾问", "v3u:home:contact")),),
     )
 
 

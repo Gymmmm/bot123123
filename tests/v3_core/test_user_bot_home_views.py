@@ -1,4 +1,3 @@
-
 from v3_core.user_bot.appointment_history import AppointmentHistoryView
 from v3_core.user_bot.home_callbacks import encode_home_callback, parse_home_callback
 from v3_core.user_bot.home_views import build_appointment_history_home_view, build_contact_view, build_home_view
@@ -18,7 +17,7 @@ def test_home_callback_codec_remains_v3_only():
     assert parse_home_callback("hub:appointments") is None
 
 
-def test_home_preserves_takeover_six_action_surface():
+def test_home_uses_compact_four_action_surface_when_channel_exists():
     view = build_home_view(
         channel_url="https://t.me/qiaolian",
         first_name="Gym",
@@ -26,20 +25,20 @@ def test_home_preserves_takeover_six_action_surface():
     )
     markup = build_home_keyboard(view)
     labels = [b.text for row in markup.inline_keyboard for b in row]
-    assert labels == ["🔍 智能找房", "📖 关于侨联地产", "📅 预约看房", "💎 直接问顾问", "⚡ 入住管家", "🧭 周边服务"]
-    assert _callbacks(markup) == ["v3u:home:search", "v3u:home:about", "v3u:home:book", "v3u:home:contact", "v3u:home:service", "v3u:home:local"]
-    assert all(button.url is None for row in markup.inline_keyboard for button in row)
+    assert labels == ["🔍 开始找房", "🛎️ 侨联服务", "📢 最新房源", "💬 中文顾问"]
+    assert _callbacks(markup) == ["v3u:home:search", "v3u:home:service", "v3u:home:contact"]
+    assert markup.inline_keyboard[1][0].url == "https://t.me/qiaolian"
     assert "Gym" in view.text
     assert "晚上好" in view.text
 
 
-def test_home_without_channel_keeps_takeover_six_actions():
+def test_home_without_channel_keeps_three_core_actions():
     markup = build_home_keyboard(
         build_home_view(channel_url="", first_name="Gym", greeting="上午好")
     )
     labels = [b.text for row in markup.inline_keyboard for b in row]
-    assert labels == ["🔍 智能找房", "📖 关于侨联地产", "📅 预约看房", "💎 直接问顾问", "⚡ 入住管家", "🧭 周边服务"]
-    assert _callbacks(markup) == ["v3u:home:search", "v3u:home:about", "v3u:home:book", "v3u:home:contact", "v3u:home:service", "v3u:home:local"]
+    assert labels == ["🔍 开始找房", "🛎️ 侨联服务", "💬 中文顾问"]
+    assert _callbacks(markup) == ["v3u:home:search", "v3u:home:service", "v3u:home:contact"]
 
 
 def test_contact_handoff_and_appointment_history_navigation_are_plain_text():

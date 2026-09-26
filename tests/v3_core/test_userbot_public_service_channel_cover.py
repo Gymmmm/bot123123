@@ -335,8 +335,9 @@ async def test_missing_binding_is_only_a_lease_gate(tmp_path):
     assert bot.calls == []
     text = query.calls[-1][1]
     assert text == (
-        "📋 <b>我的租约</b>\n"
-        "目前没有查到已绑定的租约。如果你已经通过侨联入住，但这里暂时没有显示，可以联系中文顾问帮你核对。"
+        "📋 <b>我的租约</b>\n\n"
+        "目前没有查到已绑定的租约。\n\n"
+        "如果已经通过侨联入住，可以联系中文顾问核对。"
     )
 
 
@@ -412,6 +413,6 @@ def test_local_life_is_phnom_penh_hub_with_real_rfcity_and_other_area_paths():
     callbacks = [choice.callback_data for row in view.rows for choice in row]
     assert "<b>周边生活</b>" in view.text
     assert "富力城" in view.text
-    assert labels == ["富力城周边", "问问其他区域", "返回侨联服务"]
+    assert labels == ["🏙 富力城周边", "💬 其他区域", "⬅️ 返回侨联服务"]
     assert callbacks == ["v3u:service:rfcity", "v3u:home:contact", "v3u:home:service"]
     assert "LST_" not in repr(view)

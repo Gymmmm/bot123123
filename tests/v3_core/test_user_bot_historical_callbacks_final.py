@@ -58,9 +58,9 @@ async def test_historical_user_callbacks_do_not_crash_or_restore_old_business(ra
     assert outcome.handled
     assert [call[0] for call in update.callback_query.calls] == ["answer", "edit"]
     text = update.callback_query.calls[-1][1]
-    assert text == "<b>入口已更新</b>\n\n请使用下面的最新入口。"
+    assert text == "⚠️ <b>这套房的信息已经更新</b>\n\n请使用下面的最新入口。"
     markup = update.callback_query.calls[-1][2]
     labels = [button.text for row in markup.inline_keyboard for button in row]
-    assert labels == ["返回首页", "中文顾问"]
+    assert labels == ["⬅️ 返回首页", "💬 中文顾问"]
     callbacks = [button.callback_data for row in markup.inline_keyboard for button in row if button.callback_data]
     assert callbacks == ["v3u:t:home", "v3u:home:contact"]
