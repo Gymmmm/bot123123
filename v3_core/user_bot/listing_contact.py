@@ -13,6 +13,7 @@ from .lead_service import LeadUser
 from .listing_presenter import build_public_listing_details
 from .public_inventory import PublicInventoryReader
 from .source_display import source_display_label
+from v3_core.status_labels import inventory_status_presentation
 
 
 @dataclass(frozen=True)
@@ -53,6 +54,52 @@ class ListingContactEffectExecutor:
         return ListingContactEffectResult(lead=lead, admin=admin)
 
 
+def build_structured_advisor_clues(
+    intent: ConsultIntent,
+    inventory: PublicInventoryReader,
+) -> list[str]:
+    """Build structured clues for the advisor notification.
+    
+    Includes:
+    - 来源 (source)
+    - 当前房源内部ID (internal listing_id - hidden from customer)
+    - 价格户型房态 (price/layout/status)
+    - 客户 (customer)
+    - 预约和行为 (appointment and action)
+    """
+    view = inventory.resolve(intent.public_listing_id)
+    if view is None:
+        return []
+    
+    details = build_public_listing_details(view)
+    source = source_display_label(intent.source or "listing_callback")
+    inventory_status = str(intent.inventory_status or "").strip().lower()
+    status_icon, status_label = inventory_status_presentation(inventory_status)
+    
+    price = (
+        f"${int(details.monthly_rent_usd):,}/月"
+        if details.monthly_rent_usd is not None and int(details.monthly_rent_usd) > 0
+        else "价格待确认"
+    )
+    layout = str(details.layout or "").strip() or "户型待确认"
+    
+    clues = [
+        f"📍 来源：{source}",
+        f"🏠 房源：{details.subject or '待确认'}",
+        f"💰 价格：{price}",
+        f"🗺️ 户型：{layout}",
+        f"📊 房态：{status_icon} {status_label}",
+        f"🔧 内部ID：{intent.listing_id}",
+        f"👤 客户：{{customer}}",
+        f"📝 行为：用户咨询这套房源",
+    ]
+    
+    if str(intent.touchpoint or "").strip():
+        clues.append(f"🎯 转化页：{source_display_label(intent.touchpoint)}")
+    
+    return clues
+
+
 def build_listing_contact_view(
     intent: ConsultIntent,
     inventory: PublicInventoryReader,
@@ -90,4 +137,5 @@ __all__ = [
     "ListingContactEffectResult",
     "ListingContactView",
     "build_listing_contact_view",
+    "build_structured_advisor_clues",
 ]

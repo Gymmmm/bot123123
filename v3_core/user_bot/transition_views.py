@@ -263,8 +263,32 @@ def _search_layout_view(area_display: str = "", budget_label: str = "") -> Trans
     return TransitionView(kind="search_layout", text=f"🏠 <b>选择户型</b>{selected_line}", rows=rows)
 
 def _similar_view(plan: TransitionPlan) -> TransitionView:
+    """Render similar listing view.
+
+    For rented/offline (search_submit): show brief loading message, search executes
+    in the callback handler and shows results.
+    For bookable (budget): show the search entry panel.
+    """
     if plan.similar is None:
         raise ValueError("similar_transition_missing_intent")
+    if plan.next_step == "search_submit":
+        intent = plan.similar.intent
+        area = str(intent.area_display or "").strip()
+        price_info = ""
+        if intent.budget_label:
+            price_info = f" · {intent.budget_label}"
+        layout_info = ""
+        if intent.room_type:
+            layout_info = f" · {intent.room_type}"
+        return TransitionView(
+            kind="similar_search",
+            text=(
+                "🔍 <b>正在为你找相似房源</b>\n\n"
+                f"区域｜{area or '未指定'}{price_info}{layout_info}\n\n"
+                "稍等片刻..."
+            ),
+            rows=(),
+        )
     return _search_entry_view()
 
 

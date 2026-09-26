@@ -31,6 +31,7 @@ from .lead_effects import LeadEffectExecutor, LeadEffectResult
 from .lead_service import LeadUser
 from .public_appointment import PublicAppointmentDraft
 from .search_no_match_view import build_search_no_match_view
+from .search_query import SearchCriteria
 from .search_submit_executor import SearchSubmitExecution, SearchSubmitExecutor
 from .telegram_search_results import TelegramSearchPresentation, present_search_flow_result
 from .telegram_edit import edit_query_panel
@@ -38,6 +39,7 @@ from .telegram_transition_ui import build_transition_keyboard
 from .transition_actions import (
     APPOINTMENT_AWAITING_DATE_KEY,
     APPOINTMENT_AWAITING_TIME_KEY,
+    SearchSubmitIntent,
     TransitionActionResult,
     TransitionActionService,
 )
@@ -374,6 +376,40 @@ async def handle_v3_transition_action(
             search_execution=execution,
             search_presentation=presentation,
             lead_effect=lead_effect,
+        )
+
+    # Similar search for rented/offline listings: run similar search immediately
+    if result.next_step == "search_submit" and search_executor is not None and result.similar_intent is not None:
+        intent = result.similar_intent
+        criteria = SearchCriteria(
+            location_keys=tuple(intent.location_keys) if intent.location_keys else (),
+            budget_min=int(intent.budget_min) if intent.budget_min else None,
+            budget_max=int(intent.budget_max) if intent.budget_max else None,
+            property_type=str(intent.property_type or "").strip() or "",
+            room_type=str(intent.room_type or "").strip() or "",
+            raw_text="",
+        )
+        from .search_flow import SearchFlowService
+        flow = SearchFlowService(search_executor.flow)
+        similar_result = flow.similar(criteria, limit=5)
+        presentation = await present_search_flow_result(update, context, similar_result)
+        if not presentation.matched:
+            await _edit_view(query, build_search_no_match_view(
+                result.search or SearchSubmitIntent(
+                    criteria=criteria,
+                    source=str(intent.source or "similar_listing"),
+                    goal="any",
+                    area_display=str(intent.area_display or ""),
+                    budget_label=str(intent.budget_label or ""),
+                    touch_payload={},
+                )
+            ))
+        _apply_success_mutation(user_data, result, callback.kind)
+        return TelegramTransitionActionOutcome(
+            handled=True,
+            result=result,
+            search_execution=SearchSubmitExecution(intent=result.search, result=similar_result) if result.search else None,
+            search_presentation=presentation,
         )
 
     return TelegramTransitionActionOutcome(handled=True, result=result)

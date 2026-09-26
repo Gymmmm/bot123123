@@ -66,16 +66,32 @@ def build_transition_session(plan: TransitionPlan) -> SessionMutationPlan:
             raise ValueError("similar_transition_missing_intent")
         intent = plan.similar.intent
         public_id = _public_id(intent.public_listing_id)
+        
+        # Build session values based on the next_step
+        session_values = {
+            "source": str(intent.source or "similar_listing").strip(),
+            "goal": intent.goal or "any",
+            "location_keys": list(intent.location_keys) if intent.location_keys else [],
+            "area_display": intent.area_display or "",
+            "touch_payload": {"from_public_listing_id": public_id},
+        }
+        
+        # For direct similar search (rented/offline): include budget/room_type
+        if plan.next_step == "search_submit":
+            session_values["goal"] = "any"
+            if intent.budget_min is not None:
+                session_values["budget_min"] = intent.budget_min
+            if intent.budget_max is not None:
+                session_values["budget_max"] = intent.budget_max
+            if intent.budget_label:
+                session_values["budget_label"] = intent.budget_label
+            if intent.room_type:
+                session_values["room_type"] = intent.room_type
+            if intent.property_type:
+                session_values["property_type"] = intent.property_type
+        
         return SessionMutationPlan(
-            set_values={
-                SEARCH_PREF_SESSION_KEY: {
-                    "source": "similar_listing",
-                    "goal": "any",
-                    "location_keys": list(intent.location_keys),
-                    "area_display": intent.area_display,
-                    "touch_payload": {"from_public_listing_id": public_id},
-                }
-            },
+            set_values={SEARCH_PREF_SESSION_KEY: session_values},
             delete_keys=(AWAITING_KEYWORD_SESSION_KEY,),
         )
 

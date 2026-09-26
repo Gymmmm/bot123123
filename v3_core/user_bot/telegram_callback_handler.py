@@ -191,6 +191,7 @@ async def handle_v3_callback(
     *,
     router: CallbackRouter,
     transition_views: TransitionViewService | None = None,
+    search_executor=None,
     advisor_url: str = "",
     channel_url: str = "",
 ) -> TelegramCallbackHandlerOutcome:
@@ -263,6 +264,33 @@ async def handle_v3_callback(
         plan = build_transition_plan(response)
         mutation = build_transition_session(plan)
         view = transition_views.build(plan)
+        
+        # Direct similar search for rented/offline listings
+        if response.transition == "similar" and plan.next_step == "search_submit" and search_executor is not None:
+            from .search_flow import SearchFlowService
+            from .search_query import SearchCriteria
+            from .search_no_match_view import build_search_no_match_view
+            from .telegram_search_results import present_search_flow_result
+            intent = response.similar_intent
+            if intent is not None:
+                criteria = SearchCriteria(
+                    location_keys=tuple(intent.location_keys) if intent.location_keys else (),
+                    budget_min=int(intent.budget_min) if intent.budget_min else None,
+                    budget_max=int(intent.budget_max) if intent.budget_max else None,
+                    property_type=str(intent.property_type or "").strip() or "",
+                    room_type=str(intent.room_type or "").strip() or "",
+                    raw_text="",
+                )
+                flow = SearchFlowService(search_executor.flow)
+                similar_result = flow.similar(criteria, limit=5)
+                await _render_transition_view(query, view)
+                await present_search_flow_result(update, context, similar_result)
+                user_data = getattr(context, "user_data", None)
+                if isinstance(user_data, dict):
+                    apply_session_mutation(user_data, mutation)
+                    user_data[LISTING_TOUCHPOINT_KEY] = "similar_listing"
+                return TelegramCallbackHandlerOutcome(handled=True, response=response)
+        
         if response.transition in {"book", "change_search"}:
             await _send_transition_view(update, context, query, view)
         else:

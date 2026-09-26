@@ -18,7 +18,7 @@ class MemoryInventory:
         return None
 
 
-def _view(*, frozen_listing=None, live_location="BKK2", status="rented"):
+def _view(*, frozen_listing=None, live_location="BKK2", status="rented", monthly_rent_usd=850):
     snapshot = {
         "schema": "v3_publication_snapshot.v1",
         "listing": dict(
@@ -29,9 +29,10 @@ def _view(*, frozen_listing=None, live_location="BKK2", status="rented"):
                 "canonical_area_key": "BKK1",
                 "canonical_area_display": "BKK1",
                 "property_type": "公寓",
+                "room_type": "2房1厅",
             }
         ),
-        "offer": {"offer_type": "rent"},
+        "offer": {"offer_type": "rent", "monthly_rent_usd": monthly_rent_usd},
     }
     return PublishedListingView(
         listing={
@@ -55,7 +56,8 @@ def _view(*, frozen_listing=None, live_location="BKK2", status="rented"):
 
 
 def test_similar_intent_uses_frozen_area_and_restarts_at_budget_step():
-    inventory = MemoryInventory(_view())
+    """Active/pending listings should ask for budget preference."""
+    inventory = MemoryInventory(_view(status="active"))
     result = SimilarIntentService(inventory).resolve("QL-RF-A2B3")
 
     assert result.ok
@@ -63,11 +65,10 @@ def test_similar_intent_uses_frozen_area_and_restarts_at_budget_step():
     assert result.intent.listing_id == "LST_1"
     assert result.intent.public_listing_id == "QL-RF-A2B3"
     assert result.intent.source == "similar_listing"
-    assert result.intent.goal == "any"
+    assert result.intent.goal == "budget"
     assert result.intent.location_keys == ("BKK1",)
     assert result.intent.area_display == "BKK1"
     assert result.intent.next_step == "budget"
-    assert not hasattr(result.intent, "property_type")
     assert inventory.calls == ["QL-RF-A2B3"]
 
 
@@ -82,26 +83,43 @@ def test_live_location_change_does_not_rewrite_published_similar_area():
     assert result.intent.area_display == "BKK1"
 
 
-def test_published_rented_or_offline_listing_can_still_start_similar_flow():
-    for status in ("rented", "offline", "pending"):
+def test_rented_offline_listing_runs_similar_search_directly():
+    """Rented/offline listings should trigger direct similar search without budget question."""
+    for status in ("rented", "offline", "inactive"):
         result = SimilarIntentService(
             MemoryInventory(_view(status=status))
         ).resolve("QL-RF-A2B3")
         assert result.ok
         assert result.intent is not None
-        assert result.intent.next_step == "budget"
+        assert result.intent.next_step == "search_submit"
+        assert result.intent.goal == "any"
+        # Should include budget from frozen facts for direct search
+        assert result.intent.budget_min is not None
+        assert result.intent.budget_max is not None
 
 
-def test_missing_frozen_area_still_produces_unscoped_budget_intent():
+def test_pending_listing_asks_for_budget():
+    """Pending listings should ask for budget preference (still guided flow)."""
     result = SimilarIntentService(
-        MemoryInventory(_view(frozen_listing={"property_type": "公寓"}))
+        MemoryInventory(_view(status="pending"))
+    ).resolve("QL-RF-A2B3")
+    assert result.ok
+    assert result.intent is not None
+    assert result.intent.next_step == "budget"
+    assert result.intent.goal == "budget"
+
+
+def test_missing_frozen_area_still_produces_unscoped_any_intent():
+    """Active listings with no frozen area still work with budget goal."""
+    result = SimilarIntentService(
+        MemoryInventory(_view(frozen_listing={"property_type": "公寓"}, status="active"))
     ).resolve("QL-RF-A2B3")
 
     assert result.ok
     assert result.intent is not None
     assert result.intent.location_keys == ()
     assert result.intent.area_display == ""
-    assert result.intent.goal == "any"
+    assert result.intent.goal == "budget"
 
 
 def test_unpublished_listing_returns_not_found_without_intent():

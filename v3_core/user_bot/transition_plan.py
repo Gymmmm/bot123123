@@ -7,18 +7,21 @@ starting appointment persistence.
 
 The plans preserve fixed-SHA entry semantics while keeping Telegram/session
 identity public:
-- book -> public-ID appointment draft, next step mode selection;
-- consult -> contact handoff, with lead/admin effects declared but not run;
-- similar -> keep only the frozen public area, goal any, next step budget;
-- change search -> reset to the normal search entry.
+    - book -> public-ID appointment draft, next step mode selection;
+    - consult -> contact handoff, with lead/admin effects declared but not run;
+    - similar -> for rented/offline: run similar search immediately with known
+                 budget/room_type; for bookable: ask for budget preference;
+    - change search -> reset to the normal search entry.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Literal
 
+from .appointments import AppointmentDraft, normalize_mode
 from .consult import ConsultIntent
 from .public_appointment import PublicAppointmentDraft
+from .search_query import SearchCriteria
 from .similar_intent import SimilarSearchIntent
 from .telegram_callback_response import TelegramCallbackResponse
 
@@ -30,6 +33,7 @@ TransitionStep = Literal[
     "contact_handoff",
     "search_budget",
     "search_entry",
+    "search_submit",  # direct similar search (rented/offline)
 ]
 TransitionEffect = Literal[
     "record_lead",
@@ -39,6 +43,7 @@ TransitionEffect = Literal[
     "render_contact_handoff",
     "render_search_budget",
     "render_search_entry",
+    "run_similar_search",
 ]
 
 
@@ -121,14 +126,28 @@ def build_transition_plan(response: TelegramCallbackResponse) -> TransitionPlan:
         intent = response.similar_intent
         if intent is None:
             raise ValueError("similar_transition_missing_intent")
-        if intent.goal != "any" or intent.next_step != "budget":
-            raise ValueError("similar_transition_contract_mismatch")
-        return TransitionPlan(
-            kind="similar",
-            next_step="search_budget",
-            effects=("render_search_budget",),
-            similar=SimilarTransition(intent=intent),
-        )
+        # Rented/offline listings: goal="any", next_step="search_submit" -> direct search
+        # Bookable listings: goal="budget", next_step="budget" -> ask for budget
+        if intent.next_step == "search_submit":
+            # Direct similar search (rented/offline) - must have budget info
+            if intent.goal != "any" or not intent.location_keys:
+                raise ValueError("similar_transition_contract_mismatch")
+            return TransitionPlan(
+                kind="similar",
+                next_step="search_submit",
+                effects=("run_similar_search",),
+                similar=SimilarTransition(intent=intent),
+            )
+        if intent.next_step == "budget" and intent.goal == "budget":
+            # Guided similar search (bookable) - ask for budget preference
+            return TransitionPlan(
+                kind="similar",
+                next_step="search_budget",
+                effects=("render_search_budget",),
+                similar=SimilarTransition(intent=intent),
+            )
+        # next_step == "budget" but goal != "budget" -> invalid
+        raise ValueError("similar_transition_contract_mismatch")
 
     if response.transition == "change_search":
         return TransitionPlan(

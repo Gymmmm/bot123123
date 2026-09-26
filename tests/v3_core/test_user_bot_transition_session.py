@@ -86,6 +86,7 @@ def test_consult_session_projects_away_internal_listing_id():
 
 
 def test_similar_session_keeps_frozen_area_and_public_origin_only():
+    """Bookable listings use guided flow with budget question."""
     plan = build_transition_plan(
         TelegramCallbackResponse(
             kind="transition",
@@ -95,7 +96,7 @@ def test_similar_session_keeps_frozen_area_and_public_origin_only():
                 listing_id="LST_SECRET_3",
                 public_listing_id="QL-RF-A2B3",
                 source="similar_listing",
-                goal="any",
+                goal="budget",
                 location_keys=("BKK1",),
                 area_display="BKK1",
                 next_step="budget",
@@ -108,7 +109,7 @@ def test_similar_session_keeps_frozen_area_and_public_origin_only():
     assert mutation.delete_keys == (AWAITING_KEYWORD_SESSION_KEY,)
     assert mutation.set_values[SEARCH_PREF_SESSION_KEY] == {
         "source": "similar_listing",
-        "goal": "any",
+        "goal": "budget",
         "location_keys": ["BKK1"],
         "area_display": "BKK1",
         "touch_payload": {"from_public_listing_id": "QL-RF-A2B3"},
