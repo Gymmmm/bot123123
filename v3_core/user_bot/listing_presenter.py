@@ -105,7 +105,22 @@ def _join_amenities(value: object) -> str:
 
 
 def _frozen_adviser_copy(snapshot: dict) -> str:
-    return _visible_text(snapshot.get("adviser_copy"))
+    """Read adviser_copy from snapshot, supporting both root level and canonical_facts.
+
+    New snapshots store adviser_copy at the root level.
+    Older snapshots may store it inside canonical_facts.
+    """
+    # Try root level first (new format)
+    root_copy = snapshot.get("adviser_copy")
+    if root_copy and str(root_copy).strip().lower() not in _HIDDEN_PLACEHOLDERS:
+        return _visible_text(root_copy)
+    # Fall back to canonical_facts (old format)
+    facts = snapshot.get("canonical_facts")
+    if isinstance(facts, dict):
+        facts_copy = facts.get("adviser_copy")
+        if facts_copy:
+            return _visible_text(facts_copy)
+    return ""
 
 
 def build_public_listing_details(view: PublishedListingView) -> PublicListingDetails:
