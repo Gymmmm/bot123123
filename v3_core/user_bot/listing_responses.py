@@ -121,11 +121,11 @@ def _details_actions(
                 SemanticAction("📅 预约看房", "book", target),
                 SemanticAction("💬 咨询这套", "consult", target),
             ),
-            (SemanticAction("🔍 继续找房", "similar", target),),
+            (SemanticAction("🔍 找相似", "similar", target),),
         )
     return (
         (SemanticAction("💬 咨询这套", "consult", target),),
-        (SemanticAction("🔍 继续找房", "similar", target),),
+        (SemanticAction("🔍 找相似", "similar", target),),
     )
 
 
@@ -181,7 +181,7 @@ def _photo_actions(
             tuple(first_row),
             (
                 SemanticAction("🏠 帮我找房", "change_search", target),
-                SemanticAction("🔎 看相近房源", "similar", target),
+                SemanticAction("🔍 找相似", "similar", target),
             ),
         )
 
@@ -189,7 +189,7 @@ def _photo_actions(
     return (
         (
             SemanticAction("🏠 帮我找房", "change_search", target),
-            SemanticAction("🔎 看相近房源", "similar", target),
+            SemanticAction("🔍 找相似", "similar", target),
         ),
         (SemanticAction("💬 中文顾问", "consult", target),),
     )

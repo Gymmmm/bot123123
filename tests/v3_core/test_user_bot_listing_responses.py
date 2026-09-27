@@ -132,7 +132,7 @@ def test_detail_text_omits_missing_bullets_and_adviser_without_copy():
     assert _actions(response.action_rows) == [["book", "consult"], ["similar"]]
     assert _labels(response.action_rows) == [
         ["📅 预约看房", "💬 咨询这套"],
-        ["🔍 继续找房"],
+        ["🔍 找相似"],
     ]
 
 
@@ -146,7 +146,7 @@ def test_details_response_uses_live_rented_state_but_keeps_frozen_public_facts()
     assert _actions(response.action_rows) == [["consult"], ["similar"]]
     assert _labels(response.action_rows) == [
         ["💬 咨询这套"],
-        ["🔍 继续找房"],
+        ["🔍 找相似"],
     ]
 
 
@@ -252,7 +252,7 @@ def test_photos_response_pending_has_no_book_button(tmp_path):
     assert response.text.startswith("🔵 房态待确认")
     assert _labels(response.action_rows) == [
         ["📷 查看全部实拍", "💬 中文顾问"],
-        ["🏠 帮我找房", "🔎 看相近房源"],
+        ["🏠 帮我找房", "🔍 找相似"],
     ]
     assert all(action.action != "book" for row in response.action_rows for action in row)
 
