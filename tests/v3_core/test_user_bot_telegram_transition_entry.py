@@ -152,7 +152,7 @@ async def test_book_entry_renders_transition_and_persists_public_only_session_af
         "source": "listing_callback",
     }
     assert "LST_1" not in repr(context.user_data)
-    markup = context.bot.calls[-1][1]["reply_markup"]
+    markup = query.calls[-1][2]["reply_markup"]
     assert markup.inline_keyboard[0][0].callback_data == "v3u:t:appointment_date:09-08"
 
 
