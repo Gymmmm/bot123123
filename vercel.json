@@ -1,6 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "git": {
-    "deploymentEnabled": false
+    "deploymentEnabled": {
+      "feat/sale-modern-home-20260925": true,
+      "release/v3-perfect-20260929": true,
+      "*": false
+    }
   }
 }
