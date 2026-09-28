@@ -53,10 +53,6 @@ def _lead_user(update: Any) -> LeadUser:
 
 async def _render_contact(query: Any, *, text: str, public_listing_id: str, advisor_url: str) -> None:
     direct_advisor = advisor_handoff_url(advisor_url, public_listing_id=public_listing_id)
-    contact_button = (
-        InlineKeyboardButton("💬 中文顾问", url=direct_advisor)
-        if direct_advisor else InlineKeyboardButton("💬 中文顾问", callback_data="v3u:home:contact")
-    )
     rows = [
         [InlineKeyboardButton("⬅️ 返回房源", callback_data=encode_listing_callback("details", public_listing_id))],
     ]

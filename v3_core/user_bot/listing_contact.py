@@ -163,18 +163,18 @@ def build_structured_advisor_clues(
     layout = str(details.layout or "").strip() or "户型待确认"
     
     clues = [
-        f"📍 来源：{source}",
-        f"🏠 房源：{details.subject or '待确认'}",
-        f"💰 价格：{price}",
-        f"🗺️ 户型：{layout}",
-        f"📊 房态：{status_icon} {status_label}",
-        f"🔧 内部ID：{intent.listing_id}",
+        f"📍 来源：{he(source)}",
+        f"🏠 房源：{he(details.subject or '待确认')}",
+        f"💰 价格：{he(price)}",
+        f"🗺️ 户型：{he(layout)}",
+        f"📊 房态：{status_icon} {he(status_label)}",
+        f"🔧 内部ID：{he(intent.listing_id)}",
         f"👤 客户：{{customer}}",
         f"📝 行为：用户咨询这套房源",
     ]
     
     if str(intent.touchpoint or "").strip():
-        clues.append(f"🎯 转化页：{source_display_label(intent.touchpoint)}")
+        clues.append(f"🎯 转化页：{he(source_display_label(intent.touchpoint))}")
     
     return clues
 
