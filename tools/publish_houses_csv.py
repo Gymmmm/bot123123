@@ -603,18 +603,10 @@ def _caption_from_row(row: dict[str, str], text_style: str = "ch1") -> str:
             f"{hashtags}"
         )
     raw_ref = _listing_ref_code(row).upper()
-    if raw_ref.startswith("QC"):
-        qc_tag = raw_ref
-    elif raw_ref.startswith("SP_"):
-        digits = re.sub(r"\D", "", raw_ref)
-        qc_tag = f"QC{digits.zfill(4)}" if digits else "QC0000"
-    else:
-        digits = re.sub(r"\D", "", str(row.get("source_post_id", "")))
-        if digits:
-            qc_tag = f"QC{digits.zfill(4)}"
-        else:
-            digits = re.sub(r"\D", "", raw_ref)
-            qc_tag = f"QC{digits.zfill(4)}" if digits else "QC0000"
+    from qiaolian_dual.public_listing_id import public_listing_id
+    digits = re.sub(r"\D", "", raw_ref) or re.sub(r"\D", "", str(row.get("source_post_id", "")))
+    internal_ref = f"l_{int(digits)}" if digits else raw_ref
+    qc_tag = public_listing_id(internal_ref)
     default_prefix = f"侨联 #{qc_tag}"
 
     forced_prefix = _first_non_empty(
@@ -1239,14 +1231,9 @@ async def _run(args: argparse.Namespace) -> int:
     token = _first_non_empty(args.bot_token, os.getenv("PUBLISHER_BOT_TOKEN", ""), os.getenv("BOT_TOKEN", ""))
     channel_id = _first_non_empty(args.channel_id, os.getenv("CHANNEL_ID", ""))
     if not args.dry_run and not args.prepare_only:
-        if os.getenv("CONFIRM_CHANNEL_PUBLISH", "").strip().lower() != "yes":
-            print("ERROR: Direct channel publish requires CONFIRM_CHANNEL_PUBLISH=yes env var.")
-            print("This prevents accidental bulk publishing. Set it explicitly if you are sure.")
-            sys.exit(1)
-        if not token:
-            raise RuntimeError("missing bot token: set --bot-token or PUBLISHER_BOT_TOKEN")
-        if not channel_id:
-            raise RuntimeError("missing channel id: set --channel-id or CHANNEL_ID")
+        print("BLOCKED: CSV direct publishing is disabled.")
+        print("Import CSV through intake, approve its frozen publication package, then publish with MeihuaPublisher.")
+        return 4
 
     csv_path = Path(args.csv).expanduser().resolve()
     if not csv_path.is_file():

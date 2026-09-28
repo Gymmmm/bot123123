@@ -160,7 +160,7 @@ def render_pending_jobs(
 
     for job in jobs:
         job_id = job["job_id"]
-        output_path = str(out_dir / f"{job_id}.jpg")
+        output_path = str(out_dir / f"{job_id}.png")
 
         # 解析底图路径
         image_cover = str(job["image_cover"] or "").strip()
@@ -180,10 +180,12 @@ def render_pending_jobs(
             cg.generate_house_cover(
                 output_path=output_path,
                 project=title,
-                property_type=layout or property_type,
+                property_type=property_type,
+                layout=layout,
                 area=area,
                 price=price,
                 base_image_path=image_cover or None,
+                style=str(job["desired_kind"] or "classic_blue"),
             )
             conn.execute(
                 """

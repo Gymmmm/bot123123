@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1600,initial-scale=1">
+<title>侨联蓝色横幅</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:1600px;height:1200px;background:#0b1830;font-family:"Noto Sans CJK SC","Noto Sans SC",sans-serif}
+.poster{position:relative;width:1600px;height:1200px;overflow:hidden;background:#cbd5e1;color:#fff}
+.bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.top-shade{position:absolute;left:0;right:0;top:0;height:265px;background:linear-gradient(180deg,rgba(2,12,32,.68),rgba(2,12,32,0))}
+.brand{position:absolute;left:58px;top:45px;display:flex;align-items:center;gap:19px;text-shadow:0 2px 14px rgba(0,0,0,.3)}
+.mark{width:94px;height:94px;flex:0 0 94px;padding:13px;border-radius:25px;background:rgba(255,255,255,.14)}
+.cn{font-size:59px;font-weight:900;line-height:1;letter-spacing:1px}
+.en{margin-top:9px;font-size:20px;font-weight:650;letter-spacing:2.8px;color:rgba(255,255,255,.88)}
+.pricebox{position:absolute;right:55px;top:42px;min-width:420px;max-width:650px;padding:23px 34px 25px;border:2px solid rgba(255,211,91,.78);border-radius:24px;background:rgba(5,16,38,.77);text-align:center;box-shadow:0 12px 30px rgba(0,0,0,.2)}
+.price-label{font-size:25px;font-weight:700;color:#ffe08a}
+.price{margin-top:5px;font-size:68px;font-weight:950;line-height:1;color:#ffd75f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hero{position:absolute;left:62px;bottom:285px;max-width:940px;text-shadow:0 4px 22px rgba(0,0,0,.72)}
+.title{font-size:91px;font-weight:950;line-height:1.08;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.layout{display:inline-block;max-width:760px;margin-top:20px;padding:10px 27px;border:2px solid rgba(255,215,95,.78);border-radius:999px;background:rgba(3,17,43,.66);color:#ffdf7c;font-size:43px;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stats{position:absolute;left:0;right:0;bottom:0;height:220px;display:grid;grid-template-columns:repeat(3,1fr);background:rgba(5,18,45,.91);border-top:3px solid rgba(255,211,91,.7)}
+.stat{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:0;padding:20px 34px}
+.stat+.stat:before{content:"";position:absolute;left:0;top:44px;bottom:44px;width:1px;background:rgba(255,215,95,.35)}
+.label{font-size:25px;font-weight:700;color:#ffdf82}
+.value{max-width:100%;margin-top:13px;font-size:42px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+</style>
+</head>
+<body>
+<div class="poster">
+  <img id="bg" class="bg" src="{{BG_SRC}}" alt="">
+  <div class="top-shade"></div>
+  <div class="brand">
+    <svg class="mark" viewBox="0 0 120 120" aria-hidden="true">
+      <path d="M14 62L60 28L106 62" fill="none" stroke="white" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M24 57V91H44V68H76V91H96V57" fill="none" stroke="white" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M16 96C34 87 49 84 60 84C71 84 86 87 104 96" fill="none" stroke="white" stroke-width="9" stroke-linecap="round"/>
+    </svg>
+    <div><div class="cn">侨联地产</div><div class="en">QIAO LIAN PROPERTY</div></div>
+  </div>
+  <div class="pricebox" data-field="t6">
+    <div class="price-label" id="price_label">租金</div>
+    <div class="price" id="price_text">{{PRICE_LINE}}</div>
+  </div>
+  <div class="hero">
+    <div class="title" id="t1">{{PROJECT}}</div>
+    <div class="layout" data-field="t2" id="t2">{{LAYOUT}}</div>
+  </div>
+  <div class="stats">
+    <div class="stat" data-field="t3"><div class="label">位置</div><div class="value" id="t3">{{AREA}}</div></div>
+    <div class="stat" data-field="t4"><div class="label">面积</div><div class="value" id="t4">{{SIZE}}</div></div>
+    <div class="stat" data-field="t5"><div class="label">楼层</div><div class="value" id="t5">{{FLOOR}}</div></div>
+  </div>
+</div>
+</body>
+</html>

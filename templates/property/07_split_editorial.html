@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1600, initial-scale=1">
+<title>Qiaolian Split Editorial Cover</title>
+<style>
+:root{--paper:#f4f2ed;--ink:#1a1c1e;--muted:#73787b;--accent:#e17645;--line:#d8d5ce}
+*{box-sizing:border-box}
+html,body{margin:0;width:1600px;height:1200px;background:var(--paper);font-family:"Noto Sans CJK SC","Microsoft YaHei",Arial,sans-serif;color:var(--ink)}
+.poster{position:relative;width:1600px;height:1200px;overflow:hidden;background:var(--paper)}
+.hero{position:absolute;left:0;top:0;bottom:0;width:1015px;background:#d9d6cf}
+.hero img{width:100%;height:100%;object-fit:cover;object-position:center}
+.hero:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.28),transparent 24%,rgba(0,0,0,.05))}
+.hero-label{position:absolute;z-index:2;left:58px;top:58px;color:#fff;font-size:19px;font-weight:900;letter-spacing:3px}
+.hero-label:before{content:"";display:inline-block;width:34px;height:3px;background:var(--accent);margin:0 14px 5px 0}
+.side{position:absolute;right:0;top:0;bottom:0;width:585px;background:var(--paper);padding:60px 58px 48px;display:flex;flex-direction:column}
+.brand{font-size:24px;font-weight:900;letter-spacing:2px}
+.brand small{display:block;color:var(--muted);font-size:12px;letter-spacing:3px;margin-top:7px}
+.topline{height:1px;background:var(--line);margin-top:34px}
+.qc{align-self:flex-end;color:var(--accent);font-size:21px;font-weight:900;letter-spacing:1px;margin-top:-22px;background:var(--paper);padding-left:15px}
+.area{font-size:20px;color:var(--accent);font-weight:900;letter-spacing:2px;margin-top:64px;margin-bottom:17px}
+.title{font-size:54px;line-height:1.08;letter-spacing:-2px;font-weight:900;word-break:break-all}
+.type{font-size:22px;color:var(--muted);font-weight:700;margin-top:14px}
+.price-block{margin-top:47px;padding:25px 0;border-top:5px solid var(--accent);border-bottom:1px solid var(--line)}
+.price-label{font-size:15px;color:var(--muted);font-weight:900;letter-spacing:3px}
+.price{color:var(--accent);font-size:58px;line-height:1.08;font-weight:900;letter-spacing:-2px;margin-top:5px;white-space:nowrap}
+.facts{margin-top:28px}
+.fact{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding:15px 0}
+.fact-label{font-size:17px;color:var(--muted);font-weight:800;letter-spacing:1px}
+.fact-value{font-size:24px;font-weight:900;text-align:right;max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bottom{margin-top:auto;padding-top:30px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:flex-end;gap:20px}
+.note{font-size:15px;color:var(--muted);line-height:1.65;text-align:right}
+.hide{display:none!important}
+</style>
+</head>
+<body>
+<div class="poster" id="poster">
+  <div class="hero"><img id="bg" src="" alt=""><div class="hero-label">侨联实拍 · 中文顾问</div></div>
+  <aside class="side">
+    <div class="brand">侨联地产<small>QIAO LIAN PROPERTY</small></div>
+    <div class="topline"></div>
+    <div class="qc" id="t1">{{REF}}</div>
+    <div class="area" id="t4">{{AREA}}</div>
+    <div class="title" id="t2">{{PROJECT}}</div>
+    <div class="type" id="t3">{{PROPERTY_TYPE}}</div>
+    <div class="price-block"><div class="price-label">MONTHLY RENT</div><div class="price" id="price_text">{{PRICE_LINE}}</div></div>
+    <div class="facts">
+      <div class="fact" id="fact_layout"><span class="fact-label">户型</span><span class="fact-value" id="t5">{{LAYOUT}}</span></div>
+      <div class="fact" id="fact_size"><span class="fact-label">面积</span><span class="fact-value" id="t6">{{SIZE}}</span></div>
+      <div class="fact" id="fact_floor"><span class="fact-label">楼层</span><span class="fact-value" id="t7">{{FLOOR}}</span></div>
+    </div>
+    <div class="bottom"><div class="note">真实房源<br>可预约实地或视频看房</div><div class="note" id="t8">{{REF}}</div></div>
+  </aside>
+</div>
+</body>
+</html>

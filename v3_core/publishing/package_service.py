@@ -1,0 +1,254 @@
+"""V3 publication package build and approval services."""
+from __future__ import annotations
+
+import hashlib
+from pathlib import Path
+from typing import Any
+
+from v3_core.adviser_copy import build_adviser_copy, validate_adviser_copy, verified_canonical_adviser_facts
+from v3_core.publishing.channel_contract import official_channel_action_urls
+from v3_core.publishing.channel_renderer import render_channel_caption
+from v3_core.publishing.eligibility import evaluate_offer_eligibility
+from v3_core.storage.inventory_reader import InventoryReader
+from v3_core.storage.inventory_repository import InventoryRepository
+from .package_store import FrozenPackage, FrozenPackageStore
+
+
+def _publisher_adviser_facts(
+    facts: dict[str, Any],
+    *,
+    listing: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Return verified facts suitable for Publisher-side judgement.
+
+    Listing row may supply repaired ``layout`` / ``floor`` when canonical facts
+    lag behind operator edits. Location alias tables stay in parse/canonicalize;
+    they are not used to invent adviser location prose here.
+    """
+    result = verified_canonical_adviser_facts(dict(facts or {}))
+    result["property_type"] = ""
+    result["_publisher_adviser_mode"] = "composite"
+    row = dict(listing or {})
+    layout = str(row.get("layout") or result.get("layout") or "").strip()
+    if layout:
+        result["layout"] = layout
+    floor = str(row.get("floor") or result.get("floor") or "").strip()
+    if floor:
+        result["floor"] = floor
+    return result
+
+
+class PackageBuildService:
+    def __init__(
+        self,
+        *,
+        reader: InventoryReader,
+        store: FrozenPackageStore,
+        user_bot_username: str,
+        advisor_url: str = "",
+    ):
+        self.reader = reader
+        self.store = store
+        self.user_bot_username = str(user_bot_username or "").strip().lstrip("@")
+        self.advisor_url = str(advisor_url or "").strip()
+        if not self.user_bot_username:
+            raise ValueError("user_bot_username is required")
+        if not self.advisor_url:
+            raise ValueError("advisor_url is required")
+
+    def build(
+        self,
+        *,
+        listing_id: str,
+        offer_id: str,
+        cover_style: str,
+        cover_path: str,
+        gallery: list[str],
+        source_identity: dict[str, Any] | None = None,
+        adviser_copy_override: str | None = None,
+        inventory_status_override: str | None = None,
+    ) -> FrozenPackage:
+        listing = self.reader.listing(listing_id)
+        offer = self.reader.offer(offer_id)
+        if str(offer["listing_id"]) != str(listing_id):
+            raise ValueError("offer_listing_mismatch")
+        if str(offer.get("offer_type") or "") != "rent":
+            raise ValueError("publication_package_requires_rent_offer")
+        if str(offer.get("publication_policy") or "") != "telegram_rent":
+            raise ValueError("publication_package_requires_telegram_rent_policy")
+        if str(offer.get("offer_status") or "") != "active":
+            raise ValueError("publication_package_requires_active_offer")
+
+        canonical = self.reader.canonical(str(listing["canonical_record_id"]))
+        facts = dict(canonical["facts"])
+        public_id = str(listing.get("public_listing_id") or "")
+        adviser_seed = public_id or str(listing_id)
+        if adviser_copy_override is None:
+            adviser_copy = build_adviser_copy(
+                _publisher_adviser_facts(facts, listing=listing),
+                seed=adviser_seed,
+                max_points=2,
+            )
+            validate_adviser_copy(adviser_copy)
+            adviser_copy_source = "auto"
+        else:
+            adviser_copy = str(adviser_copy_override).strip()
+            validate_adviser_copy(adviser_copy)
+            adviser_copy_source = "hidden" if not adviser_copy else "manual"
+
+        frozen_status = str(
+            inventory_status_override or listing.get("inventory_status") or "active"
+        ).strip().lower()
+        caption = render_channel_caption(
+            listing=listing,
+            offer=offer,
+            public_listing_id=public_id,
+            status=frozen_status,
+            adviser_note=adviser_copy,
+        )
+        rent = offer.get("monthly_rent_usd")
+        rent_bit = ""
+        if isinstance(rent, (int, float)) and rent not in (None, ""):
+            rent_bit = f"${int(rent)}/月"
+        elif str(rent or "").strip():
+            raw_rent = str(rent).strip()
+            rent_bit = raw_rent if ("$" in raw_rent or "/月" in raw_rent) else f"${raw_rent}/月"
+        listing_summary = "｜".join(
+            part
+            for part in (
+                str(listing.get("project_name") or "").strip(),
+                str(listing.get("layout") or "").strip(),
+                rent_bit,
+                str(listing.get("public_location_display") or listing.get("area") or "").strip(),
+            )
+            if part
+        )
+        actions = official_channel_action_urls(
+            self.user_bot_username,
+            public_id,
+            advisor_url=self.advisor_url,
+            listing_summary=listing_summary,
+        )
+        public_token = "ql" + hashlib.sha256(
+            f"{listing_id}:{offer_id}:{canonical['facts_hash']}".encode("utf-8")
+        ).hexdigest()[:14]
+        snapshot = {
+            "schema": "v3_publication_snapshot.v1",
+            "listing_id": str(listing_id),
+            "public_listing_id": public_id,
+            "offer_id": str(offer_id),
+            "canonical_record_id": str(canonical["canonical_record_id"]),
+            "canonical_facts_hash": str(canonical["facts_hash"]),
+            "canonical_facts": facts,
+            "adviser_copy": adviser_copy,
+            "adviser_copy_version": "v2",
+            "adviser_copy_source": adviser_copy_source,
+            "adviser_seed": adviser_seed,
+            "listing": {
+                **{
+                    key: listing.get(key)
+                    for key in (
+                    "project_name",
+                    "project_alias",
+                    "project_brand",
+                    "property_type",
+                    "property_subtype",
+                    "public_location_key",
+                    "public_location_display",
+                    "canonical_area_key",
+                    "canonical_area_display",
+                    "publication_location_level",
+                    "layout",
+                    "bedrooms",
+                    "bathrooms",
+                    "size_sqm",
+                    "floor",
+                        "inventory_status",
+                    )
+                },
+                "inventory_status": frozen_status,
+            },
+            "offer": {
+                key: offer.get(key)
+                for key in (
+                    "offer_type",
+                    "currency",
+                    "monthly_rent_usd",
+                    "sale_price_usd",
+                    "deposit_terms",
+                    "payment_terms",
+                    "contract_term",
+                    "available_date",
+                    "offer_status",
+                    "publication_policy",
+                )
+            },
+        }
+        return self.store.create(
+            listing_id=str(listing_id),
+            offer_id=str(offer_id),
+            canonical_record_id=str(canonical["canonical_record_id"]),
+            canonical_facts_hash=str(canonical["facts_hash"]),
+            cover_style=str(cover_style),
+            cover_path=str(Path(cover_path)),
+            gallery=[str(Path(path)) for path in gallery or []],
+            post_text=caption,
+            actions=actions,
+            snapshot=snapshot,
+            source_identity=dict(source_identity or {}),
+            public_token=public_token,
+        )
+
+
+class PackageApprovalService:
+    def __init__(
+        self,
+        *,
+        reader: InventoryReader,
+        inventory_repository: InventoryRepository,
+        store: FrozenPackageStore,
+    ):
+        self.reader = reader
+        self.inventory = inventory_repository
+        self.store = store
+
+    def approve(self, *, package_id: str, approved_by: str) -> FrozenPackage:
+        package = self.store.verify_frozen(package_id)
+        listing = self.reader.listing(package.listing_id)
+        offer = self.reader.offer(package.offer_id)
+        canonical = self.reader.canonical(package.canonical_record_id)
+
+        if str(listing["canonical_record_id"]) != package.canonical_record_id:
+            raise ValueError("package_canonical_record_stale")
+        if str(canonical["facts_hash"]) != package.canonical_facts_hash:
+            raise ValueError("package_canonical_facts_mismatch")
+        if str(listing["canonical_facts_hash"]) != package.canonical_facts_hash:
+            raise ValueError("package_listing_projection_stale")
+        if str(offer["listing_id"]) != package.listing_id:
+            raise ValueError("package_offer_listing_mismatch")
+
+        review_approved = self.reader.review_approved(offer_id=package.offer_id)
+        # Flipper = rendered cover + gallery (gallery already excludes cover-source).
+        cover_ok = Path(package.cover_path).is_file()
+        eligibility = evaluate_offer_eligibility(
+            facts=dict(canonical["facts"]),
+            offer=offer,
+            review_approved=review_approved,
+            media_count=len(package.gallery) + (1 if cover_ok else 0),
+            cover_exists=cover_ok,
+        )
+        if not eligibility.ok:
+            raise ValueError(
+                "package_publishability_blocked:" + ",".join(eligibility.blocking)
+            )
+
+        approved = self.store.approve(package.package_id, approved_by=approved_by)
+        self.inventory.set_offer_publication(
+            offer_id=package.offer_id,
+            publishable=True,
+            block_reason="",
+        )
+        return approved
+
+
+__all__ = ["PackageApprovalService", "PackageBuildService", "_publisher_adviser_facts"]
