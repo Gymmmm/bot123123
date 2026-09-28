@@ -1,234 +1,267 @@
-const API = '/api/v3/sale/listings';
+/* ════════════════════════════════════════════════════════════════════
+   SALE LISTING — app.js
+   P0: 筛选 · 列表 · 详情 · 图库 · 咨询
+   P1: 排序 · 解析 title 提取字段
+═══════════════════════════════════════════════════════════════════ */
+
+const API      = '/api/v3/sale/listings';
 const META_API = '/api/v3/sale/meta';
-const ADVISOR = 'https://t.me/pengqingw';
-const LIMIT = 24;
-let offset = 0, total = 0, metadataLoaded = false, currentListing = null, galleryIndex = 0;
-const $ = (id) => document.getElementById(id);
-const text = (v) => (v == null) ? '' : String(v).trim();
-const escapeHtml = (v) => text(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const hasValue = (v) => !!text(v) && !['null','undefined','未知','none','[]'].includes(text(v).toLowerCase());
-const formatPrice = (v) => { const n=Number(v); return Number.isFinite(n) && n>0 ? '$'+n.toLocaleString('en-US') : '' };
-const first = (o, keys) => keys.map(k=>o?.[k]).find(hasValue) || '';
-const listValue = (v) => Array.isArray(v) ? v.filter(hasValue) : (hasValue(v) ? text(v).split(/[,，、|]/).map(s=>s.trim()).filter(Boolean) : []);
-const projectOf = i => first(i,['project','building','project_name']);
-const locationOf = i => first(i,['location','area','district']);
-const bedroomsOf = i => { const n=Number(first(i,['bedrooms','bedroom_count'])); return Number.isFinite(n)&&n>0 ? n : 0 };
-const sizeOf = i => { const n=Number(first(i,['size_sqm','area_sqm','size'])); return Number.isFinite(n)&&n>0 ? n : 0 };
-const priceOf = i => first(i,['sale_price_usd','sale_price','price_usd','price']);
-const descriptionOf = i => first(i,['description','description_text','listing_description','adviser_copy']);
-const amenitiesOf = i => listValue(first(i,['amenities','features','facilities']));
-const normalizeListing = (payload) => payload?.item || payload?.listing || payload?.data || payload?.result || payload;
-const mediaUrl = (value) => text(value);
-const advisorUrl = i => ADVISOR+'?text='+encodeURIComponent(`你好，想咨询金边出售房源 ${text(i.public_id)}`);
+const LIMIT    = 24;
+const ADVISOR  = 'https://t.me/pengqingw';
 
-const retryImage = (image) => {
-  if (image.dataset.retried) {
-    image.hidden = true;
-    image.nextElementSibling.hidden = false;
-    return;
+// ── State ──────────────────────────────────────────────────────────────────
+let offset = 0, total = 0;
+let metadataLoaded = false;
+let currentListing = null, galleryIndex = 0;
+let allItems = [];  // used for client-side sort
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+const $      = id => document.getElementById(id);
+const text   = v => (v == null) ? '' : String(v).trim();
+const esc    = v => text(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const has    = v => !!text(v) && !['null','undefined','未知','none','[]'].includes(text(v).toLowerCase());
+const fmt    = v => { const n=Number(v); return Number.isFinite(n)&&n>0 ? '$'+n.toLocaleString('en-US') : '' };
+const first  = (o, keys) => keys.map(k=>o?.[k]).find(has)||'';
+const fmtNum= n => Number.isFinite(n)&&n>0 ? n.toLocaleString('en-US') : '';
+
+// Parse title like "炳发城｜4房5卫｜双拼别墅"
+function parseTitle(title) {
+  const parts = text(title).split(/[｜|]/).map(s=>s.trim()).filter(Boolean);
+  const raw = {};
+  for (const p of parts) {
+    const beds = p.match(/(\d+)房/);  if (beds) raw.bedrooms = +beds[1];
+    const baths = p.match(/(\d+)卫/); if (baths) raw.bathrooms = +baths[1];
+    const size = p.match(/(\d+(?:\.\d+)?)\s*㎡?/); if (size) raw.size = +size[1].replace(/\.$/,'');
   }
-  image.dataset.retried = '1';
-  image.src = image.src;
-};
+  // Find the part most likely to be the area/location
+  const location = parts[0] || '';
+  return { raw, location };
+}
 
-const retryGalleryImage = (image) => {
-  if (image.dataset.retried) {
-    image.replaceWith(Object.assign(document.createElement('div'), { className:'image-fallback', textContent:'图片暂时无法显示' }));
-    return;
-  }
-  image.dataset.retried = '1';
-  image.src = image.src;
-};
-
-function queryParams() {
-  const p = new URLSearchParams({ limit: LIMIT, offset });
-  const area = $('area').value, type = $('type').value, price = $('price').value;
-  if (area) p.set('area', area);
-  if (type) p.set('property_type', type);
+// ── API ──────────────────────────────────────────────────────────────────
+function queryParams(extra = {}) {
+  const p = new URLSearchParams({ limit: LIMIT, offset, ...extra });
+  const a = $('area')?.value, t = $('type')?.value, price = $('price')?.value;
+  if (a) p.set('area', a);
+  if (t) p.set('property_type', t);
   if (price) {
-    const [min, max] = price.split('-');
-    p.set('min_price', min);
-    p.set('max_price', max);
+    const [mn, mx] = price.split('-');
+    if (mn) p.set('min_price', mn);
+    if (mx) p.set('max_price', mx);
   }
   return p;
 }
 
-async function loadMetadata() {
+async function loadMeta() {
   if (metadataLoaded) return;
-  const r = await fetch(META_API, { cache: 'no-store' });
-  if (!r.ok) throw Error('metadata');
-  const d = await r.json();
-  const areas = d.areas || [], types = d.property_types || [],
-        minPrice = Number(d.min_price_usd), maxPrice = Number(d.max_price_usd);
-  [...areas].filter(hasValue).sort().forEach(v => $('area').insertAdjacentHTML('beforeend', `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`));
-  [...types].filter(hasValue).sort().forEach(v => $('type').insertAdjacentHTML('beforeend', `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`));
-  const prices = [minPrice, maxPrice].filter(Number.isFinite);
-  if (prices.length === 2) {
-    $('price').setAttribute('aria-description', `真实出售价格范围 ${formatPrice(Math.min(...prices))} 至 ${formatPrice(Math.max(...prices))}`);
-  }
+  try {
+    const r = await fetch(META_API, { cache:'no-store' });
+    if (!r.ok) throw 0;
+    const d = await r.json();
+    const areas = d.areas||[], types = d.property_types||[];
+    [...areas].filter(has).sort().forEach(v => {
+      $('area').insertAdjacentHTML('beforeend',`<option value="${esc(v)}">${esc(v)}</option>`);
+    });
+    [...types].filter(has).sort().forEach(v => {
+      $('type').insertAdjacentHTML('beforeend',`<option value="${esc(v)}">${esc(v)}</option>`);
+    });
+  } catch { /* non-critical */ }
   metadataLoaded = true;
 }
 
-function showSkeletons() {
-  $('grid').innerHTML = Array(6).fill('<div class="skeleton"></div>').join('');
-}
+async function loadList(reset = false) {
+  if (reset) { offset = 0; allItems = []; }
+  showSkeletons();
+  setCount('读取中…');
+  try {
+    await loadMeta();
+    const r = await fetch(API+'?'+queryParams(), { cache:'no-store' });
+    if (!r.ok) throw 0;
+    const d = await r.json();
+    const items = Array.isArray(d.items) ? d.items : [];
+    total = Number.isFinite(Number(d.total)) ? Number(d.total) : items.length;
 
-const summary = i => {
-  const b = bedroomsOf(i), bath = Number(i.bathrooms), s = sizeOf(i);
-  return [
-    locationOf(i),
-    b ? `${b}室` : '',
-    Number.isFinite(bath) && bath>0 ? `${bath}卫` : '',
-    hasValue(i.layout) ? i.layout : '',
-    s ? `${s.toLocaleString()}㎡` : ''
-  ].filter(hasValue).join(' · ');
-};
+    if (reset) allItems = items;
+    else allItems.push(...items);
 
-function imageMarkup(i, index = 0) {
-  if (hasValue(i.cover_url)) {
-    return `<img src="${escapeHtml(mediaUrl(i.cover_url))}"
-                  alt="${escapeHtml(text(i.title) || projectOf(i) || '出售房源')}"
-                  loading="${index===0?'eager':'lazy'}"
-                  fetchpriority="${index===0?'high':'auto'}"
-                  onerror="retryImage(this)">
-             <div class="image-fallback" hidden>暂无房源照片</div>`;
+    applySort();
+    renderList();
+    renderPager();
+    updateHeroImage(items);
+    updateUrlFilters();
+
+    // deep-link detail
+    const id = new URLSearchParams(location.search).get('id');
+    if (id && !currentListing) openDetail(id, false);
+  } catch {
+    setCount('');
+    $('grid').innerHTML = emptyMarkup(
+      '暂时无法读取出售房源',
+      [{ label:'重新加载', primary:true, action:'load(true)' }, { label:'中文顾问', href:ADVISOR }]
+    );
   }
-  return '<div class="image-fallback">暂无房源照片</div>';
 }
 
-const publicStatus = i => ({active:'在售',pending:'待确认',sold:'已售',offline:'已下架',inactive:'已下架'}[text(i.status).toLowerCase()] || '');
+// ── Sort (client-side) ────────────────────────────────────────────────────
+function applySort() {
+  const sort = $('sortSelect')?.value || 'default';
+  if (sort === 'default') return; // already in natural order
+  if (sort === 'price_asc')  allItems.sort((a,b)=>(a.sale_price_usd||0)-(b.sale_price_usd||0));
+  if (sort === 'price_desc') allItems.sort((a,b)=>(b.sale_price_usd||0)-(a.sale_price_usd||0));
+  if (sort === 'updated_desc') allItems.sort((a,b)=>new Date(b.updated_at||0)-new Date(a.updated_at||0));
+}
 
-function card(i) {
-  const id = escapeHtml(i.public_id);
-  const title = text(i.title) || projectOf(i) || '金边出售房源';
-  const price = formatPrice(priceOf(i));
-  const status = publicStatus(i);
-  const statusTag = status ? `<span class="tag">${status}</span>` : '';
-  const photoTag = hasValue(i.gallery_urls) ? '<span class="tag">有照片</span>' : '';
-  const priceBlock = price ? `<div class="card-price"><small>出售总价</small><strong class="price">${price}</strong></div>` : '';
-  const summaryText = summary(i);
+// ── Render list ──────────────────────────────────────────────────────────
+function renderList() {
+  const items = allItems.slice(offset, offset + LIMIT);
+  $('count').textContent = total ? `${fmtNum(total)} 套在售` : '暂无';
+  $('heroCountNum').textContent = total > 0 ? fmtNum(total) : '—';
+  $('grid').innerHTML = items.length
+    ? items.map(item => cardMarkup(item)).join('')
+    : emptyMarkup('当前条件下暂无出售房源', [
+        { label:'清除筛选', primary:true, action:'clearFilters()' },
+        { label:'全部房源', action:'load(true)' },
+        { label:'中文顾问', href:ADVISOR }
+      ]);
+  updateChips();
+}
+
+function setCount(txt) { if ($('count')) $('count').textContent = txt; }
+
+// ── Card markup ──────────────────────────────────────────────────────────
+function cardMarkup(i) {
+  const id     = esc(i.public_id);
+  const price  = fmt(i.sale_price_usd);
+  const title  = text(i.title) || '金边出售房源';
+  const status = text(i.status);
+  const { raw, location } = parseTitle(title);
+  const type   = text(i.property_type);
+  const specs  = [
+    raw.bedrooms  ? `${raw.bedrooms}房`  : '',
+    raw.bathrooms ? `${raw.bathrooms}卫` : '',
+    raw.size      ? `${fmtNum(raw.size)}㎡` : '',
+  ].filter(Boolean).join(' · ');
+  const ppsm   = (raw.size && i.sale_price_usd)
+    ? `约 ${fmt(Math.round(i.sale_price_usd / raw.size))}/㎡` : '';
+  const photoCount = Array.isArray(i.gallery_urls) ? i.gallery_urls.length : 0;
+  const imgUrl = text(i.cover_url);
+  const statusClass = status==='在售'?'on-sale':status==='待确认'?'pending':'sold';
+  const statusLabel = {在售:'在售',待确认:'待确认',已售:'已售',已下架:'已下架'}[status]||'';
+  const telegramUrl = `${ADVISOR}?text=${encodeURIComponent(
+    `你好，想咨询金边出售房源 ${id}\n${title}\n${price}`
+  )}`;
 
   return `<article class="card">
-    <button class="card-open" type="button" data-id="${id}" aria-label="查看${escapeHtml(title)}">
+    <button class="card-link" type="button" data-id="${id}" aria-label="查看 ${esc(title)}">
       <div class="card-image">
-        ${imageMarkup(i)}
+        ${imgUrl
+          ? `<img src="${esc(imgUrl)}" alt="${esc(title)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'"><div class="image-fallback" style="display:none">暂无照片</div>`
+          : `<div class="image-fallback">暂无照片</div>`}
         <div class="card-overlay"></div>
-        <div class="card-meta">${statusTag}${photoTag}</div>
-        ${priceBlock}
+        ${statusLabel ? `<div class="card-status"><span class="status-tag ${statusClass}">${esc(statusLabel)}</span></div>` : ''}
+        ${photoCount > 1 ? `<div class="card-photo-count">${photoCount} 张</div>` : ''}
+        ${price ? `<div class="card-price-overlay"><span class="card-price-text">${price}</span></div>` : ''}
       </div>
       <div class="card-body">
-        <h2 class="card-title">${escapeHtml(title)}</h2>
-        ${summaryText ? `<p class="card-summary">${escapeHtml(summaryText)}</p>` : ''}
+        <h2 class="card-title">${esc(title)}</h2>
+        ${type ? `<p class="card-type">${esc(type)}${location ? ' · '+esc(location) : ''}</p>` : ''}
+        ${specs ? `<p class="card-specs"><span>${esc(specs)}</span></p>` : ''}
+        ${ppsm   ? `<p class="card-specs"><span style="color:var(--accent)">${esc(ppsm)}</span></p>` : ''}
+        <p class="card-id">编号 ${esc(id)}</p>
       </div>
     </button>
     <div class="card-actions">
-      <button type="button" data-id="${id}" class="detail-action">查看详情</button>
-      <a href="${advisorUrl(i)}" target="_blank" rel="noopener">咨询顾问</a>
+      <button type="button" class="detail-btn" data-id="${id}">查看详情</button>
+      <a href="${telegramUrl}" target="_blank" rel="noopener">咨询顾问</a>
     </div>
   </article>`;
 }
 
-function render(items) {
-  $('count').textContent = total ? `${total} 套在售` : '暂无';
-  $('heroCountNum').textContent = total > 0 ? total : '—';
-  $('grid').innerHTML = items.length
-    ? items.map(card).join('')
-    : '<div class="empty">当前条件下暂无出售房源</div>';
-  const hero = items.find(i => hasValue(i.cover_url));
-  const heroImage = $('heroImage');
-  if (hero && heroImage) {
-    heroImage.src = mediaUrl(hero.cover_url);
-    heroImage.alt = text(hero.title) || projectOf(hero) || '金边出售房源';
-    heroImage.onerror = () => { heroImage.hidden = true; };
-  }
-}
-
-function updatePager() {
-  const pages = Math.max(1, Math.ceil(total / LIMIT));
-  $('pager').hidden = total <= LIMIT;
-  $('pageno').textContent = `${Math.floor(offset / LIMIT) + 1} / ${pages}`;
-  $('prev').disabled = offset === 0;
-  $('next').disabled = offset + LIMIT >= total;
-}
-
-async function load(reset = false) {
-  if (reset) offset = 0;
-  showSkeletons();
-  $('count').textContent = '读取中';
-  try {
-    await loadMetadata();
-    const r = await fetch(API + '?' + queryParams(), { cache: 'no-store' });
-    if (!r.ok) throw Error('list');
-    const d = await r.json();
-    const items = Array.isArray(d.items) ? d.items : [];
-    total = Number.isFinite(Number(d.total)) ? Number(d.total) : items.length;
-    render(items);
-    updatePager();
-    const id = new URLSearchParams(location.search).get('id');
-    if (id && !currentListing) openDetail(id, false);
-  } catch {
-    $('count').textContent = '';
-    $('grid').innerHTML = '<div class="empty error">出售房源暂时无法读取，请稍后刷新。</div>';
-  }
-}
-
+// ── Detail ───────────────────────────────────────────────────────────────
 async function openDetail(id, push = true) {
   try {
-    const r = await fetch(API + '/' + encodeURIComponent(id), { cache: 'no-store' });
-    if (!r.ok) throw Error('detail');
+    const r = await fetch(API+'/'+encodeURIComponent(id), { cache:'no-store' });
+    if (!r.ok) throw 0;
     const d = await r.json();
-    currentListing = normalizeListing(d);
-    if (!currentListing || !hasValue(currentListing.public_id)) throw Error('detail-schema');
+    currentListing = d.item || d.listing || d.data || d.result || d;
+    if (!currentListing || !has(currentListing.public_id)) throw 0;
     galleryIndex = 0;
     const i = currentListing;
-    $('detail-price').textContent = formatPrice(priceOf(i));
-    $('detail-title').textContent = text(i.title) || projectOf(i) || '金边出售房源';
-    $('consultButton').href = advisorUrl(i);
-    $('consultContext').textContent = [projectOf(i), formatPrice(priceOf(i))].filter(hasValue).join(' · ');
+    const { raw, location } = parseTitle(text(i.title));
+    const price = fmt(i.sale_price_usd);
+    const status = text(i.status);
+    const type   = text(i.property_type);
+    const desc   = first(i,['description','description_text','adviser_copy','listing_description']);
+    const amenities = listValue(first(i,['amenities','features','facilities']));
+    const photoCount = Array.isArray(i.gallery_urls) ? i.gallery_urls.length : 0;
 
-    const type = [i.property_type, i.property_subtype].filter(hasValue).join(' / ');
-    const b = bedroomsOf(i), s = sizeOf(i);
+    // Price
+    $('detail-price').textContent = price;
+
+    // Status tag
+    const statusClass = status==='在售'?'on-sale':status==='待确认'?'pending':'sold';
+    const statusLabel = {在售:'在售',待确认:'待确认',已售:'已售',已下架:'已下架'}[status]||'';
+    const statusEl = $('detail-status');
+    if (statusLabel) {
+      statusEl.textContent = statusLabel;
+      statusEl.className = `detail-status-tag ${statusClass}`;
+      statusEl.hidden = false;
+    } else { statusEl.hidden = true; }
+
+    // Title & meta
+    $('detail-title').textContent = text(i.title) || '金边出售房源';
+    $('detail-meta').textContent = [type, location].filter(Boolean).join(' · ');
+
+    // PPSM
+    const ppsmEl = $('detailPpsmBlock');
+    if (raw.size && i.sale_price_usd) {
+      $('detailPpsm').textContent = `${fmt(Math.round(i.sale_price_usd / raw.size))}/㎡`;
+      ppsmEl.hidden = false;
+    } else { ppsmEl.hidden = true; }
+
+    // Params
     const fields = [
-      ['项目', projectOf(i)],
-      ['位置', locationOf(i)],
-      ['物业类型', type],
-      ['户型', i.layout],
-      ['卧室', b ? b+' 间' : ''],
-      ['卫浴', Number(i.bathrooms)>0 ? i.bathrooms+' 间' : ''],
-      ['面积', s ? s.toLocaleString()+'㎡' : ''],
-      ['楼层', hasValue(i.floor) ? i.floor+' 楼' : '']
-    ].filter(([,v]) => hasValue(v));
-    $('detail-fields').innerHTML = fields.map(([l,v]) => `<div class="field"><small>${escapeHtml(l)}</small><strong>${escapeHtml(v)}</strong></div>`).join('');
+      ['物业类型',  type],
+      ['位置',      location],
+      ['卧室',      raw.bedrooms ? `${raw.bedrooms} 间` : ''],
+      ['卫浴',      raw.bathrooms ? `${raw.bathrooms} 间` : ''],
+      ['面积',      raw.size ? `${fmtNum(raw.size)} ㎡` : ''],
+      ['楼层',      has(i.floor) ? `${i.floor} 楼` : ''],
+      ['状态',      statusLabel],
+      ['编号',      esc(i.public_id)],
+    ].filter(([,v])=>has(v));
 
-    const referenceParts = [locationOf(i), projectOf(i),
-      hasValue(i.property_type) ? i.property_type : '',
-      hasValue(i.layout) ? i.layout : '',
-      b ? `${b}间卧室` : '',
-      Number(i.bathrooms)>0 ? `${i.bathrooms}间卫浴` : '',
-      s ? `${s.toLocaleString()}㎡` : '',
-      hasValue(i.floor) ? `${i.floor}楼` : ''
-    ].filter(hasValue);
-    const referenceText = referenceParts.length
-      ? `本套房源的购置参考信息：${referenceParts.join(' · ')}。价格与具体配置请以当前详情和现场核验为准。`
-      : '';
-    $('investmentBlock').hidden = !referenceText;
-    $('investmentText').textContent = referenceText;
+    $('detail-fields').innerHTML = fields.map(([l,v]) =>
+      `<div class="param"><small>${esc(l)}</small><strong>${esc(v)}</strong></div>`
+    ).join('');
 
-    const desc = descriptionOf(i);
-    $('descriptionBlock').hidden = !hasValue(desc);
-    $('detail-description').textContent = desc;
+    // Description
+    const descEl = $('descriptionBlock');
+    if (has(desc)) {
+      $('detail-description').textContent = desc;
+      descEl.hidden = false;
+    } else { descEl.hidden = true; }
 
-    const amenities = amenitiesOf(i);
-    $('amenitiesBlock').hidden = !amenities.length;
-    $('detail-amenities').innerHTML = amenities.map(v => `<span>${escapeHtml(v)}</span>`).join('');
+    // Amenities
+    const amEl = $('amenitiesBlock');
+    if (amenities.length) {
+      $('detail-amenities').innerHTML = amenities.map(v=>`<span>${esc(v)}</span>`).join('');
+      amEl.hidden = false;
+    } else { amEl.hidden = true; }
 
-    paintGallery();
+    // Gallery
+    paintGallery(i, photoCount);
+
+    // Telegram context
+    const telegramText = `你好，想咨询金边出售房源：\n编号：${esc(i.public_id)}\n${text(i.title)}\n${price}`;
+    $('detail-telegram').href = `${ADVISOR}?text=${encodeURIComponent(telegramText)}`;
+    $('detail-footer-meta').textContent = `${esc(i.public_id)} · ${text(i.title)}`.slice(0,40);
+
     $('overlay').hidden = false;
     document.body.style.overflow = 'hidden';
     if (push) {
-      const u = new URL(location.href);
-      u.searchParams.set('id', id);
-      history.pushState({}, '', u);
+      const u = new URL(location.href); u.searchParams.set('id',id);
+      history.pushState({},'',u);
     }
   } catch {
     $('overlay').hidden = true;
@@ -237,45 +270,57 @@ async function openDetail(id, push = true) {
   }
 }
 
-function galleryImages() {
-  const imgs = [...(currentListing?.gallery_urls||[])].filter(hasValue).map(mediaUrl);
-  const cover = mediaUrl(currentListing?.cover_url);
-  if (hasValue(cover) && !imgs.includes(cover)) imgs.unshift(cover);
-  return imgs;
+function paintGallery(i, photoCount) {
+  const gallery = $('gallery');
+  const imgs = [];
+  if (has(i.cover_url)) imgs.push(text(i.cover_url));
+  if (Array.isArray(i.gallery_urls)) {
+    i.gallery_urls.filter(has).forEach(u => { if (!imgs.includes(u)) imgs.push(u); });
+  }
+  const total = imgs.length;
+
+  gallery.innerHTML = imgs.length
+    ? imgs.map((u,n) => `<img src="${esc(u)}" alt="房源照片 ${n+1}" loading="${n===0?'eager':'lazy'}" style="flex:0 0 100%;width:100%;height:100%;object-fit:cover">`).join('')
+    : `<div class="image-fallback" style="width:100%;flex:0 0 100%">暂无房源照片</div>`;
+
+  gallery.style.transform = `translateX(-${galleryIndex*100}%)`;
+  $('galleryCounter').textContent = total ? `${galleryIndex+1} / ${total}` : '0 / 0';
+  $('galleryTotal').textContent = total;
+  $('galleryPrev').hidden = total < 2;
+  $('galleryNext').hidden = total < 2;
+  paintDots(total);
 }
 
-function paintGallery() {
-  const imgs = galleryImages();
-  $('gallery').innerHTML = imgs.length
-    ? imgs.map((u,n) => `<img src="${escapeHtml(u)}" alt="房源照片 ${n+1}" loading="${n===galleryIndex?'eager':'lazy'}" fetchpriority="${n===galleryIndex?'high':'auto'}" onerror="retryGalleryImage(this)" style="flex:0 0 100%;width:100%;height:100%;object-fit:cover">`).join('')
-    : '<div class="image-fallback" style="width:100%;flex:0 0 100%">暂无房源照片</div>';
-  $('gallery').style.transform = `translateX(-${galleryIndex * 100}%)`;
-  $('galleryCount').textContent = imgs.length ? `${galleryIndex+1} / ${imgs.length}` : '0 / 0';
-  $('galleryPrev').hidden = imgs.length < 2;
-  $('galleryNext').hidden = imgs.length < 2;
-  paintGalleryDots(imgs.length);
-}
-
-function paintGalleryDots(count) {
+function paintDots(count) {
   const dots = $('galleryDots');
   if (!dots) return;
-  dots.innerHTML = Array.from({length: count}, (_, n) =>
-    `<div class="gallery-dot${n === galleryIndex ? ' active' : ''}" data-index="${n}" role="presentation"></div>`
+  dots.innerHTML = Array.from({length: count}, (_,n) =>
+    `<div class="gallery-dot${n===galleryIndex?' active':''}" data-index="${n}" role="presentation"></div>`
   ).join('');
-  dots.querySelectorAll('.gallery-dot').forEach(dot => {
-    dot.addEventListener('click', () => {
-      galleryIndex = Number(dot.dataset.index);
-      paintGallery();
+  dots.querySelectorAll('.gallery-dot').forEach(d => {
+    d.addEventListener('click', () => {
+      galleryIndex = +d.dataset.index;
+      stepGallery(0);
     });
   });
 }
 
 function stepGallery(step) {
-  const imgs = galleryImages();
-  if (imgs.length > 1) {
-    galleryIndex = (galleryIndex + step + imgs.length) % imgs.length;
-    paintGallery();
-  }
+  const imgs = getGalleryImages();
+  if (imgs.length < 2) return;
+  galleryIndex = (galleryIndex + step + imgs.length) % imgs.length;
+  $('gallery').style.transform = `translateX(-${galleryIndex*100}%)`;
+  $('galleryCounter').textContent = `${galleryIndex+1} / ${imgs.length}`;
+  paintDots(imgs.length);
+}
+
+function getGalleryImages() {
+  const i = currentListing;
+  if (!i) return [];
+  const imgs = [];
+  if (has(i.cover_url)) imgs.push(text(i.cover_url));
+  if (Array.isArray(i.gallery_urls)) i.gallery_urls.filter(has).forEach(u => { if (!imgs.includes(u)) imgs.push(u); });
+  return imgs;
 }
 
 function closeDetail(updateUrl = true) {
@@ -283,61 +328,147 @@ function closeDetail(updateUrl = true) {
   document.body.style.overflow = '';
   currentListing = null;
   if (updateUrl) {
-    const u = new URL(location.href);
-    u.searchParams.delete('id');
-    history.pushState({}, '', u);
+    const u = new URL(location.href); u.searchParams.delete('id');
+    history.pushState({},'',u);
   }
 }
 
-function resetFilters() {
-  $('area').value = '';
-  $('type').value = '';
-  $('price').value = '';
+// ── Filters & chips ──────────────────────────────────────────────────────
+function clearFilters() {
+  if ($('area')) $('area').value = '';
+  if ($('type')) $('type').value = '';
+  if ($('price')) $('price').value = '';
+  if ($('sortSelect')) $('sortSelect').value = 'default';
+  loadList(true);
 }
 
-$('brandButton').addEventListener('click', () => {
-  closeDetail();
-  resetFilters();
-  load(true);
+function updateChips() {
+  const chips = [];
+  const area = $('area')?.value;
+  const type = $('type')?.value;
+  const price = $('price')?.value;
+  const priceLabels = { '0-80000':'$8万内','80000-120000':'$8–12万','120000-200000':'$12–20万','200000-350000':'$20–35万','350000-999999999':'$35万+' };
+
+  if (area)  chips.push({ label: area,  onRemove: () => { if($('area')) $('area').value=''; loadList(true); }});
+  if (type)  chips.push({ label: type,  onRemove: () => { if($('type')) $('type').value=''; loadList(true); }});
+  if (price) chips.push({ label: priceLabels[price]||price, onRemove: () => { if($('price')) $('price').value=''; loadList(true); }});
+
+  const row = $('chipsRow');
+  const container = $('activeChips');
+  if (!row || !container) return;
+
+  if (chips.length === 0) { row.hidden = true; return; }
+  row.hidden = false;
+  container.innerHTML = chips.map((c,i) =>
+    `<button class="chip" type="button" onclick="window._chipRemove(${i})">${esc(c.label)}<span class="chip-remove" aria-hidden="true">×</span></button>`
+  ).join('');
+  window._chipRemove = chips.map(c => c.onRemove);
+}
+
+function updateUrlFilters() {
+  const params = new URLSearchParams();
+  const area = $('area')?.value; if (area) params.set('area', area);
+  const type = $('type')?.value; if (type) params.set('type', type);
+  const price = $('price')?.value; if (price) params.set('price', price);
+  const sort  = $('sortSelect')?.value; if (sort && sort!=='default') params.set('sort', sort);
+  const search = params.toString();
+  const newUrl = search ? `?${search}` : location.pathname;
+  history.replaceState({},'', newUrl);
+}
+
+function restoreFiltersFromUrl() {
+  const p = new URLSearchParams(location.search);
+  const area  = p.get('area');  if (area  && $('area'))  $('area').value  = area;
+  const type  = p.get('type');  if (type  && $('type'))  $('type').value  = type;
+  const price = p.get('price'); if (price && $('price')) $('price').value = price;
+  const sort  = p.get('sort');  if (sort  && $('sortSelect')) $('sortSelect').value = sort;
+}
+
+// ── Skeleton ─────────────────────────────────────────────────────────────
+function showSkeletons() {
+  $('grid').innerHTML = Array(6).fill('<div class="skeleton"></div>').join('');
+}
+
+function emptyMarkup(msg, actions) {
+  const btns = actions.map(a =>
+    a.href
+      ? `<a href="${esc(a.href)}" ${a.primary?'class="primary"':''} target="_blank" rel="noopener">${esc(a.label)}</a>`
+      : `<button type="button" ${a.primary?'class="primary"':''} onclick="${esc(a.action)}">${esc(a.label)}</button>`
+  ).join('');
+  return `<div class="empty">
+    <p>${esc(msg)}</p>
+    ${btns ? `<div class="empty-actions">${btns}</div>` : ''}
+  </div>`;
+}
+
+// ── Pager ───────────────────────────────────────────────────────────────
+function renderPager() {
+  const pages = Math.max(1, Math.ceil(total / LIMIT));
+  const pager = $('pager');
+  if (pager) pager.hidden = total <= LIMIT;
+  if ($('pageno')) $('pageno').textContent = `${Math.floor(offset/LIMIT)+1} / ${pages}`;
+  if ($('prev')) $('prev').disabled = offset === 0;
+  if ($('next')) $('next').disabled = offset + LIMIT >= total;
+}
+
+function updateHeroImage(items) {
+  const hero = items.find(i => has(i.cover_url));
+  const img  = $('heroImage');
+  if (hero && img) {
+    img.src = text(hero.cover_url);
+    img.alt = text(hero.title);
+    img.onerror = () => { img.hidden = true; };
+  }
+}
+
+// ── Events ──────────────────────────────────────────────────────────────
+$('resetBtn')?.addEventListener('click', clearFilters);
+
+['area','type','price'].forEach(id => {
+  $(id)?.addEventListener('change', () => loadList(true));
 });
 
-$('resetButton').addEventListener('click', () => {
-  resetFilters();
-  load(true);
+$('sortSelect')?.addEventListener('change', () => {
+  applySort();
+  renderList();
+  updateUrlFilters();
 });
 
-['area','type','price'].forEach(id => $(id).addEventListener('change', () => load(true)));
-
-$('grid').addEventListener('click', e => {
-  const t = e.target.closest('[data-id]');
-  if (t && !e.target.closest('a')) openDetail(t.dataset.id);
+$('grid')?.addEventListener('click', e => {
+  const btn = e.target.closest('[data-id]');
+  if (!btn) return;
+  if (e.target.closest('a')) return;
+  openDetail(btn.dataset.id);
 });
 
-$('closeButton').addEventListener('click', () => closeDetail());
-$('overlay').addEventListener('click', e => { if (e.target === $('overlay')) closeDetail(); });
-$('galleryPrev').addEventListener('click', () => stepGallery(-1));
-$('galleryNext').addEventListener('click', () => stepGallery(1));
-$('prev').addEventListener('click', () => { offset -= LIMIT; load(); });
-$('next').addEventListener('click', () => { offset += LIMIT; load(); });
+$('closeBtn')?.addEventListener('click', closeDetail);
+$('overlay')?.addEventListener('click', e => { if (e.target === $('overlay')) closeDetail(); });
+$('galleryPrev')?.addEventListener('click', () => stepGallery(-1));
+$('galleryNext')?.addEventListener('click', () => stepGallery(+1));
+
+$('prev')?.addEventListener('click', () => { offset = Math.max(0, offset-LIMIT); loadList(); });
+$('next')?.addEventListener('click', () => { offset += LIMIT; loadList(); });
 
 window.addEventListener('popstate', () => {
   const id = new URLSearchParams(location.search).get('id');
-  id ? openDetail(id, false) : closeDetail(false);
+  if (id) openDetail(id, false); else closeDetail(false);
 });
 
 window.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && !$('overlay').hidden) closeDetail();
+  if (e.key === 'Escape'    && !$('overlay').hidden) closeDetail();
   if (e.key === 'ArrowLeft' && !$('overlay').hidden) stepGallery(-1);
-  if (e.key === 'ArrowRight' && !$('overlay').hidden) stepGallery(1);
+  if (e.key === 'ArrowRight'&& !$('overlay').hidden) stepGallery(+1);
 });
 
-// Touch swipe support
+// Touch swipe
 let touchStartX = 0;
-document.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].screenX; }, { passive: true });
+document.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].screenX; }, { passive:true });
 document.addEventListener('touchend', e => {
-  if ($('overlay').hidden) return;
+  if ($('overlay')?.hidden) return;
   const dx = e.changedTouches[0].screenX - touchStartX;
-  if (Math.abs(dx) > 50) stepGallery(dx < 0 ? 1 : -1);
-}, { passive: true });
+  if (Math.abs(dx) > 50) stepGallery(dx < 0 ? +1 : -1);
+}, { passive:true });
 
-load();
+// ── Boot ────────────────────────────────────────────────────────────────
+restoreFiltersFromUrl();
+loadList();

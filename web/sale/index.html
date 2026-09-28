@@ -3,171 +3,226 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0b0d0e">
-  <meta name="description" content="侨联地产 · 金边置业，金边真实出售房源，专业中文顾问全程服务。">
-  <meta property="og:title" content="侨联地产 · 金边置业">
-  <meta property="og:description" content="金边真实出售房源 · 中文顾问 · 免费看房咨询">
-  <meta property="og:type" content="website">
-  <title>侨联地产 · 金边置业</title>
+  <meta name="theme-color" content="#ffffff">
+  <meta name="description" content="侨联地产 · 金边出售房源，总价、产权、面积直接看，中文顾问全程服务。">
+  <title>侨联地产 · 金边出售</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-  <!-- Sticky Header -->
-  <header class="site-header">
-    <div class="header-inner">
-      <div class="brand-group">
-        <button class="brand" id="brandButton" type="button" aria-label="返回全部出售房源">
-          <span class="brand-mark">侨</span>
-          <span class="brand-text">
-            <strong>侨联地产</strong>
-            <small>金边置业</small>
-          </span>
-        </button>
-        <p class="header-tagline">真实在售 · 中文服务</p>
-      </div>
-      <div class="header-actions">
-        <a class="advisor-badge" href="https://t.me/pengqingw" target="_blank" rel="noopener">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm4.59-12.42L10.5 14.17l-1.41-1.41L13.17 8l5.42 5.42-2.59 3.58z"/></svg>
-          在线咨询顾问
-        </a>
+
+<!-- ═══════════════════════════════════════
+  STICKY HEADER
+═══════════════════════════════════════ -->
+<header class="site-header">
+  <div class="header-inner">
+    <div class="brand-group">
+      <span class="brand-mark">侨</span>
+      <div class="brand-text">
+        <strong>侨联地产</strong>
+        <small>金边出售</small>
       </div>
     </div>
-    <!-- Filters below header -->
-    <div class="filters" aria-label="房源筛选">
-      <div class="filters-inner">
-        <select id="area" aria-label="区域"><option value="">全部区域</option></select>
-        <select id="type" aria-label="物业类型"><option value="">全部类型</option></select>
-        <select id="price" aria-label="总价"><option value="">总价不限</option><option value="0-100000">$10万内</option><option value="100000-200000">$10–20万</option><option value="200000-500000">$20–50万</option><option value="500000-1000000">$50–100万</option><option value="1000000-999999999">$100万以上</option></select>
-        <button id="resetButton" type="button" aria-label="重置筛选">重置</button>
-      </div>
-    </div>
-  </header>
-
-  <main>
-    <!-- Hero -->
-    <section class="hero" aria-labelledby="hero-title">
-      <div class="hero-media" aria-hidden="true">
-        <img id="heroImage" alt="" />
-        <div class="hero-media-overlay"></div>
-      </div>
-      <div class="hero-content">
-        <div class="hero-text">
-          <span class="eyebrow">QIAOLIAN REALTY · PHNOM PENH</span>
-          <h1 id="hero-title">在金边，<br class="hero-break"><em>找到真正适合你的家。</em></h1>
-          <p class="hero-sub">真实在售房源 · 中文顾问全程服务</p>
-          <div class="hero-trust" aria-label="服务保证">
-            <span class="trust-item">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
-              真实在售
-            </span>
-            <span class="trust-item">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
-              中文服务
-            </span>
-            <span class="trust-item">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
-              金边本地顾问
-            </span>
-          </div>
-        </div>
-        <a class="hero-cta" href="#catalog" aria-label="浏览在售房源">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
-          浏览在售房源
-        </a>
-      </div>
-      <div class="hero-counter" aria-hidden="true">
-        <span class="hero-counter-num" id="heroCountNum">—</span>
-        <span class="hero-counter-label">套真实在售</span>
-      </div>
-    </section>
-
-    <!-- Catalog -->
-    <section id="catalog" class="catalog" aria-labelledby="catalog-title">
-      <div class="catalog-header">
-        <div class="catalog-title-block">
-          <span class="eyebrow">AVAILABLE COLLECTION</span>
-          <h2 id="catalog-title">精选出售房源</h2>
-        </div>
-        <span id="count" class="count-badge" aria-live="polite">读取中</span>
-      </div>
-      <section id="grid" class="listing-grid" aria-live="polite" aria-label="房源列表"></section>
-      <div id="pager" class="pager" hidden>
-        <button id="prev" type="button" aria-label="上一页">上一页</button>
-        <span id="pageno" class="pager-info" aria-label="当前页数"></span>
-        <button id="next" type="button" aria-label="下一页">下一页</button>
-      </div>
-    </section>
-  </main>
-
-  <!-- Advisor Strip -->
-  <aside class="advisor-strip" aria-label="在线咨询顾问">
-    <div class="advisor-strip-inner">
-      <div class="advisor-info">
-        <div class="advisor-avatar" aria-hidden="true">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>
-        </div>
-        <div>
-          <strong>想了解更多？</strong>
-          <p>中文顾问为您解答金边置业问题</p>
-        </div>
-      </div>
-      <a class="advisor-cta" href="https://t.me/pengqingw" target="_blank" rel="noopener">
-        立即咨询
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+    <div class="header-actions">
+      <a class="advisor-btn" href="https://t.me/pengqingw" target="_blank" rel="noopener">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>
+        中文顾问
       </a>
     </div>
-  </aside>
+  </div>
+</header>
 
-  <!-- Detail Overlay -->
-  <div id="overlay" class="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="detail-title">
-    <div class="detail-sheet" role="document">
-      <div class="detail-top">
-        <span class="detail-top-label">房源详情</span>
-        <button id="closeButton" class="close-btn" type="button" aria-label="关闭详情">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-        </button>
+<!-- ═══════════════════════════════════════
+  MAIN
+═══════════════════════════════════════ -->
+<main>
+
+  <!-- ── Hero ─────────────────────────── -->
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="hero-bg">
+      <img id="heroImage" alt="" aria-hidden="true" />
+      <div class="hero-overlay"></div>
+    </div>
+    <div class="hero-content">
+      <div class="hero-copy">
+        <h1 id="hero-title">金边真实出售房源</h1>
+        <p class="hero-sub">公寓 · 别墅 · 排屋 &nbsp;|&nbsp; 总价、产权、面积直接看</p>
       </div>
-      <div class="gallery-wrap">
-        <div id="gallery" class="gallery" role="list" aria-label="房源图片"></div>
-        <button id="galleryPrev" class="gallery-arrow prev" type="button" aria-label="上一张">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>
-        </button>
-        <button id="galleryNext" class="gallery-arrow next" type="button" aria-label="下一张">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>
-        </button>
-        <div id="galleryCount" class="gallery-count-badge" aria-live="polite"></div>
-        <div class="gallery-dots" id="galleryDots" aria-hidden="true"></div>
+      <div class="hero-stats">
+        <span class="stat-num" id="heroCountNum">—</span>
+        <span class="stat-label">套在售</span>
+        <span class="stat-sep">·</span>
+        <span class="stat-update">实时更新</span>
       </div>
-      <div class="detail-body">
-        <div class="detail-header">
-          <span class="detail-label">出售总价</span>
-          <strong id="detail-price" class="detail-price"></strong>
-          <h2 id="detail-title"></h2>
+    </div>
+  </section>
+
+  <!-- ── Filter Bar ───────────────────── -->
+  <div class="filter-bar">
+    <div class="filter-bar-inner">
+      <div class="filter-row" role="group" aria-label="房源筛选">
+        <div class="filter-select-wrap">
+          <select id="area" aria-label="区域">
+            <option value="">全部区域</option>
+          </select>
         </div>
-        <div id="detail-fields" class="detail-fields"></div>
-        <section id="investmentBlock" class="detail-section" hidden>
-          <h3>购置参考</h3>
-          <p id="investmentText"></p>
-        </section>
-        <section id="descriptionBlock" class="detail-section" hidden>
-          <h3>房源介绍</h3>
-          <p id="detail-description"></p>
-        </section>
-        <section id="amenitiesBlock" class="detail-section" hidden>
-          <h3>房源特点</h3>
-          <div id="detail-amenities" class="amenities"></div>
-        </section>
+        <div class="filter-select-wrap">
+          <select id="type" aria-label="物业类型">
+            <option value="">全部类型</option>
+          </select>
+        </div>
+        <div class="filter-select-wrap">
+          <select id="price" aria-label="总价">
+            <option value="">总价不限</option>
+            <option value="0-80000">$8万以内</option>
+            <option value="80000-120000">$8–12万</option>
+            <option value="120000-200000">$12–20万</option>
+            <option value="200000-350000">$20–35万</option>
+            <option value="350000-999999999">$35万以上</option>
+          </select>
+        </div>
+        <button id="resetBtn" class="filter-reset" type="button" aria-label="重置筛选">重置</button>
       </div>
-      <div class="detail-footer">
-        <div id="consultContext" class="consult-context"></div>
-        <a id="consultButton" class="consult-btn" target="_blank" rel="noopener">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>
-          咨询这套
-        </a>
+
+      <!-- Quick chips -->
+      <div class="chips-row" id="chipsRow" aria-label="快捷筛选" hidden>
+        <span class="chips-label">筛选：</span>
+        <div class="chips" id="activeChips"></div>
       </div>
     </div>
   </div>
 
-  <script src="./app.js" defer></script>
+  <!-- ── Catalog ──────────────────────── -->
+  <section class="catalog" aria-labelledby="catalog-title">
+    <div class="catalog-inner">
+      <div class="catalog-header">
+        <div class="catalog-title-group">
+          <h2 id="catalog-title">当前在售</h2>
+          <span id="count" class="count-num" aria-live="polite">— 套</span>
+        </div>
+        <div class="sort-wrap">
+          <select id="sortSelect" aria-label="排序">
+            <option value="default">默认排序</option>
+            <option value="price_asc">总价 从低到高</option>
+            <option value="price_desc">总价 从高到低</option>
+            <option value="updated_desc">最新更新</option>
+          </select>
+        </div>
+      </div>
+      <div id="grid" class="listing-grid" aria-live="polite" aria-label="房源列表"></div>
+      <div id="pager" class="pager" hidden>
+        <button id="prev" type="button" aria-label="上一页">上一页</button>
+        <span id="pageno" class="pager-num"></span>
+        <button id="next" type="button" aria-label="下一页">下一页</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ═══════════════════════════════════════
+  FOOTER ADVISOR STRIP
+═══════════════════════════════════════ -->
+<aside class="advisor-strip" aria-label="找不到合适房源？">
+  <div class="advisor-strip-inner">
+    <div class="advisor-strip-copy">
+      <strong>没有找到合适的？</strong>
+      <p>告诉我们预算、区域和房型要求，中文顾问帮你匹配</p>
+    </div>
+    <a class="advisor-strip-btn" href="https://t.me/pengqingw?text=%E4%BD%A0%E5%A5%BD%EF%BC%8C%E6%83%B3%E8%AF%A2%E9%97%AE%E9%87%91%E8%BE%B9%E5%87%BA%E5%94%AE%E6%88%BF%E6%BA%90" target="_blank" rel="noopener">
+      告诉顾问我的需求
+    </a>
+  </div>
+</aside>
+
+<!-- ═══════════════════════════════════════
+  DETAIL OVERLAY
+═══════════════════════════════════════ -->
+<div id="overlay" class="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="detail-title">
+
+  <div class="detail-sheet" role="document">
+
+    <!-- Top bar -->
+    <div class="detail-topbar">
+      <span class="detail-topbar-label">房源详情</span>
+      <button id="closeBtn" class="detail-close" type="button" aria-label="关闭">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
+    <!-- Gallery -->
+    <div class="detail-gallery-wrap">
+      <div id="gallery" class="detail-gallery" role="list"></div>
+      <button id="galleryPrev" class="gallery-nav prev" type="button" aria-label="上一张">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <button id="galleryNext" class="gallery-nav next" type="button" aria-label="下一张">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+      <div class="gallery-counter" id="galleryCounter" aria-live="polite"></div>
+      <div class="gallery-dots" id="galleryDots" aria-hidden="true"></div>
+      <button id="galleryAllBtn" class="gallery-all-btn" type="button" aria-label="查看全部图片">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        全部 <span id="galleryTotal">0</span> 张
+      </button>
+    </div>
+
+    <!-- Detail body -->
+    <div class="detail-body" id="detailBody">
+
+      <!-- Hero info block -->
+      <div class="detail-hero-block">
+        <div class="detail-price-row">
+          <strong id="detail-price" class="detail-price"></strong>
+          <span id="detail-status" class="detail-status-tag"></span>
+        </div>
+        <h1 id="detail-title" class="detail-title"></h1>
+        <p id="detail-meta" class="detail-meta"></p>
+      </div>
+
+      <!-- Price-per-sqm (computed) -->
+      <div id="detailPpsmBlock" class="detail-ppsm-block" hidden>
+        <span class="ppsm-label">参考单价</span>
+        <span class="ppsm-value" id="detailPpsm"></span>
+      </div>
+
+      <!-- Core params -->
+      <div class="detail-params" id="detail-fields"></div>
+
+      <!-- Amenities / features -->
+      <div id="amenitiesBlock" class="detail-section" hidden>
+        <h3 class="detail-section-title">房源特点</h3>
+        <div id="detail-amenities" class="detail-tags"></div>
+      </div>
+
+      <!-- Description -->
+      <div id="descriptionBlock" class="detail-section" hidden>
+        <h3 class="detail-section-title">房源介绍</h3>
+        <p id="detail-description" class="detail-desc"></p>
+      </div>
+
+      <!-- Disclaimer -->
+      <div class="detail-disclaimer">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <p>房源状态和价格可能随业主调整，请联系顾问确认当前房态。网站展示不构成购买承诺。</p>
+      </div>
+
+    </div><!-- /detail-body -->
+
+    <!-- Sticky mobile CTA -->
+    <div class="detail-footer" id="detailFooter">
+      <div class="detail-footer-meta" id="detail-footer-meta"></div>
+      <div class="detail-footer-actions">
+        <a id="detail-telegram" class="detail-telegram-btn" target="_blank" rel="noopener">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.27-.02-.12.03-1.99 1.27-5.62 3.72-.53.36-1.01.54-1.44.53-.47-.01-1.37-.27-2.06-.49-.83-.27-1.49-.42-1.43-.88.03-.24.37-.49 1.02-.74 3.99-1.74 6.65-2.89 7.99-3.45 3.8-1.6 4.59-1.88 5.1-1.89.11 0 .37.03.54.17.14.12.18.28.2.45-.01.06.01.24 0 .38z"/></svg>
+          问这套
+        </a>
+        <a class="detail-consult-btn" href="https://t.me/pengqingw" target="_blank" rel="noopener">中文顾问</a>
+      </div>
+    </div>
+
+  </div><!-- /detail-sheet -->
+</div><!-- /overlay -->
+
+<script src="./app.js" defer></script>
 </body>
 </html>
