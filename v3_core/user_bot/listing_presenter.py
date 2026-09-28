@@ -1,0 +1,176 @@
+"""Pure public listing presentation model for the V3 User Bot.
+
+Public facts come from the frozen publication snapshot. Only current
+availability/bookability comes from the live listing/offer rows. Telegram
+handlers can render this model without reaching back into drafts or canonical
+storage.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from v3_core.publishing.formatting import display_layout
+from v3_core.status_labels import inventory_status_presentation
+
+from .public_inventory import PublishedListingView
+
+
+_HIDDEN_PLACEHOLDERS = {
+    "暂无",
+    "未知",
+    "--",
+    "-",
+    "none",
+    "null",
+    "n/a",
+    "na",
+    "unknown",
+}
+
+
+@dataclass(frozen=True)
+class PublicListingDetails:
+    listing_id: str
+    public_listing_id: str
+    project_name: str
+    property_type: str
+    layout: str
+    subject: str
+    location: str
+    monthly_rent_usd: int | None
+    published_monthly_rent_usd: int | None
+    size_sqm: float | None
+    floor: str
+    deposit_terms: str
+    contract_term: str
+    inventory_status: str
+    status_icon: str
+    status_label: str
+    bookable: bool
+    management_fee: str
+    water_rate: str
+    electric_rate: str
+    building_amenities: str
+    adviser_copy: str
+    gallery: tuple[str, ...]
+
+    @property
+    def lease_summary(self) -> str:
+        return " · ".join(value for value in (self.deposit_terms, self.contract_term) if value)
+
+
+def booking_subject(details: PublicListingDetails) -> str:
+    """Identify the same public listing at every appointment step."""
+    project = str(details.project_name or "").strip()
+    location = str(details.location or "").strip()
+    identity = " · ".join(part for part in (project, location if location != project else "") if part)
+    return "｜".join(part for part in (identity, details.layout) if part) or "这套房"
+
+
+def _visible_text(value: object) -> str:
+    text = str(value or "").strip()
+    if text.lower() in _HIDDEN_PLACEHOLDERS:
+        return ""
+    return text
+
+
+def _optional_int(value: object) -> int | None:
+    if value in (None, ""):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _optional_float(value: object) -> float | None:
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _canonical_facts(snapshot: dict) -> dict:
+    raw = snapshot.get("canonical_facts")
+    return dict(raw) if isinstance(raw, dict) else {}
+
+
+def _join_amenities(value: object) -> str:
+    if isinstance(value, (list, tuple)):
+        parts = [_visible_text(item) for item in value]
+        return "、".join(part for part in parts if part)
+    return _visible_text(value)
+
+
+def _frozen_adviser_copy(snapshot: dict) -> str:
+    """Read adviser_copy from snapshot, supporting both root level and canonical_facts.
+
+    New snapshots store adviser_copy at the root level.
+    Older snapshots may store it inside canonical_facts.
+    """
+    # Try root level first (new format)
+    root_copy = snapshot.get("adviser_copy")
+    if root_copy and str(root_copy).strip().lower() not in _HIDDEN_PLACEHOLDERS:
+        return _visible_text(root_copy)
+    # Fall back to canonical_facts (old format)
+    facts = snapshot.get("canonical_facts")
+    if isinstance(facts, dict):
+        facts_copy = facts.get("adviser_copy")
+        if facts_copy:
+            return _visible_text(facts_copy)
+    return ""
+
+
+def build_public_listing_details(view: PublishedListingView) -> PublicListingDetails:
+    snapshot = view.snapshot
+    if str(snapshot.get("schema") or "") != "v3_publication_snapshot.v1":
+        raise ValueError("frozen_public_snapshot_missing")
+
+    listing = view.frozen_listing
+    offer = view.frozen_offer
+    facts = _canonical_facts(snapshot)
+    adviser_copy = _frozen_adviser_copy(snapshot)
+    project = _visible_text(listing.get("project_name"))
+    property_type = _visible_text(listing.get("property_type"))
+    raw_layout = _visible_text(listing.get("layout"))
+    layout = _visible_text(display_layout(raw_layout or property_type, property_type))
+    subject = "｜".join(value for value in (project, layout) if value)
+    location = _visible_text(listing.get("public_location_display"))
+    inventory_status = str(view.listing.get("inventory_status") or "pending").strip().lower()
+    status_icon, status_label = inventory_status_presentation(inventory_status)
+
+    return PublicListingDetails(
+        listing_id=view.listing_id,
+        public_listing_id=view.public_listing_id,
+        project_name=project,
+        property_type=property_type,
+        layout=layout,
+        subject=subject,
+        location=location,
+        monthly_rent_usd=(
+            _optional_int(getattr(view, "offer", {}).get("monthly_rent_usd"))
+            or _optional_int(offer.get("monthly_rent_usd"))
+        ),
+        published_monthly_rent_usd=_optional_int(offer.get("monthly_rent_usd")),
+        size_sqm=_optional_float(listing.get("size_sqm")),
+        floor=_visible_text(listing.get("floor")),
+        deposit_terms=_visible_text(
+            offer.get("payment_terms") or offer.get("deposit_terms")
+        ),
+        contract_term=_visible_text(offer.get("contract_term")),
+        inventory_status=inventory_status,
+        status_icon=status_icon,
+        status_label=status_label,
+        bookable=view.bookable,
+        management_fee=_visible_text(facts.get("management_fee")),
+        water_rate=_visible_text(facts.get("water_rate")),
+        electric_rate=_visible_text(facts.get("electric_rate")),
+        building_amenities=_join_amenities(facts.get("amenities")),
+        adviser_copy=adviser_copy,
+        gallery=view.gallery,
+    )
+
+
+__all__ = ["PublicListingDetails", "booking_subject", "build_public_listing_details"]

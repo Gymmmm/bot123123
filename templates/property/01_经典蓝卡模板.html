@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1600">
+<title>侨联封面 · 经典蓝卡 · 全 Noto Sans SC 锁定版</title>
+<style>
+  /* 字体：全 Noto Sans SC（与日常/黑金同一锁定；不要 Manrope） */
+  @font-face {
+    font-family: "Noto Sans SC";
+    src: local("Noto Sans SC"), local("Noto Sans CJK SC");
+    font-weight: 700;
+    font-display: block;
+  }
+  @font-face {
+    font-family: "Noto Sans SC";
+    src: local("Noto Sans SC"), local("Noto Sans CJK SC");
+    font-weight: 400;
+    font-display: block;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 1080px;
+    height: 864px;
+    overflow: hidden;
+    background: #0a1a38;
+  }
+
+  .poster {
+    position: relative;
+    width: 1080px;
+    height: 864px;
+    overflow: hidden;
+    background: #0a1a38;
+    color: #fff;
+    font-family: "Noto Sans SC", "Noto Sans CJK SC", sans-serif;
+  }
+
+  .bg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    filter: saturate(1.02) contrast(1.02);
+  }
+
+  /* Soft wide shade — readable brand without hard left mask seam */
+  .shade {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(
+        180deg,
+        rgba(4, 14, 36, 0.52) 0%,
+        rgba(4, 14, 36, 0.06) 26%,
+        rgba(4, 14, 36, 0.14) 52%,
+        rgba(4, 14, 36, 0.78) 100%
+      ),
+      linear-gradient(
+        90deg,
+        rgba(4, 14, 36, 0.38) 0%,
+        rgba(4, 14, 36, 0.12) 28%,
+        transparent 58%
+      );
+  }
+
+  /* Brand: PNG corner mark preferred; text fallback matches gallery */
+  .brand {
+    position: absolute;
+    left: 32.4px;
+    top: 28.35px;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 12.15px;
+    color: #fff;
+  }
+  .brand-logo{
+    height: 80px;
+    width: auto;
+    max-width: 280px;
+    object-fit: contain;
+    filter: drop-shadow(0 2px 8px rgba(0,0,0,.5));
+  }
+  .brand-logo[src=""],
+  .brand-logo:not([src]) { display: none; }
+  .brand:has(.brand-logo[src^="data:"]) .brand-text { display: none; }
+  .brand .cn {
+    font-weight: 700;
+    font-size: 36.45px;
+    letter-spacing: 0.05em;
+    line-height: 1;
+    text-shadow: 0 0.68px 1.35px rgba(0,0,0,.55), 0 1.35px 6.75px rgba(0,0,0,.35);
+  }
+  .brand .en {
+    font-weight: 700;
+    font-size: 11.48px;
+    opacity: 0.92;
+    margin-top: 5.4px;
+    letter-spacing: 0.16em;
+    text-shadow: 0 0.68px 1.35px rgba(0,0,0,.55), 0 1.35px 6.75px rgba(0,0,0,.35);
+  }
+
+  /* Bottom blue card — classic_blue identity (not right_price layout) */
+  .card {
+    position: absolute;
+    left: 24.3px;
+    right: 24.3px;
+    bottom: 22.95px;
+    z-index: 2;
+    padding: 20.25px 27px 18.9px;
+    border-radius: 18.9px;
+    background: linear-gradient(135deg, rgba(10, 42, 110, 0.94), rgba(14, 56, 140, 0.90));
+    border: 0.68px solid rgba(255, 255, 255, 0.18);
+    box-shadow: 0 12.15px 32.4px rgba(0, 0, 0, 0.35);
+    overflow: hidden;
+  }
+
+  .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 24.3px;
+  }
+  .primary {
+    min-width: 0;
+    flex: 1;
+    font-size: 43.2px;
+    font-weight: 700;
+    line-height: 1.08;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .primary .layout-part {
+    margin-left: 12.15px;
+    padding-left: 12.15px;
+    border-left: 2.03px solid rgba(255, 255, 255, 0.55);
+    font-weight: 700;
+  }
+  .price {
+    flex: 0 0 auto;
+    font-size: 52.65px;
+    font-weight: 700;
+    color: #ffd45e;
+    line-height: 1;
+    white-space: nowrap;
+    text-shadow: 0 1.35px 6.75px rgba(0, 0, 0, 0.25);
+  }
+  .price small {
+    font-size: 21.6px;
+    font-weight: 700;
+    color: #fff;
+    margin-left: 2.7px;
+  }
+
+  .meta {
+    display: flex;
+    align-items: center;
+    margin-top: 9.45px;
+    font-size: 18.9px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.94);
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .meta > span {
+    padding: 0 12.15px;
+    border-right: 1.35px solid rgba(255, 255, 255, 0.28);
+  }
+  .meta > span:first-child { padding-left: 0; }
+  .meta > span:last-child { border-right: 0; padding-right: 0; }
+
+  .highlights {
+    display: flex;
+    gap: 8.1px;
+    margin-top: 10.8px;
+    flex-wrap: nowrap;
+    overflow: hidden;
+  }
+  .highlights > span {
+    max-width: 216px;
+    padding: 6.75px 13.5px;
+    border-radius: 674.33px;
+    border: 0.68px solid rgba(255, 255, 255, 0.28);
+    background: rgba(255, 255, 255, 0.12);
+    font-size: 17.55px;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+</style>
+</head>
+<body>
+  <div class="poster" id="poster">
+    <img id="bg" class="bg" src="{{BG_SRC}}" alt="">
+    <div class="shade"></div>
+
+    <div class="brand">
+      <img id="brandLogo" class="brand-logo" src="{{LOGO_SRC}}" alt="侨联地产">
+      <div class="brand-text">
+        <div class="cn">侨联地产</div>
+        <div class="en">QIAO LIAN</div>
+      </div>
+    </div>
+
+    <section class="card">
+      <div class="row">
+        <div class="primary" data-autofit="40">
+          <span id="project">{{PROJECT}}</span><span class="layout-part" data-field="layout"> <span id="layout">{{LAYOUT}}</span></span>
+        </div>
+        <div class="price" data-autofit="46">
+          <span id="price">{{PRICE}}</span><small id="price_suffix">{{PRICE_SUFFIX}}</small>
+        </div>
+      </div>
+      <div class="meta" data-fields="size,floor">
+        <span data-field="size" id="size">{{SIZE}}</span>
+        <span data-field="floor" id="floor">{{FLOOR}}</span>
+      </div>
+      <div class="highlights" data-fields="h1,h2,h3">
+        <span data-field="h1" id="h1">{{H1}}</span>
+        <span data-field="h2" id="h2">{{H2}}</span>
+        <span data-field="h3" id="h3">{{H3}}</span>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

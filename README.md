@@ -2,20 +2,25 @@
 
 这个项目当前按一条生产主线运行：
 
-- **`collector_bot.py`**：持续采集源频道房源
-- **`run_pipeline_autopilot.py`**：解析、打分、补封面、推送 `ready`
-- **`v2/run_publisher_bot_v2.py`**：管理员预览、定时发布、发频道按钮
-- **`run_user_bot.py`**：承接频道流量、预约、咨询、留资
-- **`run_integrated_stack.py`**：开发/短时联调时**一键**拉起**用户 Bot**（默认）；需要时再 `--with-publisher` 带 v2 发布、`--with-collector` 带采集；生产仍建议独立 systemd/launchd
+- **`run_v3_collector.py`**：V3 采集（Telethon 源频道入库）
+- **`run_v3_canonical_worker.py`**：解析 pending 源帖 → Canonical / listing / package
+- **`run_v3_publisher_bot.py`**：管理员预览、审核、封面、发布到频道
+- **`run_user_bot.py`**（等同 `run_v3_user_bot.py`）：3858 用户 Bot，承接找房 / 预约 / 咨询
+- **`run_integrated_stack.py`**：开发/短时联调一键拉起用户 Bot（默认）；需要时再带 publisher/collector
 
-这些入口共用一个 SQLite 数据库，优先使用这一套，不再建议启旧发布链。
+兼容遗留入口（勿与现网双开）：
+
+- `collector_bot.py`：旧采集包装
+- `run_pipeline_autopilot.py` / `v2/run_publisher_bot_v2.py` / `autopilot_publish_bot.py`：旧发布链
+
+这些入口共用一个 SQLite 数据库。
 
 ### 与旧「找房助手」单文件的关系
 
 | 找房助手（旧） | 本仓库对应 |
 |----------------|------------|
 | C 端找房 / 深链 / 留资 / 预约 / 管家 | `qiaolian_dual/user_bot.py`（`run_user_bot.py`） |
-| 按钮发帖、频道、槽位、讨论组桥 | `v2/run_publisher_bot_v2.py` + `meihua_publisher.py` 等 |
+| 按钮发帖、频道、槽位、讨论组桥 | `run_v3_publisher_bot.py`（遗留：`v2/run_publisher_bot_v2.py`） |
 | JSON 内嵌中介轮询 | 未逐字迁移；留资与顾问在 `user_bot` + `.env`（`ADVISOR_*`）侧 |
 
 ## 一眼看结构
@@ -81,16 +86,16 @@ CHANNEL_URL=https://t.me/your_channel
 ADMIN_IDS=123456789
 ```
 
-4. 启动采集 Bot
+4. 启动采集
 
 ```bash
-python collector_bot.py
+python run_v3_collector.py
 ```
 
-5. 运行流水线
+5. 启动 Canonical 解析 worker
 
 ```bash
-python run_pipeline_autopilot.py
+python run_v3_canonical_worker.py
 ```
 
 6. 启动用户服务 Bot
@@ -99,10 +104,10 @@ python run_pipeline_autopilot.py
 python run_user_bot.py
 ```
 
-7. 启动频道发布 Bot（生产优先）
+7. 启动频道发布 Bot（生产）
 
 ```bash
-python v2/run_publisher_bot_v2.py
+python run_v3_publisher_bot.py
 ```
 
 8. （可选）本机一键起**用户 Bot**（默认不含发布机）
@@ -111,7 +116,7 @@ python v2/run_publisher_bot_v2.py
 python run_integrated_stack.py
 ```
 
-要带 v2 发布：`python run_integrated_stack.py --with-publisher`。要带采集：`python run_integrated_stack.py --with-collector`（勿与现网双开，见 `INTEGRATION.txt`）。
+要带发布：`python run_integrated_stack.py --with-publisher`。要带采集：`python run_integrated_stack.py --with-collector`（勿与现网双开）。
 
 启动前可先做只读配置检查（不连接 Telegram）：
 

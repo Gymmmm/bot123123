@@ -1,0 +1,381 @@
+"""Telegram-neutral view models for side-effect-free V3 transitions."""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta
+from html import escape as he
+from typing import Literal
+from zoneinfo import ZoneInfo
+
+from .listing_presenter import booking_subject, build_public_listing_details
+from .public_appointment import PublicAppointmentDraft
+from .public_inventory import PublicInventoryReader
+from .search_navigation import AREA_OPTIONS, LAYOUT_OPTIONS
+from .transition_plan import TransitionPlan
+
+
+_PHNOM_PENH_TZ = ZoneInfo("Asia/Phnom_Penh")
+_CHANNEL_BOOK_SOURCES = frozenset(
+    {"channel_deeplink", "channel_listing", "channel"}
+)
+
+TransitionChoiceKind = Literal[
+    "appointment_date",
+    "appointment_other_date",
+    "appointment_mode",
+    "appointment_time",
+    "appointment_other_time",
+    "appointment_back_date",
+    "appointment_back_mode",
+    "appointment_exit",
+    "listing_details",
+    "listing_consult",
+    "home",
+    "budget_choice",
+    "budget_custom",
+    "change_search",
+    "search_area",
+    "search_budget",
+    "search_layout",
+    "area_choice",
+    "area_other",
+    "layout_choice",
+]
+
+
+@dataclass(frozen=True)
+class TransitionChoice:
+    label: str
+    kind: TransitionChoiceKind
+    value: str = ""
+    public_listing_id: str = ""
+    budget_min: int | None = None
+    budget_max: int | None = None
+
+
+@dataclass(frozen=True)
+class TransitionView:
+    kind: str
+    text: str
+    rows: tuple[tuple[TransitionChoice, ...], ...]
+
+
+def _format_price(value: int | None) -> str:
+    return f"${int(value):,}/月" if value is not None and int(value) > 0 else ""
+
+
+def _date_display(value: object) -> str:
+    raw = str(value or "").strip()
+    bits = raw.replace("/", "-").split("-")
+    if len(bits) >= 2 and all(part.isdigit() for part in bits[-2:]):
+        return f"{int(bits[-2])}月{int(bits[-1])}日"
+    return raw or "待安排"
+
+
+def _phnom_penh_today() -> date:
+    return datetime.now(_PHNOM_PENH_TZ).date()
+
+
+def _channel_direct_book(draft: PublicAppointmentDraft) -> bool:
+    source = str(draft.source or "").strip().lower()
+    return source in _CHANNEL_BOOK_SOURCES or source.startswith("channel")
+
+
+def _resolve_bookable_details(inventory: PublicInventoryReader, public_listing_id: str):
+    view = inventory.resolve(public_listing_id)
+    if view is None:
+        raise ValueError("listing_not_publicly_published")
+    if not view.bookable:
+        raise ValueError("listing_not_bookable")
+    return build_public_listing_details(view)
+
+
+
+def _appointment_mode_view(draft: PublicAppointmentDraft, inventory: PublicInventoryReader) -> TransitionView:
+    details = _resolve_bookable_details(inventory, draft.public_listing_id)
+    subject = booking_subject(details)
+    price_line = f"💰 {_format_price(details.monthly_rent_usd)}\n" if details.monthly_rent_usd else ""
+    return TransitionView(
+        kind="appointment_mode",
+        text=(
+            "📅 <b>预约看房</b>\n\n"
+            f"🏠 {he(subject)}\n"
+            f"{price_line}"
+            "\n请选择看房方式："
+        ),
+        rows=(
+            (
+                TransitionChoice("🚶 实地看房", "appointment_mode", "offline"),
+                TransitionChoice("🎥 视频代看", "appointment_mode", "video"),
+            ),
+            (TransitionChoice("⬅️ 返回房源", "listing_details", public_listing_id=draft.public_listing_id),),
+        ),
+    )
+
+
+def _appointment_date_view(draft: PublicAppointmentDraft, inventory: PublicInventoryReader, *, today: date) -> TransitionView:
+    details = _resolve_bookable_details(inventory, draft.public_listing_id)
+    subject = booking_subject(details)
+    today_value = today.strftime("%m-%d")
+    tomorrow_value = (today + timedelta(days=1)).strftime("%m-%d")
+    after_value = (today + timedelta(days=2)).strftime("%m-%d")
+    return TransitionView(
+        kind="appointment_date",
+        text=(
+            "📅 <b>选择日期</b>\n\n"
+            f"{he(subject)}\n"
+            f"已选：{he('视频代看' if draft.mode == 'video' else '实地看房')}\n\n"
+            "请选择方便的日期："
+        ),
+        rows=(
+            (TransitionChoice(f"今天 · {today.month}月{today.day}日", "appointment_date", today_value),),
+            (TransitionChoice(f"明天 · {(today + timedelta(days=1)).month}月{(today + timedelta(days=1)).day}日", "appointment_date", tomorrow_value),),
+            (TransitionChoice(f"后天 · {(today + timedelta(days=2)).month}月{(today + timedelta(days=2)).day}日", "appointment_date", after_value),),
+            (TransitionChoice("其他日期", "appointment_other_date"),),
+            (TransitionChoice("⬅️ 返回上一步", "appointment_back_mode"),),
+        ),
+    )
+
+
+def _appointment_time_view(draft: PublicAppointmentDraft, inventory: PublicInventoryReader) -> TransitionView:
+    if not draft.date:
+        raise ValueError("appointment_time_view_requires_date")
+    details = _resolve_bookable_details(inventory, draft.public_listing_id)
+    return TransitionView(
+        kind="appointment_time",
+        text=(
+            "🕐 <b>选择时间</b>\n\n"
+            f"{he(booking_subject(details))}\n"
+            f"日期：{he(_date_display(draft.date))}\n\n"
+            "请选择方便的时间："
+        ),
+        rows=(
+            (TransitionChoice("上午 09:00–12:00", "appointment_time", "am"),),
+            (TransitionChoice("下午 14:00–17:00", "appointment_time", "pm"),),
+            (TransitionChoice("其他时间", "appointment_other_time"),),
+            (TransitionChoice("⬅️ 返回上一步", "appointment_back_date"),),
+        ),
+    )
+
+
+def _custom_date_prompt() -> TransitionView:
+    return TransitionView(
+        kind="appointment_custom_date",
+        text="📅 <b>输入日期</b>\n\n例如：\n9月28日\n0928\n下周三",
+        rows=(),
+    )
+
+
+def _custom_time_prompt() -> TransitionView:
+    return TransitionView(
+        kind="appointment_custom_time",
+        text="🕐 <b>输入时间</b>\n\n例如：\n<code>20:00</code>\n<code>晚上8点</code>",
+        rows=(),
+    )
+
+
+def _custom_area_prompt() -> TransitionView:
+    return TransitionView(
+        kind="search_custom_area",
+        text=(
+            "📍 <b>其他位置</b>\n\n"
+            "直接输入区域、小区或附近地标。\n\n"
+            "例如：\n"
+            "<code>BKK1</code>\n"
+            "<code>永旺1附近</code>\n"
+            "<code>太子寰宇</code>"
+        ),
+        rows=(),
+    )
+
+_BUDGET_OPTIONS = (
+    ("b1", "$400以内", None, 400),
+    ("b2", "$400–600", 400, 600),
+    ("b3", "$600–800", 600, 800),
+    ("b4", "$800–1200", 800, 1200),
+    ("b5", "$1200–1500", 1200, 1500),
+    ("b6", "$1500+", 1500, None),
+)
+
+
+def budget_bounds(code: object) -> tuple[str, int | None, int | None]:
+    clean = str(code or "").strip()
+    for opt_code, label, budget_min, budget_max in _BUDGET_OPTIONS:
+        if opt_code == clean:
+            return (label, budget_min, budget_max)
+    raise ValueError("unsupported_budget_choice")
+
+
+
+def _search_budget_view(area_display: str = "", *, back_label: str = "⬅️ 返回找房") -> TransitionView:
+    clean_area = str(area_display or "").strip()
+    area_line = f"\n\n已选：{he(clean_area)}" if clean_area else ""
+    choices = tuple(
+        TransitionChoice(label, "budget_choice", code, budget_min=budget_min, budget_max=budget_max)
+        for code, label, budget_min, budget_max in _BUDGET_OPTIONS
+    )
+    rows = (
+        (choices[0], choices[1]),
+        (choices[2], choices[3]),
+        (choices[4], choices[5]),
+        (TransitionChoice("自己输入", "budget_custom"),),
+        (TransitionChoice("⬅️ 返回找房", "change_search"),),
+    )
+    return TransitionView(
+        kind="search_budget",
+        text=f"💰 <b>选择预算</b>{area_line}\n\n每月租金预算：",
+        rows=rows,
+    )
+
+
+def _search_area_view() -> TransitionView:
+    choices = tuple(TransitionChoice(label, "area_choice", code) for code, label in AREA_OPTIONS)
+    rows = (
+        (choices[0], choices[1]),
+        (choices[2], choices[3]),
+        (choices[4], choices[5]),
+        (choices[6],),
+        (choices[7],),
+        (choices[8], choices[9]),
+        (choices[10],),
+        (TransitionChoice("其他位置", "area_other"),),
+        (TransitionChoice("⬅️ 返回找房", "change_search"),),
+    )
+    return TransitionView(
+        kind="search_area",
+        text="📍 <b>选择区域</b>\n\n请选择想找的位置：",
+        rows=rows,
+    )
+
+
+def _search_layout_view(area_display: str = "", budget_label: str = "") -> TransitionView:
+    choices = tuple(TransitionChoice(label, "layout_choice", code) for code, label in LAYOUT_OPTIONS)
+    selected = "｜".join(
+        value for value in (str(area_display or "").strip(), str(budget_label or "").strip()) if value
+    )
+    selected_line = f"\n\n已选：{he(selected)}" if selected else ""
+    rows = (
+        (choices[0], choices[1]),
+        (choices[2], choices[3]),
+        (choices[4], choices[5]),
+        (TransitionChoice("⬅️ 返回找房", "change_search"),),
+    )
+    return TransitionView(kind="search_layout", text=f"🏠 <b>选择户型</b>{selected_line}", rows=rows)
+
+def _similar_view(plan: TransitionPlan) -> TransitionView:
+    """Render similar listing view.
+
+    For rented/offline (search_submit): show brief loading message, search executes
+    in the callback handler and shows results.
+    For bookable (budget): show the search entry panel.
+    """
+    if plan.similar is None:
+        raise ValueError("similar_transition_missing_intent")
+    if plan.next_step == "search_submit":
+        intent = plan.similar.intent
+        area = str(intent.area_display or "").strip()
+        price_info = ""
+        if intent.budget_label:
+            price_info = f" · {intent.budget_label}"
+        layout_info = ""
+        if intent.room_type:
+            layout_info = f" · {intent.room_type}"
+        return TransitionView(
+            kind="similar_search",
+            text=(
+                "🔍 <b>正在为你找相似房源</b>\n\n"
+                f"区域｜{area or '未指定'}{price_info}{layout_info}\n\n"
+                "稍等片刻..."
+            ),
+            rows=(),
+        )
+    return _search_entry_view()
+
+
+_SEARCH_ENTRY_TEXT = (
+    "🔍 <b>想找什么样的房子？</b>\n\n"
+    "直接发需求就可以，例如：\n"
+    "<code>BKK1 一房，预算 $600</code>\n"
+    "<code>富力城两房，要能做饭</code>\n"
+    "<code>钻石岛公寓，想看实拍</code>\n\n"
+    "也可以按条件筛选："
+)
+
+
+def _search_entry_view() -> TransitionView:
+    rows = (
+        (
+            TransitionChoice("📍 按区域", "search_area"),
+            TransitionChoice("💰 按预算", "search_budget"),
+        ),
+        (
+            TransitionChoice("🏠 按户型", "search_layout"),
+            TransitionChoice("💬 中文顾问", "home", "contact"),
+        ),
+        (TransitionChoice("⬅️ 返回首页", "home"),),
+    )
+    return TransitionView(kind="search_entry", text=_SEARCH_ENTRY_TEXT, rows=rows)
+
+
+def _change_search_view(plan: TransitionPlan) -> TransitionView:
+    if plan.change_search is None:
+        raise ValueError("change_search_transition_missing_state")
+    return _search_entry_view()
+
+
+class TransitionViewService:
+    def __init__(self, inventory: PublicInventoryReader):
+        self.inventory = inventory
+
+    def appointment_mode(self, draft: PublicAppointmentDraft) -> TransitionView:
+        return _appointment_mode_view(draft, self.inventory)
+
+    def appointment_date(self, draft: PublicAppointmentDraft, *, today: date | None = None) -> TransitionView:
+        return _appointment_date_view(draft, self.inventory, today=today or _phnom_penh_today())
+
+    def appointment_time(self, draft: PublicAppointmentDraft) -> TransitionView:
+        return _appointment_time_view(draft, self.inventory)
+
+    @staticmethod
+    def custom_date_prompt() -> TransitionView:
+        return _custom_date_prompt()
+
+    @staticmethod
+    def custom_time_prompt() -> TransitionView:
+        return _custom_time_prompt()
+
+    @staticmethod
+    def custom_area_prompt() -> TransitionView:
+        return _custom_area_prompt()
+
+    @staticmethod
+    def search_area() -> TransitionView:
+        return _search_area_view()
+
+    @staticmethod
+    def search_budget(area_display: str = "") -> TransitionView:
+        return _search_budget_view(area_display)
+
+    @staticmethod
+    def search_layout(area_display: str = "", budget_label: str = "") -> TransitionView:
+        return _search_layout_view(area_display, budget_label)
+
+    @staticmethod
+    def search_entry() -> TransitionView:
+        return _search_entry_view()
+
+    def build(self, plan: TransitionPlan, *, today: date | None = None) -> TransitionView:
+        if plan.kind == "book":
+            if plan.book is None:
+                raise ValueError("book_transition_missing_public_draft")
+            return self.appointment_mode(plan.book.draft)
+        if plan.kind == "similar":
+            return _similar_view(plan)
+        if plan.kind == "change_search":
+            return _change_search_view(plan)
+        if plan.kind == "consult":
+            raise ValueError("consult_transition_requires_effect_executor")
+        raise ValueError(f"unsupported_transition_view:{plan.kind}")
+
+
+__all__ = ["TransitionChoice", "TransitionChoiceKind", "TransitionView", "TransitionViewService", "budget_bounds"]

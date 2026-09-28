@@ -2,11 +2,13 @@ import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from meihua_publisher import (
     BASIC_PUBLISH_MIN_SCORE,
     evaluate_publish_gate,
     normalize_album_grid,
+    split_album_for_channel,
 )
 
 
@@ -74,7 +76,7 @@ class AlbumLayoutTests(unittest.TestCase):
 
         gate = evaluate_publish_gate(draft, cover, self.db_path)
         main_album = normalize_album_grid(gate["album_all"])
-        extra_album = gate["album_all"][len(main_album) :]
+        main_album, extra_album = split_album_for_channel(gate["album_all"])
 
         self.assertTrue(gate["is_publishable"])
         self.assertEqual(gate["mode"], "premium_4image")
@@ -84,6 +86,20 @@ class AlbumLayoutTests(unittest.TestCase):
         self.assertEqual(gate["album_all"][1:], real_paths)
         self.assertEqual(main_album, [cover] + real_paths[:3])
         self.assertEqual(extra_album, real_paths[3:])
+
+    def test_non_contiguous_selection_keeps_every_unselected_path_once(self):
+        cover, real_paths = self._seed_real_media(6)
+        all_paths = [cover, *real_paths]
+        with patch(
+            "meihua_publisher._select_diverse_detail_paths",
+            return_value=[real_paths[0], real_paths[2], real_paths[4]],
+        ):
+            main_album, extra_album = split_album_for_channel(all_paths)
+
+        self.assertEqual(main_album, [cover, real_paths[0], real_paths[2], real_paths[4]])
+        self.assertEqual(extra_album, [real_paths[1], real_paths[3], real_paths[5]])
+        self.assertEqual(set(main_album) | set(extra_album), set(all_paths))
+        self.assertFalse(set(main_album) & set(extra_album))
 
     def test_fallback_gate_keeps_same_album_order_without_relaxing_threshold(self):
         cover, real_paths = self._seed_real_media(4)

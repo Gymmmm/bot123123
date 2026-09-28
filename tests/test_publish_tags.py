@@ -1,6 +1,11 @@
 import unittest
 
-from meihua_publisher import build_chinese_listing_post, build_listing_tags
+from meihua_publisher import (
+    build_chinese_listing_post,
+    build_discussion_detail_text,
+    build_listing_tags,
+    default_caption_variant_for_property,
+)
 
 
 class PublishTagsTests(unittest.TestCase):
@@ -34,13 +39,11 @@ class PublishTagsTests(unittest.TestCase):
         self.assertLessEqual(len(tags), 8)
         self.assertIn("#钻石岛", tags)
         # Core structure checks
-        self.assertIn("🟢 发布前已核实", caption)
-        self.assertIn("侨联地产", caption)
-        self.assertIn("您在金边的自己人", caption)
-        self.assertIn("⚠️ 提前说清：", caption)
-        self.assertIn("💬 侨联判断：", caption)
-        self.assertIn("🧾 每月费用：", caption)
-        self.assertIn("✅ 适合：", caption)
+        self.assertNotIn("发布前已核实", caption)
+        self.assertIn("<code>实拍房源｜中文顾问｜可预约看房</code>", caption)
+        self.assertNotIn("您在金边的自己人", caption)
+        self.assertNotIn("更多实拍", caption)
+        self.assertIn("费用、押付与配套见评论区", caption)
 
     def test_caption_keeps_new_channel_structure(self):
         draft = {
@@ -51,26 +54,14 @@ class PublishTagsTests(unittest.TestCase):
         caption = build_chinese_listing_post(draft)
         lines = caption.splitlines()
         # Bold compact title on line 0
-        self.assertTrue(lines[0].startswith("<b>Sen Sok｜"))
-        self.assertIn("$250/月", lines[0])
-        # User-facing verification status on line 1
-        self.assertIn("发布前已核实", lines[1])
-        # Required fields
-        self.assertIn("编号：", caption)
-        self.assertIn("📍 Sen Sok", caption)
-        self.assertIn("💵 租金", caption)
-        self.assertIn("📄 押付/合同：", caption)
-        self.assertIn("🧾 每月费用：", caption)
-        self.assertIn("✅ 适合：", caption)
-        self.assertIn("⚠️ 提前说清：", caption)
-        self.assertIn("💬 侨联判断：", caption)
-        # Brand signature
-        self.assertIn("侨联地产", caption)
-        self.assertIn("您在金边的自己人", caption)
-        # SEO tags on last line
+        self.assertTrue(lines[0].startswith("<b>🏠 Sen Sok｜"))
+        self.assertIn("💰 月租｜<b>$250/月</b>", caption)
+        self.assertNotIn("发布前已核实", caption)
+        self.assertIn("<code>侨联 #QC", caption)
+        self.assertNotIn("🧾 每月费用：", caption)
         last_line = caption.strip().splitlines()[-1]
-        self.assertIn("#金边租房", last_line)
-        self.assertIn("#侨联实拍", last_line)
+        self.assertIn("#SenSok", last_line)
+        self.assertIn("#1房", last_line)
 
     def test_caption_variants_use_unified_factual_structure(self):
         draft = {
@@ -87,16 +78,22 @@ class PublishTagsTests(unittest.TestCase):
         cap_b = build_chinese_listing_post(draft, caption_variant="b")
         cap_c = build_chinese_listing_post(draft, caption_variant="c")
 
-        # All variants produce identical output (no A/B splitting in v2)
-        self.assertEqual(cap_a, cap_b)
-        self.assertEqual(cap_b, cap_c)
-        # Compact title format
-        self.assertTrue(cap_a.splitlines()[0].startswith("<b>BKK1｜"))
-        # Structure checks
-        self.assertIn("发布前已核实", cap_a)
-        self.assertIn("⚠️ 提前说清：", cap_a)
-        self.assertIn("💬 侨联判断：", cap_a)
-        self.assertIn("侨联地产", cap_a)
+        # 三版排版不同，但所有公开事实来自同一输入。
+        self.assertEqual(len({cap_a, cap_b, cap_c}), 3)
+        for caption in (cap_a, cap_b, cap_c):
+            for fact in ("BKK1", "1房1卫", "$1,300/月", "85平", "14楼", "QC"):
+                self.assertIn(fact, caption)
+            self.assertNotIn("待确认", caption)
+        self.assertTrue(cap_a.splitlines()[0].startswith("<b>🏠 BKK1｜"))
+        self.assertIn("<i>亮点｜", cap_b)
+        self.assertIn("QIAOLIAN PROPERTY", cap_c)
+
+    def test_property_type_selects_one_default_variant(self):
+        self.assertEqual(default_caption_variant_for_property("公寓"), "a")
+        self.assertEqual(default_caption_variant_for_property("排屋"), "b")
+        self.assertEqual(default_caption_variant_for_property("别墅"), "b")
+        self.assertEqual(default_caption_variant_for_property("办公室"), "c")
+        self.assertEqual(default_caption_variant_for_property("商铺"), "c")
 
     def test_caption_contains_payment_and_contract_line(self):
         draft = {
@@ -107,9 +104,10 @@ class PublishTagsTests(unittest.TestCase):
             "normalized_data": '{"contract_term":"1年","payment_terms":"押1付1"}',
         }
         caption = build_chinese_listing_post(draft)
-        self.assertIn("押付/合同：", caption)
-        self.assertIn("押1付1", caption)
-        self.assertIn("1年", caption)
+        detail = build_discussion_detail_text(draft)
+        self.assertNotIn("押付/合同：", caption)
+        self.assertIn("押付｜押1付1", detail)
+        self.assertIn("租期｜1年", detail)
 
     def test_caption_shows_verification_date_and_recurring_costs(self):
         draft = {
@@ -124,12 +122,10 @@ class PublishTagsTests(unittest.TestCase):
         }
         caption = build_chinese_listing_post(draft)
         self.assertIn("🟢 7月31日已核实", caption)
-        self.assertIn("管理包含", caption)
-        self.assertIn("水$5/人", caption)
-        self.assertIn("电$0.25/度", caption)
-        self.assertIn("停车汽车$50/月", caption)
+        self.assertNotIn("管理包含", caption)
+        self.assertIn("费用、押付与配套", caption)
         tags = caption.strip().splitlines()[-1].split()
-        self.assertLessEqual(len(tags), 5)
+        self.assertLessEqual(len(tags), 4)
 
     def test_caption_turns_street_noise_into_actionable_advice(self):
         draft = {
@@ -139,8 +135,8 @@ class PublishTagsTests(unittest.TestCase):
             "drawbacks": ["临街，低楼层可能有车声"],
         }
         caption = build_chinese_listing_post(draft)
-        self.assertIn("重点确认楼层和窗外环境", caption)
-        self.assertIn("重视安静建议优先看高楼层", caption)
+        self.assertNotIn("重点确认楼层和窗外环境", caption)
+        self.assertIn("费用、押付与配套见评论区", caption)
 
 
 if __name__ == "__main__":

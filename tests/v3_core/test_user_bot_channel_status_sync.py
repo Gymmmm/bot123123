@@ -1,0 +1,254 @@
+from __future__ import annotations
+
+import json
+import sqlite3
+
+import pytest
+
+from v3_core.storage.bootstrap import initialize_v3_storage
+from v3_core.user_bot.channel_status_sync import V3AppointmentChannelSynchronizer
+
+
+class FakeBot:
+    def __init__(self):
+        self.calls = []
+
+    async def edit_message_caption(self, **kwargs):
+        self.calls.append(kwargs)
+
+
+def _seed(db_path, *, appointment_count=5, inventory_status="reserved"):
+    initialize_v3_storage(db_path)
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            """INSERT INTO listings_v3
+               (listing_id,public_listing_id,canonical_record_id,canonical_facts_hash,
+                canonical_facts_schema,inventory_status)
+               VALUES ('l_1','QL-RF-A2B3','cr_1','hash','v3',?)""",
+            (inventory_status,),
+        )
+        actions = json.dumps({
+            "details": "https://t.me/qiaolian_rent_bot?start=property_QL-RF-A2B3_details__ch",
+            "photos": "https://t.me/qiaolian_rent_bot?start=property_QL-RF-A2B3_photos__ch",
+            "book": "https://t.me/qiaolian_rent_bot?start=property_QL-RF-A2B3_book__ch",
+            "consult": "https://t.me/qiaolian_rent_bot?start=property_QL-RF-A2B3_contact__ch",
+        }, ensure_ascii=False)
+        snapshot = json.dumps({
+            "schema": "v3_publication_snapshot.v1",
+            "listing_id": "l_1",
+            "public_listing_id": "QL-RF-A2B3",
+        }, ensure_ascii=False)
+        for package_id in ("PKG_OLD", "PKG_NEW"):
+            conn.execute(
+                """INSERT INTO publication_packages_v3
+                   (package_id,listing_id,offer_id,canonical_record_id,package_version,status,
+                    cover_style,cover_path,gallery_json,post_text,actions_json,snapshot_json,
+                    frozen_file_hashes_json,source_identity_json,public_token,canonical_facts_hash,content_hash)
+                   VALUES (?,?,?,?,?,'published',?,?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    package_id, "l_1", "OFF_OLD" if package_id == "PKG_OLD" else "OFF_NEW", "cr_1", 1,
+                    "classic", "/tmp/cover.jpg", "[]",
+                    "🏠 <b>富力城｜两房</b>\n\n🟡 已有预约，仍可预约　QL-RF-A2B3",
+                    actions, snapshot, "{}", "{}", "token", "hash", "content",
+                ),
+            )
+        conn.execute(
+            """INSERT INTO publication_instances
+               (instance_id,package_id,listing_id,offer_id,platform,channel_chat_id,
+                channel_message_id,publish_status,post_text,published_at,updated_at)
+               VALUES
+               ('PUB_OLD','PKG_OLD','l_1','OFF_1','telegram','-100123','111','published',
+                '🏠 <b>富力城｜两房</b>\n\n🟡 已有预约，仍可预约　QL-RF-A2B3',
+                '2026-09-08 10:00:00','2026-09-08 10:00:00'),
+               ('PUB_NEW','PKG_NEW','l_1','OFF_1','telegram','-100123','222','published',
+                '🏠 <b>富力城｜两房</b>\n\n🟡 已有预约，仍可预约　QL-RF-A2B3',
+                '2026-09-08 11:00:00','2026-09-08 11:00:00')"""
+        )
+        for index in range(appointment_count):
+            conn.execute(
+                """INSERT INTO appointments_v3
+                   (user_id,listing_id,appointment_date,appointment_time,status)
+                   VALUES (?,?,?,?,?)""",
+                (100 + index, "l_1", "09-10", "pm", "pending"),
+            )
+        conn.commit()
+
+
+@pytest.mark.asyncio
+async def test_sync_edits_only_latest_exact_publication_message_and_locks_at_five(tmp_path):
+    db_path = tmp_path / "v3.db"
+    _seed(db_path, appointment_count=5)
+    fake = FakeBot()
+    sync = V3AppointmentChannelSynchronizer(
+        db_path,
+        publisher_bot_token="publisher-token",
+        user_bot_username="qiaolian_rent_bot",
+        advisor_url="https://t.me/qiaolian_advisor",
+        bot_factory=lambda token: fake,
+    )
+
+    result = await sync.sync("l_1")
+
+    assert result.synced
+    assert result.channel_chat_id == "-100123"
+    assert result.channel_message_id == "222"
+    assert result.next_status == "reserved"
+    assert result.active_appointment_count == 5
+    assert len(fake.calls) == 1
+    call = fake.calls[0]
+    assert call["chat_id"] == "-100123"
+    assert call["message_id"] == 222
+    assert "🟡" in call["caption"]
+    buttons = [button.text for row in call["reply_markup"].inline_keyboard for button in row]
+    assert buttons == ["📷 更多实拍", "📅 预约看房", "💬 中文顾问"]
+
+    with sqlite3.connect(db_path) as conn:
+        status = conn.execute(
+            "SELECT inventory_status FROM listings_v3 WHERE listing_id='l_1'"
+        ).fetchone()[0]
+        newest = conn.execute(
+            "SELECT post_text FROM publication_instances WHERE instance_id='PUB_NEW'"
+        ).fetchone()[0]
+        old = conn.execute(
+            "SELECT post_text FROM publication_instances WHERE instance_id='PUB_OLD'"
+        ).fetchone()[0]
+    assert status == "reserved"
+    assert "🟡" in newest
+    assert "⚪ 暂不可预约" not in old
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", ["offline", "rented", "inactive"])
+async def test_sync_never_reopens_terminal_inventory_status(tmp_path, status):
+    db_path = tmp_path / f"{status}.db"
+    _seed(db_path, appointment_count=5, inventory_status=status)
+    fake = FakeBot()
+    sync = V3AppointmentChannelSynchronizer(
+        db_path,
+        publisher_bot_token="publisher-token",
+        user_bot_username="qiaolian_rent_bot",
+        advisor_url="https://t.me/qiaolian_advisor",
+        bot_factory=lambda token: fake,
+    )
+
+    result = await sync.sync("l_1")
+
+    assert result.synced
+    assert result.next_status == status
+    with sqlite3.connect(db_path) as conn:
+        durable = conn.execute(
+            "SELECT inventory_status FROM listings_v3 WHERE listing_id='l_1'"
+        ).fetchone()[0]
+    assert durable == status
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", ["active", "reserved"])
+async def test_sync_projects_bookable_status_without_mutating_inventory(tmp_path, status):
+    db_path = tmp_path / f"{status}.db"
+    _seed(db_path, appointment_count=5, inventory_status=status)
+    fake = FakeBot()
+    sync = V3AppointmentChannelSynchronizer(
+        db_path,
+        publisher_bot_token="publisher-token",
+        user_bot_username="qiaolian_rent_bot",
+        advisor_url="https://t.me/qiaolian_advisor",
+        bot_factory=lambda token: fake,
+    )
+
+    result = await sync.sync("l_1")
+
+    assert result.synced
+    assert result.next_status == status
+    with sqlite3.connect(db_path) as conn:
+        durable = conn.execute(
+            "SELECT inventory_status FROM listings_v3 WHERE listing_id='l_1'"
+        ).fetchone()[0]
+    assert durable == status
+
+
+
+@pytest.mark.asyncio
+async def test_sync_refreshes_durable_status_immediately_before_telegram_edit(tmp_path):
+    db_path = tmp_path / "race.db"
+    _seed(db_path, appointment_count=0, inventory_status="active")
+    fake = FakeBot()
+    sync = V3AppointmentChannelSynchronizer(
+        db_path,
+        publisher_bot_token="publisher-token",
+        user_bot_username="qiaolian_rent_bot",
+        advisor_url="https://t.me/qiaolian_advisor",
+        bot_factory=lambda token: fake,
+    )
+
+    original_snapshot = sync._snapshot
+
+    def stale_snapshot_then_offline(listing_id):
+        row, count = original_snapshot(listing_id)
+        assert row["inventory_status"] == "active"
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                "UPDATE listings_v3 SET inventory_status='offline' WHERE listing_id=?",
+                (listing_id,),
+            )
+            conn.commit()
+        return row, count
+
+    sync._snapshot = stale_snapshot_then_offline
+
+    result = await sync.sync("l_1")
+
+    assert result.synced
+    assert result.previous_status == "active"
+    assert result.next_status == "offline"
+    assert len(fake.calls) == 1
+    call = fake.calls[0]
+    labels = [
+        button.text
+        for row in call["reply_markup"].inline_keyboard
+        for button in row
+    ]
+    assert "📅 预约看房" not in labels
+    assert "⚫ 已下架" in call["caption"]
+    with sqlite3.connect(db_path) as conn:
+        durable = conn.execute(
+            "SELECT inventory_status FROM listings_v3 WHERE listing_id='l_1'"
+        ).fetchone()[0]
+    assert durable == "offline"
+
+
+def test_channel_sync_source_never_updates_listing_inventory():
+    import inspect
+
+    source = inspect.getsource(V3AppointmentChannelSynchronizer.sync)
+    assert "UPDATE listings_v3 SET inventory_status" not in source
+
+
+@pytest.mark.asyncio
+async def test_status_sync_blocks_frozen_identity_mismatch_before_telegram_edit(tmp_path):
+    db_path = tmp_path / "identity-mismatch.db"
+    _seed(db_path, appointment_count=0, inventory_status="active")
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            "UPDATE publication_packages_v3 SET actions_json=? WHERE package_id='PKG_NEW'",
+            (json.dumps({
+                "details": "https://t.me/qiaolian_rent_bot?start=property_QL-XX-Z9Z9_details__ch",
+                "photos": "https://t.me/qiaolian_rent_bot?start=property_QL-XX-Z9Z9_photos__ch",
+                "book": "https://t.me/qiaolian_rent_bot?start=property_QL-XX-Z9Z9_book__ch",
+                "consult": "https://t.me/qiaolian_rent_bot?start=property_QL-XX-Z9Z9_contact__ch",
+            }),),
+        )
+        conn.commit()
+    fake = FakeBot()
+    sync = V3AppointmentChannelSynchronizer(
+        db_path,
+        publisher_bot_token="publisher-token",
+        user_bot_username="qiaolian_rent_bot",
+        advisor_url="https://t.me/qiaolian_advisor",
+        bot_factory=lambda token: fake,
+    )
+    result = await sync.sync("l_1")
+    assert result.attempted
+    assert not result.synced
+    assert "channel_" in result.error
+    assert fake.calls == []

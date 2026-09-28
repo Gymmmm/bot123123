@@ -1,6 +1,7 @@
 import sqlite3
 import asyncio
 import json
+import os
 import sys
 from pathlib import Path
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
@@ -8,7 +9,7 @@ from telegram.constants import ParseMode
 from telegram.error import RetryAfter
 
 DB_PATH = "/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db"
-BOT_TOKEN = "8275201351:AAFSKHRaPlLP1LnBvfXLsstuWTUX6Y4iRgk"
+BOT_TOKEN = os.environ.get("PUBLISHER_BOT_TOKEN", "").strip()
 CHANNEL_ID = -1003784908965
 ADVISOR_TG = "@pengqingw"
 USER_BOT_USERNAME = "jinbianzufan_bot"
@@ -154,6 +155,10 @@ async def send_with_images(bot, draft_id, text, image_paths, keyboard):
     return msgs[0].message_id
 
 async def main():
+    if not DRY_RUN:
+        print("BLOCKED: legacy zufang555 direct publishing cannot bypass approved frozen packages.")
+        print("Use the canonical intake/admin approval/MeihuaPublisher path.")
+        return 4
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("""
@@ -203,4 +208,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    raise SystemExit(asyncio.run(main()))

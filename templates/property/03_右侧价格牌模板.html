@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1600">
+<title>侨联封面 · 全 Noto Sans SC 锁定版</title>
+<style>
+  /* 字体：全 Noto Sans SC（不要 Manrope） */
+  @font-face {
+    font-family: "Noto Sans SC";
+    src: local("Noto Sans SC"), local("Noto Sans CJK SC");
+    font-weight: 700;
+    font-display: block;
+  }
+  @font-face {
+    font-family: "Noto Sans SC";
+    src: local("Noto Sans SC"), local("Noto Sans CJK SC");
+    font-weight: 400;
+    font-display: block;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 1080px;
+    height: 864px;
+    overflow: hidden;
+    background: #111;
+  }
+
+  .poster {
+    position: relative;
+    width: 1080px;
+    height: 864px;
+    overflow: hidden;
+    font-family: "Noto Sans SC", "Noto Sans CJK SC", sans-serif;
+  }
+
+  .bg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    filter: saturate(1.03) contrast(1.02);
+  }
+
+  .leftShade {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 50%;
+    background: linear-gradient(
+      90deg,
+      rgba(12, 20, 40, 0.90),
+      rgba(12, 20, 40, 0.55) 55%,
+      rgba(12, 20, 40, 0.02)
+    );
+  }
+
+  /* 品牌区：PNG 角标优先，文字兜底 */
+  .brand {
+    position: absolute;
+    left: 32.4px;
+    top: 28.35px;
+    display: flex;
+    align-items: center;
+    gap: 12.15px;
+    color: #fff;
+  }
+  .brand-logo{
+    height: 80px;
+    width: auto;
+    max-width: 280px;
+    object-fit: contain;
+    filter: drop-shadow(0 2px 8px rgba(0,0,0,.5));
+  }
+  .brand-logo[src=""],
+  .brand-logo:not([src]) { display: none; }
+  .brand:has(.brand-logo[src^="data:"]) .brand-text { display: none; }
+  .brand .cn {
+    font-weight: 700;
+    font-size: 36.45px;
+    letter-spacing: 0.05em;
+    text-shadow: 0 0.68px 1.35px rgba(0,0,0,.55), 0 1.35px 6.75px rgba(0,0,0,.35);
+  }
+  .brand .en {
+    font-weight: 700;
+    font-size: 11.48px;
+    opacity: 0.9;
+    margin-top: 5.4px;
+    letter-spacing: 0.16em;
+    text-shadow: 0 0.68px 1.35px rgba(0,0,0,.55), 0 1.35px 6.75px rgba(0,0,0,.35);
+  }
+
+  /* 左侧主信息：原位 top=300，不上移 */
+  .main {
+    position: absolute;
+    left: 32.4px;
+    top: 202.5px;
+    width: 486px;
+    color: #fff;
+  }
+  .title {
+    font-weight: 700;
+    font-size: 67.5px;
+    line-height: 1.05;
+    text-shadow: 0 1.35px 10.8px rgba(0, 0, 0, 0.35);
+  }
+  .sub {
+    display: inline-block;
+    margin-top: 13.5px;
+    background: rgba(255, 255, 255, 0.96);
+    color: #1d4ed8;
+    border: 1.35px solid #2563eb;
+    font-weight: 700;
+    font-size: 29.7px;
+    border-radius: 674.33px;
+    padding: 6.75px 18.9px;
+  }
+  .info {
+    margin-top: 21.6px;
+    font-weight: 400;
+    font-size: 22.95px;
+    line-height: 1.95;
+  }
+  .info b { font-weight: 700; }
+
+  /* 右下价签：上移 bottom=100；米白卡；租金 + $金额/月 同行 */
+  .pricebox {
+    position: absolute;
+    right: 32.4px;
+    bottom: 67.5px;
+    background: #FFF6EC;
+    border-radius: 22.95px;
+    padding: 18.9px 29.7px 21.6px;
+    min-width: 290.25px;
+    text-align: center;
+    box-shadow: 0 12.15px 32.4px rgba(0, 0, 0, 0.30);
+    font-weight: 700;
+  }
+  .pricebox .label {
+    font-size: 22.95px;
+    font-weight: 700;
+    color: #1E4FD6;
+    letter-spacing: 0.08em;
+  }
+  .pricebox .price {
+    font-size: 56.7px;
+    font-weight: 700;
+    line-height: 1.08;
+    margin-top: 4.05px;
+    color: #1E4FD6;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+  <div class="poster" id="poster">
+    <img class="bg" id="bg" src="{{BG_SRC}}" alt="">
+    <div class="leftShade"></div>
+
+    <div class="brand">
+      <img id="brandLogo" class="brand-logo" src="{{LOGO_SRC}}" alt="侨联地产">
+      <div class="brand-text">
+        <div class="cn">侨联地产</div>
+        <div class="en">QIAO LIAN</div>
+      </div>
+    </div>
+
+    <div class="main">
+      <div class="title" id="project" data-autofit="48">{{PROJECT}}</div>
+      <div class="sub" id="layout">{{LAYOUT}}</div>
+      <div class="info">
+        <div data-field="area">📍 <b id="area">{{AREA}}</b></div>
+        <div data-fields="size,floor"><span data-field="size">📐 <b id="size">{{SIZE}}</b></span><span data-field="floor"> ｜ 🏢 <b id="floor">{{FLOOR}}</b></span></div>
+        <div data-fields="h1,h2,h3">✨ <span data-field="h1" id="h1">{{H1}}</span><span data-field="h2"> · <span id="h2">{{H2}}</span></span><span data-field="h3"> · <span id="h3">{{H3}}</span></span></div>
+      </div>
+    </div>
+
+    <div class="pricebox">
+      <div class="label">租金</div>
+      <div class="price" id="price_line" data-autofit="48">{{PRICE_LINE}}</div>
+    </div>
+  </div>
+</body>
+</html>
