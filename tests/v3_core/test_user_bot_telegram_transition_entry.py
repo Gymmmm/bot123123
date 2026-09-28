@@ -141,8 +141,8 @@ async def test_book_entry_renders_transition_and_persists_public_only_session_af
 
     assert outcome.handled and outcome.response is not None
     assert outcome.response.transition == "book"
-    assert [call[0] for call in query.calls] == ["answer"]
-    assert [call[0] for call in context.bot.calls] == ["send_message"]
+    assert [call[0] for call in query.calls] == ["answer", "edit_caption"]
+    assert context.bot.calls == []
     assert len(views.plans) == 1 and views.plans[0].kind == "book"
     assert context.user_data[APPOINTMENT_SESSION_KEY] == {
         "public_listing_id": PUBLIC_ID,
@@ -158,12 +158,12 @@ async def test_book_entry_renders_transition_and_persists_public_only_session_af
 
 @pytest.mark.asyncio
 async def test_transition_session_does_not_advance_when_telegram_edit_fails():
-    query = FakeQuery(f"v3u:listing:book:{PUBLIC_ID}")
+    query = FakeQuery(f"v3u:listing:book:{PUBLIC_ID}", fail_edit=True)
     router = RouterStub(_book_dispatch())
     views = ViewServiceStub(_appointment_view())
-    context = _context(fail_send=True)
+    context = _context()
 
-    with pytest.raises(RuntimeError, match="telegram_send_failed"):
+    with pytest.raises(RuntimeError, match="telegram_edit_failed"):
         await handle_v3_callback(
             _update(query),
             context,
