@@ -20,6 +20,7 @@ from telegram.constants import ParseMode
 from v3_core.ingest.intake_service import SourceIntake
 from .autopilot import ERROR_LABELS
 from .autopilot_anomalies import FinalAutoPublishRepository, FinalAutoPublishService
+from .channel_contract import build_bot_start_url, channel_start_payload
 from .simple_admin import NEW_LISTING_STATE_KEY, SimplePublisherAdminController
 from .telegram_adapter import build_channel_keyboard
 
@@ -189,7 +190,10 @@ class ProductionSimplePublisherAdminController(SimplePublisherAdminController):
                 [
                     InlineKeyboardButton(
                         "📷 更多详情",
-                        url=f"https://t.me/{self.user_bot_username}?start=property_{public_id}_details",
+                        url=build_bot_start_url(
+                            self.user_bot_username,
+                            channel_start_payload(public_id, "details"),
+                        ),
                     )
                 ]
             )

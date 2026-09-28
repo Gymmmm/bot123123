@@ -24,6 +24,7 @@ from v3_core.ingest.source_repository import SourceRepository
 from v3_core.ops.runtime_state import RuntimeStateRepository
 from v3_core.parser.worker import CanonicalWorker
 from .autopilot import AutoPublishRepository, AutoPublishService, ERROR_LABELS
+from .channel_contract import build_bot_start_url, channel_start_payload
 from .package_store import FrozenPackage
 from .telegram_adapter import TelegramChannelAdapter, deliver_approved_package
 
@@ -246,7 +247,7 @@ class SimplePublisherAdminController:
         price = f"${int(rent):,}/月" if rent not in (None, "") else "未识别"
         rows: list[list[InlineKeyboardButton]] = []
         if public_id:
-            rows.append([InlineKeyboardButton("查看房源", url=f"https://t.me/{self.user_bot_username}?start=property_{public_id}_details")])
+            rows.append([InlineKeyboardButton("查看房源", url=build_bot_start_url(self.user_bot_username, channel_start_payload(public_id, "details")))])
         if status in {"active", "reserved"}:
             rows.append([InlineKeyboardButton("停止发布", callback_data=f"v3smp|status|inactive|{listing_id}")])
             rows.append([InlineKeyboardButton("标记已出租", callback_data=f"v3smp|status|rented|{listing_id}")])

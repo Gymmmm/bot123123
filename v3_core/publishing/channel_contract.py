@@ -36,6 +36,35 @@ _START_PAYLOAD_RE_PREFIX = "property_"
 _CAPTION_PUBLIC_ID_RE = re.compile(r"(?<![A-Z0-9-])(QL-[A-Z0-9]+(?:-[A-Z0-9]+)+)(?![A-Z0-9-])")
 
 
+# Telegram bot deep links must use the canonical ``https://t.me/<bot>?start=<payload>``
+# form. The ``/start?start_param=...`` variant is parsed by Telegram as
+# ``tg://resolve?domain=<bot>&appname=start`` and never reaches the bot's
+# ``/start`` handler, which silently breaks every channel CTA, broadcast button
+# and admin deep link. All V3 producers MUST go through ``build_bot_start_url``
+# (and the higher-level helpers below that delegate to it).
+TELEGRAM_BOT_DEEPLINK_HOST = "https://t.me"
+
+
+def build_bot_start_url(username: str, payload: object) -> str:
+    """Build the canonical Telegram bot /start deep link.
+
+    Returns an empty string when ``username`` is empty so callers can decide
+    whether to short-circuit (legacy behaviour). Empty / whitespace payloads
+    raise so a buggy caller cannot ship ``?start=`` (which Telegram treats as
+    a no-arg /start and silently routes to the home view).
+    """
+    user = str(username or "").strip().lstrip("@")
+    if not user:
+        return ""
+    raw_payload = str(payload or "")
+    value = raw_payload.strip()
+    if not value:
+        raise ValueError("bot_start_payload_empty")
+    if any(ch in value for ch in (" ", "\n", "\t", "\r")):
+        raise ValueError("bot_start_payload_contains_whitespace")
+    return f"{TELEGRAM_BOT_DEEPLINK_HOST}/{user}?start={value}"
+
+
 _DEBUG_TRAILING_TEXT_RE = re.compile(
     r"(?<=[\u4e00-\u9fff。！？.!?])(?:a['’]?a|a|c)+$",
     re.IGNORECASE,
@@ -111,7 +140,7 @@ def channel_action_url(
         action,
         source_code=source_code,
     )
-    return f"https://t.me/{user}?start={payload}"
+    return build_bot_start_url(user, payload)
 
 
 def channel_general_action_url(username: str, payload: object) -> str:
@@ -121,7 +150,7 @@ def channel_general_action_url(username: str, payload: object) -> str:
         raise ValueError("channel_username_missing")
     if not value or not re.fullmatch(r"(?:find|advisor|service|more_[A-Za-z0-9_-]+)", value):
         raise ValueError(f"unsupported_channel_general_payload:{payload}")
-    return f"https://t.me/{user}?start={value}"
+    return build_bot_start_url(user, value)
 
 
 def channel_actions(public_listing_id: object) -> tuple[str, str, str]:
@@ -263,6 +292,8 @@ def _public_id_from_action_url(url: str, expected_action: str) -> str:
 __all__ = [
     "CHANNEL_ACTION_ORDER",
     "CHANNEL_CTA_LABELS",
+    "TELEGRAM_BOT_DEEPLINK_HOST",
+    "build_bot_start_url",
     "channel_action_url",
     "channel_general_action_url",
     "channel_actions",

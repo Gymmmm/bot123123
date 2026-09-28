@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 
+from .channel_contract import build_bot_start_url, channel_start_payload
 from .pending_batch_admin import BATCH_STATUS_SYNC_KEY, PendingBatchOperatorPublisherAdminController
 from .simple_admin import SIMPLE_EDIT_STATE_KEY
 
@@ -459,7 +460,7 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
         ]
         if public_id:
             rows.append(
-                [InlineKeyboardButton("📋 查看完整资料", url=f"https://t.me/{self.user_bot_username}?start=property_{public_id}_details")]
+                [InlineKeyboardButton("📋 查看完整资料", url=build_bot_start_url(self.user_bot_username, channel_start_payload(public_id, "details")))]
             )
         post_url = self._channel_post_url(meta.get("channel_message_id"))
         if post_url:

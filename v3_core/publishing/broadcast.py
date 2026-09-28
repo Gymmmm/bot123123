@@ -16,6 +16,8 @@ from typing import Callable, Mapping
 from urllib.request import Request, urlopen
 from zoneinfo import ZoneInfo
 
+from .channel_contract import build_bot_start_url
+
 
 DDL = """
 CREATE TABLE IF NOT EXISTS publisher_settings_v3 (
@@ -496,11 +498,10 @@ class BroadcastService:
             return ()
         if selected not in BUTTON_KEYS:
             raise ValueError("broadcast_unknown_button")
-        base = f"https://t.me/{self.user_bot_username}?start="
         buttons = {
-            "find": BroadcastButton("🔍 帮我找房", base + "find_home"),
-            "latest": BroadcastButton("🏠 最新房源", base + "latest"),
-            "contact": BroadcastButton("💬 联系中文顾问", base + "advisor"),
+            "find": BroadcastButton("🔍 帮我找房", build_bot_start_url(self.user_bot_username, "find_home")),
+            "latest": BroadcastButton("🏠 最新房源", build_bot_start_url(self.user_bot_username, "latest")),
+            "contact": BroadcastButton("💬 联系中文顾问", build_bot_start_url(self.user_bot_username, "advisor")),
         }
         if selected == "combo":
             return ((buttons["find"], buttons["latest"]), (buttons["contact"],))
