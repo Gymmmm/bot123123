@@ -584,7 +584,11 @@ def build_photos_response(
     start = max(0, int(offset or 0))
     if start > 0:
         # The first batch is already visible; only append unseen original frames.
-        originals = all_photos[start:PHOTOS_MAX_TOTAL]
+        originals = (
+            all_photos[start:PHOTOS_MAX_TOTAL]
+            if start < total
+            else all_photos[:PHOTOS_MAX_TOTAL]
+        )
         groups = _as_media_groups(originals)
         first = originals[0] if originals else ""
         caption = (

@@ -308,7 +308,7 @@ def test_album_starts_on_package_cover_path(tmp_path):
     expanded = build_photos_response(view, offset=6)
     assert expanded.expand_only
     assert expanded.has_media
-    assert str(Path(cover).resolve()) not in {
+    assert str(Path(cover).resolve()) in {
         str(Path(p).resolve()) for p in expanded.media_groups[0]
     }
 
@@ -350,7 +350,7 @@ def test_album_recovers_rendered_cover_when_package_path_stale(tmp_path):
     expanded = build_photos_response(view, offset=6)
     assert expanded.expand_only
     assert expanded.has_media
-    assert str(rendered.resolve()) not in {
+    assert str(rendered.resolve()) in {
         str(Path(p).resolve()) for p in expanded.media_groups[0]
     }
 
