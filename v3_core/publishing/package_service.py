@@ -230,8 +230,26 @@ class PackageApprovalService:
         review_approved = self.reader.review_approved(offer_id=package.offer_id)
         # Flipper = rendered cover + gallery (gallery already excludes cover-source).
         cover_ok = Path(package.cover_path).is_file()
+        eligibility_facts = dict(canonical["facts"])
+        # Operator edits intentionally update the listing projection without
+        # rewriting immutable canonical evidence.  Approval must therefore use
+        # the explicitly repaired layout already frozen into the package flow,
+        # otherwise a stale canonical ``missing_layout`` flag blocks a valid
+        # manual publish even though the preview displays the repaired value.
+        repaired_layout = str(listing.get("layout") or "").strip()
+        if repaired_layout:
+            eligibility_facts["layout"] = repaired_layout
+            quality = dict(eligibility_facts.get("quality") or {})
+            blocking = [
+                flag
+                for flag in (quality.get("blocking_flags") or [])
+                if str(flag).strip() != "missing_layout"
+            ]
+            quality["blocking_flags"] = blocking
+            eligibility_facts["quality"] = quality
+
         eligibility = evaluate_offer_eligibility(
-            facts=dict(canonical["facts"]),
+            facts=eligibility_facts,
             offer=offer,
             review_approved=review_approved,
             media_count=len(package.gallery) + (1 if cover_ok else 0),
