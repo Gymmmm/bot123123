@@ -233,9 +233,9 @@ def test_photos_response_first_batch_album_with_expand(tmp_path):
     expanded = build_photos_response(_view(gallery=gallery), offset=6)
     assert expanded.expand_only
     assert expanded.action_rows == ()
-    # Expand sends the full original album (cap 10).
-    assert len(expanded.media_groups[0]) == 10
-    assert expanded.media_groups[0][0] == str(cover)
+    # Expand appends only unseen frames; it does not resend the first six.
+    assert len(expanded.media_groups[0]) == 4
+    assert expanded.media_groups[0][0] == files[5]
 
 
 def test_photos_response_pending_has_no_book_button(tmp_path):
@@ -308,7 +308,7 @@ def test_album_starts_on_package_cover_path(tmp_path):
     expanded = build_photos_response(view, offset=6)
     assert expanded.expand_only
     assert expanded.has_media
-    assert str(Path(cover).resolve()) in {
+    assert str(Path(cover).resolve()) not in {
         str(Path(p).resolve()) for p in expanded.media_groups[0]
     }
 
@@ -350,7 +350,7 @@ def test_album_recovers_rendered_cover_when_package_path_stale(tmp_path):
     expanded = build_photos_response(view, offset=6)
     assert expanded.expand_only
     assert expanded.has_media
-    assert str(rendered.resolve()) in {
+    assert str(rendered.resolve()) not in {
         str(Path(p).resolve()) for p in expanded.media_groups[0]
     }
 
@@ -426,3 +426,9 @@ def test_no_rendered_cover_falls_back_only_to_current_listing_gallery(tmp_path):
     )
     response = build_photos_response(view)
     assert response.photo_path == str(gallery.resolve())
+
+def test_customer_photo_surface_never_exposes_public_listing_id():
+    response = build_photos_response(_view())
+    assert "🆔" not in response.text
+    assert "QL-RF-A2B3" not in response.text
+    assert "QL-RF-A2B3" not in response.media_caption

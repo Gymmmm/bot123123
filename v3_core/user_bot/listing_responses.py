@@ -505,12 +505,12 @@ def _album_media_caption(
     total: int,
     expand: bool,
 ) -> str:
-    public_id = he(str(public_listing_id or "").strip() or "实拍")
+    del public_listing_id
     if expand:
-        return f"📷 {public_id}｜全部实拍{chr(10)}共 {shown} 张"
+        return f"📷 继续看实拍{chr(10)}剩余 {shown} 张"
     if total > shown:
-        return f"📷 {public_id}｜实拍精选{chr(10)}共 {total} 张 · 先看 {shown} 张"
-    return f"📷 {public_id}｜实拍相册{chr(10)}共 {shown} 张"
+        return f"📷 实拍精选{chr(10)}共 {total} 张 · 先看 {shown} 张"
+    return f"📷 实拍相册{chr(10)}共 {shown} 张"
 
 
 def _photos_action_text(details) -> str:
@@ -532,8 +532,6 @@ def _photos_action_text(details) -> str:
     price = _format_price(details.monthly_rent_usd)
     if price:
         lines.append(f"💰 {he(price)}")
-    if details.public_listing_id:
-        lines.append(f"🆔 {he(details.public_listing_id)}")
     return chr(10).join(lines)
 
 
@@ -567,9 +565,9 @@ def build_photos_response(
     offset: int = 0,
     page_size: int | None = None,
 ) -> PublicPhotosResponse:
-    """First screen: side-stack collage (1 JPG); expand: native MediaGroup originals.
+    """First screen: native Telegram originals; expand: remaining originals.
 
-    ``offset`` > 0 means 「查看全部实拍」→ send original frames (cap 10).
+    ``offset`` > 0 means 「查看全部实拍」→ send only frames not already shown.
     ``page_size`` ignored (call-site compatibility).
     """
     del page_size
@@ -585,8 +583,8 @@ def build_photos_response(
 
     start = max(0, int(offset or 0))
     if start > 0:
-        # Full original album (collage was only a preview card).
-        originals = all_photos[:PHOTOS_MAX_TOTAL]
+        # The first batch is already visible; only append unseen original frames.
+        originals = all_photos[start:PHOTOS_MAX_TOTAL]
         groups = _as_media_groups(originals)
         first = originals[0] if originals else ""
         caption = (
