@@ -119,10 +119,89 @@ function numberInput(id) {
   const n = Number($(id)?.value);
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
+function deriveSaleReferenceFromItems(i) {
+  const currentFacts = listingFacts(i);
+  const currentProject = text(currentFacts.project);
+  const currentLocation = text(currentFacts.location);
+  const currentType = text(currentFacts.subtype || currentFacts.type);
+  const currentBedrooms = num(currentFacts.bedrooms);
+
+  const publicItems = allItems.filter(item => !isInternalListing(item));
+  const strategies = [
+    {
+      scope:'same_project_layout',
+      label:'同项目同户型',
+      min:2,
+      match:item => {
+        const f=listingFacts(item);
+        return currentProject && text(f.project)===currentProject &&
+          currentBedrooms && num(f.bedrooms)===currentBedrooms;
+      }
+    },
+    {
+      scope:'same_project',
+      label:'同项目',
+      min:2,
+      match:item => currentProject && text(listingFacts(item).project)===currentProject
+    },
+    {
+      scope:'same_area_type_layout',
+      label:'同区域同类型同户型',
+      min:3,
+      match:item => {
+        const f=listingFacts(item);
+        return currentLocation && text(f.location)===currentLocation &&
+          currentType && text(f.subtype || f.type)===currentType &&
+          currentBedrooms && num(f.bedrooms)===currentBedrooms;
+      }
+    },
+    {
+      scope:'same_area_type',
+      label:'同区域同类型',
+      min:3,
+      match:item => {
+        const f=listingFacts(item);
+        return currentLocation && text(f.location)===currentLocation &&
+          currentType && text(f.subtype || f.type)===currentType;
+      }
+    }
+  ];
+
+  for (const strategy of strategies) {
+    const matches = publicItems.filter(strategy.match).filter(item => num(item.sale_price_usd));
+    if (matches.length < strategy.min) continue;
+    const prices = matches.map(item => Number(item.sale_price_usd)).sort((a,b)=>a-b);
+    const medianValue = values => {
+      const mid=Math.floor(values.length/2);
+      return values.length%2 ? values[mid] : (values[mid-1]+values[mid])/2;
+    };
+    const ppsm = matches.map(item => {
+      const f=listingFacts(item);
+      return f.size ? Math.round(Number(item.sale_price_usd)/f.size) : null;
+    }).filter(Number.isFinite).sort((a,b)=>a-b);
+    const medianPrice=Math.round(medianValue(prices));
+    const currentPrice=Number(i.sale_price_usd);
+    return {
+      scope:strategy.scope,
+      label:strategy.label,
+      count:prices.length,
+      min_sale_price_usd:prices[0],
+      median_sale_price_usd:medianPrice,
+      max_sale_price_usd:prices[prices.length-1],
+      min_price_per_sqm_usd:ppsm.length ? ppsm[0] : null,
+      median_price_per_sqm_usd:ppsm.length ? Math.round(medianValue(ppsm)) : null,
+      max_price_per_sqm_usd:ppsm.length ? ppsm[ppsm.length-1] : null,
+      current_vs_median_pct:currentPrice>0 && medianPrice>0 ? (currentPrice-medianPrice)/medianPrice*100 : null,
+      basis:'current_sale_page_inventory'
+    };
+  }
+  return null;
+}
+
 function renderSaleReference(i) {
   const block = $('saleReferenceBlock');
   if (!block) return;
-  const ref = i?.sale_market_reference;
+  const ref = i?.sale_market_reference || deriveSaleReferenceFromItems(i);
   if (!ref || Number(ref.count) < 2) {
     block.hidden = true;
     return;
