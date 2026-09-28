@@ -16,7 +16,11 @@ from .contact_effects import ContactEffectExecutor
 from .deeplink import parse_channel_start_payload, parse_search_start_payload
 from .home_views import build_appointment_history_home_view, build_contact_view, build_home_view
 from .lead_service import LeadUser
-from .listing_contact import ListingContactEffectExecutor, build_listing_contact_view
+from .listing_contact import (
+    ListingContactEffectExecutor,
+    build_listing_contact_view,
+    remember_listing_question_context,
+)
 from .listing_presenter import build_public_listing_details
 from .public_flow import PublicListingFlowResult, PublicListingFlowService
 from .search_no_match_view import build_search_no_match_view
@@ -490,6 +494,9 @@ async def _handle_listing_contact_start(
             user=_lead_user(update),
             intent=resolved.intent,
         )
+    user_data = getattr(context, "user_data", None)
+    if isinstance(user_data, dict):
+        remember_listing_question_context(user_data, resolved.intent)
     view = build_listing_contact_view(
         resolved.intent,
         inventory,

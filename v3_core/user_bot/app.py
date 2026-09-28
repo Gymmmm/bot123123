@@ -35,7 +35,7 @@ from .appointment_runtime_effects import AppointmentRuntimeEffectExecutor
 from .channel_status_sync import V3AppointmentChannelSynchronizer
 from .contact_effects import ContactEffectExecutor
 from .home_views import build_home_view
-from .listing_contact import ListingContactEffectExecutor
+from .listing_contact import ListingContactEffectExecutor, clear_listing_question_context
 from .legacy_routes import legacy_home_action, legacy_reply_text_action, legacy_start_payload
 from .runtime import UserBotReadRuntime, build_read_runtime
 from .service_effects import ServiceEffectExecutor
@@ -44,7 +44,7 @@ from .telegram_edit import edit_query_panel
 from .telegram_home_handler import handle_v3_home_callback
 from .telegram_home_ui import build_home_keyboard
 from .telegram_keyword_search_handler import handle_v3_keyword_search_text
-from .telegram_listing_callback import handle_v3_listing_callback
+from .telegram_listing_callback import handle_v3_listing_callback, handle_v3_listing_question_text
 from .telegram_service_handler import handle_v3_service_callback, handle_v3_service_media, handle_v3_service_text
 from .telegram_start_handler import handle_v3_start
 from .telegram_transition_action_handler import handle_v3_transition_action
@@ -168,6 +168,7 @@ def build_v3_user_bot_dependencies(config: V3UserBotConfig) -> V3UserBotDependen
     listing_contact_effects = ListingContactEffectExecutor(
         leads=transition.lead_effects,
         admins=admins,
+        inventory=read.inventory,
     )
     service_effects = ServiceEffectExecutor(leads=transition.leads, admins=admins)
     appointment_effects = AppointmentRuntimeEffectExecutor(
@@ -207,6 +208,7 @@ def build_takeover_user_bot_dependencies(
     listing_contact_effects = ListingContactEffectExecutor(
         leads=transition.lead_effects,
         admins=admins,
+        inventory=read.inventory,
     )
     service_effects = ServiceEffectExecutor(
         leads=transition.leads,
@@ -453,6 +455,9 @@ def build_v3_user_bot_application(
         await remove_legacy_reply_keyboard(update, context)
         query = getattr(update, "callback_query", None)
         raw = str(getattr(query, "data", "") or "") if query is not None else ""
+        user_data = getattr(context, "user_data", None)
+        if isinstance(user_data, dict) and ":consult:" not in raw:
+            clear_listing_question_context(user_data)
         if await _legacy_callback(update, context, raw):
             return
         if raw == "v3u:t:home":
@@ -529,6 +534,12 @@ def build_v3_user_bot_application(
             admin_result = await admin_contract_text_handler(update, context)
             if admin_result is not None:
                 return
+        if await handle_v3_listing_question_text(
+            update,
+            context,
+            contact_effects=deps.listing_contact_effects,
+        ):
+            return
         outcome = await handle_v3_transition_text(
             update,
             context,

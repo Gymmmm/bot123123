@@ -20,7 +20,7 @@ from .public_inventory import PublishedListingView
 
 
 # First screen album size; remaining frames (if any) expand on demand.
-PHOTOS_FIRST_BATCH = 4
+PHOTOS_FIRST_BATCH = 6
 # Hard cap for one listing photos view (first batch + expand).
 PHOTOS_MAX_TOTAL = 10
 
@@ -612,31 +612,8 @@ def build_photos_response(
             expand_only=True,
         )
 
-    collage = _try_side_collage(
-        all_photos,
-        public_listing_id=details.public_listing_id,
-    )
-    if collage:
-        return PublicPhotosResponse(
-            media_groups=((collage,),),
-            text=_photos_action_text(details),
-            media_caption="",
-            detail_text="",
-            photo_path=collage,
-            photo_index=0,
-            photo_total=total,
-            listing_summary=summary,
-            action_rows=_photo_actions(
-                bookable=details.bookable,
-                inventory_status=details.inventory_status,
-                public_listing_id=details.public_listing_id,
-                # Collage uses 4 frames; expand always offers the native originals.
-                has_more=True,
-            ),
-            expand_only=False,
-        )
-
-    # Fallback: native first-batch album (0/1 photo, or collage render failed).
+    # Public photos open as native Telegram originals. Keep collage rendering
+    # available for other surfaces, but never hide the real-photo entry point.
     if total > PHOTOS_FIRST_BATCH:
         batch = all_photos[:PHOTOS_FIRST_BATCH]
         has_more = True

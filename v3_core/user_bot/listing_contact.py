@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from html import escape as he
-from typing import Any
+from typing import Any, Mapping
 
 from .admin_notification_plans import user_contact_text, user_mention_html
 from .admin_notifications import AdminNotification, AdminNotificationResult, TelegramAdminNotifier
@@ -29,13 +29,67 @@ class ListingContactView:
     public_listing_id: str = ""
 
 
+LISTING_QUESTION_SESSION_KEY = "v3_listing_question"
+
+
+def remember_listing_question_context(
+    user_data: dict[str, Any],
+    intent: ConsultIntent,
+) -> None:
+    user_data[LISTING_QUESTION_SESSION_KEY] = {
+        "listing_id": intent.listing_id,
+        "public_listing_id": intent.public_listing_id,
+        "source": intent.source,
+        "inventory_status": intent.inventory_status,
+        "offer_status": intent.offer_status,
+        "publication_instance_id": intent.publication_instance_id,
+        "touchpoint": intent.touchpoint,
+    }
+
+
+def clear_listing_question_context(user_data: dict[str, Any]) -> None:
+    user_data.pop(LISTING_QUESTION_SESSION_KEY, None)
+
+
+def listing_question_intent(session: Mapping[str, Any]) -> ConsultIntent | None:
+    raw = session.get(LISTING_QUESTION_SESSION_KEY)
+    if not isinstance(raw, Mapping):
+        return None
+    public_id = str(raw.get("public_listing_id") or "").strip()
+    listing_id = str(raw.get("listing_id") or "").strip()
+    if not public_id or not listing_id:
+        return None
+    return ConsultIntent(
+        listing_id=listing_id,
+        public_listing_id=public_id,
+        source=str(raw.get("source") or "listing_callback").strip(),
+        inventory_status=str(raw.get("inventory_status") or "").strip(),
+        offer_status=str(raw.get("offer_status") or "").strip(),
+        publication_instance_id=str(raw.get("publication_instance_id") or "").strip(),
+        touchpoint=str(raw.get("touchpoint") or "").strip(),
+    )
+
+
 class ListingContactEffectExecutor:
-    def __init__(self, *, leads: LeadEffectExecutor, admins: TelegramAdminNotifier):
+    def __init__(
+        self,
+        *,
+        leads: LeadEffectExecutor,
+        admins: TelegramAdminNotifier,
+        inventory: PublicInventoryReader | None = None,
+    ):
         self.leads = leads
         self.admins = admins
+        self.inventory = inventory
 
-    async def execute(self, *, bot: Any, user: LeadUser, intent: ConsultIntent) -> ListingContactEffectResult:
-        lead = self.leads.record_listing_contact(user=user, intent=intent)
+    def _admin_lines(self, user: LeadUser, intent: ConsultIntent) -> list[str]:
+        if self.inventory is not None:
+            clues = build_structured_advisor_clues(intent, self.inventory)
+            if clues:
+                customer = user_mention_html(user)
+                lines = [line.replace("{customer}", customer) for line in clues]
+                lines.append(f"💬 Telegram：{he(user_contact_text(user))}")
+                return lines
         lines = [
             f"用户：{user_mention_html(user)}",
             f"联系方式：{he(user_contact_text(user))}",
@@ -44,14 +98,39 @@ class ListingContactEffectExecutor:
         if str(intent.touchpoint or "").strip():
             lines.append(f"转化页：{he(source_display_label(intent.touchpoint))}")
         lines.append(f"咨询房源：{he(intent.public_listing_id)}")
+        return lines
+
+    async def execute(self, *, bot: Any, user: LeadUser, intent: ConsultIntent) -> ListingContactEffectResult:
+        lead = self.leads.record_listing_contact(user=user, intent=intent)
         admin = await self.admins.send(
             bot,
             AdminNotification(
                 title="用户咨询房源",
-                lines=tuple(lines),
+                lines=tuple(self._admin_lines(user, intent)),
             ),
         )
         return ListingContactEffectResult(lead=lead, admin=admin)
+
+    async def execute_question(
+        self,
+        *,
+        bot: Any,
+        user: LeadUser,
+        intent: ConsultIntent,
+        question: object,
+    ) -> AdminNotificationResult:
+        clean = str(question or "").strip()
+        if not clean:
+            raise ValueError("listing_question_required")
+        lines = self._admin_lines(user, intent)
+        lines.append(f"❓ 客户问题：{he(clean[:1200])}")
+        return await self.admins.send(
+            bot,
+            AdminNotification(
+                title="用户提问房源",
+                lines=tuple(lines),
+            ),
+        )
 
 
 def build_structured_advisor_clues(
@@ -118,12 +197,12 @@ def build_listing_contact_view(
     )
     identity = "｜".join(part for part in (subject, price) if part)
     lines = [
-        "💬 <b>咨询这套</b>",
+        "💬 <b>问这套</b>",
         "",
         he(identity),
         "",
         "房源信息已经带上。",
-        "直接说想确认的问题就可以。",
+        "直接在这里发问题就可以，例如：最低多少？明天下午能看吗？",
     ]
     return ListingContactView(
         text="\n".join(lines),
@@ -133,9 +212,13 @@ def build_listing_contact_view(
 
 
 __all__ = [
+    "LISTING_QUESTION_SESSION_KEY",
     "ListingContactEffectExecutor",
     "ListingContactEffectResult",
     "ListingContactView",
     "build_listing_contact_view",
     "build_structured_advisor_clues",
+    "clear_listing_question_context",
+    "listing_question_intent",
+    "remember_listing_question_context",
 ]

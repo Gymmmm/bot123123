@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+import re
 from typing import Any, Protocol
 
 from v3_core.storage.lead_repository import SQLiteLeadRepository
@@ -108,10 +109,36 @@ def build_sqlite_lead_service(db_path: str | Path) -> LeadService:
     return LeadService(SQLiteLeadRepository(db_path))
 
 
+def _move_in_hint(raw: object) -> str:
+    text = str(raw or "").strip()
+    if not text:
+        return ""
+    for pattern in (
+        r"(\d{1,2}月\d{1,2}日(?:前后|左右)?(?:入住|搬入)?)",
+        r"((?:今天|明天|后天|下周[一二三四五六日天]?|月底|月初|尽快|随时|马上)(?:入住|搬入)?)",
+    ):
+        match = re.search(pattern, text)
+        if match:
+            return match.group(1)
+    return ""
+
+
 def search_lead_request(intent: SearchSubmitIntent) -> LeadRequest:
     area = str(intent.area_display or "").strip()
     if area == "不限":
         area = ""
+    payload = {
+        "goal": str(intent.goal or "any"),
+        "area_hint": str(intent.area_display or ""),
+        "budget_label": str(intent.budget_label or ""),
+        **dict(intent.touch_payload or {}),
+    }
+    room_type = str(intent.criteria.room_type or "").strip()
+    if room_type:
+        payload["room_type"] = room_type
+    move_in = _move_in_hint(intent.criteria.raw_text)
+    if move_in:
+        payload["move_in_hint"] = move_in
     return LeadRequest(
         action="search_pref_submit",
         source=str(intent.source or "user_search"),
@@ -119,12 +146,7 @@ def search_lead_request(intent: SearchSubmitIntent) -> LeadRequest:
         property_type=str(intent.criteria.property_type or ""),
         budget_min=int(intent.criteria.budget_min) if intent.criteria.budget_min is not None else None,
         budget_max=int(intent.criteria.budget_max) if intent.criteria.budget_max is not None else None,
-        payload={
-            "goal": str(intent.goal or "any"),
-            "area_hint": str(intent.area_display or ""),
-            "budget_label": str(intent.budget_label or ""),
-            **dict(intent.touch_payload or {}),
-        },
+        payload=payload,
     )
 
 
@@ -137,6 +159,16 @@ def keyword_search_lead_request(
     if area == "不限":
         area = ""
     touch = dict(intent.touch_payload or {})
+    payload = {
+        "message": str(touch.get("message") or intent.criteria.raw_text or ""),
+        "match_mode": str(match_mode or "no_match"),
+    }
+    room_type = str(intent.criteria.room_type or touch.get("room_type") or "").strip()
+    if room_type:
+        payload["room_type"] = room_type
+    move_in = _move_in_hint(payload["message"])
+    if move_in:
+        payload["move_in_hint"] = move_in
     return LeadRequest(
         action="keyword_find_play",
         source=str(intent.source or "smart_find_play"),
@@ -144,10 +176,7 @@ def keyword_search_lead_request(
         property_type=str(intent.criteria.property_type or ""),
         budget_min=int(intent.criteria.budget_min) if intent.criteria.budget_min is not None else None,
         budget_max=int(intent.criteria.budget_max) if intent.criteria.budget_max is not None else None,
-        payload={
-            "message": str(touch.get("message") or intent.criteria.raw_text or ""),
-            "match_mode": str(match_mode or "no_match"),
-        },
+        payload=payload,
     )
 
 

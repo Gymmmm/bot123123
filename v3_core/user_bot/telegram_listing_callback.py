@@ -10,7 +10,14 @@ from telegram.constants import ParseMode
 from .callback_router import CallbackRouter
 from .callbacks import encode_listing_callback
 from .lead_service import LeadUser
-from .listing_contact import ListingContactEffectExecutor, ListingContactEffectResult, build_listing_contact_view
+from .listing_contact import (
+    ListingContactEffectExecutor,
+    ListingContactEffectResult,
+    build_listing_contact_view,
+    clear_listing_question_context,
+    listing_question_intent,
+    remember_listing_question_context,
+)
 from .public_inventory import PublicInventoryReader
 from .telegram_callback_handler import TelegramCallbackHandlerOutcome, handle_v3_callback
 from .telegram_edit import edit_query_panel
@@ -50,10 +57,12 @@ async def _render_contact(query: Any, *, text: str, public_listing_id: str, advi
         InlineKeyboardButton("💬 中文顾问", url=direct_advisor)
         if direct_advisor else InlineKeyboardButton("💬 中文顾问", callback_data="v3u:home:contact")
     )
-    markup = InlineKeyboardMarkup([
-        [contact_button],
+    rows = [
         [InlineKeyboardButton("⬅️ 返回房源", callback_data=encode_listing_callback("details", public_listing_id))],
-    ])
+    ]
+    if direct_advisor:
+        rows.append([InlineKeyboardButton("↗️ 直接联系顾问", url=direct_advisor)])
+    markup = InlineKeyboardMarkup(rows)
     await edit_query_panel(
         query,
         text=text,
@@ -124,6 +133,9 @@ async def handle_v3_listing_callback(
         user=_lead_user(update),
         intent=response.consult_intent,
     )
+    user_data = getattr(context, "user_data", None)
+    if isinstance(user_data, dict):
+        remember_listing_question_context(user_data, response.consult_intent)
     view = build_listing_contact_view(response.consult_intent, inventory, advisor_url=advisor_url)
     await _render_contact(
         update.callback_query,
@@ -134,4 +146,46 @@ async def handle_v3_listing_callback(
     return TelegramListingCallbackOutcome(handled=True, callback=outcome, contact_effect=effect)
 
 
-__all__ = ["TelegramListingCallbackOutcome", "handle_v3_listing_callback"]
+async def handle_v3_listing_question_text(
+    update: Any,
+    context: Any,
+    *,
+    contact_effects: ListingContactEffectExecutor,
+) -> bool:
+    message = getattr(update, "effective_message", None)
+    user_data = getattr(context, "user_data", None)
+    if message is None or not isinstance(user_data, dict):
+        return False
+    intent = listing_question_intent(user_data)
+    if intent is None:
+        return False
+    question = str(getattr(message, "text", "") or "").strip()
+    if not question:
+        return False
+
+    await contact_effects.execute_question(
+        bot=getattr(context, "bot", None),
+        user=_lead_user(update),
+        intent=intent,
+        question=question,
+    )
+    clear_listing_question_context(user_data)
+    markup = InlineKeyboardMarkup([[
+        InlineKeyboardButton(
+            "⬅️ 返回房源",
+            callback_data=encode_listing_callback("details", intent.public_listing_id),
+        )
+    ]])
+    await message.reply_text(
+        "✅ <b>已发给中文顾问</b>\n\n这套房的信息和你的问题已经一起带上，顾问会按这套房继续回复你。",
+        parse_mode=ParseMode.HTML,
+        reply_markup=markup,
+    )
+    return True
+
+
+__all__ = [
+    "TelegramListingCallbackOutcome",
+    "handle_v3_listing_callback",
+    "handle_v3_listing_question_text",
+]
