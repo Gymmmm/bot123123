@@ -196,7 +196,7 @@ def test_villa_caption_keeps_full_frozen_adviser_copy_in_separate_section():
     assert len(caption) < 1024
 
 
-def test_photos_response_first_batch_album_with_expand(tmp_path):
+def test_photos_response_paginates_four_real_photos_without_cover(tmp_path):
     from pathlib import Path
     from PIL import Image
 
@@ -219,23 +219,24 @@ def test_photos_response_first_batch_album_with_expand(tmp_path):
     assert len(first.media_groups) == 1
     assert len(first.media_groups[0]) == 1
     assert Path(first.media_groups[0][0]).is_file()
-    assert first.text.startswith("🟢 当前可预约")
-    assert "以上是这套房" not in first.text
-    assert "⬅️ 上一张" not in str(_labels(first.action_rows))
-    assert _actions(first.action_rows) == [["photos", "book"], ["consult"]]
+    assert "富力城" in first.text and "第 1 / 3 页" in first.text
+    assert "LST_1" not in first.text
+    assert _actions(first.action_rows) == [["noop", "photos"], ["book"], ["consult"], ["details"]]
     assert _labels(first.action_rows) == [
-        ["📷 查看全部实拍", "📅 预约看房"],
-        ["💬 中文顾问"],
+        ["1 / 3", "下一页 ➡️"],
+        ["📅 预约看房"],
+        ["💬 咨询这套"],
+        ["⬅️ 返回房源"],
     ]
-    expand_btn = first.action_rows[0][0]
+    expand_btn = first.action_rows[0][1]
     assert expand_btn.target_index == 4
 
     expanded = build_photos_response(_view(gallery=gallery), offset=4)
-    assert expanded.expand_only
-    assert expanded.action_rows == ()
-    # Expand sends original frames (cap 10), not "remaining after collage".
-    assert len(expanded.media_groups[0]) == 10
-    assert expanded.media_groups[0][0] == str(cover)
+    assert not expanded.expand_only
+    assert expanded.photo_index == 1
+    assert len(expanded.media_groups[0]) == 1
+    assert _labels(expanded.action_rows)[0] == ["⬅️ 上一页", "2 / 3", "下一页 ➡️"]
+    assert build_photos_response(_view(gallery=gallery), offset=8).action_rows[0][-1].label == "3 / 3"
 
 
 def test_photos_response_pending_has_no_book_button(tmp_path):
@@ -249,10 +250,11 @@ def test_photos_response_pending_has_no_book_button(tmp_path):
 
     response = build_photos_response(_view(status="pending", gallery=files))
 
-    assert response.text.startswith("🔵 房态待确认")
+    assert "第 1 / 2 页" in response.text
     assert _labels(response.action_rows) == [
-        ["📷 查看全部实拍", "💬 中文顾问"],
-        ["🏠 帮我找房", "🔍 找相似"],
+        ["1 / 2", "下一页 ➡️"],
+        ["💬 咨询这套"],
+        ["⬅️ 返回房源"],
     ]
     assert all(action.action != "book" for row in response.action_rows for action in row)
 
@@ -264,11 +266,13 @@ def test_photos_response_single_photo_uses_details_not_expand(tmp_path):
     Image.new("RGB", (640, 480), (90, 90, 90)).save(one, quality=85)
     response = build_photos_response(_view(gallery=[str(one)]))
 
-    assert response.media_groups == ((str(one),),)
+    assert len(response.media_groups[0]) == 1
     assert response.photo_total == 1
     assert _labels(response.action_rows) == [
-        ["📷 房源详情", "📅 预约看房"],
-        ["💬 中文顾问"],
+        ["1 / 1"],
+        ["📅 预约看房"],
+        ["💬 咨询这套"],
+        ["⬅️ 返回房源"],
     ]
 
 
@@ -279,7 +283,7 @@ def test_photos_response_drops_missing_files_and_keeps_text_fallback(tmp_path):
     assert not response.has_media
     assert response.media_groups == ()
     assert response.photo_path == ""
-    assert response.text.startswith("🟢 当前可预约")
+    assert response.text.startswith("这套房的实拍暂时没有加载出来")
     assert "实拍暂时没有加载出来" in response.text
     assert "🏢 金边优质房源出租" not in response.text
     assert response.detail_text == ""
@@ -301,16 +305,14 @@ def test_album_starts_on_package_cover_path(tmp_path):
         package=package,
     )
     response = build_photos_response(view)
-    assert response.photo_total == 2
+    assert response.photo_total == 1
     assert response.has_media
     # Prefer collage when images are readable; tiny non-image fixtures fall back.
-    assert len(response.media_groups[0]) in {1, 2}
+    assert len(response.media_groups[0]) == 1
     expanded = build_photos_response(view, offset=4)
-    assert expanded.expand_only
+    assert not expanded.expand_only
     assert expanded.has_media
-    assert str(Path(cover).resolve()) in {
-        str(Path(p).resolve()) for p in expanded.media_groups[0]
-    }
+    assert str(Path(cover).resolve()) not in expanded.media_groups[0]
 
 
 def test_album_recovers_rendered_cover_when_package_path_stale(tmp_path):
@@ -345,14 +347,12 @@ def test_album_recovers_rendered_cover_when_package_path_stale(tmp_path):
 
     response = build_photos_response(view)
     # First screen may be a collage; cover must still be in the source set.
-    assert response.photo_total == 2
+    assert response.photo_total == 1
     assert response.has_media
     expanded = build_photos_response(view, offset=4)
-    assert expanded.expand_only
+    assert not expanded.expand_only
     assert expanded.has_media
-    assert str(rendered.resolve()) in {
-        str(Path(p).resolve()) for p in expanded.media_groups[0]
-    }
+    assert str(rendered.resolve()) not in expanded.media_groups[0]
 
 
 def test_build_detail_caption_alias_matches_public_fact_body():
@@ -413,7 +413,7 @@ def test_stale_cover_path_recovers_current_listing_exact_rendered_cover(tmp_path
         cover_style="classic_blue",
     )
     response = build_photos_response(view)
-    assert response.photo_path == str(rendered.resolve())
+    assert response.photo_path == str(room.resolve())
 
 
 def test_no_rendered_cover_falls_back_only_to_current_listing_gallery(tmp_path):

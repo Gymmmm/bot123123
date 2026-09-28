@@ -95,7 +95,7 @@ def test_photos_payload_returns_frozen_existing_gallery_response(tmp_path):
     assert result.photos is not None
     assert result.photos.media_groups == ((str(photo),),)
     assert result.photos.photo_path == str(photo)
-    assert result.photos.text.startswith("🟢 当前可预约")
+    assert result.photos.text.endswith("第 1 / 1 页")
     assert "基本信息" not in result.photos.text
     assert result.details is None
     assert result.book is None

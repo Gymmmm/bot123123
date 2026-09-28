@@ -5,8 +5,9 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from telegram import InputMediaPhoto
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 from telegram.constants import ParseMode
+from telegram.error import BadRequest
 
 from .callback_router import CallbackRouter
 from .callbacks import PREFIX, encode_card_callback
@@ -72,6 +73,13 @@ def _chat_id(update: Any) -> int | str:
 async def _render_details(query: Any, response: TelegramCallbackResponse) -> None:
     message = getattr(query, "message", None)
     if getattr(message, "photo", None):
+        cover = Path(response.photo_path) if response.photo_path else None
+        if cover is not None and cover.is_file():
+            await query.edit_message_media(
+                media=InputMediaPhoto(media=cover.read_bytes(), caption=response.text, parse_mode=ParseMode.HTML),
+                reply_markup=response.keyboard,
+            )
+            return
         await query.edit_message_caption(caption=response.text, parse_mode=ParseMode.HTML, reply_markup=response.keyboard)
         return
     await query.edit_message_text(response.text, parse_mode=ParseMode.HTML, reply_markup=response.keyboard)
@@ -84,20 +92,40 @@ async def _render_photos(
     *,
     query: Any | None = None,
 ) -> None:
-    """Send native album (+ optional action bar). Never flips in place."""
-    from .telegram_photos_render import send_listing_photos_album
-
-    del query  # Album always appends new messages; do not edit prior frames.
-    await send_listing_photos_album(
-        context.bot,
-        chat_id=_chat_id(update),
-        media_groups=response.media_groups,
-        media_caption=str(getattr(response, "media_caption", "") or ""),
-        photo_path=str(getattr(response, "photo_path", "") or ""),
-        text=response.text,
-        reply_markup=response.keyboard,
-        expand_only=bool(getattr(response, "expand_only", False)),
-    )
+    """Edit the current photo; append one message only if Telegram rejects edit."""
+    path = Path(response.photo_path) if response.photo_path else None
+    if path is not None and path.is_file():
+        if query is not None:
+            try:
+                await query.edit_message_media(
+                    media=InputMediaPhoto(media=path.read_bytes(), caption=response.text, parse_mode=ParseMode.HTML),
+                    reply_markup=response.keyboard,
+                )
+                return
+            except BadRequest as exc:
+                message = str(exc).lower()
+                if "message is not modified" in message:
+                    return
+                if not any(token in message for token in (
+                    "can't be edited", "cannot be edited", "message to edit not found",
+                    "there is no media", "no media", "message is not a media message",
+                )):
+                    raise
+                # Old text messages cannot always be turned into photos.
+        with path.open("rb") as photo:
+            await context.bot.send_photo(
+                chat_id=_chat_id(update), photo=photo, caption=response.text,
+                parse_mode=ParseMode.HTML, reply_markup=response.keyboard,
+            )
+        return
+    if query is not None:
+        if getattr(getattr(query, "message", None), "photo", None):
+            await query.edit_message_caption(caption=response.text, parse_mode=ParseMode.HTML, reply_markup=response.keyboard)
+        else:
+            await query.edit_message_text(response.text, parse_mode=ParseMode.HTML, reply_markup=response.keyboard)
+    else:
+        await context.bot.send_message(chat_id=_chat_id(update), text=response.text,
+                                       parse_mode=ParseMode.HTML, reply_markup=response.keyboard)
 
 
 async def _render_transition_view(query: Any, view: TransitionView) -> None:
@@ -201,6 +229,9 @@ async def handle_v3_callback(
         return TelegramCallbackHandlerOutcome(handled=False)
     if parse_transition_callback(raw) is not None:
         return TelegramCallbackHandlerOutcome(handled=False)
+    if raw == f"{PREFIX}:noop":
+        await query.answer()
+        return TelegramCallbackHandlerOutcome(handled=True)
 
     session_ids = _session_ids(context)
     dispatched = _dispatch(router, raw, context)
@@ -219,21 +250,31 @@ async def handle_v3_callback(
                 back_to_search_callback = encode_card_callback(
                     session_ids.index(public_id), public_id
                 )
-        response = replace(
-            response,
-            keyboard=polish_listing_keyboard(
-                response.keyboard,
-                advisor_url=advisor_url,
-                channel_url=channel_url,
-                back_to_search_callback=back_to_search_callback,
-                listing_summary=str(getattr(response, "listing_summary", "") or ""),
-                add_home=(
-                    response.kind in {"details", "photos"}
-                    and not bool(getattr(response, "expand_only", False))
+        if response.kind == "photos" and response.keyboard is not None:
+            rows = []
+            for row in response.keyboard.inline_keyboard:
+                rows.append([
+                    InlineKeyboardButton(button.text, callback_data=back_to_search_callback)
+                    if button.text == "⬅️ 返回房源" and back_to_search_callback
+                    else button for button in row
+                ])
+            response = replace(response, keyboard=InlineKeyboardMarkup(rows))
+        else:
+            response = replace(
+                response,
+                keyboard=polish_listing_keyboard(
+                    response.keyboard,
+                    advisor_url=advisor_url,
+                    channel_url=channel_url,
+                    back_to_search_callback=back_to_search_callback,
+                    listing_summary=str(getattr(response, "listing_summary", "") or ""),
+                    add_home=(
+                        response.kind in {"details", "photos"}
+                        and not bool(getattr(response, "expand_only", False))
+                    ),
+                    add_channel=False,
                 ),
-                add_channel=False,
-            ),
-        )
+            )
     await query.answer()
 
     if response.kind == "details":
@@ -241,23 +282,7 @@ async def handle_v3_callback(
         _set_listing_touchpoint(context, "listing_details")
     elif response.kind == "photos":
         await _render_photos(update, context, response, query=query)
-        action = str(getattr(dispatched, "action", "") or "")
-        callback = dispatched.callback
-        is_expand = bool(
-            getattr(response, "expand_only", False)
-            or (
-                callback is not None
-                and getattr(callback, "target_index", None) is not None
-                and int(getattr(callback, "target_index") or 0) > 0
-            )
-        )
-        if is_expand:
-            _set_listing_touchpoint(context, "listing_photos_expand")
-        else:
-            _set_listing_touchpoint(
-                context,
-                "listing_details" if action == "details" else "listing_photos",
-            )
+        _set_listing_touchpoint(context, "listing_photos")
     elif response.kind == "card":
         await render_search_card_response(update, context, response, query=query)
     elif response.kind == "transition" and response.transition in {"book", "similar", "change_search"} and transition_views is not None:

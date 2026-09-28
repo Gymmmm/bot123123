@@ -161,7 +161,7 @@ def test_details_and_photos_contract_has_real_fields_three_entries_and_no_intern
     photos = build_photos_response(view)
     photo_labels = _labels(photos.action_rows)
     # Photos keyboard uses consult action
-    assert "中文顾问" in "".join(photo_labels)
+    assert "咨询这套" in "".join(photo_labels)
     assert "返回房源详情" not in photo_labels
     assert "LST_INTERNAL_1" not in photos.text
     # Photo caption stays short

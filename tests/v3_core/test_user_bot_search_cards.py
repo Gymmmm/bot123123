@@ -94,7 +94,7 @@ def test_search_card_preserves_fixed_sha_copy_and_uses_frozen_cover(tmp_path):
     assert card.photo_path == str(cover)
     assert _actions(card) == [
         ["previous", "next"],
-        ["details", "book"],
+        ["photos", "book"],
         ["change_search"],
     ]
 
@@ -152,7 +152,7 @@ def test_search_card_listing_actions_target_current_public_identity():
     actions = [item for row in card.action_rows for item in row]
 
     assert _actions(card) == [
-        ["details", "book"],
+        ["photos", "book"],
         ["change_search"],
     ]
     for action in actions:
@@ -192,7 +192,7 @@ def test_live_reserved_status_changes_badge_without_changing_frozen_facts():
     assert "$800/月" in card.text
     assert "19楼" in card.text
     assert "🟡 已有预约，仍可预约" in card.text
-    assert _actions(card)[0] == ["details", "book"]
+    assert _actions(card)[0] == ["photos", "book"]
 
 
 def test_build_search_cards_builds_one_card_per_result():

@@ -73,7 +73,7 @@ def test_media_preparation_scrubs_to_derived_files_before_selection(tmp_path):
     assert all(prepared_dir in Path(path).parents for path in prepared.gallery_paths)
     assert all(Path(path).parent.name == "gallery" for path in prepared.gallery_paths)
     assert all(Path(path).name.endswith("_gallery.jpg") for path in prepared.gallery_paths)
-    assert prepared.source_identity["gallery_brand_revision"] == "qiaolian_gallery_v11_no_cover_dup_20260925"
+    assert prepared.source_identity["gallery_brand_revision"] == "qiaolian_gallery_v12_new_top_right_logo_20260929"
     assert all(str(Path(path).resolve()) not in prepared.gallery_paths for path in paths)
     assert [_sha(path) for path in paths] == before
 
@@ -155,11 +155,9 @@ def test_source_scrub_crops_bottom_contact_banner(tmp_path):
     assert Path(dst).is_file()
 
 
-def test_resolve_gallery_logo_path_maps_three_cover_styles():
+def test_resolve_gallery_logo_path_uses_new_mark_for_all_cover_styles():
     from v3_core.media.photo_formatter import (
-        BLACK_GOLD_LOGO,
-        CLASSIC_BLUE_LOGO,
-        RIGHT_PRICE_LOGO,
+        CURRENT_LOGO,
         resolve_gallery_logo_path,
     )
 
@@ -168,16 +166,8 @@ def test_resolve_gallery_logo_path_maps_three_cover_styles():
     gold = resolve_gallery_logo_path("black_gold")
     alias = resolve_gallery_logo_path("villa_premium")
     premium = resolve_gallery_logo_path("premium_photo")
-    assert right == RIGHT_PRICE_LOGO
-    assert classic == CLASSIC_BLUE_LOGO
-    assert gold == BLACK_GOLD_LOGO
-    assert alias == BLACK_GOLD_LOGO
-    assert premium == BLACK_GOLD_LOGO
-    assert classic != right
-    assert gold != right
-    assert CLASSIC_BLUE_LOGO.is_file()
-    assert RIGHT_PRICE_LOGO.is_file()
-    assert BLACK_GOLD_LOGO.is_file()
+    assert all(path == CURRENT_LOGO for path in (right, classic, gold, alias, premium))
+    assert CURRENT_LOGO.is_file()
 
 
 def test_prepare_black_gold_uses_style_keyed_gallery_filenames(tmp_path):

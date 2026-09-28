@@ -242,26 +242,19 @@ async def _render_photos(
 ) -> None:
     if result.photos is None:
         raise ValueError("start_photos_result_missing_response")
-    from .telegram_photos_render import send_listing_photos_album
-
     photos = result.photos
-    keyboard = None
-    if not bool(getattr(photos, "expand_only", False)):
-        keyboard = _listing_keyboard(
-            photos,
-            advisor_url=advisor_url,
-            channel_url=channel_url,
+    keyboard = build_action_keyboard(photos.action_rows)
+    if photos.photo_path:
+        with Path(photos.photo_path).open("rb") as frame:
+            await context.bot.send_photo(
+                chat_id=_chat_id(update), photo=frame, caption=photos.text,
+                parse_mode=ParseMode.HTML, reply_markup=keyboard,
+            )
+    else:
+        await context.bot.send_message(
+            chat_id=_chat_id(update), text=photos.text,
+            parse_mode=ParseMode.HTML, reply_markup=keyboard,
         )
-    await send_listing_photos_album(
-        context.bot,
-        chat_id=_chat_id(update),
-        media_groups=photos.media_groups,
-        media_caption=str(getattr(photos, "media_caption", "") or ""),
-        photo_path=str(getattr(photos, "photo_path", "") or ""),
-        text=photos.text,
-        reply_markup=keyboard,
-        expand_only=bool(getattr(photos, "expand_only", False)),
-    )
 
 
 def _support_keyboard(*, advisor_url: str = "", channel_url: str = "") -> InlineKeyboardMarkup:

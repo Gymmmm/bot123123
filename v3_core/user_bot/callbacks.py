@@ -78,6 +78,8 @@ def encode_semantic_action(action: SemanticAction) -> str:
         return encode_card_callback(action.target_index, action.target_public_listing_id)
     if clean == "change_search":
         return encode_change_search_callback()
+    if clean == "noop":
+        return f"{PREFIX}:noop"
     if clean in _LISTING_ACTIONS:
         photo_offset = None
         if clean == "photos" and action.target_index is not None:

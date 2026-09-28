@@ -6,7 +6,9 @@ shots, white footer with 侨联地产 / 出租房源. Pure Pillow — no Chromiu
 from __future__ import annotations
 
 import hashlib
+import os
 from pathlib import Path
+import tempfile
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -171,3 +173,57 @@ def render_side_stack_collage(
 
 
 __all__ = ["render_side_stack_collage"]
+
+
+def render_gallery_page(
+    photo_paths: tuple[str, ...], *, public_listing_id: str, page_index: int
+) -> str:
+    """Render up to four real photos into one cached Telegram frame."""
+    if not photo_paths or len(photo_paths) > 4:
+        raise ValueError("gallery_page_requires_one_to_four_photos")
+    paths = tuple(Path(raw).resolve(strict=True) for raw in photo_paths)
+    signature = "|".join(
+        f"{path}:{path.stat().st_size}:{path.stat().st_mtime_ns}" for path in paths
+    )
+    digest = hashlib.sha256(
+        f"gallery-v1|{public_listing_id}|{page_index}|{signature}".encode()
+    ).hexdigest()[:24]
+    target = _cache_dir() / f"gallery_{digest}.jpg"
+    if target.is_file():
+        return str(target)
+
+    width, height, gap = 1200, 1600, 8
+    canvas = Image.new("RGB", (width, height), "white")
+    if len(paths) == 1:
+        boxes = [(0, 0, width, height)]
+    elif len(paths) == 2:
+        boxes = [(0, 0, (width-gap)//2, height), ((width+gap)//2, 0, width, height)]
+    elif len(paths) == 3:
+        left = (width-gap)//2
+        boxes = [(0, 0, left, height), (left+gap, 0, width, (height-gap)//2),
+                 (left+gap, (height+gap)//2, width, height)]
+    else:
+        mid_x, mid_y = (width-gap)//2, (height-gap)//2
+        boxes = [(0, 0, mid_x, mid_y), (mid_x+gap, 0, width, mid_y),
+                 (0, mid_y+gap, mid_x, height), (mid_x+gap, mid_y+gap, width, height)]
+    for path, (x1, y1, x2, y2) in zip(paths, boxes):
+        canvas.paste(_cover_fit(path, x2-x1, y2-y1), (x1, y1))
+    brand_path = Path(__file__).resolve().parents[1] / "media" / "assets" / "qiaolian_new_logo_20260929.jpeg"
+    if brand_path.is_file():
+        with Image.open(brand_path) as brand_source:
+            brand = brand_source.convert("RGB")
+            brand.thumbnail((330, 115), Image.Resampling.LANCZOS)
+            x, y = width - brand.width - 20, 20
+            canvas.paste(brand, (x, y))
+    fd, temp_name = tempfile.mkstemp(prefix="gallery_", suffix=".jpg", dir=target.parent)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            canvas.save(stream, format="JPEG", quality=86, optimize=True)
+        os.replace(temp_name, target)
+    finally:
+        if os.path.exists(temp_name):
+            os.unlink(temp_name)
+    return str(target)
+
+
+__all__.append("render_gallery_page")

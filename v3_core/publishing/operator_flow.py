@@ -327,6 +327,7 @@ class OperatorPublisherAdminController(ProductionSimplePublisherAdminController)
             )
             context.user_data.pop(NEW_LISTING_STATE_KEY, None)
             return
+        self.repository.set_item(str(row["offer_id"]), state="held", origin="manual")
         await self.show_manual_confirmation(message, context)
 
     def _manual_values(self, detail: Any) -> dict[str, Any]:
@@ -622,6 +623,7 @@ class OperatorPublisherAdminController(ProductionSimplePublisherAdminController)
                 task = state.get("_album_task")
                 if task and not task.done():
                     task.cancel()
+                self.repository.cancel_manual_draft(str(state.get("offer_id") or ""))
             await query.message.reply_text("已取消本次房源发布。", reply_markup=InlineKeyboardMarkup([self.home_row()]))
             return True
         if action == "source_add":

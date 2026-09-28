@@ -122,6 +122,7 @@ def adapt_callback_response(
                 kind="details",
                 status="ok",
                 text=listing.details.text,
+                photo_path=str(getattr(listing.details, "photo_path", "") or ""),
                 keyboard=build_action_keyboard(listing.details.action_rows),
                 listing_summary=str(getattr(listing.details, "listing_summary", "") or ""),
             )

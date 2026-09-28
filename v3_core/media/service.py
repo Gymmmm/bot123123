@@ -23,7 +23,7 @@ from .source_scrub import scrub_file
 
 MAX_SCRUB_COVERAGE = 0.08
 SCRUB_REVISION = "source_scrub_v3_center_watermark_20260925"
-GALLERY_BRAND_REVISION = "qiaolian_gallery_v11_no_cover_dup_20260925"
+GALLERY_BRAND_REVISION = "qiaolian_gallery_v12_new_top_right_logo_20260929"
 
 
 @dataclass(frozen=True)
@@ -160,7 +160,7 @@ class MediaPreparationService:
                     source,
                     target,
                     logo_path=resolve_gallery_logo_path(cover_style),
-                    logo_position="top_left",
+                    logo_position="top_right",
                     add_logo=True,
                     enhance=True,
                     cover_style=cover_style,

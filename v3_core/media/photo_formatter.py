@@ -33,6 +33,7 @@ LOGO_MAX_PHOTO_HEIGHT_RATIO = 0.22
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 
 ROOT = Path(__file__).resolve().parent
+CURRENT_LOGO = ROOT / "assets" / "qiaolian_new_logo_20260929.jpeg"
 CLASSIC_BLUE_LOGO = ROOT / "assets" / "qiaolian_corner_classic_blue.png"
 RIGHT_PRICE_LOGO = ROOT / "assets" / "qiaolian_corner_right_price.png"
 BLACK_GOLD_LOGO = ROOT / "assets" / "qiaolian_corner_black_gold.png"
@@ -202,6 +203,8 @@ def resolve_gallery_logo_path(cover_style: str | None) -> Path | None:
     Portrait variants reuse the same family logo as their landscape twin.
     Empty style keeps the historical right_price (日常白) default.
     """
+    if CURRENT_LOGO.is_file():
+        return CURRENT_LOGO
     raw = str(cover_style or "").strip().lower()
     if not raw:
         path = RIGHT_PRICE_LOGO

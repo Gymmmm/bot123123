@@ -13,10 +13,13 @@ import os
 from pathlib import Path
 from typing import Any
 
+from PIL import Image, ImageOps
+
 from .cover_styles import (
     cover_style_family,
     cover_template_path,
     cover_viewport,
+    is_video_cover_style,
     normalize_cover_style,
 )
 from .photo_formatter import resolve_gallery_logo_path
@@ -44,6 +47,7 @@ class CoverRenderData:
     highlight_1: str = ""
     highlight_2: str = ""
     highlight_3: str = ""
+    gallery_paths: tuple[str, ...] = ()
 
     def tokens(self, source_image: str, *, style: str | None = None) -> dict[str, str]:
         deal_type = str(self.deal_type or "rent").lower()
@@ -111,6 +115,36 @@ def _file_to_data_url(path: str, *, enhance: bool = False) -> str:
     mime = mimetypes.guess_type(source.name)[0] or "image/jpeg"
     encoded = base64.b64encode(source.read_bytes()).decode("ascii")
     return f"data:{mime};base64,{encoded}"
+
+
+def append_real_photo_strip(output: Path, gallery_paths: tuple[str, ...]) -> None:
+    """Keep the factual poster legible above a strip of up to three real photos."""
+    thumbs = []
+    for raw in dict.fromkeys(gallery_paths):
+        try:
+            with Image.open(raw) as source_thumb:
+                thumbs.append(ImageOps.exif_transpose(source_thumb).convert("RGB"))
+        except (OSError, ValueError):
+            continue
+        if len(thumbs) == 3:
+            break
+    if not thumbs:
+        return
+    with Image.open(output) as poster_source:
+        poster_image = poster_source.convert("RGB")
+    width, height = poster_image.size
+    strip_y = int(height * 0.73)
+    gap = max(5, width // 160)
+    collage = Image.new("RGB", (width, height), "white")
+    collage.paste(poster_image.resize((width, strip_y - gap), Image.Resampling.LANCZOS), (0, 0))
+    count = len(thumbs)
+    for index, thumb in enumerate(thumbs):
+        left = (width * index + gap * (count - index)) // count
+        right = (width * (index + 1) - gap * index) // count
+        if right > left:
+            collage.paste(ImageOps.fit(thumb, (right - left, height - strip_y),
+                                        method=Image.Resampling.LANCZOS), (left, strip_y))
+    collage.save(output, format="JPEG" if output.suffix.lower() in {".jpg", ".jpeg"} else "PNG")
 
 
 def render_cover(
@@ -214,6 +248,24 @@ def render_cover(
                     )
                 else:
                     brand_logo.evaluate("el => { el.removeAttribute('src'); el.style.display = 'none'; }")
+                if logo_src:
+                    # Keep the same supplied brand mark at the top right on every cover style.
+                    page.evaluate("""() => {
+                        const poster = document.querySelector('.poster');
+                        const logo = document.querySelector('#brandLogo');
+                        if (poster && logo) {
+                            const oldBrand = logo.parentElement;
+                            const oldText = oldBrand && oldBrand.querySelector('.brand-text');
+                            if (oldText) oldText.style.display = 'none';
+                            poster.appendChild(logo);
+                            Object.assign(logo.style, {
+                                position: 'absolute', top: '24px', right: '24px', left: 'auto',
+                                bottom: 'auto', width: '27%', height: 'auto', maxWidth: '330px',
+                                maxHeight: '120px', objectFit: 'contain', background: 'white',
+                                borderRadius: '10px', zIndex: '99', display: 'block',
+                            });
+                        }
+                    }""")
 
             field_ids = {
                 "ref": "REF",
@@ -309,6 +361,10 @@ def render_cover(
             poster.screenshot(path=str(output), type="jpeg" if output.suffix.lower() in {".jpg", ".jpeg"} else "png")
         finally:
             browser.close()
+    # Channel thumbnail: factual cover above up to three distinct real room shots.
+    # The image stays one Telegram photo; the User Bot gallery uses larger pages.
+    if not is_video_cover_style(normalized_style):
+        append_real_photo_strip(output, data.gallery_paths)
     return str(output)
 
 

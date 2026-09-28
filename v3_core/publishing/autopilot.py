@@ -427,6 +427,20 @@ class AutoPublishRepository:
             )
             conn.commit()
 
+    def cancel_manual_draft(self, offer_id: str) -> None:
+        """Stop a cancelled manual preview before the automatic worker can send it."""
+        if not str(offer_id or "").strip():
+            return
+        with self._connect() as conn:
+            conn.execute(
+                """UPDATE publisher_auto_items_v3
+                   SET state='ignored',ignored=1,updated_at=CURRENT_TIMESTAMP
+                   WHERE offer_id=? AND origin='manual'
+                     AND state IN ('queued','held','preview_ready','exception')""",
+                (str(offer_id),),
+            )
+            conn.commit()
+
     def mark_listing_pending_for_auto_publish(self, listing_id: str) -> None:
         """Make the first automatic public state explicitly await confirmation."""
         with self._connect() as conn:

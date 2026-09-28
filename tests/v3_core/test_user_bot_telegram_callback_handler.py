@@ -177,7 +177,7 @@ async def test_channel_details_return_home_without_channel_or_change_conditions_
 
 
 @pytest.mark.asyncio
-async def test_photos_send_frozen_media_then_action_message(tmp_path):
+async def test_photos_edit_one_message_without_album_or_action_message(tmp_path):
     one = tmp_path / "1.jpg"
     two = tmp_path / "2.jpg"
     three = tmp_path / "3.jpg"
@@ -221,13 +221,9 @@ async def test_photos_send_frozen_media_then_action_message(tmp_path):
 
     assert outcome.handled and outcome.response is not None
     assert outcome.response.kind == "photos"
-    assert [call[0] for call in context.bot.calls] == ["send_media_group", "send_message"]
-    media = context.bot.calls[0][1]["media"]
-    assert len(media) == 3
-    assert getattr(media[0], "caption", None)
-    assert not getattr(media[1], "caption", None)
-    assert "🟢 当前可预约" in context.bot.calls[1][1]["text"]
-    assert [call[0] for call in query.calls] == ["answer"]
+    assert context.bot.calls == []
+    assert [call[0] for call in query.calls] == ["answer", "edit_media"]
+    assert query.calls[-1][2]["media"].caption == "🟢 当前可预约"
 
 
 @pytest.mark.asyncio
@@ -410,7 +406,7 @@ def test_details_from_album_edits_caption_or_text(tmp_path):
     assert context.bot.calls == []
 
 
-def test_photos_expand_sends_remaining_without_action_bar(tmp_path):
+def test_old_expand_callback_edits_current_photo_without_album(tmp_path):
     import asyncio
 
     frame_a = tmp_path / "5.jpg"
@@ -445,6 +441,6 @@ def test_photos_expand_sends_remaining_without_action_bar(tmp_path):
     )
     assert outcome.handled and outcome.response is not None
     assert outcome.response.expand_only
-    assert [call[0] for call in query.calls] == ["answer"]
-    assert [call[0] for call in context.bot.calls] == ["send_media_group"]
-    assert context.user_data.get("v3_listing_touchpoint") == "listing_photos_expand"
+    assert [call[0] for call in query.calls] == ["answer", "edit_media"]
+    assert context.bot.calls == []
+    assert context.user_data.get("v3_listing_touchpoint") == "listing_photos"

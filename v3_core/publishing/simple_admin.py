@@ -709,6 +709,7 @@ class SimplePublisherAdminController:
             self.repository.mark_sale_store_only(offer_id, origin="manual")
             await update.effective_message.reply_text("✅ 已识别为出售房源并保存归档。出售房源不会发布到租赁频道。", reply_markup=InlineKeyboardMarkup([self.home_row()]))
             return
+        self.repository.set_item(offer_id, state="held", origin="manual")
         await self.prepare_manual_preview(update.effective_message, context, review_id=review_id, offer_id=offer_id)
 
     async def prepare_manual_preview(
@@ -961,11 +962,18 @@ class SimplePublisherAdminController:
                 task = state.get("_album_task")
                 if task and not task.done():
                     task.cancel()
+                self.repository.cancel_manual_draft(str(state.get("offer_id") or ""))
             await query.message.reply_text(
                 "已取消本次房源发布。",
                 reply_markup=InlineKeyboardMarkup([self.home_row()]),
             )
         elif action == "manual_send" and len(parts) == 4:
+            state = context.user_data.get(NEW_LISTING_STATE_KEY)
+            if (not isinstance(state, dict)
+                    or str(state.get("offer_id") or "") != parts[3]
+                    or str(state.get("package_id") or "") != parts[2]):
+                await query.message.reply_text("这份预览已失效，请重新新建房源。", reply_markup=InlineKeyboardMarkup([self.home_row()]))
+                return True
             package = await asyncio.to_thread(
                 self.workflow.approve_package,
                 package_id=parts[2],

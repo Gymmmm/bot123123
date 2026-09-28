@@ -115,6 +115,7 @@ class V3PublisherApplication(PublisherAdminBot):
         if isinstance(state,dict):
             task=state.get("_album_task")
             if task and not task.done(): task.cancel()
+            self.auto_repository.cancel_manual_draft(str(state.get("offer_id") or ""))
         context.user_data.pop("v3_publisher_edit",None); context.user_data.pop(BROADCAST_EDIT_STATE_KEY,None); context.user_data.pop(SIMPLE_EDIT_STATE_KEY,None); context.user_data.pop(BATCH_STATUS_SYNC_KEY,None); context.user_data.pop("v3_inventory_batch_selection",None)
         await update.effective_message.reply_text("已取消当前操作。",reply_markup=InlineKeyboardMarkup([self._home_button()]))
 

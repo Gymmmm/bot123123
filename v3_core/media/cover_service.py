@@ -118,6 +118,10 @@ class CoverRenderService:
             highlight_1="",
             highlight_2="",
             highlight_3="",
+            gallery_paths=tuple(
+                path for path in media.gallery_paths
+                if Path(path).resolve() != cover_source
+            )[:3],
         )
         target = (
             Path(output_path).expanduser().resolve()

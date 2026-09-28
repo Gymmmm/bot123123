@@ -1,8 +1,6 @@
 """Telegram-neutral public listing responses for the V3 User Bot.
 
-Photos entry sends a native Telegram album (first-batch curated frames) plus a
-separate status/action message. Remaining frames expand on demand — no Bot-side
-上一张 / 下一张 flipper state.
+Photos entry renders one cached collage per page for in-place Telegram edits.
 """
 from __future__ import annotations
 
@@ -34,6 +32,7 @@ InternalListingAction = Literal[
     "previous",
     "next",
     "change_search",
+    "noop",
 ]
 
 
@@ -50,14 +49,14 @@ class PublicDetailsResponse:
     text: str
     action_rows: tuple[tuple[SemanticAction, ...], ...]
     listing_summary: str = ""
+    photo_path: str = ""
 
 
 @dataclass(frozen=True)
 class PublicPhotosResponse:
-    """Native album payload + separate status/action message.
+    """One cached photo page and its inline keyboard.
 
-    ``expand_only`` means the user already saw the first batch and only remaining
-    frames should be sent (no second action keyboard).
+    Legacy media_groups / expand_only fields remain for older integration callers.
     """
 
     media_groups: tuple[tuple[str, ...], ...]
@@ -134,65 +133,24 @@ def _photo_actions(
     bookable: bool,
     inventory_status: str,
     public_listing_id: str,
-    has_more: bool,
+    page_index: int,
+    page_count: int,
 ) -> tuple[tuple[SemanticAction, ...], ...]:
-    """FINAL LOCK status matrix for the album action bar.
-
-    Bookability still comes from the unified ``bookable`` flag (active/reserved
-    via inventory_status_bookable / PublishedListingView.bookable). Never invent
-    a second bookable rule here.
-    """
+    """Page navigation and bookability use the public listing contract."""
     target = str(public_listing_id or "").strip()
-    status = str(inventory_status or "").strip().lower()
-
-    def _expand_or_details() -> SemanticAction:
-        if has_more:
-            return SemanticAction(
-                "📷 查看全部实拍",
-                "photos",
-                target,
-                target_index=PHOTOS_FIRST_BATCH,
-            )
-        return SemanticAction("📷 房源详情", "details", target)
-
-    if bookable or status in {"active", "reserved"}:
-        # Book button only when unified bookable is true.
-        first: list[SemanticAction] = [_expand_or_details()]
-        if bookable:
-            first.append(SemanticAction("📅 预约看房", "book", target))
-        return (
-            tuple(first),
-            (SemanticAction("💬 中文顾问", "consult", target),),
-        )
-
-    if status == "pending":
-        first_row: list[SemanticAction] = []
-        if has_more:
-            first_row.append(
-                SemanticAction(
-                    "📷 查看全部实拍",
-                    "photos",
-                    target,
-                    target_index=PHOTOS_FIRST_BATCH,
-                )
-            )
-        first_row.append(SemanticAction("💬 中文顾问", "consult", target))
-        return (
-            tuple(first_row),
-            (
-                SemanticAction("🏠 帮我找房", "change_search", target),
-                SemanticAction("🔍 找相似", "similar", target),
-            ),
-        )
-
-    # rented / offline / inactive / withdrawn / unknown non-bookable
-    return (
-        (
-            SemanticAction("🏠 帮我找房", "change_search", target),
-            SemanticAction("🔍 找相似", "similar", target),
-        ),
-        (SemanticAction("💬 中文顾问", "consult", target),),
-    )
+    del inventory_status
+    navigation: list[SemanticAction] = []
+    if page_index > 0:
+        navigation.append(SemanticAction("⬅️ 上一页", "photos", target, (page_index - 1) * 4))
+    navigation.append(SemanticAction(f"{page_index + 1} / {page_count}", "noop", target))
+    if page_index + 1 < page_count:
+        navigation.append(SemanticAction("下一页 ➡️", "photos", target, (page_index + 1) * 4))
+    rows: list[tuple[SemanticAction, ...]] = [tuple(navigation)]
+    if bookable:
+        rows.append((SemanticAction("📅 预约看房", "book", target),))
+    rows.append((SemanticAction("💬 咨询这套", "consult", target),))
+    rows.append((SemanticAction("⬅️ 返回房源", "details", target),))
+    return tuple(rows)
 
 def _utilities_line(*, water: str, electric: str) -> str:
     parts: list[str] = []
@@ -316,6 +274,7 @@ def build_details_response(view: PublishedListingView) -> PublicDetailsResponse:
             bookable=details.bookable,
             public_listing_id=details.public_listing_id,
         ),
+        photo_path=_frozen_cover_path(view),
     )
 
 
@@ -567,14 +526,16 @@ def build_photos_response(
     offset: int = 0,
     page_size: int | None = None,
 ) -> PublicPhotosResponse:
-    """First screen: side-stack collage (1 JPG); expand: native MediaGroup originals.
-
-    ``offset`` > 0 means 「查看全部实拍」→ send original frames (cap 10).
-    ``page_size`` ignored (call-site compatibility).
-    """
+    """A single real-photo collage; old offset 4 opens page two in place."""
     del page_size
     details = build_public_listing_details(view)
-    all_photos = _gallery_photo_paths(view)[:PHOTOS_MAX_TOTAL]
+    # A marketing cover is not a room photo. Keep only actual frozen gallery files.
+    cover = _frozen_cover_path(view)
+    all_photos = tuple(dict.fromkeys(
+        path for raw in view.gallery
+        if (path := _existing_file(raw)) and path != cover
+        and Path(path).name.lower() not in {"cover.jpg", "cover.jpeg", "cover.png", "cover.webp"}
+    ))[:PHOTOS_MAX_TOTAL]
     total = len(all_photos)
     summary = listing_summary_bits(
         project_name=details.project_name,
@@ -583,99 +544,42 @@ def build_photos_response(
         location=details.location,
     )
 
-    start = max(0, int(offset or 0))
-    if start > 0:
-        # Full original album (collage was only a preview card).
-        originals = all_photos[:PHOTOS_MAX_TOTAL]
-        groups = _as_media_groups(originals)
-        first = originals[0] if originals else ""
-        caption = (
-            _album_media_caption(
-                public_listing_id=details.public_listing_id,
-                shown=len(originals),
-                total=total,
-                expand=True,
-            )
-            if originals
-            else ""
-        )
-        return PublicPhotosResponse(
-            media_groups=groups,
-            text="",
-            media_caption=caption,
-            detail_text="",
-            photo_path=first,
-            photo_index=start,
-            photo_total=total,
-            listing_summary=summary,
-            action_rows=(),
-            expand_only=True,
-        )
-
-    collage = _try_side_collage(
-        all_photos,
-        public_listing_id=details.public_listing_id,
-    )
-    if collage:
-        return PublicPhotosResponse(
-            media_groups=((collage,),),
-            text=_photos_action_text(details),
-            media_caption="",
-            detail_text="",
-            photo_path=collage,
-            photo_index=0,
-            photo_total=total,
-            listing_summary=summary,
-            action_rows=_photo_actions(
-                bookable=details.bookable,
-                inventory_status=details.inventory_status,
-                public_listing_id=details.public_listing_id,
-                # Collage uses 4 frames; expand always offers the native originals.
-                has_more=True,
-            ),
-            expand_only=False,
-        )
-
-    # Fallback: native first-batch album (0/1 photo, or collage render failed).
-    if total > PHOTOS_FIRST_BATCH:
-        batch = all_photos[:PHOTOS_FIRST_BATCH]
-        has_more = True
-    else:
-        batch = all_photos
-        has_more = False
-
-    groups = _as_media_groups(batch)
-    first = batch[0] if batch else ""
-    if batch:
-        caption = _album_media_caption(
-            public_listing_id=details.public_listing_id,
-            shown=len(batch),
-            total=total,
-            expand=False,
-        )
-        text = _photos_action_text(details)
-    else:
-        caption = ""
-        text = (
-            f"{_detail_status_line(details)}{chr(10)}{chr(10)}"
-            f"这套房的实拍暂时没有加载出来。{chr(10)}"
-            f"可以稍后再试，或直接联系顾问。"
-        )
-
+    page_count = max(1, (total + 3) // 4)
+    page_index = min(max(0, int(offset or 0)) // 4, page_count - 1)
+    page = all_photos[page_index * 4 : (page_index + 1) * 4]
+    frame = ""
+    if page:
+        try:
+            from .photos_collage import render_gallery_page
+            frame = render_gallery_page(page, public_listing_id=details.public_listing_id, page_index=page_index)
+        except (OSError, ValueError):
+            # An unreadable frame must not take down the callback.
+            frame = page[0] if Path(page[0]).is_file() else ""
+    area = details.location if not location_display_overlaps_project(details.project_name, details.location) else ""
+    title = "｜".join(part for part in (details.project_name, area) if part)
+    caption = "\n".join(part for part in (
+        he(title or "房源实拍"),
+        he(str(details.layout or "")),
+        he(_format_price(details.monthly_rent_usd)),
+        f"第 {page_index + 1} / {page_count} 页",
+    ) if part)
+    if not page:
+        caption = "这套房的实拍暂时没有加载出来。\n可以稍后再试，或直接联系顾问。"
     return PublicPhotosResponse(
-        media_groups=groups,
-        text=text,
+        media_groups=((frame,),) if frame else (),
+        text=caption,
         media_caption=caption,
         detail_text="",
-        photo_path=first,
-        photo_index=0,
+        photo_path=frame,
+        photo_index=page_index,
         photo_total=total,
         listing_summary=summary,
         action_rows=_photo_actions(
             bookable=details.bookable,
             inventory_status=details.inventory_status,
             public_listing_id=details.public_listing_id,
-            has_more=has_more,
+            page_index=page_index,
+            page_count=page_count,
         ),
         expand_only=False,
     )
