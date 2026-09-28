@@ -42,14 +42,21 @@ HANDOVER_TEXT = (
     "• 费用和押金"
 )
 
-DEPOSIT_TEXT = HANDOVER_TEXT
+DEPOSIT_TEXT = (
+    "💰 <b>押金与费用确认</b>\n\n"
+    "付款前把金额、用途、收款方和退还条件确认清楚，并保留转账及聊天记录。\n\n"
+    "建议确认：\n\n"
+    "• 押金金额与币种\n"
+    "• 房租及付款周期\n"
+    "• 管理费、水电、网络等费用\n"
+    "• 押金退还时间与扣款条件\n"
+    "• 收款人和合同主体是否一致"
+)
 
 MOVING_TEXT = (
     "🚚 <b>搬家协助</b>\n\n"
     "请说明搬家日期、出发地、目的地，以及大概物品情况。"
 )
-
-
 
 
 def build_assurance_home_view() -> AssuranceView:
@@ -63,9 +70,9 @@ def build_assurance_home_view() -> AssuranceView:
         ),
     )
 
+
 def build_signing_view() -> AssuranceView:
     return build_assurance_home_view()
-
 
 
 def build_handover_view() -> AssuranceView:
@@ -86,9 +93,9 @@ def build_deposit_view(
 ) -> AssuranceView:
     return AssuranceView(
         kind="deposit",
-        text=HANDOVER_TEXT,
+        text=DEPOSIT_TEXT,
         rows=(
-            (AssuranceChoice("查看入住交接清单", callback_data="v3u:assure:deposit_download"),),
+            (AssuranceChoice("查看押金确认清单", callback_data="v3u:assure:deposit_download"),),
             (AssuranceChoice(back_label, callback_data=back_callback),),
         ),
     )
@@ -103,6 +110,7 @@ def build_moving_view() -> AssuranceView:
             (AssuranceChoice("⬅️ 返回入住服务", callback_data="v3u:service:concierge"),),
         ),
     )
+
 
 @dataclass(frozen=True)
 class AssuranceAssetBundle:
@@ -120,13 +128,14 @@ def assurance_asset_bundle(repo_root: str | Path, kind: str) -> AssuranceAssetBu
         raise ValueError("unsupported_assurance_asset")
     root = Path(repo_root).expanduser().resolve()
     generated = root / "assets" / "v2_2" / "generated"
+    is_deposit = clean == "deposit"
     return AssuranceAssetBundle(
         kind=clean,  # type: ignore[arg-type]
-        image_path=generated / ("handover.png" if clean == "handover" else "deposit.png"),
-        pdf_path=generated / ("handover.pdf" if clean == "handover" else "deposit.pdf"),
-        title="入住交接留档",
-        instruction=HANDOVER_TEXT,
-        filename="入住交接清单.pdf",
+        image_path=generated / ("deposit.png" if is_deposit else "handover.png"),
+        pdf_path=generated / ("deposit.pdf" if is_deposit else "handover.pdf"),
+        title="押金与费用确认" if is_deposit else "入住交接留档",
+        instruction=DEPOSIT_TEXT if is_deposit else HANDOVER_TEXT,
+        filename="押金确认清单.pdf" if is_deposit else "入住交接清单.pdf",
     )
 
 
