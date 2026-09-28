@@ -24,6 +24,21 @@ const has    = v => !!text(v) && !['null','undefined','未知','none','[]'].incl
 const fmt    = v => { const n=Number(v); return Number.isFinite(n)&&n>0 ? '$'+n.toLocaleString('en-US') : '' };
 const first  = (o, keys) => keys.map(k=>o?.[k]).find(has)||'';
 const fmtNum= n => Number.isFinite(n)&&n>0 ? n.toLocaleString('en-US') : '';
+const fmtUpdated = v => {
+  const m = text(v).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${Number(m[2])}月${Number(m[3])}日更新` : '';
+};
+const isInternalListing = i => /^QL-VERIFY-/i.test(text(i?.public_id));
+function isApartment(facts) {
+  return /公寓|condo|apartment/i.test([facts?.type, facts?.subtype].filter(Boolean).join(' '));
+}
+function layoutSummary(facts) {
+  if (has(facts?.layout)) return text(facts.layout);
+  return [
+    facts?.bedrooms ? `${facts.bedrooms}房` : '',
+    facts?.bathrooms ? `${facts.bathrooms}卫` : '',
+  ].filter(Boolean).join('');
+}
 
 // Parse title and use it only as a fallback when canonical fields are absent.
 const num = v => {
@@ -103,7 +118,7 @@ async function loadMeta() {
     [...areas].filter(has).sort().forEach(v => {
       $('area')?.insertAdjacentHTML('beforeend',`<option value="${esc(v)}">${esc(v)}</option>`);
     });
-    [...types].filter(has).sort().forEach(v => {
+    [...types].filter(v => has(v) && text(v) !== '未知').sort().forEach(v => {
       $('type')?.insertAdjacentHTML('beforeend',`<option value="${esc(v)}">${esc(v)}</option>`);
     });
   } catch {}
@@ -124,8 +139,11 @@ async function loadList(reset = false) {
     const r = await fetch(API+'?'+queryParams(), { cache:'no-store' });
     if (!r.ok) throw 0;
     const d = await r.json();
-    allItems = Array.isArray(d.items) ? d.items : [];
-    total = Number.isFinite(Number(d.total)) ? Number(d.total) : allItems.length;
+    const rawItems = Array.isArray(d.items) ? d.items : [];
+    const hiddenInternal = rawItems.filter(isInternalListing).length;
+    allItems = rawItems.filter(i => !isInternalListing(i));
+    const apiTotal = Number.isFinite(Number(d.total)) ? Number(d.total) : rawItems.length;
+    total = Math.max(0, apiTotal - hiddenInternal);
     renderList();
     renderPager();
     updateHeroImage(allItems);
@@ -168,13 +186,14 @@ function cardMarkup(i) {
   const status = statusInfo(i.status);
   const photoCount = Array.isArray(i.gallery_urls) ? i.gallery_urls.filter(has).length : 0;
   const imgUrl = text(i.cover_url);
+  const layout = layoutSummary(facts);
   const specs = [
-    facts.bedrooms ? `${facts.bedrooms}房` : (facts.layout || ''),
-    facts.bathrooms ? `${facts.bathrooms}卫` : '',
+    layout,
     facts.size ? `${fmtNum(facts.size)}㎡` : '',
   ].filter(Boolean).join(' · ');
-  const ppsm = facts.size && num(i.sale_price_usd)
+  const ppsm = isApartment(facts) && facts.size && num(i.sale_price_usd)
     ? `约 ${fmt(Math.round(Number(i.sale_price_usd) / facts.size))}/㎡` : '';
+  const updated = fmtUpdated(i.updated_at);
   const descriptor = [facts.location, facts.subtype || facts.type].filter(Boolean)
     .filter((v, idx, arr) => arr.indexOf(v) === idx).join(' · ');
   const telegramUrl = `${ADVISOR}?text=${encodeURIComponent(
@@ -197,11 +216,12 @@ function cardMarkup(i) {
         ${descriptor ? `<p class="card-type">${esc(descriptor)}</p>` : ''}
         ${specs ? `<p class="card-specs"><span>${esc(specs)}</span></p>` : ''}
         ${ppsm ? `<p class="card-specs"><span class="card-ppsm">${esc(ppsm)}</span></p>` : ''}
+        ${updated ? `<p class="card-updated">${esc(updated)}</p>` : ''}
       </div>
     </button>
     <div class="card-actions">
-      <button type="button" class="detail-btn" data-id="${esc(id)}">查看详情</button>
-      <a href="${telegramUrl}" target="_blank" rel="noopener">咨询顾问</a>
+      <button type="button" class="detail-btn" data-id="${esc(id)}">看详情</button>
+      <a href="${telegramUrl}" target="_blank" rel="noopener">问这套</a>
     </div>
   </article>`;
 }
@@ -209,6 +229,7 @@ function cardMarkup(i) {
 // ── Detail ───────────────────────────────────────────────────────────────
 async function openDetail(id, push = true) {
   try {
+    if (isInternalListing({ public_id:id })) throw 0;
     const r = await fetch(API+'/'+encodeURIComponent(id), { cache:'no-store' });
     if (!r.ok) throw 0;
     const d = await r.json();
@@ -218,6 +239,7 @@ async function openDetail(id, push = true) {
     currentListing = i;
     galleryIndex = 0;
     const facts = listingFacts(i);
+    const layout = layoutSummary(facts);
     const price = fmt(i.sale_price_usd);
     const status = statusInfo(i.status);
     const desc = first(i,['description','description_text','adviser_copy','listing_description']);
@@ -236,7 +258,7 @@ async function openDetail(id, push = true) {
       statusEl.hidden = true;
     }
 
-    if (facts.size && num(i.sale_price_usd)) {
+    if (isApartment(facts) && facts.size && num(i.sale_price_usd)) {
       $('detailPpsm').textContent = `${fmt(Math.round(Number(i.sale_price_usd) / facts.size))}/㎡`;
       $('detailPpsmBlock').hidden = false;
     } else {
@@ -247,13 +269,11 @@ async function openDetail(id, push = true) {
       ['项目', facts.project],
       ['区域', facts.location],
       ['物业类型', facts.subtype || facts.type],
-      ['户型', facts.layout],
-      ['卧室', facts.bedrooms ? `${facts.bedrooms} 间` : ''],
-      ['卫浴', facts.bathrooms ? `${facts.bathrooms} 间` : ''],
+      ['户型', layout],
       ['面积', facts.size ? `${fmtNum(facts.size)} ㎡` : ''],
       ['楼层', facts.floor ? `${facts.floor} 楼` : ''],
       ['状态', status.label],
-      ['编号', text(i.public_id)],
+      ['最近更新', fmtUpdated(i.updated_at)],
     ].filter(([,v])=>has(v));
     $('detail-fields').innerHTML = fields.map(([l,v]) =>
       `<div class="param"><small>${esc(l)}</small><strong>${esc(v)}</strong></div>`
@@ -276,7 +296,16 @@ async function openDetail(id, push = true) {
 
     const telegramText = `你好，想咨询金边出售房源：\n编号：${text(i.public_id)}\n${text(i.title)}\n${price}`;
     $('detail-telegram').href = `${ADVISOR}?text=${encodeURIComponent(telegramText)}`;
-    $('detail-footer-meta').textContent = `${text(i.public_id)} · ${text(i.title)}`.slice(0,46);
+    const unavailable = ['已售','已下架'].includes(status.label);
+    const bookingText = unavailable
+      ? `你好，这套房源已经${status.label}，想找同区域、同预算的类似出售房源：\n编号：${text(i.public_id)}\n${text(i.title)}\n${price}`
+      : `你好，想预约看这套金边出售房源：\n编号：${text(i.public_id)}\n${text(i.title)}\n${price}`;
+    const booking = $('detail-book');
+    if (booking) {
+      booking.textContent = unavailable ? '找同类' : '预约看房';
+      booking.href = `${ADVISOR}?text=${encodeURIComponent(bookingText)}`;
+    }
+    $('detail-footer-meta').textContent = [facts.location || text(i.title), price].filter(has).join(' · ').slice(0,46);
 
     $('overlay').hidden = false;
     document.body.style.overflow = 'hidden';

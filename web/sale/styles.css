@@ -785,3 +785,23 @@ img { display:block; max-width:100% }
   .lightbox-nav.prev { left:8px }
   .lightbox-nav.next { right:8px }
 }
+
+
+/* SALE P1 — buyer decision polish */
+.card-updated {
+  margin-top:7px;
+  font-size:10px;
+  line-height:1.35;
+  color:var(--muted);
+}
+
+@media (max-width: 480px) {
+  .hero { height:160px }
+  .detail-footer {
+    flex-wrap:nowrap;
+    padding:8px 12px calc(8px + env(safe-area-inset-bottom, 0px));
+  }
+  .detail-footer-meta { display:none }
+  .detail-footer-actions { width:100%; gap:8px }
+  .detail-footer-actions a { flex:1; justify-content:center }
+}
