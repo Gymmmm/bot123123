@@ -54,31 +54,14 @@ JOIN listing_offers o ON o.offer_id=(
     WHERE o2.listing_id=l.listing_id
       AND o2.offer_type='sale'
       AND o2.offer_status='active'
-      AND o2.sale_price_usd IS NOT NULL
-      AND o2.sale_price_usd>0
       AND o2.publication_policy='store_only'
-      AND o2.publishable=0
     ORDER BY o2.updated_at DESC,o2.created_at DESC,o2.offer_id DESC
     LIMIT 1
 )
 WHERE l.data_status='current'
   AND l.inventory_status IN ('pending','active','reserved')
   AND TRIM(COALESCE(l.public_listing_id,''))<>''
-  AND (
-      TRIM(COALESCE(l.project_name,''))<>'' OR
-      TRIM(COALESCE(l.public_location_display,''))<>'' OR
-      TRIM(COALESCE(l.canonical_area_display,''))<>''
-  )
-  AND EXISTS (
-      SELECT 1 FROM media_assets m
-      WHERE m.owner_type='source_post'
-        AND CAST(m.owner_ref_id AS TEXT)=CAST(c.source_post_id AS TEXT)
-        AND m.asset_type='photo'
-        AND m.status='active'
-        AND TRIM(COALESCE(m.local_path,''))<>''
-        AND (TRIM(COALESCE(m.mime_type,''))='' OR LOWER(m.mime_type) LIKE 'image/%')
-        AND LOWER(COALESCE(m.mime_type,''))<>'image/svg+xml'
-  )
+
 """
 
 
@@ -216,7 +199,7 @@ class SaleCatalogRepository:
             "bathrooms": row["bathrooms"],
             "size_sqm": row["size_sqm"],
             "floor": str(row["floor"] or "").strip(),
-            "sale_price_usd": int(row["sale_price_usd"]),
+            "sale_price_usd": None if row["sale_price_usd"] is None else int(row["sale_price_usd"]),
             "status": _PUBLIC_STATUS.get(str(row["inventory_status"]), "在售"),
             "cover_url": gallery[0] if gallery else "",
             "gallery_urls": gallery,
@@ -304,8 +287,6 @@ class SaleCatalogRepository:
             if row is None:
                 return None
             media = self._media_for_source(conn, row["source_post_id"])
-            if not media:
-                return None
             return self._public_row(row, media)
 
     def media_asset(self, asset_id: str) -> tuple[Path, str] | None:
@@ -327,17 +308,10 @@ class SaleCatalogRepository:
                      AND m.status='active'
                      AND o.offer_type='sale'
                      AND o.offer_status='active'
-                     AND o.sale_price_usd>0
                      AND o.publication_policy='store_only'
-                     AND o.publishable=0
                      AND l.data_status='current'
                      AND l.inventory_status IN ('pending','active','reserved')
                      AND TRIM(COALESCE(l.public_listing_id,''))<>''
-                     AND (
-                       TRIM(COALESCE(l.project_name,''))<>'' OR
-                       TRIM(COALESCE(l.public_location_display,''))<>'' OR
-                       TRIM(COALESCE(l.canonical_area_display,''))<>''
-                     )
                    LIMIT 1""",
                 (asset_id,),
             ).fetchone()
