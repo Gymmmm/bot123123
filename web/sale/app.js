@@ -14,7 +14,8 @@ let offset = 0, total = 0;
 let metadataLoaded = false, initialUrlRestored = false;
 let currentListing = null, galleryIndex = 0, lightboxIndex = 0;
 let allItems = [];
-let touchStartX = 0
+let touchStartX = 0;
+let heroImageLocked = false;
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 const $      = id => document.getElementById(id);
@@ -559,13 +560,14 @@ function renderPager() {
 }
 
 function updateHeroImage(items) {
+  if (heroImageLocked) return;
   const hero = items.find(i => has(i.cover_url));
   const img = $('heroImage');
-  if (!img) return;
-  if (!hero) { img.hidden = true; return; }
+  if (!img || !hero) return;
   img.hidden = false;
   img.src = text(hero.cover_url);
   img.alt = '';
+  img.onload = () => { heroImageLocked = true; };
   img.onerror = () => { img.hidden = true; };
 }
 
