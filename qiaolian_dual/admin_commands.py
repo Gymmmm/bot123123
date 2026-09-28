@@ -3,6 +3,13 @@ from __future__ import annotations
 
 from .common import *
 
+
+def _advisor_response_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton('💬 联系顾问', callback_data='v3u:home:contact')],
+        [InlineKeyboardButton('🏠 返回首页', callback_data='v3u:t:home')],
+    ])
+
 async def cmd_deal_done(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     from .admin_contract import _is_admin_user
     from .session_deeplink import _deep_link, now_ts
@@ -87,7 +94,7 @@ async def cmd_lead_response(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                 chat_id=user_id,
                 text=advisor_response_notice_text(),
                 parse_mode=ParseMode.HTML,
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('💬 联系顾问', callback_data='appointment_menu:contact')], [InlineKeyboardButton('🏠 返回首页', callback_data='home')]]),
+                reply_markup=_advisor_response_keyboard(),
             )
             notice_sent = True
         except Exception:
