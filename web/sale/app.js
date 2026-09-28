@@ -40,6 +40,27 @@ function layoutSummary(facts) {
   ].filter(Boolean).join('');
 }
 
+function listingLink(id) {
+  const u = new URL(window.location.origin + window.location.pathname);
+  if (has(id)) u.searchParams.set('id', text(id));
+  return u.toString();
+}
+function advisorUrl(action, i) {
+  const id = text(i?.public_id);
+  const title = text(i?.title) || '金边出售房源';
+  const price = fmt(i?.sale_price_usd);
+  const lines = [
+    '你好，想咨询这套金边出售房源',
+    action ? `动作：${action}` : '',
+    `房源：${title}`,
+    price ? `总价：${price}` : '',
+    id ? `系统编号：${id}` : '',
+    '来源：侨联出售网站',
+    id ? `链接：${listingLink(id)}` : '',
+  ].filter(Boolean);
+  return `${ADVISOR}?text=${encodeURIComponent(lines.join('\n'))}`;
+}
+
 // Parse title and use it only as a fallback when canonical fields are absent.
 const num = v => {
   const n = Number(v);
@@ -121,6 +142,7 @@ async function loadMeta() {
     [...types].filter(v => has(v) && text(v) !== '未知').sort().forEach(v => {
       $('type')?.insertAdjacentHTML('beforeend',`<option value="${esc(v)}">${esc(v)}</option>`);
     });
+    renderQuickFilters({ areas, types });
   } catch {}
   metadataLoaded = true;
 }
@@ -183,6 +205,7 @@ function cardMarkup(i) {
   const price = fmt(i.sale_price_usd);
   const title = text(i.title) || '金边出售房源';
   const facts = listingFacts(i);
+  const displayTitle = facts.project || title;
   const status = statusInfo(i.status);
   const photoCount = Array.isArray(i.gallery_urls) ? i.gallery_urls.filter(has).length : 0;
   const imgUrl = text(i.cover_url);
@@ -194,11 +217,11 @@ function cardMarkup(i) {
   const ppsm = isApartment(facts) && facts.size && num(i.sale_price_usd)
     ? `约 ${fmt(Math.round(Number(i.sale_price_usd) / facts.size))}/㎡` : '';
   const updated = fmtUpdated(i.updated_at);
-  const descriptor = [facts.location, facts.subtype || facts.type].filter(Boolean)
-    .filter((v, idx, arr) => arr.indexOf(v) === idx).join(' · ');
-  const telegramUrl = `${ADVISOR}?text=${encodeURIComponent(
-    `你好，想咨询金边出售房源 ${id}\n${title}\n${price}`
-  )}`;
+  const descriptor = facts.project
+    ? [facts.location, facts.subtype || facts.type].filter(Boolean)
+        .filter((v, idx, arr) => arr.indexOf(v) === idx).join(' · ')
+    : '';
+  const telegramUrl = advisorUrl('询问实际价格', i);
 
   return `<article class="card">
     <button class="card-link" type="button" data-id="${esc(id)}" aria-label="查看 ${esc(title)}">
@@ -212,7 +235,7 @@ function cardMarkup(i) {
         ${price ? `<div class="card-price-overlay"><span class="card-price-text">${esc(price)}</span></div>` : ''}
       </div>
       <div class="card-body">
-        <h2 class="card-title">${esc(title)}</h2>
+        <h2 class="card-title">${esc(displayTitle)}</h2>
         ${descriptor ? `<p class="card-type">${esc(descriptor)}</p>` : ''}
         ${specs ? `<p class="card-specs"><span>${esc(specs)}</span></p>` : ''}
         ${ppsm ? `<p class="card-specs"><span class="card-ppsm">${esc(ppsm)}</span></p>` : ''}
@@ -221,7 +244,7 @@ function cardMarkup(i) {
     </button>
     <div class="card-actions">
       <button type="button" class="detail-btn" data-id="${esc(id)}">看详情</button>
-      <a href="${telegramUrl}" target="_blank" rel="noopener">问这套</a>
+      <a href="${telegramUrl}" target="_blank" rel="noopener">问价格</a>
     </div>
   </article>`;
 }
@@ -247,7 +270,8 @@ async function openDetail(id, push = true) {
 
     $('detail-price').textContent = price || '价格咨询';
     $('detail-title').textContent = text(i.title) || '金边出售房源';
-    $('detail-meta').textContent = [facts.location, facts.subtype || facts.type].filter(Boolean).join(' · ');
+    $('detail-meta').textContent = [facts.location, layout, facts.subtype || facts.type]
+      .filter(Boolean).filter((v, idx, arr) => arr.indexOf(v) === idx).join(' · ');
 
     const statusEl = $('detail-status');
     if (status.label) {
@@ -272,6 +296,7 @@ async function openDetail(id, push = true) {
       ['户型', layout],
       ['面积', facts.size ? `${fmtNum(facts.size)} ㎡` : ''],
       ['楼层', facts.floor ? `${facts.floor} 楼` : ''],
+      ['实拍', Array.isArray(i.gallery_urls) && i.gallery_urls.filter(has).length ? `${i.gallery_urls.filter(has).length} 张` : ''],
       ['状态', status.label],
       ['最近更新', fmtUpdated(i.updated_at)],
     ].filter(([,v])=>has(v));
@@ -294,16 +319,16 @@ async function openDetail(id, push = true) {
 
     paintGallery();
 
-    const telegramText = `你好，想咨询金边出售房源：\n编号：${text(i.public_id)}\n${text(i.title)}\n${price}`;
-    $('detail-telegram').href = `${ADVISOR}?text=${encodeURIComponent(telegramText)}`;
     const unavailable = ['已售','已下架'].includes(status.label);
-    const bookingText = unavailable
-      ? `你好，这套房源已经${status.label}，想找同区域、同预算的类似出售房源：\n编号：${text(i.public_id)}\n${text(i.title)}\n${price}`
-      : `你好，想预约看这套金边出售房源：\n编号：${text(i.public_id)}\n${text(i.title)}\n${price}`;
+    const primary = $('detail-telegram');
+    if (primary) {
+      primary.textContent = '问实际价格';
+      primary.href = advisorUrl('询问实际价格', i);
+    }
     const booking = $('detail-book');
     if (booking) {
       booking.textContent = unavailable ? '找同类' : '预约看房';
-      booking.href = `${ADVISOR}?text=${encodeURIComponent(bookingText)}`;
+      booking.href = advisorUrl(unavailable ? '寻找同区域同预算房源' : '预约现场/视频看房', i);
     }
     $('detail-footer-meta').textContent = [facts.location || text(i.title), price].filter(has).join(' · ').slice(0,46);
 
@@ -439,12 +464,14 @@ function updateChips() {
   if (!chips.length) {
     row.hidden = true;
     container.innerHTML = '';
+    updateQuickFilterState();
     return;
   }
   row.hidden = false;
   container.innerHTML = chips.map(c =>
     `<button class="chip" type="button" data-clear-filter="${esc(c.key)}">${esc(c.label)}<span class="chip-remove" aria-hidden="true">×</span></button>`
   ).join('');
+  updateQuickFilterState();
 }
 
 function updateUrlFilters(detailId = null) {
@@ -471,6 +498,41 @@ function restoreFiltersFromUrl() {
   const type = p.get('type'); if (type && $('type')) $('type').value = type;
   const price = p.get('price'); if (price && $('price')) $('price').value = price;
   const sort = p.get('sort'); if (sort && $('sortSelect')) $('sortSelect').value = sort === 'updated_desc' ? 'newest' : sort;
+}
+
+function renderQuickFilters(meta = {}) {
+  const areas = Array.isArray(meta.areas) ? meta.areas.filter(has) : [];
+  const types = Array.isArray(meta.types) ? meta.types.filter(has) : [];
+  const hasArea = needle => areas.some(v => text(v).includes(needle));
+  const hasType = needle => types.some(v => text(v) === needle);
+  const presets = [
+    { kind:'price', value:'0-80000', label:'$8万内', show:true },
+    { kind:'price', value:'80000-120000', label:'$8–12万', show:true },
+    { kind:'area', value:'BKK1', label:'BKK1', show:hasArea('BKK1') },
+    { kind:'area', value:'永旺3附近', label:'永旺3附近', show:hasArea('永旺3附近') },
+    { kind:'type', value:'公寓', label:'公寓', show:hasType('公寓') },
+    { kind:'type', value:'别墅', label:'别墅', show:hasType('别墅') },
+  ].filter(x => x.show);
+  const root = $('quickFilters');
+  if (!root) return;
+  root.innerHTML = presets.map(p =>
+    `<button class="quick-filter-chip" type="button" data-quick-kind="${esc(p.kind)}" data-quick-value="${esc(p.value)}">${esc(p.label)}</button>`
+  ).join('');
+  updateQuickFilterState();
+}
+
+function updateQuickFilterState() {
+  const root = $('quickFilters');
+  if (!root) return;
+  const current = {
+    area: text($('area')?.value),
+    type: text($('type')?.value),
+    price: text($('price')?.value),
+  };
+  root.querySelectorAll('[data-quick-kind]').forEach(button => {
+    const kind = button.dataset.quickKind;
+    button.classList.toggle('active', current[kind] === button.dataset.quickValue);
+  });
 }
 
 // ── Skeleton / empty ─────────────────────────────────────────────────────
@@ -517,6 +579,17 @@ $('resetBtn')?.addEventListener('click', clearFilters);
   $(id)?.addEventListener('change', () => loadList(true));
 });
 $('sortSelect')?.addEventListener('change', () => loadList(true));
+
+$('quickFilters')?.addEventListener('click', e => {
+  const button = e.target.closest('[data-quick-kind]');
+  if (!button) return;
+  const kind = button.dataset.quickKind;
+  const value = button.dataset.quickValue;
+  const target = kind === 'area' ? $('area') : kind === 'type' ? $('type') : kind === 'price' ? $('price') : null;
+  if (!target) return;
+  target.value = target.value === value ? '' : value;
+  loadList(true);
+});
 
 $('activeChips')?.addEventListener('click', e => {
   const button = e.target.closest('[data-clear-filter]');

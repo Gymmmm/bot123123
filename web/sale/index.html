@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
-  <meta name="description" content="侨联地产 · 金边出售房源，总价、区域、面积直接看，中文顾问全程服务。">
+  <meta name="description" content="侨联地产 · 金边真实在售房源。总价、区域、户型、实拍图直接看，中文顾问本地带看。">
   <title>侨联地产 · 金边出售</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
@@ -45,7 +45,7 @@
     <div class="hero-content">
       <div class="hero-copy">
         <h1 id="hero-title">金边真实出售房源</h1>
-        <p class="hero-sub">公寓 · 别墅 · 排屋 &nbsp;|&nbsp; 总价、区域、面积直接看</p>
+        <p class="hero-sub">公寓 · 别墅 · 排屋 &nbsp;|&nbsp; 总价、在售状态、实拍图直接看</p>
       </div>
       <div class="hero-stats">
         <span class="stat-num" id="heroCountNum">—</span>
@@ -62,7 +62,7 @@
       <div class="catalog-search" role="search">
         <label class="search-box" for="searchInput">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="20" y1="20" x2="16.65" y2="16.65"/></svg>
-          <input id="searchInput" type="search" inputmode="search" autocomplete="off" placeholder="搜索楼盘、区域、房源编号">
+          <input id="searchInput" type="search" inputmode="search" autocomplete="off" placeholder="搜索楼盘、区域、户型">
         </label>
         <button id="searchBtn" class="search-btn" type="button">搜索</button>
       </div>
@@ -71,11 +71,6 @@
         <div class="filter-select-wrap">
           <select id="area" aria-label="区域">
             <option value="">全部区域</option>
-          </select>
-        </div>
-        <div class="filter-select-wrap">
-          <select id="type" aria-label="物业类型">
-            <option value="">全部类型</option>
           </select>
         </div>
         <div class="filter-select-wrap">
@@ -88,11 +83,21 @@
             <option value="350000-999999999">$35万以上</option>
           </select>
         </div>
+        <div class="filter-select-wrap">
+          <select id="type" aria-label="物业类型">
+            <option value="">全部类型</option>
+          </select>
+        </div>
         <button id="resetBtn" class="filter-reset" type="button" aria-label="重置筛选">重置</button>
       </div>
 
-      <!-- Quick chips -->
-      <div class="chips-row" id="chipsRow" aria-label="快捷筛选" hidden>
+      <div class="quick-filter-row" aria-label="快捷找房">
+        <span class="quick-filter-label">快捷找房</span>
+        <div class="quick-filters" id="quickFilters"></div>
+      </div>
+
+      <!-- Active filter chips -->
+      <div class="chips-row" id="chipsRow" aria-label="当前筛选" hidden>
         <span class="chips-label">筛选：</span>
         <div class="chips" id="activeChips"></div>
       </div>
@@ -221,7 +226,7 @@
       <div class="detail-footer-actions">
         <a id="detail-telegram" class="detail-telegram-btn" target="_blank" rel="noopener">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.27-.02-.12.03-1.99 1.27-5.62 3.72-.53.36-1.01.54-1.44.53-.47-.01-1.37-.27-2.06-.49-.83-.27-1.49-.42-1.43-.88.03-.24.37-.49 1.02-.74 3.99-1.74 6.65-2.89 7.99-3.45 3.8-1.6 4.59-1.88 5.1-1.89.11 0 .37.03.54.17.14.12.18.28.2.45-.01.06.01.24 0 .38z"/></svg>
-          问这套
+          问实际价格
         </a>
         <a id="detail-book" class="detail-consult-btn" target="_blank" rel="noopener">预约看房</a>
       </div>
