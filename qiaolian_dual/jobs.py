@@ -3,6 +3,13 @@ from __future__ import annotations
 
 from .common import *
 
+
+def _lease_reminder_keyboard(binding_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton('✅ 我想续租', callback_data=f'contract:renew_yes:{int(binding_id)}')],
+        [InlineKeyboardButton('💬 联系中文顾问', callback_data='v3u:home:contact')],
+    ])
+
 async def lease_reminder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     """租约到期前 7 天提醒一次；按日志去重，默认每天早上检查。"""
     from .admin_contract import _binding_end_date
@@ -39,7 +46,7 @@ async def lease_reminder_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             rent_line = f'${int(rent_value)}/月' if rent_value > 0 else '待确认'
             name = str(binding.get('first_name') or '您好')
             text = f'⏰ <b>租约到期提醒</b>\n\n{he(name)}，您在 {he(property_name)} 的租约还有 <b>7 天</b>到期。\n到期日：{he(end_date)}\n月租：{he(rent_line)}\n\n如果准备继续住，可以在这里告诉我们，中文顾问会为您确认新的租期和价格。'
-            keyboard = InlineKeyboardMarkup([[InlineKeyboardButton('✅ 我想续租', callback_data=f'contract:renew_yes:{binding_id}')], [InlineKeyboardButton('💬 联系中文顾问', callback_data='appointment_menu:contact')]])
+            keyboard = _lease_reminder_keyboard(binding_id)
             try:
                 await context.bot.send_message(chat_id=user_id, text=text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
                 db.log_reminder_sent(binding_id=binding_id, user_id=user_id, lease_end_date=end_date, remind_for_date=target_date, remind_type=remind_type, sent_at=now_ts())
