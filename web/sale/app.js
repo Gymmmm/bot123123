@@ -109,6 +109,60 @@ function statusInfo(value) {
   return { label:v, className:'' };
 }
 
+function percent(v) {
+  return Number.isFinite(v) ? `${v.toFixed(2)}%` : '—';
+}
+function money(v) {
+  return Number.isFinite(v) ? String.fromCharCode(36)+Math.round(v).toLocaleString('en-US') : '—';
+}
+function numberInput(id) {
+  const n = Number($(id)?.value);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+function investmentContext(netYield, facts) {
+  if (!Number.isFinite(netYield)) return '先填预计月租，系统再计算。不要把开发商保证租金直接当真实租金。';
+  const area = text(facts?.location);
+  if (/BKK1|Boeung Keng Kang/i.test(area)) {
+    return 'BKK1 公开挂牌毛回报参考约 6%，这里只用于横向比较；你当前看到的是按输入成本计算的净回报，不是保底收益。';
+  }
+  return '净回报应结合当地真实出租盘、空置、物业管理和未来转售难度一起判断，不能只看一个百分比。';
+}
+function calculateInvestment() {
+  if (!currentListing) return;
+  const facts = listingFacts(currentListing);
+  const price = numberInput('calcPrice');
+  const rent = numberInput('calcRent');
+  const vacancy = Math.min(12, numberInput('calcVacancy') ?? 0);
+  const annualCost = numberInput('calcAnnualCost') ?? 0;
+  const entryCost = numberInput('calcEntryCost') ?? 0;
+  if (!price || !rent) {
+    if ($('calcGrossYield')) $('calcGrossYield').textContent = '—';
+    if ($('calcNetYield')) $('calcNetYield').textContent = '—';
+    if ($('calcNetIncome')) $('calcNetIncome').textContent = '—';
+    if ($('calcPayback')) $('calcPayback').textContent = '—';
+    if ($('calcContext')) $('calcContext').textContent = investmentContext(NaN, facts);
+    return;
+  }
+  const grossIncome = rent * 12;
+  const collectedIncome = rent * Math.max(0, 12 - vacancy);
+  const netIncome = Math.max(0, collectedIncome - annualCost);
+  const totalBasis = price + entryCost;
+  const grossYield = totalBasis > 0 ? grossIncome / totalBasis * 100 : NaN;
+  const netYield = totalBasis > 0 ? netIncome / totalBasis * 100 : NaN;
+  const payback = netIncome > 0 ? totalBasis / netIncome : NaN;
+  $('calcGrossYield').textContent = percent(grossYield);
+  $('calcNetYield').textContent = percent(netYield);
+  $('calcNetIncome').textContent = money(netIncome);
+  $('calcPayback').textContent = Number.isFinite(payback) ? `${payback.toFixed(1)} 年` : '—';
+  $('calcContext').textContent = investmentContext(netYield, facts);
+}
+function resetInvestmentCalculator() {
+  const price = Number(currentListing?.sale_price_usd);
+  if ($('calcPrice')) $('calcPrice').value = Number.isFinite(price) && price > 0 ? String(price) : '';
+  ['calcRent','calcVacancy','calcAnnualCost','calcEntryCost'].forEach(id => { if ($(id)) $(id).value=''; });
+  calculateInvestment();
+}
+
 // ── API ──────────────────────────────────────────────────────────────────
 function queryParams() {
   const p = new URLSearchParams({ limit: String(LIMIT), offset: String(offset) });
@@ -319,6 +373,7 @@ async function openDetail(id, push = true) {
     }
 
     paintGallery();
+    resetInvestmentCalculator();
 
     const unavailable = ['已售','已下架'].includes(status.label);
     const primary = $('detail-telegram');
@@ -603,6 +658,11 @@ $('activeChips')?.addEventListener('click', e => {
   if (key === 'price' && $('price')) $('price').value = '';
   loadList(true);
 });
+
+['calcRent','calcVacancy','calcAnnualCost','calcEntryCost'].forEach(id => {
+  $(id)?.addEventListener('input', calculateInvestment);
+});
+$('investmentCalcReset')?.addEventListener('click', resetInvestmentCalculator);
 
 $('grid')?.addEventListener('click', e => {
   const emptyAction = e.target.closest('[data-empty-action]');
