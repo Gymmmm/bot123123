@@ -291,10 +291,7 @@ async def handle_v3_callback(
                     user_data[LISTING_TOUCHPOINT_KEY] = "similar_listing"
                 return TelegramCallbackHandlerOutcome(handled=True, response=response)
         
-        if response.transition in {"book", "change_search"}:
-            await _send_transition_view(update, context, query, view)
-        else:
-            await _render_transition_view(query, view)
+        await _render_transition_view(query, view)
         user_data = getattr(context, "user_data", None)
         if not isinstance(user_data, dict):
             raise ValueError("telegram_user_data_missing_for_transition")
