@@ -109,8 +109,8 @@ function statusInfo(value) {
   return { label:v, className:'' };
 }
 
-function percent(v) {
-  return Number.isFinite(v) ? `${v.toFixed(2)}%` : '—';
+function percent(v, digits = 1) {
+  return Number.isFinite(v) ? `${v.toFixed(digits)}%` : '—';
 }
 function money(v) {
   return Number.isFinite(v) ? String.fromCharCode(36)+Math.round(v).toLocaleString('en-US') : '—';
@@ -119,48 +119,66 @@ function numberInput(id) {
   const n = Number($(id)?.value);
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
-function investmentContext(netYield, facts) {
-  if (!Number.isFinite(netYield)) return '先填预计月租，系统再计算。不要把开发商保证租金直接当真实租金。';
-  const area = text(facts?.location);
-  if (/BKK1|Boeung Keng Kang/i.test(area)) {
-    return 'BKK1 公开挂牌毛回报参考约 6%，这里只用于横向比较；你当前看到的是按输入成本计算的净回报，不是保底收益。';
-  }
-  return '净回报应结合当地真实出租盘、空置、物业管理和未来转售难度一起判断，不能只看一个百分比。';
-}
-function calculateInvestment() {
-  if (!currentListing) return;
-  const facts = listingFacts(currentListing);
-  const price = numberInput('calcPrice');
-  const rent = numberInput('calcRent');
-  const vacancy = Math.min(12, numberInput('calcVacancy') ?? 0);
-  const annualCost = numberInput('calcAnnualCost') ?? 0;
-  const entryCost = numberInput('calcEntryCost') ?? 0;
-  if (!price || !rent) {
-    if ($('calcGrossYield')) $('calcGrossYield').textContent = '—';
-    if ($('calcNetYield')) $('calcNetYield').textContent = '—';
-    if ($('calcNetIncome')) $('calcNetIncome').textContent = '—';
-    if ($('calcPayback')) $('calcPayback').textContent = '—';
-    if ($('calcContext')) $('calcContext').textContent = investmentContext(NaN, facts);
+function renderSaleReference(i) {
+  const block = $('saleReferenceBlock');
+  if (!block) return;
+  const ref = i?.sale_market_reference;
+  if (!ref || Number(ref.count) < 2) {
+    block.hidden = true;
     return;
   }
-  const grossIncome = rent * 12;
-  const collectedIncome = rent * Math.max(0, 12 - vacancy);
-  const netIncome = Math.max(0, collectedIncome - annualCost);
-  const totalBasis = price + entryCost;
-  const grossYield = totalBasis > 0 ? grossIncome / totalBasis * 100 : NaN;
-  const netYield = totalBasis > 0 ? netIncome / totalBasis * 100 : NaN;
-  const payback = netIncome > 0 ? totalBasis / netIncome : NaN;
-  $('calcGrossYield').textContent = percent(grossYield);
-  $('calcNetYield').textContent = percent(netYield);
-  $('calcNetIncome').textContent = money(netIncome);
-  $('calcPayback').textContent = Number.isFinite(payback) ? `${payback.toFixed(1)} 年` : '—';
-  $('calcContext').textContent = investmentContext(netYield, facts);
+  block.hidden = false;
+  $('saleReferenceScope').textContent = `${text(ref.label)} · 当前公开出售库存`;
+  $('saleReferenceCount').textContent = `${fmtNum(Number(ref.count))} 套样本`;
+  $('saleReferenceRange').textContent =
+    `${fmt(ref.min_sale_price_usd)} – ${fmt(ref.max_sale_price_usd)}`;
+  $('saleReferenceMedian').textContent = fmt(ref.median_sale_price_usd) || '—';
+  const delta = Number(ref.current_vs_median_pct);
+  $('saleReferencePosition').textContent = Number.isFinite(delta)
+    ? (Math.abs(delta) < 0.05 ? '接近中位价' : delta > 0 ? `高 ${percent(Math.abs(delta))}` : `低 ${percent(Math.abs(delta))}`)
+    : '—';
+
+  const ppsmBlock = $('saleReferencePpsmBlock');
+  const minPpsm = Number(ref.min_price_per_sqm_usd);
+  const maxPpsm = Number(ref.max_price_per_sqm_usd);
+  if (ppsmBlock && Number.isFinite(minPpsm) && minPpsm > 0 && Number.isFinite(maxPpsm) && maxPpsm > 0) {
+    $('saleReferencePpsm').textContent = `${fmt(minPpsm)}/㎡ – ${fmt(maxPpsm)}/㎡`;
+    ppsmBlock.hidden = false;
+  } else if (ppsmBlock) {
+    ppsmBlock.hidden = true;
+  }
+}
+function calculateAcquisition() {
+  if (!currentListing) return;
+  const facts = listingFacts(currentListing);
+  const ask = numberInput('calcAskPrice');
+  const deal = numberInput('calcDealPrice');
+  const stampRate = numberInput('calcStampRate') ?? 4;
+  const other = numberInput('calcOtherCost') ?? 0;
+  if (!deal) {
+    ['calcDiscount','calcStampDuty','calcTotalAcquisition','calcAllInPpsm'].forEach(id => {
+      if ($(id)) $(id).textContent = '—';
+    });
+    return;
+  }
+  const discount = ask && ask > 0 ? (deal - ask) / ask * 100 : NaN;
+  const stamp = deal * stampRate / 100;
+  const total = deal + stamp + other;
+  $('calcDiscount').textContent = Number.isFinite(discount)
+    ? (Math.abs(discount) < 0.05 ? '0%' : discount < 0 ? `低于挂牌 ${percent(Math.abs(discount))}` : `高于挂牌 ${percent(discount)}`)
+    : '—';
+  $('calcStampDuty').textContent = money(stamp);
+  $('calcTotalAcquisition').textContent = money(total);
+  $('calcAllInPpsm').textContent = facts.size && facts.size > 0 ? `${money(total / facts.size)}/㎡` : '—';
 }
 function resetInvestmentCalculator() {
   const price = Number(currentListing?.sale_price_usd);
-  if ($('calcPrice')) $('calcPrice').value = Number.isFinite(price) && price > 0 ? String(price) : '';
-  ['calcRent','calcVacancy','calcAnnualCost','calcEntryCost'].forEach(id => { if ($(id)) $(id).value=''; });
-  calculateInvestment();
+  const value = Number.isFinite(price) && price > 0 ? String(price) : '';
+  if ($('calcAskPrice')) $('calcAskPrice').value = value;
+  if ($('calcDealPrice')) $('calcDealPrice').value = value;
+  if ($('calcStampRate')) $('calcStampRate').value = '4';
+  if ($('calcOtherCost')) $('calcOtherCost').value = '';
+  calculateAcquisition();
 }
 
 // ── API ──────────────────────────────────────────────────────────────────
@@ -373,6 +391,7 @@ async function openDetail(id, push = true) {
     }
 
     paintGallery();
+    renderSaleReference(i);
     resetInvestmentCalculator();
 
     const unavailable = ['已售','已下架'].includes(status.label);
@@ -659,8 +678,8 @@ $('activeChips')?.addEventListener('click', e => {
   loadList(true);
 });
 
-['calcRent','calcVacancy','calcAnnualCost','calcEntryCost'].forEach(id => {
-  $(id)?.addEventListener('input', calculateInvestment);
+['calcDealPrice','calcStampRate','calcOtherCost'].forEach(id => {
+  $(id)?.addEventListener('input', calculateAcquisition);
 });
 $('investmentCalcReset')?.addEventListener('click', resetInvestmentCalculator);
 

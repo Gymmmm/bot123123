@@ -206,6 +206,70 @@ def test_sale_catalog_meta_is_public_safe(tmp_path: Path):
     }
 
 
+def test_sale_detail_exposes_sale_only_market_reference(tmp_path: Path):
+    db = initialize_v3_storage(tmp_path / "v3.sqlite")
+    current = _seed_listing(
+        db,
+        tmp_path,
+        suffix="CMP1",
+        public_id="QL-CMP-1",
+        sale_price=110000,
+        location="BKK1",
+        layout="1房1卫",
+    )
+    lower = _seed_listing(
+        db,
+        tmp_path,
+        suffix="CMP2",
+        public_id="QL-CMP-2",
+        sale_price=100000,
+        location="BKK1",
+        layout="1房1卫",
+    )
+    upper = _seed_listing(
+        db,
+        tmp_path,
+        suffix="CMP3",
+        public_id="QL-CMP-3",
+        sale_price=120000,
+        location="BKK1",
+        layout="1房1卫",
+    )
+    _seed_listing(
+        db,
+        tmp_path,
+        suffix="CMPRENT",
+        public_id="QL-CMP-RENT",
+        offer_type="rent",
+        monthly_rent=9999,
+        location="BKK1",
+        layout="1房1卫",
+    )
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            "UPDATE listings_v3 SET project_name='测试公寓',bedrooms=1,size_sqm=100 WHERE listing_id IN (?,?,?)",
+            (current, lower, upper),
+        )
+        conn.commit()
+
+    item = SaleCatalogRepository(db).get_sale_listing("QL-CMP-1")
+    assert item is not None
+    ref = item["sale_market_reference"]
+    assert ref["scope"] == "same_project_layout"
+    assert ref["label"] == "同项目同户型"
+    assert ref["count"] == 3
+    assert ref["min_sale_price_usd"] == 100000
+    assert ref["median_sale_price_usd"] == 110000
+    assert ref["max_sale_price_usd"] == 120000
+    assert ref["min_price_per_sqm_usd"] == 1000
+    assert ref["median_price_per_sqm_usd"] == 1100
+    assert ref["max_price_per_sqm_usd"] == 1200
+    assert ref["current_vs_median_pct"] == 0.0
+    serialized = json.dumps(item, ensure_ascii=False)
+    assert "monthly_rent_usd" not in serialized
+    assert "9999" not in serialized
+
+
 def test_sale_media_resolver_cannot_expose_rent_or_non_image_asset(tmp_path: Path):
     db = initialize_v3_storage(tmp_path / "v3.sqlite")
     _seed_listing(db, tmp_path, suffix="SALEMEDIA", public_id="QL-5001")
