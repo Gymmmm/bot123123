@@ -159,3 +159,30 @@ def test_lead_service_normalizes_attribution_fields_before_repository_write():
     assert row["agent_id"] == "agent-1"
     assert row["response_at"] == "2026-09-09 02:00:00"
     assert row["created_at"] == "2026-09-09 02:01:00"
+
+
+
+def test_keyword_search_lead_keeps_room_type_and_move_in_hint():
+    from v3_core.user_bot.lead_service import keyword_search_lead_request
+
+    intent = SearchSubmitIntent(
+        criteria=SearchCriteria(
+            location_keys=("BKK1",),
+            budget_max=700,
+            room_type="1房",
+            raw_text="BKK1 一房 700以内 10月5日入住",
+        ),
+        source="direct_text",
+        goal="any",
+        area_display="BKK1",
+        budget_label="<= 700 USD/月",
+        touch_payload={
+            "message": "BKK1 一房 700以内 10月5日入住",
+            "room_type": "1房",
+        },
+    )
+
+    request = keyword_search_lead_request(intent, match_mode="strict")
+
+    assert request.payload["room_type"] == "1房"
+    assert request.payload["move_in_hint"] == "10月5日入住"

@@ -213,12 +213,12 @@ def test_photos_response_first_batch_album_with_expand(tmp_path):
 
     assert first.has_media
     assert not first.expand_only
-    # First screen is one side-stack collage JPG (not a 4-frame MediaGroup).
+    # First screen is a native Telegram album of the first six real frames.
     assert first.photo_index == 0
     assert first.photo_total == 10  # capped at PHOTOS_MAX_TOTAL
     assert len(first.media_groups) == 1
-    assert len(first.media_groups[0]) == 1
-    assert Path(first.media_groups[0][0]).is_file()
+    assert len(first.media_groups[0]) == 6
+    assert first.media_groups[0][0] == str(cover)
     assert first.text.startswith("🟢 当前可预约")
     assert "以上是这套房" not in first.text
     assert "⬅️ 上一张" not in str(_labels(first.action_rows))
@@ -228,12 +228,12 @@ def test_photos_response_first_batch_album_with_expand(tmp_path):
         ["💬 中文顾问"],
     ]
     expand_btn = first.action_rows[0][0]
-    assert expand_btn.target_index == 4
+    assert expand_btn.target_index == 6
 
-    expanded = build_photos_response(_view(gallery=gallery), offset=4)
+    expanded = build_photos_response(_view(gallery=gallery), offset=6)
     assert expanded.expand_only
     assert expanded.action_rows == ()
-    # Expand sends original frames (cap 10), not "remaining after collage".
+    # Expand sends the full original album (cap 10).
     assert len(expanded.media_groups[0]) == 10
     assert expanded.media_groups[0][0] == str(cover)
 
@@ -303,9 +303,9 @@ def test_album_starts_on_package_cover_path(tmp_path):
     response = build_photos_response(view)
     assert response.photo_total == 2
     assert response.has_media
-    # Prefer collage when images are readable; tiny non-image fixtures fall back.
-    assert len(response.media_groups[0]) in {1, 2}
-    expanded = build_photos_response(view, offset=4)
+    # Native album keeps both real frames when available.
+    assert len(response.media_groups[0]) == 2
+    expanded = build_photos_response(view, offset=6)
     assert expanded.expand_only
     assert expanded.has_media
     assert str(Path(cover).resolve()) in {
@@ -344,10 +344,10 @@ def test_album_recovers_rendered_cover_when_package_path_stale(tmp_path):
     )
 
     response = build_photos_response(view)
-    # First screen may be a collage; cover must still be in the source set.
+    # First screen is a native album; recovered cover stays in the source set.
     assert response.photo_total == 2
     assert response.has_media
-    expanded = build_photos_response(view, offset=4)
+    expanded = build_photos_response(view, offset=6)
     assert expanded.expand_only
     assert expanded.has_media
     assert str(rendered.resolve()) in {

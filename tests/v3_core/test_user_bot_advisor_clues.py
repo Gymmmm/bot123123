@@ -6,7 +6,15 @@ import json
 import pytest
 
 from v3_core.user_bot.consult import ConsultIntent
-from v3_core.user_bot.listing_contact import build_structured_advisor_clues
+from v3_core.user_bot.listing_contact import (
+    ListingContactEffectExecutor,
+    build_listing_contact_view,
+    build_structured_advisor_clues,
+    clear_listing_question_context,
+    listing_question_intent,
+    remember_listing_question_context,
+)
+from v3_core.user_bot.lead_service import LeadUser
 from v3_core.user_bot.public_inventory import PublishedListingView
 
 
@@ -230,3 +238,85 @@ class TestStructuredAdvisorClues:
         clues = build_structured_advisor_clues(intent, inventory)
         
         assert any("行为" in c and "咨询" in c for c in clues)
+
+
+
+class _LeadsStub:
+    def record_listing_contact(self, *, user, intent):
+        return object()
+
+
+class _AdminsStub:
+    def __init__(self):
+        self.notifications = []
+
+    async def send(self, bot, notification):
+        self.notifications.append(notification)
+        return object()
+
+
+def test_listing_question_session_round_trips_intent():
+    intent = ConsultIntent(
+        listing_id="LST_INTERNAL_123",
+        public_listing_id="QL-RF-A2B3",
+        source="channel_deeplink",
+        inventory_status="active",
+        offer_status="active",
+        publication_instance_id="PUB_1",
+        touchpoint="listing_photos",
+    )
+    session = {}
+    remember_listing_question_context(session, intent)
+    restored = listing_question_intent(session)
+    assert restored == intent
+    clear_listing_question_context(session)
+    assert listing_question_intent(session) is None
+
+
+def test_listing_contact_view_invites_direct_question():
+    view = _frozen_view()
+    inventory = MemoryInventory({"QL-RF-A2B3": view})
+    intent = ConsultIntent(
+        listing_id="LST_INTERNAL_123",
+        public_listing_id="QL-RF-A2B3",
+        source="listing_callback",
+        inventory_status="active",
+        offer_status="active",
+        publication_instance_id="PUB_1",
+    )
+    contact = build_listing_contact_view(intent, inventory)
+    assert "问这套" in contact.text
+    assert "直接在这里发问题" in contact.text
+
+
+@pytest.mark.asyncio
+async def test_question_notification_contains_structured_listing_context_and_question():
+    view = _frozen_view(monthly_rent_usd=950, layout="3房2卫")
+    inventory = MemoryInventory({"QL-RF-A2B3": view})
+    admins = _AdminsStub()
+    executor = ListingContactEffectExecutor(
+        leads=_LeadsStub(),
+        admins=admins,
+        inventory=inventory,
+    )
+    intent = ConsultIntent(
+        listing_id="LST_INTERNAL_123",
+        public_listing_id="QL-RF-A2B3",
+        source="channel_deeplink",
+        inventory_status="active",
+        offer_status="active",
+        publication_instance_id="PUB_1",
+        touchpoint="listing_photos",
+    )
+    await executor.execute_question(
+        bot=object(),
+        user=LeadUser(123, "alice", "Alice"),
+        intent=intent,
+        question="明天下午能看吗？",
+    )
+    assert len(admins.notifications) == 1
+    text = admins.notifications[0].text
+    assert "频道房源" in text
+    assert "$950/月" in text
+    assert "3房2卫" in text
+    assert "明天下午能看吗？" in text
