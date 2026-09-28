@@ -75,7 +75,7 @@ def _seed(
         conn.commit()
 
 
-def test_incomplete_sale_inventory_stays_stored_but_is_hidden_from_public_catalog(tmp_path: Path):
+def test_incomplete_sale_inventory_stays_stored_and_visible_in_public_catalog(tmp_path: Path):
     db = initialize_v3_storage(tmp_path / "v3.sqlite")
     _seed(db, tmp_path, suffix="READY", public_id="QL-READY")
     _seed(db, tmp_path, suffix="NOLOC", public_id="QL-NOLOC", location="")
@@ -84,13 +84,15 @@ def test_incomplete_sale_inventory_stays_stored_but_is_hidden_from_public_catalo
     repo = SaleCatalogRepository(db)
     payload = repo.list_sale_listings()
 
-    assert payload["total"] == 1
-    assert [item["public_id"] for item in payload["items"]] == ["QL-READY"]
+    assert payload["total"] == 3
+    assert {item["public_id"] for item in payload["items"]} == {
+        "QL-READY", "QL-NOLOC", "QL-NOMEDIA"
+    }
     assert repo.get_sale_listing("QL-READY") is not None
-    assert repo.get_sale_listing("QL-NOLOC") is None
-    assert repo.get_sale_listing("QL-NOMEDIA") is None
+    assert repo.get_sale_listing("QL-NOLOC") is not None
+    assert repo.get_sale_listing("QL-NOMEDIA") is not None
 
-    # The incomplete rows were not deleted or rewritten; they remain sale inventory.
+    # Incomplete rows remain sale inventory and are not rewritten or deleted.
     with sqlite3.connect(db) as conn:
         assert conn.execute(
             "SELECT COUNT(*) FROM listing_offers WHERE offer_type='sale' AND offer_status='active'"

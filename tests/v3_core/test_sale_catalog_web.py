@@ -303,3 +303,53 @@ def test_sale_web_entrypoint_is_read_only_and_has_no_alignment_side_effect():
     root = Path(__file__).resolve().parents[2]
     assert not (root / "v3_core" / "sale" / "align.py").exists()
     assert not (root / "run_v3_sale_align.py").exists()
+
+
+def test_sale_materialization_creates_store_only_offer_without_rent_publishability(tmp_path: Path):
+    from v3_core.storage.inventory_repository import InventoryRepository
+
+    db = initialize_v3_storage(tmp_path / "v3.sqlite")
+    repo = InventoryRepository(db)
+    facts = {
+        "schema_version": "canonical_facts.v1",
+        "canonical_facts_hash": "hash-sale-materialize",
+        "deal_type": "sale",
+        "sale_price_usd": 250000,
+        "project_name": "",
+        "public_location_display": "",
+        "quality": {"all_flags": ["missing_location", "missing_project"]},
+    }
+    canonical = repo.store_canonical(source_post_id="new-sale-post", facts=facts)
+    repo.upsert_listing(
+        listing_id="listing-sale-materialize",
+        canonical_record_id=str(canonical["canonical_record_id"]),
+        public_listing_id="QL-MATERIALIZE-01",
+        facts=facts,
+    )
+    offers = repo.sync_offers(listing_id="listing-sale-materialize", facts=facts)
+
+    assert len(offers) == 1
+    assert offers[0]["offer_type"] == "sale"
+    assert offers[0]["publication_policy"] == "store_only"
+    assert offers[0]["publishable"] == 0
+    assert SaleCatalogRepository(db).get_sale_listing("QL-MATERIALIZE-01") is not None
+
+
+def test_sale_catalog_handles_missing_public_fields_and_media(tmp_path: Path):
+    db = initialize_v3_storage(tmp_path / "v3.sqlite")
+    _seed_listing(
+        db,
+        tmp_path,
+        suffix="INCOMPLETE",
+        public_id="QL-INCOMPLETE-01",
+        location="",
+        layout="",
+        with_media=False,
+    )
+    item = SaleCatalogRepository(db).get_sale_listing("QL-INCOMPLETE-01")
+    assert item is not None
+    assert item["project"] == "项目INCOMPLETE"
+    assert item["location"] == ""
+    assert item["layout"] == ""
+    assert item["gallery_urls"] == []
+    assert item["sale_price_usd"] == 180000
