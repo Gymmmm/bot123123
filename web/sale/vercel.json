@@ -3,6 +3,7 @@
   "git": {
     "deploymentEnabled": {
       "feat/sale-modern-home-20260925": true,
+      "release/v3-perfect-20260929": true,
       "*": false
     }
   },
