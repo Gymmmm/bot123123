@@ -52,55 +52,46 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
             return 0
         return int(repo.held_count() or 0)
 
+    def _recovery_unknown_count(self) -> int:
+        try:
+            counts = self.workflow.queue_counts()
+        except Exception:
+            return 0
+        return int(getattr(counts, "unknown", 0) or 0)
+
     def home_keyboard(self) -> InlineKeyboardMarkup:
-        preview_n = self._preview_ready_count()
-        exception_n = self._open_exception_count()
         pending_n = int(self._pending_count() or 0)
-        queued_n = self._queued_count()
-        held_n = self._held_count()
+        exception_n = self._open_exception_count()
+        recovery_n = self._recovery_unknown_count()
         rows: list[list[InlineKeyboardButton]] = [
             [
-                InlineKeyboardButton("➕ 发布房源", callback_data="v3smp|new"),
-                InlineKeyboardButton("📢 发布中心", callback_data="v3bc"),
+                InlineKeyboardButton("➕ 新建房源", callback_data="v3smp|new"),
+                InlineKeyboardButton("📢 频道运营", callback_data="v3bc"),
             ],
             [
                 InlineKeyboardButton(
-                    f"🔵 房态工作台 · 待确认 {pending_n}",
+                    f"🔵 房态管理 {pending_n}",
                     callback_data="v3smp|listings",
                 ),
-            ],
-            [
                 InlineKeyboardButton(
-                    f"🚀 自动待发 {queued_n}",
-                    callback_data="v3smp|auto_queue",
-                ),
-                InlineKeyboardButton(
-                    f"📦 旧库存 {held_n}",
-                    callback_data="v3smp|held_queue",
+                    f"⚠️ 异常房源 {exception_n}",
+                    callback_data="v3smp|exceptions|all",
                 ),
             ],
         ]
-        todo: list[InlineKeyboardButton] = []
-        if exception_n > 0:
-            todo.append(
-                InlineKeyboardButton(
-                    f"⚠️ 异常 {exception_n}",
-                    callback_data="v3smp|exceptions|all",
-                )
+        if recovery_n > 0:
+            rows.append(
+                [
+                    InlineKeyboardButton(
+                        f"⚠️ 发布恢复 {recovery_n}",
+                        callback_data="v3err",
+                    ),
+                ]
             )
-        if preview_n > 0:
-            todo.append(
-                InlineKeyboardButton(
-                    f"📤 待确认发布 {preview_n}",
-                    callback_data="v3smp|preview_ready",
-                )
-            )
-        if todo:
-            rows.append(todo)
         rows.append(
             [
-                InlineKeyboardButton("📡 采集源", callback_data="v3smp|sources"),
-                InlineKeyboardButton("📚 发布记录", callback_data="v3smp|logs"),
+                InlineKeyboardButton("🕘 最近发布", callback_data="v3smp|inv_rows|recent"),
+                InlineKeyboardButton("⚙️ 更多", callback_data="v3smp|settings"),
             ]
         )
         return InlineKeyboardMarkup(rows)
@@ -108,22 +99,20 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
     async def show_home(self, message: Any) -> None:
         pending_n = int(self._pending_count() or 0)
         exception_n = self._open_exception_count()
-        preview_n = self._preview_ready_count()
-        queued_n = self._queued_count()
-        held_n = self._held_count()
+        recovery_n = self._recovery_unknown_count()
         lines = [
             "<b>📣 侨联发布助手</b>",
             "",
-            "发布房源、处理待确认，并管理频道房态。",
+            "今天先处理需要关注的非 0 事项，其他低频功能都收进了「⚙️ 更多」。",
             "",
-            f"🚀 自动待发 <b>{queued_n}</b>　📦 旧库存暂停 <b>{held_n}</b>",
-            f"🔵 待确认 {pending_n}　⚠️ 异常 {exception_n}　📤 待发预览 {preview_n}",
+            f"🔵 房态管理 <b>{pending_n}</b>　⚠️ 异常房源 <b>{exception_n}</b>",
+            f"⚠️ 发布恢复 <b>{recovery_n}</b>",
         ]
-        if queued_n > 0 and held_n == 0:
+        if recovery_n > 0:
             lines.extend(
                 [
                     "",
-                    "处理旧库存前，请先暂停当前自动待发；新采集仍会正常入队。",
+                    "有发送结果未确认的房源，请到「⚠️ 发布恢复」人工结案。",
                 ]
             )
         await message.reply_text(

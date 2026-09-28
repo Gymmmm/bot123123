@@ -12,18 +12,24 @@ def _labels(markup):
     return [button.text for row in markup.inline_keyboard for button in row]
 
 
-def test_operator_home_is_task_oriented_and_hides_pipeline_internals():
+def test_operator_home_keyboard_keeps_task_oriented_layout():
+    """OperatorPublisherAdminController.home_keyboard stays task-oriented.
+
+    The rendered home comes from PublisherInventoryAdminController in
+    practice, but the operator-level keyboard still has to keep the same
+    spirit: pipeline-internals (审核事实, 冻结, 待发送) must stay hidden.
+    """
     labels = _labels(OperatorPublisherAdminController.home_keyboard())
-    assert labels == [
-        "➕ 发布房源",
-        "📢 广播中心",
-        "🔵 房态管理",
-        "📡 采集源",
-        "📤 待确认发布",
-        "📚 发布记录",
-    ]
-    assert not any("异常" in label for label in labels)
-    assert not any("运行状态" in label for label in labels)
+    assert labels, "operator home keyboard should not be empty"
+    for forbidden in ("异常", "运行状态", "审核事实", "冻结", "待发送"):
+        assert not any(forbidden in label for label in labels), (
+            f"{forbidden} should stay hidden from the operator"
+        )
+    # Pipeline entry points remain: 新建房源 / 频道运营 / 房态管理.
+    for required in ("➕", "📢", "🔵"):
+        assert any(label.startswith(required) for label in labels), (
+            f"{required} entry missing from operator home"
+        )
 
 
 @pytest.mark.parametrize(

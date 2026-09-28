@@ -62,13 +62,24 @@ class ProductionSimplePublisherAdminController(SimplePublisherAdminController):
 
     async def show_settings(self, message: Any) -> None:
         cfg = self.repository.config()
+        preview_n = self._preview_ready_count() if hasattr(self, "_preview_ready_count") else 0
+        queued_n = self._queued_count() if hasattr(self, "_queued_count") else 0
+        held_n = self._held_count() if hasattr(self, "_held_count") else 0
         await message.reply_text(
-            "<b>⚙️ 发布设置</b>\n\n"
+            "<b>⚙️ 更多</b>\n\n"
             f"自动发布：<b>{'运行中' if cfg.enabled else '已暂停'}</b>\n"
-            "运行状态、发帖时段和统计放在这里，不占用日常操作首页。",
+            "运行状态、发帖时段、统计、自动待发、旧库存、待发预览和采集源都在这里。",
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(
                 [
+                    [
+                        InlineKeyboardButton("🚀 自动待发", callback_data="v3smp|auto_queue"),
+                        InlineKeyboardButton("📦 旧库存", callback_data="v3smp|held_queue"),
+                    ],
+                    [
+                        InlineKeyboardButton("📤 待发预览", callback_data="v3smp|preview_ready"),
+                        InlineKeyboardButton("📡 采集源", callback_data="v3smp|sources"),
+                    ],
                     [
                         InlineKeyboardButton("🟢 运行状态", callback_data="v3smp|runtime"),
                         InlineKeyboardButton("🕒 发帖时段", callback_data="v3smp|windows"),

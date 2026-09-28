@@ -216,5 +216,8 @@ def test_publisher_dashboard_exposes_broadcast_center(tmp_path):
     )
     bot = V3PublisherApplication(settings)
     buttons = [button for row in bot._dashboard_keyboard().inline_keyboard for button in row]
-    broadcast = next(button for button in buttons if button.text == "📢 发布中心")
+    # Active operator home uses the renamed label.
+    broadcast = next(button for button in buttons if button.text == "📢 频道运营")
     assert broadcast.callback_data == "v3bc"
+    # v3bc still routes into the broadcast center (marketing, weather, FX, ...).
+    assert "v3bc" in {button.callback_data for button in buttons}

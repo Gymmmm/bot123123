@@ -509,6 +509,31 @@ class AutoPublishRepository:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def exception_rows_filtered(
+        self, where_clause: str, params: list[Any], *, limit: int = 20
+    ) -> list[dict[str, Any]]:
+        """Run a fully-prepared WHERE clause + params against the exception listing.
+
+        The caller is responsible for SQL safety (we only consume caller-built
+        clauses against a closed set of category mappings).
+        """
+        clean_clause = str(where_clause or "").strip()
+        if not clean_clause:
+            return self.exception_rows(limit=limit)
+        clause_params = list(params or [])
+        clause_params.append(max(1, int(limit)))
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"""SELECT a.*,l.public_listing_id,l.display_title,l.project_name,o.monthly_rent_usd
+                   FROM publisher_auto_items_v3 a
+                   JOIN listings_v3 l ON l.listing_id=a.listing_id
+                   JOIN listing_offers o ON o.offer_id=a.offer_id
+                   WHERE a.state='exception' AND a.ignored=0 AND {clean_clause}
+                   ORDER BY a.updated_at DESC LIMIT ?""",
+                clause_params,
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def exception_counts_by_reason(self) -> dict[str, int]:
         with self._connect() as conn:
             rows = conn.execute(

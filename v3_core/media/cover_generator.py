@@ -96,6 +96,131 @@ def _rounded_card_with_shadow(
     draw.rounded_rectangle(bbox, radius=radius, fill=fill, outline=(255, 255, 255, 180), width=2)
 
 
+# ---------------------------------------------------------------------------
+# Premium-photo style helpers — gold-bordered cards + bottom brand strip.
+# Mirrors the new 侨联极简实拍 design previewed with the listing photos.
+# ---------------------------------------------------------------------------
+
+GOLD = (244, 221, 176)
+GOLD_DARK = (198, 154, 67)
+GOLD_CARD_BG = (255, 252, 247)
+GOLD_CARD_TEXT = (30, 58, 110)
+SHADOW = (10, 16, 28, 120)
+OFF_WHITE = (235, 235, 235)
+WHITE_RGB = (255, 255, 255)
+BRAND_STRIP_H = 56
+
+
+def _fit_canvas(img: Image.Image, cw: int, ch: int) -> Image.Image:
+    ir = img.width / img.height
+    cr = cw / ch
+    if ir > cr:
+        nh = ch
+        nw = int(nh * ir)
+    else:
+        nw = cw
+        nh = int(nw / ir)
+    img = img.resize((nw, nh), Image.Resampling.LANCZOS)
+    lx = (nw - cw) // 2
+    ty = (nh - ch) // 2
+    return img.crop((lx, ty, lx + cw, ty + ch))
+
+
+def _center_square(img: Image.Image, tw: int, th: int) -> Image.Image:
+    iw, ih = img.size
+    src = min(iw, ih)
+    sx = (iw - src) // 2
+    sy = (ih - src) // 2
+    img = img.crop((sx, sy, sx + src, sy + src))
+    return img.resize((tw, th), Image.Resampling.LANCZOS)
+
+
+def _bottom_fade(canvas: Image.Image, *, top_veil: bool = True) -> Image.Image:
+    overlay = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+    band = int(canvas.height * 0.42)
+    for y in range(band):
+        prog = y / max(1, band - 1)
+        alpha = int(200 * (prog ** 1.6))
+        draw.line(
+            [(0, canvas.height - band + y), (canvas.width, canvas.height - band + y)],
+            fill=(0, 0, 0, alpha),
+        )
+    if top_veil:
+        top_band = int(canvas.height * 0.22)
+        for y in range(top_band):
+            prog = 1 - (y / max(1, top_band - 1))
+            alpha = int(90 * (prog ** 1.4))
+            draw.line([(0, y), (int(canvas.width * 0.55), y)], fill=(0, 0, 0, alpha))
+    return Image.alpha_composite(canvas.convert("RGBA"), overlay)
+
+
+def _draw_pill(canvas: Image.Image, x: int, y: int, w: int, h: int, fill) -> None:
+    layer = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+    pd = ImageDraw.Draw(layer)
+    pd.rounded_rectangle([x, y, x + w, y + h], radius=h // 2, fill=fill)
+    canvas.paste(layer, (0, 0), layer)
+
+
+def _gold_price_card(
+    canvas: Image.Image,
+    draw: ImageDraw.ImageDraw,
+    bbox: list[int],
+    *,
+    radius: int = 20,
+    label: str,
+    value: str,
+) -> None:
+    """Gold-bordered white card with shadow, label + bold navy value."""
+    x1, y1, x2, y2 = bbox
+    cw = canvas.width
+    ch = canvas.height
+    # Shadow stack (separate layers — alpha_composite needs matching sizes).
+    for off, alpha in ((6, 18), (4, 28), (2, 40)):
+        sh = Image.new("RGBA", (cw, ch), (0, 0, 0, 0))
+        sd = ImageDraw.Draw(sh)
+        sd.rounded_rectangle(
+            [x1, y1 + off, x2, y2 + off],
+            radius=radius,
+            fill=(0, 0, 0, alpha),
+        )
+        canvas.paste(sh, (0, 0), sh)
+    draw.rounded_rectangle(bbox, radius=radius, fill=GOLD_CARD_BG, outline=GOLD, width=2)
+    lf = _font(20, bold=True)
+    lw = lf.getbbox(label)[2]
+    draw.text((x1 + (x2 - x1 - lw) // 2, y1 + 14), label, font=lf, fill=GOLD_DARK)
+    vf = _font(38, bold=True)
+    vw = vf.getbbox(value)[2]
+    draw.text((x1 + (x2 - x1 - vw) // 2, y1 + 44), value, font=vf, fill=GOLD_CARD_TEXT)
+
+
+def _brand_strip(canvas: Image.Image, *, label: str = "出租房源") -> None:
+    bar_h = BRAND_STRIP_H
+    bar_y = canvas.height - bar_h
+    bar = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+    bd = ImageDraw.Draw(bar)
+    bd.rectangle([0, 0, canvas.width, bar_h], fill=(0, 0, 0, 155))
+    bd.line([(0, 0), (canvas.width, 0)], fill=(198, 154, 67, 200), width=1)
+    brand_cn = _font(28, bold=True)
+    brand_en = _font(12, bold=False)
+    bd.text((28, bar_y + 8), "侨联地产", font=brand_cn, fill=GOLD)
+    bd.text(
+        (30, bar_y + 38),
+        "QIAO LIAN  |  OVERSEAS UNITED REAL ESTATE",
+        font=brand_en,
+        fill=(244, 221, 176, 150),
+    )
+    cat_font = _font(20, bold=True)
+    cw = cat_font.getbbox(label)[2]
+    bd.text(
+        (canvas.width - 28 - cw, bar_y + 18),
+        label,
+        font=cat_font,
+        fill=OFF_WHITE,
+    )
+    canvas.paste(bar, (0, 0), bar)
+
+
 def _cover_price(data: CoverRenderData) -> str:
     raw = str(data.price or "").strip()
     if not raw:
@@ -190,38 +315,50 @@ def generate_cover(
         draw.text((805, 704), price_label, fill=(219,194,142), font=_font(26, bold=True))
         draw.text((805, 752), price, fill=gold, font=_font(50, bold=True))
     elif style == "premium_photo":
-        # Photo-first: soft bottom gradient + white type (matches HTML 13_ template).
-        shade = Image.new("RGBA", (target_width, target_height), (0, 0, 0, 0))
-        sd = ImageDraw.Draw(shade)
-        band = int(target_height * 0.42)
-        for y in range(band):
-            progress = y / max(1, band - 1)
-            alpha = int(200 * (progress ** 1.6))
-            sd.line([(0, target_height - band + y), (target_width, target_height - band + y)], fill=(0, 0, 0, alpha))
-        for y in range(int(target_height * 0.22)):
-            progress = 1 - (y / max(1, int(target_height * 0.22) - 1))
-            alpha = int(90 * (progress ** 1.4))
-            sd.line([(0, y), (int(target_width * 0.55), y)], fill=(0, 0, 0, alpha))
-        canvas = Image.alpha_composite(bg, shade)
+        # Photo-first with gold accents: layout/project pills top-left,
+        # gold price card on the photo, full-width brand strip at the bottom.
+        canvas = _bottom_fade(bg, top_veil=True)
         draw = ImageDraw.Draw(canvas)
-        gold = (244, 221, 176)
-        draw.text((48, 40), "侨联地产", fill=gold, font=_font(44, bold=True))
-        draw.text((50, 94), "QIAO LIAN", fill=(198, 154, 67), font=_font(16, bold=True))
-        meta_bits = [p for p in (location, str(data.size or "").strip(), str(data.floor or "").strip()) if p]
-        if meta_bits:
-            draw.text((48, target_height - 150), "  ·  ".join(meta_bits), fill=(235, 235, 235), font=_font(24))
-        highlights = " · ".join(
-            part for part in (str(data.highlight_1 or "").strip(), str(data.highlight_2 or "").strip(), str(data.highlight_3 or "").strip()) if part
+
+        # Brand top-left
+        draw.text((38, 28), "侨联地产", fill=GOLD, font=_font(38, bold=True))
+        draw.text((40, 74), "QIAO LIAN", fill=GOLD_DARK, font=_font(14, bold=True))
+
+        # Layout pill (top-left below brand)
+        layout_text = tag
+        if layout_text and layout_text != "房源":
+            lf2 = _font(22, bold=True)
+            lw = lf2.getbbox(layout_text)[2]
+            lh = lf2.getbbox(layout_text)[3] - lf2.getbbox(layout_text)[1]
+            lph = lh + 22
+            _draw_pill(canvas, 38, 110, lw + 50, lph, (0, 0, 0, 115))
+            draw = ImageDraw.Draw(canvas)
+            draw.text((56, 110 + 9), layout_text, font=lf2, fill=OFF_WHITE)
+
+        # Project pill next to layout
+        proj_text = title
+        if proj_text:
+            pf = _font(20, bold=True)
+            pw = pf.getbbox(proj_text)[2]
+            ph_f = pf.getbbox(proj_text)[3] - pf.getbbox(proj_text)[1]
+            pph = ph_f + 18
+            layout_pill_w = (lf2.getbbox(layout_text)[2] + 50) if (layout_text and layout_text != "房源") else 0
+            proj_x = 38 + layout_pill_w + 14
+            _draw_pill(canvas, proj_x, 110, pw + 44, pph, (0, 0, 0, 95))
+            draw = ImageDraw.Draw(canvas)
+            draw.text((proj_x + 16, 110 + 7), proj_text, font=pf, fill=OFF_WHITE)
+
+        # Gold price card bottom-right (sits above the brand strip)
+        pc_w, pc_h = 240, 90
+        px = target_width - 38 - pc_w
+        py = target_height - BRAND_STRIP_H - 18 - pc_h
+        _gold_price_card(
+            canvas,
+            draw,
+            [px, py, target_width - 38, py + pc_h],
+            label=price_label,
+            value=price,
         )
-        if highlights:
-            draw.text((48, target_height - 110), highlights, fill=(235, 235, 235), font=_font(22))
-        right_title = title if not tag else f"{title} · {tag}"
-        title_font = _font(40, bold=True)
-        price_font = _font(64, bold=True)
-        tb = title_font.getbbox(right_title)
-        pb = price_font.getbbox(price)
-        draw.text((target_width - 52 - (tb[2] - tb[0]), target_height - 150), right_title, fill=(245, 245, 245), font=title_font)
-        draw.text((target_width - 52 - (pb[2] - pb[0]), target_height - 100), price, fill="white", font=price_font)
     else:
         mask = Image.new("RGBA", (target_width, target_height), (0, 0, 0, 0))
         mask_draw = ImageDraw.Draw(mask)
@@ -260,6 +397,12 @@ def generate_cover(
         draw.text((card_x1 + (card_w - (label_bbox[2]-label_bbox[0])) // 2, card_y1 + 24), price_label, fill="#64748B", font=label_font)
         price_bbox = value_font.getbbox(price)
         draw.text((card_x1 + (card_w - (price_bbox[2]-price_bbox[0])) // 2, card_y1 + 64), price, fill="#0F4C81", font=value_font)
+
+    # Bottom brand strip — premium_photo style only; other styles keep their
+    # existing layout / footer treatments.
+    if style == "premium_photo":
+        strip_label = "出租房源" if str(data.deal_type or "rent").lower() == "rent" else "出售房源"
+        _brand_strip(canvas, label=strip_label)
 
     if output.suffix.lower() not in {".jpg", ".jpeg"}:
         output = output.with_suffix(".jpg")

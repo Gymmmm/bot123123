@@ -5,6 +5,7 @@ import sqlite3
 
 from v3_core.publishing.autopilot import AutoPublishRepository
 from v3_core.publishing.autopilot_anomalies import FinalAutoPublishRepository
+from v3_core.publishing.simple_admin import SimplePublisherAdminController
 
 
 def _seed(db: Path) -> None:
@@ -41,6 +42,15 @@ def _seed(db: Path) -> None:
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 published_at TEXT
+            );
+            CREATE TABLE publisher_review_exceptions_v3 (
+                review_id TEXT PRIMARY KEY,
+                listing_id TEXT NOT NULL,
+                reason_code TEXT NOT NULL,
+                reason_text TEXT NOT NULL,
+                ignored INTEGER NOT NULL DEFAULT 0 CHECK(ignored IN (0,1)),
+                resolved INTEGER NOT NULL DEFAULT 0 CHECK(resolved IN (0,1)),
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
             INSERT INTO listings_v3 VALUES
               ('l_sale','QL-S1','出售A','项目A','pending'),
@@ -102,17 +112,6 @@ def test_final_repo_counts_include_review_exceptions(tmp_path: Path):
     _seed(db)
     with sqlite3.connect(db) as conn:
         conn.execute(
-            """CREATE TABLE publisher_review_exceptions_v3 (
-                review_id TEXT PRIMARY KEY,
-                listing_id TEXT NOT NULL,
-                reason_code TEXT NOT NULL,
-                reason_text TEXT NOT NULL,
-                ignored INTEGER NOT NULL DEFAULT 0,
-                resolved INTEGER NOT NULL DEFAULT 0,
-                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )"""
-        )
-        conn.execute(
             """INSERT INTO publisher_review_exceptions_v3
                (review_id, listing_id, reason_code, reason_text, ignored, resolved)
                VALUES ('rv1','l_loc','missing_location','缺少项目或位置',0,0)"""
@@ -127,3 +126,68 @@ def test_final_repo_counts_include_review_exceptions(tmp_path: Path):
     offer_ids = {row["offer_id"] for row in rows}
     assert "off_loc" in offer_ids
     assert "review:rv1" in offer_ids
+
+
+def test_exception_category_mapping_and_filter_clause():
+    """The 6 operator-facing tabs collapse existing reason_codes without
+    touching the underlying DB or autopilot semantics.
+    """
+    from v3_core.publishing.simple_admin import SimplePublisherAdminController
+
+    assert SimplePublisherAdminController.category_for_reason("missing_location") == "missing_location"
+    assert SimplePublisherAdminController.category_for_reason("missing_rent") == "data_issue"
+    assert SimplePublisherAdminController.category_for_reason("canonical_error") == "data_issue"
+    assert SimplePublisherAdminController.category_for_reason("unreadable_media") == "data_issue"
+    assert SimplePublisherAdminController.category_for_reason("insufficient_media") == "data_issue"
+    assert SimplePublisherAdminController.category_for_reason("listing_not_publishable") == "data_issue"
+    assert SimplePublisherAdminController.category_for_reason("admin_hold") == "data_issue"
+    assert SimplePublisherAdminController.category_for_reason("duplicate_listing") == "duplicate"
+    assert SimplePublisherAdminController.category_for_reason("already_published") == "duplicate"
+    assert SimplePublisherAdminController.category_for_reason("telegram_unknown") == "delivery_pending"
+    assert SimplePublisherAdminController.category_for_reason("telegram_failed") == "delivery_pending"
+    assert SimplePublisherAdminController.category_for_reason("sale_store_only") == "sale_store_only"
+    assert SimplePublisherAdminController.category_for_reason("legacy_backlog") == "other"
+    assert SimplePublisherAdminController.category_for_reason("") == "other"
+
+    # Plain-language labels for the confusing codes.
+    assert SimplePublisherAdminController.human_reason("duplicate_listing") == "疑似重复房源"
+    assert SimplePublisherAdminController.human_reason("already_published") == "已经发布"
+    assert SimplePublisherAdminController.human_reason("missing_rent") == "缺少租金"
+
+    # Tab labels stay operator-friendly.
+    tabs = dict(SimplePublisherAdminController._EXCEPTION_TABS)
+    assert tabs["missing_location"].startswith("📍")
+    assert tabs["data_issue"].startswith("📝")
+    assert tabs["duplicate"].startswith("🔁")
+    assert tabs["delivery_pending"].startswith("📤")
+    assert tabs["sale_store_only"].startswith("🏷")
+    assert tabs["other"].startswith("⚠️")
+
+    # Filter clause only emits known reasons; "all" returns empty.
+    stub = object.__new__(SimplePublisherAdminController)
+    assert stub._exception_filter_clause("all") == ("", [])
+    clause, params = stub._exception_filter_clause("missing_location")
+    assert clause == "reason_code IN (?)"
+    assert params == ["missing_location"]
+    other_clause, other_params = stub._exception_filter_clause("other")
+    assert other_clause.startswith("reason_code NOT IN (")
+    assert "missing_location" in other_params
+    assert "sale_store_only" in other_params
+
+
+def test_exception_rows_filtered_returns_other_category(tmp_path: Path):
+    db = tmp_path / "q.db"
+    _seed(db)
+    repo = FinalAutoPublishRepository(db)
+    repo.sync_review_exceptions = lambda: 0  # type: ignore[method-assign]
+    stub = object.__new__(SimplePublisherAdminController)
+    # The seed includes an `unreadable_media` exception.  That belongs to the
+    # 📝 资料问题 tab, so it must NOT appear under ⚠️ 其他.
+    clause, params = stub._exception_filter_clause("other")
+    rows = repo.exception_rows_filtered(clause, params, limit=20)
+    offer_ids = {row["offer_id"] for row in rows}
+    assert "off_media" not in offer_ids
+    # And it must appear under 📝 资料问题.
+    clause, params = stub._exception_filter_clause("data_issue")
+    rows = repo.exception_rows_filtered(clause, params, limit=20)
+    assert any(row["offer_id"] == "off_media" for row in rows)

@@ -4,6 +4,7 @@ import asyncio
 from pathlib import Path
 import sqlite3
 
+from v3_core.publishing.inventory_operator_ui import PublisherInventoryAdminController
 from v3_core.publishing.simple_admin_production import ProductionSimplePublisherAdminController
 
 
@@ -22,6 +23,18 @@ class _Repo:
     def exception_count(self) -> int:
         return self._exceptions
 
+    def config(self):
+        from dataclasses import dataclass
+
+        @dataclass
+        class _Cfg:
+            enabled: bool = True
+            min_media: int = 1
+            timezone_name: str = "Asia/Phnom_Penh"
+            interval_seconds: int = 60
+
+        return _Cfg()
+
 
 def _labels(markup):
     return [button.text for row in markup.inline_keyboard for button in row]
@@ -31,25 +44,114 @@ def _callbacks(markup):
     return [button.callback_data for row in markup.inline_keyboard for button in row if button.callback_data]
 
 
-def test_production_home_restores_compact_operator_layout():
-    keyboard = ProductionSimplePublisherAdminController.home_keyboard()
+def test_active_operator_home_shows_only_attention_entries():
+    """The active operator home is built from PublisherInventoryAdminController.
+
+    V3PublisherApplication delegates ``show_home`` to ``self.simple`` which is
+    a PublisherAdviserAdminController.  We assert against the actually
+    rendered keyboard so the test pins down what operators see.
+    """
+    controller = object.__new__(PublisherInventoryAdminController)
+    controller.db_path = ":memory:"
+    controller.repository = type(
+        "_StubRepo",
+        (),
+        {
+            "exception_count": lambda self: 0,
+            "queue_count": lambda self: 0,
+            "held_count": lambda self: 0,
+        },
+    )()
+    controller.workflow = type(
+        "_StubWorkflow",
+        (),
+        {"queue_counts": lambda self: type("_C", (), {"unknown": 0})()},
+    )()
+    controller._pending_count = lambda: 0  # type: ignore[assignment]
+    keyboard = controller.home_keyboard()
     rows = [[button.text for button in row] for row in keyboard.inline_keyboard]
-    assert rows == [
-        ["➕ 发布房源", "🔵 房态管理"],
-        ["📢 广播中心", "📡 采集源"],
-        ["🧪 查看发布效果", "📚 发布记录"],
-        ["⚙️ 发布设置"],
-    ]
+    # New compact layout: high-attention entries only, no orphan zero badges.
+    assert rows[0] == ["➕ 新建房源", "📢 频道运营"]
+    assert rows[1][0].startswith("🔵 房态管理")
+    assert rows[1][1].startswith("⚠️ 异常房源")
+    last = rows[-1]
+    assert last[0] == "🕘 最近发布"
+    assert last[1] == "⚙️ 更多"
     callbacks = _callbacks(keyboard)
-    assert callbacks == [
-        "v3smp|new",
-        "v3smp|listings",
-        "v3bc",
+    assert "v3smp|new" in callbacks
+    assert "v3bc" in callbacks
+    assert any(cb.startswith("v3smp|listings") for cb in callbacks)
+    assert any(cb.startswith("v3smp|exceptions|") for cb in callbacks)
+    assert "v3smp|inv_rows|recent" in callbacks
+    assert "v3smp|settings" in callbacks
+    # Low-frequency entries must NOT appear on the home screen anymore.
+    forbidden_home_labels = {
+        "🚀 自动待发",
+        "📦 旧库存",
+        "📤 待发预览",
+        "📡 采集源",
+        "🟢 运行状态",
+        "🕒 发帖时段",
+        "📊 今日统计",
+    }
+    flat = [label for row in rows for label in row]
+    for forbidden in forbidden_home_labels:
+        assert forbidden not in flat, f"{forbidden} should not be on home"
+
+
+def test_low_frequency_entries_live_behind_settings_page():
+    """`⚙️ 更多` (`v3smp|settings`) re-exposes everything we moved off the home."""
+    controller = object.__new__(PublisherInventoryAdminController)
+    controller.db_path = ":memory:"
+    controller.repository = type(
+        "_StubRepo",
+        (),
+        {
+            "exception_count": lambda self: 0,
+            "queue_count": lambda self: 0,
+            "held_count": lambda self: 0,
+        },
+    )()
+    controller.workflow = type(
+        "_StubWorkflow",
+        (),
+        {"queue_counts": lambda self: type("_C", (), {"unknown": 0})()},
+    )()
+    controller._pending_count = lambda: 0  # type: ignore[assignment]
+    home = controller.home_keyboard()
+    home_callbacks = set(_callbacks(home))
+    moved_callbacks = {
+        "v3smp|auto_queue",
+        "v3smp|held_queue",
+        "v3smp|preview_ready",
         "v3smp|sources",
-        "v3smp|preview",
-        "v3smp|logs",
-        "v3smp|settings",
-    ]
+        "v3smp|runtime",
+        "v3smp|windows",
+        "v3smp|stats",
+    }
+    for moved in moved_callbacks:
+        assert moved not in home_callbacks, f"{moved} should live behind ⚙️ 更多"
+
+
+def test_settings_page_keyboard_lists_every_moved_entry():
+    """Confirm the ⚙️ 更多 page keeps every moved callback reachable."""
+    controller = object.__new__(ProductionSimplePublisherAdminController)
+    controller.repository = _Repo(exceptions=0)
+    message = _Message()
+    asyncio.run(controller.show_settings(message))
+    markup = message.calls[-1]["reply_markup"]
+    callbacks = set(_callbacks(markup))
+    expected = {
+        "v3smp|auto_queue",
+        "v3smp|held_queue",
+        "v3smp|preview_ready",
+        "v3smp|sources",
+        "v3smp|runtime",
+        "v3smp|windows",
+        "v3smp|stats",
+    }
+    missing = expected - callbacks
+    assert not missing, f"⚙️ 更多 is missing callbacks: {sorted(missing)}"
 
 
 def test_room_status_hub_exposes_reserved_as_first_class_state():

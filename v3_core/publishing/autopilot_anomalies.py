@@ -198,13 +198,76 @@ class FinalAutoPublishRepository(ProductionAutoPublishRepository):
                 counts["other"] = int(counts.get("other", 0)) + amount
             counts["all"] = int(counts.get("all", 0)) + amount
         return counts
+
+    def exception_rows_filtered(
+        self, where_clause: str, params: list[Any], *, limit: int = 20
+    ) -> list[dict[str, Any]]:
+        """Like ``exception_rows`` but matches a caller-built SQL clause."""
+        self.sync_review_exceptions()
+        auto_rows = super().exception_rows_filtered(where_clause, params, limit=limit)
+        review_where = "e.resolved=0 AND e.ignored=0"
+        review_params: list[Any] = []
+        clean_clause = str(where_clause or "").strip()
+        if clean_clause:
+            import re
+
+            filter_match = re.fullmatch(
+                r"reason_code\s+(NOT\s+)?IN\s*\(\s*(\?(?:\s*,\s*\?)*)\s*\)",
+                clean_clause,
+                flags=re.IGNORECASE,
+            )
+            codes = [str(value) for value in params]
+            if not codes:
+                merged = self.exception_rows(limit=limit, reason_code=None)
+                merged = [
+                    row
+                    for row in merged
+                    if str(row.get("reason_code") or "")
+                    not in {"sale_store_only", "missing_location", "canonical_error"}
+                ]
+                return merged[:limit]
+            if filter_match is None or filter_match.group(2).count("?") != len(codes):
+                raise ValueError("unsupported_exception_filter")
+            if filter_match.group(1):
+                placeholders = ",".join("?" for _ in codes)
+                review_where += f" AND e.reason_code NOT IN ({placeholders})"
+                review_params.extend(codes)
+            else:
+                placeholders = ",".join("?" for _ in codes)
+                review_where += f" AND e.reason_code IN ({placeholders})"
+                review_params.extend(codes)
+        review_params.append(max(1, int(limit)))
+        with self._connect() as conn:
+            extra = conn.execute(
+                f"""SELECT e.review_id,e.listing_id,e.reason_code,e.reason_text,e.updated_at,
+                          l.public_listing_id,l.display_title,l.project_name
+                   FROM publisher_review_exceptions_v3 e
+                   JOIN listings_v3 l ON l.listing_id=e.listing_id
+                   WHERE {review_where}
+                   ORDER BY e.updated_at DESC LIMIT ?""",
+                review_params,
+            ).fetchall()
+        merged = list(auto_rows)
+        for row in extra:
+            item = dict(row)
+            item["offer_id"] = "review:" + str(row["review_id"])
+            merged.append(item)
+        merged.sort(key=lambda value: str(value.get("updated_at") or ""), reverse=True)
+        return merged[: max(1, int(limit))]
+
+
     def review_exception_detail(self, token: str) -> dict[str, Any]:
         review_id = str(token).removeprefix("review:")
         self.sync_review_exceptions()
         with self._connect() as conn:
             row = conn.execute(
                 """SELECT e.*,r.canonical_record_id,c.source_post_id,
-                          l.public_listing_id,l.display_title,l.project_name
+                          l.public_listing_id,l.display_title,l.project_name,
+                          l.layout,l.public_location_display,
+                          (SELECT o.monthly_rent_usd FROM listing_offers o
+                            WHERE o.listing_id=e.listing_id AND o.offer_type='rent'
+                            ORDER BY CASE WHEN o.offer_status='active' THEN 0 ELSE 1 END,
+                                     o.rowid DESC LIMIT 1) AS monthly_rent_usd
                    FROM publisher_review_exceptions_v3 e
                    JOIN review_items r ON r.review_id=e.review_id
                    JOIN listings_v3 l ON l.listing_id=e.listing_id

@@ -132,18 +132,16 @@ def test_bootstrap_contains_all_autopublish_runtime_tables(tmp_path):
     assert expected <= tables
 
 
-def test_homepage_has_exactly_seven_operator_entries():
-    keyboard = SimplePublisherAdminController.home_keyboard()
-    labels = [button.text for row in keyboard.inline_keyboard for button in row]
-    assert labels == [
-        "➕ 新建房源",
-        "🟢 运行状态",
-        "📣 每日广播",
-        "📊 今日统计",
-        "🏠 房源状态",
-        "🕒 发帖时段",
-        "📡 采集源",
-    ]
+def test_base_simple_home_keyboard_has_seven_inheritance_entries():
+    """The base ``SimplePublisherAdminController.home_keyboard`` keeps 7 entries
+    for downstream inheritance, but the rendered operator home is built by
+    ``PublisherInventoryAdminController.home_keyboard`` (6 attention entries).
+
+    Pipeline-internal terms must never surface on any operator keyboard.
+    """
+    base_labels = [button.text for row in SimplePublisherAdminController.home_keyboard().inline_keyboard for button in row]
+    assert len(base_labels) == 7, base_labels
+
     forbidden = {
         "待审核",
         "待生成",
@@ -153,7 +151,37 @@ def test_homepage_has_exactly_seven_operator_entries():
         "发布恢复中心",
         "选择封面和实拍",
     }
-    assert not forbidden.intersection(labels)
+    assert not forbidden.intersection(base_labels)
+
+    # The rendered home uses the compact 6-entry layout.
+    from v3_core.publishing.inventory_operator_ui import PublisherInventoryAdminController
+
+    rendered_controller = object.__new__(PublisherInventoryAdminController)
+    rendered_controller.db_path = ":memory:"
+    rendered_controller.repository = type(
+        "_StubRepo",
+        (),
+        {
+            "exception_count": lambda self: 0,
+            "queue_count": lambda self: 0,
+            "held_count": lambda self: 0,
+        },
+    )()
+    rendered_controller.workflow = type(
+        "_StubWorkflow",
+        (),
+        {"queue_counts": lambda self: type("_C", (), {"unknown": 0})()},
+    )()
+    rendered_controller._pending_count = lambda: 0  # type: ignore[assignment]
+    rendered_labels = [
+        button.text
+        for row in rendered_controller.home_keyboard().inline_keyboard
+        for button in row
+    ]
+    assert not forbidden.intersection(rendered_labels)
+    # No orphan zero badges — only the high-attention rows.
+    assert "🕘 最近发布" in rendered_labels
+    assert "⚙️ 更多" in rendered_labels
 
 
 def test_default_cover_style_policy():
