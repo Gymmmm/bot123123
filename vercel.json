@@ -1,9 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "git": {
-    "deploymentEnabled": {
-      "feat/sale-redesign-20260929": true,
-      "*": false
-    }
+    "deploymentEnabled": true
   }
 }
