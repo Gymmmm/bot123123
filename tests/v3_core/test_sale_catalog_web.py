@@ -283,14 +283,16 @@ def test_sale_http_api_meta_detail_media_and_static_frontend(tmp_path: Path):
         thread.join(timeout=3)
 
 
-def test_sale_api_is_backend_only_without_bundled_demo_frontend():
-    """Sale UI lives on Vercel; this service only serves the public catalog API."""
+def test_sale_web_is_bundled_and_uses_store_only_policy():
+    """Sale UI is bundled in this repo; Sale uses store_only policy, not telegram_publish."""
     root = Path(__file__).resolve().parents[2]
-    assert not (root / "web" / "sale" / "index.html").exists()
+    assert (root / "web" / "sale" / "index.html").exists(), "sale frontend should be bundled"
     catalog = (root / "v3_core" / "sale" / "catalog.py").read_text(encoding="utf-8")
     assert "inventory_status IN ('pending','active','reserved')" in catalog
     assert '"pending": "在售"' in catalog
     assert '"active": "在售"' in catalog
+    # Sale must not appear in telegram_rent or telegram_publish flows
+    assert "telegram_publish" not in catalog
 
 
 def test_sale_web_entrypoint_is_read_only_and_has_no_alignment_side_effect():
