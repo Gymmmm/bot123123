@@ -21,6 +21,7 @@ _CHANNEL_BOOK_SOURCES = frozenset(
 
 TransitionChoiceKind = Literal[
     "appointment_date",
+    "appointment_quick_slot",
     "appointment_other_date",
     "appointment_mode",
     "appointment_time",
@@ -116,24 +117,50 @@ def _appointment_mode_view(draft: PublicAppointmentDraft, inventory: PublicInven
 def _appointment_date_view(draft: PublicAppointmentDraft, inventory: PublicInventoryReader, *, today: date) -> TransitionView:
     details = _resolve_bookable_details(inventory, draft.public_listing_id)
     subject = booking_subject(details)
-    today_value = today.strftime("%m-%d")
-    tomorrow_value = (today + timedelta(days=1)).strftime("%m-%d")
-    after_value = (today + timedelta(days=2)).strftime("%m-%d")
+    tomorrow = today + timedelta(days=1)
+    after = today + timedelta(days=2)
+    rows: list[tuple[TransitionChoice, ...]] = []
+    now = datetime.now(_PHNOM_PENH_TZ)
+    if today != now.date() or now.hour < 14:
+        rows.append((
+            TransitionChoice(
+                f"今天下午 · {today.month}月{today.day}日",
+                "appointment_quick_slot",
+                f"{today.strftime('%m-%d')}_pm",
+            ),
+        ))
+    rows.extend((
+        (
+            TransitionChoice(
+                f"明天上午 · {tomorrow.month}月{tomorrow.day}日",
+                "appointment_quick_slot",
+                f"{tomorrow.strftime('%m-%d')}_am",
+            ),
+            TransitionChoice(
+                f"明天下午 · {tomorrow.month}月{tomorrow.day}日",
+                "appointment_quick_slot",
+                f"{tomorrow.strftime('%m-%d')}_pm",
+            ),
+        ),
+        (
+            TransitionChoice(
+                f"后天上午 · {after.month}月{after.day}日",
+                "appointment_quick_slot",
+                f"{after.strftime('%m-%d')}_am",
+            ),
+        ),
+        (TransitionChoice("其他日期 / 时间", "appointment_other_date"),),
+        (TransitionChoice("⬅️ 返回上一步", "appointment_back_mode"),),
+    ))
     return TransitionView(
         kind="appointment_date",
         text=(
-            "📅 <b>选择日期</b>\n\n"
+            "🕐 <b>选择看房时间</b>\n\n"
             f"{he(subject)}\n"
             f"已选：{he('视频代看' if draft.mode == 'video' else '实地看房')}\n\n"
-            "请选择方便的日期："
+            "常用时段可直接选；没有合适时间再自己输入。"
         ),
-        rows=(
-            (TransitionChoice(f"今天 · {today.month}月{today.day}日", "appointment_date", today_value),),
-            (TransitionChoice(f"明天 · {(today + timedelta(days=1)).month}月{(today + timedelta(days=1)).day}日", "appointment_date", tomorrow_value),),
-            (TransitionChoice(f"后天 · {(today + timedelta(days=2)).month}月{(today + timedelta(days=2)).day}日", "appointment_date", after_value),),
-            (TransitionChoice("其他日期", "appointment_other_date"),),
-            (TransitionChoice("⬅️ 返回上一步", "appointment_back_mode"),),
-        ),
+        rows=tuple(rows),
     )
 
 

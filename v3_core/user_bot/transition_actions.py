@@ -175,6 +175,7 @@ class TransitionActionService:
         if kind in {
             "appointment_mode",
             "appointment_date",
+            "appointment_quick_slot",
             "appointment_other_date",
             "appointment_time",
             "appointment_other_time",
@@ -204,6 +205,28 @@ class TransitionActionService:
                 return TransitionActionResult(
                     status="ok",
                     next_step="appointment_date",
+                    appointment=updated,
+                    mutation=SessionMutationPlan(
+                        set_values={APPOINTMENT_SESSION_KEY: _appointment_values(updated)},
+                        delete_keys=(
+                            APPOINTMENT_AWAITING_DATE_KEY,
+                            APPOINTMENT_AWAITING_TIME_KEY,
+                        ),
+                    ),
+                )
+
+            if kind == "appointment_quick_slot":
+                date_value, time_value = callback.value.rsplit("_", 1)
+                try:
+                    updated = draft.with_date(date_value).with_time(time_value)
+                except ValueError:
+                    return TransitionActionResult(
+                        status="invalid",
+                        reason="invalid_appointment_quick_slot",
+                    )
+                return TransitionActionResult(
+                    status="ok",
+                    next_step="appointment_submit",
                     appointment=updated,
                     mutation=SessionMutationPlan(
                         set_values={APPOINTMENT_SESSION_KEY: _appointment_values(updated)},

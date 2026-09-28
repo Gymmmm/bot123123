@@ -253,3 +253,28 @@ def test_budget_requires_live_search_pref_and_remaining_navigation_is_explicit()
         result = service.apply(TransitionCallback(kind=kind), {})
         assert result.ok and result.next_step == "navigation"
         assert result.navigation == kind
+
+
+
+def test_appointment_quick_slot_skips_separate_date_and_time_steps():
+    service = TransitionActionService()
+    session = {
+        APPOINTMENT_SESSION_KEY: {
+            "public_listing_id": "QL-RF-A2B3",
+            "mode": "offline",
+            "date": "",
+            "time": "",
+            "source": "listing_callback",
+        }
+    }
+
+    result = service.apply(
+        TransitionCallback(kind="appointment_quick_slot", value="09-10_pm"),
+        session,
+    )
+
+    assert result.ok
+    assert result.next_step == "appointment_submit"
+    assert result.appointment is not None
+    assert result.appointment.date == "09-10"
+    assert result.appointment.time == "pm"

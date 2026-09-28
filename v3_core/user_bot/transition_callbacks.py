@@ -19,6 +19,7 @@ TRANSITION_PREFIX = f"{PREFIX}:t"
 _VALUE_KINDS = frozenset(
     {
         "appointment_date",
+        "appointment_quick_slot",
         "appointment_mode",
         "appointment_time",
         "budget_choice",
@@ -49,6 +50,7 @@ _LAYOUT_CODES = frozenset(code for code, _ in LAYOUT_OPTIONS)
 _MODES = frozenset({"offline", "video"})
 _TIMES = frozenset({"am", "pm", "evening"})
 _DATE_RE = re.compile(r"^\d{2}-\d{2}$")
+_QUICK_SLOT_RE = re.compile(r"^(\d{2}-\d{2})_(am|pm)$")
 
 
 @dataclass(frozen=True)
@@ -65,6 +67,15 @@ def _validate_value(kind: str, value: object) -> str:
         month, day = (int(part) for part in clean.split("-", 1))
         if not (1 <= month <= 12 and 1 <= day <= 31):
             raise ValueError("invalid_transition_appointment_date")
+        return clean
+    if kind == "appointment_quick_slot":
+        match = _QUICK_SLOT_RE.fullmatch(clean)
+        if match is None:
+            raise ValueError("invalid_transition_appointment_quick_slot")
+        date_value = match.group(1)
+        month, day = (int(part) for part in date_value.split("-", 1))
+        if not (1 <= month <= 12 and 1 <= day <= 31):
+            raise ValueError("invalid_transition_appointment_quick_slot")
         return clean
     if kind == "appointment_mode":
         if clean not in _MODES:

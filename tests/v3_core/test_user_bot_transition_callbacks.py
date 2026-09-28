@@ -16,6 +16,7 @@ PUBLIC_ID = "QL-RF-A2B3"
 def test_codec_uses_only_v3_namespaces_and_reuses_existing_listing_and_change_search_contracts():
     choices = (
         TransitionChoice("今天", "appointment_date", "09-08"),
+        TransitionChoice("明天下午", "appointment_quick_slot", "09-09_pm"),
         TransitionChoice("📅 其他日期", "appointment_other_date"),
         TransitionChoice("🎥 改为视频看房", "appointment_mode", "video"),
         TransitionChoice("下午 14:00–17:00", "appointment_time", "pm"),
@@ -51,6 +52,7 @@ def test_codec_uses_only_v3_namespaces_and_reuses_existing_listing_and_change_se
 def test_value_callbacks_round_trip_and_reject_malformed_values():
     for kind, value in (
         ("appointment_date", "09-08"),
+        ("appointment_quick_slot", "09-09_pm"),
         ("appointment_mode", "video"),
         ("appointment_mode", "offline"),
         ("appointment_time", "am"),
@@ -73,6 +75,8 @@ def test_value_callbacks_round_trip_and_reject_malformed_values():
         "v3u:t:appointment_date:13-08",
         "v3u:t:appointment_date:09-32",
         "v3u:t:appointment_date:9-8",
+        "v3u:t:appointment_quick_slot:09-09_noon",
+        "v3u:t:appointment_quick_slot:13-01_pm",
         "v3u:t:appointment_mode:walk",
         "v3u:t:appointment_time:noon",
         "v3u:t:budget_choice:b7",
@@ -124,6 +128,8 @@ def test_encoder_fails_closed_on_unsupported_or_invalid_choice():
         encode_transition_choice(TransitionChoice("今天", "appointment_date", "13-01"))
     with pytest.raises(ValueError, match="invalid_transition_appointment_time"):
         encode_transition_choice(TransitionChoice("时间", "appointment_time", "noon"))
+    with pytest.raises(ValueError, match="invalid_transition_appointment_quick_slot"):
+        encode_transition_choice(TransitionChoice("快捷时间", "appointment_quick_slot", "09-08_noon"))
     with pytest.raises(ValueError, match="invalid_transition_budget_choice"):
         encode_transition_choice(TransitionChoice("预算", "budget_choice", "b9"))
     with pytest.raises(ValueError, match="invalid_transition_area_choice"):
