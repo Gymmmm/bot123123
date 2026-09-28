@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import sqlite3
+from statistics import median
 from typing import Any
 from urllib.parse import quote
 
@@ -278,6 +279,156 @@ class SaleCatalogRepository:
             "property_types": [str(item["value"]) for item in type_rows if str(item["value"] or "").strip()],
         }
 
+    @staticmethod
+    def _sale_reference_from_rows(
+        rows: list[sqlite3.Row],
+        *,
+        scope: str,
+        label: str,
+        current_price: int | None,
+        current_size_sqm: float | None,
+    ) -> dict[str, Any] | None:
+        prices = sorted(
+            int(row["sale_price_usd"])
+            for row in rows
+            if row["sale_price_usd"] is not None and int(row["sale_price_usd"]) > 0
+        )
+        if len(prices) < 2:
+            return None
+
+        ppsm_values: list[int] = []
+        for row in rows:
+            price = row["sale_price_usd"]
+            size = row["size_sqm"]
+            try:
+                price_value = int(price)
+                size_value = float(size)
+            except (TypeError, ValueError):
+                continue
+            if price_value > 0 and size_value > 0:
+                ppsm_values.append(int(round(price_value / size_value)))
+        ppsm_values.sort()
+
+        median_price = int(round(float(median(prices))))
+        current_vs_median_pct: float | None = None
+        if current_price and median_price > 0:
+            current_vs_median_pct = round((int(current_price) - median_price) / median_price * 100, 1)
+
+        current_ppsm: int | None = None
+        if current_price and current_size_sqm:
+            try:
+                if float(current_size_sqm) > 0:
+                    current_ppsm = int(round(int(current_price) / float(current_size_sqm)))
+            except (TypeError, ValueError):
+                current_ppsm = None
+
+        return {
+            "scope": scope,
+            "label": label,
+            "count": len(prices),
+            "min_sale_price_usd": prices[0],
+            "median_sale_price_usd": median_price,
+            "max_sale_price_usd": prices[-1],
+            "ppsm_count": len(ppsm_values),
+            "min_price_per_sqm_usd": ppsm_values[0] if ppsm_values else None,
+            "median_price_per_sqm_usd": int(round(float(median(ppsm_values)))) if ppsm_values else None,
+            "max_price_per_sqm_usd": ppsm_values[-1] if ppsm_values else None,
+            "current_price_per_sqm_usd": current_ppsm,
+            "current_vs_median_pct": current_vs_median_pct,
+            "basis": "current_public_sale_inventory",
+        }
+
+    def _sale_reference_for_row(
+        self,
+        conn: sqlite3.Connection,
+        sale_row: sqlite3.Row,
+    ) -> dict[str, Any] | None:
+        """Compare only current public sale inventory; never reads rent offers."""
+        project = str(sale_row["project_name"] or "").strip()
+        location = str(
+            sale_row["public_location_display"]
+            or sale_row["canonical_area_display"]
+            or ""
+        ).strip()
+        property_type = str(sale_row["property_type"] or "").strip()
+        bedrooms = sale_row["bedrooms"]
+        current_price = None if sale_row["sale_price_usd"] is None else int(sale_row["sale_price_usd"])
+        current_size = sale_row["size_sqm"]
+
+        base = """
+            SELECT l.public_listing_id,l.project_name,l.public_location_display,
+                   l.canonical_area_display,l.property_type,l.bedrooms,l.size_sqm,
+                   l.updated_at,o.sale_price_usd
+            FROM listings_v3 l
+            JOIN listing_offers o ON o.offer_id=(
+                SELECT o2.offer_id
+                FROM listing_offers o2
+                WHERE o2.listing_id=l.listing_id
+                  AND o2.offer_type='sale'
+                  AND o2.offer_status='active'
+                  AND o2.publication_policy='store_only'
+                ORDER BY o2.updated_at DESC,o2.created_at DESC,o2.offer_id DESC
+                LIMIT 1
+            )
+            WHERE l.data_status='current'
+              AND l.inventory_status IN ('pending','active','reserved')
+              AND TRIM(COALESCE(l.public_listing_id,''))<>''
+        """
+
+        candidates: list[tuple[str, str, str, list[Any], int]] = []
+        if project and bedrooms is not None:
+            candidates.append((
+                "same_project_layout",
+                "同项目同户型",
+                " AND TRIM(l.project_name)=? AND l.bedrooms=?",
+                [project, int(bedrooms)],
+                2,
+            ))
+        if project:
+            candidates.append((
+                "same_project",
+                "同项目",
+                " AND TRIM(l.project_name)=?",
+                [project],
+                2,
+            ))
+        if location and property_type and bedrooms is not None:
+            candidates.append((
+                "same_area_type_layout",
+                "同区域同类型同户型",
+                """ AND (l.public_location_display LIKE ? OR l.canonical_area_display LIKE ?)
+                    AND l.property_type=? AND l.bedrooms=?""",
+                [f"%{location}%", f"%{location}%", property_type, int(bedrooms)],
+                3,
+            ))
+        if location and property_type:
+            candidates.append((
+                "same_area_type",
+                "同区域同类型",
+                """ AND (l.public_location_display LIKE ? OR l.canonical_area_display LIKE ?)
+                    AND l.property_type=?""",
+                [f"%{location}%", f"%{location}%", property_type],
+                3,
+            ))
+
+        for scope, label, extra_sql, params, minimum in candidates:
+            rows = conn.execute(
+                base + extra_sql + " ORDER BY l.updated_at DESC LIMIT 80",
+                tuple(params),
+            ).fetchall()
+            if len(rows) < minimum:
+                continue
+            reference = self._sale_reference_from_rows(
+                list(rows),
+                scope=scope,
+                label=label,
+                current_price=current_price,
+                current_size_sqm=current_size,
+            )
+            if reference is not None:
+                return reference
+        return None
+
     def get_sale_listing(self, public_id: str) -> dict[str, Any] | None:
         public_id = str(public_id or "").strip().upper()
         if not public_id:
@@ -287,7 +438,9 @@ class SaleCatalogRepository:
             if row is None:
                 return None
             media = self._media_for_source(conn, row["source_post_id"])
-            return self._public_row(row, media)
+            item = self._public_row(row, media)
+            item["sale_market_reference"] = self._sale_reference_for_row(conn, row)
+            return item
 
     def media_asset(self, asset_id: str) -> tuple[Path, str] | None:
         """Resolve only image media belonging to a currently public sale listing."""
