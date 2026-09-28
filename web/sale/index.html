@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
-  <meta name="description" content="侨联地产 · 金边出售房源，总价、产权、面积直接看，中文顾问全程服务。">
+  <meta name="description" content="侨联地产 · 金边出售房源，总价、区域、面积直接看，中文顾问全程服务。">
   <title>侨联地产 · 金边出售</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
@@ -45,7 +45,7 @@
     <div class="hero-content">
       <div class="hero-copy">
         <h1 id="hero-title">金边真实出售房源</h1>
-        <p class="hero-sub">公寓 · 别墅 · 排屋 &nbsp;|&nbsp; 总价、产权、面积直接看</p>
+        <p class="hero-sub">公寓 · 别墅 · 排屋 &nbsp;|&nbsp; 总价、区域、面积直接看</p>
       </div>
       <div class="hero-stats">
         <span class="stat-num" id="heroCountNum">—</span>
@@ -59,6 +59,14 @@
   <!-- ── Filter Bar ───────────────────── -->
   <div class="filter-bar">
     <div class="filter-bar-inner">
+      <div class="catalog-search" role="search">
+        <label class="search-box" for="searchInput">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="20" y1="20" x2="16.65" y2="16.65"/></svg>
+          <input id="searchInput" type="search" inputmode="search" autocomplete="off" placeholder="搜索楼盘、区域、房源编号">
+        </label>
+        <button id="searchBtn" class="search-btn" type="button">搜索</button>
+      </div>
+
       <div class="filter-row" role="group" aria-label="房源筛选">
         <div class="filter-select-wrap">
           <select id="area" aria-label="区域">
@@ -101,10 +109,9 @@
         </div>
         <div class="sort-wrap">
           <select id="sortSelect" aria-label="排序">
-            <option value="default">默认排序</option>
+            <option value="newest">最新更新</option>
             <option value="price_asc">总价 从低到高</option>
             <option value="price_desc">总价 从高到低</option>
-            <option value="updated_desc">最新更新</option>
           </select>
         </div>
       </div>
@@ -203,7 +210,7 @@
       <!-- Disclaimer -->
       <div class="detail-disclaimer">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        <p>房源状态和价格可能随业主调整，请联系顾问确认当前房态。网站展示不构成购买承诺。</p>
+        <p>售价和在售状态可能随业主调整，请联系顾问确认当前信息。网站展示不构成购买承诺。</p>
       </div>
 
     </div><!-- /detail-body -->
@@ -222,6 +229,14 @@
 
   </div><!-- /detail-sheet -->
 </div><!-- /overlay -->
+
+<div id="lightbox" class="lightbox" hidden role="dialog" aria-modal="true" aria-label="房源大图">
+  <button id="lightboxClose" class="lightbox-close" type="button" aria-label="关闭大图">×</button>
+  <button id="lightboxPrev" class="lightbox-nav prev" type="button" aria-label="上一张">‹</button>
+  <img id="lightboxImage" alt="">
+  <button id="lightboxNext" class="lightbox-nav next" type="button" aria-label="下一张">›</button>
+  <div id="lightboxCount" class="lightbox-count"></div>
+</div>
 
 <script src="./app.js" defer></script>
 </body>
