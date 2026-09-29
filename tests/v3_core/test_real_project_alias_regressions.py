@@ -28,3 +28,49 @@ def test_bare_time_square_remains_unresolved_when_phase_is_unknown() -> None:
 def test_explicit_time_square_phase_still_resolves() -> None:
     result = classify_listing_taxonomy("#时代广场1 两房公寓出租")
     assert result.project_key == "time_square_1"
+
+
+def test_verified_bali3_chinese_alias_gets_chroy_changvar_default() -> None:
+    facts = canonicalize_source("巴厘3，一房一厅 租金300-350 押一付一，合同一年。")
+    assert facts["project_key"] == "bali_3"
+    assert facts["public_location_key"] == "水净华"
+
+
+def test_verified_yuetai_ecc_alias_gets_tonle_bassac_default() -> None:
+    facts = canonicalize_source("#粤泰ECC 小单间：$200/月 家具齐全")
+    assert facts["project_key"] == "yuetai_ecc"
+    assert facts["public_location_key"] == "百色河"
+    assert facts["public_location_display"] == "诺罗敦大道 · 永旺1附近"
+
+
+def test_bare_yuetai_is_not_forced_to_ecc() -> None:
+    result = classify_listing_taxonomy("#粤泰 三房公寓出租")
+    assert result.project_key is None
+
+
+def test_spaced_aeon2_is_safe_nearby_location() -> None:
+    facts = canonicalize_source("永旺 2 附近独栋别墅 出租价格：2800 房间7+2")
+    assert facts["public_location_key"] == "永旺2"
+
+
+def test_picasso_bkk1_does_not_gain_one_letter_daun_penh_false_positive() -> None:
+    facts = canonicalize_source("#Picasso City Garden BKK1 两房出租 $1200/月")
+    assert facts["project_key"] == "picasso_city_garden"
+    assert facts["public_location_key"] == "BKK1"
+    assert "隆边" not in facts["market_location_keys"]
+    assert "ambiguous_market_location" not in facts["candidate_flags"]
+
+
+def test_nearby_landmarks_do_not_override_verified_project_location() -> None:
+    facts = canonicalize_source(
+        "#香格里拉 两房出租 $1400/月\n📍周边：金界｜金街｜永旺1"
+    )
+    assert facts["project_key"] == "the_peak"
+    assert facts["public_location_key"] == "百色河"
+    assert facts["public_location_display"] == "金街附近"
+    assert "ambiguous_market_location" not in facts["candidate_flags"]
+
+
+def test_conflicting_corridors_remain_ambiguous() -> None:
+    facts = canonicalize_source("#洪森大道50米路 双拼别墅出租 $1450/月")
+    assert "ambiguous_market_location" in facts["candidate_flags"]
