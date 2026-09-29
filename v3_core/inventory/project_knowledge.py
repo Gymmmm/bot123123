@@ -31,6 +31,53 @@ _TAXONOMY_TO_KNOWLEDGE = {
 _KNOWLEDGE_TO_TAXONOMY = {value: key for key, value in _TAXONOMY_TO_KNOWLEDGE.items()}
 
 _WEB_VERIFIED_PROJECTS: dict[str, dict[str, Any]] = {
+    "le_conde_bkk1": {
+        "knowledge_key": "web:le-conde-bkk1",
+        "reference_kind": "web_verified_project",
+        "display_name": "Le Condé BKK1",
+        "developer": "Wangfu International",
+        "project_type": "43层综合开发项目",
+        "location": "BKK1, Phnom Penh",
+        "nearby": ["独立碑", "皇宫", "永旺1"],
+        "source_urls": ["https://www.leconde.com/"],
+    },
+    "la_vista_one": {
+        "knowledge_key": "web:la-vista-one",
+        "reference_kind": "web_verified_project",
+        "display_name": "La Vista ONE 紫晶壹号",
+        "developer": "YIN YI VENTURE CO., LTD / 柬埔寨银翼创投有限公司",
+        "project_type": "公寓",
+        "location": "水净华 · Mekong Road · Sokha Hotel北侧",
+        "address": "No.3 Mekong Road, Chroy Changvar District, Phnom Penh",
+        "source_urls": ["https://www.lavistaone.com/"],
+    },
+    "picasso_city_garden": {
+        "knowledge_key": "web:picasso-city-garden",
+        "reference_kind": "web_verified_project",
+        "display_name": "Picasso City Garden 毕加索城市花园",
+        "developer": "Picasso City Garden Development Plc.",
+        "project_type": "高端公寓",
+        "location": "BKK1 · Street 322",
+        "address": "No. 41, Street 322, Village 7, Sangkat Boeng Keng Kang 1, Phnom Penh",
+        "source_urls": [
+            "https://pcgdevelopmentplc.com.kh/en/about-us/",
+            "https://pcgdevelopmentplc.com.kh/en/contact-us/",
+        ],
+    },
+    "diamond_one": {
+        "knowledge_key": "web:diamond-one",
+        "reference_kind": "web_verified_project",
+        "display_name": "Diamond One",
+        "project_type": "公寓 / 联排住宅",
+        "location": "钻石岛 / Koh Pich",
+        "completion_year": "2019",
+        "amenities": ["泳池", "健身房", "停车", "花园", "儿童区", "备用发电", "24小时接待", "视频安保"],
+        "nearby": ["永旺1", "Canadian International School", "会展中心", "Sofitel"],
+        "source_urls": [
+            "https://www.realestate.com.kh/new-developments/diamond-one/",
+            "https://construction-property.com/diamond-one-opens-sales-center/",
+        ],
+    },
     "the_penthouse_residence": {
         "knowledge_key": "web:the-penthouse-residence",
         "reference_kind": "web_verified_project",
@@ -38,7 +85,9 @@ _WEB_VERIFIED_PROJECTS: dict[str, dict[str, Any]] = {
         "project_type": "公寓 / 服务式住宅",
         "location": "Tonle Bassac · Sothearos Boulevard",
         "address": "No. 83B, Sothearos Boulevard, Phnom Penh",
-        "amenities": ["泳池", "健身房", "停车", "Sky Bar"],
+        "amenities": ["泳池", "健身房", "停车", "Sky Bar", "Spa", "花园"],
+        "building_profile": "官方资料同时出现36层与43层口径；系统保留冲突，不把总楼层自动继承到房源。",
+        "nearby": ["永旺1", "Sofitel", "iCan British International School"],
         "notes": "楼层口径在公开资料中存在差异，系统不把总楼层作为自动继承事实。",
         "source_urls": [
             "https://thepenthouseresidence.com/our-facilities/",
@@ -64,8 +113,11 @@ _WEB_VERIFIED_PROJECTS: dict[str, dict[str, Any]] = {
         "display_name": "The Peninsula Private Residences",
         "project_type": "公寓 / 商业",
         "location": "Chroy Changvar · 日本桥附近",
-        "building_profile": "公开项目资料称约25层、161个住宅单位，含Studio/1房/2房/3房。",
+        "developer": "CC Peninsula Co., Ltd.（National 6A Investment + SUN & MOON Group + Saturn Investment 合资）",
+        "building_profile": "约25层、161个住宅单位，含Studio/1房/2房/3房。",
+        "amenities": ["泳池", "健身房", "桑拿", "花园"],
         "source_urls": [
+            "https://www.sunandmoongroup.com.kh/our-companies/service-apartment.html",
             "https://www.realestate.com.kh/new-developments/the-peninsula-private-residences/offices-222379/",
         ],
     },
@@ -279,6 +331,16 @@ def project_reference_for_key(project_key: object) -> dict[str, Any] | None:
     if not payload:
         return None
     result = deepcopy(payload)
+    web_profile = _WEB_VERIFIED_PROJECTS.get(taxonomy_key)
+    if web_profile:
+        result["web_verified"] = deepcopy(web_profile)
+        for field in (
+            "display_name", "developer", "project_type", "location", "address",
+            "amenities", "nearby", "building_profile", "completion_year", "notes",
+            "source_urls",
+        ):
+            if web_profile.get(field) not in (None, "", [], {}):
+                result.setdefault(field, deepcopy(web_profile[field]))
     result["knowledge_key"] = knowledge_key
     result["knowledge_version"] = KNOWLEDGE_VERSION
     result["reference_only"] = True
