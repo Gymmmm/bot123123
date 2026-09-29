@@ -91,6 +91,9 @@ PROJECTS: tuple[tuple[str, str, tuple[str, ...], str | None], ...] = (
     ("la_vista_one", "紫晶壹号 La Vista One", ("la vista one", "lavista one", "紫晶壹号", "紫晶一号", "紫晶"), "公寓"),
     ("phnom_penh_galaxy_garden", "金边星河花园", ("phnom penh galaxy garden", "galaxy garden", "金边星河花园", "金边星河", "星河花园", "星河"), "公寓"),
     ("one_70", "ONE 70 金边首座", ("one 70", "one70", "one-70", "金边首座", "金边首座one70"), "公寓"),
+    ("yuetai_ecc", "YUETAI ECC 粤泰", ("yuetai ecc", "yue tai ecc", "粤泰ecc"), "公寓"),
+    ("bali_3", "Bali 3 Condominium", ("bali 3", "bali3", "bali 3 condo", "bali 3 condominium", "巴厘3", "巴里3", "巴厘3号", "巴里3号"), "公寓"),
+    ("the_penthouse_residence", "The Penthouse Residence", ("the penthouse residence", "penthouse residence", "the penhouse residence"), "公寓"),
     ("ding_li_tower", "Ding Li Tower 鼎立大厦", ("ding li tower", "dingli tower", "鼎立", "鼎立大厦"), "公寓"),
     # Peng Huoth / 炳发 — corridor projects (family=None → mixed below; do NOT
     # bind bare「60米炳发/一号路炳发」as DIRECT project aliases).
@@ -216,6 +219,9 @@ PROJECT_DEFAULT_LOCATIONS: dict[str, tuple[str, str]] = {
     "m_residence": ("BKK1", "BKK1"),  # #170 St282 official site
     "odom_living": ("诺罗敦大道", "独立碑附近"),  # 160B Norodom, ~800m Independence Monument
     "one_70": ("隆边", "隆边 · PPCC附近"),  # St70 Daun Penh / PPCC
+    "yuetai_ecc": ("百色河", "诺罗敦大道 · 永旺1附近"),
+    "bali_3": ("水净华", "水净华"),
+    "the_penthouse_residence": ("百色河", "永旺1附近"),
     # ding_li_tower: DingLi Sunshine City(7Makara) vs Dingli Tower(TK) conflict — leave empty
     # Peng Huoth corridor projects (V5/V2). Bare「60米炳发/一号路炳发」stay road
     # markets only — never DIRECT_RESOLVE to one Star community.
@@ -271,7 +277,7 @@ MARKET_ALIAS_EXTENSIONS: dict[str, tuple[str, ...]] = {
     "森速": ("新金边", "新金边区"),
     "水净华": ("鸭子岛", "chroy changvar peninsula"),
     "桑园": ("chamkarmon", "chamkar mon"),
-    "隆边": ("daun penh"),
+    "隆边": ("daun penh",),
     "铁桥头": ("chbar ampov",),
     "俄罗斯市场": ("俄市", "ttp", "tuol tom poung", "toul tom poung"),
     "中央市场": ("新街市", "central market", "phsar thmei"),
@@ -286,7 +292,7 @@ MARKET_ALIAS_EXTENSIONS: dict[str, tuple[str, ...]] = {
     "6号路": ("6a炳发", "6号路炳发", "national road 6a"),
     "铁桥头": ("铁桥头炳发", "chbar ampov"),
     "永旺商圈": ("aeon mall 1", "aeon mall1", "永旺1附近"),
-    "永旺2": ("aeon mall 2", "aeon mall2"),
+    "永旺2": ("aeon mall 2", "aeon mall2", "永旺 2"),
 }
 
 
