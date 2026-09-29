@@ -211,7 +211,7 @@ class TestRentedListingDetailsKeyboard:
         response = build_details_response(view)
         
         labels = [action.label for row in response.action_rows for action in row]
-        assert "📅 预约看房" not in labels
+        assert "📅 在线预约" not in labels
         assert "💬 咨询这套" in labels
         assert "🔍 找相似" in labels
 
@@ -222,7 +222,7 @@ class TestRentedListingDetailsKeyboard:
         response = build_details_response(view)
         
         labels = [action.label for row in response.action_rows for action in row]
-        assert "📅 预约看房" not in labels
+        assert "📅 在线预约" not in labels
 
     def test_pending_listing_no_book_button(self):
         """Pending listings should not show book button."""
@@ -231,4 +231,4 @@ class TestRentedListingDetailsKeyboard:
         response = build_details_response(view)
         
         labels = [action.label for row in response.action_rows for action in row]
-        assert "📅 预约看房" not in labels
+        assert "📅 在线预约" not in labels
