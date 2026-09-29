@@ -449,6 +449,18 @@ def _extract_project(text: str) -> tuple[str | None, str | None, str | None, str
             alias, position = hit
             matches.append((item, alias, position))
 
+    # In the production corpus, #Penthouse is used as a project hashtag even
+    # on studio/2BR units, so it cannot mean the unit subtype there. Keep the
+    # bare word unsafe globally; resolve only the explicit hashtag form.
+    penthouse_tag = re.search(r"(?<![A-Za-z0-9_])#\s*penthouse\b", project_text, flags=re.I)
+    if penthouse_tag:
+        identity = next(
+            (item for item in PROJECT_IDENTITIES if item.key == "the_penthouse_residence"),
+            None,
+        )
+        if identity and not any(item.key == identity.key for item, _alias, _position in matches):
+            matches.append((identity, "#Penthouse", penthouse_tag.start()))
+
     # Prefer the longest alias when project aliases overlap in one phrase.
     # "紫晶壹号" must resolve to La Vista One instead of conflicting with
     # ONE PARK's generic alias "壹号".
