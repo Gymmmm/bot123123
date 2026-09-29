@@ -76,7 +76,7 @@ def test_registry_expands_recognition_without_inheriting_authoritative_location(
     # Registry location is available as reference, but not promoted to an
     # authoritative listing location without an explicit safe location rule.
     assert facts["public_location_display"] is None
-    assert facts["project_reference"]["registry"]["canonical_geo_display"]
+    assert facts["project_reference"]["registry"]["public_location_display_cn"] == "598路 · Chip Mong"
 
 
 def test_projectless_listing_does_not_receive_project_reference():
