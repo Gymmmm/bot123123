@@ -196,7 +196,7 @@ def test_deeplink_invalid_copy_and_reason_missing_compatibility_are_locked():
 
 def test_offline_and_video_drafts_keep_same_listing_date_time_identity():
     inventory = Inventory(bookable=True)
-    for mode, mode_text in (("offline", "实地看房"), ("video", "视频代看")):
+    for mode, mode_text in (("offline", "实地带看"), ("video", "视频带看")):
         draft = PublicAppointmentDraft(PUBLIC_ID, mode=mode, date="09-10", time="pm")
         view = build_appointment_confirmation_view(draft, inventory)
         assert "富力城" in view.text
