@@ -79,12 +79,19 @@ class PublicInventoryAdapter:
         # outside canonical business-fact hashing so research updates never
         # trigger listing revision/publication churn.
         try:
-            from v3_core.inventory.project_knowledge import project_reference_for_key
+            from v3_core.inventory.project_knowledge import (
+                project_reference_for_key,
+                project_reference_location,
+            )
             project_reference = project_reference_for_key(canonical.get("project_key"))
+            project_location_reference = project_reference_location(canonical.get("project_key"))
         except Exception:
             project_reference = None
+            project_location_reference = None
         if project_reference:
             canonical["project_reference"] = project_reference
+        if project_location_reference:
+            canonical["project_reference_location"] = project_location_reference
         live_listing = dict(getattr(view, "listing", None) or {})
         live_offer = dict(getattr(view, "offer", None) or {})
 
@@ -119,6 +126,7 @@ class PublicInventoryAdapter:
             or frozen.get("canonical_area_display")
             or canonical.get("public_location_display")
             or canonical.get("canonical_area_display")
+            or (project_location_reference or {}).get("display")
             or ""
         )
         property_type = (
