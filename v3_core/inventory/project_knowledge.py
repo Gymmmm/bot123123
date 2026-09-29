@@ -291,6 +291,126 @@ def project_knowledge_stats() -> dict[str, int]:
     }
 
 
+def _project_reference_name(reference: dict[str, Any]) -> str:
+    registry = reference.get("registry") or {}
+    v5 = reference.get("v5_profile") or {}
+    return str(
+        registry.get("canonical_name_cn")
+        or v5.get("中文常用名")
+        or reference.get("display_name")
+        or reference.get("knowledge_key")
+        or "该项目"
+    ).strip()
+
+
+def _range_text(living: dict[str, Any], prefix: str, unit_key: str) -> str | None:
+    low = str(living.get(f"{prefix}_min") or "").strip()
+    high = str(living.get(f"{prefix}_max") or "").strip()
+    if not low and not high:
+        return None
+    unit = str(living.get(unit_key) or "").strip()
+    value = low or high
+    if low and high and low != high:
+        value = f"{low}–{high}"
+    return f"{value} {unit}".strip()
+
+
+def answer_project_question(project_key: object, question: object) -> str | None:
+    """Answer deterministic project questions from the reference layer only.
+
+    Returns None when the knowledge bundle cannot support the answer. Listing
+    facts always take precedence; fee ranges are explicitly labelled as market
+    practice/owner-specific when the source says so.
+    """
+    reference = project_reference_for_key(project_key)
+    q = str(question or "").strip().casefold()
+    if not reference or not q:
+        return None
+    if reference.get("reference_kind") == "project_family":
+        if any(token in q for token in ("项目", "位置", "哪里", "配套", "泳池", "健身", "水费", "电费", "物业", "管理费", "停车", "开发商")):
+            return str(reference.get("resolution_hint") or "").strip() or None
+        return None
+
+    name = _project_reference_name(reference)
+    registry = reference.get("registry") or {}
+    v5 = reference.get("v5_profile") or {}
+    living = reference.get("living") or {}
+
+    if any(token in q for token in ("位置", "地址", "哪里", "在哪")):
+        location = (
+            v5.get("中文位置展示")
+            or registry.get("public_location_display_cn")
+            or reference.get("location")
+            or reference.get("address")
+        )
+        if location:
+            return f"{name}：{location}。"
+
+    if any(token in q for token in ("开发商", "谁开发", "开发公司")):
+        developer = registry.get("developer") or reference.get("developer")
+        if developer:
+            return f"{name}开发商：{developer}。"
+
+    fee_specs = (
+        (("电费", "电价"), "electricity_rate", "electricity_unit", "electricity_scope"),
+        (("水费", "水价"), "water_rate", "water_unit", "water_scope"),
+        (("物业费", "管理费"), "management_fee", "management_fee_unit", "management_fee_scope"),
+        (("汽车停车", "车位费", "停车费"), "car_parking_fee", "car_parking_fee_unit", "car_parking_fee_scope"),
+        (("摩托停车", "摩托车位"), "motorbike_parking_fee", "motorbike_parking_fee_unit", "motorbike_parking_fee_scope"),
+    )
+    for tokens, prefix, unit_key, scope_key in fee_specs:
+        if any(token in q for token in tokens):
+            value = _range_text(living, prefix, unit_key)
+            if value:
+                scope = str(living.get(scope_key) or "").strip().upper()
+                if scope == "OWNER_SPECIFIC":
+                    caveat = "这是现有房源样本，不是项目统一收费；具体这套以房东/合同为准。"
+                else:
+                    caveat = "这是项目资料中的常见/参考口径；具体这套以房东和合同为准。"
+                return f"{name}：{value}。{caveat}"
+
+    amenity_tokens = {
+        "泳池": "pool",
+        "健身": "gym",
+        "桑拿": "sauna",
+        "蒸汽": "steam_room",
+        "按摩池": "jacuzzi",
+        "儿童": "kids_playground",
+        "花园": "garden",
+        "天台": "rooftop",
+        "安保": "security_24h",
+        "门禁": "access_card",
+        "监控": "cctv",
+        "发电机": "generator",
+        "备用电": "backup_power",
+    }
+    asked = [(label, field) for label, field in amenity_tokens.items() if label in q]
+    if asked:
+        yes = [
+            label for label, field in asked
+            if str(living.get(field) or "").strip().upper() in {"YES", "TRUE", "1"}
+        ]
+        web_amenities = {str(item).strip() for item in reference.get("amenities") or []}
+        yes.extend(label for label, _field in asked if any(label in item for item in web_amenities) and label not in yes)
+        if yes:
+            return f"{name}项目资料显示有：{'、'.join(yes)}。具体开放/收费规则以物业当期为准。"
+        return None
+
+    if any(token in q for token in ("楼龄", "哪年", "建成", "交付")) and living.get("building_year"):
+        return f"{name}项目资料记录年份：{living['building_year']}。"
+    if any(token in q for token in ("多少层", "总楼层", "几层")) and living.get("total_floors"):
+        return f"{name}项目资料记录总楼层：{living['total_floors']}。"
+    if any(token in q for token in ("多少户", "户数", "多少套")) and living.get("unit_count"):
+        return f"{name}项目资料记录单位数：{living['unit_count']}。"
+
+    if any(token in q for token in ("项目资料", "项目怎么样", "项目介绍", "配套")):
+        summary = str(living.get("living_summary") or reference.get("building_profile") or reference.get("notes") or "").strip()
+        if summary:
+            return f"{name}：{summary}"
+
+    return None
+
+
 def registry_project_identities() -> tuple[dict[str, Any], ...]:
     """Return research-backed identities safe to add to project recognition.
 
@@ -363,6 +483,7 @@ __all__ = [
     "knowledge_key_for_taxonomy",
     "project_reference_for_key",
     "project_knowledge_stats",
+    "answer_project_question",
     "registry_project_identities",
     "taxonomy_key_for_knowledge",
 ]
