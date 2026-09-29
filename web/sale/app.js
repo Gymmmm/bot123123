@@ -450,7 +450,7 @@ function cardMarkup(i) {
         <div class="card-overlay"></div>
         ${status.label ? `<div class="card-status"><span class="status-tag ${esc(status.className)}">${esc(status.label)}</span></div>` : ''}
         ${photoCount > 1 ? `<div class="card-photo-count">${photoCount} 张</div>` : ''}
-        ${price ? `<div class="card-price-overlay"><span class="card-price-text">${esc(price)}</span></div>` : ''}
+        ${price ? `<div class="card-price-overlay"><span class="card-price-block"><small>总价</small><span class="card-price-text">${esc(price)}</span></span></div>` : ''}
       </div>
       <div class="card-body">
         <h2 class="card-title">${esc(displayTitle)}</h2>
@@ -462,7 +462,7 @@ function cardMarkup(i) {
     </a>
     <div class="card-actions">
       <a class="detail-btn property-link" href="${propertyUrl}" data-id="${esc(id)}">看详情</a>
-      <a href="${telegramUrl}" target="_blank" rel="noopener">问价格</a>
+      <a href="${telegramUrl}" target="_blank" rel="noopener">咨询这套</a>
     </div>
   </article>`;
 }
@@ -557,7 +557,7 @@ async function openDetail(id, push = true) {
     const unavailable = ['已售','已下架'].includes(status.label);
     const primary = $('detail-telegram');
     if (primary) {
-      primary.textContent = '问实际价格';
+      primary.textContent = '核实当前价格';
       primary.href = advisorUrl('询问实际价格', i);
     }
     const booking = $('detail-book');
@@ -802,6 +802,8 @@ function updateHeroImage(items) {
   const img = $('heroImage');
   if (!img || !hero) return;
   img.hidden = false;
+  img.fetchPriority = 'high';
+  img.decoding = 'async';
   img.src = text(hero.cover_url);
   img.alt = '';
   img.onload = () => { heroImageLocked = true; };
