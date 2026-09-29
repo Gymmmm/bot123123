@@ -82,16 +82,21 @@ class PublicInventoryAdapter:
             from v3_core.inventory.project_knowledge import (
                 project_reference_for_key,
                 project_reference_location,
+                project_reference_summary,
             )
             project_reference = project_reference_for_key(canonical.get("project_key"))
             project_location_reference = project_reference_location(canonical.get("project_key"))
+            project_summary = project_reference_summary(canonical.get("project_key"))
         except Exception:
             project_reference = None
             project_location_reference = None
+            project_summary = None
         if project_reference:
             canonical["project_reference"] = project_reference
         if project_location_reference:
             canonical["project_reference_location"] = project_location_reference
+        if project_summary:
+            canonical["project_reference_summary"] = project_summary
         live_listing = dict(getattr(view, "listing", None) or {})
         live_offer = dict(getattr(view, "offer", None) or {})
 
