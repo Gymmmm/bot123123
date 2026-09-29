@@ -347,3 +347,13 @@ def test_orkide_royal_condominium_official_profile_is_detailed():
     answer = answer_project_question("orkide_the_royal_condominium", "这个项目有哪些户型？")
     assert "Studio" in answer
     assert "3 Bedrooms" in answer
+
+
+def test_detailed_summary_includes_structured_living_reference_when_available():
+    summary = project_reference_summary("agile_sky_residence")
+    assert "项目户型：Studio、1房、2房、3房" in summary
+    assert "项目规模：" in summary
+    assert "费用参考：" in summary
+    assert "电费0.25–0.27 USD/kWh" in summary
+    assert "水费0.5–1.0 USD/m3" in summary
+    assert "具体房源的租金、水电、管理费" in summary
