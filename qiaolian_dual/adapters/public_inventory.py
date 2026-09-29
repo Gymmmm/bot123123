@@ -75,6 +75,16 @@ class PublicInventoryAdapter:
         frozen = dict(getattr(view, "frozen_listing", None) or {})
         frozen_offer = dict(getattr(view, "frozen_offer", None) or {})
         canonical = dict(snapshot.get("canonical_facts") or {})
+        # Project knowledge is a read-time reference layer. It is intentionally
+        # outside canonical business-fact hashing so research updates never
+        # trigger listing revision/publication churn.
+        try:
+            from v3_core.inventory.project_knowledge import project_reference_for_key
+            project_reference = project_reference_for_key(canonical.get("project_key"))
+        except Exception:
+            project_reference = None
+        if project_reference:
+            canonical["project_reference"] = project_reference
         live_listing = dict(getattr(view, "listing", None) or {})
         live_offer = dict(getattr(view, "offer", None) or {})
 
