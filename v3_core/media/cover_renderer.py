@@ -118,7 +118,7 @@ def _file_to_data_url(path: str, *, enhance: bool = False) -> str:
 
 
 def append_real_photo_strip(output: Path, gallery_paths: tuple[str, ...]) -> None:
-    """Keep the factual poster legible above a strip of up to three real photos."""
+    """Compose the fixed Telegram cover: 1080x1350 hero plus three real photos."""
     thumbs = []
     for raw in dict.fromkeys(gallery_paths):
         try:
@@ -131,19 +131,33 @@ def append_real_photo_strip(output: Path, gallery_paths: tuple[str, ...]) -> Non
     if not thumbs:
         return
     with Image.open(output) as poster_source:
-        poster_image = poster_source.convert("RGB")
-    width, height = poster_image.size
-    strip_y = int(height * 0.73)
-    gap = max(5, width // 160)
+        poster_image = ImageOps.exif_transpose(poster_source).convert("RGB")
+    width, height, hero_height, gap = 1080, 1350, 850, 8
+    strip_y = hero_height + gap
     collage = Image.new("RGB", (width, height), "white")
-    collage.paste(poster_image.resize((width, strip_y - gap), Image.Resampling.LANCZOS), (0, 0))
+    collage.paste(
+        ImageOps.fit(
+            poster_image,
+            (width, hero_height),
+            method=Image.Resampling.LANCZOS,
+        ),
+        (0, 0),
+    )
     count = len(thumbs)
+    usable_width = width - gap * (count - 1)
+    base_width, remainder = divmod(usable_width, count)
+    left = 0
     for index, thumb in enumerate(thumbs):
-        left = (width * index + gap * (count - index)) // count
-        right = (width * (index + 1) - gap * index) // count
-        if right > left:
-            collage.paste(ImageOps.fit(thumb, (right - left, height - strip_y),
-                                        method=Image.Resampling.LANCZOS), (left, strip_y))
+        thumb_width = base_width + (1 if index < remainder else 0)
+        collage.paste(
+            ImageOps.fit(
+                thumb,
+                (thumb_width, height - strip_y),
+                method=Image.Resampling.LANCZOS,
+            ),
+            (left, strip_y),
+        )
+        left += thumb_width + gap
     collage.save(output, format="JPEG" if output.suffix.lower() in {".jpg", ".jpeg"} else "PNG")
 
 

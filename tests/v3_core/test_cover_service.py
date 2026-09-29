@@ -154,3 +154,49 @@ def test_cover_service_rejects_offer_from_another_listing(tmp_path):
             offer_id=str(offer["offer_id"]),
             media=media,
         )
+
+
+def test_image_cover_stays_landscape_before_fixed_4x5_composition(tmp_path):
+    db = tmp_path / "cover-portrait-source.sqlite3"
+    initialize_v3_storage(db)
+    repo = InventoryRepository(str(db))
+    facts = _facts()
+    canonical = repo.store_canonical(source_post_id="source-portrait", facts=facts)
+    repo.upsert_listing(
+        listing_id="l_portrait",
+        public_listing_id="QL-RF-P444",
+        canonical_record_id=str(canonical["canonical_record_id"]),
+        facts=facts,
+    )
+    offer = repo.sync_offers(listing_id="l_portrait", facts=facts)[0]
+    source = tmp_path / "portrait.jpg"
+    Image.new("RGB", (720, 1080), "gray").save(source)
+    media = PreparedSourceMedia(
+        source_post_id=1,
+        cover_source_path=str(source),
+        gallery_paths=(str(source),),
+        source_identity={},
+        duplicates=(),
+        rejected_paths=(),
+        ranking=(),
+    )
+    calls = []
+
+    def fake_renderer(**kwargs):
+        calls.append(kwargs)
+        Path(kwargs["output_path"]).write_bytes(b"fixed-cover")
+        return kwargs["output_path"]
+
+    result = CoverRenderService(
+        reader=InventoryReader(str(db)),
+        output_dir=tmp_path / "covers",
+        renderer=fake_renderer,
+    ).render(
+        listing_id="l_portrait",
+        offer_id=str(offer["offer_id"]),
+        media=media,
+        style="right_price_portrait",
+    )
+
+    assert result.style == "right_price"
+    assert calls[0]["style"] == "right_price"

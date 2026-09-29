@@ -15,6 +15,7 @@ from v3_core.storage.inventory_reader import InventoryReader
 from .cover_renderer import CoverRenderData, render_cover
 from .cover_styles import (
     is_video_cover_style,
+    landscape_style_for,
     recommended_cover_style,
     resolve_cover_style_for_source,
 )
@@ -88,12 +89,17 @@ class CoverRenderService:
         cover_source = Path(media.cover_source_path).resolve()
         if not cover_source.is_file():
             raise FileNotFoundError(f"cover_source_not_found:{media.cover_source_path}")
-        # Style family from admin/default; canvas orientation follows the main photo.
-        normalized_style = resolve_cover_style_for_source(
-            selected_style,
-            cover_source,
-            allow_video=is_video_cover_style(selected_style),
-        )
+        # Telegram image posts use one fixed 4:5 cover regardless of source
+        # orientation. The landscape poster is the factual 1080x850 hero and
+        # the renderer appends the real-photo strip to reach 1080x1350.
+        if is_video_cover_style(selected_style):
+            normalized_style = resolve_cover_style_for_source(
+                selected_style,
+                cover_source,
+                allow_video=True,
+            )
+        else:
+            normalized_style = landscape_style_for(selected_style)
 
         property_type = display_property_type(listing.get("property_type") or "")
         layout = display_layout(listing.get("layout") or "", property_type)
