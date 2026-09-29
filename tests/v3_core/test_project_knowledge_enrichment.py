@@ -303,7 +303,7 @@ def test_public_inventory_uses_verified_project_location_when_post_omits_address
 @pytest.mark.parametrize(
     ("project_key", "location_token"),
     [
-        ("prince_central_plaza", "Norodom"),
+        ("prince_central_plaza", "诺罗敦大道"),
         ("prince_international_plaza", "Sen Sok"),
         ("casa_meridian", "Koh Pich"),
         ("sky_villa", "Street 163"),
@@ -357,3 +357,21 @@ def test_detailed_summary_includes_structured_living_reference_when_available():
     assert "电费0.25–0.27 USD/kWh" in summary
     assert "水费0.5–1 USD/m3" in summary
     assert "具体房源的租金、水电、管理费" in summary
+
+
+def test_researched_market_profiles_keep_prince_times_square_commercial():
+    reference = project_reference_for_key("prince_times_square")
+    assert reference["project_type"] == "开放式街区商业中心 / Street Mall"
+    assert "不是住宅塔楼" in reference["building_profile"]
+    assert "不得生成“太子时代广场公寓”" in reference["notes"]
+
+
+def test_researched_market_profiles_enrich_yuetai_and_prince_central():
+    yuetai = project_reference_for_key("yuetai_ecc")
+    assert "粤泰公寓" in yuetai["display_name"]
+    assert "永旺1" in yuetai["location"]
+    assert "业态冲突" in yuetai["project_type"]
+    central = project_reference_for_key("prince_central_plaza")
+    assert "Tonle Bassac" in central["location"]
+    assert "37层" in central["building_profile"]
+    assert "SOHO/LOFT" in central["unit_types"]

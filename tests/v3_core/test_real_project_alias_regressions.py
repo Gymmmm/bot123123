@@ -43,9 +43,9 @@ def test_verified_yuetai_ecc_alias_gets_tonle_bassac_default() -> None:
     assert facts["public_location_display"] == "诺罗敦大道 · 永旺1附近"
 
 
-def test_bare_yuetai_is_not_forced_to_ecc() -> None:
+def test_bare_yuetai_market_shorthand_resolves_to_ecc() -> None:
     result = classify_listing_taxonomy("#粤泰 三房公寓出租")
-    assert result.project_key is None
+    assert result.project_key == "yuetai_ecc"
 
 
 def test_spaced_aeon2_is_safe_nearby_location() -> None:
@@ -74,3 +74,31 @@ def test_nearby_landmarks_do_not_override_verified_project_location() -> None:
 def test_conflicting_corridors_remain_ambiguous() -> None:
     facts = canonicalize_source("#洪森大道50米路 双拼别墅出租 $1450/月")
     assert "ambiguous_market_location" in facts["candidate_flags"]
+
+
+def test_bare_yuetai_market_shorthand_resolves_to_yuetai_ecc():
+    facts = canonicalize_source("#粤泰\n一房一厅出租\n$500/月")
+    assert facts["project_key"] == "yuetai_ecc"
+    assert facts["public_location_display"] == "诺罗敦大道 · 永旺1附近"
+
+
+def test_yuetai_apartment_market_shorthand_resolves_to_yuetai_ecc():
+    facts = canonicalize_source("#粤泰公寓\n两房出租")
+    assert facts["project_key"] == "yuetai_ecc"
+
+
+def test_phnom_penh_central_plaza_market_name_resolves_to_prince_central():
+    facts = canonicalize_source("#金边中央广场\n一房出租")
+    assert facts["project_key"] == "prince_central_plaza"
+    assert facts["public_location_display"] == "独立碑附近"
+
+
+def test_prince_times_square_is_not_megakim_time_square_series():
+    facts = canonicalize_source("#太子时代广场\n两房出租")
+    assert facts["project_key"] == "prince_times_square"
+    assert facts["public_location_display"] == "诺罗敦大道南段"
+
+
+def test_bare_time_square_remains_phase_ambiguous():
+    facts = canonicalize_source("#时代广场\n两房出租")
+    assert facts.get("project_key") in (None, "")

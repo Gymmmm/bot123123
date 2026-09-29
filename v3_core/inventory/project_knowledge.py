@@ -30,6 +30,23 @@ _TAXONOMY_TO_KNOWLEDGE = {
 _KNOWLEDGE_TO_TAXONOMY = {value: key for key, value in _TAXONOMY_TO_KNOWLEDGE.items()}
 
 _WEB_VERIFIED_PROJECTS: dict[str, dict[str, Any]] = {
+    "prince_times_square": {
+        "knowledge_key": "research:prince-times-square",
+        "reference_kind": "researched_market_project",
+        "display_name": "Prince Times Square 太子时代广场",
+        "developer": "Prince Real Estate / 太子地产集团",
+        "project_type": "开放式街区商业中心 / Street Mall",
+        "location": "桑园区 · 诺罗敦大道南段",
+        "building_profile": "商业/餐饮地标，不是住宅塔楼；同行研究记录34间双层商铺、约6,487㎡，面积存在来源冲突。",
+        "property_types": ["商业铺位", "双层商铺"],
+        "amenities": ["餐饮", "娱乐", "零售", "露天/户外空间"],
+        "nearby": ["永旺1", "独立碑", "BKK1", "钻石岛"],
+        "notes": "用于附近房源时应写“近太子时代广场”；不得生成“太子时代广场公寓”。与Megakim Time Square住宅系列完全分开。",
+        "source_urls": [
+            "https://phnompenhpost.com/socialite/prince-times-square-street-mall-opens-capital/",
+            "https://www.sohu.com/a/555882602_121357123",
+        ],
+    },
     "orkide_the_royal_condominium": {
         "knowledge_key": "web:orkide-the-royal-condominium",
         "reference_kind": "web_verified_project",
@@ -50,11 +67,15 @@ _WEB_VERIFIED_PROJECTS: dict[str, dict[str, Any]] = {
         "knowledge_key": "web:prince-central-plaza",
         "reference_kind": "web_verified_project",
         "display_name": "Prince Central Plaza 太子中央广场",
-        "developer": "Prince Real Estate (Cambodia) Group",
+        "developer": "Prince Real Estate / 太子地产集团",
         "project_type": "公寓 / 商业综合体",
-        "location": "Tonle Bassac · Norodom Boulevard",
+        "location": "桑园区 Tonle Bassac · 诺罗敦大道",
         "completion_year": "2017",
-        "nearby": ["独立碑", "永旺1", "河滨", "使馆区"],
+        "building_profile": "研究资料主值37层；楼层/总户数在不同平台存在冲突，因此不写死总户数。",
+        "unit_types": ["Studio", "1 Bedroom", "2 Bedrooms", "3 Bedrooms", "SOHO/LOFT"],
+        "amenities": ["泳池", "健身房", "24小时安保/物业", "电梯", "停车"],
+        "nearby": ["独立碑", "永旺1", "使馆区"],
+        "notes": "同行常简称“太子中央”；当前出租样本常见包物业，但水电、停车、短租均按具体房源合同确认。",
         "source_urls": [
             "https://www.princerealestate.com/Project/info.aspx?itemid=588",
             "https://www.asia.villas/projects/cambodia/phnom-penh/chamkar-mon/tonle-basak/prince-central-plaza",
@@ -206,12 +227,16 @@ _WEB_VERIFIED_PROJECTS: dict[str, dict[str, Any]] = {
     "yuetai_ecc": {
         "knowledge_key": "web:yuetai-ecc",
         "reference_kind": "web_verified_project",
-        "display_name": "YUETAI ECC",
-        "project_type": "综合楼 / 公寓办公用途",
-        "location": "Norodom Boulevard · Tonle Bassac, Chamkarmon",
-        "notes": "当前公开证据足以确认建筑与位置；统一住宅收费/配套规则仍按具体房源核验。",
+        "display_name": "YUETAI ECC / 粤泰公寓",
+        "project_type": "当前租赁市场按公寓/酒店式公寓使用；历史ECC资料存在办公楼业态冲突",
+        "location": "桑园区 Tonle Bassac · 诺罗敦大道 · 近永旺1",
+        "unit_types": ["Studio", "1 Bedroom", "2 Bedrooms", "3 Bedrooms"],
+        "amenities": ["泳池", "健身房", "WiFi", "停车"],
+        "nearby": ["永旺1", "Bassac Lane", "使馆区"],
+        "notes": "华人市场常叫粤泰/粤泰公寓/YUETAI ECC。历史East Commercial Center资料强调办公用途，开发商、完整业态与楼层资料保留冲突；水电、管理费、停车和健身房收费只作为房源样本，不作为整栋固定标准。",
         "source_urls": [
             "https://www.ppcbank.com.kh/atm-branches/ppcbank-atm-yuetai-ecc-building/",
+            "https://www.realestate.com.kh/km/news/east-commercial-center-ecc-nurturing-a-new-generation-of-entrepreneurs/",
         ],
     },
 }
