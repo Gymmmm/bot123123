@@ -434,7 +434,7 @@ def _extract_project(text: str) -> tuple[str | None, str | None, str | None, str
     # name (for example "首都💕国金"). Strip only symbol runs between CJK
     # characters; Latin token boundaries and ordinary prose stay untouched.
     project_match_text = re.sub(
-        r"(?<=[\\u4e00-\\u9fff])[^A-Za-z0-9\\u4e00-\\u9fff\\s]+(?=[\\u4e00-\\u9fff])",
+        r"(?<=[\u4e00-\u9fff])[^A-Za-z0-9\u4e00-\u9fff\s]+(?=[\u4e00-\u9fff])",
         "",
         project_text,
     )
