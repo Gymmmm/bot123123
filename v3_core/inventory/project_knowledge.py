@@ -82,6 +82,17 @@ def _bundle() -> dict[str, dict[str, Any]]:
         if key:
             projects.setdefault(key, {})["living"] = row
 
+    for row in _rows("aliases"):
+        identity = str(row.get("canonical_identity", "") or "").strip()
+        if identity.startswith("project:new:"):
+            key = identity[len("project:new:"):]
+        elif identity.startswith("project:"):
+            key = identity[len("project:"):]
+        else:
+            key = ""
+        if key:
+            projects.setdefault(key, {}).setdefault("aliases", []).append(row)
+
     for prefix, field in (
         ("relations", "relations"),
         ("evidence", "evidence"),
@@ -150,6 +161,7 @@ def project_knowledge_stats() -> dict[str, int]:
         "relations": sum(len(value.get("relations") or []) for value in projects.values()),
         "evidence_rows": sum(len(value.get("evidence") or []) for value in projects.values()),
         "conflicts": sum(len(value.get("conflicts") or []) for value in projects.values()),
+        "alias_rows": sum(len(value.get("aliases") or []) for value in projects.values()),
     }
 
 
@@ -163,36 +175,57 @@ def registry_project_identities() -> tuple[dict[str, Any], ...]:
     for knowledge_key, payload in _bundle().items():
         row = payload.get("registry") or {}
         status = row.get("verification_status", "")
-        if status not in {"VERIFIED", "PARTIAL"}:
-            continue
         aliases: list[str] = []
         market_aliases = {
             alias.strip().casefold()
             for alias in str(row.get("market_aliases_cn", "") or "").split(";")
             if alias.strip()
         }
-        for field, value in (
-            ("canonical_name_cn", row.get("canonical_name_cn", "")),
-            ("canonical_name_en", row.get("canonical_name_en", "")),
-            ("search_aliases_cn", row.get("search_aliases_cn", "")),
-        ):
-            for alias in str(value or "").split(";"):
-                alias = alias.strip()
-                # Location-qualified market handles such as「一号路炳发」are
-                # search/navigation aliases, not safe project identities.
-                if field == "search_aliases_cn" and alias.casefold() in market_aliases:
-                    continue
-                if alias and alias not in aliases:
-                    aliases.append(alias)
+        if status in {"VERIFIED", "PARTIAL"}:
+            for field, value in (
+                ("canonical_name_cn", row.get("canonical_name_cn", "")),
+                ("canonical_name_en", row.get("canonical_name_en", "")),
+                ("search_aliases_cn", row.get("search_aliases_cn", "")),
+            ):
+                for alias in str(value or "").split(";"):
+                    alias = alias.strip()
+                    # Location-qualified market handles such as「一号路炳发」are
+                    # search/navigation aliases, not safe project identities.
+                    if field == "search_aliases_cn" and alias.casefold() in market_aliases:
+                        continue
+                    if alias and alias not in aliases:
+                        aliases.append(alias)
+
+        verified_alias_rows = [
+            item for item in payload.get("aliases") or []
+            if item.get("entity_level") == "PROJECT"
+            and item.get("verification_status") == "VERIFIED"
+            and item.get("resolution_action") == "DIRECT_RESOLVE"
+            and str(item.get("search_only", "")).casefold() != "true"
+            and str(item.get("conflict_flag", "")).casefold() != "true"
+        ]
+        for item in verified_alias_rows:
+            alias = str(item.get("raw_alias", "") or "").strip()
+            if alias and alias not in aliases:
+                aliases.append(alias)
+
         if not aliases:
             continue
+        display = (
+            row.get("canonical_name_cn")
+            or row.get("canonical_name_en")
+            or next(
+                (str(item.get("target_display_name") or "").strip() for item in verified_alias_rows if item.get("target_display_name")),
+                knowledge_key,
+            )
+        )
         identities.append(
             {
                 "taxonomy_key": taxonomy_key_for_knowledge(knowledge_key),
                 "knowledge_key": knowledge_key,
-                "display": row.get("canonical_name_cn") or row.get("canonical_name_en") or knowledge_key,
+                "display": display,
                 "aliases": tuple(aliases),
-                "verification_status": status,
+                "verification_status": status or ("VERIFIED" if verified_alias_rows else "UNKNOWN"),
             }
         )
     return tuple(identities)
