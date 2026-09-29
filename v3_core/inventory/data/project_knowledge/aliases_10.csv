@@ -1,4 +1,4 @@
-<PARSED TEXT FOR SHEET: 1 / 1 TABS
+index,raw_alias,normalized_alias,entity_level,target_display_name,canonical_identity,alias_kind,weight,search_only,conflict_flag,resolution_action,verification_status,notes
 448,炳发 The Star Munirah,炳发thestarmunirah,PROJECT,炳发 The Star Munirah,project:the-star-munirah,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
 449,炳发 The Star Natural,炳发thestarnatural,PROJECT,炳发 The Star Natural,project:the-star-natural,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
 450,炳发 The Star Platinum,炳发thestarplatinum,PROJECT,炳发 The Star Platinum,project:the-star-platinum,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
