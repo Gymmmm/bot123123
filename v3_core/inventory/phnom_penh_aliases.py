@@ -354,6 +354,12 @@ def apply_phnom_penh_aliases(taxonomy: Any) -> None:
     for item in projects:
         extra = PROJECT_ALIAS_EXTENSIONS.get(item.key, ())
         aliases = tuple(dict.fromkeys((*item.aliases, *extra)))
+        # Legacy orkide_royal conflated The Royal villa community and The
+        # Royal Condominium. The verified alias registry splits them. Disable
+        # the legacy matcher; the two explicit identities below now own the
+        # corresponding aliases.
+        if item.key == "orkide_royal":
+            aliases = ()
         loc_key = getattr(item, "default_location_key", None)
         loc_display = getattr(item, "default_location_display", None)
         # Fill missing locations only; never overwrite core-registry values.
