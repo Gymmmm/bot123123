@@ -30,6 +30,63 @@ _TAXONOMY_TO_KNOWLEDGE = {
 _KNOWLEDGE_TO_TAXONOMY = {value: key for key, value in _TAXONOMY_TO_KNOWLEDGE.items()}
 
 _WEB_VERIFIED_PROJECTS: dict[str, dict[str, Any]] = {
+    "prince_central_plaza": {
+        "knowledge_key": "web:prince-central-plaza",
+        "reference_kind": "web_verified_project",
+        "display_name": "Prince Central Plaza 太子中央广场",
+        "developer": "Prince Real Estate (Cambodia) Group",
+        "project_type": "公寓 / 商业综合体",
+        "location": "Tonle Bassac · Norodom Boulevard",
+        "completion_year": "2017",
+        "nearby": ["独立碑", "永旺1", "河滨", "使馆区"],
+        "source_urls": [
+            "https://www.princerealestate.com/Project/info.aspx?itemid=588",
+            "https://www.asia.villas/projects/cambodia/phnom-penh/chamkar-mon/tonle-basak/prince-central-plaza",
+        ],
+    },
+    "prince_international_plaza": {
+        "knowledge_key": "web:prince-international-plaza",
+        "reference_kind": "web_verified_project",
+        "display_name": "Prince International Plaza 太子国际广场",
+        "developer": "Prince Real Estate Group",
+        "project_type": "商业 / 办公 / 住宅综合体",
+        "location": "Sen Sok · Tuol Kork · Meanchey交界方向",
+        "building_profile": "Prince Group公开资料称项目约200,000㎡，包含商业与住宅用途。",
+        "source_urls": [
+            "https://www.princeholdinggroup.com/featured_development/prince-square/",
+        ],
+    },
+    "casa_meridian": {
+        "knowledge_key": "web:casa-by-meridian",
+        "reference_kind": "web_verified_project",
+        "display_name": "CASA by Meridian",
+        "developer": "Meridian International / M.D H.K Property (Cambodia) Ltd",
+        "project_type": "公寓",
+        "location": "钻石岛 / Koh Pich",
+        "amenities": ["泳池", "健身房", "会所", "儿童区", "24小时安保"],
+        "nearby": ["永旺1", "NagaWorld", "Sofitel", "Canadian International School"],
+        "source_urls": [
+            "https://www.realestate.com.kh/new-developments/casa-by-meridian/",
+            "https://www.landscope.com/overseas-properties/1777cc",
+        ],
+    },
+    "sky_villa": {
+        "knowledge_key": "web:sky-villa",
+        "reference_kind": "web_verified_project",
+        "display_name": "Sky Villa",
+        "developer": "Greatview Investment（公开项目资料口径）",
+        "project_type": "高端公寓 / 服务式住宅",
+        "location": "7 Makara · Veal Vong · Street 163",
+        "address": "No. 192, Street 163, Sangkat Veal Vong, Khan 7 Makara, Phnom Penh",
+        "building_profile": "两栋35层住宅塔楼，公开项目资料记录256个住宅单位。",
+        "completion_year": "2020",
+        "amenities": ["泳池", "健身房", "桑拿", "Jacuzzi", "花园", "儿童区", "停车", "24小时接待", "视频安保"],
+        "nearby": ["奥林匹克体育场"],
+        "source_urls": [
+            "https://www.realestate.com.kh/new-developments/sky-villa/",
+            "https://data.opendevelopmentcambodia.net/en/dataset/webpage-capture-on-the-location-of-sky-villa-phnom-penh",
+        ],
+    },
     "le_conde_bkk1": {
         "knowledge_key": "web:le-conde-bkk1",
         "reference_kind": "web_verified_project",
