@@ -523,7 +523,7 @@ class TestContract8_PhotoFlowPreservesExitPoints:
             action_rows=(
                 (
                     SemanticAction("📸 房源详情", "details", "QL-RF-A2B3"),
-                    SemanticAction("📅 预约看房", "book", "QL-RF-A2B3"),
+                    SemanticAction("📅 在线预约", "book", "QL-RF-A2B3"),
                 ),
             ),
         )
@@ -533,7 +533,7 @@ class TestContract8_PhotoFlowPreservesExitPoints:
             None
         )
         assert book_button is not None
-        assert book_button.label == "📅 预约看房"
+        assert book_button.label == "📅 在线预约"
 
     def test_appointment_success_view_has_advisor_exit(self):
         """预约成功页有顾问联系方式出口。"""
