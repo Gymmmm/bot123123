@@ -278,6 +278,21 @@ class SaleCatalogRepository:
             "property_types": [str(item["value"]) for item in type_rows if str(item["value"] or "").strip()],
         }
 
+    def seo_entries(self) -> tuple[dict[str, str], ...]:
+        """Canonical public sale URLs for sitemap generation."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"""SELECT public_listing_id,updated_at
+                    FROM ({_BASE_SELECT})
+                    ORDER BY updated_at DESC,public_listing_id ASC"""
+            ).fetchall()
+        return tuple(
+            {"public_id": str(row["public_listing_id"] or "").strip(),
+             "updated_at": str(row["updated_at"] or "").strip()}
+            for row in rows
+            if str(row["public_listing_id"] or "").strip()
+        )
+
     def get_sale_listing(self, public_id: str) -> dict[str, Any] | None:
         public_id = str(public_id or "").strip().upper()
         if not public_id:
