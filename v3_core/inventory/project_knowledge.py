@@ -492,6 +492,67 @@ def _range_text(living: dict[str, Any], prefix: str, unit_key: str) -> str | Non
     return f"{value} {unit}".strip()
 
 
+def project_reference_summary(project_key: object) -> str | None:
+    """Build a compact but information-dense project profile for read-time UI."""
+    reference = project_reference_for_key(project_key)
+    if not reference:
+        return None
+    if reference.get("reference_kind") == "project_family":
+        corridors = "、".join(reference.get("known_corridors") or [])
+        types = "、".join(reference.get("property_types") or [])
+        parts = [
+            str(reference.get("display_name") or "").strip(),
+            f"开发商：{reference['developer']}" if reference.get("developer") else "",
+            f"常见项目分布：{corridors}" if corridors else "",
+            f"住宅类型：{types}" if types else "",
+            str(reference.get("resolution_hint") or "").strip(),
+        ]
+        return "\n".join(part for part in parts if part)
+
+    registry = reference.get("registry") or {}
+    v5 = reference.get("v5_profile") or {}
+    living = reference.get("living") or {}
+    name = _project_reference_name(reference)
+    location = project_reference_location(project_key)
+    developer = registry.get("developer") or reference.get("developer")
+    project_type = registry.get("project_type") or v5.get("项目类型") or reference.get("project_type")
+    building = reference.get("building_profile")
+    nearby = reference.get("nearby") or []
+    if not nearby:
+        raw_nearby = str(v5.get("附近地标") or "").strip()
+        nearby = [item.strip() for item in raw_nearby.replace("；", "、").split("、") if item.strip()]
+    amenities = list(reference.get("amenities") or [])
+    if not amenities:
+        amenity_fields = (
+            ("泳池", "pool"), ("健身房", "gym"), ("桑拿", "sauna"),
+            ("蒸汽房", "steam_room"), ("儿童区", "kids_playground"),
+            ("花园", "garden"), ("屋顶", "rooftop"), ("24小时安保", "security_24h"),
+            ("门禁", "access_card"), ("CCTV", "cctv"), ("备用发电", "generator"),
+        )
+        amenities = [
+            label for label, field in amenity_fields
+            if str(living.get(field) or "").strip().upper() in {"YES", "TRUE", "1"}
+        ]
+    parts = [name]
+    if developer:
+        parts.append(f"开发商：{developer}")
+    if project_type:
+        parts.append(f"项目类型：{project_type}")
+    if location:
+        parts.append(f"位置：{location['display']}")
+    if building:
+        parts.append(f"项目规模：{building}")
+    if amenities:
+        parts.append(f"公区/配套：{'、'.join(str(item) for item in amenities)}")
+    if nearby:
+        parts.append(f"周边：{'、'.join(str(item) for item in nearby)}")
+    living_summary = str(living.get("living_summary") or "").strip()
+    if living_summary:
+        parts.append(f"租住参考：{living_summary}")
+    parts.append("具体房源的租金、水电、管理费、停车、押金和开放规则，以该套房源及当期物业/合同为准。")
+    return "\n".join(parts)
+
+
 def answer_project_question(project_key: object, question: object) -> str | None:
     """Answer deterministic project questions from the reference layer only.
 
@@ -593,10 +654,8 @@ def answer_project_question(project_key: object, question: object) -> str | None
     if any(token in q for token in ("多少户", "户数", "多少套")) and living.get("unit_count"):
         return f"{name}项目资料记录单位数：{living['unit_count']}。"
 
-    if any(token in q for token in ("项目资料", "项目怎么样", "项目介绍", "配套")):
-        summary = str(living.get("living_summary") or reference.get("building_profile") or reference.get("notes") or "").strip()
-        if summary:
-            return f"{name}：{summary}"
+    if any(token in q for token in ("项目资料", "项目怎么样", "项目介绍", "配套", "详细资料", "楼盘资料")):
+        return project_reference_summary(project_key)
 
     return None
 
@@ -673,6 +732,7 @@ __all__ = [
     "knowledge_key_for_taxonomy",
     "project_reference_for_key",
     "project_reference_location",
+    "project_reference_summary",
     "project_knowledge_stats",
     "answer_project_question",
     "registry_project_identities",
