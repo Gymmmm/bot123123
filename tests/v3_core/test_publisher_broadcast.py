@@ -70,7 +70,12 @@ def test_weekly_marketing_copy_is_safe_when_public_inventory_is_empty(tmp_path):
     assert "六年，这个承诺没破过" not in joined
     assert "我们赚服务费" not in joined
     assert "顾问实地核实" not in joined
-    assert "当前公开库存" in joined
+    assert "公开" in joined
+    assert "年租" in joined
+    assert "金边" in joined
+    assert "中国人在金边" in joined
+    assert "短租" not in joined
+    assert "日租" not in joined
 
 
 def test_marketing_uses_only_durably_published_rent_inventory(tmp_path):
@@ -100,8 +105,9 @@ def test_marketing_uses_only_durably_published_rent_inventory(tmp_path):
     tuesday = service.template(1).body
     assert "当前公开有效：<b>1 套</b>" in monday
     assert "BKK1：1 套" in monday
-    assert "$650–$650/月" in monday
+    assert "年租房源月租展示：$650–$650/月" in monday
     assert "$500–700：1 套" in tuesday
+    assert "当前公开年租库存共 1 套" in tuesday
     assert "全金边市场均价" in tuesday
 
 
@@ -174,7 +180,8 @@ def test_footer_buttons_use_live_v3_start_shortcuts(tmp_path):
 def test_static_and_custom_templates_are_explicit(tmp_path):
     service = _service(tmp_path)
     service.set_template("weekly")
-    assert "本周找房提醒" in service.body()
+    assert "金边年租找房" in service.body()
+    assert "租金按月展示" in service.body()
     service.set_custom_html("<b>自定义广播</b>")
     assert service.config().template_key == "custom"
     assert service.body() == "<b>自定义广播</b>"
@@ -231,6 +238,9 @@ def test_live_builder_preserves_weather_and_fx_contract(tmp_path):
     assert "100 USD ≈ 700 CNY" in body
     assert "📌 今日提醒" in body
     assert "今天有阵雨，出门记得带伞。" in body
+    assert "金边年租找房" in body
+    assert "租金按月展示" in body
+    assert "常去地点 / 区域 + 月预算 + 户型 + 入住时间" in body
 
 
 def test_publisher_dashboard_exposes_broadcast_center(tmp_path):
