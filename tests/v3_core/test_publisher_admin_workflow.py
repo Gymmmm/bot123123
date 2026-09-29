@@ -299,7 +299,7 @@ def test_pending_autopublish_success_commits_publication_then_activates_and_is_b
     assert package.snapshot["listing"]["inventory_status"] == "active"
     assert len(bot.calls) == 1
     labels = [button.text for row in bot.calls[0]["reply_markup"].inline_keyboard for button in row]
-    assert "📅 预约看房" in labels
+    assert "📅 在线预约" in labels
     with sqlite3.connect(reader.db_path) as conn:
         assert conn.execute(
             "SELECT COUNT(*) FROM publication_instances WHERE listing_id=? AND publish_status='published'",
