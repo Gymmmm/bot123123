@@ -2282,3 +2282,107 @@ img { display:block; max-width:100% }
   .hero-sub { font-size:10.5px }
   .brand-text small { letter-spacing:.06em }
 }
+
+
+/* SALE P1.10 — investment conversion without sales pressure */
+.price-check-cta {
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:36px;
+  margin-top:28px;
+  padding:30px 32px;
+  overflow:hidden;
+  border:1px solid rgba(181,138,75,.30);
+  border-radius:16px;
+  background:
+    radial-gradient(circle at 92% 10%, rgba(181,138,75,.12), transparent 34%),
+    linear-gradient(135deg,#183a33 0%,#102d27 100%);
+  box-shadow:0 18px 46px rgba(24,58,51,.12);
+}
+.price-check-copy {
+  position:relative;
+  z-index:1;
+  max-width:720px;
+}
+.price-check-kicker {
+  display:block;
+  margin-bottom:8px;
+  color:#d8b77f;
+  font-size:9px;
+  font-weight:700;
+  letter-spacing:.18em;
+}
+.price-check-copy h3 {
+  color:#fffdf8;
+  font-family:var(--display-font);
+  font-size:clamp(20px,2.4vw,28px);
+  font-weight:600;
+  line-height:1.3;
+  letter-spacing:-.025em;
+}
+.price-check-copy p {
+  max-width:680px;
+  margin-top:9px;
+  color:rgba(255,253,248,.76);
+  font-size:12px;
+  line-height:1.75;
+}
+.price-check-copy small {
+  display:block;
+  margin-top:9px;
+  color:rgba(255,253,248,.48);
+  font-size:9px;
+  line-height:1.55;
+}
+.price-check-btn {
+  position:relative;
+  z-index:1;
+  flex:0 0 auto;
+  min-width:154px;
+  height:46px;
+  padding:0 20px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border:1px solid rgba(216,183,127,.62);
+  border-radius:999px;
+  background:#d2ad70;
+  color:#17362f;
+  font-size:12px;
+  font-weight:700;
+  letter-spacing:.02em;
+  box-shadow:0 8px 22px rgba(0,0,0,.10);
+  transition:transform .18s, background .18s, box-shadow .18s;
+}
+.price-check-btn:hover {
+  transform:translateY(-1px);
+  background:#dfbf89;
+  box-shadow:0 11px 26px rgba(0,0,0,.14);
+}
+
+.advisor-strip {
+  background:#f0e9de;
+  border-color:#ddd2c2;
+}
+.advisor-strip-copy strong { color:var(--accent) }
+.advisor-strip-btn {
+  background:var(--accent);
+  color:#fffdf8;
+  border-color:var(--accent);
+}
+
+@media (max-width:699px) {
+  .price-check-cta {
+    display:block;
+    margin-top:22px;
+    padding:24px 20px;
+    border-radius:14px;
+  }
+  .price-check-copy h3 { font-size:22px }
+  .price-check-btn {
+    width:100%;
+    margin-top:18px;
+  }
+}
