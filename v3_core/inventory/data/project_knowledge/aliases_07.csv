@@ -1,0 +1,51 @@
+<PARSED TEXT FOR SHEET: 1 / 1 TABS
+298,名仕城,名仕城,FAMILY,名仕城,family:new:elite-town,NEW_VERIFIED_ALIAS,95,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,OCIC官方中文明确“钻石岛名仕城1期和2期”，III为商业住宅项目；裸“名仕城”只到项目family。
+299,国金一期,国金一期,PROJECT,首都·国金一期,project:urban-village-1,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+300,国金二期,国金二期,PROJECT,首都·国金二期,project:urban-village-2,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+301,堆谷,堆谷,PROJECT,J Tower 1,project:j-tower-1,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,J Tower旧堆谷映射错误。；纯GEO/地标词不能直接解析到具体PROJECT。
+302,堆谷,堆谷,PROJECT,J Tower 2,project:j-tower-2,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯地理词不能直接映射某个PROJECT。；纯GEO/地标词不能直接解析到具体PROJECT。
+303,堆谷,堆谷,PROJECT,J Tower 3,project:j-tower-3,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯地理词不能直接映射某个PROJECT。；纯GEO/地标词不能直接解析到具体PROJECT。
+304,堆谷,堆谷,PROJECT,时代广场1,project:times-square-1,PROJECT_LANDMARK,85,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯GEO/地标词不能直接解析到具体PROJECT。
+305,堆谷,堆谷,PROJECT,时代广场2,project:times-square-2,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯地理词不能直接映射某个PROJECT。；纯GEO/地标词不能直接解析到具体PROJECT。
+306,堆谷,堆谷,PROJECT,时代广场3,project:times-square-3,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯地理词不能直接映射某个PROJECT。；纯GEO/地标词不能直接解析到具体PROJECT。
+307,堆谷,堆谷,PROJECT,时代广场5（Time Square 306）,project:times-square-5,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯地理词不能直接映射某个PROJECT。；纯GEO/地标词不能直接解析到具体PROJECT。
+308,堆谷,堆谷,PROJECT,TK Royal One,project:tk-royal-one,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯GEO/地标词不能直接解析到具体PROJECT。
+309,堆谷方向,堆谷方向,PROJECT,金边壹号 ONE PARK,project:one-park,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+310,塞纳河,塞纳河,PROJECT,塞纳河,project:new:la-seine,NEW_PARTIAL_ALIAS,70,True,False,DIRECT_RESOLVE,PARTIAL,OCIC官方Koh Pich项目列表确认La Seine真实存在；本轮不扩大其住宅/商业细分。
+311,天空别墅（易混天空树）,天空别墅易混天空树,PROJECT,Sky Villa（天空别墅）,project:sky-villa,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+312,天空树,天空树,PROJECT,天空树,project:skytree,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+313,太子,太子,FAMILY / MARKET_GEO,太子,family:prince,AMBIGUOUS_FAMILY,20,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,裸太子只到family；需幸福/国际/寰宇/中央/现代等项目词。
+314,太子One Tropica,太子onetropica,PROJECT,Prince One Tropica（中文俗称待核）,project:new:prince-one-tropica,NEW_PARTIAL_ALIAS,70,True,False,DIRECT_RESOLVE,PARTIAL,真实项目已确认；未找到足够稳定的华人中文俗称，因此中文名不硬翻。
+315,太子One Tropica（搜索用）,太子onetropica搜索用,PROJECT,Prince One Tropica（中文俗称待核）,project:new:prince-one-tropica,NEW_PARTIAL_ALIAS,70,True,False,DIRECT_RESOLVE,PARTIAL,真实项目已确认；未找到足够稳定的华人中文俗称，因此中文名不硬翻。
+316,太子中央,太子中央,PROJECT,太子中央广场,project:prince-central-plaza,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+317,太子中央广场,太子中央广场,PROJECT,太子中央广场,project:prince-central-plaza,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+318,太子国际,太子国际,PROJECT,太子国际广场,project:prince-international-plaza,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+319,太子国际广场,太子国际广场,PROJECT,太子国际广场,project:prince-international-plaza,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+320,太子寰宇,太子寰宇,PROJECT,太子寰宇中心,project:prince-universe,STRONG_PROJECT_ALIAS,95,True,False,SEARCH_ONLY_LEGACY,VERIFIED,canonical英文修正为Prince Huan Yu Center。
+321,太子寰宇中心,太子寰宇中心,PROJECT,太子寰宇中心,project:prince-universe,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+322,太子幸福,太子幸福,PROJECT,太子幸福广场,project:the-pinnacle,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+323,太子幸福广场,太子幸福广场,PROJECT,太子幸福广场,project:the-pinnacle,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+324,太子现代,太子现代,PROJECT,太子现代广场,project:prince-modern-plaza,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+325,太子现代广场,太子现代广场,PROJECT,太子现代广场,project:prince-modern-plaza,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+326,太子系,太子系,FAMILY / MARKET_GEO,太子,family:prince,AMBIGUOUS_FAMILY,20,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,裸太子只到family；需幸福/国际/寰宇/中央/现代等项目词。
+327,奥凯德,奥凯德,FAMILY / MARKET_GEO,Orkide / 奥凯德,family:orkide,FAMILY_GEO,70,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,2004路优先The Royal/The Grand但仍需项目词；品牌词不得单独定项目。
+328,奥凯德2004,奥凯德2004,PROJECT,奥凯德 The Royal（别墅社区）,project:orkide-the-royal,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+329,奥凯德6A,奥凯德6a,PROJECT,奥凯德 Botanic City,project:orkide-botanic-city,PROJECT_ROAD,90,True,False,DIRECT_RESOLVE,VERIFIED,
+330,奥凯德Botanic City,奥凯德botaniccity,PROJECT,奥凯德 Botanic City,project:orkide-botanic-city,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+331,奥凯德Pochentong,奥凯德pochentong,PROJECT,奥凯德 Pochentong,project:orkide-pochentong,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+332,奥凯德The Grand,奥凯德thegrand,PROJECT,奥凯德 The Grand,project:orkide-the-grand,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+333,奥凯德The Royal,奥凯德theroyal,PROJECT,奥凯德 The Royal（别墅社区）,project:orkide-the-royal,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+334,奥凯德公寓,奥凯德公寓,PROJECT,奥凯德皇家公寓,project:new:orkide-the-royal-condominium,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,V3仅有Orkide The Royal别墅社区，本轮确认The Royal Condominium为独立真实公寓项目，必须拆开。
+335,奥凯德皇家公寓,奥凯德皇家公寓,PROJECT,奥凯德皇家公寓,project:new:orkide-the-royal-condominium,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,V3仅有Orkide The Royal别墅社区，本轮确认The Royal Condominium为独立真实公寓项目，必须拆开。
+336,奥林匹亚,奥林匹亚,PROJECT,奥林匹亚城,project:olympia-city,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+337,奥林匹克商圈,奥林匹克商圈,PROJECT,奥林匹亚城,project:olympia-city,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+338,奥林匹克城,奥林匹克城,PROJECT,奥林匹亚城,project:olympia-city,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+339,威尔斯,威尔斯,PROJECT,威尔斯公馆,project:wealth-mansion,STRONG_PROJECT_ALIAS,95,True,True,REDIRECT_NEEDS_VERIFICATION,VERIFIED,旧Wells Mansion记录并入Wealth Mansion冲突候选；不得创建独立项目。
+340,威尔斯公馆,威尔斯公馆,PROJECT,威尔斯公馆,project:wealth-mansion,EXACT_PROJECT_NAME,100,False,True,REDIRECT_NEEDS_VERIFICATION,VERIFIED,旧Wells Mansion记录并入Wealth Mansion冲突候选；不得创建独立项目。
+341,富力,富力,PROJECT,富力城,project:rf-city,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+342,富力中心城,富力中心城,PROJECT,富力城,project:rf-city,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+343,富力城,富力城,PROJECT,富力城,project:rf-city,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+344,峰会,峰会,PROJECT,香格里拉公寓 The Peak,project:the-peak,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+345,幸福广场,幸福广场,PROJECT,太子幸福广场,project:the-pinnacle,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+346,康帝,康帝,PROJECT,王府观邸,project:le-conde-bkk1,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+347,（待核）,待核,PROJECT,钻石名邸,project:diamond-mansion,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,NEEDS_VERIFICATION,
