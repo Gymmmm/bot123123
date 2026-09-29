@@ -355,5 +355,5 @@ def test_detailed_summary_includes_structured_living_reference_when_available():
     assert "项目规模：" in summary
     assert "费用参考：" in summary
     assert "电费0.25–0.27 USD/kWh" in summary
-    assert "水费0.5–1.0 USD/m3" in summary
+    assert "水费0.5–1 USD/m3" in summary
     assert "具体房源的租金、水电、管理费" in summary
