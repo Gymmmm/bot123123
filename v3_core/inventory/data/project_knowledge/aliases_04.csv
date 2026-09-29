@@ -1,4 +1,4 @@
-<PARSED TEXT FOR SHEET: 1 / 1 TABS
+index,raw_alias,normalized_alias,entity_level,target_display_name,canonical_identity,alias_kind,weight,search_only,conflict_flag,resolution_action,verification_status,notes
 148,Orkide Botanic City,orkidebotaniccity,PROJECT,奥凯德 Botanic City,project:orkide-botanic-city,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
 149,Orkide Grand,orkidegrand,PROJECT,奥凯德 The Grand,project:orkide-the-grand,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
 150,Orkide Pochentong,orkidepochentong,PROJECT,奥凯德 Pochentong,project:orkide-pochentong,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
