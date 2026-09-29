@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
+
 from v3_core.inventory.canonical_facts import canonicalize_source, draft_projection
 from v3_core.inventory.project_knowledge import (
     answer_project_question,
@@ -172,3 +174,44 @@ def test_project_question_answers_use_verified_reference_and_fee_caveats():
     assert "先按道路/地标缩小炳发 family" in family
 
     assert answer_project_question("the_peak", "这个房东最低多少？") is None
+
+
+@pytest.mark.asyncio
+async def test_listing_question_uses_project_answer_before_advisor_handoff():
+    from v3_core.user_bot.telegram_listing_callback import handle_v3_listing_question_text
+
+    class Message:
+        text = "这个项目有泳池吗？"
+        def __init__(self):
+            self.sent = []
+        async def reply_text(self, text, **kwargs):
+            self.sent.append((text, kwargs))
+
+    class Effects:
+        def answer_project_question(self, *, intent, question):
+            assert intent.public_listing_id == "QL-TEST-A1B2"
+            assert question == "这个项目有泳池吗？"
+            return "The Peak 香格里拉项目资料显示有：泳池。"
+        async def execute_question(self, **kwargs):
+            raise AssertionError("verified project answer must not be forwarded")
+
+    message = Message()
+    update = SimpleNamespace(effective_message=message)
+    context = SimpleNamespace(
+        user_data={
+            "v3_listing_question": {
+                "listing_id": "l_test",
+                "public_listing_id": "QL-TEST-A1B2",
+                "source": "listing_callback",
+            }
+        },
+        bot=None,
+    )
+    handled = await handle_v3_listing_question_text(
+        update,
+        context,
+        contact_effects=Effects(),
+    )
+    assert handled is True
+    assert message.sent[0][0].startswith("The Peak 香格里拉")
+    assert "v3_listing_question" not in context.user_data
