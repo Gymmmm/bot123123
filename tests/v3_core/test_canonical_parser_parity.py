@@ -26,6 +26,11 @@ def _assert_same(raw: str, **kwargs):
     for payload in (legacy, v3):
         payload.pop("parser_revision", None)
         payload.pop("canonical_facts_hash", None)
+        # Project knowledge is an additive reference layer. It must not change
+        # any locked listing business fact, but it is intentionally absent from
+        # the legacy parser payload.
+        payload.pop("project_reference", None)
+        payload.pop("project_reference_version", None)
     assert v3 == legacy
 
 
