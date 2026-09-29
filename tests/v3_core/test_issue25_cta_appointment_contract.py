@@ -103,14 +103,14 @@ def test_channel_ctas_and_sync_contract_share_one_real_listing():
     assert CHANNEL_CTA_LABELS == {
         "details": "📷 更多实拍",
         "photos": "📸 更多实拍",
-        "book": "📅 预约看房",
+        "book": "📅 在线预约",
         "consult": "💬 联系中文顾问",
         "find": "🔍 帮我找房",
         "more": "🔎 更多房源",
         "similar": "🔎 更多房源",
     }
     assert [[label for label, _ in row] for row in rows] == [
-        ["📷 更多实拍", "📅 预约看房"], ["💬 联系中文顾问"],
+        ["📷 更多实拍", "📅 在线预约"], ["💬 联系中文顾问"],
     ]
     assert urls["details"] == f"https://t.me/QiaoLianBot?start=property_{PUBLIC_ID}_details"
     assert urls["photos"] == f"https://t.me/QiaoLianBot?start=property_{PUBLIC_ID}_photos"
@@ -151,7 +151,7 @@ def test_details_and_photos_contract_has_real_fields_three_entries_and_no_intern
     details = build_details_response(view)
     labels = _labels(details.action_rows)
     # NOTE: details keyboard has no photos button (photos is a separate deep link)
-    assert "📅 预约看房" in labels and "💬 咨询这套" in labels
+    assert "📅 在线预约" in labels and "💬 咨询这套" in labels
     assert "富力城" in details.text
     # NOTE: public_id is NOT exposed in user-visible details text (privacy)
     assert "🪧" not in details.text
@@ -244,5 +244,5 @@ def test_new_channel_runtime_never_generates_legacy_buttons():
     pending = official_channel_button_spec(urls, inventory_status="pending")
     assert [[label for label, _ in row] for row in pending] == [["📷 更多实拍"], ["💬 联系中文顾问"]]
     offline = official_channel_button_spec(urls, inventory_status="offline")
-    assert "📅 预约看房" not in [label for row in offline for label, _ in row]
+    assert "📅 在线预约" not in [label for row in offline for label, _ in row]
     assert [[label for label, _ in row] for row in offline] == [["📷 更多实拍"], ["💬 联系中文顾问"]]
