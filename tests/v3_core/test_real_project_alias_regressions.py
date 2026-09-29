@@ -43,9 +43,9 @@ def test_verified_yuetai_ecc_alias_gets_tonle_bassac_default() -> None:
     assert facts["public_location_display"] == "诺罗敦大道 · 永旺1附近"
 
 
-def test_bare_yuetai_is_not_forced_to_ecc() -> None:
+def test_bare_yuetai_market_shorthand_resolves_to_ecc() -> None:
     result = classify_listing_taxonomy("#粤泰 三房公寓出租")
-    assert result.project_key is None
+    assert result.project_key == "yuetai_ecc"
 
 
 def test_spaced_aeon2_is_safe_nearby_location() -> None:
