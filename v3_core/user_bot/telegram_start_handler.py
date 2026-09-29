@@ -578,9 +578,9 @@ async def _handle_video_inventory_start(
             mode = relaxed.mode
 
     lines = [
-        "🎥 <b>视频代看</b>",
+        "🎥 <b>视频带看</b>",
         "",
-        "没时间到现场，可以先通过视频确认房屋和周边情况。",
+        "没空到场？顾问到房源现场，实时视频带你看。",
         "",
         f"区域｜{area}",
         f"预算｜{budget}",
@@ -599,7 +599,7 @@ async def _handle_video_inventory_start(
         ])
     lines.extend([
         "",
-        "可以先咨询房源，或直接安排视频代看。",
+        "可以先咨询房源，或直接预约视频带看。",
     ])
 
     rows: list[list[InlineKeyboardButton]] = []
@@ -613,7 +613,7 @@ async def _handle_video_inventory_start(
             "time": "",
             "source": "video_deeplink",
         }
-        rows.append([InlineKeyboardButton("📅 安排视频代看", callback_data="v3u:t:appointment_mode:video")])
+        rows.append([InlineKeyboardButton("📅 预约视频带看", callback_data="v3u:t:appointment_mode:video")])
     rows.append([InlineKeyboardButton("🔍 继续找房", callback_data=encode_home_callback("search"))])
     await message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(rows))
     user_data["v3_video_booking_preferred"] = True

@@ -98,15 +98,16 @@ def _appointment_mode_view(draft: PublicAppointmentDraft, inventory: PublicInven
     return TransitionView(
         kind="appointment_mode",
         text=(
-            "📅 <b>预约看房</b>\n\n"
+            "📅 <b>在线预约看房</b>\n\n"
             f"🏠 {he(subject)}\n"
             f"{price_line}"
-            "\n请选择看房方式："
+            "\n没空到场？选择视频带看，顾问到现场实时带你看。\n\n"
+            "请选择看房方式："
         ),
         rows=(
             (
-                TransitionChoice("🚶 实地看房", "appointment_mode", "offline"),
-                TransitionChoice("🎥 视频代看", "appointment_mode", "video"),
+                TransitionChoice("🚶 实地带看", "appointment_mode", "offline"),
+                TransitionChoice("🎥 视频带看", "appointment_mode", "video"),
             ),
             (TransitionChoice("⬅️ 返回房源", "listing_details", public_listing_id=draft.public_listing_id),),
         ),
@@ -124,7 +125,7 @@ def _appointment_date_view(draft: PublicAppointmentDraft, inventory: PublicInven
         text=(
             "📅 <b>选择日期</b>\n\n"
             f"{he(subject)}\n"
-            f"已选：{he('视频代看' if draft.mode == 'video' else '实地看房')}\n\n"
+            f"已选：{he('视频带看' if draft.mode == 'video' else '实地带看')}\n\n"
             "请选择方便的日期："
         ),
         rows=(
