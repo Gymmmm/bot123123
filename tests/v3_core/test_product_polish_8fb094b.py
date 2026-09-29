@@ -53,11 +53,11 @@ def _button_labels(markup):
 )
 def test_channel_keyboard_booking_follows_inventory_status(status, has_book):
     labels = _button_labels(build_channel_keyboard(dict(ACTIONS), inventory_status=status, area="BKK1"))
-    assert ("📅 预约看房" in labels) is has_book
+    assert ("📅 在线预约" in labels) is has_book
     assert "📷 更多实拍" in labels
     assert "📸 更多实拍" not in labels
     if has_book:
-        assert labels == ["📷 更多实拍", "📅 预约看房", "💬 联系中文顾问"]
+        assert labels == ["📷 更多实拍", "📅 在线预约", "💬 联系中文顾问"]
     else:
         assert labels == ["📷 更多实拍", "💬 联系中文顾问"]
     assert "💬 联系中文顾问" in labels
