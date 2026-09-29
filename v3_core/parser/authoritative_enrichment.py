@@ -10,7 +10,6 @@ from __future__ import annotations
 from typing import Any
 
 from v3_core.inventory.hashing import facts_hash
-from v3_core.inventory.project_knowledge import enrich_project_reference
 from .adviser_enrichment import enrich_adviser_signals
 from .safe_enrichment import assert_v1_1_preserved, enrich_v2
 
@@ -20,7 +19,6 @@ def enrich_authoritative_facts(
 ) -> dict[str, Any]:
     enriched = enrich_v2(str(raw_text or ""), authoritative)
     enriched = enrich_adviser_signals(str(raw_text or ""), enriched)
-    enriched = enrich_project_reference(enriched)
     assert_v1_1_preserved(authoritative, enriched)
     if authoritative.get("canonical_facts_hash"):
         enriched["canonical_facts_hash"] = facts_hash(enriched)
