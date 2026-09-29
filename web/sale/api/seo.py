@@ -20,7 +20,7 @@ def _money(value):
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         public_id = str((parse_qs(urlsplit(self.path).query).get("id") or [""])[0]).strip()
-        if not public_id:
+        if not public_id or public_id.upper().startswith("QL-VERIFY-"):
             self.send_error(404)
             return
         try:

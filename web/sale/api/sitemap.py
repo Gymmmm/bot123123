@@ -26,7 +26,7 @@ class handler(BaseHTTPRequestHandler):
         urls = ["<url><loc>" + escape(PUBLIC_BASE + "/") + "</loc></url>"]
         for item in rows:
             public_id = str(item.get("public_id") or "").strip()
-            if not public_id:
+            if not public_id or public_id.upper().startswith("QL-VERIFY-"):
                 continue
             updated = str(item.get("updated_at") or "").strip().replace(" ", "T")
             lastmod = ("<lastmod>" + escape(updated) + "</lastmod>") if updated else ""

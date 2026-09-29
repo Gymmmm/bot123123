@@ -42,9 +42,8 @@ function layoutSummary(facts) {
 }
 
 function listingLink(id) {
-  const u = new URL(window.location.origin + window.location.pathname);
-  if (has(id)) u.searchParams.set('id', text(id));
-  return u.toString();
+  if (!has(id)) return window.location.origin + '/';
+  return new URL('/property/' + encodeURIComponent(text(id)), window.location.origin).toString();
 }
 function advisorUrl(action, i) {
   const id = text(i?.public_id);
