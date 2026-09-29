@@ -214,3 +214,18 @@ async def test_listing_question_uses_project_answer_before_advisor_handoff():
     assert handled is True
     assert message.sent[0][0].startswith("The Peak 香格里拉")
     assert "v3_listing_question" not in context.user_data
+
+
+def test_peng_huoth_family_reference_has_safe_official_context():
+    reference = project_reference_for_key("peng_huoth_city")
+    assert reference["developer"] == "Borey Peng Huoth / Peng Huoth Group"
+    assert "1号路 / National Road 1" in reference["known_corridors"]
+    assert "60米大道 / Samdech Techo Hun Sen Blvd" in reference["known_corridors"]
+    assert any("Single Villa" in item for item in reference["property_types"])
+    assert reference["requires_specific_project"] is True
+
+    developer = answer_project_question("peng_huoth_city", "开发商是谁？")
+    assert "Peng Huoth Group" in developer
+    location = answer_project_question("peng_huoth_city", "这个项目在哪里？")
+    assert "不是单一地址" in location
+    assert "先按道路/地标缩小炳发 family" in location
