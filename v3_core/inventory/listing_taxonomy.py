@@ -798,7 +798,11 @@ def _apply_verified_project_defaults(
         only_nearby = bool(market_items) and all(
             item is not None and item.relation == "nearby" for item in market_items
         )
-        if loc_key and loc_display and (not market_keys or self_label or only_nearby):
+        # If the source already names the same market key, preserve the
+        # source-backed evidence. A project default may fill a missing location
+        # or outrank different nearby landmarks, but must never replace an
+        # explicit identical location token.
+        if loc_key and loc_display and loc_key not in market_keys and (not market_keys or self_label or only_nearby):
             if only_nearby:
                 # Nearby landmarks describe access, not the property's own
                 # location. Keep them as secondary evidence, but lead with the
