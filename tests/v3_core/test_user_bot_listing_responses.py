@@ -213,18 +213,18 @@ def test_photos_response_first_batch_album_with_expand(tmp_path):
 
     assert first.has_media
     assert not first.expand_only
-    # First screen is one side-stack collage JPG (not a 4-frame MediaGroup).
+    # First screen is now a 4-frame native MediaGroup (paged album).
     assert first.photo_index == 0
-    assert first.photo_total == 10  # capped at PHOTOS_MAX_TOTAL
+    assert first.photo_total == 12  # capped at PHOTOS_MAX_TOTAL
     assert len(first.media_groups) == 1
-    assert len(first.media_groups[0]) == 1
-    assert Path(first.media_groups[0][0]).is_file()
+    assert len(first.media_groups[0]) == 4
+    assert all(Path(path).is_file() for path in first.media_groups[0])
     assert first.text.startswith("🟢 当前可预约")
     assert "以上是这套房" not in first.text
     assert "⬅️ 上一张" not in str(_labels(first.action_rows))
     assert _actions(first.action_rows) == [["photos", "book"], ["consult"]]
     assert _labels(first.action_rows) == [
-        ["📷 查看全部实拍", "📅 预约看房"],
+        ["📄 下一页", "📅 预约看房"],
         ["💬 中文顾问"],
     ]
     expand_btn = first.action_rows[0][0]
@@ -232,10 +232,16 @@ def test_photos_response_first_batch_album_with_expand(tmp_path):
 
     expanded = build_photos_response(_view(gallery=gallery), offset=4)
     assert expanded.expand_only
-    assert expanded.action_rows == ()
-    # Expand sends original frames (cap 10), not "remaining after collage".
-    assert len(expanded.media_groups[0]) == 10
-    assert expanded.media_groups[0][0] == str(cover)
+    assert _actions(expanded.action_rows) == [["photos", "book"], ["consult"]]
+    # Second page = frames 4..7 (4 originals per page).
+    assert len(expanded.media_groups[0]) == 4
+    # Still more frames after page 2 (12 total), so the keyboard keeps 下一页.
+    assert _labels(expanded.action_rows)[0][0] == "📄 下一页"
+    assert expanded.action_rows[0][0].target_index == 8
+
+    last_page = build_photos_response(_view(gallery=gallery), offset=8)
+    assert _labels(last_page.action_rows)[0] == ["📷 房源详情", "📅 预约看房"]
+    assert len(last_page.media_groups[0]) == 4
 
 
 def test_photos_response_pending_has_no_book_button(tmp_path):
@@ -251,7 +257,7 @@ def test_photos_response_pending_has_no_book_button(tmp_path):
 
     assert response.text.startswith("🔵 房态待确认")
     assert _labels(response.action_rows) == [
-        ["📷 查看全部实拍", "💬 中文顾问"],
+        ["📄 下一页", "💬 中文顾问"],
         ["🏠 帮我找房", "🔍 找相似"],
     ]
     assert all(action.action != "book" for row in response.action_rows for action in row)
@@ -303,14 +309,15 @@ def test_album_starts_on_package_cover_path(tmp_path):
     response = build_photos_response(view)
     assert response.photo_total == 2
     assert response.has_media
-    # Prefer collage when images are readable; tiny non-image fixtures fall back.
+    # Only 2 usable frames (<PHOTOS_PAGE_SIZE), so the fallback path delivers
+    # them via native album instead of the paged collage.
     assert len(response.media_groups[0]) in {1, 2}
+    # Out-of-range offset clamps back to the first (and only) page.
     expanded = build_photos_response(view, offset=4)
     assert expanded.expand_only
     assert expanded.has_media
-    assert str(Path(cover).resolve()) in {
-        str(Path(p).resolve()) for p in expanded.media_groups[0]
-    }
+    assert expanded.photo_index == 0
+    assert expanded.photo_total == 2
 
 
 def test_album_recovers_rendered_cover_when_package_path_stale(tmp_path):
@@ -347,12 +354,12 @@ def test_album_recovers_rendered_cover_when_package_path_stale(tmp_path):
     # First screen may be a collage; cover must still be in the source set.
     assert response.photo_total == 2
     assert response.has_media
+    # Out-of-range offset clamps to page 1 (2-frame listing fits in one page).
     expanded = build_photos_response(view, offset=4)
     assert expanded.expand_only
     assert expanded.has_media
-    assert str(rendered.resolve()) in {
-        str(Path(p).resolve()) for p in expanded.media_groups[0]
-    }
+    assert expanded.photo_index == 0
+    assert expanded.photo_total == 2
 
 
 def test_build_detail_caption_alias_matches_public_fact_body():

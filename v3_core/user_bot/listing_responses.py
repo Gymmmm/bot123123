@@ -22,7 +22,10 @@ from .public_inventory import PublishedListingView
 # First screen album size; remaining frames (if any) expand on demand.
 PHOTOS_FIRST_BATCH = 4
 # Hard cap for one listing photos view (first batch + expand).
-PHOTOS_MAX_TOTAL = 10
+PHOTOS_MAX_TOTAL = 12
+# Page size for native MediaGroup pagination. Telegram caps an album at 10,
+# so keep one page under that even if PHOTOS_FIRST_BATCH grows later.
+PHOTOS_PAGE_SIZE = 4
 
 
 InternalListingAction = Literal[
@@ -135,6 +138,7 @@ def _photo_actions(
     inventory_status: str,
     public_listing_id: str,
     has_more: bool,
+    next_offset: int = PHOTOS_FIRST_BATCH,
 ) -> tuple[tuple[SemanticAction, ...], ...]:
     """FINAL LOCK status matrix for the album action bar.
 
@@ -144,20 +148,21 @@ def _photo_actions(
     """
     target = str(public_listing_id or "").strip()
     status = str(inventory_status or "").strip().lower()
+    page_offset = max(int(next_offset or 0), PHOTOS_FIRST_BATCH)
 
-    def _expand_or_details() -> SemanticAction:
+    def _next_or_details() -> SemanticAction:
         if has_more:
             return SemanticAction(
-                "📷 查看全部实拍",
+                "📄 下一页",
                 "photos",
                 target,
-                target_index=PHOTOS_FIRST_BATCH,
+                target_index=page_offset,
             )
         return SemanticAction("📷 房源详情", "details", target)
 
     if bookable or status in {"active", "reserved"}:
         # Book button only when unified bookable is true.
-        first: list[SemanticAction] = [_expand_or_details()]
+        first: list[SemanticAction] = [_next_or_details()]
         if bookable:
             first.append(SemanticAction("📅 预约看房", "book", target))
         return (
@@ -170,10 +175,10 @@ def _photo_actions(
         if has_more:
             first_row.append(
                 SemanticAction(
-                    "📷 查看全部实拍",
+                    "📄 下一页",
                     "photos",
                     target,
-                    target_index=PHOTOS_FIRST_BATCH,
+                    target_index=page_offset,
                 )
             )
         first_row.append(SemanticAction("💬 中文顾问", "consult", target))
@@ -567,12 +572,14 @@ def build_photos_response(
     offset: int = 0,
     page_size: int | None = None,
 ) -> PublicPhotosResponse:
-    """First screen: side-stack collage (1 JPG); expand: native MediaGroup originals.
+    """Native MediaGroup pagination, 4 frames per page.
 
-    ``offset`` > 0 means 「查看全部实拍」→ send original frames (cap 10).
-    ``page_size`` ignored (call-site compatibility).
+    Page 1 (offset=0): first PHOTOS_PAGE_SIZE originals; keyboard offers
+    「📄 下一页」when more frames remain, otherwise falls back to 「📷 房源详情」.
+    Page 2+ (offset>0): next PHOTOS_PAGE_SIZE originals; same keyboard logic.
+    Single-photo / failed-collage listings still get a single-shot fallback.
     """
-    del page_size
+    page = max(1, int(page_size or PHOTOS_PAGE_SIZE))
     details = build_public_listing_details(view)
     all_photos = _gallery_photo_paths(view)[:PHOTOS_MAX_TOTAL]
     total = len(all_photos)
@@ -584,34 +591,89 @@ def build_photos_response(
     )
 
     start = max(0, int(offset or 0))
-    if start > 0:
-        # Full original album (collage was only a preview card).
-        originals = all_photos[:PHOTOS_MAX_TOTAL]
-        groups = _as_media_groups(originals)
-        first = originals[0] if originals else ""
-        caption = (
-            _album_media_caption(
-                public_listing_id=details.public_listing_id,
-                shown=len(originals),
-                total=total,
-                expand=True,
-            )
-            if originals
-            else ""
+    # Clamp out-of-range offsets (defensive: stale/tampered "下一页" buttons).
+    # Remember whether the user was already past page 1 — used to set expand_only
+    # correctly on the clamped-first-page return.
+    was_expand = start > 0 and (total <= 0 or start >= total)
+    if total > 0 and start >= total:
+        start = 0
+    # Page 1 always sends the first PHOTOS_PAGE_SIZE originals as a native
+    # MediaGroup so users see 4 real frames. Subsequent pages slice forward.
+    # Collage is reserved as a fallback for listings that have fewer usable
+    # photos than PHOTOS_PAGE_SIZE.
+    if start == 0 and total >= page:
+        batch = all_photos[:page]
+        end_index = len(batch)
+        groups = _as_media_groups(batch)
+        first = batch[0] if batch else ""
+        has_more = end_index < total
+        caption = _album_media_caption(
+            public_listing_id=details.public_listing_id,
+            shown=end_index,
+            total=total,
+            expand=has_more,
         )
+        text = _photos_action_text(details)
         return PublicPhotosResponse(
             media_groups=groups,
-            text="",
+            text=text,
+            media_caption=caption,
+            detail_text="",
+            photo_path=first,
+            photo_index=0,
+            photo_total=total,
+            listing_summary=summary,
+            action_rows=_photo_actions(
+                bookable=details.bookable,
+                inventory_status=details.inventory_status,
+                public_listing_id=details.public_listing_id,
+                has_more=has_more,
+                next_offset=end_index,
+            ),
+            expand_only=False,
+        )
+    if start > 0:
+        # Paged native album (offset>0) or single-page listing.
+        batch = all_photos[start : start + page]
+        groups = _as_media_groups(batch)
+        first = batch[0] if batch else ""
+        has_more = (start + len(batch)) < total
+        if batch:
+            caption = _album_media_caption(
+                public_listing_id=details.public_listing_id,
+                shown=start + len(batch),
+                total=total,
+                expand=has_more,
+            )
+            text = _photos_action_text(details)
+        else:
+            caption = ""
+            text = (
+                f"{_detail_status_line(details)}{chr(10)}{chr(10)}"
+                f"这套房的实拍暂时没有加载出来。{chr(10)}"
+                f"可以稍后再试，或直接联系顾问。"
+            )
+        return PublicPhotosResponse(
+            media_groups=groups,
+            text=text,
             media_caption=caption,
             detail_text="",
             photo_path=first,
             photo_index=start,
             photo_total=total,
             listing_summary=summary,
-            action_rows=(),
+            action_rows=_photo_actions(
+                bookable=details.bookable,
+                inventory_status=details.inventory_status,
+                public_listing_id=details.public_listing_id,
+                has_more=has_more,
+                next_offset=start + page,
+            ),
             expand_only=True,
         )
 
+    # Page 1: also offer collage when one rendered; MediaGroup next-page path
+    # stays the canonical interaction so users can always get past frame 4.
     collage = _try_side_collage(
         all_photos,
         public_listing_id=details.public_listing_id,
@@ -630,19 +692,16 @@ def build_photos_response(
                 bookable=details.bookable,
                 inventory_status=details.inventory_status,
                 public_listing_id=details.public_listing_id,
-                # Collage uses 4 frames; expand always offers the native originals.
                 has_more=True,
+                next_offset=page,
             ),
-            expand_only=False,
+            expand_only=was_expand,
         )
 
-    # Fallback: native first-batch album (0/1 photo, or collage render failed).
-    if total > PHOTOS_FIRST_BATCH:
-        batch = all_photos[:PHOTOS_FIRST_BATCH]
-        has_more = True
-    else:
-        batch = all_photos
-        has_more = False
+    # Fallback: native first-batch album (collage render failed). Still capped
+    # at PHOTOS_PAGE_SIZE so the keyboard contract matches the paged path.
+    batch = all_photos[:PHOTOS_PAGE_SIZE]
+    has_more = total > len(batch)
 
     groups = _as_media_groups(batch)
     first = batch[0] if batch else ""
@@ -651,7 +710,7 @@ def build_photos_response(
             public_listing_id=details.public_listing_id,
             shown=len(batch),
             total=total,
-            expand=False,
+            expand=has_more,
         )
         text = _photos_action_text(details)
     else:
@@ -676,8 +735,9 @@ def build_photos_response(
             inventory_status=details.inventory_status,
             public_listing_id=details.public_listing_id,
             has_more=has_more,
+            next_offset=len(batch),
         ),
-        expand_only=False,
+        expand_only=was_expand,
     )
 
 
