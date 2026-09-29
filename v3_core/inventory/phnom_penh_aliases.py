@@ -10,6 +10,7 @@ from typing import Any
 
 
 PROJECTS: tuple[tuple[str, str, tuple[str, ...], str | None], ...] = (
+    ("bali_3", "Bali 3", ("bali 3", "bali3", "巴厘3", "巴厘3号"), "公寓"),
     ("j_tower_1", "J Tower 1", ("j tower 1", "j-tower 1", "jtower1", "jt1", "j tower一期"), "公寓"),
     ("j_tower_2", "J Tower 2", ("j tower 2", "j-tower 2", "jtower2", "jt2", "j2", "j tower二期"), "公寓"),
     ("j_tower_3", "J Tower 3", ("j tower 3", "j-tower 3", "jtower3", "jt3", "j3", "j tower三期"), "公寓"),
