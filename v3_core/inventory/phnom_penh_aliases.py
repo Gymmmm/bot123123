@@ -319,6 +319,37 @@ def apply_phnom_penh_aliases(taxonomy: Any) -> None:
                     default_location_display=loc[1] if loc else None,
                 )
             )
+    # Extend recognition from the researched project registry. This adds only
+    # VERIFIED/PARTIAL project identities and aliases; it deliberately does not
+    # promote registry location/fees/property type into authoritative listing
+    # facts. Those remain in project_reference.
+    from .project_knowledge import registry_project_identities
+
+    project_keys = {item.key for item in projects}
+    for identity in registry_project_identities():
+        key = str(identity["taxonomy_key"])
+        if key in project_keys:
+            continue
+        aliases = tuple(
+            alias for alias in identity["aliases"]
+            if len(taxonomy.clean_text(alias)) >= 3
+        )
+        if not aliases:
+            continue
+        projects.append(
+            taxonomy.ProjectIdentity(
+                key,
+                str(identity["display"]),
+                "project",
+                aliases,
+                property_family=None,
+                property_type_mode=None,
+                default_location_key=None,
+                default_location_display=None,
+            )
+        )
+        project_keys.add(key)
+
     extended_projects = []
     for item in projects:
         extra = PROJECT_ALIAS_EXTENSIONS.get(item.key, ())
