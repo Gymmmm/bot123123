@@ -24,6 +24,7 @@ _TAXONOMY_TO_KNOWLEDGE = {
     # Existing taxonomy key historically names 威尔斯公馆. Do not attach the
     # separate 财富大厦 / Wealth Mansion profile to it.
     "wealth_mansion": "wells-mansion",
+    "wealth_mansion_building": "wealth-mansion",
     **{f"time_square_{n}": f"times-square-{n}" for n in (1, 2, 3, 5, 7, 8, 9, 11)},
 }
 _KNOWLEDGE_TO_TAXONOMY = {value: key for key, value in _TAXONOMY_TO_KNOWLEDGE.items()}
@@ -153,13 +154,22 @@ def registry_project_identities() -> tuple[dict[str, Any], ...]:
         if status not in {"VERIFIED", "PARTIAL"}:
             continue
         aliases: list[str] = []
-        for value in (
-            row.get("canonical_name_cn", ""),
-            row.get("canonical_name_en", ""),
-            row.get("search_aliases_cn", ""),
+        market_aliases = {
+            alias.strip().casefold()
+            for alias in str(row.get("market_aliases_cn", "") or "").split(";")
+            if alias.strip()
+        }
+        for field, value in (
+            ("canonical_name_cn", row.get("canonical_name_cn", "")),
+            ("canonical_name_en", row.get("canonical_name_en", "")),
+            ("search_aliases_cn", row.get("search_aliases_cn", "")),
         ):
             for alias in str(value or "").split(";"):
                 alias = alias.strip()
+                # Location-qualified market handles such as「一号路炳发」are
+                # search/navigation aliases, not safe project identities.
+                if field == "search_aliases_cn" and alias.casefold() in market_aliases:
+                    continue
                 if alias and alias not in aliases:
                     aliases.append(alias)
         if not aliases:
