@@ -140,7 +140,40 @@ def taxonomy_key_for_knowledge(knowledge_key: object) -> str:
     return key.replace("-", "_")
 
 
+def _peng_huoth_family_reference() -> dict[str, Any]:
+    family_rows = [
+        row for row in _rows("aliases")
+        if str(row.get("canonical_identity") or "") == "family:peng-huoth"
+    ]
+    child_projects = sorted(
+        key for key, payload in _bundle().items()
+        if key.startswith(("peng-huoth-", "the-star-"))
+        or any(
+            str(row.get("target_display_name") or "").startswith("炳发")
+            for row in payload.get("aliases") or []
+        )
+    )
+    return {
+        "knowledge_key": "family:peng-huoth",
+        "knowledge_version": KNOWLEDGE_VERSION,
+        "reference_kind": "project_family",
+        "reference_only": True,
+        "requires_specific_project": True,
+        "resolution_hint": "先按道路/地标缩小炳发 family，再解析具体项目；裸炳发/炳发城不能继承某个子项目收费或配套。",
+        "aliases": family_rows,
+        "child_project_keys": child_projects,
+        "inheritance_policy": {
+            "listing_fact_precedence": True,
+            "owner_specific_not_project_default": True,
+            "conflicts_require_confirmation": True,
+            "needs_verification_not_asserted": True,
+        },
+    }
+
+
 def project_reference_for_key(project_key: object) -> dict[str, Any] | None:
+    if str(project_key or "").strip() == "peng_huoth_city":
+        return _peng_huoth_family_reference()
     knowledge_key = knowledge_key_for_taxonomy(project_key)
     if not knowledge_key:
         return None
