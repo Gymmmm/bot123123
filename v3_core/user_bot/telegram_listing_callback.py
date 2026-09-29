@@ -53,11 +53,12 @@ def _lead_user(update: Any) -> LeadUser:
 
 async def _render_contact(query: Any, *, text: str, public_listing_id: str, advisor_url: str) -> None:
     direct_advisor = advisor_handoff_url(advisor_url, public_listing_id=public_listing_id)
-    rows = [
-        [InlineKeyboardButton("⬅️ 返回房源", callback_data=encode_listing_callback("details", public_listing_id))],
-    ]
+    rows: list[list[InlineKeyboardButton]] = []
     if direct_advisor:
-        rows.append([InlineKeyboardButton("↗️ 直接联系顾问", url=direct_advisor)])
+        rows.append([InlineKeyboardButton("💬 中文顾问", url=direct_advisor)])
+    else:
+        rows.append([InlineKeyboardButton("💬 中文顾问", callback_data="v3u:home:contact")])
+    rows.append([InlineKeyboardButton("⬅️ 返回房源", callback_data=encode_listing_callback("details", public_listing_id))])
     markup = InlineKeyboardMarkup(rows)
     await edit_query_panel(
         query,

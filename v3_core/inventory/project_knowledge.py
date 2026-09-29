@@ -480,7 +480,7 @@ def project_reference_location(project_key: object) -> dict[str, str] | None:
     display = str(web.get("location") or reference.get("location") or "").strip()
     if display and (
         web
-        or reference.get("reference_kind") == "web_verified_project"
+        or reference.get("reference_kind") in ("web_verified_project", "researched_market_project")
     ):
         return {"display": display, "source": "project_web_verified", "confidence": "verified"}
     return None

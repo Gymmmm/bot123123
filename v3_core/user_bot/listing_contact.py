@@ -211,12 +211,13 @@ def build_listing_contact_view(
     )
     identity = "｜".join(part for part in (subject, price) if part)
     lines = [
-        "💬 <b>问这套</b>",
+        "💬 <b>咨询这套</b>",
         "",
         he(identity),
         "",
-        "房源信息已经带上。",
-        "直接在这里发问题就可以，例如：最低多少？明天下午能看吗？",
+        "想直接问这套房，最低多少、明天下午能不能看，都可以在这里问。",
+        "房源信息已经带上，顾问收到后会按这套房继续回你。",
+        "问这套：直接在这里发问题就可以，例如：最低多少？明天下午能看吗？",
     ]
     return ListingContactView(
         text="\n".join(lines),

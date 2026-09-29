@@ -505,12 +505,11 @@ def _album_media_caption(
     total: int,
     expand: bool,
 ) -> str:
-    del public_listing_id
     if expand:
-        return f"📷 继续看实拍{chr(10)}剩余 {shown} 张"
+        return f"📷 继续看实拍{chr(10)}剩余 {shown} 张{chr(10)}{public_listing_id}"
     if total > shown:
-        return f"📷 实拍精选{chr(10)}共 {total} 张 · 先看 {shown} 张"
-    return f"📷 实拍相册{chr(10)}共 {shown} 张"
+        return f"📷 实拍精选{chr(10)}共 {total} 张 · 先看 {shown} 张{chr(10)}{public_listing_id}"
+    return f"📷 实拍相册{chr(10)}共 {shown} 张{chr(10)}{public_listing_id}"
 
 
 def _photos_action_text(details) -> str:
