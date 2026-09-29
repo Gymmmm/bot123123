@@ -111,6 +111,20 @@ class ListingContactEffectExecutor:
         )
         return ListingContactEffectResult(lead=lead, admin=admin)
 
+    def answer_project_question(self, *, intent: ConsultIntent, question: object) -> str | None:
+        if self.inventory is None:
+            return None
+        view = self.inventory.resolve(intent.public_listing_id)
+        if view is None:
+            return None
+        snapshot = dict(getattr(view, "snapshot", None) or {})
+        canonical = dict(snapshot.get("canonical_facts") or {})
+        project_key = canonical.get("project_key")
+        if not project_key:
+            return None
+        from v3_core.inventory.project_knowledge import answer_project_question
+        return answer_project_question(project_key, question)
+
     async def execute_question(
         self,
         *,
