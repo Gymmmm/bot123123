@@ -2386,3 +2386,67 @@ img { display:block; max-width:100% }
     margin-top:18px;
   }
 }
+
+
+/* SALE P1.11 — perceived performance + interaction polish */
+html {
+  scroll-padding-top:148px;
+}
+body {
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+button,
+a,
+select,
+input {
+  -webkit-tap-highlight-color:transparent;
+}
+.card-link,
+.card-actions a,
+.advisor-btn,
+.price-check-btn,
+.advisor-strip-btn {
+  touch-action:manipulation;
+}
+#buyer-guide {
+  scroll-margin-top:148px;
+}
+.investment-intel,
+.buyer-guide {
+  content-visibility:auto;
+  contain-intrinsic-size:1px 1500px;
+}
+.card-image img,
+.hero-bg img {
+  backface-visibility:hidden;
+}
+
+@media (hover:none) {
+  .card:hover {
+    transform:none;
+    box-shadow:0 3px 14px rgba(42,50,46,.055);
+  }
+  .card:hover .card-image img { transform:none }
+}
+
+@media (prefers-reduced-motion:reduce) {
+  html { scroll-behavior:auto }
+  *,
+  *::before,
+  *::after {
+    animation-duration:.01ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.01ms !important;
+    scroll-behavior:auto !important;
+  }
+}
+
+@media (max-width:699px) {
+  html { scroll-padding-top:64px }
+  #buyer-guide { scroll-margin-top:64px }
+  .investment-intel,
+  .buyer-guide {
+    contain-intrinsic-size:1px 1100px;
+  }
+}
