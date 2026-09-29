@@ -338,6 +338,10 @@ def test_sale_http_api_meta_detail_media_and_static_frontend(tmp_path: Path):
             assert response.headers["Content-Type"] == "image/jpeg"
         with urlopen(base + "/", timeout=3) as response:
             assert b"sale frontend" in response.read()
+        with urlopen(base + "/robots.txt", timeout=3) as response:
+            assert "sitemap.xml" in response.read().decode("utf-8")
+        with urlopen(base + "/sitemap.xml", timeout=3) as response:
+            assert "/property/QL-6001" in response.read().decode("utf-8")
         with pytest.raises(HTTPError) as exc:
             urlopen(base + "/api/v3/sale/listings/QL-NOTFOUND", timeout=3)
         assert exc.value.code == 404
@@ -419,3 +423,37 @@ def test_sale_catalog_handles_missing_public_fields_and_media(tmp_path: Path):
     assert item["layout"] == ""
     assert item["gallery_urls"] == []
     assert item["sale_price_usd"] == 180000
+
+
+
+def test_sale_production_frontend_has_search_indexing_contract():
+    root = Path(__file__).resolve().parents[2]
+    index = (root / "web" / "sale" / "index.html").read_text(encoding="utf-8")
+    app = (root / "web" / "sale" / "app.js").read_text(encoding="utf-8")
+    assert "金边买房｜金边房产出售与投资置业｜侨联地产" in index
+    assert 'rel="canonical"' in index
+    assert '"@type":"WebSite"' in index
+    assert "property-link" in app
+    assert "routeListingId" in app
+
+
+def test_sale_property_url_renders_unique_seo(tmp_path: Path):
+    from http.server import ThreadingHTTPServer
+    db = initialize_v3_storage(tmp_path / "seo.sqlite")
+    _seed_listing(db, tmp_path, suffix="SEO", public_id="QL-SEO-01", sale_price=188000, location="BKK1", layout="2房2卫")
+    root = Path(__file__).resolve().parents[2]
+    server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(SaleCatalogRepository(db), root / "web" / "sale" / "index.html"))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        host, port = server.server_address
+        with urlopen(f"http://{host}:{port}/property/QL-SEO-01", timeout=3) as response:
+            body = response.read().decode("utf-8")
+        assert "项目SEO · 2房2卫出售｜金边买房｜侨联地产" in body
+        assert 'rel="canonical" href="https://qiaolian-jinbian-sale.vercel.app/property/QL-SEO-01"' in body
+        assert '"@type":"RealEstateListing"' in body
+        assert '"price":188000' in body
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=3)

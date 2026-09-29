@@ -42,9 +42,8 @@ function layoutSummary(facts) {
 }
 
 function listingLink(id) {
-  const u = new URL(window.location.origin + window.location.pathname);
-  if (has(id)) u.searchParams.set('id', text(id));
-  return u.toString();
+  if (!has(id)) return window.location.origin + '/';
+  return new URL('/property/' + encodeURIComponent(text(id)), window.location.origin).toString();
 }
 function advisorUrl(action, i) {
   const id = text(i?.public_id);
@@ -372,7 +371,7 @@ async function loadList(reset = false) {
       restoreFiltersFromUrl();
       initialUrlRestored = true;
     }
-    const detailId = new URLSearchParams(window.location.search).get('id');
+    const detailId = routeListingId();
     const r = await fetch(API+'?'+queryParams(), { cache:'no-store' });
     if (!r.ok) throw 0;
     const d = await r.json();
@@ -440,9 +439,10 @@ function cardMarkup(i) {
         .filter((v, idx, arr) => arr.indexOf(v) === idx).join(' · ')
     : '';
   const telegramUrl = advisorUrl('询问实际价格', i);
+  const propertyUrl = '/property/' + encodeURIComponent(id);
 
   return `<article class="card">
-    <button class="card-link" type="button" data-id="${esc(id)}" aria-label="查看 ${esc(title)}">
+    <a class="card-link property-link" href="${propertyUrl}" data-id="${esc(id)}" aria-label="查看 ${esc(title)}">
       <div class="card-image">
         ${imgUrl
           ? `<img src="${esc(imgUrl)}" alt="${esc(title)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'"><div class="image-fallback" style="display:none">暂无照片</div>`
@@ -459,9 +459,9 @@ function cardMarkup(i) {
         ${ppsm ? `<p class="card-specs"><span class="card-ppsm">${esc(ppsm)}</span></p>` : ''}
         ${updated ? `<p class="card-updated">${esc(updated)}</p>` : ''}
       </div>
-    </button>
+    </a>
     <div class="card-actions">
-      <button type="button" class="detail-btn" data-id="${esc(id)}">看详情</button>
+      <a class="detail-btn property-link" href="${propertyUrl}" data-id="${esc(id)}">看详情</a>
       <a href="${telegramUrl}" target="_blank" rel="noopener">问价格</a>
     </div>
   </article>`;
@@ -570,9 +570,7 @@ async function openDetail(id, push = true) {
     $('overlay').hidden = false;
     document.body.style.overflow = 'hidden';
     if (push) {
-      const u = new URL(window.location.href);
-      u.searchParams.set('id', text(i.public_id));
-      history.pushState({},'',u);
+      history.pushState({},'', '/property/' + encodeURIComponent(text(i.public_id)));
     }
   } catch {
     currentListing = null;
@@ -662,9 +660,7 @@ function closeDetail(updateUrl = true) {
   document.body.style.overflow = '';
   currentListing = null;
   if (updateUrl) {
-    const u = new URL(window.location.href);
-    u.searchParams.delete('id');
-    history.pushState({},'',u);
+    history.pushState({},'', '/');
   }
 }
 
@@ -709,6 +705,11 @@ function updateChips() {
   updateQuickFilterState();
 }
 
+function routeListingId() {
+  const match = window.location.pathname.match(/^\/property\/([^/]+)\/?$/);
+  return match ? decodeURIComponent(match[1]) : new URLSearchParams(window.location.search).get('id');
+}
+
 function updateUrlFilters(detailId = null) {
   const params = new URLSearchParams();
   const q = text($('searchInput')?.value);
@@ -721,9 +722,11 @@ function updateUrlFilters(detailId = null) {
   if (type) params.set('type',type);
   if (price) params.set('price',price);
   if (sort && sort !== 'newest') params.set('sort',sort);
-  if (detailId) params.set('id',detailId);
+  const onPropertyPath = /^\/property\/[^/]+\/?$/.test(window.location.pathname);
+  if (detailId && !onPropertyPath) params.set('id',detailId);
   const search = params.toString();
-  history.replaceState({},'',search ? `?${search}` : window.location.pathname);
+  const path = onPropertyPath ? window.location.pathname : '/';
+  history.replaceState({},'',search ? `${path}?${search}` : path);
 }
 
 function restoreFiltersFromUrl() {
@@ -859,6 +862,8 @@ $('grid')?.addEventListener('click', e => {
     else loadList(true);
     return;
   }
+  const propertyLink = e.target.closest('a.property-link[data-id]');
+  if (propertyLink) { e.preventDefault(); openDetail(propertyLink.dataset.id); return; }
   if (e.target.closest('a')) return;
   const button = e.target.closest('[data-id]');
   if (button) openDetail(button.dataset.id);
@@ -897,7 +902,7 @@ $('next')?.addEventListener('click', () => {
 });
 
 window.addEventListener('popstate', () => {
-  const id = new URLSearchParams(window.location.search).get('id');
+  const id = routeListingId();
   if (id) openDetail(id, false);
   else if (!$('overlay').hidden) closeDetail(false);
 });
