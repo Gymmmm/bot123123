@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 from v3_core.inventory.canonical_facts import canonicalize_source, draft_projection
 from v3_core.inventory.project_knowledge import (
+    answer_project_question,
     project_knowledge_stats,
     project_reference_for_key,
     registry_project_identities,
@@ -156,3 +157,18 @@ def test_generic_peng_huoth_gets_family_reference_not_fake_child_project_facts()
     assert reference["knowledge_key"] == "family:peng-huoth"
     assert reference["child_project_keys"]
     assert "living" not in reference
+
+
+def test_project_question_answers_use_verified_reference_and_fee_caveats():
+    fee = answer_project_question("agile_sky_residence", "这个项目电费多少？")
+    assert "0.25–0.27" in fee
+    assert "具体这套以房东和合同为准" in fee
+
+    amenities = answer_project_question("the_peak", "有泳池和健身房吗？")
+    assert "泳池" in amenities
+    assert "健身" in amenities
+
+    family = answer_project_question("peng_huoth_city", "炳发城有泳池吗？")
+    assert "先按道路/地标缩小炳发 family" in family
+
+    assert answer_project_question("the_peak", "这个房东最低多少？") is None
