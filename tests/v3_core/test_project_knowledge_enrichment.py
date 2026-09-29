@@ -12,6 +12,7 @@ def test_project_knowledge_bundle_has_full_research_coverage():
         "projects": 114,
         "registry_profiles": 107,
         "living_profiles": 107,
+        "v5_profiles": 113,
         "relations": 39,
         "evidence_rows": 53,
         "conflicts": 12,
@@ -50,13 +51,14 @@ def test_listing_specific_fee_is_not_overwritten_by_project_market_reference():
     assert reference["living"]["electricity_rate_max"] == "0.27"
 
 
-def test_wells_mansion_never_receives_wealth_mansion_profile():
+def test_wealth_mansion_legacy_split_is_reconciled_to_one_verified_identity():
     wells = canonicalize_source("威尔斯公馆出租\n2房\n租金$1200/月")
     wealth = canonicalize_source("财富大厦出租\n2房\n租金$1200/月")
     assert wells["project_key"] == "wealth_mansion"
-    assert wells["project_reference"]["knowledge_key"] == "wells-mansion"
-    assert wealth["project_key"] == "wealth_mansion_building"
+    assert wealth["project_key"] == "wealth_mansion"
+    assert wells["project_reference"]["knowledge_key"] == "wealth-mansion"
     assert wealth["project_reference"]["knowledge_key"] == "wealth-mansion"
+    assert wells["project_reference"]["v5_profile"]["中文常用名"] == "威尔斯公馆"
 
 
 def test_market_handle_does_not_become_specific_borey_project():
