@@ -352,6 +352,42 @@ def project_reference_for_key(project_key: object) -> dict[str, Any] | None:
     return result
 
 
+def project_reference_location(project_key: object) -> dict[str, str] | None:
+    """Return a safe read-time location fallback for an exact project.
+
+    This never mutates canonical listing facts. Only VERIFIED project-level
+    research or a web-verified project profile may supply the fallback.
+    """
+    reference = project_reference_for_key(project_key)
+    if not reference or reference.get("reference_kind") == "project_family":
+        return None
+
+    v5 = reference.get("v5_profile") or {}
+    if str(v5.get("verification_status") or "").strip().upper() == "VERIFIED":
+        display = str(v5.get("中文位置展示") or "").strip()
+        if display:
+            return {"display": display, "source": "project_v5_verified", "confidence": "verified"}
+
+    registry = reference.get("registry") or {}
+    if str(registry.get("verification_status") or "").strip().upper() == "VERIFIED":
+        display = str(
+            registry.get("public_location_display_cn")
+            or registry.get("canonical_geo_display")
+            or ""
+        ).strip()
+        if display:
+            return {"display": display, "source": "project_registry_verified", "confidence": "verified"}
+
+    web = reference.get("web_verified") or {}
+    display = str(web.get("location") or reference.get("location") or "").strip()
+    if display and (
+        web
+        or reference.get("reference_kind") == "web_verified_project"
+    ):
+        return {"display": display, "source": "project_web_verified", "confidence": "verified"}
+    return None
+
+
 def enrich_project_reference(facts: dict[str, Any]) -> dict[str, Any]:
     enriched = deepcopy(facts)
     reference = project_reference_for_key(enriched.get("project_key"))
@@ -579,6 +615,7 @@ __all__ = [
     "enrich_project_reference",
     "knowledge_key_for_taxonomy",
     "project_reference_for_key",
+    "project_reference_location",
     "project_knowledge_stats",
     "answer_project_question",
     "registry_project_identities",
