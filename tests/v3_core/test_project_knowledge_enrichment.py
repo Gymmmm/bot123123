@@ -9,12 +9,13 @@ from v3_core.inventory.project_knowledge import (
 
 def test_project_knowledge_bundle_has_full_research_coverage():
     assert project_knowledge_stats() == {
-        "projects": 107,
+        "projects": 114,
         "registry_profiles": 107,
         "living_profiles": 107,
         "relations": 39,
         "evidence_rows": 53,
         "conflicts": 12,
+        "alias_rows": 476,
     }
 
 
@@ -82,3 +83,19 @@ def test_registry_expands_recognition_without_inheriting_authoritative_location(
 def test_projectless_listing_does_not_receive_project_reference():
     facts = canonicalize_source("BKK1两房出租\n租金$800/月")
     assert "project_reference" not in facts
+
+
+def test_verified_alias_registry_adds_new_projects_without_family_false_positive():
+    ts6 = canonicalize_source("Time Square 6出租\n1房\n租金$700/月")
+    assert ts6["project_key"] == "times_square_6"
+    assert ts6["project_reference"]["knowledge_key"] == "times-square-6"
+
+    royal_condo = canonicalize_source("奥凯德皇家公寓出租\n2房\n租金$900/月")
+    assert royal_condo["project_key"] == "orkide_the_royal_condominium"
+    assert royal_condo["project_reference"]["knowledge_key"] == "orkide-the-royal-condominium"
+
+    royal_villa = canonicalize_source("Orkide The Royal 别墅社区\n4房\n租金$2500/月")
+    assert royal_villa["project_key"] == "orkide_the_royal"
+
+    generic = canonicalize_source("时代广场出租\n1房\n租金$700/月")
+    assert generic["project_key"] is None
