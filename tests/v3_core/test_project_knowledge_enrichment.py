@@ -128,3 +128,18 @@ def test_public_inventory_attaches_project_reference_without_mutating_canonical_
     assert item["normalized_data"]["project_reference"]["knowledge_key"] == "the-peak"
     assert item["normalized_data"]["canonical_facts_hash"] == before_hash
     assert "project_reference" not in canonical
+
+
+def test_production_penthouse_hashtag_resolves_project_not_unit_subtype():
+    facts = canonicalize_source(
+        "418🌳 【公寓出租/出售】 #Penthouse\n"
+        "💰 售价：$100,000\n💰 租金：$350/月\n🏠 户型：单间"
+    )
+    assert facts["project_key"] == "the_penthouse_residence"
+    assert facts["project_name"] == "The Penthouse Residence"
+    assert facts["public_location_display"] == "永旺1附近"
+    assert project_reference_for_key(facts["project_key"]) is not None
+
+    # Bare descriptive penthouse language remains unsafe as a project identity.
+    generic = canonicalize_source("BKK1 penthouse unit for rent $3000/month")
+    assert generic["project_key"] is None
