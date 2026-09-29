@@ -34,7 +34,7 @@ def test_details_dispatch_becomes_keyboarded_telegram_response_with_public_ids_o
             action_rows=(
                 (
                     SemanticAction(
-                        "📅 预约看房",
+                        "📅 在线预约",
                         "book",
                         target_public_listing_id="QL-RF-A2B3",
                     ),
