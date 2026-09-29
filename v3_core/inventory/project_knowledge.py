@@ -430,14 +430,19 @@ def answer_project_question(project_key: object, question: object) -> str | None
     living = reference.get("living") or {}
 
     if any(token in q for token in ("位置", "地址", "哪里", "在哪")):
-        location = (
-            v5.get("中文位置展示")
-            or registry.get("public_location_display_cn")
-            or reference.get("location")
-            or reference.get("address")
-        )
-        if location:
-            return f"{name}：{location}。"
+        locations: list[str] = []
+        for value in (
+            v5.get("中文位置展示"),
+            registry.get("public_location_display_cn"),
+            registry.get("canonical_geo_display"),
+            reference.get("location"),
+            reference.get("address"),
+        ):
+            clean = str(value or "").strip()
+            if clean and clean not in locations:
+                locations.append(clean)
+        if locations:
+            return f"{name}：{'；'.join(locations)}。"
 
     if any(token in q for token in ("开发商", "谁开发", "开发公司")):
         developer = registry.get("developer") or reference.get("developer")
