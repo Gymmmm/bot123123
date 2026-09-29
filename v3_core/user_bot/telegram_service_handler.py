@@ -117,7 +117,7 @@ async def _render_consultation_handoff(
     direct = consultation_handoff_url(advisor_url, envelope)
     rows = []
     if direct:
-        rows.append([InlineKeyboardButton("中文顾问", url=direct)])
+        rows.append([InlineKeyboardButton("💬 联系中文顾问", url=direct)])
     rows.append([InlineKeyboardButton("返回侨联服务", callback_data="v3u:home:service")])
     await query.edit_message_text(
         "<b>中文顾问</b>\n\n直接把问题发给我。",
@@ -257,7 +257,7 @@ def _updated_entry_view() -> ServiceView:
     return ServiceView(
         "historical_updated",
         "<b>这个入口已经更新</b>\n\n请使用下面的最新服务入口。",
-        ((ServiceChoice("⬅️ 返回首页", "v3u:t:home"), ServiceChoice("💬 中文顾问", "v3u:home:contact")),),
+        ((ServiceChoice("🏠 返回首页", "v3u:t:home"), ServiceChoice("💬 联系中文顾问", "v3u:home:contact")),),
     )
 
 

@@ -58,7 +58,7 @@ def build_assurance_home_view() -> AssuranceView:
         text=ASSURANCE_HOME_TEXT,
         rows=(
             (AssuranceChoice("🛡️ 入住留档", callback_data="v3u:assure:handover"),),
-            (AssuranceChoice("💬 中文顾问", callback_data="v3u:home:contact"),),
+            (AssuranceChoice("💬 联系中文顾问", callback_data="v3u:home:contact"),),
             (AssuranceChoice("⬅️ 返回侨联服务", callback_data="v3u:home:service"),),
         ),
     )
@@ -99,7 +99,7 @@ def build_moving_view() -> AssuranceView:
         kind="moving",
         text=MOVING_TEXT,
         rows=(
-            (AssuranceChoice("💬 中文顾问", callback_data="v3u:home:contact"),),
+            (AssuranceChoice("💬 联系中文顾问", callback_data="v3u:home:contact"),),
             (AssuranceChoice("⬅️ 返回租后服务", callback_data="v3u:service:concierge"),),
         ),
     )

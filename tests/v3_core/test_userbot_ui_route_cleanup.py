@@ -28,7 +28,7 @@ def test_public_command_menu_hides_retired_and_admin_entries():
     commands = _commands(public_command_menu())
     assert commands == [
         ("start", "回到首页"),
-        ("find", "开始找房"),
+        ("find", "帮我找房"),
         ("appointments", "我的预约"),
         ("service", "侨联服务"),
     ]
@@ -104,16 +104,16 @@ async def test_property_advisor_buttons_are_only_handoff_and_return():
     await _render_contact(query, text="QL-RF-A2B3", public_listing_id="QL-RF-A2B3", advisor_url="https://t.me/advisor")
     labels = [button.text for row in query.markup.inline_keyboard for button in row]
     callbacks = [button.callback_data for row in query.markup.inline_keyboard for button in row if button.callback_data]
-    assert labels == ["💬 中文顾问", "⬅️ 返回房源"]
+    assert labels == ["💬 联系中文顾问", "⬅️ 返回房源"]
     assert callbacks == ["v3u:listing:details:QL-RF-A2B3"]
     assert all(term not in labels for term in ("预约看房", "更多实拍", "继续找房"))
 
 
 def test_aftercare_and_public_resident_buttons_stay_frozen():
-    assert _labels(build_assurance_home_view()) == ["🛡️ 入住留档", "💬 中文顾问", "⬅️ 返回侨联服务"]
+    assert _labels(build_assurance_home_view()) == ["🛡️ 入住留档", "💬 联系中文顾问", "⬅️ 返回侨联服务"]
     expected = [
         "📋 我的租约", "🤝 租后服务", "🛡️ 侨联安心租",
-        "💬 中文顾问", "⬅️ 返回首页",
+        "💬 联系中文顾问", "🏠 返回首页",
     ]
     assert _labels(service_home_view()) == expected
     class Service:
@@ -145,7 +145,7 @@ def test_public_service_buttons_use_generic_chinese_advisor_name():
 
 def test_legacy_reply_button_texts_have_explicit_frozen_destinations():
     expected = {
-        "开始找房": "search",
+        "帮我找房": "search",
         "帮我找房": "search",
         "精准筛选": "search",
         "预约看房": "search",
@@ -203,7 +203,7 @@ def test_legacy_reply_text_intercept_precedes_all_normal_text_pipelines():
 
 def test_legacy_reply_text_never_exposes_internal_listing_ids():
     labels = (
-        "开始找房", "帮我找房", "精准筛选", "预约看房", "我的收藏",
+        "帮我找房", "帮我找房", "精准筛选", "预约看房", "我的收藏",
         "我的预约", "我的租约", "入住服务", "售后服务", "服务保障",
         "租后服务", "联系顾问", "联系我们", "中文顾问", "使用说明",
         "关于侨联", "首页", "返回首页",

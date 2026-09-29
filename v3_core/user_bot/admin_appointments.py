@@ -279,7 +279,7 @@ async def _notify_user_status(
     if public_id:
         if status == "cancelled":
             rows.append([InlineKeyboardButton("📅 重新预约", callback_data=encode_listing_callback("book", public_id))])
-        rows.append([InlineKeyboardButton("📷 更多详情", callback_data=encode_listing_callback("details", public_id))])
+        rows.append([InlineKeyboardButton("📷 房源详情", callback_data=encode_listing_callback("details", public_id))])
     clean_advisor = str(advisor_url or "").strip()
     if clean_advisor:
         rows.append([
@@ -290,7 +290,7 @@ async def _notify_user_status(
         ])
     else:
         rows.append([InlineKeyboardButton("💬 联系中文顾问", callback_data="v3u:home:contact")])
-    rows.append([InlineKeyboardButton("📅 查看我的预约", callback_data="v3u:home:appointments")])
+    rows.append([InlineKeyboardButton("📅 我的预约", callback_data="v3u:home:appointments")])
     clean_channel = str(channel_url or "").strip()
     if clean_channel:
         rows.append([InlineKeyboardButton("📣 返回房源频道", url=clean_channel)])

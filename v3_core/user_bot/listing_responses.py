@@ -162,7 +162,7 @@ def _photo_actions(
             first.append(SemanticAction("📅 预约看房", "book", target))
         return (
             tuple(first),
-            (SemanticAction("💬 中文顾问", "consult", target),),
+            (SemanticAction("💬 联系中文顾问", "consult", target),),
         )
 
     if status == "pending":
@@ -176,11 +176,11 @@ def _photo_actions(
                     target_index=PHOTOS_FIRST_BATCH,
                 )
             )
-        first_row.append(SemanticAction("💬 中文顾问", "consult", target))
+        first_row.append(SemanticAction("💬 联系中文顾问", "consult", target))
         return (
             tuple(first_row),
             (
-                SemanticAction("🏠 帮我找房", "change_search", target),
+                SemanticAction("🔍 帮我找房", "change_search", target),
                 SemanticAction("🔍 找相似", "similar", target),
             ),
         )
@@ -188,10 +188,10 @@ def _photo_actions(
     # rented / offline / inactive / withdrawn / unknown non-bookable
     return (
         (
-            SemanticAction("🏠 帮我找房", "change_search", target),
+            SemanticAction("🔍 帮我找房", "change_search", target),
             SemanticAction("🔍 找相似", "similar", target),
         ),
-        (SemanticAction("💬 中文顾问", "consult", target),),
+        (SemanticAction("💬 联系中文顾问", "consult", target),),
     )
 
 def _utilities_line(*, water: str, electric: str) -> str:
@@ -659,7 +659,7 @@ def build_photos_response(
         text = (
             f"{_detail_status_line(details)}{chr(10)}{chr(10)}"
             f"这套房的实拍暂时没有加载出来。{chr(10)}"
-            f"可以稍后再试，或直接联系顾问。"
+            f"可以稍后再试，或直接联系中文顾问。"
         )
 
     return PublicPhotosResponse(
