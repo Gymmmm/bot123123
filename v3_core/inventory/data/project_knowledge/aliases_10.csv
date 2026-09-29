@@ -1,0 +1,51 @@
+<PARSED TEXT FOR SHEET: 1 / 1 TABS
+448,炳发 The Star Munirah,炳发thestarmunirah,PROJECT,炳发 The Star Munirah,project:the-star-munirah,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+449,炳发 The Star Natural,炳发thestarnatural,PROJECT,炳发 The Star Natural,project:the-star-natural,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+450,炳发 The Star Platinum,炳发thestarplatinum,PROJECT,炳发 The Star Platinum,project:the-star-platinum,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+451,炳发 The Star Premier,炳发thestarpremier,PROJECT,炳发 The Star Premier,project:the-star-premier,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+452,炳发 The Star Quateria,炳发thestarquateria,PROJECT,炳发 The Star Quateria,project:the-star-quateria,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+453,炳发 Veng Sreng,炳发vengsreng,PROJECT,炳发 Veng Sreng,project:peng-huoth-veng-sreng,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+454,爱丽舍,爱丽舍,PROJECT,爱丽舍宫,project:new:the-elysee,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,OCIC官方确认钻石岛大型法式商业/商住项目。
+455,爱丽舍宫,爱丽舍宫,PROJECT,爱丽舍宫,project:new:the-elysee,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,OCIC官方确认钻石岛大型法式商业/商住项目。
+456,独立碑商圈,独立碑商圈,PROJECT,太子中央广场,project:prince-central-plaza,PROJECT_LANDMARK,85,True,True,DEPRECATE_PROJECT_ALIAS,PARTIAL,纯GEO/地标词不能直接解析到具体PROJECT。
+457,玫瑰园,玫瑰园,PROJECT,玫瑰滨江园,project:rose-garden,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+458,玫瑰滨江,玫瑰滨江,PROJECT,玫瑰滨江园,project:rose-garden,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+459,玫瑰滨江园,玫瑰滨江园,PROJECT,玫瑰滨江园,project:rose-garden,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+460,百色河玫瑰,百色河玫瑰,PROJECT,玫瑰滨江园,project:rose-garden,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+461,皇家一号,皇家一号,FAMILY / MARKET_GEO,皇家一号,family:royal-one,FAMILY_GEO,70,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,裸Royal One默认只指Royal One候选；TK token是TK Royal One必要强证据。
+462,皇家公寓,皇家公寓,PROJECT,奥凯德皇家公寓,project:new:orkide-the-royal-condominium,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,V3仅有Orkide The Royal别墅社区，本轮确认The Royal Condominium为独立真实公寓项目，必须拆开。
+463,精英城,精英城,FAMILY,名仕城,family:new:elite-town,NEW_VERIFIED_ALIAS,95,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,OCIC官方中文明确“钻石岛名仕城1期和2期”，III为商业住宅项目；裸“名仕城”只到项目family。
+464,维拉,维拉,PROJECT,Vila Town,project:vila-town,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,NEEDS_VERIFICATION,
+465,网关,网关,PROJECT,The Gateway,project:the-gateway,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+466,莫尼旺雅居乐,莫尼旺雅居乐,PROJECT,雅居乐天悦（天空公馆）,project:agile-sky-residence,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+467,诺罗敦玫瑰,诺罗敦玫瑰,PROJECT,玫瑰滨江园,project:rose-garden,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+468,财富大厦,财富大厦,PROJECT,威尔斯公馆,project:wealth-mansion,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+469,近富力,近富力,PROJECT,富力城,project:rf-city,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+470,金界香格里拉,金界香格里拉,PROJECT,香格里拉公寓 The Peak,project:the-peak,PROJECT_LANDMARK,85,True,False,DIRECT_RESOLVE,VERIFIED,
+471,金街桥牌,金街桥牌,PROJECT,桥牌公寓（世桥）,project:the-bridge,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+472,金边中心城,金边中心城,PROJECT,富力城,project:rf-city,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+473,金边星河花园,金边星河花园,PROJECT,金边星河花园,project:xinghe-garden,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+474,钻石一号,钻石一号,PROJECT,钻石一号,project:diamond-one,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+475,钻石凯撒,钻石凯撒,PROJECT,钻石凯撒酒店式公寓,project:new:casa-service-apartment,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,与CASA by Meridian不是同一项目，需严格分开。
+476,钻石凯撒公寓,钻石凯撒公寓,PROJECT,钻石凯撒酒店式公寓,project:new:casa-service-apartment,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,与CASA by Meridian不是同一项目，需严格分开。
+477,钻石双塔,钻石双塔,PROJECT,钻石双子塔,project:diamond-twin-tower,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+478,钻石名邸,钻石名邸,PROJECT,钻石名邸,project:diamond-mansion,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,NEEDS_VERIFICATION,
+479,钻石岛,钻石岛,PROJECT,钻石庭（CASA Meridian）,project:casa-meridian,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,PARTIAL,纯地理词不能直接映射某个PROJECT。；纯GEO/地标词不能直接解析到具体PROJECT。
+480,钻石岛,钻石岛,PROJECT,钻石湾花园,project:diamond-bay-garden,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,PARTIAL,纯地理词不能直接映射某个PROJECT。；纯GEO/地标词不能直接解析到具体PROJECT。
+481,钻石岛,钻石岛,PROJECT,钻石名邸,project:diamond-mansion,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,NEEDS_VERIFICATION,纯地理词不能直接映射某个PROJECT。；纯GEO/地标词不能直接解析到具体PROJECT。
+482,钻石岛,钻石岛,PROJECT,钻石一号,project:diamond-one,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,PARTIAL,纯地理词不能直接映射某个PROJECT。；纯GEO/地标词不能直接解析到具体PROJECT。
+483,钻石岛,钻石岛,PROJECT,钻石双子塔,project:diamond-twin-tower,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,PARTIAL,纯地理词不能直接映射某个PROJECT。；纯GEO/地标词不能直接解析到具体PROJECT。
+484,钻石岛,钻石岛,PROJECT,金汇 MESONG,project:mesong,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,PARTIAL,纯地理词不能直接映射某个PROJECT。；纯GEO/地标词不能直接解析到具体PROJECT。
+485,钻石岛名仕城,钻石岛名仕城,FAMILY,名仕城,family:new:elite-town,NEW_VERIFIED_ALIAS,95,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,OCIC官方中文明确“钻石岛名仕城1期和2期”，III为商业住宅项目；裸“名仕城”只到项目family。
+486,钻石岛塞纳河,钻石岛塞纳河,PROJECT,塞纳河,project:new:la-seine,NEW_PARTIAL_ALIAS,70,True,False,DIRECT_RESOLVE,PARTIAL,OCIC官方Koh Pich项目列表确认La Seine真实存在；本轮不扩大其住宅/商业细分。
+487,钻石岛方向,钻石岛方向,PROJECT,滨江雅诗顿,project:vue-aston,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+488,钻石岛桥牌,钻石岛桥牌,PROJECT,桥牌公寓（世桥）,project:the-bridge,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+489,钻石岛爱丽舍,钻石岛爱丽舍,PROJECT,爱丽舍宫,project:new:the-elysee,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,OCIC官方确认钻石岛大型法式商业/商住项目。
+490,钻石岛香格里拉,钻石岛香格里拉,PROJECT,香格里拉公寓 The Peak,project:the-peak,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+491,钻石湾花园,钻石湾花园,PROJECT,钻石湾花园,project:diamond-bay-garden,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+492,铁桥头,铁桥头,PROJECT,炳发 The Star Platinum,project:the-star-platinum,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯地理词不能直接映射某个PROJECT。；纯GEO/地标词不能直接解析到具体PROJECT。
+493,铁桥头方向,铁桥头方向,PROJECT,滨江雅诗顿,project:vue-aston,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+494,铁桥头炳发,铁桥头炳发,FAMILY / MARKET_GEO,炳发,family:peng-huoth,FAMILY_GEO,70,True,True,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,先按道路/地标缩小family，再解析具体项目；开发商名“炳发”不得直接当PROJECT。
+495,铁桥头炳发,铁桥头炳发,PROJECT,炳发 Athina,project:the-star-platinum-athina,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+496,铁桥头炳发,铁桥头炳发,PROJECT,炳发 Capital One,project:the-star-platinum-capital-one,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+497,铁桥头炳发,铁桥头炳发,PROJECT,炳发 Eco Delta,project:the-star-platinum-eco-delta,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
