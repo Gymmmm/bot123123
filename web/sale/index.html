@@ -46,7 +46,7 @@
     <div class="hero-content">
       <div class="hero-copy">
         <h1 id="hero-title">金边投资置业房源</h1>
-        <p class="hero-sub">先看总价 · 单价 · 出租逻辑 · 产权 · 退出风险</p>
+        <p class="hero-sub">先看总价 · 单价 · 同类价格 · 产权 · 退出风险</p>
       </div>
       <div class="hero-stats">
         <span class="stat-num" id="heroCountNum">—</span>
@@ -137,7 +137,7 @@
         <div>
           <span class="guide-eyebrow">INVESTMENT VIEW</span>
           <h2 id="investment-intel-title">先判断值不值得，再决定买哪套</h2>
-          <p>金边现在不是“买了就涨”的市场。真正要看的，是买入价、真实租金、空置、持有成本、产权和以后谁来接盘。</p>
+          <p>金边现在不是“买了就涨”的市场。真正要看的，是买入价、同类在售价格、产权、买入总成本和以后谁来接盘。</p>
         </div>
         <span class="guide-updated">市场资料：2025–2026</span>
       </div>
@@ -188,8 +188,8 @@
         </article>
         <article class="investment-framework-card">
           <span class="guide-index">05 · 项目质量</span>
-          <h3>物业管理直接影响租金和残值</h3>
-          <p>Knight Frank 观察到，维护良好的项目更能保护资本价值，并更有效利用出租市场。看泳池不如看入住率、电梯、公共区和管理。</p>
+          <h3>物业管理直接影响资产质量和残值</h3>
+          <p>Knight Frank 观察到，维护良好的项目更能保护资本价值。看宣传图不如看实际交付、入住情况、电梯、公共区和长期管理。</p>
         </article>
         <article class="investment-framework-card">
           <span class="guide-index">06 · 税务时间点</span>
@@ -346,7 +346,7 @@
           <a href="https://www.tax.gov.kh/en/prakas" target="_blank" rel="noopener">GDT 印花税 / 房产税法规</a>
           <a href="https://www.tax.gov.kh/en/notice" target="_blank" rel="noopener">GDT 2026 税务通知</a>
           <a href="https://content.knightfrank.com/research/3081/documents/en/cambodia-real-estate-highlights-h2-2025-cambodia-real-estate-highlights-h2-2025-12692.pdf" target="_blank" rel="noopener">Knight Frank 2025 H2 市场报告</a>
-          <a href="https://www.realestate.com.kh/phnom-penh/bkk-1/" target="_blank" rel="noopener">BKK1 挂牌租售数据</a>
+          <a href="https://www.realestate.com.kh/phnom-penh/bkk-1/" target="_blank" rel="noopener">BKK1 挂牌数据</a>
           <a href="https://www.pwc.com/kh/en/publications/newsbrief/january-2026.html" target="_blank" rel="noopener">PwC 2026 CGT 更新</a>
         </div>
       </div>
@@ -434,13 +434,21 @@
           </div>
           <span id="saleReferenceCount" class="sale-reference-count"></span>
         </div>
-        <div class="sale-reference-grid">
-          <div><small>挂牌总价区间</small><strong id="saleReferenceRange">—</strong></div>
-          <div><small>挂牌中位价</small><strong id="saleReferenceMedian">—</strong></div>
-          <div><small>本套相对中位</small><strong id="saleReferencePosition">—</strong></div>
+        <div class="sale-reference-scale" aria-label="同类在售价格位置">
+          <div class="sale-reference-track">
+            <span id="saleReferenceMarker" class="sale-reference-marker" aria-hidden="true"></span>
+          </div>
+          <div class="sale-reference-labels">
+            <span id="saleReferenceMin">—</span>
+            <span id="saleReferenceMedian">中位 —</span>
+            <span id="saleReferenceMax">—</span>
+          </div>
+        </div>
+        <div class="sale-reference-summary">
+          <div><small>本套价格位置</small><strong id="saleReferencePosition">—</strong></div>
           <div id="saleReferencePpsmBlock" hidden><small>样本单价区间</small><strong id="saleReferencePpsm">—</strong></div>
         </div>
-        <p class="sale-reference-note">仅聚合侨联当前公开出售库存，属于挂牌参考，不是成交价、银行估值或独立估价。样本少时只用于辅助比较。</p>
+        <p class="sale-reference-note">仅聚合侨联当前公开出售库存。挂牌参考 ≠ 成交价、银行估值或独立估价；样本少时只用于辅助比较。</p>
       </div>
 
       <!-- Acquisition cost calculator -->
@@ -479,6 +487,15 @@
         <p id="calcContext" class="investment-calc-context">4% 是一般转让印花税情景，不代表最终应税额。2026 年优惠是否适用、计税基础和其他费用应按具体交易重新核实。</p>
       </div>
 
+      <!-- Buyer decision summary -->
+      <div id="detailInvestmentRead" class="detail-section detail-investment-read" hidden>
+        <div class="detail-section-head">
+          <h3 class="detail-section-title">这套房先看什么</h3>
+          <span>基于当前出售数据</span>
+        </div>
+        <div id="detailInvestmentReadRows" class="detail-investment-read-rows"></div>
+      </div>
+
       <!-- Amenities / features -->
       <div id="amenitiesBlock" class="detail-section" hidden>
         <h3 class="detail-section-title">房源特点</h3>
@@ -493,19 +510,31 @@
 
       <!-- Buyer due diligence -->
       <div class="detail-section detail-buy-check">
-        <h3 class="detail-section-title">买前确认</h3>
-        <p class="detail-check-intro">以下是签约前需要逐项核实的交易事项，不代表当前房源已经完成法律尽调。</p>
-        <div class="detail-check-grid">
-          <span>产权类型 / Strata 状态</span>
-          <span>卖方身份与处分权</span>
-          <span>外籍配额与楼层</span>
-          <span>抵押 / 租约 / 权利负担</span>
-          <span>物业与水电欠费</span>
-          <span>税费与过户责任</span>
+        <div class="detail-check-head">
+          <div>
+            <h3 class="detail-section-title">买前核验</h3>
+            <p>签约前确认，不代表当前房源已完成法律尽调。</p>
+          </div>
+          <button id="buyCheckToggle" type="button" aria-expanded="false">查看全部</button>
         </div>
-        <div class="detail-guide-note">
-          <strong>外国买家</strong>
-          <p>公寓重点确认共管登记、非地面层和外籍配额；别墅 / 排屋涉及土地，产权结构需要单独核验。</p>
+        <div class="detail-check-summary">
+          <div><span>产权</span><strong>待核验</strong></div>
+          <div><span>外国买家</span><strong>按物业类型核验</strong></div>
+          <div><span>税费</span><strong>按实际交易核算</strong></div>
+        </div>
+        <div id="buyCheckExpanded" class="detail-check-expanded" hidden>
+          <div class="detail-check-grid">
+            <span>产权类型 / Strata 状态</span>
+            <span>卖方身份与处分权</span>
+            <span>外籍配额与楼层</span>
+            <span>抵押 / 租约 / 权利负担</span>
+            <span>物业与水电欠费</span>
+            <span>税费与过户责任</span>
+          </div>
+          <div class="detail-guide-note">
+            <strong>外国买家</strong>
+            <p>公寓重点确认共管登记、非地面层和外籍配额；别墅 / 排屋涉及土地，产权结构需要单独核验。</p>
+          </div>
         </div>
       </div>
 

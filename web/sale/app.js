@@ -200,21 +200,36 @@ function deriveSaleReferenceFromItems(i) {
 
 function renderSaleReference(i) {
   const block = $('saleReferenceBlock');
-  if (!block) return;
+  if (!block) return null;
   const ref = i?.sale_market_reference || deriveSaleReferenceFromItems(i);
   if (!ref || Number(ref.count) < 2) {
     block.hidden = true;
-    return;
+    return null;
   }
   block.hidden = false;
   $('saleReferenceScope').textContent = `${text(ref.label)} · 当前公开出售库存`;
   $('saleReferenceCount').textContent = `${fmtNum(Number(ref.count))} 套样本`;
-  $('saleReferenceRange').textContent =
-    `${fmt(ref.min_sale_price_usd)} – ${fmt(ref.max_sale_price_usd)}`;
-  $('saleReferenceMedian').textContent = fmt(ref.median_sale_price_usd) || '—';
+
+  const minPrice = Number(ref.min_sale_price_usd);
+  const medianPrice = Number(ref.median_sale_price_usd);
+  const maxPrice = Number(ref.max_sale_price_usd);
+  const currentPrice = Number(i?.sale_price_usd);
+  $('saleReferenceMin').textContent = fmt(minPrice) || '—';
+  $('saleReferenceMedian').textContent = medianPrice > 0 ? `中位 ${fmt(medianPrice)}` : '中位 —';
+  $('saleReferenceMax').textContent = fmt(maxPrice) || '—';
+
+  const marker = $('saleReferenceMarker');
+  if (marker && currentPrice > 0 && maxPrice > minPrice) {
+    const position = Math.max(0, Math.min(100, (currentPrice - minPrice) / (maxPrice - minPrice) * 100));
+    marker.style.left = `${position}%`;
+    marker.hidden = false;
+  } else if (marker) {
+    marker.hidden = true;
+  }
+
   const delta = Number(ref.current_vs_median_pct);
   $('saleReferencePosition').textContent = Number.isFinite(delta)
-    ? (Math.abs(delta) < 0.05 ? '接近中位价' : delta > 0 ? `高 ${percent(Math.abs(delta))}` : `低 ${percent(Math.abs(delta))}`)
+    ? (Math.abs(delta) < 0.05 ? '接近挂牌中位' : delta > 0 ? `高于中位 ${percent(Math.abs(delta))}` : `低于中位 ${percent(Math.abs(delta))}`)
     : '—';
 
   const ppsmBlock = $('saleReferencePpsmBlock');
@@ -226,6 +241,48 @@ function renderSaleReference(i) {
   } else if (ppsmBlock) {
     ppsmBlock.hidden = true;
   }
+  return ref;
+}
+
+function renderInvestmentRead(i, ref) {
+  const block = $('detailInvestmentRead');
+  const root = $('detailInvestmentReadRows');
+  if (!block || !root) return;
+  const facts = listingFacts(i);
+  const rows = [];
+  const delta = Number(ref?.current_vs_median_pct);
+  if (ref && Number(ref.count) >= 2) {
+    rows.push({
+      label:'价格位置',
+      value:Number.isFinite(delta)
+        ? (Math.abs(delta) < 0.05 ? '接近当前同类挂牌中位' : delta > 0 ? `高于中位 ${percent(Math.abs(delta))}` : `低于中位 ${percent(Math.abs(delta))}`)
+        : `${fmtNum(Number(ref.count))} 套同类在售可比较`,
+      tone:Number.isFinite(delta) && delta > 10 ? 'watch' : 'neutral'
+    });
+    rows.push({
+      label:'可比样本',
+      value:`${fmtNum(Number(ref.count))} 套 · ${text(ref.label)}`,
+      tone:'neutral'
+    });
+  } else {
+    rows.push({ label:'价格对比', value:'当前库存暂无足够同类样本', tone:'watch' });
+  }
+  if (isApartment(facts) && facts.size && num(i?.sale_price_usd)) {
+    rows.push({
+      label:'挂牌单价',
+      value:`${fmt(Math.round(Number(i.sale_price_usd) / facts.size))}/㎡`,
+      tone:'neutral'
+    });
+  }
+  rows.push({
+    label:'签约前',
+    value:'产权、卖方处分权、税费与过户责任需逐项核验',
+    tone:'neutral'
+  });
+  root.innerHTML = rows.map(row =>
+    `<div class="detail-investment-read-row ${esc(row.tone)}"><span>${esc(row.label)}</span><strong>${esc(row.value)}</strong></div>`
+  ).join('');
+  block.hidden = false;
 }
 function calculateAcquisition() {
   if (!currentListing) return;
@@ -249,6 +306,12 @@ function calculateAcquisition() {
   $('calcStampDuty').textContent = money(stamp);
   $('calcTotalAcquisition').textContent = money(total);
   $('calcAllInPpsm').textContent = facts.size && facts.size > 0 ? `${money(total / facts.size)}/㎡` : '—';
+  const overhead = deal > 0 ? (total - deal) / deal * 100 : NaN;
+  if ($('calcContext')) {
+    $('calcContext').textContent = Number.isFinite(overhead)
+      ? `按当前输入，买入端附加成本约为预计成交价的 ${percent(overhead)}。4% 仅作一般印花税情景；2026 优惠、计税基础和其他费用应按具体交易核实。`
+      : '4% 仅作一般印花税情景；2026 优惠、计税基础和其他费用应按具体交易核实。';
+  }
 }
 function resetInvestmentCalculator() {
   const price = Number(currentListing?.sale_price_usd);
@@ -357,7 +420,10 @@ function cardMarkup(i) {
   const price = fmt(i.sale_price_usd);
   const title = text(i.title) || '金边出售房源';
   const facts = listingFacts(i);
-  const displayTitle = facts.project || title;
+  const displayTitle = facts.project ||
+    [facts.location, facts.subtype || facts.type].filter(Boolean)
+      .filter((v, idx, arr) => arr.indexOf(v) === idx).join(' · ') ||
+    title;
   const status = statusInfo(i.status);
   const photoCount = Array.isArray(i.gallery_urls) ? i.gallery_urls.filter(has).length : 0;
   const imgUrl = text(i.cover_url);
@@ -421,9 +487,18 @@ async function openDetail(id, push = true) {
     const amenities = listValue(first(i,['amenities','features','facilities']));
 
     $('detail-price').textContent = price || '价格咨询';
-    $('detail-title').textContent = text(i.title) || '金边出售房源';
-    $('detail-meta').textContent = [facts.location, layout, facts.subtype || facts.type]
-      .filter(Boolean).filter((v, idx, arr) => arr.indexOf(v) === idx).join(' · ');
+    const detailTitle = facts.project
+      ? [facts.project, facts.subtype || facts.type].filter(Boolean)
+          .filter((v, idx, arr) => arr.indexOf(v) === idx).join(' · ')
+      : (text(i.title) || [facts.location, facts.subtype || facts.type].filter(Boolean).join(' · ') || '金边出售房源');
+    $('detail-title').textContent = detailTitle;
+    const detailMetaParts = [
+      layout,
+      facts.size ? `${fmtNum(facts.size)}㎡` : '',
+      facts.floor ? `${facts.floor}楼` : ''
+    ].filter(Boolean).filter(v => !detailTitle.includes(v));
+    $('detail-meta').textContent = detailMetaParts.join(' · ');
+    $('detail-meta').hidden = detailMetaParts.length === 0;
 
     const statusEl = $('detail-status');
     if (status.label) {
@@ -449,11 +524,11 @@ async function openDetail(id, push = true) {
       ['面积', facts.size ? `${fmtNum(facts.size)} ㎡` : ''],
       ['楼层', facts.floor ? `${facts.floor} 楼` : ''],
       ['实拍', Array.isArray(i.gallery_urls) && i.gallery_urls.filter(has).length ? `${i.gallery_urls.filter(has).length} 张` : ''],
-      ['状态', status.label],
       ['最近更新', fmtUpdated(i.updated_at)],
     ].filter(([,v])=>has(v));
-    $('detail-fields').innerHTML = fields.map(([l,v]) =>
-      `<div class="param"><small>${esc(l)}</small><strong>${esc(v)}</strong></div>`
+    const oddFieldCount = fields.length % 2 === 1;
+    $('detail-fields').innerHTML = fields.map(([l,v], idx) =>
+      `<div class="param${oddFieldCount && idx === fields.length - 1 ? ' param-wide' : ''}"><small>${esc(l)}</small><strong>${esc(v)}</strong></div>`
     ).join('');
 
     if (has(desc)) {
@@ -470,8 +545,14 @@ async function openDetail(id, push = true) {
     }
 
     paintGallery();
-    renderSaleReference(i);
+    const saleReference = renderSaleReference(i);
+    renderInvestmentRead(i, saleReference);
     resetInvestmentCalculator();
+    if ($('buyCheckExpanded')) $('buyCheckExpanded').hidden = true;
+    if ($('buyCheckToggle')) {
+      $('buyCheckToggle').textContent = '查看全部';
+      $('buyCheckToggle').setAttribute('aria-expanded','false');
+    }
 
     const unavailable = ['已售','已下架'].includes(status.label);
     const primary = $('detail-telegram');
@@ -761,6 +842,15 @@ $('activeChips')?.addEventListener('click', e => {
   $(id)?.addEventListener('input', calculateAcquisition);
 });
 $('investmentCalcReset')?.addEventListener('click', resetInvestmentCalculator);
+$('buyCheckToggle')?.addEventListener('click', () => {
+  const panel = $('buyCheckExpanded');
+  const button = $('buyCheckToggle');
+  if (!panel || !button) return;
+  const nextOpen = panel.hidden;
+  panel.hidden = !nextOpen;
+  button.textContent = nextOpen ? '收起' : '查看全部';
+  button.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
+});
 
 $('grid')?.addEventListener('click', e => {
   const emptyAction = e.target.closest('[data-empty-action]');
