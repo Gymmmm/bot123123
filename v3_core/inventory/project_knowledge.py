@@ -540,6 +540,12 @@ def project_reference_summary(project_key: object) -> str | None:
         parts.append(f"项目类型：{project_type}")
     if location:
         parts.append(f"位置：{location['display']}")
+    address = str(reference.get("address") or "").strip()
+    if address and (not location or address not in location["display"]):
+        parts.append(f"核实地址：{address}")
+    completion_year = str(reference.get("completion_year") or living.get("building_year") or "").strip()
+    if completion_year:
+        parts.append(f"交付/完工资料：{completion_year}")
     if building:
         parts.append(f"项目规模：{building}")
     if amenities:
