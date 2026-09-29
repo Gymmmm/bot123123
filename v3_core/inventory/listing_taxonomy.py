@@ -408,7 +408,11 @@ def _extract_markets(text: str) -> tuple[list[str], list[str], list[dict[str, An
     # Multiple landmarks explicitly labelled as 周边/生活配套 are useful
     # nearby evidence, not competing claims about the listing's own location.
     # Only non-nearby-context matches participate in ambiguity blocking.
-    primary = [match for match in unique if not _inside_nearby_context(text, match[2])]
+    primary = [
+        match for match in unique
+        if match[0].relation != "nearby"
+        and not _inside_nearby_context(text, match[2])
+    ]
     if primary:
         best_priority = relation_priority.get(primary[0][0].relation, 9)
         if sum(relation_priority.get(item.relation, 9) == best_priority for item, _alias, _position in primary) > 1:
@@ -790,12 +794,34 @@ def _apply_verified_project_defaults(
         loc_key = clean_text(project.default_location_key)
         loc_display = clean_text(project.default_location_display)
         self_label = _market_is_project_self_label(market_keys, project)
-        if loc_key and loc_display and (not market_keys or self_label):
-            market_keys = [loc_key]
-            market_displays = [loc_display]
-            market_evidence = [
-                _evidence(loc_key, "project_default_location", "high", project_name or project.key)
-            ]
+        market_items = [market_location_by_key(key) for key in market_keys]
+        only_nearby = bool(market_items) and all(
+            item is not None and item.relation == "nearby" for item in market_items
+        )
+        if loc_key and loc_display and (not market_keys or self_label or only_nearby):
+            if only_nearby:
+                # Nearby landmarks describe access, not the property's own
+                # location. Keep them as secondary evidence, but lead with the
+                # verified project location.
+                kept = [
+                    (key, display, evidence)
+                    for key, display, evidence in zip(
+                        market_keys, market_displays, market_evidence
+                    )
+                    if key != loc_key
+                ]
+                market_keys = [loc_key, *(key for key, _display, _evidence_item in kept)]
+                market_displays = [loc_display, *(display for _key, display, _evidence_item in kept)]
+                market_evidence = [
+                    _evidence(loc_key, "project_default_location", "high", project_name or project.key),
+                    *(evidence for _key, _display, evidence in kept),
+                ]
+            else:
+                market_keys = [loc_key]
+                market_displays = [loc_display]
+                market_evidence = [
+                    _evidence(loc_key, "project_default_location", "high", project_name or project.key)
+                ]
 
     # Property type: source text wins; mixed never backfills.
     mode = _effective_property_type_mode(project)
