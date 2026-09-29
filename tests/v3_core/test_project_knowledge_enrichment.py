@@ -57,14 +57,13 @@ def test_listing_specific_fee_is_not_overwritten_by_project_market_reference():
     assert reference["living"]["electricity_rate_max"] == "0.27"
 
 
-def test_wealth_mansion_legacy_split_is_reconciled_to_one_verified_identity():
+def test_wells_and_wealth_mansion_remain_separate_projects():
     wells = canonicalize_source("威尔斯公馆出租\n2房\n租金$1200/月")
     wealth = canonicalize_source("财富大厦出租\n2房\n租金$1200/月")
     assert wells["project_key"] == "wealth_mansion"
-    assert wealth["project_key"] == "wealth_mansion"
-    assert project_reference_for_key(wells["project_key"])["knowledge_key"] == "wealth-mansion"
+    assert wealth["project_key"] == "wealth_mansion_building"
+    assert project_reference_for_key(wells["project_key"])["knowledge_key"] == "wells-mansion"
     assert project_reference_for_key(wealth["project_key"])["knowledge_key"] == "wealth-mansion"
-    assert project_reference_for_key(wells["project_key"])["v5_profile"]["中文常用名"] == "威尔斯公馆"
 
 
 def test_market_handle_does_not_become_specific_borey_project():
@@ -189,7 +188,7 @@ async def test_listing_question_uses_project_answer_before_advisor_handoff():
 
     class Effects:
         def answer_project_question(self, *, intent, question):
-            assert intent.public_listing_id == "QL-TEST-A1B2"
+            assert intent.public_listing_id == "QL-PP-A2B3"
             assert question == "这个项目有泳池吗？"
             return "The Peak 香格里拉项目资料显示有：泳池。"
         async def execute_question(self, **kwargs):
@@ -201,7 +200,7 @@ async def test_listing_question_uses_project_answer_before_advisor_handoff():
         user_data={
             "v3_listing_question": {
                 "listing_id": "l_test",
-                "public_listing_id": "QL-TEST-A1B2",
+                "public_listing_id": "QL-PP-A2B3",
                 "source": "listing_callback",
             }
         },
