@@ -342,7 +342,7 @@ def test_orkide_royal_condominium_official_profile_is_detailed():
     assert "Studio" in reference["unit_types"]
     assert "泳池" in reference["amenities"]
     assert "桑拿" in reference["amenities"]
-    assert "Street 2004" in project_reference_location("orkide_the_royal_condominium")["display"]
+    assert "2004路" in project_reference_location("orkide_the_royal_condominium")["display"]
 
     answer = answer_project_question("orkide_the_royal_condominium", "这个项目有哪些户型？")
     assert "Studio" in answer
