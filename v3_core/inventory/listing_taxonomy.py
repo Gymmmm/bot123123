@@ -430,13 +430,34 @@ def _project_identity_text(text: str) -> str:
 
 def _extract_project(text: str) -> tuple[str | None, str | None, str | None, str | None, str | None, list[dict[str, Any]], list[str]]:
     project_text = _project_identity_text(text)
+    # Real agent copy often inserts decorative symbols inside a Chinese project
+    # name (for example "首都💕国金"). Strip only symbol runs between CJK
+    # characters; Latin token boundaries and ordinary prose stay untouched.
+    project_match_text = re.sub(
+        r"(?<=[\\u4e00-\\u9fff])[^A-Za-z0-9\\u4e00-\\u9fff\\s]+(?=[\\u4e00-\\u9fff])",
+        "",
+        project_text,
+    )
     matches: list[tuple[ProjectIdentity, str, int]] = []
     for item in PROJECT_IDENTITIES:
         hit = _find_alias(project_match_text, item.aliases)
         if hit:
             alias, position = hit
             matches.append((item, alias, position))
-    matches.sort(key=lambda item: (item[2], -len(item[1])))
+
+    # Prefer the longest alias when project aliases overlap in one phrase.
+    # "紫晶壹号" must resolve to La Vista One instead of conflicting with
+    # ONE PARK's generic alias "壹号".
+    non_overlapping: list[tuple[ProjectIdentity, str, int]] = []
+    for match in sorted(matches, key=lambda item: (-len(item[1]), item[2])):
+        start, end = match[2], match[2] + len(match[1])
+        if any(
+            start < kept_pos + len(kept_alias) and kept_pos < end
+            for _kept, kept_alias, kept_pos in non_overlapping
+        ):
+            continue
+        non_overlapping.append(match)
+    matches = sorted(non_overlapping, key=lambda item: (item[2], -len(item[1])))
     project_matches = [item for item in matches if item[0].kind == "project"]
     brand_matches = [item for item in matches if item[0].kind == "brand"]
     evidence = [_evidence(item.key, f"raw_{item.kind}_alias", "high", alias) for item, alias, _position in matches]
