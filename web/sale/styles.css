@@ -2014,3 +2014,271 @@ img { display:block; max-width:100% }
   .detail-sheet,
   .card { background:var(--surface) }
 }
+
+
+/* SALE P1.9 — editorial luxury hierarchy */
+:root {
+  --display-font: "Songti SC","STSong","Noto Serif SC","Source Han Serif SC",Georgia,serif;
+}
+
+.header-inner { height:58px }
+.brand-group { gap:11px }
+.brand-mark {
+  width:32px;
+  height:32px;
+  border-radius:9px;
+  font-family:var(--display-font);
+  font-size:15px;
+}
+.brand-text strong {
+  font-size:15px;
+  letter-spacing:.04em;
+}
+.brand-text small {
+  margin-top:2px;
+  font-size:10px;
+  letter-spacing:.12em;
+}
+
+.hero { height:340px }
+.hero-bg img {
+  object-position:center 44%;
+  transform:scale(1.008);
+}
+.hero-content {
+  padding-bottom:38px;
+}
+.hero-copy { max-width:680px }
+.hero-kicker {
+  display:block;
+  margin-bottom:10px;
+  color:rgba(230,203,158,.92);
+  font-size:9px;
+  font-weight:600;
+  letter-spacing:.20em;
+}
+.hero-copy h1 {
+  font-family:var(--display-font);
+  font-size:clamp(31px,4.5vw,50px);
+  font-weight:600;
+  line-height:1.16;
+  letter-spacing:-.035em;
+  text-wrap:balance;
+}
+.hero-sub {
+  margin-top:10px;
+  font-size:13px;
+  color:rgba(255,253,248,.78);
+  letter-spacing:.055em;
+}
+.hero-stats { margin-top:20px }
+.stat-num {
+  font-family:var(--display-font);
+  color:#f0d3a3;
+}
+.stat-label,
+.stat-update { color:rgba(255,253,248,.72) }
+
+.filter-bar {
+  box-shadow:0 7px 24px rgba(35,44,40,.035);
+}
+.filter-bar-inner { padding-top:13px; padding-bottom:13px }
+.search-box,
+.filter-select-wrap select,
+.sort-wrap select {
+  transition:border-color .18s, background .18s, box-shadow .18s;
+}
+.search-box:focus-within,
+.filter-select-wrap select:focus,
+.sort-wrap select:focus {
+  background:var(--surface);
+  box-shadow:0 0 0 3px var(--accent-bg);
+}
+
+.catalog { padding-top:38px }
+.catalog-header { margin-bottom:22px }
+.catalog-title-group h2,
+.investment-intel-head h2,
+.buyer-guide-head h2 {
+  font-family:var(--display-font);
+  font-weight:600;
+}
+.catalog-title-group h2 {
+  font-size:25px;
+  color:var(--accent);
+}
+
+.listing-grid { gap:24px }
+.card {
+  border-radius:12px;
+  overflow:hidden;
+}
+.card-image { aspect-ratio:1.5 }
+.card-image img { transition:transform .55s cubic-bezier(.2,.65,.25,1) }
+.card:hover .card-image img { transform:scale(1.025) }
+.card-overlay {
+  background:linear-gradient(to bottom, rgba(10,28,24,0) 34%, rgba(10,28,24,.72) 100%);
+}
+.card-body { padding:16px 16px 14px }
+.card-title {
+  margin-bottom:6px;
+  font-size:16px;
+  font-weight:600;
+  letter-spacing:-.018em;
+}
+.card-type { font-size:11px }
+.card-specs {
+  margin-top:6px;
+  font-size:11px;
+}
+.card-price-overlay { bottom:14px; left:14px; right:14px }
+.card-price-block {
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+.card-price-block small {
+  color:rgba(255,253,248,.68);
+  font-size:9px;
+  line-height:1;
+  letter-spacing:.12em;
+}
+.card-price-text {
+  font-family:var(--display-font);
+  font-size:29px;
+  font-weight:600;
+  letter-spacing:-.035em;
+}
+.card-photo-count {
+  top:10px;
+  right:10px;
+  bottom:auto;
+  background:rgba(15,38,33,.64);
+}
+.card-actions {
+  margin-top:12px;
+  background:rgba(246,241,232,.38);
+}
+.card-actions button,
+.card-actions a {
+  height:44px;
+  font-size:12px;
+  letter-spacing:.02em;
+}
+.card-actions .detail-btn {
+  background:var(--accent);
+}
+.card-actions a {
+  background:var(--surface);
+}
+
+.investment-intel,
+.buyer-guide { padding:84px 0 }
+.investment-intel-head,
+.buyer-guide-head { margin-bottom:34px }
+.investment-intel-head h2,
+.buyer-guide-head h2 {
+  color:var(--accent);
+}
+.market-stat,
+.investment-framework-card,
+.guide-card {
+  box-shadow:0 3px 16px rgba(41,48,44,.035);
+}
+.market-stat {
+  padding:24px 22px;
+}
+.market-stat strong {
+  font-family:var(--display-font);
+  font-size:32px;
+}
+.market-stat span { margin-top:10px }
+
+.area-investment-grid article {
+  position:relative;
+  overflow:hidden;
+  background:var(--surface);
+  color:var(--text);
+  border:1px solid var(--line);
+  box-shadow:0 3px 16px rgba(41,48,44,.035);
+}
+.area-investment-grid article::before {
+  content:"";
+  position:absolute;
+  top:0;
+  left:0;
+  width:100%;
+  height:2px;
+  background:linear-gradient(90deg,var(--gold),rgba(181,138,75,.12));
+}
+.area-investment-grid strong { color:var(--accent) }
+.area-investment-grid span { color:var(--gold-h) }
+.area-investment-grid p { color:var(--text-2) }
+
+.buy-process {
+  background:linear-gradient(135deg,#173b33 0%,#102d27 100%);
+  box-shadow:0 18px 42px rgba(24,58,51,.13);
+}
+.buy-process-list > li > span {
+  border-color:rgba(213,177,118,.42);
+  color:#e0bd82;
+}
+.guide-sources {
+  border-color:var(--line);
+  background:#f3eee6;
+}
+
+.detail-sheet { background:var(--surface) }
+.detail-price {
+  font-family:var(--display-font);
+  color:var(--accent);
+}
+.detail-telegram-btn {
+  box-shadow:0 5px 14px rgba(24,58,51,.13);
+}
+
+@media (min-width:900px) {
+  .filter-bar {
+    position:sticky;
+    top:58px;
+    z-index:90;
+  }
+}
+
+@media (max-width:699px) {
+  .header-inner { height:54px }
+  .hero { height:286px }
+  .hero-content { padding-bottom:28px }
+  .hero-kicker {
+    margin-bottom:8px;
+    font-size:8px;
+    letter-spacing:.15em;
+  }
+  .hero-copy h1 {
+    max-width:320px;
+    font-size:31px;
+    line-height:1.17;
+  }
+  .hero-sub {
+    max-width:330px;
+    font-size:11px;
+    line-height:1.6;
+    letter-spacing:.025em;
+  }
+  .hero-stats { margin-top:15px }
+  .catalog { padding-top:28px }
+  .catalog-title-group h2 { font-size:21px }
+  .listing-grid { gap:18px }
+  .card-image { aspect-ratio:1.46 }
+  .card-price-text { font-size:27px }
+  .investment-intel,
+  .buyer-guide { padding:54px 0 }
+  .investment-intel-head,
+  .buyer-guide-head { margin-bottom:24px }
+}
+
+@media (max-width:380px) {
+  .hero-copy h1 { font-size:28px }
+  .hero-sub { font-size:10.5px }
+  .brand-text small { letter-spacing:.06em }
+}
