@@ -1,0 +1,10 @@
+index,project_entity_id,target_entity_id,target_name_cn,relation_type,distance_m,distance_km,walk_minutes,drive_minutes,source,confidence,notes
+30,project:urban-village-2,landmark:aeon-3,永旺3,MARKET_POSITIONING,,,,,,MEDIUM,市场位置表达；不反写canonical GEO。
+31,project:times-square-3,landmark:tk-avenue,TK Avenue,MARKET_POSITIONING,,,,,,MEDIUM,市场位置表达；不反写canonical GEO。
+32,project:times-square-7,landmark:tk-avenue,TK Avenue,MARKET_POSITIONING,,,,,,MEDIUM,市场位置表达；不反写canonical GEO。
+33,project:times-square-11,landmark:russian-market,俄罗斯市场,MARKET_POSITIONING,,,,,,MEDIUM,市场位置表达；不反写canonical GEO。
+34,project:diamond-bay-garden,landmark:aeon-1,永旺1,MARKET_POSITIONING,,,,,,MEDIUM,市场位置表达；不反写canonical GEO。
+35,project:la-vista-one,landmark:sunrise-japan-hospital,Sunrise Japan Hospital,MARKET_POSITIONING,,,,,,MEDIUM,市场位置表达；不反写canonical GEO。
+36,project:the-star-diamond,landmark:aeon-3,永旺3,MARKET_POSITIONING,,,,,,MEDIUM,市场位置表达；不反写canonical GEO。
+37,project:the-star-diamond-ii,landmark:aeon-3,永旺3,MARKET_POSITIONING,,,,,,MEDIUM,市场位置表达；不反写canonical GEO。
+38,project:the-star-platinum-rosato,landmark:koh-norea-bridge,诺利亚桥,MARKET_POSITIONING,,,,,,MEDIUM,市场位置表达；不反写canonical GEO。
