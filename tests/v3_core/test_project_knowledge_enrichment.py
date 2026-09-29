@@ -229,3 +229,34 @@ def test_peng_huoth_family_reference_has_safe_official_context():
     location = answer_project_question("peng_huoth_city", "这个项目在哪里？")
     assert "不是单一地址" in location
     assert "先按道路/地标缩小炳发 family" in location
+
+
+@pytest.mark.parametrize(
+    ("project_key", "expected_developer"),
+    [
+        ("le_conde_bkk1", "Wangfu International"),
+        ("la_vista_one", "YIN YI VENTURE CO., LTD / 柬埔寨银翼创投有限公司"),
+        ("picasso_city_garden", "Picasso City Garden Development Plc."),
+        ("peninsula_private_residence", "CC Peninsula Co., Ltd.（National 6A Investment + SUN & MOON Group + Saturn Investment 合资）"),
+    ],
+)
+def test_web_verified_profiles_fill_reference_gaps(project_key, expected_developer):
+    reference = project_reference_for_key(project_key)
+    assert reference["developer"] == expected_developer
+    assert reference["source_urls"]
+
+
+def test_diamond_one_reference_has_safe_project_level_facilities():
+    reference = project_reference_for_key("diamond_one")
+    assert reference["location"] == "钻石岛 / Koh Pich"
+    assert reference["completion_year"] == "2019"
+    assert "泳池" in reference["amenities"]
+    assert "健身房" in reference["amenities"]
+
+
+def test_project_question_can_use_web_verified_developer_and_location():
+    developer = answer_project_question("le_conde_bkk1", "开发商是谁？")
+    assert "Wangfu International" in developer
+    location = answer_project_question("picasso_city_garden", "项目在哪里？")
+    assert "BKK1" in location
+    assert "Street 322" in location
