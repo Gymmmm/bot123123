@@ -222,7 +222,29 @@ def _peng_huoth_family_reference() -> dict[str, Any]:
         "reference_kind": "project_family",
         "reference_only": True,
         "requires_specific_project": True,
-        "resolution_hint": "先按道路/地标缩小炳发 family，再解析具体项目；裸炳发/炳发城不能继承某个子项目收费或配套。",
+        "display_name": "炳发 / Borey Peng Huoth",
+        "developer": "Borey Peng Huoth / Peng Huoth Group",
+        "developer_founded_year": "2005",
+        "project_type": "大型住宅社区项目 family",
+        "known_corridors": [
+            "1号路 / National Road 1",
+            "598路 / Chea Sophara",
+            "60米大道 / Samdech Techo Hun Sen Blvd",
+            "50米路 / Ring Road 2",
+            "6A路 / National Road 6A",
+            "217路 / Monireth Blvd",
+            "371路",
+            "1928路 / Oknha Mong Reth Thy",
+            "Chamkar Dong",
+            "Veng Sreng",
+        ],
+        "property_types": ["排屋 / Link House", "商铺屋 / Shop House", "独栋别墅 / Single Villa", "双拼 / Twin Villa", "公寓 / Condominium（部分子项目）"],
+        "resolution_hint": "炳发是多项目 family，必须先按道路/地标/具体子项目名继续解析；裸炳发/炳发城不能继承某个子项目的收费、泳池或其他配套。",
+        "source_urls": [
+            "https://boreypenghuoth.com/borey/en/about-us/who-we-are/",
+            "https://boreypenghuoth.com/borey/en/project-listing/",
+            "https://boreypenghuoth.com/borey/en/our-properties/",
+        ],
         "aliases": family_rows,
         "child_project_keys": child_projects,
         "inheritance_policy": {
@@ -328,7 +350,15 @@ def answer_project_question(project_key: object, question: object) -> str | None
     if not reference or not q:
         return None
     if reference.get("reference_kind") == "project_family":
-        if any(token in q for token in ("项目", "位置", "哪里", "配套", "泳池", "健身", "水费", "电费", "物业", "管理费", "停车", "开发商")):
+        if any(token in q for token in ("开发商", "谁开发", "开发公司")) and reference.get("developer"):
+            return f"{reference['display_name']}开发商：{reference['developer']}。"
+        if any(token in q for token in ("位置", "地址", "哪里", "在哪")):
+            corridors = "、".join(reference.get("known_corridors") or [])
+            return f"{reference['display_name']}不是单一地址，已知项目分布包括：{corridors}。{reference['resolution_hint']}"
+        if any(token in q for token in ("户型", "房型", "类型", "排屋", "别墅", "公寓")):
+            types = "、".join(reference.get("property_types") or [])
+            return f"{reference['display_name']} family 包含：{types}。具体以子项目为准。"
+        if any(token in q for token in ("项目", "配套", "泳池", "健身", "水费", "电费", "物业", "管理费", "停车")):
             return str(reference.get("resolution_hint") or "").strip() or None
         return None
 
