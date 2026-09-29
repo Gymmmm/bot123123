@@ -305,7 +305,7 @@ def test_album_starts_on_package_cover_path(tmp_path):
     assert response.has_media
     # Native album keeps both real frames when available.
     assert len(response.media_groups[0]) == 2
-    expanded = build_photos_response(view, offset=6)
+    expanded = build_photos_response(view, offset=4)
     assert expanded.expand_only
     assert expanded.has_media
     assert str(Path(cover).resolve()) in {
@@ -347,7 +347,7 @@ def test_album_recovers_rendered_cover_when_package_path_stale(tmp_path):
     # First screen is a native album; recovered cover stays in the source set.
     assert response.photo_total == 2
     assert response.has_media
-    expanded = build_photos_response(view, offset=6)
+    expanded = build_photos_response(view, offset=4)
     assert expanded.expand_only
     assert expanded.has_media
     assert str(rendered.resolve()) in {
