@@ -1,4 +1,4 @@
-<PARSED TEXT FOR SHEET: 1 / 1 TABS
+index,raw_alias,normalized_alias,entity_level,target_display_name,canonical_identity,alias_kind,weight,search_only,conflict_flag,resolution_action,verification_status,notes
 198,The Elysée,theelysée,PROJECT,爱丽舍宫,project:new:the-elysee,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,OCIC官方确认钻石岛大型法式商业/商住项目。
 199,The Gateway,thegateway,PROJECT,The Gateway,project:the-gateway,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
 200,The Mesa?,themesa?,PROJECT,金汇 MESONG,project:mesong,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,PARTIAL,The Mesa? 为不确定旧alias，禁止自动匹配。
