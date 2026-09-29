@@ -1,4 +1,4 @@
-<PARSED TEXT FOR SHEET: 1 / 1 TABS
+index,raw_alias,normalized_alias,entity_level,target_display_name,canonical_identity,alias_kind,weight,search_only,conflict_flag,resolution_action,verification_status,notes
 498,铁桥头炳发,铁桥头炳发,PROJECT,炳发 Eco Melody,project:the-star-platinum-eco-melody,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
 499,铁桥头炳发,铁桥头炳发,PROJECT,炳发 Eco Romance,project:the-star-platinum-eco-romance,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
 500,铁桥头炳发,铁桥头炳发,PROJECT,炳发 Eco Sunrise,project:the-star-platinum-eco-sunrise,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
