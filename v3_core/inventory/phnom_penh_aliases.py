@@ -325,8 +325,13 @@ def apply_phnom_penh_aliases(taxonomy: Any) -> None:
     # facts. Those remain in project_reference.
     from .project_knowledge import registry_project_identities
 
+    registry_identities = registry_project_identities()
+    registry_aliases_by_key = {
+        str(identity["taxonomy_key"]): tuple(identity["aliases"])
+        for identity in registry_identities
+    }
     project_keys = {item.key for item in projects}
-    for identity in registry_project_identities():
+    for identity in registry_identities:
         key = str(identity["taxonomy_key"])
         if key in project_keys:
             continue
@@ -353,7 +358,8 @@ def apply_phnom_penh_aliases(taxonomy: Any) -> None:
     extended_projects = []
     for item in projects:
         extra = PROJECT_ALIAS_EXTENSIONS.get(item.key, ())
-        aliases = tuple(dict.fromkeys((*item.aliases, *extra)))
+        researched = registry_aliases_by_key.get(item.key, ())
+        aliases = tuple(dict.fromkeys((*item.aliases, *extra, *researched)))
         # Legacy orkide_royal conflated The Royal villa community and The
         # Royal Condominium. The verified alias registry splits them. Disable
         # the legacy matcher; the two explicit identities below now own the
