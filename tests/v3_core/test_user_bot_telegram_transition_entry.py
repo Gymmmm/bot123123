@@ -100,7 +100,7 @@ def _book_dispatch():
 def _appointment_view():
     return TransitionView(
         kind="appointment_date",
-        text="📅 预约看房",
+        text="📅 在线预约",
         rows=(
             (
                 TransitionChoice("今天", "appointment_date", "09-08"),
