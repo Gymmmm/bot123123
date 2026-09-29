@@ -23,17 +23,17 @@ class AssuranceView:
 
 
 ASSURANCE_HOME_TEXT = (
-    "🏠 <b>安心租房</b>\n\n"
-    "从看房到入住，重要信息尽量提前确认并留档。\n\n"
-    "入住交接、费用确认和住房问题，都可以继续找侨联。"
+    "🛡️ <b>侨联安心租</b>\n\n"
+    "看房更省事，入住更有据，租后有人跟。\n\n"
+    "<b>视频带看｜费用透明｜入住留档｜租后服务</b>"
 )
 
 SIGNING_TEXT = ASSURANCE_HOME_TEXT
 
 HANDOVER_TEXT = (
-    "📋 <b>入住交接留档</b>\n\n"
-    "入住当天把房屋状态记录清楚，退租时更容易核对。\n\n"
-    "建议记录：\n\n"
+    "🛡️ <b>入住留档</b>\n\n"
+    "<b>入住有记录，退租有依据。</b>\n\n"
+    "入住当天建议记录：\n\n"
     "• 水电表\n"
     "• 家具家电\n"
     "• 钥匙和门卡\n"
@@ -57,7 +57,7 @@ def build_assurance_home_view() -> AssuranceView:
         kind="home",
         text=ASSURANCE_HOME_TEXT,
         rows=(
-            (AssuranceChoice("📋 入住交接留档", callback_data="v3u:assure:handover"),),
+            (AssuranceChoice("🛡️ 入住留档", callback_data="v3u:assure:handover"),),
             (AssuranceChoice("💬 中文顾问", callback_data="v3u:home:contact"),),
             (AssuranceChoice("⬅️ 返回侨联服务", callback_data="v3u:home:service"),),
         ),
@@ -74,14 +74,14 @@ def build_handover_view() -> AssuranceView:
         text=HANDOVER_TEXT,
         rows=(
             (AssuranceChoice("查看入住交接清单", callback_data="v3u:assure:handover_download"),),
-            (AssuranceChoice("⬅️ 返回安心租房", callback_data="v3u:home:rental"),),
+            (AssuranceChoice("⬅️ 返回侨联安心租", callback_data="v3u:home:rental"),),
         ),
     )
 
 
 def build_deposit_view(
     *,
-    back_label: str = "⬅️ 返回安心租房",
+    back_label: str = "⬅️ 返回侨联安心租",
     back_callback: str = "v3u:home:rental",
 ) -> AssuranceView:
     return AssuranceView(
@@ -100,7 +100,7 @@ def build_moving_view() -> AssuranceView:
         text=MOVING_TEXT,
         rows=(
             (AssuranceChoice("💬 中文顾问", callback_data="v3u:home:contact"),),
-            (AssuranceChoice("⬅️ 返回入住服务", callback_data="v3u:service:concierge"),),
+            (AssuranceChoice("⬅️ 返回租后服务", callback_data="v3u:service:concierge"),),
         ),
     )
 
@@ -124,7 +124,7 @@ def assurance_asset_bundle(repo_root: str | Path, kind: str) -> AssuranceAssetBu
         kind=clean,  # type: ignore[arg-type]
         image_path=generated / ("handover.png" if clean == "handover" else "deposit.png"),
         pdf_path=generated / ("handover.pdf" if clean == "handover" else "deposit.pdf"),
-        title="入住交接留档",
+        title="入住留档",
         instruction=HANDOVER_TEXT,
         filename="入住交接清单.pdf",
     )

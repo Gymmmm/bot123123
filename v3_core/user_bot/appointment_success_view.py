@@ -25,7 +25,7 @@ def build_appointment_success_view(draft: PublicAppointmentDraft, inventory: Pub
     else:
         details=build_public_listing_details(published)
         subject=booking_subject(details)
-    mode="视频代看" if draft.mode=="video" else "实地看房"
+    mode="视频带看" if draft.mode=="video" else "实地带看"
     lines=[
         "✅ <b>预约已提交</b>",
         "",
