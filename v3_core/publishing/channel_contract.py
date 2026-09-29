@@ -18,7 +18,7 @@ CHANNEL_ACTION_ORDER = ("details", "photos", "book", "consult")
 CHANNEL_CTA_LABELS = {
     "details": "📷 更多实拍",
     "photos": "📸 更多实拍",  # kept for package/compat; not shown on channel keyboard
-    "book": "📅 预约看房",
+    "book": "📅 在线预约",
     "consult": "💬 联系中文顾问",
     "find": "🔍 帮我找房",
     "more": "🔎 更多房源",
