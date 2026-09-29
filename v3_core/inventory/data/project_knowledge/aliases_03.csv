@@ -1,4 +1,4 @@
-<PARSED TEXT FOR SHEET: 1 / 1 TABS
+index,raw_alias,normalized_alias,entity_level,target_display_name,canonical_identity,alias_kind,weight,search_only,conflict_flag,resolution_action,verification_status,notes
 98,Eco区炳发,eco区炳发,PROJECT,炳发 Eco Sunrise,project:the-star-platinum-eco-sunrise,STRONG_PROJECT_ALIAS,95,True,True,CANDIDATE_ONLY,VERIFIED,
 99,Eco区炳发,eco区炳发,PROJECT,炳发 Eco Varanda,project:the-star-platinum-eco-varanda,STRONG_PROJECT_ALIAS,95,True,True,CANDIDATE_ONLY,VERIFIED,
 100,Elite Town,elitetown,FAMILY,名仕城,family:new:elite-town,NEW_VERIFIED_ALIAS,95,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,OCIC官方中文明确“钻石岛名仕城1期和2期”，III为商业住宅项目；裸“名仕城”只到项目family。
