@@ -222,6 +222,12 @@ PROJECT_DEFAULT_LOCATIONS: dict[str, tuple[str, str]] = {
     "yuetai_ecc": ("百色河", "诺罗敦大道 · 永旺1附近"),
     "bali_3": ("水净华", "水净华"),
     "the_penthouse_residence": ("百色河", "永旺1附近"),
+    # V5 verified new identities.
+    "casa_service_apartment": ("钻石岛", "钻石岛"),
+    "the_elysee": ("钻石岛", "钻石岛"),
+    "picasso_sky_gemme": ("BKK1", "BKK1"),
+    "times_square_6": ("BKK1", "BKK1 · 302路"),
+    "orkide_the_royal_condominium": ("2004路", "2004路 · 森速"),
     # ding_li_tower: DingLi Sunshine City(7Makara) vs Dingli Tower(TK) conflict — leave empty
     # Peng Huoth corridor projects (V5/V2). Bare「60米炳发/一号路炳发」stay road
     # markets only — never DIRECT_RESOLVE to one Star community.
@@ -319,10 +325,57 @@ def apply_phnom_penh_aliases(taxonomy: Any) -> None:
                     default_location_display=loc[1] if loc else None,
                 )
             )
+    # Extend recognition from the researched project registry. This adds only
+    # VERIFIED/PARTIAL project identities and aliases; it deliberately does not
+    # promote registry location/fees/property type into authoritative listing
+    # facts. Those remain in project_reference.
+    from .project_knowledge import registry_project_identities
+
+    registry_identities = registry_project_identities()
+    registry_aliases_by_key = {
+        str(identity["taxonomy_key"]): tuple(identity["aliases"])
+        for identity in registry_identities
+    }
+    project_keys = {item.key for item in projects}
+    for identity in registry_identities:
+        key = str(identity["taxonomy_key"])
+        if key in project_keys:
+            continue
+        aliases = tuple(
+            alias for alias in identity["aliases"]
+            if len(taxonomy.clean_text(alias)) >= 3
+        )
+        if not aliases:
+            continue
+        projects.append(
+            taxonomy.ProjectIdentity(
+                key,
+                str(identity["display"]),
+                "project",
+                aliases,
+                property_family=None,
+                property_type_mode=None,
+                default_location_key=None,
+                default_location_display=None,
+            )
+        )
+        project_keys.add(key)
+
     extended_projects = []
     for item in projects:
         extra = PROJECT_ALIAS_EXTENSIONS.get(item.key, ())
-        aliases = tuple(dict.fromkeys((*item.aliases, *extra)))
+        researched = registry_aliases_by_key.get(item.key, ())
+        # Keep AEON1's locked parser evidence stable; its existing aliases
+        # already cover the researched variants.
+        if item.key == "aeon1":
+            researched = ()
+        aliases = tuple(dict.fromkeys((*item.aliases, *extra, *researched)))
+        # Legacy orkide_royal conflated The Royal villa community and The
+        # Royal Condominium. The verified alias registry splits them. Disable
+        # the legacy matcher; the two explicit identities below now own the
+        # corresponding aliases.
+        if item.key == "orkide_royal":
+            aliases = ()
         loc_key = getattr(item, "default_location_key", None)
         loc_display = getattr(item, "default_location_display", None)
         # Fill missing locations only; never overwrite core-registry values.

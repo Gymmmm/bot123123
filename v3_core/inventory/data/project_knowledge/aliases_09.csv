@@ -1,0 +1,51 @@
+index,raw_alias,normalized_alias,entity_level,target_display_name,canonical_identity,alias_kind,weight,search_only,conflict_flag,resolution_action,verification_status,notes
+398,毕加索花园,毕加索花园,PROJECT,毕加索城市花园,project:picasso-city-garden,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+399,水净华,水净华,PROJECT,摩根天御,project:morgan-enmaison,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯GEO/地标词不能直接解析到具体PROJECT。
+400,水净华方向,水净华方向,PROJECT,集茂6A,project:chip-mong-park-land-6a,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+401,水净华方向炳发,水净华方向炳发,PROJECT,炳发朱美拉,project:the-star-jumeirah,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+402,水净华方向炳发,水净华方向炳发,PROJECT,炳发 The Star Munirah,project:the-star-munirah,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+403,永旺1桥牌,永旺1桥牌,PROJECT,桥牌公寓（世桥）,project:the-bridge,PROJECT_LANDMARK,85,True,False,DIRECT_RESOLVE,VERIFIED,
+404,永旺1香格里拉,永旺1香格里拉,PROJECT,香格里拉公寓 The Peak,project:the-peak,PROJECT_LANDMARK,85,True,False,DIRECT_RESOLVE,VERIFIED,
+405,永旺2 Piphup Thmey,永旺2piphupthmey,PROJECT,Piphup Thmey 森速社区,project:piphup-thmey-sen-sok,PROJECT_LANDMARK,85,True,False,DIRECT_RESOLVE,PARTIAL,
+406,永旺2方向,永旺2方向,PROJECT,集茂森速,project:chip-mong-park-land-sen-sok,PROJECT_LANDMARK,85,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯GEO/地标词不能直接解析到具体PROJECT。
+407,永旺3 Chankiri,永旺3chankiri,PROJECT,Chankiri Palm Creek（棕榈溪）,project:chankiri-palm-creek,PROJECT_LANDMARK,85,True,False,DIRECT_RESOLVE,PARTIAL,
+408,永旺3富力城,永旺3富力城,PROJECT,富力城,project:rf-city,PROJECT_LANDMARK,85,True,False,DIRECT_RESOLVE,VERIFIED,
+409,永旺3方向,永旺3方向,PROJECT,集茂60米,project:chip-mong-landmark-60m,PROJECT_LANDMARK,85,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯GEO/地标词不能直接解析到具体PROJECT。
+410,永旺3方向,永旺3方向,PROJECT,太子幸福广场,project:the-pinnacle,PROJECT_LANDMARK,85,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯GEO/地标词不能直接解析到具体PROJECT。
+411,永旺3炳发,永旺3炳发,FAMILY / MARKET_GEO,炳发,family:peng-huoth,FAMILY_GEO,70,True,True,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,先按道路/地标缩小family，再解析具体项目；开发商名“炳发”不得直接当PROJECT。
+412,永旺3炳发,永旺3炳发,PROJECT,炳发钻石城,project:the-star-diamond,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+413,永旺3炳发,永旺3炳发,PROJECT,炳发 The Star Diamond II,project:the-star-diamond-ii,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+414,永旺3附近炳发,永旺3附近炳发,PROJECT,炳发钻石城,project:the-star-diamond,FAMILY_GEO,70,True,False,DIRECT_RESOLVE,VERIFIED,
+415,洪森大道口,洪森大道口,PROJECT,太子幸福广场,project:the-pinnacle,PROJECT_LANDMARK,85,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯GEO/地标词不能直接解析到具体PROJECT。
+416,洪森大道富力城,洪森大道富力城,PROJECT,富力城,project:rf-city,PROJECT_ROAD,90,True,False,DIRECT_RESOLVE,VERIFIED,
+417,洪森大道炳发,洪森大道炳发,PROJECT,炳发钻石城,project:the-star-diamond,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+418,洪森大道炳发,洪森大道炳发,PROJECT,炳发 The Star Diamond II,project:the-star-diamond-ii,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+419,湄松,湄松,PROJECT,金汇 MESONG,project:mesong,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,PARTIAL,The Mesa? 为不确定旧alias，禁止自动匹配。
+420,炳发,炳发,FAMILY / MARKET_GEO,炳发,family:peng-huoth,AMBIGUOUS_FAMILY,20,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,先按道路/地标缩小family，再解析具体项目；开发商名“炳发”不得直接当PROJECT。
+421,炳发 Athina,炳发athina,PROJECT,炳发 Athina,project:the-star-platinum-athina,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+422,炳发 Capital One,炳发capitalone,PROJECT,炳发 Capital One,project:the-star-platinum-capital-one,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+423,炳发 Chamkar Dong,炳发chamkardong,PROJECT,炳发 Chamkar Dong,project:peng-huoth-chamkardong,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+424,炳发 Eco Delta,炳发ecodelta,PROJECT,炳发 Eco Delta,project:the-star-platinum-eco-delta,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+425,炳发 Eco Melody,炳发ecomelody,PROJECT,炳发 Eco Melody,project:the-star-platinum-eco-melody,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+426,炳发 Eco Romance,炳发ecoromance,PROJECT,炳发 Eco Romance,project:the-star-platinum-eco-romance,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+427,炳发 Eco Sunrise,炳发ecosunrise,PROJECT,炳发 Eco Sunrise,project:the-star-platinum-eco-sunrise,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+428,炳发 Eco Varanda,炳发ecovaranda,PROJECT,炳发 Eco Varanda,project:the-star-platinum-eco-varanda,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+429,炳发 Euro Ville,炳发euroville,PROJECT,炳发 Euro Ville,project:the-star-platinum-euro-ville,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+430,炳发 Herminus,炳发herminus,PROJECT,炳发 Herminus,project:the-star-platinum-herminus,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+431,炳发 Mastery,炳发mastery,PROJECT,炳发 Mastery,project:the-star-platinum-mastery,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+432,炳发Mera Garden,炳发meragarden,PROJECT,炳发美拉花园,project:the-star-mera-garden,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+433,炳发 Mercurean I,炳发mercureani,PROJECT,炳发 Mercurean I,project:the-star-platinum-mercurean-i,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+434,炳发 Mercurean II,炳发mercureanii,PROJECT,炳发 Mercurean II,project:the-star-platinum-mercurean-ii,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+435,炳发 Paradigm,炳发paradigm,PROJECT,炳发 Paradigm,project:the-star-platinum-paradigm,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+436,炳发 Polaris 23 公寓,炳发polaris23公寓,PROJECT,炳发 Polaris 23 公寓,project:the-star-polaris-23-condominium,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+437,炳发 Polaris I,炳发polarisi,PROJECT,炳发 Polaris I,project:the-star-platinum-polaris-i,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+438,炳发 Polaris II,炳发polarisii,PROJECT,炳发 Polaris II,project:the-star-platinum-polaris-ii,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+439,炳发 Rosato,炳发rosato,PROJECT,炳发 Rosato,project:the-star-platinum-rosato,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+440,炳发 Roseville,炳发roseville,PROJECT,炳发 Roseville,project:the-star-platinum-roseville,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+441,炳发 The Star Diamond,炳发thestardiamond,PROJECT,炳发钻石城,project:the-star-diamond,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+442,炳发 The Star Diamond II,炳发thestardiamondii,PROJECT,炳发 The Star Diamond II,project:the-star-diamond-ii,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+443,炳发 The Star Emerald II,炳发thestaremeraldii,PROJECT,炳发翡翠 II,project:the-star-emerald-ii,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+444,炳发 The Star Eternal,炳发thestareternal,PROJECT,炳发 The Star Eternal,project:the-star-eternal,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+445,炳发 The Star Jumeirah,炳发thestarjumeirah,PROJECT,炳发朱美拉,project:the-star-jumeirah,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+446,炳发 The Star Light,炳发thestarlight,PROJECT,炳发 The Star Light,project:the-star-light,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+447,炳发 The Star Mera Garden,炳发thestarmeragarden,PROJECT,炳发美拉花园,project:the-star-mera-garden,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,

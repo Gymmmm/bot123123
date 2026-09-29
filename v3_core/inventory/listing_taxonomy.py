@@ -449,6 +449,18 @@ def _extract_project(text: str) -> tuple[str | None, str | None, str | None, str
             alias, position = hit
             matches.append((item, alias, position))
 
+    # In the production corpus, #Penthouse is used as a project hashtag even
+    # on studio/2BR units, so it cannot mean the unit subtype there. Keep the
+    # bare word unsafe globally; resolve only the explicit hashtag form.
+    penthouse_tag = re.search(r"(?<![A-Za-z0-9_])#\s*penthouse\b", project_text, flags=re.I)
+    if penthouse_tag:
+        identity = next(
+            (item for item in PROJECT_IDENTITIES if item.key == "the_penthouse_residence"),
+            None,
+        )
+        if identity and not any(item.key == identity.key for item, _alias, _position in matches):
+            matches.append((identity, "#Penthouse", penthouse_tag.start()))
+
     # Prefer the longest alias when project aliases overlap in one phrase.
     # "紫晶壹号" must resolve to La Vista One instead of conflicting with
     # ONE PARK's generic alias "壹号".
@@ -798,7 +810,11 @@ def _apply_verified_project_defaults(
         only_nearby = bool(market_items) and all(
             item is not None and item.relation == "nearby" for item in market_items
         )
-        if loc_key and loc_display and (not market_keys or self_label or only_nearby):
+        # If the source already names the same market key, preserve the
+        # source-backed evidence. A project default may fill a missing location
+        # or outrank different nearby landmarks, but must never replace an
+        # explicit identical location token.
+        if loc_key and loc_display and loc_key not in market_keys and (not market_keys or self_label or only_nearby):
             if only_nearby:
                 # Nearby landmarks describe access, not the property's own
                 # location. Keep them as secondary evidence, but lead with the

@@ -159,9 +159,7 @@ async def handle_v3_listing_question_text(
     if not question:
         return False
 
-    await contact_effects.execute_question(
-        bot=getattr(context, "bot", None),
-        user=_lead_user(update),
+    project_answer = contact_effects.answer_project_question(
         intent=intent,
         question=question,
     )
@@ -172,6 +170,19 @@ async def handle_v3_listing_question_text(
             callback_data=encode_listing_callback("details", intent.public_listing_id),
         )
     ]])
+    if project_answer:
+        await message.reply_text(
+            project_answer,
+            reply_markup=markup,
+        )
+        return True
+
+    await contact_effects.execute_question(
+        bot=getattr(context, "bot", None),
+        user=_lead_user(update),
+        intent=intent,
+        question=question,
+    )
     await message.reply_text(
         "✅ <b>已发给中文顾问</b>\n\n这套房的信息和你的问题已经一起带上，顾问会按这套房继续回复你。",
         parse_mode=ParseMode.HTML,

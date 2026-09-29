@@ -1,0 +1,51 @@
+index,raw_alias,normalized_alias,entity_level,target_display_name,canonical_identity,alias_kind,weight,search_only,conflict_flag,resolution_action,verification_status,notes
+348,德城堡,德城堡,PROJECT,De Castle Royal（德卡斯尔皇家）,project:de-castle-royal,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+349,摩根,摩根,FAMILY / MARKET_GEO,摩根,family:morgan,AMBIGUOUS_FAMILY,20,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,裸Morgan只到family；EnMaison住宅与Tower办公/综合体严格分开。
+350,摩根塔,摩根塔,PROJECT,摩根大厦,project:morgan-tower,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+351,摩根大厦,摩根大厦,PROJECT,摩根大厦,project:morgan-tower,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+352,摩根天御,摩根天御,PROJECT,摩根天御,project:morgan-enmaison,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+353,新世界,新世界,FAMILY / MARKET_GEO,New World / 新世界,family:new-world,AMBIGUOUS_FAMILY,20,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,裸New World只到family；Kour Srov 1&2与3按明确项目名区分。
+354,新世界3,新世界3,PROJECT,新世界 Kour Srov 3,project:new-world-kour-srov-3,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+355,新世界Kour Srov,新世界koursrov,PROJECT,新世界 Kour Srov 1&2,project:new-world-kour-srov-1-2,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+356,新世界 Kour Srov 1&2,新世界koursrov1&2,PROJECT,新世界 Kour Srov 1&2,project:new-world-kour-srov-1-2,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+357,新世界 Kour Srov 3,新世界koursrov3,PROJECT,新世界 Kour Srov 3,project:new-world-kour-srov-3,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+358,新世界生活/皮普特梅 Sen Sok社区,新世界生活皮普特梅sensok社区,PROJECT,Piphup Thmey 森速社区,project:piphup-thmey-sen-sok,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+359,时代,时代,FAMILY / MARKET_GEO,时代广场,family:time-square,AMBIGUOUS_FAMILY,20,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,必须有数字/道路/BKK/TK等证据才能解析具体期数。
+360,时代1,时代1,PROJECT,时代广场1,project:times-square-1,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+361,时代11,时代11,PROJECT,时代广场11（Time Castle）,project:times-square-11,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+362,时代2,时代2,PROJECT,时代广场2,project:times-square-2,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+363,时代3,时代3,PROJECT,时代广场3,project:times-square-3,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+364,时代302,时代302,PROJECT,时代广场6（Time Square 302）,project:new:times-square-6,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,V3缺失；官方明确 Time Square 6 = Time Square 302。
+365,时代5,时代5,PROJECT,时代广场5（Time Square 306）,project:times-square-5,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+366,时代6,时代6,PROJECT,时代广场6（Time Square 302）,project:new:times-square-6,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,V3缺失；官方明确 Time Square 6 = Time Square 302。
+367,时代7,时代7,PROJECT,时代广场7,project:times-square-7,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+368,时代8,时代8,PROJECT,时代广场8,project:times-square-8,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+369,时代9,时代9,PROJECT,时代广场9期,project:times-square-9,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+370,时代商圈,时代商圈,PROJECT,J Tower 1,project:j-tower-1,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,J Tower旧堆谷映射错误。
+371,时代广场,时代广场,FAMILY / MARKET_GEO,时代广场,family:time-square,AMBIGUOUS_FAMILY,20,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,必须有数字/道路/BKK/TK等证据才能解析具体期数。
+372,时代广场1,时代广场1,PROJECT,时代广场1,project:times-square-1,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+373,时代广场11,时代广场11,PROJECT,时代广场11（Time Castle）,project:times-square-11,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+374,时代广场2,时代广场2,PROJECT,时代广场2,project:times-square-2,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+375,时代广场3,时代广场3,PROJECT,时代广场3,project:times-square-3,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+376,时代广场5,时代广场5,PROJECT,时代广场5（Time Square 306）,project:times-square-5,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+377,时代广场6,时代广场6,PROJECT,时代广场6（Time Square 302）,project:new:times-square-6,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,V3缺失；官方明确 Time Square 6 = Time Square 302。
+378,时代广场7,时代广场7,PROJECT,时代广场7,project:times-square-7,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+379,时代广场8,时代广场8,PROJECT,时代广场8,project:times-square-8,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+380,时代广场9,时代广场9,PROJECT,时代广场9期,project:times-square-9,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+381,星河花园,星河花园,PROJECT,金边星河花园,project:xinghe-garden,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+382,桥,桥,PROJECT,桥牌公寓（世桥）,project:the-bridge,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+383,桥牌,桥牌,PROJECT,桥牌公寓（世桥）,project:the-bridge,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+384,棕榈社区,棕榈社区,PROJECT,The Palms（棕榈社区）,project:the-palms,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+385,森速,森速,PROJECT,集茂598,project:chip-mong-park-land-598,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯地理词不能直接映射某个PROJECT。；纯GEO/地标词不能直接解析到具体PROJECT。
+386,森速,森速,PROJECT,金边壹号 ONE PARK,project:one-park,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,PARTIAL,纯GEO/地标词不能直接解析到具体PROJECT。
+387,森速Chip Mong,森速chipmong,PROJECT,集茂金边大城,project:chip-mong-grand-phnom-penh-city,STRONG_PROJECT_ALIAS,95,True,True,CANDIDATE_ONLY,VERIFIED,
+388,森速Chip Mong,森速chipmong,PROJECT,集茂森速,project:chip-mong-park-land-sen-sok,STRONG_PROJECT_ALIAS,95,True,True,CANDIDATE_ONLY,VERIFIED,
+389,森速Chip Mong公寓,森速chipmong公寓,PROJECT,集茂TK公寓,project:chip-mong-park-land-tk-condo,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+390,森速Piphup Thmey,森速piphupthmey,PROJECT,Piphup Thmey 森速社区,project:piphup-thmey-sen-sok,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+391,森速方向炳发,森速方向炳发,PROJECT,炳发 The Star Light,project:the-star-light,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+392,森速方向炳发,森速方向炳发,PROJECT,炳发 The Star Premier,project:the-star-premier,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+393,森速炳发,森速炳发,PROJECT,炳发翡翠 II,project:the-star-emerald-ii,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+394,森速炳发,森速炳发,PROJECT,炳发 The Star Quateria,project:the-star-quateria,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+395,毕加索,毕加索,PROJECT,毕加索城市花园,project:picasso-city-garden,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+396,毕加索 Sky Gemme,毕加索skygemme,PROJECT,Picasso Sky Gemme（中文俗称待核）,project:new:picasso-sky-gemme,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,与Picasso City Garden为两个不同项目；旧表“毕加索天空之石/天空宝石”需避免硬译。
+397,毕加索天空宝石（仅搜索）,毕加索天空宝石仅搜索,PROJECT,Picasso Sky Gemme（中文俗称待核）,project:new:picasso-sky-gemme,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,与Picasso City Garden为两个不同项目；旧表“毕加索天空之石/天空宝石”需避免硬译。
