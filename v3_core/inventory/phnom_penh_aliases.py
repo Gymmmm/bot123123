@@ -160,6 +160,7 @@ PROJECT_ALIAS_EXTENSIONS: dict[str, tuple[str, ...]] = {
 # Only fill when the relation is stable; leave blank rather than guess.
 # Keys/displays must already exist in MARKET_LOCATIONS (core or this module).
 PROJECT_DEFAULT_LOCATIONS: dict[str, tuple[str, str]] = {
+    "bali_3": ("水净华", "水净华半岛"),
     # key = GEO/area bucket; display = Chinese-customer anchors (V2).
     # Never lead with bare「百色河」.
     "the_peak": ("百色河", "金街附近"),
