@@ -204,7 +204,7 @@ async def test_photos_send_frozen_media_then_action_message(tmp_path):
                             target_public_listing_id="QL-RF-A2B3",
                         ),
                         SemanticAction(
-                            "📅 预约看房",
+                            "📅 在线预约",
                             "book",
                             target_public_listing_id="QL-RF-A2B3",
                         ),
@@ -390,7 +390,7 @@ def test_details_from_album_edits_caption_or_text(tmp_path):
                 action_rows=(
                     (
                         SemanticAction(
-                            "📅 预约看房",
+                            "📅 在线预约",
                             "book",
                             target_public_listing_id="QL-RF-A2B3",
                         ),
