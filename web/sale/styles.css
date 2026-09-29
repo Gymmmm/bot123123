@@ -2450,3 +2450,210 @@ input {
     contain-intrinsic-size:1px 1100px;
   }
 }
+
+
+/* SALE P1.12 — mobile detail editorial cleanup */
+@media (max-width:899px) {
+  .detail-topbar {
+    height:50px;
+    padding-inline:16px;
+    background:var(--surface);
+  }
+  .detail-topbar-label {
+    font-family:var(--display-font);
+    font-size:12px;
+    font-weight:600;
+    letter-spacing:.10em;
+  }
+  .detail-close {
+    width:32px;
+    height:32px;
+    background:#f3eee6;
+  }
+
+  .detail-gallery-wrap {
+    aspect-ratio:1.58;
+    max-height:44dvh;
+  }
+  .detail-gallery img { object-position:center center }
+  .gallery-all-btn {
+    top:14px;
+    right:14px;
+    padding:7px 11px;
+    background:rgba(21,37,32,.64);
+  }
+  .gallery-counter {
+    bottom:14px;
+    right:14px;
+    background:rgba(21,37,32,.62);
+  }
+
+  .detail-body {
+    padding:20px 18px 104px;
+    background:var(--surface);
+  }
+  .detail-hero-block {
+    margin-bottom:14px;
+    padding-bottom:16px;
+    border-bottom:1px solid var(--line-soft);
+  }
+  .detail-price-row { margin-bottom:9px }
+  .detail-price {
+    font-size:34px;
+    font-weight:600;
+  }
+  .detail-title {
+    font-family:var(--display-font);
+    font-size:20px;
+    font-weight:600;
+    color:var(--accent);
+  }
+  .detail-meta {
+    margin-top:5px;
+    line-height:1.55;
+  }
+
+  .detail-ppsm-block {
+    display:inline-flex;
+    margin:0 0 14px;
+    padding:7px 10px;
+    background:var(--gold-bg);
+    border-color:rgba(181,138,75,.18);
+  }
+  .detail-params {
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:0;
+    margin-bottom:22px;
+    border:0;
+    border-top:1px solid var(--line-soft);
+    border-bottom:1px solid var(--line-soft);
+    border-radius:0;
+    background:transparent;
+  }
+  .param {
+    min-width:0;
+    min-height:0;
+    padding:11px 8px;
+    text-align:center;
+    background:transparent;
+    border-right:1px solid var(--line-soft);
+  }
+  .param:nth-child(4n) { border-right:0 }
+  .param small {
+    margin-bottom:4px;
+    font-size:9px;
+  }
+  .param strong {
+    display:block;
+    overflow:hidden;
+    font-size:11px;
+    line-height:1.35;
+    text-overflow:ellipsis;
+  }
+  .param.param-wide { grid-column:auto }
+
+  .detail-section { margin-bottom:22px }
+  .detail-section-title {
+    margin-bottom:11px;
+    font-family:var(--display-font);
+    font-size:14px;
+    font-weight:600;
+    letter-spacing:.04em;
+  }
+
+  .detail-investment-read,
+  .detail-buy-check {
+    padding:0;
+    border:0;
+    border-radius:0;
+    background:transparent;
+  }
+  .detail-investment-read {
+    padding-top:4px;
+  }
+  .detail-section-head,
+  .detail-check-head {
+    padding-bottom:10px;
+    border-bottom:1px solid var(--line-soft);
+  }
+  .detail-section-head .detail-section-title,
+  .detail-check-head .detail-section-title {
+    margin-bottom:0;
+  }
+  .detail-investment-read-rows,
+  .detail-check-summary {
+    border:0;
+    border-radius:0;
+    background:transparent;
+  }
+  .detail-investment-read-rows > div,
+  .detail-check-summary > div {
+    min-height:48px;
+    padding:12px 0;
+    border-color:var(--line-soft);
+    background:transparent;
+  }
+  .detail-investment-read-rows > div:last-child,
+  .detail-check-summary > div:last-child {
+    border-bottom:0;
+  }
+  .detail-investment-read-rows strong,
+  .detail-check-summary strong {
+    max-width:68%;
+    text-align:right;
+    line-height:1.45;
+  }
+
+  .detail-disclaimer {
+    margin-top:24px;
+    padding:13px 14px;
+    border:0;
+    background:#f3eee6;
+  }
+
+  .detail-footer {
+    position:absolute;
+    left:0;
+    right:0;
+    bottom:0;
+    z-index:6;
+    padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px));
+    border-top:1px solid var(--line-soft);
+    background:rgba(255,253,248,.94);
+    backdrop-filter:blur(16px);
+    -webkit-backdrop-filter:blur(16px);
+    box-shadow:0 -10px 30px rgba(32,43,38,.06);
+  }
+  .detail-footer-actions { gap:10px }
+  .detail-footer-actions a {
+    height:46px;
+    border-radius:10px;
+    font-size:13px;
+  }
+  .detail-telegram-btn { box-shadow:none }
+  .detail-consult-btn {
+    background:transparent;
+    border-color:#d8cdbf;
+  }
+}
+
+@media (max-width:520px) {
+  .detail-gallery-wrap {
+    aspect-ratio:1.52;
+    max-height:40dvh;
+  }
+  .detail-params {
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .param:nth-child(4n) { border-right:1px solid var(--line-soft) }
+  .param:nth-child(2n) { border-right:0 }
+  .param {
+    text-align:left;
+    padding:10px 8px 10px 0;
+  }
+  .param:nth-child(2n) { padding-left:12px }
+  .detail-investment-read-rows strong,
+  .detail-check-summary strong {
+    max-width:64%;
+  }
+}
