@@ -10,6 +10,7 @@ from v3_core.inventory.project_knowledge import (
     project_knowledge_stats,
     project_reference_for_key,
     project_reference_location,
+    project_reference_summary,
     registry_project_identities,
 )
 
@@ -312,3 +313,23 @@ def test_web_verified_location_fallback_covers_known_projects(project_key, locat
     fallback = project_reference_location(project_key)
     assert fallback["confidence"] == "verified"
     assert location_token in fallback["display"]
+
+
+def test_project_summary_combines_verified_location_developer_amenities_and_nearby():
+    summary = project_reference_summary("picasso_city_garden")
+    assert "Picasso" in summary or "毕加索" in summary
+    assert "Picasso City Garden Development Plc." in summary
+    assert "BKK1" in summary
+    assert "具体房源的租金、水电、管理费" in summary
+
+    diamond = project_reference_summary("diamond_one")
+    assert "泳池" in diamond
+    assert "健身房" in diamond
+    assert "永旺1" in diamond
+
+
+def test_project_intro_question_returns_detailed_reference_summary():
+    answer = answer_project_question("la_vista_one", "给我这个楼盘详细资料")
+    assert "YIN YI VENTURE" in answer
+    assert "水净华" in answer
+    assert "具体房源的租金" in answer
