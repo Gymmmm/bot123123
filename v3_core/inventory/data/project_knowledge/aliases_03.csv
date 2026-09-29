@@ -1,0 +1,51 @@
+<PARSED TEXT FOR SHEET: 1 / 1 TABS
+98,Eco区炳发,eco区炳发,PROJECT,炳发 Eco Sunrise,project:the-star-platinum-eco-sunrise,STRONG_PROJECT_ALIAS,95,True,True,CANDIDATE_ONLY,VERIFIED,
+99,Eco区炳发,eco区炳发,PROJECT,炳发 Eco Varanda,project:the-star-platinum-eco-varanda,STRONG_PROJECT_ALIAS,95,True,True,CANDIDATE_ONLY,VERIFIED,
+100,Elite Town,elitetown,FAMILY,名仕城,family:new:elite-town,NEW_VERIFIED_ALIAS,95,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,OCIC官方中文明确“钻石岛名仕城1期和2期”，III为商业住宅项目；裸“名仕城”只到项目family。
+101,Elite Town III,elitetowniii,FAMILY,名仕城,family:new:elite-town,NEW_VERIFIED_ALIAS,95,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,OCIC官方中文明确“钻石岛名仕城1期和2期”，III为商业住宅项目；裸“名仕城”只到项目family。
+102,EnMaison,enmaison,PROJECT,摩根天御,project:morgan-enmaison,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+103,Factory Phnom Penh附近,factoryphnompenh附近,PROJECT,首都·国金一期,project:urban-village-1,PROJECT_LANDMARK,85,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯GEO/地标词不能直接解析到具体PROJECT。
+104,Factory Phnom Penh附近,factoryphnompenh附近,PROJECT,首都·国金二期,project:urban-village-2,PROJECT_LANDMARK,85,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯GEO/地标词不能直接解析到具体PROJECT。
+105,Grand Phnom Penh,grandphnompenh,PROJECT,集茂金边大城,project:chip-mong-grand-phnom-penh-city,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+106,Grand Phnom Penh City,grandphnompenhcity,PROJECT,集茂金边大城,project:chip-mong-grand-phnom-penh-city,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+107,J1,j1,PROJECT,J Tower 1,project:j-tower-1,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+108,J2,j2,PROJECT,J Tower 2,project:j-tower-2,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+109,J3,j3,PROJECT,J Tower 3,project:j-tower-3,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+110,J Tower,jtower,FAMILY / MARKET_GEO,J Tower,family:j-tower,FAMILY_GEO,70,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,必须有1/2/3或明确地址证据。
+111,J Tower 1,jtower1,PROJECT,J Tower 1,project:j-tower-1,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+112,J Tower 2,jtower2,PROJECT,J Tower 2,project:j-tower-2,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+113,J Tower 3,jtower3,PROJECT,J Tower 3,project:j-tower-3,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+114,J塔,j塔,FAMILY / MARKET_GEO,J Tower,family:j-tower,FAMILY_GEO,70,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,必须有1/2/3或明确地址证据。
+115,Kour Srov新世界,koursrov新世界,FAMILY / MARKET_GEO,New World / 新世界,family:new-world,FAMILY_GEO,70,True,True,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,裸New World只到family；Kour Srov 1&2与3按明确项目名区分。
+116,Kour Srov新世界,koursrov新世界,PROJECT,新世界 Kour Srov 3,project:new-world-kour-srov-3,STRONG_PROJECT_ALIAS,95,True,True,CANDIDATE_ONLY,PARTIAL,
+117,Landmark 271,landmark271,PROJECT,集茂271,project:chip-mong-landmark-271,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+118,Landmark 60M,landmark60m,PROJECT,集茂60米,project:chip-mong-landmark-60m,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+119,Land Riche Chamkar Dong,landrichechamkardong,PROJECT,集茂 Land Riche Chamkar Dong,project:chip-mong-landriche-chamkar-dong,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+120,La Seine,laseine,PROJECT,塞纳河,project:new:la-seine,NEW_PARTIAL_ALIAS,70,True,False,DIRECT_RESOLVE,PARTIAL,OCIC官方Koh Pich项目列表确认La Seine真实存在；本轮不扩大其住宅/商业细分。
+121,La Vista One,lavistaone,PROJECT,紫晶壹号,project:la-vista-one,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+122,Le Conde,leconde,PROJECT,王府观邸,project:le-conde-bkk1,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+123,Le Condé,lecondé,PROJECT,王府观邸,project:le-conde-bkk1,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+124,Le Condé BKK1,lecondébkk1,PROJECT,王府观邸,project:le-conde-bkk1,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+125,Mera Garden,meragarden,PROJECT,炳发美拉花园,project:the-star-mera-garden,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+126,MESONG,mesong,PROJECT,金汇 MESONG,project:mesong,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,The Mesa? 为不确定旧alias，禁止自动匹配。
+127,Mong Reththy炳发,mongreththy炳发,PROJECT,炳发 The Star Quateria,project:the-star-quateria,FAMILY_GEO,70,True,False,DIRECT_RESOLVE,VERIFIED,
+128,Monireth炳发,monireth炳发,PROJECT,炳发 The Star Eternal,project:the-star-eternal,FAMILY_GEO,70,True,False,DIRECT_RESOLVE,VERIFIED,
+129,Morgan,morgan,FAMILY / MARKET_GEO,摩根,family:morgan,AMBIGUOUS_FAMILY,20,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,裸Morgan只到family；EnMaison住宅与Tower办公/综合体严格分开。
+130,Morgan EnMaison,morganenmaison,PROJECT,摩根天御,project:morgan-enmaison,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+131,Morgan Tower,morgantower,PROJECT,摩根大厦,project:morgan-tower,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+132,M Residence,mresidence,PROJECT,M Residence,project:m-residence,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+133,New World,newworld,FAMILY / MARKET_GEO,New World / 新世界,family:new-world,AMBIGUOUS_FAMILY,20,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,裸New World只到family；Kour Srov 1&2与3按明确项目名区分。
+134,New World Kour Srov 1&2,newworldkoursrov1&2,PROJECT,新世界 Kour Srov 1&2,project:new-world-kour-srov-1-2,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+135,New World Kour Srov 3,newworldkoursrov3,PROJECT,新世界 Kour Srov 3,project:new-world-kour-srov-3,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+136,Norea附近The Palms,norea附近thepalms,PROJECT,The Palms（棕榈社区）,project:the-palms,PROJECT_LANDMARK,85,True,False,DIRECT_RESOLVE,VERIFIED,
+137,Norea附近炳发,norea附近炳发,FAMILY / MARKET_GEO,炳发,family:peng-huoth,FAMILY_GEO,70,True,True,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,先按道路/地标缩小family，再解析具体项目；开发商名“炳发”不得直接当PROJECT。
+138,Norea附近炳发,norea附近炳发,PROJECT,炳发 Euro Ville,project:the-star-platinum-euro-ville,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+139,Norea附近炳发,norea附近炳发,PROJECT,炳发 Rosato,project:the-star-platinum-rosato,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+140,Norea附近炳发,norea附近炳发,PROJECT,炳发 Roseville,project:the-star-platinum-roseville,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+141,Olympia,olympia,PROJECT,奥林匹亚城,project:olympia-city,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+142,Olympia City,olympiacity,PROJECT,奥林匹亚城,project:olympia-city,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+143,ONE 70,one70,PROJECT,ONE 70（金边首座）,project:one-70,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+144,One Park,onepark,PROJECT,金边壹号 ONE PARK,project:one-park,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+145,One Park Residence,oneparkresidence,PROJECT,金边壹号 ONE PARK,project:one-park,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+146,Orkide,orkide,FAMILY / MARKET_GEO,Orkide / 奥凯德,family:orkide,FAMILY_GEO,70,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,2004路优先The Royal/The Grand但仍需项目词；品牌词不得单独定项目。
+147,Orkide 2004,orkide2004,PROJECT,奥凯德 The Royal（别墅社区）,project:orkide-the-royal,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
