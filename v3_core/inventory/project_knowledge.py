@@ -8,6 +8,7 @@ OWNER_SPECIFIC / conflicting values remain reference-only.
 from __future__ import annotations
 
 import csv
+import io
 from copy import deepcopy
 from functools import lru_cache
 from pathlib import Path
@@ -58,9 +59,17 @@ def _clean_row(row: dict[str, Any]) -> dict[str, str]:
 
 def _rows(prefix: str) -> Iterable[dict[str, str]]:
     for path in sorted(_DATA_DIR.glob(f"{prefix}_*.csv")):
-        with path.open("r", encoding="utf-8-sig", newline="") as handle:
-            for row in csv.DictReader(handle):
-                yield _clean_row(row)
+        text = path.read_text(encoding="utf-8-sig")
+        # Library CSV materialization may preserve a two-line sheet wrapper.
+        # Accept it deterministically so the checked-in research snapshot stays
+        # traceable to the original source export.
+        if text.startswith("<PARSED TEXT FOR SHEET:"):
+            lines = text.splitlines()
+            if len(lines) >= 2 and ">" in lines[1]:
+                lines[1] = lines[1].split(">", 1)[1]
+                text = "\n".join(lines[1:])
+        for row in csv.DictReader(io.StringIO(text)):
+            yield _clean_row(row)
 
 
 def _entity_key(value: str) -> str:
