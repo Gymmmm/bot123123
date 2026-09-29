@@ -227,7 +227,7 @@ PROJECT_DEFAULT_LOCATIONS: dict[str, tuple[str, str]] = {
     "the_elysee": ("钻石岛", "钻石岛"),
     "picasso_sky_gemme": ("BKK1", "BKK1"),
     "times_square_6": ("BKK1", "BKK1 · 302路"),
-    "orkide_the_royal_condominium": ("2004路", "2004路 · 奥凯德皇家公寓"),
+    "orkide_the_royal_condominium": ("2004路", "2004路 · 森速"),
     # ding_li_tower: DingLi Sunshine City(7Makara) vs Dingli Tower(TK) conflict — leave empty
     # Peng Huoth corridor projects (V5/V2). Bare「60米炳发/一号路炳发」stay road
     # markets only — never DIRECT_RESOLVE to one Star community.
