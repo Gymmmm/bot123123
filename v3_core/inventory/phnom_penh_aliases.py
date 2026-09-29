@@ -222,6 +222,12 @@ PROJECT_DEFAULT_LOCATIONS: dict[str, tuple[str, str]] = {
     "yuetai_ecc": ("百色河", "诺罗敦大道 · 永旺1附近"),
     "bali_3": ("水净华", "水净华"),
     "the_penthouse_residence": ("百色河", "永旺1附近"),
+    # V5 verified new identities.
+    "casa_service_apartment": ("钻石岛", "钻石岛"),
+    "the_elysee": ("钻石岛", "钻石岛"),
+    "picasso_sky_gemme": ("BKK1", "BKK1"),
+    "times_square_6": ("BKK1", "BKK1 · 302路"),
+    "orkide_the_royal_condominium": ("2004路", "2004路 · 奥凯德皇家公寓"),
     # ding_li_tower: DingLi Sunshine City(7Makara) vs Dingli Tower(TK) conflict — leave empty
     # Peng Huoth corridor projects (V5/V2). Bare「60米炳发/一号路炳发」stay road
     # markets only — never DIRECT_RESOLVE to one Star community.
