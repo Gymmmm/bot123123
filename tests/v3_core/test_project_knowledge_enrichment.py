@@ -48,7 +48,7 @@ def test_project_reference_is_exposed_in_draft_projection():
 def test_listing_specific_fee_is_not_overwritten_by_project_market_reference():
     facts = canonicalize_source("雅居乐天悦\n1房\n租金$900/月\n电费$0.35/度")
     assert facts["electric_rate"] == "$0.35/度"
-    reference = facts["project_reference"]
+    reference = project_reference_for_key(facts["project_key"])
     assert reference["knowledge_key"] == "agile-sky-residence"
     assert reference["living"]["electricity_rate_min"] == "0.25"
     assert reference["living"]["electricity_rate_max"] == "0.27"
