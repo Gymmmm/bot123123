@@ -239,7 +239,7 @@ def _peng_huoth_family_reference() -> dict[str, Any]:
             "Veng Sreng",
         ],
         "property_types": ["排屋 / Link House", "商铺屋 / Shop House", "独栋别墅 / Single Villa", "双拼 / Twin Villa", "公寓 / Condominium（部分子项目）"],
-        "resolution_hint": "炳发是多项目 family，必须先按道路/地标/具体子项目名继续解析；裸炳发/炳发城不能继承某个子项目的收费、泳池或其他配套。",
+        "resolution_hint": "先按道路/地标缩小炳发 family，再解析具体子项目；裸炳发/炳发城不能继承某个子项目的收费、泳池或其他配套。",
         "source_urls": [
             "https://boreypenghuoth.com/borey/en/about-us/who-we-are/",
             "https://boreypenghuoth.com/borey/en/project-listing/",
