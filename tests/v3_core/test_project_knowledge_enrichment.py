@@ -357,3 +357,68 @@ def test_detailed_summary_includes_structured_living_reference_when_available():
     assert "电费0.25–0.27 USD/kWh" in summary
     assert "水费0.5–1 USD/m3" in summary
     assert "具体房源的租金、水电、管理费" in summary
+
+
+def test_listing_specific_facts_override_project_reference_answers():
+    from v3_core.user_bot.consult import ConsultIntent
+    from v3_core.user_bot.listing_contact import ListingContactEffectExecutor
+
+    canonical = canonicalize_source(
+        "雅居乐天空公馆\n1房\n租金$900/月\n电费$0.35/度\n水费$1.2/方\n管理费$1.5/㎡\n押一付一"
+    )
+
+    class Inventory:
+        def resolve(self, public_id):
+            assert public_id == "QL-PP-A2B3"
+            return SimpleNamespace(snapshot={"canonical_facts": canonical})
+
+    executor = ListingContactEffectExecutor(
+        leads=SimpleNamespace(),
+        admins=SimpleNamespace(),
+        inventory=Inventory(),
+    )
+    intent = ConsultIntent(
+        listing_id="l_test",
+        public_listing_id="QL-PP-A2B3",
+        source="listing_callback",
+        inventory_status="active",
+        offer_status="active",
+        publication_instance_id="pub_test",
+    )
+
+    electric = executor.answer_project_question(intent=intent, question="这套电费多少？")
+    assert "$0.35/度" in electric
+    assert "0.25" not in electric
+
+    rent = executor.answer_project_question(intent=intent, question="租金多少钱？")
+    assert "$900" in rent
+
+    developer = executor.answer_project_question(intent=intent, question="开发商是谁？")
+    assert "Agile Group" in developer
+
+
+def test_listing_explicit_location_beats_project_reference_location():
+    from v3_core.user_bot.consult import ConsultIntent
+    from v3_core.user_bot.listing_contact import ListingContactEffectExecutor
+
+    canonical = canonicalize_source("Picasso City Garden BKK1\n位置：BKK1 322街\n2房\n$1200/月")
+
+    class Inventory:
+        def resolve(self, public_id):
+            return SimpleNamespace(snapshot={"canonical_facts": canonical})
+
+    executor = ListingContactEffectExecutor(
+        leads=SimpleNamespace(),
+        admins=SimpleNamespace(),
+        inventory=Inventory(),
+    )
+    intent = ConsultIntent(
+        listing_id="l_picasso",
+        public_listing_id="QL-PP-A2B3",
+        source="listing_callback",
+        inventory_status="active",
+        offer_status="active",
+        publication_instance_id="pub_picasso",
+    )
+    answer = executor.answer_project_question(intent=intent, question="这套在哪里？")
+    assert canonical["public_location_display"] in answer
