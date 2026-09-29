@@ -16,6 +16,8 @@ from typing import Callable, Mapping
 from urllib.request import Request, urlopen
 from zoneinfo import ZoneInfo
 
+from .channel_contract import build_bot_start_url
+
 
 DDL = """
 CREATE TABLE IF NOT EXISTS publisher_settings_v3 (
@@ -70,35 +72,36 @@ BUTTON_KEYS = frozenset(BUTTON_LABELS)
 
 TEMPLATES: Mapping[str, tuple[str, str]] = {
     "weekly": (
-        "📅 每周找房提醒",
-        "<b>📅 侨联地产｜本周找房提醒</b>\n\n"
-        "这周准备找房或换房，可以直接把 <b>区域 + 月预算 + 户型 + 入住时间</b> 发给我们。\n\n"
-        "我们按当前在租房源为您筛选，不需要先翻一大堆无关房源。\n\n"
-        "<b>💎 侨联地产｜您在金边的自己人</b>",
+        "📅 金边年租找房",
+        "<b>📅 侨联地产｜金边年租找房</b>\n\n"
+        "准备在金边长期住，直接把 <b>常去地点 / 区域 + 月预算 + 户型 + 入住时间</b> 发给我们。\n\n"
+        "频道以年租房源为主，租金按月展示；我们按当前 Telegram 库存筛，不需要先翻一大堆无关房源。\n\n"
+        "<b>侨联地产｜您在金边的自己人</b>",
     ),
     "weekend": (
-        "🏠 周末看房",
-        "<b>🏠 周末看房安排</b>\n\n"
-        "周末准备集中看房的，可以提前把 <b>区域、预算、户型、方便时间</b> 发过来。\n\n"
-        "我们先确认房态，再安排实际可看的房源；不方便到现场也可以先约视频看房。\n\n"
-        "<b>💎 侨联地产｜您在金边的自己人</b>",
+        "🏠 周末年租看房",
+        "<b>🏠 周末集中看金边年租房</b>\n\n"
+        "提前发 <b>常去地点 / 区域、月预算、户型、入住时间</b>，先确认房态，再把同一路线的房源尽量排在一起。\n\n"
+        "不方便到现场，可以先约视频看房；具体租期和合同条件以每套房实际约定为准。\n\n"
+        "<b>侨联地产｜您在金边的自己人</b>",
     ),
     "viewing": (
-        "📋 看房前准备",
-        "<b>📋 看房前，先把这几项定下来</b>\n\n"
-        "• 想住的区域\n"
-        "• 每月预算\n"
-        "• 户型\n"
-        "• 预计入住时间\n\n"
-        "这几项明确以后，找房和排看房都会快很多。\n\n"
-        "<b>💎 侨联地产｜您在金边的自己人</b>",
+        "📋 年租看房重点",
+        "<b>📋 中国人在金边年租，看房别只看装修</b>\n\n"
+        "• 通勤和常去地点\n"
+        "• 空调、热水、家具家电\n"
+        "• 水电计费、网络\n"
+        "• 停车 / 宠物\n"
+        "• 押付、维修和入住时间\n\n"
+        "这些先确认，后面一年住起来会省很多事。\n\n"
+        "<b>侨联地产｜您在金边的自己人</b>",
     ),
     "contract": (
-        "📝 签约提醒",
-        "<b>📝 签约前再确认一次</b>\n\n"
-        "租期、押付方式、水电、物业、网络、停车，以及提前退租和维修责任，最好都在签约前确认清楚。\n\n"
-        "入住当天再把房屋现状、家具家电、表计读数、钥匙和门卡做好留档。\n\n"
-        "<b>💎 侨联地产｜您在金边的自己人</b>",
+        "📝 年租签约提醒",
+        "<b>📝 在金边住一年，签约前再确认一次</b>\n\n"
+        "租期、押付方式、水电、物业、网络、停车、维修责任、提前退租和退房条件，最好都写进合同或附件。\n\n"
+        "入住当天把房屋现状、家具家电、表计读数、钥匙和门卡留档。\n\n"
+        "<b>侨联地产｜您在金边的自己人</b>",
     ),
 }
 TEMPLATE_KEYS = frozenset({"live", "custom", *TEMPLATES.keys()})
@@ -384,6 +387,8 @@ class LiveDailyInfoBuilder:
             f"{fx_display}{hundred_line}\n\n"
             "<b>📌 今日提醒</b>\n"
             f"{weather_note}\n\n"
+            "🏠 <b>金边年租找房</b>：频道以长期居住的年租房源为主，租金按月展示。\n"
+            "找房直接发：常去地点 / 区域 + 月预算 + 户型 + 入住时间。\n\n"
             "<i>天气与汇率仅供参考，以实时信息及实际牌价为准。</i>"
         )
 
@@ -496,11 +501,10 @@ class BroadcastService:
             return ()
         if selected not in BUTTON_KEYS:
             raise ValueError("broadcast_unknown_button")
-        base = f"https://t.me/{self.user_bot_username}?start="
         buttons = {
-            "find": BroadcastButton("🔍 帮我找房", base + "find_home"),
-            "latest": BroadcastButton("🏠 最新房源", base + "latest"),
-            "contact": BroadcastButton("💬 联系中文顾问", base + "advisor"),
+            "find": BroadcastButton("🔍 帮我找房", build_bot_start_url(self.user_bot_username, "find_home")),
+            "latest": BroadcastButton("🏠 最新房源", build_bot_start_url(self.user_bot_username, "latest")),
+            "contact": BroadcastButton("💬 联系中文顾问", build_bot_start_url(self.user_bot_username, "advisor")),
         }
         if selected == "combo":
             return ((buttons["find"], buttons["latest"]), (buttons["contact"],))
