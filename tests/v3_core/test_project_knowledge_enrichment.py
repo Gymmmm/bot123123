@@ -125,7 +125,7 @@ def test_public_inventory_attaches_project_reference_without_mutating_canonical_
         offer={},
         gallery=(),
         package={},
-        public_listing_id="QL-TEST-A1B2",
+        public_listing_id="QL-RF-A2B3",
         listing_id="l_test",
         bookable=True,
     )
