@@ -62,7 +62,7 @@ _REPLY_KEYBOARD_REMOVED_KEY = "v3_reply_keyboard_removed"
 def public_command_menu() -> tuple[BotCommand, ...]:
     return (
         BotCommand("start", "回到首页"),
-        BotCommand("find", "开始找房"),
+        BotCommand("find", "帮我找房"),
         BotCommand("appointments", "我的预约"),
         BotCommand("service", "侨联服务"),
     )

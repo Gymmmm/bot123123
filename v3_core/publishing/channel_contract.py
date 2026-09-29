@@ -19,8 +19,8 @@ CHANNEL_CTA_LABELS = {
     "details": "📷 更多实拍",
     "photos": "📸 更多实拍",  # kept for package/compat; not shown on channel keyboard
     "book": "📅 预约看房",
-    "consult": "💬 中文顾问",
-    "find": "🏠 帮我找房",
+    "consult": "💬 联系中文顾问",
+    "find": "🔍 帮我找房",
     "more": "🔎 更多房源",
     "similar": "🔎 更多房源",
 }

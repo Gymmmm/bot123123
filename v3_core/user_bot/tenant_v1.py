@@ -26,9 +26,9 @@ def _safe_text(value: Any, fallback: str = "待补全") -> str:
 
 def _public_rows() -> tuple[tuple[ServiceChoice, ...], ...]:
     return (
-        (ServiceChoice("💬 中文顾问", "v3u:home:contact"),),
-        (ServiceChoice("🛎️ 侨联服务", "v3u:home:service"), ServiceChoice("🔍 开始找房", "v3u:home:search")),
-        (ServiceChoice("⬅️ 返回首页", "v3u:t:home"),),
+        (ServiceChoice("💬 联系中文顾问", "v3u:home:contact"),),
+        (ServiceChoice("🛎️ 侨联服务", "v3u:home:service"), ServiceChoice("🔍 帮我找房", "v3u:home:search")),
+        (ServiceChoice("🏠 返回首页", "v3u:t:home"),),
     )
 
 
@@ -47,7 +47,7 @@ def missing_lease_view() -> ServiceView:
             "如果已经通过侨联入住，可以联系中文顾问核对。"
         ),
         (
-            (ServiceChoice("💬 中文顾问", "v3u:home:contact"),),
+            (ServiceChoice("💬 联系中文顾问", "v3u:home:contact"),),
             (ServiceChoice("⬅️ 返回侨联服务", "v3u:home:service"),),
         ),
     )
@@ -72,7 +72,7 @@ def lease_view(service: TenantService, user_id: int) -> ServiceView:
             "状态｜🟢 租约有效"
         ),
         (
-            (ServiceChoice("🔄 申请续租", "v3u:service:tenant_renew"), ServiceChoice("💬 中文顾问", "v3u:home:contact")),
+            (ServiceChoice("🔄 申请续租", "v3u:service:tenant_renew"), ServiceChoice("💬 联系中文顾问", "v3u:home:contact")),
             (ServiceChoice("⬅️ 返回侨联服务", "v3u:home:service"),),
         ),
     )
@@ -92,7 +92,7 @@ def renew_view(service: TenantService, user_id: int) -> ServiceView:
         ),
         (
             (ServiceChoice("提交续租意向", "v3u:service:tenant_renew_submit"),),
-            (ServiceChoice("💬 中文顾问", "v3u:home:contact"),),
+            (ServiceChoice("💬 联系中文顾问", "v3u:home:contact"),),
             (ServiceChoice("⬅️ 返回我的租约", "v3u:service:tenant_lease"),),
         ),
     )
@@ -113,7 +113,7 @@ def terminate_view(service: TenantService, user_id: int) -> ServiceView:
         ),
         (
             (ServiceChoice("提交退租意向", "v3u:service:tenant_terminate_submit"),),
-            (ServiceChoice("💬 中文顾问", "v3u:home:contact"),),
+            (ServiceChoice("💬 联系中文顾问", "v3u:home:contact"),),
             (ServiceChoice("⬅️ 返回我的租约", "v3u:service:tenant_lease"),),
         ),
     )
@@ -126,7 +126,7 @@ def guide_view(service: TenantService, user_id: int) -> ServiceView:
         "<b>侨联服务</b>\n\n入住后的住房问题，可以从侨联服务继续处理。",
         (
             (ServiceChoice("🛎️ 侨联服务", "v3u:home:service"),),
-            (ServiceChoice("⬅️ 返回首页", "v3u:t:home"),),
+            (ServiceChoice("🏠 返回首页", "v3u:t:home"),),
         ),
     )
 
@@ -171,7 +171,7 @@ async def submit_request(*, kind: str, service: TenantService, effects, update, 
     return ServiceView(
         "tenant_submit",
         text,
-        ((ServiceChoice("💬 中文顾问", "v3u:home:contact"),),),
+        ((ServiceChoice("💬 联系中文顾问", "v3u:home:contact"),),),
     ), effect
 
 
