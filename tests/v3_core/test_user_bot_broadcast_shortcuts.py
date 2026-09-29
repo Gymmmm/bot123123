@@ -159,7 +159,7 @@ async def test_appointments_shortcut_uses_real_appointment_history():
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("payload", "expected_kind", "expected_text"),
-    [("assurance", "broadcast_assurance", "安心租房"), ("service", "broadcast_service", "侨联服务")],
+    [("assurance", "broadcast_assurance", "侨联安心租"), ("service", "broadcast_service", "侨联服务")],
 )
 async def test_service_shortcuts_land_on_real_user_surfaces(payload, expected_kind, expected_text):
     message = FakeMessage()
@@ -170,7 +170,7 @@ async def test_service_shortcuts_land_on_real_user_surfaces(payload, expected_ki
     assert listings.calls == []
     assert expected_text in message.calls[-1][0][0]
     if payload == "assurance":
-        assert "入住交接、费用确认和住房问题" in message.calls[-1][0][0]
+        assert "视频带看｜费用透明｜入住留档｜租后服务" in message.calls[-1][0][0]
         assert "关于侨联" not in message.calls[-1][0][0]
 
 

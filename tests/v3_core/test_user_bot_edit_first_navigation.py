@@ -119,7 +119,7 @@ def test_home_about_edits_brand_page_instead_of_assurance_or_new_message():
     assert outcome.rendered is True
     assert query.message.replies == []
     assert query.edits
-    assert "侨联地产｜金边中文租房" in query.edits[-1][1]
+    assert "侨联安心租" in query.edits[-1][1]
     assert "真实房源" in query.edits[-1][1]
 
 
