@@ -57,12 +57,12 @@ def test_listing_specific_fee_is_not_overwritten_by_project_market_reference():
     assert reference["living"]["electricity_rate_max"] == "0.27"
 
 
-def test_wells_and_wealth_mansion_remain_separate_projects():
+def test_wealth_mansion_verified_aliases_reconcile_to_one_project():
     wells = canonicalize_source("威尔斯公馆出租\n2房\n租金$1200/月")
     wealth = canonicalize_source("财富大厦出租\n2房\n租金$1200/月")
     assert wells["project_key"] == "wealth_mansion"
-    assert wealth["project_key"] == "wealth_mansion_building"
-    assert project_reference_for_key(wells["project_key"])["knowledge_key"] == "wells-mansion"
+    assert wealth["project_key"] == "wealth_mansion"
+    assert project_reference_for_key(wells["project_key"])["knowledge_key"] == "wealth-mansion"
     assert project_reference_for_key(wealth["project_key"])["knowledge_key"] == "wealth-mansion"
 
 
