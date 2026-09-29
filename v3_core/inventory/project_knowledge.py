@@ -24,13 +24,10 @@ _TAXONOMY_TO_KNOWLEDGE = {
     "phnom_penh_galaxy_garden": "xinghe-garden",
     # Existing taxonomy key historically names 威尔斯公馆. Do not attach the
     # separate 财富大厦 / Wealth Mansion profile to it.
-    "wealth_mansion": "wells-mansion",
-    "wealth_mansion_building": "wealth-mansion",
+    "wealth_mansion": "wealth-mansion",
     **{f"time_square_{n}": f"times-square-{n}" for n in (1, 2, 3, 5, 7, 8, 9, 11)},
 }
 _KNOWLEDGE_TO_TAXONOMY = {value: key for key, value in _TAXONOMY_TO_KNOWLEDGE.items()}
-# Preserve the separate 财富大厦 identity instead of colliding with 威尔斯公馆.
-_KNOWLEDGE_TO_TAXONOMY["wealth-mansion"] = "wealth_mansion_building"
 
 
 def _clean_row(row: dict[str, Any]) -> dict[str, str]:
@@ -90,6 +87,17 @@ def _bundle() -> dict[str, dict[str, Any]]:
         key = _entity_key(row.get("project_entity_id", ""))
         if key:
             projects.setdefault(key, {})["living"] = row
+
+    for row in _rows("v5"):
+        identity = str(row.get("canonical project identity", "") or "").strip()
+        if identity.startswith("project:new:"):
+            key = identity[len("project:new:"):]
+        elif identity.startswith("project:"):
+            key = identity[len("project:"):]
+        else:
+            key = ""
+        if key:
+            projects.setdefault(key, {})["v5_profile"] = row
 
     for row in _rows("aliases"):
         identity = str(row.get("canonical_identity", "") or "").strip()
@@ -167,6 +175,7 @@ def project_knowledge_stats() -> dict[str, int]:
         "projects": len(projects),
         "registry_profiles": sum(1 for value in projects.values() if value.get("registry")),
         "living_profiles": sum(1 for value in projects.values() if value.get("living")),
+        "v5_profiles": sum(1 for value in projects.values() if value.get("v5_profile")),
         "relations": sum(len(value.get("relations") or []) for value in projects.values()),
         "evidence_rows": sum(len(value.get("evidence") or []) for value in projects.values()),
         "conflicts": sum(len(value.get("conflicts") or []) for value in projects.values()),
