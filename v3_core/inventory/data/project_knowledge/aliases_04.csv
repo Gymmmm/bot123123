@@ -1,0 +1,51 @@
+<PARSED TEXT FOR SHEET: 1 / 1 TABS
+148,Orkide Botanic City,orkidebotaniccity,PROJECT,奥凯德 Botanic City,project:orkide-botanic-city,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+149,Orkide Grand,orkidegrand,PROJECT,奥凯德 The Grand,project:orkide-the-grand,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+150,Orkide Pochentong,orkidepochentong,PROJECT,奥凯德 Pochentong,project:orkide-pochentong,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+151,Orkide The Botanic City,orkidethebotaniccity,PROJECT,奥凯德 Botanic City,project:orkide-botanic-city,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+152,Orkide The Grand,orkidethegrand,PROJECT,奥凯德 The Grand,project:orkide-the-grand,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+153,Orkide The Pochentong,orkidethepochentong,PROJECT,奥凯德 Pochentong,project:orkide-pochentong,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+154,Orkide The Royal,orkidetheroyal,PROJECT,奥凯德 The Royal（别墅社区）,project:orkide-the-royal,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+155,Orkide The Royal Condominium,orkidetheroyalcondominium,PROJECT,奥凯德皇家公寓,project:new:orkide-the-royal-condominium,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,V3仅有Orkide The Royal别墅社区，本轮确认The Royal Condominium为独立真实公寓项目，必须拆开。
+156,Orkide The Royal 别墅社区,orkidetheroyal别墅社区,PROJECT,奥凯德 The Royal（别墅社区）,project:orkide-the-royal,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+157,Orkide Villa,orkidevilla,FAMILY / MARKET_GEO,Orkide / 奥凯德,family:orkide,FAMILY_GEO,70,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,2004路优先The Royal/The Grand但仍需项目词；品牌词不得单独定项目。
+158,Oxley Worldbridge,oxleyworldbridge,FAMILY / MARKET_GEO,Oxley Worldbridge,family:oxley-worldbridge,FAMILY_GEO,70,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,Bridge/Peak/Palms分别解析，不共享canonical GEO。
+159,Palm Creek,palmcreek,PROJECT,Chankiri Palm Creek（棕榈溪）,project:chankiri-palm-creek,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+160,Parc 21,parc21,PROJECT,柏盛21（Parc 21）,project:parc-21,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+161,Park Land 50M,parkland50m,PROJECT,集茂50米,project:chip-mong-park-land-50m,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+162,Park Land 598,parkland598,PROJECT,集茂598,project:chip-mong-park-land-598,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+163,Park Land 6A,parkland6a,PROJECT,集茂6A,project:chip-mong-park-land-6a,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+164,Park Land Sen Sok,parklandsensok,PROJECT,集茂森速,project:chip-mong-park-land-sen-sok,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+165,Park Land TK,parklandtk,PROJECT,集茂TK,project:chip-mong-park-land-tk,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+166,Park Land TK Condo,parklandtkcondo,PROJECT,集茂TK公寓,project:chip-mong-park-land-tk-condo,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+167,PARTIAL,partial,PROJECT,Piphup Thmey 森速社区,project:piphup-thmey-sen-sok,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+168,Peak,peak,PROJECT,香格里拉公寓 The Peak,project:the-peak,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+169,Peak Residences,peakresidences,PROJECT,香格里拉公寓 The Peak,project:the-peak,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+170,Peng Huoth,penghuoth,FAMILY / MARKET_GEO,炳发,family:peng-huoth,FAMILY_GEO,70,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,先按道路/地标缩小family，再解析具体项目；开发商名“炳发”不得直接当PROJECT。
+171,Phnom Penh Galaxy Garden,phnompenhgalaxygarden,PROJECT,金边星河花园,project:xinghe-garden,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+172,Picasso,picasso,PROJECT,毕加索城市花园,project:picasso-city-garden,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+173,Picasso City Garden,picassocitygarden,PROJECT,毕加索城市花园,project:picasso-city-garden,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+174,Picasso Sky Gemme,picassoskygemme,PROJECT,Picasso Sky Gemme（中文俗称待核）,project:new:picasso-sky-gemme,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,与Picasso City Garden为两个不同项目；旧表“毕加索天空之石/天空宝石”需避免硬译。
+175,Piphup Thmey,piphupthmey,FAMILY / MARKET_GEO,Piphup Thmey,family:piphup-thmey,FAMILY_GEO,70,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,按Sen Sok/Chamkar Dong/NR4等位置证据解析；裸品牌不定项目。
+176,Piphup Thmey 4号路社区,piphupthmey4号路社区,PROJECT,Piphup Thmey 4号路社区,project:piphup-thmey-nr4,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,NEEDS_VERIFICATION,
+177,Piphup Thmey Chamkar Dong,piphupthmeychamkardong,PROJECT,Piphup Thmey Chamkar Dong,project:piphup-thmey-chamkar-dong,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+178,Piphup Thmey NR4,piphupthmeynr4,PROJECT,Piphup Thmey 4号路社区,project:piphup-thmey-nr4,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,NEEDS_VERIFICATION,
+179,Piphup Thmey Sen Sok,piphupthmeysensok,PROJECT,Piphup Thmey 森速社区,project:piphup-thmey-sen-sok,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+180,Prince,prince,FAMILY / MARKET_GEO,太子,family:prince,AMBIGUOUS_FAMILY,20,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,裸太子只到family；需幸福/国际/寰宇/中央/现代等项目词。
+181,Prince Central Plaza,princecentralplaza,PROJECT,太子中央广场,project:prince-central-plaza,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+182,Prince Happiness Plaza,princehappinessplaza,PROJECT,太子幸福广场,project:the-pinnacle,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+183,Prince International Plaza,princeinternationalplaza,PROJECT,太子国际广场,project:prince-international-plaza,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+184,Prince Modern Plaza,princemodernplaza,PROJECT,太子现代广场,project:prince-modern-plaza,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+185,Prince One Tropica,princeonetropica,PROJECT,Prince One Tropica（中文俗称待核）,project:new:prince-one-tropica,NEW_PARTIAL_ALIAS,70,True,False,DIRECT_RESOLVE,PARTIAL,真实项目已确认；未找到足够稳定的华人中文俗称，因此中文名不硬翻。
+186,Prince Universe,princeuniverse,PROJECT,太子寰宇中心,project:prince-universe,EXACT_PROJECT_NAME,100,False,False,SEARCH_ONLY_LEGACY,VERIFIED,canonical英文修正为Prince Huan Yu Center。
+187,R&F City,r&fcity,PROJECT,富力城,project:rf-city,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+188,R and F,randf,PROJECT,富力城,project:rf-city,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+189,RF City,rfcity,PROJECT,富力城,project:rf-city,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+190,Rose Garden,rosegarden,PROJECT,玫瑰滨江园,project:rose-garden,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+191,Rose Garden Condo,rosegardencondo,PROJECT,玫瑰滨江园,project:rose-garden,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+192,Rose Garden Condominium,rosegardencondominium,PROJECT,玫瑰滨江园,project:rose-garden,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+193,Royal One,royalone,FAMILY / MARKET_GEO,皇家一号,family:royal-one,FAMILY_GEO,70,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,裸Royal One默认只指Royal One候选；TK token是TK Royal One必要强证据。
+194,SKYTREE,skytree,PROJECT,天空树,project:skytree,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+195,Sky Villa,skyvilla,PROJECT,Sky Villa（天空别墅）,project:sky-villa,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+196,The Bridge,thebridge,PROJECT,桥牌公寓（世桥）,project:the-bridge,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+197,The Elysee,theelysee,PROJECT,爱丽舍宫,project:new:the-elysee,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,OCIC官方确认钻石岛大型法式商业/商住项目。
