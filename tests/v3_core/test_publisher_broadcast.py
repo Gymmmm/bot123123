@@ -74,6 +74,21 @@ def test_weekly_marketing_copy_is_phnom_penh_annual_rent_for_chinese_renters():
     assert "我们赚服务费" not in joined
 
 
+def test_legacy_custom_marketing_copy_cannot_override_annual_phnom_penh_positioning(tmp_path):
+    db = tmp_path / "marketing-positioning.db"
+    initialize_v3_storage(db)
+    service = MarketingBroadcastService(db, user_bot_username="qiaolian_rent_bot")
+
+    service.set_custom_body(0, "🏠 金边找房第一步：先别急着看房！")
+    body = service.template(0).body
+    assert "年租" in body
+    assert "租金按月展示" in body
+    assert "先别急着看房" not in body
+
+    service.set_custom_body(0, "🏠 金边年租本周特别提醒：一年长住先确认入住时间。")
+    assert service.template(0).body == "🏠 金边年租本周特别提醒：一年长住先确认入住时间。"
+
+
 def test_marketing_runtime_button_rows_and_urls_match_locked_v1(tmp_path, monkeypatch):
     db = tmp_path / "marketing.db"
     initialize_v3_storage(db)

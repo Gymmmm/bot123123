@@ -185,7 +185,16 @@ class MarketingBroadcastService:
         index = self.local_now().weekday() if weekday is None else int(weekday)
         base = TEMPLATES[index % 7]
         custom = self._get_optional(f"marketing_body_{base.key}").strip()
-        return MarketingTemplate(base.key, base.title, custom or base.body, base.buttons)
+        # Rental marketing has two non-negotiable positioning constraints:
+        # Phnom Penh context + annual/long-stay lease context. Legacy custom
+        # copy that predates these constraints must not silently override them.
+        custom_matches_positioning = bool(
+            custom
+            and "金边" in custom
+            and ("年租" in custom or "一年" in custom)
+        )
+        body = custom if custom_matches_positioning else base.body
+        return MarketingTemplate(base.key, base.title, body, base.buttons)
 
     def set_custom_body(self, weekday: int, body: str) -> None:
         clean = str(body or "").strip()
