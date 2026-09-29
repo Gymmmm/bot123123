@@ -7,8 +7,9 @@ publication policy.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from html import escape
 import os
 import sqlite3
 from zoneinfo import ZoneInfo
@@ -33,48 +34,56 @@ class MarketingTemplate:
 
 TEMPLATES = (
     MarketingTemplate(
-        "mon",
-        "🏠 本周找房",
-        "📮 <b>侨联周承诺 · 周一</b>\n🔒 <b>真实房源承诺</b>\n\n• 顾问实地核实\n• 实拍不用网图\n• 费用提前问清\n• 已租及时下架\n\n到场不符，侨联负责沟通。",
+        "mon", "📊 本周租房库存",
+        "📊 <b>本周金边租房库存</b>\n\n当前公开库存暂时没有足够数据，直接进入最新房源查看实时房态。",
         (("🔍 开始找房", "find"), ("💬 中文顾问", "advisor"), ("📢 最新房源", "latest")),
     ),
     MarketingTemplate(
-        "tue",
-        "📋 看房准备",
-        "📮 <b>侨联周承诺 · 周二</b>\n🔒 <b>押金保障承诺</b>\n\n入住前｜全屋拍照存档\n租期中｜维修争议介入协调\n退租时｜对照档案陪同核查\n有纠纷｜帮您与房东沟通\n\n六年，这个承诺没破过。",
+        "tue", "💰 预算能租什么",
+        "💰 <b>金边租房预算参考</b>\n\n按侨联当前公开库存统计；库存不足时不生成价格结论。",
         (("💬 中文顾问", "advisor"), ("🛎️ 侨联服务", "service"), ("🔍 开始找房", "find")),
     ),
     MarketingTemplate(
-        "wed",
-        "💰 租房预算",
-        "📮 <b>侨联周承诺 · 周三</b>\n💡 <b>租房隐性成本清单</b>\n\n每套都会问清：\n• 水电：按表 / 固定？\n• 网络：含 / 自装？\n• 物业：房东 / 租客？\n• 停车：含 / 另收？\n• 门禁卡：押金？\n\n找房时每套都注明。",
+        "wed", "📍 当前房源区域",
+        "📍 <b>当前房源主要分布</b>\n\n只按侨联当前已公开房源统计，不代表整个金边市场成交量。",
         (("🔍 开始找房", "find"), ("💬 中文顾问", "advisor")),
     ),
     MarketingTemplate(
-        "thu",
-        "🔍 房源怎么选",
-        "📮 <b>侨联周承诺 · 周四</b>\n📹 <b>视频实拍代看</b>\n\n人不在金边，或没时间跑现场？\n提前告诉我们你在意什么：\n\n噪音大不大、外卖能不能上楼、\n家电新不新、采光好不好……\n\n约个时间，顾问替您到现场，\n开实时视频，想看哪就看哪，\n这些细节，我们替您现场把关。",
+        "thu", "🆕 近7天上新",
+        "🆕 <b>近7天房源更新</b>\n\n只统计已经公开发布、当前仍有效的租房房源。",
         (("💬 中文顾问", "advisor"), ("🔍 开始找房", "find")),
     ),
     MarketingTemplate(
-        "fri",
-        "📝 签约提醒",
-        "📮 <b>侨联周承诺 · 周五</b>\n🈚 <b>无中介费承诺</b>\n\n通过侨联租房：\n• 不向租客收中介费\n• 租金直接与房东签\n• 费用明细提前列清\n\n我们赚服务费，不赚信息差。",
+        "fri", "📋 周末看房准备",
+        "📋 <b>周末看房前先确认</b>\n\n区域、预算、户型、入住时间确定后，再按当前房态安排看房，减少无效往返。",
         (("💬 中文顾问", "advisor"), ("🔍 开始找房", "find")),
     ),
     MarketingTemplate(
-        "sat",
-        "🏠 周末看房",
-        "📮 <b>侨联周承诺 · 周六</b>\n🏆 <b>六年本地服务承诺</b>\n\n金边本地6年：\n• 真实房源，实拍更新\n• 中文顾问，全程跟进\n• 视频代看，人不到也能选\n• 入住售后，租期内继续管\n\n六年，这个承诺没破过。",
+        "sat", "🏠 周末可看房源",
+        "🏠 <b>周末找房</b>\n\n先从当前公开房源里筛选，再确认实时房态和可看时间。",
         (("🔍 开始找房", "find"), ("🛎️ 侨联服务", "service"), ("💬 中文顾问", "advisor")),
     ),
     MarketingTemplate(
-        "sun",
-        "🛡 侨联保障",
-        "📮 <b>侨联周承诺 · 周日</b>\n🛡️ <b>入住售后承诺</b>\n\n签约不是结束，入住才是开始：\n• 报修：工单登记，快速响应\n• 物业：代您沟通，不用自己跑\n• 水电：缴费协助，避免停水停电\n• 搬家保洁网络：需要就找侨联\n\n租期内，有问题都能找到人。",
+        "sun", "📈 本周房源复盘",
+        "📈 <b>本周房源复盘</b>\n\n用本周真实公开库存做复盘，不使用虚构热度、成交量或回报率。",
         (("🛎️ 侨联服务", "service"), ("💬 中文顾问", "advisor")),
     ),
 )
+
+
+@dataclass(frozen=True)
+class InventoryMarketingSnapshot:
+    total: int = 0
+    active: int = 0
+    reserved: int = 0
+    new_7d: int = 0
+    min_rent: int | None = None
+    max_rent: int | None = None
+    budget_under_500: int = 0
+    budget_500_700: int = 0
+    budget_701_1000: int = 0
+    budget_over_1000: int = 0
+    top_areas: tuple[tuple[str, int], ...] = ()
 
 
 class MarketingBroadcastService:
@@ -136,11 +145,114 @@ class MarketingBroadcastService:
     def local_now(self) -> datetime:
         return datetime.now(self.timezone)
 
+    def _inventory_snapshot(self) -> InventoryMarketingSnapshot:
+        """Aggregate only currently published Telegram rent inventory."""
+        sql = """
+            SELECT l.listing_id,l.inventory_status,
+                   COALESCE(NULLIF(TRIM(l.public_location_display), ''), TRIM(l.canonical_area_display)) AS area,
+                   o.monthly_rent_usd,MAX(pi.published_at) AS latest_published
+            FROM listings_v3 l
+            JOIN listing_offers o
+              ON o.listing_id=l.listing_id AND o.offer_type='rent'
+             AND o.offer_status='active' AND o.publication_policy='telegram_rent'
+            JOIN publication_instances pi
+              ON pi.listing_id=l.listing_id AND pi.offer_id=o.offer_id
+             AND pi.platform='telegram' AND pi.publish_status='published'
+            JOIN publication_packages_v3 pp
+              ON pp.package_id=pi.package_id AND pp.listing_id=l.listing_id
+             AND pp.offer_id=o.offer_id AND pp.status IN ('approved','published')
+            WHERE l.data_status='current'
+              AND l.inventory_status IN ('active','reserved')
+              AND TRIM(COALESCE(l.public_listing_id,''))<>''
+            GROUP BY l.listing_id,l.inventory_status,area,o.monthly_rent_usd
+        """
+        with self._connect() as conn:
+            rows = conn.execute(sql).fetchall()
+        now_utc = datetime.now(timezone.utc)
+        area_counts: dict[str, int] = {}
+        rents: list[int] = []
+        active = reserved = new_7d = 0
+        bands = [0, 0, 0, 0]
+        for row in rows:
+            status = str(row["inventory_status"] or "").strip().lower()
+            active += int(status == "active")
+            reserved += int(status == "reserved")
+            area = str(row["area"] or "").strip()
+            if area:
+                area_counts[area] = area_counts.get(area, 0) + 1
+            try:
+                rent = int(row["monthly_rent_usd"])
+            except (TypeError, ValueError):
+                rent = 0
+            if rent > 0:
+                rents.append(rent)
+                if rent < 500: bands[0] += 1
+                elif rent <= 700: bands[1] += 1
+                elif rent <= 1000: bands[2] += 1
+                else: bands[3] += 1
+            raw_published = str(row["latest_published"] or "").strip()
+            if raw_published:
+                try:
+                    published = datetime.fromisoformat(raw_published.replace("Z", "+00:00"))
+                    if published.tzinfo is None:
+                        published = published.replace(tzinfo=timezone.utc)
+                    if now_utc - published.astimezone(timezone.utc) <= timedelta(days=7):
+                        new_7d += 1
+                except ValueError:
+                    pass
+        top_areas = tuple(sorted(area_counts.items(), key=lambda item: (-item[1], item[0]))[:4])
+        return InventoryMarketingSnapshot(
+            total=len(rows), active=active, reserved=reserved, new_7d=new_7d,
+            min_rent=min(rents) if rents else None, max_rent=max(rents) if rents else None,
+            budget_under_500=bands[0], budget_500_700=bands[1],
+            budget_701_1000=bands[2], budget_over_1000=bands[3], top_areas=top_areas,
+        )
+
+    @staticmethod
+    def _money(value: int | None) -> str:
+        return f"${int(value):,}" if value else "—"
+
+    def _data_body(self, key: str, fallback: str) -> str:
+        s = self._inventory_snapshot()
+        if s.total <= 0:
+            return fallback
+        area_lines = "\n".join(f"• {escape(area)}：{count} 套" for area, count in s.top_areas) or "• 区域信息待补全"
+        rent_range = f"{self._money(s.min_rent)}–{self._money(s.max_rent)}/月" if s.min_rent and s.max_rent else "价格信息待补全"
+        bodies = {
+            "mon": "📊 <b>本周金边租房库存</b>\n\n"
+                   f"当前公开有效：<b>{s.total} 套</b>\n可租：{s.active} 套｜已预留：{s.reserved} 套\n"
+                   f"当前月租范围：{rent_range}\n\n<b>房源较多的区域</b>\n{area_lines}\n\n"
+                   "<i>数据：侨联地产当前已公开租房库存；房态会变化，以咨询时实时确认为准。</i>",
+            "tue": "💰 <b>现在这个预算，侨联有多少套？</b>\n\n"
+                   f"$500 以下：{s.budget_under_500} 套\n$500–700：{s.budget_500_700} 套\n"
+                   f"$701–1,000：{s.budget_701_1000} 套\n$1,000 以上：{s.budget_over_1000} 套\n\n"
+                   f"当前公开库存共 {s.total} 套。\n<i>这是侨联当前公开库存，不代表全金边市场均价或成交价。</i>",
+            "wed": "📍 <b>侨联当前房源主要在哪些区域？</b>\n\n"
+                   f"{area_lines}\n\n当前公开有效：{s.total} 套\n"
+                   "<i>按当前公开库存数量排序，不使用“最热门”等无法验证的市场结论。</i>",
+            "thu": "🆕 <b>近7天房源更新</b>\n\n"
+                   f"近7天新公开 / 重新发布且当前有效：<b>{s.new_7d} 套</b>\n"
+                   f"当前公开有效：{s.total} 套\n当前月租范围：{rent_range}\n\n"
+                   "找房时直接给区域 + 预算 + 户型 + 入住时间，按当前库存筛。",
+            "fri": "📋 <b>周末看房，先把这4项定下来</b>\n\n"
+                   "1. 区域\n2. 月预算\n3. 户型\n4. 预计入住时间\n\n"
+                   f"侨联当前公开有效房源：{s.total} 套。\n先筛当前库存，再确认房态和可看时间，避免无效往返。",
+            "sat": "🏠 <b>周末找房库存</b>\n\n"
+                   f"当前可租：<b>{s.active} 套</b>\n已预留：{s.reserved} 套\n月租范围：{rent_range}\n\n"
+                   f"{area_lines}\n\n先选条件，再确认今天实际能看的房源。",
+            "sun": "📈 <b>本周房源数据</b>\n\n"
+                   f"当前公开有效：{s.total} 套\n近7天更新：{s.new_7d} 套\n"
+                   f"可租：{s.active} 套｜已预留：{s.reserved} 套\n月租范围：{rent_range}\n\n"
+                   "<i>全部来自侨联当前公开库存；不把挂牌库存包装成成交量、热度或投资回报率。</i>",
+        }
+        return bodies.get(key, fallback)
+
     def template(self, weekday: int | None = None) -> MarketingTemplate:
         index = self.local_now().weekday() if weekday is None else int(weekday)
         base = TEMPLATES[index % 7]
         custom = self._get_optional(f"marketing_body_{base.key}").strip()
-        return MarketingTemplate(base.key, base.title, custom or base.body, base.buttons)
+        body = custom or self._data_body(base.key, base.body)
+        return MarketingTemplate(base.key, base.title, body, base.buttons)
 
     def set_custom_body(self, weekday: int, body: str) -> None:
         clean = str(body or "").strip()
