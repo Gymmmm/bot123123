@@ -408,7 +408,7 @@ def project_reference_for_key(project_key: object) -> dict[str, Any] | None:
         result["web_verified"] = deepcopy(web_profile)
         for field in (
             "display_name", "developer", "project_type", "location", "address",
-            "amenities", "nearby", "building_profile", "completion_year", "notes",
+            "amenities", "nearby", "unit_types", "building_profile", "completion_year", "notes",
             "source_urls",
         ):
             if web_profile.get(field) not in (None, "", [], {}):
