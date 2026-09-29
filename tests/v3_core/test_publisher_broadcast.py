@@ -61,17 +61,54 @@ def test_marketing_template_button_metadata_matches_locked_v1_ctas():
     assert {template.key: template.buttons for template in MARKETING_TEMPLATES} == expected
 
 
-def test_weekly_marketing_copy_matches_locked_v1():
-    expected = {
-        "mon": "📮 <b>侨联周承诺 · 周一</b>\n🔒 <b>真实房源承诺</b>\n\n• 顾问实地核实\n• 实拍不用网图\n• 费用提前问清\n• 已租及时下架\n\n到场不符，侨联负责沟通。",
-        "tue": "📮 <b>侨联周承诺 · 周二</b>\n🔒 <b>押金保障承诺</b>\n\n入住前｜全屋拍照存档\n租期中｜维修争议介入协调\n退租时｜对照档案陪同核查\n有纠纷｜帮您与房东沟通\n\n六年，这个承诺没破过。",
-        "wed": "📮 <b>侨联周承诺 · 周三</b>\n💡 <b>租房隐性成本清单</b>\n\n每套都会问清：\n• 水电：按表 / 固定？\n• 网络：含 / 自装？\n• 物业：房东 / 租客？\n• 停车：含 / 另收？\n• 门禁卡：押金？\n\n找房时每套都注明。",
-        "thu": "📮 <b>侨联周承诺 · 周四</b>\n📹 <b>视频实拍代看</b>\n\n人不在金边，或没时间跑现场？\n提前告诉我们你在意什么：\n\n噪音大不大、外卖能不能上楼、\n家电新不新、采光好不好……\n\n约个时间，顾问替您到现场，\n开实时视频，想看哪就看哪，\n这些细节，我们替您现场把关。",
-        "fri": "📮 <b>侨联周承诺 · 周五</b>\n🈚 <b>无中介费承诺</b>\n\n通过侨联租房：\n• 不向租客收中介费\n• 租金直接与房东签\n• 费用明细提前列清\n\n我们赚服务费，不赚信息差。",
-        "sat": "📮 <b>侨联周承诺 · 周六</b>\n🏆 <b>六年本地服务承诺</b>\n\n金边本地6年：\n• 真实房源，实拍更新\n• 中文顾问，全程跟进\n• 视频代看，人不到也能选\n• 入住售后，租期内继续管\n\n六年，这个承诺没破过。",
-        "sun": "📮 <b>侨联周承诺 · 周日</b>\n🛡️ <b>入住售后承诺</b>\n\n签约不是结束，入住才是开始：\n• 报修：工单登记，快速响应\n• 物业：代您沟通，不用自己跑\n• 水电：缴费协助，避免停水停电\n• 搬家保洁网络：需要就找侨联\n\n租期内，有问题都能找到人。",
-    }
-    assert {template.key: template.body for template in MARKETING_TEMPLATES} == expected
+def test_weekly_marketing_copy_is_safe_when_public_inventory_is_empty(tmp_path):
+    db = tmp_path / "marketing-safe.db"
+    initialize_v3_storage(db)
+    service = MarketingBroadcastService(db, user_bot_username="qiaolian_rent_bot")
+    bodies = [service.template(day).body for day in range(7)]
+    joined = "\n".join(bodies)
+    assert "六年，这个承诺没破过" not in joined
+    assert "我们赚服务费" not in joined
+    assert "顾问实地核实" not in joined
+    assert "公开" in joined
+    assert "年租" in joined
+    assert "金边" in joined
+    assert "中国人在金边" in joined
+    assert "短租" not in joined
+    assert "日租" not in joined
+
+
+def test_marketing_uses_only_durably_published_rent_inventory(tmp_path):
+    db = tmp_path / "marketing-data.db"
+    initialize_v3_storage(db)
+    with sqlite3.connect(db) as conn:
+        conn.execute("INSERT INTO canonical_records (canonical_record_id,source_post_id,schema_version,deal_type,facts_json,facts_hash) VALUES ('CAN_MKT','1','canonical_facts.v1','rent','{}','hash-mkt')")
+        conn.execute("""INSERT INTO listings_v3
+            (listing_id,public_listing_id,canonical_record_id,property_type,public_location_display,
+             canonical_area_display,layout,display_title,canonical_facts_hash,canonical_facts_schema,
+             inventory_status,data_status)
+            VALUES ('L_MKT','QL-MKT-01','CAN_MKT','公寓','BKK1','BKK1','1房1卫','BKK1 1房',
+                    'hash-mkt','canonical_facts.v1','active','current')""")
+        conn.execute("INSERT INTO listing_offers (offer_id,listing_id,offer_type,monthly_rent_usd,offer_status,publication_policy,publishable) VALUES ('O_MKT','L_MKT','rent',650,'active','telegram_rent',1)")
+        conn.execute("""INSERT INTO publication_packages_v3
+            (package_id,listing_id,offer_id,canonical_record_id,package_version,status,cover_style,cover_path,
+             gallery_json,post_text,actions_json,snapshot_json,frozen_file_hashes_json,source_identity_json,
+             public_token,canonical_facts_hash,content_hash)
+            VALUES ('PKG_MKT','L_MKT','O_MKT','CAN_MKT',1,'published','none','','[]','','{}','{}','{}','{}',
+                    'tok','hash-mkt','content-mkt')""")
+        conn.execute("""INSERT INTO publication_instances
+            (instance_id,package_id,listing_id,offer_id,platform,channel_chat_id,channel_message_id,publish_status,published_at)
+            VALUES ('PI_MKT','PKG_MKT','L_MKT','O_MKT','telegram','-1001','101','published',CURRENT_TIMESTAMP)""")
+        conn.commit()
+    service = MarketingBroadcastService(db, user_bot_username="qiaolian_rent_bot")
+    monday = service.template(0).body
+    tuesday = service.template(1).body
+    assert "当前公开有效：<b>1 套</b>" in monday
+    assert "BKK1：1 套" in monday
+    assert "年租房源月租展示：$650–$650/月" in monday
+    assert "$500–700：1 套" in tuesday
+    assert "当前公开年租库存共 1 套" in tuesday
+    assert "全金边市场均价" in tuesday
 
 
 def test_marketing_runtime_button_rows_and_urls_match_locked_v1(tmp_path, monkeypatch):
@@ -143,7 +180,8 @@ def test_footer_buttons_use_live_v3_start_shortcuts(tmp_path):
 def test_static_and_custom_templates_are_explicit(tmp_path):
     service = _service(tmp_path)
     service.set_template("weekly")
-    assert "本周找房提醒" in service.body()
+    assert "金边年租找房" in service.body()
+    assert "租金按月展示" in service.body()
     service.set_custom_html("<b>自定义广播</b>")
     assert service.config().template_key == "custom"
     assert service.body() == "<b>自定义广播</b>"
@@ -200,6 +238,9 @@ def test_live_builder_preserves_weather_and_fx_contract(tmp_path):
     assert "100 USD ≈ 700 CNY" in body
     assert "📌 今日提醒" in body
     assert "今天有阵雨，出门记得带伞。" in body
+    assert "金边年租找房" in body
+    assert "租金按月展示" in body
+    assert "常去地点 / 区域 + 月预算 + 户型 + 入住时间" in body
 
 
 def test_publisher_dashboard_exposes_broadcast_center(tmp_path):
@@ -216,5 +257,8 @@ def test_publisher_dashboard_exposes_broadcast_center(tmp_path):
     )
     bot = V3PublisherApplication(settings)
     buttons = [button for row in bot._dashboard_keyboard().inline_keyboard for button in row]
-    broadcast = next(button for button in buttons if button.text == "📢 发布中心")
+    # Active operator home uses the renamed label.
+    broadcast = next(button for button in buttons if button.text == "📢 频道运营")
     assert broadcast.callback_data == "v3bc"
+    # v3bc still routes into the broadcast center (marketing, weather, FX, ...).
+    assert "v3bc" in {button.callback_data for button in buttons}
