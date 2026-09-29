@@ -303,7 +303,7 @@ def test_public_inventory_uses_verified_project_location_when_post_omits_address
 @pytest.mark.parametrize(
     ("project_key", "location_token"),
     [
-        ("prince_central_plaza", "Norodom"),
+        ("prince_central_plaza", "诺罗敦大道"),
         ("prince_international_plaza", "Sen Sok"),
         ("casa_meridian", "Koh Pich"),
         ("sky_villa", "Street 163"),
