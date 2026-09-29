@@ -94,10 +94,12 @@ def test_verified_alias_registry_adds_new_projects_without_family_false_positive
     ts6 = canonicalize_source("Time Square 6出租\n1房\n租金$700/月")
     assert ts6["project_key"] == "times_square_6"
     assert project_reference_for_key(ts6["project_key"])["knowledge_key"] == "times-square-6"
+    assert ts6["public_location_display"] == "BKK1 · 302路"
 
     royal_condo = canonicalize_source("奥凯德皇家公寓出租\n2房\n租金$900/月")
     assert royal_condo["project_key"] == "orkide_the_royal_condominium"
     assert project_reference_for_key(royal_condo["project_key"])["knowledge_key"] == "orkide-the-royal-condominium"
+    assert royal_condo["public_location_display"] == "2004路 · 奥凯德皇家公寓"
 
     royal_villa = canonicalize_source("Orkide The Royal 别墅社区\n4房\n租金$2500/月")
     assert royal_villa["project_key"] == "orkide_the_royal"
