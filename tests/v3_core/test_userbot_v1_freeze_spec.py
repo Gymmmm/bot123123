@@ -12,17 +12,17 @@ def _labels(view):
 
 def test_home_matches_final_service_surface():
     view = build_home_view(channel_url="https://t.me/example")
-    assert _labels(view) == ["🔍 帮我找房", "🛎️ 侨联服务", "📢 最新房源", "💬 联系中文顾问"]
+    assert _labels(view) == ["🔍 1V1定制找房", "🛎️ 侨联服务", "📢 最新房源", "💬 1V1中文顾问"]
     assert "金边中文租房" in view.text
 
 
 def test_search_entry_is_direct_filter_panel():
     view = TransitionViewService.search_entry()
-    assert "想找什么样的房子？" in view.text
+    assert "1V1定制找房" in view.text
     assert "BKK1 一房，预算 $600" in view.text
     assert _labels(view) == [
         "📍 按区域", "💰 按预算", "🏠 按户型",
-        "💬 联系中文顾问", "🏠 返回首页",
+        "💬 1V1中文顾问", "🏠 返回首页",
     ]
 
 
@@ -35,12 +35,12 @@ def test_listing_surface_source_contains_final_first_layer_actions():
 
 def test_service_hubs_match_final_layouts():
     assert _labels(service_home_view()) == [
-        "📋 我的租约", "🤝 租后服务", "🛡️ 侨联安心租",
-        "💬 联系中文顾问", "🏠 返回首页",
+        "📋 我的租约", "🤝 租后管家", "🛡️ 侨联安心租",
+        "💬 1V1中文顾问", "🏠 返回首页",
     ]
     assert _labels(concierge_home_view()) == [
-        "🔧 报修直通", "🏢 物业代办", "🔌 账单代办", "🚚 搬家协助",
-        "🧹 保洁安排", "🌐 网络办理", "❓ 其他住房问题", "⬅️ 返回侨联服务",
+        "🔧 报修直通", "🏢 物业代办", "🔌 账单代办", "🚚 搬家帮办",
+        "🧹 保洁代约", "🌐 网络帮办", "❓ 其他住房问题", "⬅️ 返回侨联服务",
     ]
 
 
@@ -56,8 +56,8 @@ class _Service:
 
 
 def test_renew_terminate_are_safe_intent_surfaces():
-    assert _labels(renew_view(_Service(), 1)) == ["提交续租意向", "💬 联系中文顾问", "⬅️ 返回我的租约"]
-    assert _labels(terminate_view(_Service(), 1)) == ["提交退租意向", "💬 联系中文顾问", "⬅️ 返回我的租约"]
+    assert _labels(renew_view(_Service(), 1)) == ["提交续租意向", "💬 1V1中文顾问", "⬅️ 返回我的租约"]
+    assert _labels(terminate_view(_Service(), 1)) == ["提交退租意向", "💬 1V1中文顾问", "⬅️ 返回我的租约"]
 
 
 def test_adviser_notes_remain_publisher_read_only():

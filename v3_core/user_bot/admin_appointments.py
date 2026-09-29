@@ -284,12 +284,12 @@ async def _notify_user_status(
     if clean_advisor:
         rows.append([
             InlineKeyboardButton(
-                "💬 联系中文顾问",
+                "💬 1V1中文顾问",
                 url=advisor_handoff_url(clean_advisor, public_listing_id=public_id),
             )
         ])
     else:
-        rows.append([InlineKeyboardButton("💬 联系中文顾问", callback_data="v3u:home:contact")])
+        rows.append([InlineKeyboardButton("💬 1V1中文顾问", callback_data="v3u:home:contact")])
     rows.append([InlineKeyboardButton("📅 我的预约", callback_data="v3u:home:appointments")])
     clean_channel = str(channel_url or "").strip()
     if clean_channel:

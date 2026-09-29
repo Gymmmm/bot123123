@@ -28,7 +28,7 @@ def test_public_command_menu_hides_retired_and_admin_entries():
     commands = _commands(public_command_menu())
     assert commands == [
         ("start", "回到首页"),
-        ("find", "帮我找房"),
+        ("find", "1V1定制找房"),
         ("appointments", "我的预约"),
         ("service", "侨联服务"),
     ]
@@ -104,16 +104,16 @@ async def test_property_advisor_buttons_are_only_handoff_and_return():
     await _render_contact(query, text="QL-RF-A2B3", public_listing_id="QL-RF-A2B3", advisor_url="https://t.me/advisor")
     labels = [button.text for row in query.markup.inline_keyboard for button in row]
     callbacks = [button.callback_data for row in query.markup.inline_keyboard for button in row if button.callback_data]
-    assert labels == ["💬 联系中文顾问", "⬅️ 返回房源"]
+    assert labels == ["💬 1V1中文顾问", "⬅️ 返回房源"]
     assert callbacks == ["v3u:listing:details:QL-RF-A2B3"]
     assert all(term not in labels for term in ("预约看房", "更多实拍", "继续找房"))
 
 
 def test_aftercare_and_public_resident_buttons_stay_frozen():
-    assert _labels(build_assurance_home_view()) == ["🛡️ 入住留档", "💬 联系中文顾问", "⬅️ 返回侨联服务"]
+    assert _labels(build_assurance_home_view()) == ["🛡️ 入住留档", "💬 1V1中文顾问", "⬅️ 返回侨联服务"]
     expected = [
-        "📋 我的租约", "🤝 租后服务", "🛡️ 侨联安心租",
-        "💬 联系中文顾问", "🏠 返回首页",
+        "📋 我的租约", "🤝 租后管家", "🛡️ 侨联安心租",
+        "💬 1V1中文顾问", "🏠 返回首页",
     ]
     assert _labels(service_home_view()) == expected
     class Service:
@@ -222,5 +222,5 @@ def test_legacy_contact_and_aftercare_destinations_render_new_names():
     assert "联系顾问" not in _labels(contact)
     rental = build_assurance_home_view()
     assert "侨联安心租" in rental.text
-    assert "视频带看｜费用透明｜入住留档｜租后服务" in rental.text
+    assert "视频代看｜费用先说清｜入住留档｜租后管家" in rental.text
     assert "关于侨联" not in rental.text

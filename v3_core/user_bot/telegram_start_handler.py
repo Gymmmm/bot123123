@@ -266,13 +266,13 @@ async def _render_photos(
 
 def _support_keyboard(*, advisor_url: str = "", channel_url: str = "") -> InlineKeyboardMarkup:
     rows = [
-        [InlineKeyboardButton("🔍 帮我找房", callback_data="v3u:home:search")],
+        [InlineKeyboardButton("🔍 1V1定制找房", callback_data="v3u:home:search")],
     ]
     clean_advisor = str(advisor_url or "").strip()
     if clean_advisor:
-        rows.append([InlineKeyboardButton("💬 联系中文顾问", url=advisor_handoff_url(clean_advisor))])
+        rows.append([InlineKeyboardButton("💬 1V1中文顾问", url=advisor_handoff_url(clean_advisor))])
     else:
-        rows.append([InlineKeyboardButton("💬 联系中文顾问", callback_data="v3u:home:contact")])
+        rows.append([InlineKeyboardButton("💬 1V1中文顾问", callback_data="v3u:home:contact")])
     clean_channel = str(channel_url or "").strip()
     if clean_channel:
         rows.append([InlineKeyboardButton("📢 最新房源", url=clean_channel)])
@@ -501,7 +501,7 @@ async def _handle_listing_contact_start(
     )
     rows = []
     if direct:
-        rows.append([InlineKeyboardButton("💬 联系中文顾问", url=direct)])
+        rows.append([InlineKeyboardButton("💬 1V1中文顾问", url=direct)])
     from .callbacks import encode_listing_callback
     rows.append(
         [InlineKeyboardButton(
@@ -578,9 +578,9 @@ async def _handle_video_inventory_start(
             mode = relaxed.mode
 
     lines = [
-        "🎥 <b>视频带看</b>",
+        "🎥 <b>视频代看</b>",
         "",
-        "没空到场？顾问到房源现场，实时视频带你看。",
+        "人不到金边？顾问到现场实时视频，把房先看清楚。",
         "",
         f"区域｜{area}",
         f"预算｜{budget}",
@@ -599,7 +599,7 @@ async def _handle_video_inventory_start(
         ])
     lines.extend([
         "",
-        "可以先咨询房源，或直接预约视频带看。",
+        "可以先咨询房源，或直接预约视频代看。",
     ])
 
     rows: list[list[InlineKeyboardButton]] = []
@@ -613,7 +613,7 @@ async def _handle_video_inventory_start(
             "time": "",
             "source": "video_deeplink",
         }
-        rows.append([InlineKeyboardButton("📅 预约视频带看", callback_data="v3u:t:appointment_mode:video")])
+        rows.append([InlineKeyboardButton("📅 预约视频代看", callback_data="v3u:t:appointment_mode:video")])
     rows.append([InlineKeyboardButton("🔍 继续找房", callback_data=encode_home_callback("search"))])
     await message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(rows))
     user_data["v3_video_booking_preferred"] = True

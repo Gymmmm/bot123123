@@ -43,7 +43,7 @@ TEMPLATES = (
         "• 入住时间\n\n"
         "频道里的出租房源以长期年租为主，<b>价格按月租展示</b>。条件越清楚，越容易直接筛掉不合适的房。\n\n"
         "<b>侨联地产｜您在金边的自己人</b>",
-        (("🔍 帮我找房", "find"), ("💬 联系中文顾问", "advisor"), ("📢 最新房源", "latest")),
+        (("🔍 1V1定制找房", "find"), ("💬 1V1中文顾问", "advisor"), ("📢 最新房源", "latest")),
     ),
     MarketingTemplate(
         "tue",
@@ -57,7 +57,7 @@ TEMPLATES = (
         "• 押付怎么谈\n\n"
         "同样的月租，住一年后的实际成本可能不一样。具体费用以每套房和合同为准。\n\n"
         "<b>侨联地产｜您在金边的自己人</b>",
-        (("💬 联系中文顾问", "advisor"), ("🛎️ 侨联服务", "service"), ("🔍 帮我找房", "find")),
+        (("💬 1V1中文顾问", "advisor"), ("🛎️ 侨联服务", "service"), ("🔍 1V1定制找房", "find")),
     ),
     MarketingTemplate(
         "wed",
@@ -70,7 +70,7 @@ TEMPLATES = (
         "• 常去商场 / 办事地点\n\n"
         "把常去地点发给我们，再从当前 Telegram 年租房源里反推区域，通常比先定一个区域更实用。\n\n"
         "<b>侨联地产｜您在金边的自己人</b>",
-        (("🔍 帮我找房", "find"), ("💬 联系中文顾问", "advisor")),
+        (("🔍 1V1定制找房", "find"), ("💬 1V1中文顾问", "advisor")),
     ),
     MarketingTemplate(
         "thu",
@@ -84,7 +84,7 @@ TEMPLATES = (
         "• 停车 / 宠物要求\n\n"
         "人不在金边，也可以先约视频看房，把你在意的细节直接告诉顾问。\n\n"
         "<b>侨联地产｜您在金边的自己人</b>",
-        (("💬 联系中文顾问", "advisor"), ("🔍 帮我找房", "find")),
+        (("💬 1V1中文顾问", "advisor"), ("🔍 1V1定制找房", "find")),
     ),
     MarketingTemplate(
         "fri",
@@ -93,7 +93,7 @@ TEMPLATES = (
         "租期｜押付方式｜水电计费｜物业 / 网络｜维修责任｜提前退租｜家具家电清单｜退房条件\n\n"
         "口头说过的不算完成，重要条件尽量落到合同或附件里。具体条款以双方实际约定为准。\n\n"
         "<b>侨联地产｜您在金边的自己人</b>",
-        (("💬 联系中文顾问", "advisor"), ("🔍 帮我找房", "find")),
+        (("💬 1V1中文顾问", "advisor"), ("🔍 1V1定制找房", "find")),
     ),
     MarketingTemplate(
         "sat",
@@ -103,7 +103,7 @@ TEMPLATES = (
         "先确认实时房态，再尽量把同一路线的房源排在一起，少在金边来回跑。\n\n"
         "频道房源以年租为主，租金按月展示；具体租期和押付以每套房实际约定为准。\n\n"
         "<b>侨联地产｜您在金边的自己人</b>",
-        (("🔍 帮我找房", "find"), ("🛎️ 侨联服务", "service"), ("💬 联系中文顾问", "advisor")),
+        (("🔍 1V1定制找房", "find"), ("🛎️ 侨联服务", "service"), ("💬 1V1中文顾问", "advisor")),
     ),
     MarketingTemplate(
         "sun",
@@ -117,7 +117,7 @@ TEMPLATES = (
         "• 已有损坏和维修事项\n\n"
         "住一年，入住时多留一份记录，退房时会省很多沟通。\n\n"
         "<b>侨联地产｜您在金边的自己人</b>",
-        (("🛎️ 侨联服务", "service"), ("💬 联系中文顾问", "advisor")),
+        (("🛎️ 侨联服务", "service"), ("💬 1V1中文顾问", "advisor")),
     ),
 )
 
@@ -229,8 +229,8 @@ class MarketingBroadcastService:
             channel_id = str(os.getenv("CHANNEL_ID") or "").strip()
             if channel_id.startswith("@"):
                 channel_username = channel_id.lstrip("@")
-        find = BroadcastButton("🔍 帮我找房", channel_general_action_url(self.user_bot_username, "find"))
-        advisor = BroadcastButton("💬 联系中文顾问", channel_general_action_url(self.user_bot_username, "advisor"))
+        find = BroadcastButton("🔍 1V1定制找房", channel_general_action_url(self.user_bot_username, "find"))
+        advisor = BroadcastButton("💬 1V1中文顾问", channel_general_action_url(self.user_bot_username, "advisor"))
         service = BroadcastButton("🛎️ 侨联服务", channel_general_action_url(self.user_bot_username, "service"))
         latest = BroadcastButton("📢 最新房源", f"https://t.me/{channel_username}") if channel_username else None
         if template.key == "mon" and latest is None:
@@ -246,7 +246,7 @@ class MarketingBroadcastService:
         }
         if selected == "default":
             return locked[template.key]
-        generic = {"find": BroadcastButton("🔍 帮我找房", find.url), "contact": BroadcastButton("💬 联系中文顾问", advisor.url)}
+        generic = {"find": BroadcastButton("🔍 1V1定制找房", find.url), "contact": BroadcastButton("💬 1V1中文顾问", advisor.url)}
         if latest is not None:
             generic["latest"] = latest
         if selected == "combo":

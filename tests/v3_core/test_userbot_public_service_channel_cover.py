@@ -218,8 +218,8 @@ def test_public_service_home_matches_frozen_product():
     callbacks = [choice.callback_data for row in view.rows for choice in row]
     assert "<b>侨联服务</b>" in view.text
     assert labels == [
-        "📋 我的租约", "🤝 租后服务", "🛡️ 侨联安心租",
-        "💬 联系中文顾问", "🏠 返回首页",
+        "📋 我的租约", "🤝 租后管家", "🛡️ 侨联安心租",
+        "💬 1V1中文顾问", "🏠 返回首页",
     ]
     assert callbacks == [
         "v3u:service:tenant_lease", "v3u:service:concierge",

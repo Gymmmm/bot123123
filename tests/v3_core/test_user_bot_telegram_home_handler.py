@@ -1,4 +1,3 @@
-
 from types import SimpleNamespace
 import pytest
 
@@ -75,7 +74,7 @@ async def test_search_home_edits_existing_panel_then_sets_session():
     assert outcome.handled and outcome.rendered
     assert [c[0] for c in query.calls]==["answer","edit_text"]
     assert message.calls==[]
-    assert "想找什么样的房子？" in query.calls[-1][1][0]
+    assert "1V1定制找房" in query.calls[-1][1][0]
     assert "BKK1 一房，预算 $600" in query.calls[-1][1][0]
     callbacks=[b.callback_data for row in query.calls[-1][2]["reply_markup"].inline_keyboard for b in row]
     assert callbacks==[
@@ -108,7 +107,7 @@ async def test_appointments_edit_existing_surface():
     assert message.calls==[]
     assert "QL-RF-A2B3" in query.calls[-1][1][0]
     labels=[b.text for row in query.calls[-1][2]["reply_markup"].inline_keyboard for b in row]
-    assert labels==["🔍 帮我找房","💬 联系中文顾问","🏠 返回首页"]
+    assert labels==["🔍 1V1定制找房","💬 1V1中文顾问","🏠 返回首页"]
 
 
 @pytest.mark.asyncio
@@ -121,7 +120,7 @@ async def test_service_home_edits_existing_surface():
     assert [c[0] for c in query.calls]==["answer","edit_text"]
     assert "侨联服务" in query.calls[-1][1][0]
     labels=[b.text for row in query.calls[-1][2]["reply_markup"].inline_keyboard for b in row]
-    assert labels==["📋 我的租约","🤝 租后服务","🛡️ 侨联安心租","💬 联系中文顾问","🏠 返回首页"]
+    assert labels==["📋 我的租约","🤝 租后管家","🛡️ 侨联安心租","💬 1V1中文顾问","🏠 返回首页"]
 
 
 @pytest.mark.asyncio

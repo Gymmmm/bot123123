@@ -46,8 +46,8 @@ def test_round2_tenant_service_entry_is_public_regardless_of_binding(tmp_path):
     missing = tenant_home_view(service, 99)
     missing_labels = [choice.label for row in missing.rows for choice in row]
     assert missing_labels == [
-        "📋 我的租约", "🤝 租后服务", "🛡️ 侨联安心租",
-        "💬 联系中文顾问", "🏠 返回首页",
+        "📋 我的租约", "🤝 租后管家", "🛡️ 侨联安心租",
+        "💬 1V1中文顾问", "🏠 返回首页",
     ]
     assert "没有显示你的住房信息" not in missing.text
 

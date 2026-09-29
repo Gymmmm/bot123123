@@ -50,13 +50,13 @@ def test_parse_hhmm_is_strict():
 
 def test_marketing_template_button_metadata_matches_locked_v1_ctas():
     expected = {
-        "mon": (("🔍 帮我找房", "find"), ("💬 联系中文顾问", "advisor"), ("📢 最新房源", "latest")),
-        "tue": (("💬 联系中文顾问", "advisor"), ("🛎️ 侨联服务", "service"), ("🔍 帮我找房", "find")),
-        "wed": (("🔍 帮我找房", "find"), ("💬 联系中文顾问", "advisor")),
-        "thu": (("💬 联系中文顾问", "advisor"), ("🔍 帮我找房", "find")),
-        "fri": (("💬 联系中文顾问", "advisor"), ("🔍 帮我找房", "find")),
-        "sat": (("🔍 帮我找房", "find"), ("🛎️ 侨联服务", "service"), ("💬 联系中文顾问", "advisor")),
-        "sun": (("🛎️ 侨联服务", "service"), ("💬 联系中文顾问", "advisor")),
+        "mon": (("🔍 1V1定制找房", "find"), ("💬 1V1中文顾问", "advisor"), ("📢 最新房源", "latest")),
+        "tue": (("💬 1V1中文顾问", "advisor"), ("🛎️ 侨联服务", "service"), ("🔍 1V1定制找房", "find")),
+        "wed": (("🔍 1V1定制找房", "find"), ("💬 1V1中文顾问", "advisor")),
+        "thu": (("💬 1V1中文顾问", "advisor"), ("🔍 1V1定制找房", "find")),
+        "fri": (("💬 1V1中文顾问", "advisor"), ("🔍 1V1定制找房", "find")),
+        "sat": (("🔍 1V1定制找房", "find"), ("🛎️ 侨联服务", "service"), ("💬 1V1中文顾问", "advisor")),
+        "sun": (("🛎️ 侨联服务", "service"), ("💬 1V1中文顾问", "advisor")),
     }
     assert {template.key: template.buttons for template in MARKETING_TEMPLATES} == expected
 
@@ -96,17 +96,17 @@ def test_marketing_runtime_button_rows_and_urls_match_locked_v1(tmp_path, monkey
     service = MarketingBroadcastService(db, user_bot_username="qiaolian_rent_bot")
 
     expected_labels = {
-        "mon": [["🔍 帮我找房", "💬 联系中文顾问"], ["📢 最新房源"]],
-        "tue": [["💬 联系中文顾问", "🛎️ 侨联服务"], ["🔍 帮我找房"]],
-        "wed": [["🔍 帮我找房", "💬 联系中文顾问"]],
-        "thu": [["💬 联系中文顾问", "🔍 帮我找房"]],
-        "fri": [["💬 联系中文顾问", "🔍 帮我找房"]],
-        "sat": [["🔍 帮我找房", "🛎️ 侨联服务"], ["💬 联系中文顾问"]],
-        "sun": [["🛎️ 侨联服务", "💬 联系中文顾问"]],
+        "mon": [["🔍 1V1定制找房", "💬 1V1中文顾问"], ["📢 最新房源"]],
+        "tue": [["💬 1V1中文顾问", "🛎️ 侨联服务"], ["🔍 1V1定制找房"]],
+        "wed": [["🔍 1V1定制找房", "💬 1V1中文顾问"]],
+        "thu": [["💬 1V1中文顾问", "🔍 1V1定制找房"]],
+        "fri": [["💬 1V1中文顾问", "🔍 1V1定制找房"]],
+        "sat": [["🔍 1V1定制找房", "🛎️ 侨联服务"], ["💬 1V1中文顾问"]],
+        "sun": [["🛎️ 侨联服务", "💬 1V1中文顾问"]],
     }
     expected_urls = {
-        "🔍 帮我找房": "https://t.me/qiaolian_rent_bot?start=find",
-        "💬 联系中文顾问": "https://t.me/qiaolian_rent_bot?start=advisor",
+        "🔍 1V1定制找房": "https://t.me/qiaolian_rent_bot?start=find",
+        "💬 1V1中文顾问": "https://t.me/qiaolian_rent_bot?start=advisor",
         "🛎️ 侨联服务": "https://t.me/qiaolian_rent_bot?start=service",
         "📢 最新房源": "https://t.me/qiaolian_channel",
     }
@@ -144,8 +144,8 @@ def test_footer_buttons_use_live_v3_start_shortcuts(tmp_path):
     service.set_button("combo")
     rows = service.footer_rows()
     assert [[button.label for button in row] for row in rows] == [
-        ["🔍 帮我找房", "🏠 最新房源"],
-        ["💬 联系中文顾问"],
+        ["🔍 1V1定制找房", "🏠 最新房源"],
+        ["💬 1V1中文顾问"],
     ]
     urls = [button.url for row in rows for button in row]
     assert urls == [

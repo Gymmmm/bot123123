@@ -162,7 +162,7 @@ def _photo_actions(
             first.append(SemanticAction("📅 在线预约", "book", target))
         return (
             tuple(first),
-            (SemanticAction("💬 联系中文顾问", "consult", target),),
+            (SemanticAction("💬 咨询这套", "consult", target),),
         )
 
     if status == "pending":
@@ -176,11 +176,11 @@ def _photo_actions(
                     target_index=PHOTOS_FIRST_BATCH,
                 )
             )
-        first_row.append(SemanticAction("💬 联系中文顾问", "consult", target))
+        first_row.append(SemanticAction("💬 咨询这套", "consult", target))
         return (
             tuple(first_row),
             (
-                SemanticAction("🔍 帮我找房", "change_search", target),
+                SemanticAction("🔍 1V1定制找房", "change_search", target),
                 SemanticAction("🔍 找相似", "similar", target),
             ),
         )
@@ -188,10 +188,10 @@ def _photo_actions(
     # rented / offline / inactive / withdrawn / unknown non-bookable
     return (
         (
-            SemanticAction("🔍 帮我找房", "change_search", target),
+            SemanticAction("🔍 1V1定制找房", "change_search", target),
             SemanticAction("🔍 找相似", "similar", target),
         ),
-        (SemanticAction("💬 联系中文顾问", "consult", target),),
+        (SemanticAction("💬 咨询这套", "consult", target),),
     )
 
 def _utilities_line(*, water: str, electric: str) -> str:

@@ -65,7 +65,7 @@ BUTTON_LABELS = {
     "none": "不带按钮",
     "find": "帮我找房",
     "latest": "最新房源",
-    "contact": "联系中文顾问",
+    "contact": "1V1中文顾问",
     "combo": "组合按钮",
 }
 BUTTON_KEYS = frozenset(BUTTON_LABELS)
@@ -502,9 +502,9 @@ class BroadcastService:
         if selected not in BUTTON_KEYS:
             raise ValueError("broadcast_unknown_button")
         buttons = {
-            "find": BroadcastButton("🔍 帮我找房", build_bot_start_url(self.user_bot_username, "find_home")),
+            "find": BroadcastButton("🔍 1V1定制找房", build_bot_start_url(self.user_bot_username, "find_home")),
             "latest": BroadcastButton("🏠 最新房源", build_bot_start_url(self.user_bot_username, "latest")),
-            "contact": BroadcastButton("💬 联系中文顾问", build_bot_start_url(self.user_bot_username, "advisor")),
+            "contact": BroadcastButton("💬 1V1中文顾问", build_bot_start_url(self.user_bot_username, "advisor")),
         }
         if selected == "combo":
             return ((buttons["find"], buttons["latest"]), (buttons["contact"],))

@@ -28,7 +28,7 @@ def build_appointment_confirmation_view(draft: PublicAppointmentDraft, inventory
         raise ValueError("listing_not_bookable")
     details=build_public_listing_details(published)
     subject=booking_subject(details)
-    mode="视频带看" if draft.mode=="video" else "实地带看"
+    mode="视频代看" if draft.mode=="video" else "顾问陪看"
     lines=[
         "✅ <b>确认预约</b>",
         "",
@@ -38,7 +38,7 @@ def build_appointment_confirmation_view(draft: PublicAppointmentDraft, inventory
         f"时间｜{he(_time_display(draft.time))}",
         "",
         "请确认以上信息。",
-        "提交后，中文顾问会联系你确认具体安排。",
+        "提交后，1V1中文顾问会联系你确认具体安排。",
     ]
     return TransitionView(
         kind="appointment_confirmation",

@@ -23,11 +23,11 @@ def test_p15_service_hub_copy_buttons_and_callbacks_locked():
     assert view.text == (
         "🛎️ <b>侨联服务</b>\n\n"
         "找房只是开始。\n"
-        "视频带看、入住留档、租后问题，都可以继续找侨联。"
+        "视频代看、入住留档、租后管家，都有明确入口。"
     )
     assert _rows(view) == [
-        ["📋 我的租约", "🤝 租后服务"],
-        ["🛡️ 侨联安心租", "💬 联系中文顾问"],
+        ["📋 我的租约", "🤝 租后管家"],
+        ["🛡️ 侨联安心租", "💬 1V1中文顾问"],
         ["🏠 返回首页"],
     ]
     assert _callbacks(view) == [
@@ -41,11 +41,11 @@ def test_p15_service_hub_copy_buttons_and_callbacks_locked():
 
 def test_p16_resident_service_copy_buttons_and_coordination_callbacks_locked():
     view = concierge_home_view()
-    assert view.text == "🤝 <b>租后服务</b>\n\n签完合同不是结束。报修、物业、账单、搬家、保洁和网络，都可以继续找侨联。"
+    assert view.text == "🤝 <b>租后管家</b>\n\n报修、物业、账单、搬家、保洁、网络，不用自己到处找人。\n选一项，侨联接着办。"
     assert _rows(view) == [
         ["🔧 报修直通", "🏢 物业代办"],
-        ["🔌 账单代办", "🚚 搬家协助"],
-        ["🧹 保洁安排", "🌐 网络办理"],
+        ["🔌 账单代办", "🚚 搬家帮办"],
+        ["🧹 保洁代约", "🌐 网络帮办"],
         ["❓ 其他住房问题"],
         ["⬅️ 返回侨联服务"],
     ]
@@ -65,7 +65,7 @@ def test_p16_resident_service_copy_buttons_and_coordination_callbacks_locked():
 
 def test_p20_repair_copy_buttons_and_callbacks_locked():
     view = repair_home_view()
-    assert view.text == "🔧 <b>报修直通</b>\n\n请选择需要处理的问题："
+    assert view.text == "🔧 <b>报修直通</b>\n\n问题一次说清，后面按这条继续处理。\n\n请选择需要处理的问题："
     assert _rows(view) == [
         ["❄️ 空调", "🚿 热水 / 漏水"],
         ["💡 灯具 / 电路", "🔐 门锁 / 门禁"],
@@ -96,7 +96,7 @@ def test_p18_unbound_lease_copy_and_buttons_locked():
         "如果已经通过侨联入住，可以联系中文顾问核对。"
     )
     assert _rows(view) == [
-        ["💬 联系中文顾问"],
+        ["💬 1V1中文顾问"],
         ["⬅️ 返回侨联服务"],
     ]
     assert _callbacks(view) == [
@@ -126,7 +126,7 @@ def test_p19_bound_lease_copy_buttons_and_callbacks_locked():
         "状态｜🟢 租约有效"
     )
     assert _rows(view) == [
-        ["🔄 申请续租", "💬 联系中文顾问"],
+        ["🔄 申请续租", "💬 1V1中文顾问"],
         ["⬅️ 返回侨联服务"],
     ]
     assert _callbacks(view) == [
@@ -140,12 +140,12 @@ def test_p24_assurance_copy_buttons_and_callbacks_locked():
     view = build_assurance_home_view()
     assert view.text == (
         "🛡️ <b>侨联安心租</b>\n\n"
-        "看房更省事，入住更有据，租后有人跟。\n\n"
-        "<b>视频带看｜费用透明｜入住留档｜租后服务</b>"
+        "看房先确认，费用先说清，入住有记录，租后有人接。\n\n"
+        "<b>视频代看｜费用先说清｜入住留档｜租后管家</b>"
     )
     assert _rows(view) == [
         ["🛡️ 入住留档"],
-        ["💬 联系中文顾问"],
+        ["💬 1V1中文顾问"],
         ["⬅️ 返回侨联服务"],
     ]
     assert _callbacks(view) == [

@@ -170,7 +170,7 @@ async def test_service_shortcuts_land_on_real_user_surfaces(payload, expected_ki
     assert listings.calls == []
     assert expected_text in message.calls[-1][0][0]
     if payload == "assurance":
-        assert "视频带看｜费用透明｜入住留档｜租后服务" in message.calls[-1][0][0]
+        assert "视频代看｜费用先说清｜入住留档｜租后管家" in message.calls[-1][0][0]
         assert "关于侨联" not in message.calls[-1][0][0]
 
 

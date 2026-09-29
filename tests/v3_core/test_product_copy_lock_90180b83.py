@@ -70,7 +70,7 @@ class MemoryPublishedInventory:
 def test_channel_and_sync_keyboards_use_locked_details_label():
     publish = _labels(build_channel_keyboard(dict(ACTIONS), inventory_status="active"))
     sync = _labels(appointment_channel_keyboard(username="qiaolian_rent_bot", public_listing_id="QL-RF-A2B3", status="reserved", advisor_url="https://t.me/advisor"))
-    expected = ["📷 更多实拍", "📅 在线预约", "💬 联系中文顾问"]
+    expected = ["📷 更多实拍", "📅 在线预约", "💬 咨询这套"]
     assert publish == expected
     assert sync == expected
     assert "📷 更多详情" not in publish + sync
@@ -89,9 +89,9 @@ def test_home_contact_and_no_match_use_final_advisor_label():
         touch_payload={},
     )
     no_match = [choice.label for row in build_search_no_match_view(intent).rows for choice in row]
-    assert "💬 联系中文顾问" in home
-    assert "💬 联系中文顾问" in contact
-    assert "💬 联系中文顾问" in no_match
+    assert "💬 1V1中文顾问" in home
+    assert "💬 1V1中文顾问" in contact
+    assert "💬 1V1中文顾问" in no_match
     assert "联系我们" not in home + contact + no_match
     assert "顾问帮我找" not in home + contact + no_match
 

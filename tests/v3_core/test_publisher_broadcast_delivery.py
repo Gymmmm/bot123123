@@ -191,7 +191,7 @@ async def test_each_weekday_copy_and_button_can_be_changed(tmp_path):
     assert await controller.handle_callback(SimpleNamespace(callback_query=query), context) is True
     assert controller.marketing.button_key(2) == "contact"
     rows = controller.marketing.footer_rows(controller.marketing.template(2))
-    assert rows[0][0].label == "💬 联系中文顾问"
+    assert rows[0][0].label == "💬 1V1中文顾问"
 
 
 @pytest.mark.asyncio

@@ -79,7 +79,7 @@ def polish_listing_keyboard(
             for button in row:
                 raw_label = str(button.text or "")
                 label = raw_label
-                if raw_label in {"💬 联系我们", "💬 联系中文顾问", "问这套房", "联系我们"}:
+                if raw_label in {"💬 联系我们", "💬 联系中文顾问", "💬 1V1中文顾问", "问这套房", "联系我们"}:
                     label = "💬 咨询这套"
                 elif raw_label in {"🔍 看相近房源", "✏️ 换个条件找"}:
                     label = "🔍 继续找房"

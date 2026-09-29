@@ -24,15 +24,15 @@ class AssuranceView:
 
 ASSURANCE_HOME_TEXT = (
     "🛡️ <b>侨联安心租</b>\n\n"
-    "看房更省事，入住更有据，租后有人跟。\n\n"
-    "<b>视频带看｜费用透明｜入住留档｜租后服务</b>"
+    "看房先确认，费用先说清，入住有记录，租后有人接。\n\n"
+    "<b>视频代看｜费用先说清｜入住留档｜租后管家</b>"
 )
 
 SIGNING_TEXT = ASSURANCE_HOME_TEXT
 
 HANDOVER_TEXT = (
     "🛡️ <b>入住留档</b>\n\n"
-    "<b>入住有记录，退租有依据。</b>\n\n"
+    "<b>入住当天记清楚，退租押金少扯皮。</b>\n\n"
     "入住当天建议记录：\n\n"
     "• 水电表\n"
     "• 家具家电\n"
@@ -45,8 +45,8 @@ HANDOVER_TEXT = (
 DEPOSIT_TEXT = HANDOVER_TEXT
 
 MOVING_TEXT = (
-    "🚚 <b>搬家协助</b>\n\n"
-    "请说明搬家日期、出发地、目的地，以及大概物品情况。"
+    "🚚 <b>搬家帮办</b>\n\n"
+    "把搬家日期、出发地、目的地和大概物品发过来，帮你对接搬家。"
 )
 
 
@@ -58,7 +58,7 @@ def build_assurance_home_view() -> AssuranceView:
         text=ASSURANCE_HOME_TEXT,
         rows=(
             (AssuranceChoice("🛡️ 入住留档", callback_data="v3u:assure:handover"),),
-            (AssuranceChoice("💬 联系中文顾问", callback_data="v3u:home:contact"),),
+            (AssuranceChoice("💬 1V1中文顾问", callback_data="v3u:home:contact"),),
             (AssuranceChoice("⬅️ 返回侨联服务", callback_data="v3u:home:service"),),
         ),
     )
@@ -73,7 +73,7 @@ def build_handover_view() -> AssuranceView:
         kind="handover",
         text=HANDOVER_TEXT,
         rows=(
-            (AssuranceChoice("查看入住交接清单", callback_data="v3u:assure:handover_download"),),
+            (AssuranceChoice("查看入住留档清单", callback_data="v3u:assure:handover_download"),),
             (AssuranceChoice("⬅️ 返回侨联安心租", callback_data="v3u:home:rental"),),
         ),
     )
@@ -88,7 +88,7 @@ def build_deposit_view(
         kind="deposit",
         text=HANDOVER_TEXT,
         rows=(
-            (AssuranceChoice("查看入住交接清单", callback_data="v3u:assure:deposit_download"),),
+            (AssuranceChoice("查看入住留档清单", callback_data="v3u:assure:deposit_download"),),
             (AssuranceChoice(back_label, callback_data=back_callback),),
         ),
     )
@@ -99,8 +99,8 @@ def build_moving_view() -> AssuranceView:
         kind="moving",
         text=MOVING_TEXT,
         rows=(
-            (AssuranceChoice("💬 联系中文顾问", callback_data="v3u:home:contact"),),
-            (AssuranceChoice("⬅️ 返回租后服务", callback_data="v3u:service:concierge"),),
+            (AssuranceChoice("💬 1V1中文顾问", callback_data="v3u:home:contact"),),
+            (AssuranceChoice("⬅️ 返回租后管家", callback_data="v3u:service:concierge"),),
         ),
     )
 

@@ -38,7 +38,7 @@ def test_booking_starts_with_mode_surface():
     assert "🏠 富力城｜2房1厅" in view.text
     assert "💰 $800/月" in view.text
     assert "请选择看房方式" in view.text
-    assert _labels(view)==["🚶 实地带看","🎥 视频带看","⬅️ 返回房源"]
+    assert _labels(view)==["🚶 顾问陪看","🎥 视频代看","⬅️ 返回房源"]
     assert "LST_1" not in view.text
 
 def test_date_and_time_steps_are_light_and_supported():
@@ -86,7 +86,7 @@ def test_search_entry_is_final_direct_filter_panel():
     service=TransitionViewService(InventoryStub(None))
     plan=TransitionPlan(kind="change_search",next_step="search_entry",effects=("render_search_entry",),change_search=ChangeSearchTransition())
     view=service.build(plan)
-    assert _labels(view)==["📍 按区域","💰 按预算","🏠 按户型","💬 联系中文顾问","🏠 返回首页"]
+    assert _labels(view)==["📍 按区域","💰 按预算","🏠 按户型","💬 1V1中文顾问","🏠 返回首页"]
     assert "BKK1 一房，预算 $600" in view.text
     assert "富力城两房，要能做饭" in view.text
     assert "钻石岛公寓，想看实拍" in view.text

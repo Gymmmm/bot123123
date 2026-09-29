@@ -101,13 +101,13 @@ def _appointment_mode_view(draft: PublicAppointmentDraft, inventory: PublicInven
             "📅 <b>在线预约看房</b>\n\n"
             f"🏠 {he(subject)}\n"
             f"{price_line}"
-            "\n没空到场？选择视频带看，顾问到现场实时带你看。\n\n"
+            "\n人不到金边？选视频代看，顾问到现场实时视频，把房先看清楚。\n\n"
             "请选择看房方式："
         ),
         rows=(
             (
-                TransitionChoice("🚶 实地带看", "appointment_mode", "offline"),
-                TransitionChoice("🎥 视频带看", "appointment_mode", "video"),
+                TransitionChoice("🚶 顾问陪看", "appointment_mode", "offline"),
+                TransitionChoice("🎥 视频代看", "appointment_mode", "video"),
             ),
             (TransitionChoice("⬅️ 返回房源", "listing_details", public_listing_id=draft.public_listing_id),),
         ),
@@ -125,7 +125,7 @@ def _appointment_date_view(draft: PublicAppointmentDraft, inventory: PublicInven
         text=(
             "📅 <b>选择日期</b>\n\n"
             f"{he(subject)}\n"
-            f"已选：{he('视频带看' if draft.mode == 'video' else '实地带看')}\n\n"
+            f"已选：{he('视频代看' if draft.mode == 'video' else '顾问陪看')}\n\n"
             "请选择方便的日期："
         ),
         rows=(
@@ -294,7 +294,7 @@ def _similar_view(plan: TransitionPlan) -> TransitionView:
 
 
 _SEARCH_ENTRY_TEXT = (
-    "🔍 <b>想找什么样的房子？</b>\n\n"
+    "🔍 <b>1V1定制找房</b>\n\n"
     "直接发需求就可以，例如：\n"
     "<code>BKK1 一房，预算 $600</code>\n"
     "<code>富力城两房，要能做饭</code>\n"
@@ -311,7 +311,7 @@ def _search_entry_view() -> TransitionView:
         ),
         (
             TransitionChoice("🏠 按户型", "search_layout"),
-            TransitionChoice("💬 联系中文顾问", "home", "contact"),
+            TransitionChoice("💬 1V1中文顾问", "home", "contact"),
         ),
         (TransitionChoice("🏠 返回首页", "home"),),
     )

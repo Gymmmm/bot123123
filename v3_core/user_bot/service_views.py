@@ -28,9 +28,9 @@ def service_home_view() -> ServiceView:
             "房子定下来以后，入住和居住过程中需要处理的事情，可以从这里找侨联。"
         ),
         rows=(
-            (ServiceChoice("📋 入住交接留档", "v3u:assure:handover"), ServiceChoice("🚚 搬家协助", "v3u:assure:moving")),
+            (ServiceChoice("📋 入住交接留档", "v3u:assure:handover"), ServiceChoice("🚚 搬家帮办", "v3u:assure:moving")),
             (ServiceChoice("🔧 房屋问题报修", "v3u:service:repair"), ServiceChoice("🏢 物业沟通", "v3u:service:property")),
-            (ServiceChoice("📍 周边生活", "v3u:service:local"), ServiceChoice("💬 联系中文顾问", "v3u:home:contact")),
+            (ServiceChoice("📍 周边生活", "v3u:service:local"), ServiceChoice("💬 1V1中文顾问", "v3u:home:contact")),
             (ServiceChoice("🏠 返回首页", "v3u:t:home"),),
         ),
     )
@@ -46,7 +46,7 @@ def repair_home_view() -> ServiceView:
             (ServiceChoice("🧺 洗衣机", "v3u:service:issue:repair_washer"), ServiceChoice("🧊 冰箱", "v3u:service:issue:repair_fridge")),
             (ServiceChoice("📶 网络", "v3u:service:issue:repair_network"), ServiceChoice("🪑 家具损坏", "v3u:service:issue:repair_furniture")),
             (ServiceChoice("🔧 其他问题", "v3u:service:issue:repair_other"),),
-            (ServiceChoice("⬅️ 返回租后服务", "v3u:home:service"),),
+            (ServiceChoice("⬅️ 返回租后管家", "v3u:home:service"),),
         ),
     )
 
@@ -59,7 +59,7 @@ def property_view() -> ServiceView:
             "噪音、停车、门禁、公共区域、垃圾处理等需要物业协调的问题，可以联系中文顾问。\n\n"
             "说明 <b>发生了什么 + 大概时间 + 是否已经联系过物业</b>，我们会协助整理并跟进。"
         ),
-        rows=((ServiceChoice("💬 联系中文顾问", "v3u:home:contact"),), (ServiceChoice("⬅️ 返回租后服务", "v3u:home:service"),)),
+        rows=((ServiceChoice("💬 1V1中文顾问", "v3u:home:contact"),), (ServiceChoice("⬅️ 返回租后管家", "v3u:home:service"),)),
     )
 
 
@@ -73,7 +73,7 @@ def issue_prompt_view(draft: ServiceRequestDraft) -> ServiceView:
             "请直接发送文字说明问题。\n"
             f"例如：<code>空调可以启动，但一直不制冷。</code>{note}"
         ),
-        rows=((ServiceChoice("💬 联系中文顾问", "v3u:home:contact"),), (ServiceChoice("⬅️ 重新选择问题", "v3u:service:repair"),)),
+        rows=((ServiceChoice("💬 1V1中文顾问", "v3u:home:contact"),), (ServiceChoice("⬅️ 重新选择问题", "v3u:service:repair"),)),
     )
 
 
@@ -84,7 +84,7 @@ def slot_view(draft: ServiceRequestDraft) -> ServiceView:
         rows=(
             (ServiceChoice("今天内", "v3u:service:slot:today"), ServiceChoice("明天上午", "v3u:service:slot:tomorrow_am")),
             (ServiceChoice("明天下午", "v3u:service:slot:tomorrow_pm"),),
-            (ServiceChoice("⬅️ 返回租后服务", "v3u:home:service"),),
+            (ServiceChoice("⬅️ 返回租后管家", "v3u:home:service"),),
         ),
     )
 
@@ -94,7 +94,7 @@ def repair_success_view(*, urgent: bool) -> ServiceView:
     return ServiceView(
         kind="repair_success",
         text="✅ <b>报修已提交</b>\n\n顾问会根据您提交的问题和时间安排后续处理。" + urgent_note,
-        rows=((ServiceChoice("💬 联系中文顾问", "v3u:home:contact"),), (ServiceChoice("⬅️ 返回租后服务", "v3u:home:service"),)),
+        rows=((ServiceChoice("💬 1V1中文顾问", "v3u:home:contact"),), (ServiceChoice("⬅️ 返回租后管家", "v3u:home:service"),)),
     )
 
 
@@ -108,13 +108,13 @@ def general_prompt_view(*, nearby: bool = False) -> ServiceView:
     return ServiceView(
         kind="general_prompt",
         text="💬 <b>其他需求</b>\n\n直接发送需要处理的事情，顾问会按您这条内容继续跟进。",
-        rows=((ServiceChoice("💬 联系中文顾问", "v3u:home:contact"),), (ServiceChoice("⬅️ 返回租后服务", "v3u:home:service"),)),
+        rows=((ServiceChoice("💬 1V1中文顾问", "v3u:home:contact"),), (ServiceChoice("⬅️ 返回租后管家", "v3u:home:service"),)),
     )
 
 
 def general_success_view(*, nearby: bool = False) -> ServiceView:
     text = "✅ <b>周边需求已收到</b>\n\n顾问会根据您提交的区域和需求回复。" if nearby else "✅ <b>需求已收到</b>\n\n顾问会根据您刚才提交的内容继续跟进。"
-    return ServiceView(kind="general_success", text=text, rows=((ServiceChoice("⬅️ 返回租后服务", "v3u:home:service"),),))
+    return ServiceView(kind="general_success", text=text, rows=((ServiceChoice("⬅️ 返回租后管家", "v3u:home:service"),),))
 
 
 def local_life_view() -> ServiceView:
@@ -132,7 +132,7 @@ def local_life_view() -> ServiceView:
         rows=(
             (ServiceChoice("🏙 富力城周边", "v3u:service:rfcity"),),
             (ServiceChoice("📍 其他区域需求", "v3u:service:nearby_other"),),
-            (ServiceChoice("⬅️ 返回租后服务", "v3u:home:service"),),
+            (ServiceChoice("⬅️ 返回租后管家", "v3u:home:service"),),
         ),
     )
 
@@ -191,11 +191,11 @@ def service_home_view() -> ServiceView:
         text=(
             "🛎️ <b>侨联服务</b>\n\n"
             "找房只是开始。\n"
-            "视频带看、入住留档、租后问题，都可以继续找侨联。"
+            "视频代看、入住留档、租后管家，都有明确入口。"
         ),
         rows=(
-            (ServiceChoice("📋 我的租约", "v3u:service:tenant_lease"), ServiceChoice("🤝 租后服务", "v3u:service:concierge")),
-            (ServiceChoice("🛡️ 侨联安心租", "v3u:home:rental"), ServiceChoice("💬 联系中文顾问", "v3u:home:contact")),
+            (ServiceChoice("📋 我的租约", "v3u:service:tenant_lease"), ServiceChoice("🤝 租后管家", "v3u:service:concierge")),
+            (ServiceChoice("🛡️ 侨联安心租", "v3u:home:rental"), ServiceChoice("💬 1V1中文顾问", "v3u:home:contact")),
             (ServiceChoice("🏠 返回首页", "v3u:t:home"),),
         ),
     )
@@ -205,13 +205,14 @@ def concierge_home_view() -> ServiceView:
     return ServiceView(
         kind="concierge_home",
         text=(
-            "🤝 <b>租后服务</b>\n\n"
-            "签完合同不是结束。报修、物业、账单、搬家、保洁和网络，都可以继续找侨联。"
+            "🤝 <b>租后管家</b>\n\n"
+            "报修、物业、账单、搬家、保洁、网络，不用自己到处找人。\n"
+            "选一项，侨联接着办。"
         ),
         rows=(
             (ServiceChoice("🔧 报修直通", "v3u:service:repair"), ServiceChoice("🏢 物业代办", "v3u:service:coordination")),
-            (ServiceChoice("🔌 账单代办", "v3u:service:utilities"), ServiceChoice("🚚 搬家协助", "v3u:service:moving")),
-            (ServiceChoice("🧹 保洁安排", "v3u:service:cleaning"), ServiceChoice("🌐 网络办理", "v3u:service:network_help")),
+            (ServiceChoice("🔌 账单代办", "v3u:service:utilities"), ServiceChoice("🚚 搬家帮办", "v3u:service:moving")),
+            (ServiceChoice("🧹 保洁代约", "v3u:service:cleaning"), ServiceChoice("🌐 网络帮办", "v3u:service:network_help")),
             (ServiceChoice("❓ 其他住房问题", "v3u:service:general"),),
             (ServiceChoice("⬅️ 返回侨联服务", "v3u:home:service"),),
         ),
@@ -221,7 +222,7 @@ def concierge_home_view() -> ServiceView:
 def repair_home_view() -> ServiceView:
     return ServiceView(
         kind="repair_home",
-        text="🔧 <b>报修直通</b>\n\n请选择需要处理的问题：",
+        text="🔧 <b>报修直通</b>\n\n问题一次说清，后面按这条继续处理。\n\n请选择需要处理的问题：",
         rows=(
             (ServiceChoice("❄️ 空调", "v3u:service:issue:repair_ac"), ServiceChoice("🚿 热水 / 漏水", "v3u:service:issue:repair_water")),
             (ServiceChoice("💡 灯具 / 电路", "v3u:service:issue:repair_power"), ServiceChoice("🔐 门锁 / 门禁", "v3u:service:issue:repair_door")),
@@ -318,13 +319,13 @@ def repair_result_view(*, outcome: str, issue_label: str = "", property_name: st
             lines.extend([f"🏠 {he(property_name)}", ""])
         if issue_label:
             lines.extend([f"问题｜{he(issue_label)}", ""])
-        lines.append("中文顾问会根据你提交的信息继续跟进。")
+        lines.append("问题和时间已记录，1V1中文顾问按这条信息继续跟进。")
         return ServiceView(
             kind=f"repair_{clean}",
             text="\n".join(lines),
             rows=(
-                (ServiceChoice("💬 联系中文顾问", "v3u:home:contact"),),
-                (ServiceChoice("⬅️ 返回租后服务", "v3u:service:concierge"),),
+                (ServiceChoice("💬 1V1中文顾问", "v3u:home:contact"),),
+                (ServiceChoice("⬅️ 返回租后管家", "v3u:service:concierge"),),
             ),
         )
     return ServiceView(
@@ -336,7 +337,7 @@ def repair_result_view(*, outcome: str, issue_label: str = "", property_name: st
         ),
         rows=(
             (ServiceChoice("重新提交", "v3u:service:repair_confirm"),),
-            (ServiceChoice("💬 联系中文顾问", "v3u:home:contact"),),
+            (ServiceChoice("💬 1V1中文顾问", "v3u:home:contact"),),
             (ServiceChoice("退出报修", "v3u:service:repair_exit"),),
         ),
     )
@@ -346,7 +347,7 @@ def repair_exit_view() -> ServiceView:
     return ServiceView(
         kind="repair_exit",
         text="<b>已退出本次报修</b>\n\n本次信息未提交。",
-        rows=((ServiceChoice("⬅️ 返回租后服务", "v3u:service:concierge"),),),
+        rows=((ServiceChoice("⬅️ 返回租后管家", "v3u:service:concierge"),),),
     )
 
 
@@ -365,7 +366,7 @@ def property_view() -> ServiceView:
     choices = [ServiceChoice(label, f"v3u:service:property_category:{key}") for label, key in _PROPERTY_CATEGORIES]
     return ServiceView(
         kind="property",
-        text="🏢 <b>物业代办</b>\n\n请选择需要协调的问题：",
+        text="🏢 <b>物业代办</b>\n\n不用自己跟物业来回解释，侨联帮你对接。\n\n请选择需要协调的问题：",
         rows=(
             (choices[0], choices[1]),
             (choices[2], choices[3]),
@@ -433,10 +434,10 @@ def property_result_view(*, success: bool) -> ServiceView:
     if success:
         return ServiceView(
             kind="property_success",
-            text="✅ <b>情况已记录</b>\n\n中文顾问会根据你提交的信息继续跟进。",
+            text="✅ <b>物业代办已记录</b>\n\n不用重复解释，1V1中文顾问按这条信息继续跟进。",
             rows=(
-                (ServiceChoice("💬 联系中文顾问", "v3u:home:contact"),),
-                (ServiceChoice("⬅️ 返回租后服务", "v3u:service:concierge"),),
+                (ServiceChoice("💬 1V1中文顾问", "v3u:home:contact"),),
+                (ServiceChoice("⬅️ 返回租后管家", "v3u:service:concierge"),),
             ),
         )
     return ServiceView(
@@ -448,7 +449,7 @@ def property_result_view(*, success: bool) -> ServiceView:
         ),
         rows=(
             (ServiceChoice("重新提交", "v3u:service:property_confirm"),),
-            (ServiceChoice("💬 联系中文顾问", "v3u:home:contact"),),
+            (ServiceChoice("💬 1V1中文顾问", "v3u:home:contact"),),
             (ServiceChoice("退出", "v3u:service:property_exit"),),
         ),
     )
@@ -458,24 +459,24 @@ def property_exit_view() -> ServiceView:
     return ServiceView(
         kind="property_exit",
         text="<b>已退出本次物业代办</b>\n\n本次信息未提交。",
-        rows=((ServiceChoice("⬅️ 返回租后服务", "v3u:service:concierge"),),),
+        rows=((ServiceChoice("⬅️ 返回租后管家", "v3u:service:concierge"),),),
     )
 
 
 def utility_stub_view(kind: str) -> ServiceView:
     labels = {
-        "utilities": ("🔌 账单代办", "把水电账单或需要处理的情况发过来，中文顾问协助对接处理。"),
-        "moving": ("🚚 搬家协助", "请说明搬家日期、出发地、目的地，以及大概物品情况。"),
-        "cleaning": ("🧹 保洁安排", "请说明希望安排的日期和类型：\n\n日常保洁 / 入住保洁 / 退租保洁 / 深度保洁"),
-        "network_help": ("🌐 网络办理", "请说明需要处理的问题：\n\n新装 / 续费 / 故障 / 其他"),
+        "utilities": ("🔌 账单代办", "把水电账单或收费截图发过来，帮你看清项目并对接处理。"),
+        "moving": ("🚚 搬家帮办", "把搬家日期、出发地、目的地和大概物品发过来，帮你对接搬家。"),
+        "cleaning": ("🧹 保洁代约", "日常保洁 / 入住保洁 / 退租保洁 / 深度保洁，直接发日期和类型。"),
+        "network_help": ("🌐 网络帮办", "新装 / 续费 / 故障，直接发情况，帮你对接处理。"),
     }
     title, body = labels.get(kind, ("住房服务", "请直接说明需要协助的事情。"))
     return ServiceView(
         kind=f"{kind}_prompt",
         text=f"<b>{title}</b>\n\n{body}",
         rows=(
-            (ServiceChoice("💬 联系中文顾问", "v3u:home:contact"),),
-            (ServiceChoice("⬅️ 返回租后服务", "v3u:service:concierge"),),
+            (ServiceChoice("💬 1V1中文顾问", "v3u:home:contact"),),
+            (ServiceChoice("⬅️ 返回租后管家", "v3u:service:concierge"),),
         ),
     )
 

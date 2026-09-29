@@ -47,8 +47,8 @@ def _lead_user(update: Any) -> LeadUser:
 async def _render_contact(query: Any, *, text: str, public_listing_id: str, advisor_url: str) -> None:
     direct_advisor = advisor_handoff_url(advisor_url, public_listing_id=public_listing_id)
     contact_button = (
-        InlineKeyboardButton("💬 联系中文顾问", url=direct_advisor)
-        if direct_advisor else InlineKeyboardButton("💬 联系中文顾问", callback_data="v3u:home:contact")
+        InlineKeyboardButton("💬 1V1中文顾问", url=direct_advisor)
+        if direct_advisor else InlineKeyboardButton("💬 1V1中文顾问", callback_data="v3u:home:contact")
     )
     markup = InlineKeyboardMarkup([
         [contact_button],
@@ -75,8 +75,8 @@ def _is_historical_callback(raw: str) -> bool:
 async def _render_updated_entry(query: Any, *, advisor_url: str = "") -> None:
     direct = advisor_handoff_url(advisor_url)
     advisor_button = (
-        InlineKeyboardButton("💬 联系中文顾问", url=direct)
-        if direct else InlineKeyboardButton("💬 联系中文顾问", callback_data="v3u:home:contact")
+        InlineKeyboardButton("💬 1V1中文顾问", url=direct)
+        if direct else InlineKeyboardButton("💬 1V1中文顾问", callback_data="v3u:home:contact")
     )
     markup = InlineKeyboardMarkup([
         [InlineKeyboardButton("🏠 返回首页", callback_data="v3u:t:home")],

@@ -56,7 +56,7 @@ def test_renderer_maps_success_follow_up_actions_to_existing_home_callbacks():
                 TransitionChoice("📅 我的预约", "home", "appointments"),
                 TransitionChoice("🏠 继续看房", "home", "search"),
             ),
-            (TransitionChoice("💬 联系中文顾问", "home", "contact"),),
+            (TransitionChoice("💬 1V1中文顾问", "home", "contact"),),
         ),
     )
 
