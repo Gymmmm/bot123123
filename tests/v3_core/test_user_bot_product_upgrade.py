@@ -41,10 +41,11 @@ def test_about_and_booking_are_compatible_secondary_home_actions():
     assert parse_home_callback(encode_home_callback("about")).action == "about"
     assert parse_home_callback(encode_home_callback("book")).action == "book"
     about = build_about_view().text
-    assert "侨联地产｜金边中文租房" in about
+    assert "侨联安心租" in about
     assert "真实房源" in about
-    assert "看房、费用确认、入住交接留档" in about
-    assert "预约看房" in build_booking_view().text
+    assert "视频带看" in about
+    assert "入住留档" in about
+    assert "在线预约看房" in build_booking_view().text
     assert "换房" not in build_about_view().text
 
 
@@ -52,7 +53,7 @@ def test_service_hub_is_public_and_does_not_require_binding():
     view = service_home_view()
     labels = _labels(view)
     assert labels == [
-        "📋 我的租约", "🛡️ 入住服务", "🏠 安心租房",
+        "📋 我的租约", "🤝 租后服务", "🛡️ 侨联安心租",
         "💬 中文顾问", "⬅️ 返回首页",
     ]
     callbacks = _callbacks(view)
@@ -66,11 +67,11 @@ def test_service_hub_is_public_and_does_not_require_binding():
 def test_rental_service_is_public_parent_content_center():
     view = build_assurance_home_view()
     assert view.text == (
-        "🏠 <b>安心租房</b>\n\n"
-        "从看房到入住，重要信息尽量提前确认并留档。\n\n"
-        "入住交接、费用确认和住房问题，都可以继续找侨联。"
+        "🛡️ <b>侨联安心租</b>\n\n"
+        "看房更省事，入住更有据，租后有人跟。\n\n"
+        "<b>视频带看｜费用透明｜入住留档｜租后服务</b>"
     )
-    assert _labels(view) == ["📋 入住交接留档", "💬 中文顾问", "⬅️ 返回侨联服务"]
+    assert _labels(view) == ["🛡️ 入住留档", "💬 中文顾问", "⬅️ 返回侨联服务"]
     assert _callbacks(view) == [
         "v3u:assure:handover", "v3u:home:contact", "v3u:home:service",
     ]

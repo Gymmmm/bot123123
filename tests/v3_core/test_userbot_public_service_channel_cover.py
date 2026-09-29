@@ -218,7 +218,7 @@ def test_public_service_home_matches_frozen_product():
     callbacks = [choice.callback_data for row in view.rows for choice in row]
     assert "<b>侨联服务</b>" in view.text
     assert labels == [
-        "📋 我的租约", "🛡️ 入住服务", "🏠 安心租房",
+        "📋 我的租约", "🤝 租后服务", "🛡️ 侨联安心租",
         "💬 中文顾问", "⬅️ 返回首页",
     ]
     assert callbacks == [
@@ -301,8 +301,8 @@ def _unbound_service(tmp_path):
 @pytest.mark.parametrize(
     ("callback", "expected"),
     [
-        ("v3u:service:repair", "房屋报修"),
-        ("v3u:service:property", "物业协调"),
+        ("v3u:service:repair", "报修直通"),
+        ("v3u:service:property", "物业代办"),
         ("v3u:service:local", "周边生活"),
     ],
 )

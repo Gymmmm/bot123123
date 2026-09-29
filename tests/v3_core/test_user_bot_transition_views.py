@@ -38,7 +38,7 @@ def test_booking_starts_with_mode_surface():
     assert "🏠 富力城｜2房1厅" in view.text
     assert "💰 $800/月" in view.text
     assert "请选择看房方式" in view.text
-    assert _labels(view)==["🚶 实地看房","🎥 视频代看","⬅️ 返回房源"]
+    assert _labels(view)==["🚶 实地带看","🎥 视频带看","⬅️ 返回房源"]
     assert "LST_1" not in view.text
 
 def test_date_and_time_steps_are_light_and_supported():
