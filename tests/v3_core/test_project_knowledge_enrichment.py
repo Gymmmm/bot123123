@@ -9,6 +9,7 @@ from v3_core.inventory.project_knowledge import (
     answer_project_question,
     project_knowledge_stats,
     project_reference_for_key,
+    project_reference_location,
     registry_project_identities,
 )
 
@@ -260,3 +261,39 @@ def test_project_question_can_use_web_verified_developer_and_location():
     location = answer_project_question("picasso_city_garden", "项目在哪里？")
     assert "BKK1" in location
     assert "Street 322" in location
+
+
+def test_verified_project_location_fallback_is_reference_only():
+    facts = canonicalize_source("The Palms别墅出租\n4房\n租金$2500/月")
+    assert facts["public_location_display"] is None
+    fallback = project_reference_location(facts["project_key"])
+    assert fallback == {
+        "display": "一号路 / Norea方向｜The Palms",
+        "source": "project_v5_verified",
+        "confidence": "verified",
+    }
+
+
+def test_public_inventory_uses_verified_project_location_when_post_omits_address():
+    from qiaolian_dual.adapters.public_inventory import PublicInventoryAdapter
+
+    canonical = canonicalize_source("The Palms别墅出租\n4房\n租金$2500/月")
+    before_hash = canonical["canonical_facts_hash"]
+    view = SimpleNamespace(
+        snapshot={"canonical_facts": canonical},
+        frozen_listing={},
+        frozen_offer={},
+        listing={"inventory_status": "active"},
+        offer={},
+        gallery=(),
+        package={},
+        public_listing_id="QL-PP-A2B3",
+        listing_id="l_palms",
+        bookable=True,
+    )
+    item = PublicInventoryAdapter().to_3858_listing(view)
+    assert item["area"] == "一号路 / Norea方向｜The Palms"
+    assert item["normalized_data"]["project_reference_location"]["confidence"] == "verified"
+    assert item["normalized_data"]["canonical_facts_hash"] == before_hash
+    assert canonical["public_location_display"] is None
+    assert "project_reference_location" not in canonical
