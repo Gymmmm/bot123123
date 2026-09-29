@@ -52,7 +52,7 @@ class FakeAdapter:
     async def send(self, command):
         self.command = command
         labels = _labels(build_channel_keyboard(command.actions, inventory_status=command.inventory_status))
-        assert labels == ["📷 更多实拍", "📅 预约看房", "💬 联系中文顾问"]
+        assert labels == ["📷 更多实拍", "📅 在线预约", "💬 联系中文顾问"]
         return {"caption_message_id": "99"}
 
 
@@ -75,5 +75,5 @@ async def test_manual_first_publish_can_send_as_active_without_prechanging_inven
 
 def test_pending_keyboard_still_hides_booking_for_normal_non_manual_send():
     labels = _labels(build_channel_keyboard(dict(ACTIONS), inventory_status="pending"))
-    assert "📅 预约看房" not in labels
+    assert "📅 在线预约" not in labels
     assert labels == ["📷 更多实拍", "💬 联系中文顾问"]
