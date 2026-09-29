@@ -565,12 +565,56 @@ def project_reference_summary(project_key: object) -> str | None:
     if building:
         parts.append(f"项目规模：{building}")
     unit_types = list(reference.get("unit_types") or [])
+    if not unit_types:
+        living_types = (
+            ("Studio", "studio_available"),
+            ("1房", "1br_available"),
+            ("2房", "2br_available"),
+            ("3房", "3br_available"),
+            ("4房+", "4br_plus_available"),
+        )
+        unit_types = [
+            label for label, field in living_types
+            if str(living.get(field) or "").strip().upper() == "YES"
+        ]
     if unit_types:
         parts.append(f"项目户型：{'、'.join(str(item) for item in unit_types)}")
     if amenities:
         parts.append(f"公区/配套：{'、'.join(str(item) for item in amenities)}")
     if nearby:
         parts.append(f"周边：{'、'.join(str(item) for item in nearby)}")
+
+    if not building:
+        scale: list[str] = []
+        if living.get("total_floors"):
+            scale.append(f"{living['total_floors']}层")
+        if living.get("unit_count"):
+            scale.append(f"{living['unit_count']}户/单位")
+        if scale:
+            parts.append(f"项目规模：{'；'.join(scale)}")
+
+    fee_parts: list[str] = []
+    for label, prefix, unit_key in (
+        ("电费", "electricity_rate", "electricity_unit"),
+        ("水费", "water_rate", "water_unit"),
+        ("管理费", "management_fee", "management_fee_unit"),
+        ("汽车停车", "car_parking_fee", "car_parking_fee_unit"),
+        ("摩托停车", "motorbike_parking_fee", "motorbike_parking_fee_unit"),
+    ):
+        value = _range_text(living, prefix, unit_key)
+        if value:
+            fee_parts.append(f"{label}{value}")
+    if fee_parts:
+        parts.append(f"费用参考：{'；'.join(fee_parts)}（项目/市场参考，不覆盖具体房源合同）")
+
+    policy_parts: list[str] = []
+    for label, field in (("宠物", "pet_policy"), ("短租", "short_term_allowed"), ("Airbnb", "airbnb_allowed")):
+        value = str(living.get(field) or "").strip().upper()
+        if value in {"YES", "NO"}:
+            policy_parts.append(f"{label}{'可' if value == 'YES' else '不可/通常不允许'}")
+    if policy_parts:
+        parts.append(f"规则参考：{'；'.join(policy_parts)}")
+
     living_summary = str(living.get("living_summary") or "").strip()
     if living_summary:
         parts.append(f"租住参考：{living_summary}")
