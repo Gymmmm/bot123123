@@ -82,7 +82,7 @@ def test_legacy_custom_marketing_copy_cannot_override_annual_phnom_penh_position
     service.set_custom_body(0, "🏠 金边找房第一步：先别急着看房！")
     body = service.template(0).body
     assert "年租" in body
-    assert "租金按月展示" in body
+    assert "价格按月租展示" in body
     assert "先别急着看房" not in body
 
     service.set_custom_body(0, "🏠 金边年租本周特别提醒：一年长住先确认入住时间。")
