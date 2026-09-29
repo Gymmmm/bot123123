@@ -30,6 +30,22 @@ _TAXONOMY_TO_KNOWLEDGE = {
 _KNOWLEDGE_TO_TAXONOMY = {value: key for key, value in _TAXONOMY_TO_KNOWLEDGE.items()}
 
 _WEB_VERIFIED_PROJECTS: dict[str, dict[str, Any]] = {
+    "orkide_the_royal_condominium": {
+        "knowledge_key": "web:orkide-the-royal-condominium",
+        "reference_kind": "web_verified_project",
+        "display_name": "Orkidē The Royal Condominium 奥凯德皇家公寓",
+        "developer": "Orkidē Development",
+        "project_type": "公寓 / 商业 / 娱乐综合项目",
+        "location": "Street 2004 (MaiDa) · Ou Baek K'am · Sen Sok",
+        "address": "Street 2004 (MaiDa), Sangkat Ou Baek K'am, Khan Sen Sok, Phnom Penh",
+        "building_profile": "官方资料：6栋公寓塔楼，每栋18层；项目页记录1,999个住宅单位。",
+        "unit_types": ["Studio", "1 Bedroom", "2 Bedrooms", "3 Bedrooms"],
+        "amenities": ["泳池", "健身房", "蒸汽房", "桑拿", "步道", "自行车道", "屋顶花园", "Sky Club", "商场", "超市", "电影院", "保龄球"],
+        "source_urls": [
+            "https://www.orkide.com.kh/our-projects/the-royal-condo",
+            "https://www.orkide.com.kh/",
+        ],
+    },
     "prince_central_plaza": {
         "knowledge_key": "web:prince-central-plaza",
         "reference_kind": "web_verified_project",
