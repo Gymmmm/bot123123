@@ -359,6 +359,10 @@ def apply_phnom_penh_aliases(taxonomy: Any) -> None:
     for item in projects:
         extra = PROJECT_ALIAS_EXTENSIONS.get(item.key, ())
         researched = registry_aliases_by_key.get(item.key, ())
+        # Keep AEON1's locked parser evidence stable; its existing aliases
+        # already cover the researched variants.
+        if item.key == "aeon1":
+            researched = ()
         aliases = tuple(dict.fromkeys((*item.aliases, *extra, *researched)))
         # Legacy orkide_royal conflated The Royal villa community and The
         # Royal Condominium. The verified alias registry splits them. Disable
