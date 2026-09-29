@@ -333,3 +333,17 @@ def test_project_intro_question_returns_detailed_reference_summary():
     assert "YIN YI VENTURE" in answer
     assert "水净华" in answer
     assert "具体房源的租金" in answer
+
+
+def test_orkide_royal_condominium_official_profile_is_detailed():
+    reference = project_reference_for_key("orkide_the_royal_condominium")
+    assert reference["developer"] == "Orkidē Development"
+    assert "6栋公寓塔楼" in reference["building_profile"]
+    assert "Studio" in reference["unit_types"]
+    assert "泳池" in reference["amenities"]
+    assert "桑拿" in reference["amenities"]
+    assert "Street 2004" in project_reference_location("orkide_the_royal_condominium")["display"]
+
+    answer = answer_project_question("orkide_the_royal_condominium", "这个项目有哪些户型？")
+    assert "Studio" in answer
+    assert "3 Bedrooms" in answer
