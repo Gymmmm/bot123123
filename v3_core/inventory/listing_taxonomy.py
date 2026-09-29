@@ -432,7 +432,7 @@ def _extract_project(text: str) -> tuple[str | None, str | None, str | None, str
     project_text = _project_identity_text(text)
     matches: list[tuple[ProjectIdentity, str, int]] = []
     for item in PROJECT_IDENTITIES:
-        hit = _find_alias(project_text, item.aliases)
+        hit = _find_alias(project_match_text, item.aliases)
         if hit:
             alias, position = hit
             matches.append((item, alias, position))
