@@ -70,7 +70,7 @@ class MemoryPublishedInventory:
 def test_channel_and_sync_keyboards_use_locked_details_label():
     publish = _labels(build_channel_keyboard(dict(ACTIONS), inventory_status="active"))
     sync = _labels(appointment_channel_keyboard(username="qiaolian_rent_bot", public_listing_id="QL-RF-A2B3", status="reserved", advisor_url="https://t.me/advisor"))
-    expected = ["📷 更多实拍", "📅 预约看房", "💬 联系中文顾问"]
+    expected = ["📷 更多实拍", "📅 在线预约", "💬 联系中文顾问"]
     assert publish == expected
     assert sync == expected
     assert "📷 更多详情" not in publish + sync
@@ -107,7 +107,7 @@ def test_unbookable_book_payload_keeps_details_instead_of_dead_link():
     labels = [item.label for row in result.details.action_rows for item in row]
     assert "💬 咨询这套" in labels
     assert "更多实拍" not in labels
-    assert "📅 预约看房" not in labels
+    assert "📅 在线预约" not in labels
 
 
 class _FakeMessage:
@@ -145,4 +145,4 @@ async def test_start_handler_renders_chinese_unbookable_copy_then_details():
     actions = [button.text for row in message.markups[1].inline_keyboard for button in row]
     assert any("咨询这套" in a for a in actions)
     assert "更多实拍" not in actions
-    assert "📅 预约看房" not in actions
+    assert "📅 在线预约" not in actions
