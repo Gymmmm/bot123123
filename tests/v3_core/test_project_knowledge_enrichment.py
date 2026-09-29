@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 from v3_core.inventory.canonical_facts import canonicalize_source, draft_projection
 from v3_core.inventory.project_knowledge import (
     project_knowledge_stats,
@@ -102,3 +104,27 @@ def test_verified_alias_registry_adds_new_projects_without_family_false_positive
 
     generic = canonicalize_source("时代广场出租\n1房\n租金$700/月")
     assert generic["project_key"] is None
+
+
+def test_public_inventory_attaches_project_reference_without_mutating_canonical_hash_payload():
+    from qiaolian_dual.adapters.public_inventory import PublicInventoryAdapter
+
+    canonical = canonicalize_source("The Peak 香格里拉\n2房\n租金$1400/月")
+    assert "project_reference" not in canonical
+    before_hash = canonical["canonical_facts_hash"]
+    view = SimpleNamespace(
+        snapshot={"canonical_facts": canonical},
+        frozen_listing={},
+        frozen_offer={},
+        listing={"inventory_status": "active"},
+        offer={},
+        gallery=(),
+        package={},
+        public_listing_id="QL-TEST-A1B2",
+        listing_id="l_test",
+        bookable=True,
+    )
+    item = PublicInventoryAdapter().to_3858_listing(view)
+    assert item["normalized_data"]["project_reference"]["knowledge_key"] == "the-peak"
+    assert item["normalized_data"]["canonical_facts_hash"] == before_hash
+    assert "project_reference" not in canonical
