@@ -35,12 +35,12 @@ def test_listing_surface_source_contains_final_first_layer_actions():
 
 def test_service_hubs_match_final_layouts():
     assert _labels(service_home_view()) == [
-        "📋 我的租约", "🛡️ 入住服务", "🏠 安心租房",
+        "📋 我的租约", "🤝 租后服务", "🛡️ 侨联安心租",
         "💬 中文顾问", "⬅️ 返回首页",
     ]
     assert _labels(concierge_home_view()) == [
-        "🔧 房屋报修", "🏢 物业协调", "🔌 水电协助", "🚚 搬家协助",
-        "🧹 保洁服务", "🌐 网络协助", "❓ 其他住房问题", "⬅️ 返回侨联服务",
+        "🔧 报修直通", "🏢 物业代办", "🔌 账单代办", "🚚 搬家协助",
+        "🧹 保洁安排", "🌐 网络办理", "❓ 其他住房问题", "⬅️ 返回侨联服务",
     ]
 
 
