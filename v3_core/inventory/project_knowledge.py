@@ -24,8 +24,7 @@ _TAXONOMY_TO_KNOWLEDGE = {
     "phnom_penh_galaxy_garden": "xinghe-garden",
     # Existing taxonomy key historically names 威尔斯公馆. Do not attach the
     # separate 财富大厦 / Wealth Mansion profile to it.
-    "wealth_mansion": "wells-mansion",
-    "wealth_mansion_building": "wealth-mansion",
+    "wealth_mansion": "wealth-mansion",
     **{f"time_square_{n}": f"times-square-{n}" for n in (1, 2, 3, 5, 7, 8, 9, 11)},
 }
 _KNOWLEDGE_TO_TAXONOMY = {value: key for key, value in _TAXONOMY_TO_KNOWLEDGE.items()}
