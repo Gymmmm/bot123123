@@ -1,0 +1,51 @@
+<PARSED TEXT FOR SHEET: 1 / 1 TABS
+248,Time Square 8,timesquare8,PROJECT,时代广场8,project:times-square-8,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+249,Time Square 9,timesquare9,PROJECT,时代广场9期,project:times-square-9,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+250,Times Square 1,timessquare1,PROJECT,时代广场1,project:times-square-1,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+251,TK,tk,PROJECT,TK Royal One,project:tk-royal-one,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+252,TK Chip Mong,tkchipmong,PROJECT,集茂TK,project:chip-mong-park-land-tk,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+253,TK Condo,tkcondo,PROJECT,集茂TK公寓,project:chip-mong-park-land-tk-condo,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+254,TK Royal One,tkroyalone,PROJECT,TK Royal One,project:tk-royal-one,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+255,TK皇家一号,tk皇家一号,PROJECT,TK Royal One,project:tk-royal-one,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+256,TS6,ts6,PROJECT,时代广场6（Time Square 302）,project:new:times-square-6,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,V3缺失；官方明确 Time Square 6 = Time Square 302。
+257,Urban Village,urbanvillage,FAMILY / MARKET_GEO,首都·国金,family:urban-village,FAMILY_GEO,70,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,裸Urban Village/首都国金只到family；需一期/二期或明确位置证据。
+258,Urban Village 1,urbanvillage1,PROJECT,首都·国金一期,project:urban-village-1,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+259,Urban Village 2,urbanvillage2,PROJECT,首都·国金二期,project:urban-village-2,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+260,Urban Village Phase 1,urbanvillagephase1,PROJECT,首都·国金一期,project:urban-village-1,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+261,Urban Village Phase 2,urbanvillagephase2,PROJECT,首都·国金二期,project:urban-village-2,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+262,UV1,uv1,PROJECT,首都·国金一期,project:urban-village-1,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+263,UV2,uv2,PROJECT,首都·国金二期,project:urban-village-2,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+264,Veng Sreng炳发,vengsreng炳发,PROJECT,炳发 Veng Sreng,project:peng-huoth-veng-sreng,FAMILY_GEO,70,True,False,DIRECT_RESOLVE,VERIFIED,
+265,VERIFIED,verified,PROJECT,The Palms（棕榈社区）,project:the-palms,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+266,Vila Town,vilatown,PROJECT,Vila Town,project:vila-town,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,NEEDS_VERIFICATION,
+267,Vue Aston,vueaston,PROJECT,滨江雅诗顿,project:vue-aston,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+268,Wealth Mansion,wealthmansion,PROJECT,威尔斯公馆,project:wealth-mansion,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+269,Wells Mansion?,wellsmansion?,PROJECT,威尔斯公馆,project:wealth-mansion,EXACT_PROJECT_NAME,100,False,True,REDIRECT_NEEDS_VERIFICATION,VERIFIED,旧Wells Mansion记录并入Wealth Mansion冲突候选；不得创建独立项目。
+270,Worldbridge,worldbridge,FAMILY / MARKET_GEO,Oxley Worldbridge,family:oxley-worldbridge,FAMILY_GEO,70,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,Bridge/Peak/Palms分别解析，不共享canonical GEO。
+271,ពិភពថ្មី,ពិភពថ្មី,FAMILY / MARKET_GEO,Piphup Thmey,family:piphup-thmey,FAMILY_GEO,70,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,按Sen Sok/Chamkar Dong/NR4等位置证据解析；裸品牌不定项目。
+272,一公园,一公园,PROJECT,金边壹号 ONE PARK,project:one-park,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+273,一号路The Palms,一号路thepalms,PROJECT,The Palms（棕榈社区）,project:the-palms,PROJECT_ROAD,90,True,False,DIRECT_RESOLVE,VERIFIED,
+274,一号路炳发,一号路炳发,FAMILY / MARKET_GEO,炳发,family:peng-huoth,FAMILY_GEO,70,True,True,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,先按道路/地标缩小family，再解析具体项目；开发商名“炳发”不得直接当PROJECT。
+275,一号路炳发,一号路炳发,PROJECT,炳发 The Star Platinum,project:the-star-platinum,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+276,一号路炳发,一号路炳发,PROJECT,炳发 Athina,project:the-star-platinum-athina,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+277,一号路炳发,一号路炳发,PROJECT,炳发 Capital One,project:the-star-platinum-capital-one,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+278,一号路炳发,一号路炳发,PROJECT,炳发 Eco Delta,project:the-star-platinum-eco-delta,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+279,一号路炳发,一号路炳发,PROJECT,炳发 Eco Melody,project:the-star-platinum-eco-melody,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+280,一号路炳发,一号路炳发,PROJECT,炳发 Eco Romance,project:the-star-platinum-eco-romance,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+281,一号路炳发,一号路炳发,PROJECT,炳发 Eco Sunrise,project:the-star-platinum-eco-sunrise,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+282,一号路炳发,一号路炳发,PROJECT,炳发 Eco Varanda,project:the-star-platinum-eco-varanda,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+283,一号路炳发,一号路炳发,PROJECT,炳发 Euro Ville,project:the-star-platinum-euro-ville,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+284,一号路炳发,一号路炳发,PROJECT,炳发 Herminus,project:the-star-platinum-herminus,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+285,一号路炳发,一号路炳发,PROJECT,炳发 Mastery,project:the-star-platinum-mastery,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+286,一号路炳发,一号路炳发,PROJECT,炳发 Mercurean I,project:the-star-platinum-mercurean-i,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+287,一号路炳发,一号路炳发,PROJECT,炳发 Mercurean II,project:the-star-platinum-mercurean-ii,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+288,一号路炳发,一号路炳发,PROJECT,炳发 Paradigm,project:the-star-platinum-paradigm,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+289,一号路炳发,一号路炳发,PROJECT,炳发 Polaris I,project:the-star-platinum-polaris-i,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+290,一号路炳发,一号路炳发,PROJECT,炳发 Polaris II,project:the-star-platinum-polaris-ii,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+291,一号路炳发,一号路炳发,PROJECT,炳发 Rosato,project:the-star-platinum-rosato,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+292,一号路炳发,一号路炳发,PROJECT,炳发 Roseville,project:the-star-platinum-roseville,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+293,一号路炳发,一号路炳发,PROJECT,炳发 Polaris 23 公寓,project:the-star-polaris-23-condominium,FAMILY_GEO,70,True,True,CANDIDATE_ONLY,VERIFIED,
+294,世桥,世桥,PROJECT,桥牌公寓（世桥）,project:the-bridge,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+295,俄市方向,俄市方向,PROJECT,奥林匹亚城,project:olympia-city,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+296,俄罗斯市场方向,俄罗斯市场方向,PROJECT,时代广场1,project:times-square-1,PROJECT_LANDMARK,85,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯GEO/地标词不能直接解析到具体PROJECT。
+297,凯撒公寓,凯撒公寓,PROJECT,钻石凯撒酒店式公寓,project:new:casa-service-apartment,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,与CASA by Meridian不是同一项目，需严格分开。
