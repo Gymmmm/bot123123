@@ -297,3 +297,18 @@ def test_public_inventory_uses_verified_project_location_when_post_omits_address
     assert item["normalized_data"]["canonical_facts_hash"] == before_hash
     assert canonical["public_location_display"] is None
     assert "project_reference_location" not in canonical
+
+
+@pytest.mark.parametrize(
+    ("project_key", "location_token"),
+    [
+        ("prince_central_plaza", "Norodom"),
+        ("prince_international_plaza", "Sen Sok"),
+        ("casa_meridian", "Koh Pich"),
+        ("sky_villa", "Street 163"),
+    ],
+)
+def test_web_verified_location_fallback_covers_known_projects(project_key, location_token):
+    fallback = project_reference_location(project_key)
+    assert fallback["confidence"] == "verified"
+    assert location_token in fallback["display"]
