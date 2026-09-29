@@ -143,3 +143,14 @@ def test_production_penthouse_hashtag_resolves_project_not_unit_subtype():
     # Bare descriptive penthouse language remains unsafe as a project identity.
     generic = canonicalize_source("BKK1 penthouse unit for rent $3000/month")
     assert generic["project_key"] is None
+
+
+def test_generic_peng_huoth_gets_family_reference_not_fake_child_project_facts():
+    facts = canonicalize_source("50米炳发城\n排屋出租\n租金$1500")
+    assert facts["project_key"] == "peng_huoth_city"
+    reference = project_reference_for_key(facts["project_key"])
+    assert reference["reference_kind"] == "project_family"
+    assert reference["requires_specific_project"] is True
+    assert reference["knowledge_key"] == "family:peng-huoth"
+    assert reference["child_project_keys"]
+    assert "living" not in reference
