@@ -1,3 +1,4 @@
+from v3_core.inventory.phnom_penh_aliases import MARKET_ALIAS_EXTENSIONS, PROJECT_ALIAS_EXTENSIONS
 from v3_core.inventory.listing_taxonomy import classify_listing_taxonomy
 
 
@@ -47,3 +48,8 @@ def test_market_aliases_never_include_blank_tokens():
         for item in taxonomy.MARKET_LOCATIONS
         for alias in item.aliases
     )
+
+
+def test_alias_extension_values_are_tuples_not_strings():
+    assert all(isinstance(value, tuple) for value in PROJECT_ALIAS_EXTENSIONS.values())
+    assert all(isinstance(value, tuple) for value in MARKET_ALIAS_EXTENSIONS.values())
