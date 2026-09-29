@@ -141,6 +141,18 @@ def enrich_project_reference(facts: dict[str, Any]) -> dict[str, Any]:
     return enriched
 
 
+def project_knowledge_stats() -> dict[str, int]:
+    projects = _bundle()
+    return {
+        "projects": len(projects),
+        "registry_profiles": sum(1 for value in projects.values() if value.get("registry")),
+        "living_profiles": sum(1 for value in projects.values() if value.get("living")),
+        "relations": sum(len(value.get("relations") or []) for value in projects.values()),
+        "evidence_rows": sum(len(value.get("evidence") or []) for value in projects.values()),
+        "conflicts": sum(len(value.get("conflicts") or []) for value in projects.values()),
+    }
+
+
 def registry_project_identities() -> tuple[dict[str, Any], ...]:
     """Return research-backed identities safe to add to project recognition.
 
@@ -191,6 +203,7 @@ __all__ = [
     "enrich_project_reference",
     "knowledge_key_for_taxonomy",
     "project_reference_for_key",
+    "project_knowledge_stats",
     "registry_project_identities",
     "taxonomy_key_for_knowledge",
 ]
