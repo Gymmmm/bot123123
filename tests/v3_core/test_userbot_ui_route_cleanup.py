@@ -28,7 +28,7 @@ def test_public_command_menu_hides_retired_and_admin_entries():
     commands = _commands(public_command_menu())
     assert commands == [
         ("start", "回到首页"),
-        ("find", "开始找房"),
+        ("find", "帮我找房"),
         ("appointments", "我的预约"),
         ("service", "侨联服务"),
     ]
@@ -104,16 +104,16 @@ async def test_property_advisor_buttons_are_only_handoff_and_return():
     await _render_contact(query, text="QL-RF-A2B3", public_listing_id="QL-RF-A2B3", advisor_url="https://t.me/advisor")
     labels = [button.text for row in query.markup.inline_keyboard for button in row]
     callbacks = [button.callback_data for row in query.markup.inline_keyboard for button in row if button.callback_data]
-    assert labels == ["💬 中文顾问", "⬅️ 返回房源"]
+    assert labels == ["💬 联系中文顾问", "⬅️ 返回房源"]
     assert callbacks == ["v3u:listing:details:QL-RF-A2B3"]
     assert all(term not in labels for term in ("预约看房", "更多实拍", "继续找房"))
 
 
 def test_aftercare_and_public_resident_buttons_stay_frozen():
-    assert _labels(build_assurance_home_view()) == ["📋 入住交接留档", "💬 中文顾问", "⬅️ 返回侨联服务"]
+    assert _labels(build_assurance_home_view()) == ["📋 入住交接留档", "💬 联系中文顾问", "⬅️ 返回侨联服务"]
     expected = [
         "📋 我的租约", "🛡️ 入住服务", "🏠 安心租房",
-        "💬 中文顾问", "⬅️ 返回首页",
+        "💬 联系中文顾问", "🏠 返回首页",
     ]
     assert _labels(service_home_view()) == expected
     class Service:

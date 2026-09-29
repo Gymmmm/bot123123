@@ -27,8 +27,8 @@ def test_p15_service_hub_copy_buttons_and_callbacks_locked():
     )
     assert _rows(view) == [
         ["📋 我的租约", "🛡️ 入住服务"],
-        ["🏠 安心租房", "💬 中文顾问"],
-        ["⬅️ 返回首页"],
+        ["🏠 安心租房", "💬 联系中文顾问"],
+        ["🏠 返回首页"],
     ]
     assert _callbacks(view) == [
         "v3u:service:tenant_lease",
@@ -96,7 +96,7 @@ def test_p18_unbound_lease_copy_and_buttons_locked():
         "如果已经通过侨联入住，可以联系中文顾问核对。"
     )
     assert _rows(view) == [
-        ["💬 中文顾问"],
+        ["💬 联系中文顾问"],
         ["⬅️ 返回侨联服务"],
     ]
     assert _callbacks(view) == [
@@ -126,7 +126,7 @@ def test_p19_bound_lease_copy_buttons_and_callbacks_locked():
         "状态｜🟢 租约有效"
     )
     assert _rows(view) == [
-        ["🔄 申请续租", "💬 中文顾问"],
+        ["🔄 申请续租", "💬 联系中文顾问"],
         ["⬅️ 返回侨联服务"],
     ]
     assert _callbacks(view) == [
@@ -145,7 +145,7 @@ def test_p24_assurance_copy_buttons_and_callbacks_locked():
     )
     assert _rows(view) == [
         ["📋 入住交接留档"],
-        ["💬 中文顾问"],
+        ["💬 联系中文顾问"],
         ["⬅️ 返回侨联服务"],
     ]
     assert _callbacks(view) == [

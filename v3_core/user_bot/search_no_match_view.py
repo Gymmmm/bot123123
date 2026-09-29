@@ -32,8 +32,8 @@ def build_search_no_match_view(intent: SearchSubmitIntent) -> TransitionView:
                 TransitionChoice("📍 换个区域", "search_area"),
             ),
             (TransitionChoice("🏠 调整户型", "search_layout"),),
-            (TransitionChoice("💬 中文顾问", "home", value="contact"),),
-            (TransitionChoice("⬅️ 返回首页", "home"),),
+            (TransitionChoice("💬 联系中文顾问", "home", value="contact"),),
+            (TransitionChoice("🏠 返回首页", "home"),),
         ),
     )
 

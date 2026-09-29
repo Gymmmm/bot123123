@@ -104,13 +104,13 @@ def test_channel_ctas_and_sync_contract_share_one_real_listing():
         "details": "📷 更多实拍",
         "photos": "📸 更多实拍",
         "book": "📅 预约看房",
-        "consult": "💬 中文顾问",
-        "find": "🏠 帮我找房",
+        "consult": "💬 联系中文顾问",
+        "find": "🔍 帮我找房",
         "more": "🔎 更多房源",
         "similar": "🔎 更多房源",
     }
     assert [[label for label, _ in row] for row in rows] == [
-        ["📷 更多实拍", "📅 预约看房"], ["💬 中文顾问"],
+        ["📷 更多实拍", "📅 预约看房"], ["💬 联系中文顾问"],
     ]
     assert urls["details"] == f"https://t.me/QiaoLianBot?start=property_{PUBLIC_ID}_details"
     assert urls["photos"] == f"https://t.me/QiaoLianBot?start=property_{PUBLIC_ID}_photos"
@@ -122,23 +122,23 @@ def test_channel_ctas_and_sync_contract_share_one_real_listing():
     assert synced == rows
     unbookable = official_channel_button_spec(urls, inventory_status="pending", area="BKK1")
     assert [[label for label, _ in row] for row in unbookable] == [
-        ["📷 更多实拍"], ["💬 中文顾问"],
+        ["📷 更多实拍"], ["💬 联系中文顾问"],
     ]
     assert unbookable[0][0][1] == urls["photos"]
     assert unbookable[1][0][1] == urls["consult"]
     orange = official_channel_button_spec(urls, inventory_status="high_demand", area="BKK1")
     assert [[label for label, _ in row] for row in orange] == [
-        ["📷 更多实拍"], ["💬 中文顾问"],
+        ["📷 更多实拍"], ["💬 联系中文顾问"],
     ]
     assert orange[0][0][1] == urls["photos"]
     rented = official_channel_button_spec(urls, inventory_status="rented", area="BKK1")
     assert [[label for label, _ in row] for row in rented] == [
-        ["📷 更多实拍"], ["💬 中文顾问"],
+        ["📷 更多实拍"], ["💬 联系中文顾问"],
     ]
     assert rented[0][0][1] == urls["photos"]
     offline = official_channel_button_spec(urls, inventory_status="offline", area="BKK1")
     assert [[label for label, _ in row] for row in offline] == [
-        ["📷 更多实拍"], ["💬 中文顾问"],
+        ["📷 更多实拍"], ["💬 联系中文顾问"],
     ]
     assert offline[0][0][1] == urls["photos"]
     assert official_channel_cta_keys("active") == ("details", "book", "consult")
@@ -171,7 +171,7 @@ def test_details_and_photos_contract_has_real_fields_three_entries_and_no_intern
 def test_contact_entries_have_real_callbacks_when_external_config_is_missing():
     home = build_home_view(channel_url="")
     contact = next(choice for row in home.rows for choice in row if choice.kind == "contact")
-    assert contact.label == "💬 中文顾问"
+    assert contact.label == "💬 联系中文顾问"
 
     intent = SearchSubmitIntent(
         criteria=SearchCriteria(location_keys=("BKK1",), budget_max=800),
@@ -182,7 +182,7 @@ def test_contact_entries_have_real_callbacks_when_external_config_is_missing():
         touch_payload={},
     )
     no_match = build_search_no_match_view(intent)
-    contact = next(choice for row in no_match.rows for choice in row if choice.label == "💬 中文顾问")
+    contact = next(choice for row in no_match.rows for choice in row if choice.label == "💬 联系中文顾问")
     assert contact.kind == "home" and contact.value == "contact"
 
 
@@ -242,7 +242,7 @@ def test_new_channel_runtime_never_generates_legacy_buttons():
         labels = {label for row in rows for label, _ in row}
         assert labels.isdisjoint(forbidden)
     pending = official_channel_button_spec(urls, inventory_status="pending")
-    assert [[label for label, _ in row] for row in pending] == [["📷 更多实拍"], ["💬 中文顾问"]]
+    assert [[label for label, _ in row] for row in pending] == [["📷 更多实拍"], ["💬 联系中文顾问"]]
     offline = official_channel_button_spec(urls, inventory_status="offline")
     assert "📅 预约看房" not in [label for row in offline for label, _ in row]
-    assert [[label for label, _ in row] for row in offline] == [["📷 更多实拍"], ["💬 中文顾问"]]
+    assert [[label for label, _ in row] for row in offline] == [["📷 更多实拍"], ["💬 联系中文顾问"]]

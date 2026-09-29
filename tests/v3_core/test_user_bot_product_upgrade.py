@@ -25,15 +25,15 @@ def test_v3_home_uses_final_conversion_navigation():
     view = build_home_view(channel_url="https://t.me/qiaolian")
     labels = _labels(view)
     assert labels == [
-        "🔍 开始找房", "🛎️ 侨联服务",
-        "📢 最新房源", "💬 中文顾问",
+        "🔍 帮我找房", "🛎️ 侨联服务",
+        "📢 最新房源", "💬 联系中文顾问",
     ]
 
 
 def test_home_without_channel_keeps_core_conversion_actions():
     labels = _labels(build_home_view())
     assert labels == [
-        "🔍 开始找房", "🛎️ 侨联服务", "💬 中文顾问",
+        "🔍 帮我找房", "🛎️ 侨联服务", "💬 联系中文顾问",
     ]
 
 
@@ -53,7 +53,7 @@ def test_service_hub_is_public_and_does_not_require_binding():
     labels = _labels(view)
     assert labels == [
         "📋 我的租约", "🛡️ 入住服务", "🏠 安心租房",
-        "💬 中文顾问", "⬅️ 返回首页",
+        "💬 联系中文顾问", "🏠 返回首页",
     ]
     callbacks = _callbacks(view)
     assert callbacks == [
@@ -70,7 +70,7 @@ def test_rental_service_is_public_parent_content_center():
         "从看房到入住，重要信息尽量提前确认并留档。\n\n"
         "入住交接、费用确认和住房问题，都可以继续找侨联。"
     )
-    assert _labels(view) == ["📋 入住交接留档", "💬 中文顾问", "⬅️ 返回侨联服务"]
+    assert _labels(view) == ["📋 入住交接留档", "💬 联系中文顾问", "⬅️ 返回侨联服务"]
     assert _callbacks(view) == [
         "v3u:assure:handover", "v3u:home:contact", "v3u:home:service",
     ]

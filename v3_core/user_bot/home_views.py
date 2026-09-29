@@ -35,7 +35,7 @@ def welcome_text(*, first_name: str, greeting: str) -> str:
     return (
         f"👋 <b>{he(str(first_name))}</b>，{he(str(greeting))}\n\n"
         "🏠 <b>侨联地产｜金边中文租房</b>\n"
-        "💬 中文顾问｜实地看房 / 视频代看\n\n"
+        "💬 联系中文顾问｜实地看房 / 视频代看\n\n"
         "📍 富力城｜炳发城｜BKK1｜钻石岛\n"
         "🛎️ 找房 · 看房 · 签约 · 入住 · 售后\n\n"
         "⭐ 金边本地6年经验\n"
@@ -75,7 +75,7 @@ def build_home_view(
 ) -> HomeView:
     rows: list[tuple[HomeChoice, ...]] = [
         (
-            HomeChoice("🔍 开始找房", "search"),
+            HomeChoice("🔍 帮我找房", "search"),
             HomeChoice("🛎️ 侨联服务", "service"),
         ),
     ]
@@ -84,11 +84,11 @@ def build_home_view(
         rows.append(
             (
                 HomeChoice("📢 最新房源", "root", url=clean_channel),
-                HomeChoice("💬 中文顾问", "contact"),
+                HomeChoice("💬 联系中文顾问", "contact"),
             )
         )
     else:
-        rows.append((HomeChoice("💬 中文顾问", "contact"),))
+        rows.append((HomeChoice("💬 联系中文顾问", "contact"),))
     resolved_greeting = str(greeting or "").strip() or phnom_penh_greeting()
     return HomeView(
         "home",
@@ -101,8 +101,8 @@ def build_about_view(*, advisor_url: str = "") -> HomeView:
         "about",
         ABOUT_TEXT,
         (
-            (HomeChoice("🔍 开始找房", "search"), HomeChoice("💬 中文顾问", "contact")),
-            (HomeChoice("⬅️ 返回首页", "root"),),
+            (HomeChoice("🔍 帮我找房", "search"), HomeChoice("💬 联系中文顾问", "contact")),
+            (HomeChoice("🏠 返回首页", "root"),),
         ),
     )
 
@@ -111,27 +111,27 @@ def build_booking_view(*, advisor_url: str = "") -> HomeView:
         "book",
         BOOK_TEXT,
         (
-            (HomeChoice("🔍 开始找房", "search"), HomeChoice("📋 我的预约", "appointments")),
-            (HomeChoice("💬 中文顾问", "contact"),),
-            (HomeChoice("⬅️ 返回首页", "root"),),
+            (HomeChoice("🔍 帮我找房", "search"), HomeChoice("📅 我的预约", "appointments")),
+            (HomeChoice("💬 联系中文顾问", "contact"),),
+            (HomeChoice("🏠 返回首页", "root"),),
         ),
     )
 
 def build_contact_view(*, advisor_url: str = "") -> HomeView:
     advisor=advisor_handoff_url(advisor_url)
-    first=HomeChoice("💬 中文顾问","contact",url=advisor) if advisor else HomeChoice("💬 中文顾问","contact")
+    first=HomeChoice("💬 联系中文顾问","contact",url=advisor) if advisor else HomeChoice("💬 联系中文顾问","contact")
     return HomeView(
         "contact",
         CONTACT_TEXT,
         (
             (first,),
-            (HomeChoice("🔍 开始找房", "search"),),
-            (HomeChoice("⬅️ 返回首页", "root"),),
+            (HomeChoice("🔍 帮我找房", "search"),),
+            (HomeChoice("🏠 返回首页", "root"),),
         ),
     )
 
 def build_appointment_history_home_view(history: AppointmentHistoryView) -> HomeView:
-    find_label="🔍 开始找房" if not history.items else "🔍 继续找房"
-    return HomeView("appointments",history.text,((HomeChoice(find_label,"search"),HomeChoice("💬 中文顾问","contact")),(HomeChoice("⬅️ 返回首页","root"),)))
+    find_label="🔍 帮我找房" if not history.items else "🔍 继续找房"
+    return HomeView("appointments",history.text,((HomeChoice(find_label,"search"),HomeChoice("💬 联系中文顾问","contact")),(HomeChoice("🏠 返回首页","root"),)))
 
 __all__=["ABOUT_TEXT","BOOK_TEXT","CONTACT_TEXT","HomeChoice","HomeChoiceKind","HomeView","WELCOME_TEXT","build_about_view","build_appointment_history_home_view","build_booking_view","build_contact_view","build_home_view","phnom_penh_greeting","welcome_text"]

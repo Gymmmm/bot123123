@@ -310,9 +310,9 @@ def _search_entry_view() -> TransitionView:
         ),
         (
             TransitionChoice("🏠 按户型", "search_layout"),
-            TransitionChoice("💬 中文顾问", "home", "contact"),
+            TransitionChoice("💬 联系中文顾问", "home", "contact"),
         ),
-        (TransitionChoice("⬅️ 返回首页", "home"),),
+        (TransitionChoice("🏠 返回首页", "home"),),
     )
     return TransitionView(kind="search_entry", text=_SEARCH_ENTRY_TEXT, rows=rows)
 

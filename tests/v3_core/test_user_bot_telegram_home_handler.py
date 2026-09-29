@@ -108,7 +108,7 @@ async def test_appointments_edit_existing_surface():
     assert message.calls==[]
     assert "QL-RF-A2B3" in query.calls[-1][1][0]
     labels=[b.text for row in query.calls[-1][2]["reply_markup"].inline_keyboard for b in row]
-    assert labels==["🔍 开始找房","💬 中文顾问","⬅️ 返回首页"]
+    assert labels==["🔍 帮我找房","💬 联系中文顾问","🏠 返回首页"]
 
 
 @pytest.mark.asyncio
@@ -121,7 +121,7 @@ async def test_service_home_edits_existing_surface():
     assert [c[0] for c in query.calls]==["answer","edit_text"]
     assert "侨联服务" in query.calls[-1][1][0]
     labels=[b.text for row in query.calls[-1][2]["reply_markup"].inline_keyboard for b in row]
-    assert labels==["📋 我的租约","🛡️ 入住服务","🏠 安心租房","💬 中文顾问","⬅️ 返回首页"]
+    assert labels==["📋 我的租约","🛡️ 入住服务","🏠 安心租房","💬 联系中文顾问","🏠 返回首页"]
 
 
 @pytest.mark.asyncio

@@ -12,7 +12,7 @@ def _labels(view):
 
 def test_home_matches_final_service_surface():
     view = build_home_view(channel_url="https://t.me/example")
-    assert _labels(view) == ["🔍 开始找房", "🛎️ 侨联服务", "📢 最新房源", "💬 中文顾问"]
+    assert _labels(view) == ["🔍 帮我找房", "🛎️ 侨联服务", "📢 最新房源", "💬 联系中文顾问"]
     assert "金边中文租房" in view.text
 
 
@@ -22,7 +22,7 @@ def test_search_entry_is_direct_filter_panel():
     assert "BKK1 一房，预算 $600" in view.text
     assert _labels(view) == [
         "📍 按区域", "💰 按预算", "🏠 按户型",
-        "💬 中文顾问", "⬅️ 返回首页",
+        "💬 联系中文顾问", "🏠 返回首页",
     ]
 
 
@@ -36,7 +36,7 @@ def test_listing_surface_source_contains_final_first_layer_actions():
 def test_service_hubs_match_final_layouts():
     assert _labels(service_home_view()) == [
         "📋 我的租约", "🛡️ 入住服务", "🏠 安心租房",
-        "💬 中文顾问", "⬅️ 返回首页",
+        "💬 联系中文顾问", "🏠 返回首页",
     ]
     assert _labels(concierge_home_view()) == [
         "🔧 房屋报修", "🏢 物业协调", "🔌 水电协助", "🚚 搬家协助",
@@ -56,8 +56,8 @@ class _Service:
 
 
 def test_renew_terminate_are_safe_intent_surfaces():
-    assert _labels(renew_view(_Service(), 1)) == ["提交续租意向", "💬 中文顾问", "⬅️ 返回我的租约"]
-    assert _labels(terminate_view(_Service(), 1)) == ["提交退租意向", "💬 中文顾问", "⬅️ 返回我的租约"]
+    assert _labels(renew_view(_Service(), 1)) == ["提交续租意向", "💬 联系中文顾问", "⬅️ 返回我的租约"]
+    assert _labels(terminate_view(_Service(), 1)) == ["提交退租意向", "💬 联系中文顾问", "⬅️ 返回我的租约"]
 
 
 def test_adviser_notes_remain_publisher_read_only():

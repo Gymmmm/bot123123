@@ -266,17 +266,17 @@ async def _render_photos(
 
 def _support_keyboard(*, advisor_url: str = "", channel_url: str = "") -> InlineKeyboardMarkup:
     rows = [
-        [InlineKeyboardButton("🔍 开始找房", callback_data="v3u:home:search")],
+        [InlineKeyboardButton("🔍 帮我找房", callback_data="v3u:home:search")],
     ]
     clean_advisor = str(advisor_url or "").strip()
     if clean_advisor:
-        rows.append([InlineKeyboardButton("💬 中文顾问", url=advisor_handoff_url(clean_advisor))])
+        rows.append([InlineKeyboardButton("💬 联系中文顾问", url=advisor_handoff_url(clean_advisor))])
     else:
-        rows.append([InlineKeyboardButton("💬 中文顾问", callback_data="v3u:home:contact")])
+        rows.append([InlineKeyboardButton("💬 联系中文顾问", callback_data="v3u:home:contact")])
     clean_channel = str(channel_url or "").strip()
     if clean_channel:
         rows.append([InlineKeyboardButton("📢 最新房源", url=clean_channel)])
-    rows.append([InlineKeyboardButton("⬅️ 返回首页", callback_data="v3u:t:home")])
+    rows.append([InlineKeyboardButton("🏠 返回首页", callback_data="v3u:t:home")])
     return InlineKeyboardMarkup(rows)
 
 
@@ -501,7 +501,7 @@ async def _handle_listing_contact_start(
     )
     rows = []
     if direct:
-        rows.append([InlineKeyboardButton("💬 中文顾问", url=direct)])
+        rows.append([InlineKeyboardButton("💬 联系中文顾问", url=direct)])
     from .callbacks import encode_listing_callback
     rows.append(
         [InlineKeyboardButton(

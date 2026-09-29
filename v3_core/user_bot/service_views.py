@@ -30,8 +30,8 @@ def service_home_view() -> ServiceView:
         rows=(
             (ServiceChoice("📋 入住交接留档", "v3u:assure:handover"), ServiceChoice("🚚 搬家协助", "v3u:assure:moving")),
             (ServiceChoice("🔧 房屋问题报修", "v3u:service:repair"), ServiceChoice("🏢 物业沟通", "v3u:service:property")),
-            (ServiceChoice("📍 周边生活", "v3u:service:local"), ServiceChoice("💬 中文顾问", "v3u:home:contact")),
-            (ServiceChoice("⬅️ 返回首页", "v3u:t:home"),),
+            (ServiceChoice("📍 周边生活", "v3u:service:local"), ServiceChoice("💬 联系中文顾问", "v3u:home:contact")),
+            (ServiceChoice("🏠 返回首页", "v3u:t:home"),),
         ),
     )
 
@@ -59,7 +59,7 @@ def property_view() -> ServiceView:
             "噪音、停车、门禁、公共区域、垃圾处理等需要物业协调的问题，可以联系中文顾问。\n\n"
             "说明 <b>发生了什么 + 大概时间 + 是否已经联系过物业</b>，我们会协助整理并跟进。"
         ),
-        rows=((ServiceChoice("💬 中文顾问", "v3u:home:contact"),), (ServiceChoice("⬅️ 返回入住服务", "v3u:home:service"),)),
+        rows=((ServiceChoice("💬 联系中文顾问", "v3u:home:contact"),), (ServiceChoice("⬅️ 返回入住服务", "v3u:home:service"),)),
     )
 
 
@@ -73,7 +73,7 @@ def issue_prompt_view(draft: ServiceRequestDraft) -> ServiceView:
             "请直接发送文字说明问题。\n"
             f"例如：<code>空调可以启动，但一直不制冷。</code>{note}"
         ),
-        rows=((ServiceChoice("💬 中文顾问", "v3u:home:contact"),), (ServiceChoice("⬅️ 重新选择问题", "v3u:service:repair"),)),
+        rows=((ServiceChoice("💬 联系中文顾问", "v3u:home:contact"),), (ServiceChoice("⬅️ 重新选择问题", "v3u:service:repair"),)),
     )
 
 
@@ -94,7 +94,7 @@ def repair_success_view(*, urgent: bool) -> ServiceView:
     return ServiceView(
         kind="repair_success",
         text="✅ <b>报修已提交</b>\n\n顾问会根据您提交的问题和时间安排后续处理。" + urgent_note,
-        rows=((ServiceChoice("💬 中文顾问", "v3u:home:contact"),), (ServiceChoice("⬅️ 返回入住服务", "v3u:home:service"),)),
+        rows=((ServiceChoice("💬 联系中文顾问", "v3u:home:contact"),), (ServiceChoice("⬅️ 返回入住服务", "v3u:home:service"),)),
     )
 
 
@@ -108,7 +108,7 @@ def general_prompt_view(*, nearby: bool = False) -> ServiceView:
     return ServiceView(
         kind="general_prompt",
         text="💬 <b>其他需求</b>\n\n直接发送需要处理的事情，顾问会按您这条内容继续跟进。",
-        rows=((ServiceChoice("💬 中文顾问", "v3u:home:contact"),), (ServiceChoice("⬅️ 返回入住服务", "v3u:home:service"),)),
+        rows=((ServiceChoice("💬 联系中文顾问", "v3u:home:contact"),), (ServiceChoice("⬅️ 返回入住服务", "v3u:home:service"),)),
     )
 
 
@@ -195,8 +195,8 @@ def service_home_view() -> ServiceView:
         ),
         rows=(
             (ServiceChoice("📋 我的租约", "v3u:service:tenant_lease"), ServiceChoice("🛡️ 入住服务", "v3u:service:concierge")),
-            (ServiceChoice("🏠 安心租房", "v3u:home:rental"), ServiceChoice("💬 中文顾问", "v3u:home:contact")),
-            (ServiceChoice("⬅️ 返回首页", "v3u:t:home"),),
+            (ServiceChoice("🏠 安心租房", "v3u:home:rental"), ServiceChoice("💬 联系中文顾问", "v3u:home:contact")),
+            (ServiceChoice("🏠 返回首页", "v3u:t:home"),),
         ),
     )
 
@@ -323,7 +323,7 @@ def repair_result_view(*, outcome: str, issue_label: str = "", property_name: st
             kind=f"repair_{clean}",
             text="\n".join(lines),
             rows=(
-                (ServiceChoice("💬 中文顾问", "v3u:home:contact"),),
+                (ServiceChoice("💬 联系中文顾问", "v3u:home:contact"),),
                 (ServiceChoice("⬅️ 返回入住服务", "v3u:service:concierge"),),
             ),
         )
@@ -336,7 +336,7 @@ def repair_result_view(*, outcome: str, issue_label: str = "", property_name: st
         ),
         rows=(
             (ServiceChoice("重新提交", "v3u:service:repair_confirm"),),
-            (ServiceChoice("💬 中文顾问", "v3u:home:contact"),),
+            (ServiceChoice("💬 联系中文顾问", "v3u:home:contact"),),
             (ServiceChoice("退出报修", "v3u:service:repair_exit"),),
         ),
     )
@@ -435,7 +435,7 @@ def property_result_view(*, success: bool) -> ServiceView:
             kind="property_success",
             text="✅ <b>情况已记录</b>\n\n中文顾问会根据你提交的信息继续跟进。",
             rows=(
-                (ServiceChoice("💬 中文顾问", "v3u:home:contact"),),
+                (ServiceChoice("💬 联系中文顾问", "v3u:home:contact"),),
                 (ServiceChoice("⬅️ 返回入住服务", "v3u:service:concierge"),),
             ),
         )
@@ -448,7 +448,7 @@ def property_result_view(*, success: bool) -> ServiceView:
         ),
         rows=(
             (ServiceChoice("重新提交", "v3u:service:property_confirm"),),
-            (ServiceChoice("💬 中文顾问", "v3u:home:contact"),),
+            (ServiceChoice("💬 联系中文顾问", "v3u:home:contact"),),
             (ServiceChoice("退出", "v3u:service:property_exit"),),
         ),
     )
@@ -474,7 +474,7 @@ def utility_stub_view(kind: str) -> ServiceView:
         kind=f"{kind}_prompt",
         text=f"<b>{title}</b>\n\n{body}",
         rows=(
-            (ServiceChoice("💬 中文顾问", "v3u:home:contact"),),
+            (ServiceChoice("💬 联系中文顾问", "v3u:home:contact"),),
             (ServiceChoice("⬅️ 返回入住服务", "v3u:service:concierge"),),
         ),
     )
@@ -482,7 +482,7 @@ def utility_stub_view(kind: str) -> ServiceView:
 
 def local_life_view(*, back_to_home: bool = False) -> ServiceView:
     back_choice = (
-        ServiceChoice("⬅️ 返回首页", "v3u:t:home")
+        ServiceChoice("🏠 返回首页", "v3u:t:home")
         if back_to_home
         else ServiceChoice("⬅️ 返回侨联服务", "v3u:home:service")
     )

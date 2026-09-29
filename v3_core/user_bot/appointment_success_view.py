@@ -39,7 +39,7 @@ def build_appointment_success_view(draft: PublicAppointmentDraft, inventory: Pub
         kind="appointment_success",
         text="\n".join(lines),
         rows=(
-            (TransitionChoice("📋 我的预约","home","appointments"),TransitionChoice("💬 中文顾问","home","contact")),
+            (TransitionChoice("📅 我的预约","home","appointments"),TransitionChoice("💬 联系中文顾问","home","contact")),
             (TransitionChoice("🔍 继续找房","home","search"),),
         ),
     )
