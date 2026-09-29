@@ -182,7 +182,7 @@ async def test_round2_manual_status_sync_edits_exact_published_post_and_hides_bo
     assert call["message_id"] == 456
     assert "🔴 已租出　QL-RF-A2B3" in call["caption"]
     labels = [button.text for row in call["reply_markup"].inline_keyboard for button in row]
-    assert "📅 预约看房" not in labels
+    assert "📅 在线预约" not in labels
 
     with sqlite3.connect(db_path) as conn:
         stored = conn.execute("SELECT post_text FROM publication_instances WHERE id=7").fetchone()[0]
