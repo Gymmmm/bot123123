@@ -20,7 +20,7 @@ from .public_inventory import PublishedListingView
 
 
 # First screen album size; remaining frames (if any) expand on demand.
-PHOTOS_FIRST_BATCH = 6
+PHOTOS_FIRST_BATCH = 4
 # Hard cap for one listing photos view (first batch + expand).
 PHOTOS_MAX_TOTAL = 10
 

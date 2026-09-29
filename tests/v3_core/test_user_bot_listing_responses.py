@@ -213,11 +213,11 @@ def test_photos_response_first_batch_album_with_expand(tmp_path):
 
     assert first.has_media
     assert not first.expand_only
-    # First screen is a native Telegram album of the first six real frames.
+    # First screen is a native Telegram album of four equal-canvas real frames.
     assert first.photo_index == 0
     assert first.photo_total == 10  # capped at PHOTOS_MAX_TOTAL
     assert len(first.media_groups) == 1
-    assert len(first.media_groups[0]) == 6
+    assert len(first.media_groups[0]) == 4
     assert first.media_groups[0][0] == str(cover)
     assert first.text.startswith("🟢 当前可预约")
     assert "以上是这套房" not in first.text
@@ -228,14 +228,14 @@ def test_photos_response_first_batch_album_with_expand(tmp_path):
         ["💬 中文顾问"],
     ]
     expand_btn = first.action_rows[0][0]
-    assert expand_btn.target_index == 6
+    assert expand_btn.target_index == 4
 
-    expanded = build_photos_response(_view(gallery=gallery), offset=6)
+    expanded = build_photos_response(_view(gallery=gallery), offset=4)
     assert expanded.expand_only
     assert expanded.action_rows == ()
-    # Expand appends only unseen frames; it does not resend the first six.
-    assert len(expanded.media_groups[0]) == 4
-    assert expanded.media_groups[0][0] == files[5]
+    # Expand appends only unseen frames; it does not resend the first four.
+    assert len(expanded.media_groups[0]) == 6
+    assert expanded.media_groups[0][0] == files[3]
 
 
 def test_photos_response_pending_has_no_book_button(tmp_path):
