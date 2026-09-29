@@ -564,6 +564,9 @@ def project_reference_summary(project_key: object) -> str | None:
         parts.append(f"交付/完工资料：{completion_year}")
     if building:
         parts.append(f"项目规模：{building}")
+    unit_types = list(reference.get("unit_types") or [])
+    if unit_types:
+        parts.append(f"项目户型：{'、'.join(str(item) for item in unit_types)}")
     if amenities:
         parts.append(f"公区/配套：{'、'.join(str(item) for item in amenities)}")
     if nearby:
@@ -623,6 +626,11 @@ def answer_project_question(project_key: object, question: object) -> str | None
         developer = registry.get("developer") or reference.get("developer")
         if developer:
             return f"{name}开发商：{developer}。"
+
+    if any(token in q for token in ("户型", "房型", "几房", "studio")):
+        unit_types = list(reference.get("unit_types") or [])
+        if unit_types:
+            return f"{name}项目资料中的户型包括：{'、'.join(str(item) for item in unit_types)}。具体在租房源以当前库存为准。"
 
     fee_specs = (
         (("电费", "电价"), "electricity_rate", "electricity_unit", "electricity_scope"),
