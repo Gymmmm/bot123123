@@ -59,13 +59,13 @@ def test_rental_service_home_is_public_content_center_with_final_labels():
     ]
     labels = [choice.label for row in view.rows for choice in row]
     assert labels == [
-        "📋 入住交接留档",
+        "🛡️ 入住留档",
         "💬 中文顾问",
         "⬅️ 返回侨联服务",
     ]
-    assert "安心租房" in view.text
-    assert "重要信息尽量提前确认并留档" in view.text
-    assert "入住交接、费用确认和住房问题" in view.text
+    assert "侨联安心租" in view.text
+    assert "看房更省事" in view.text
+    assert "视频带看｜费用透明｜入住留档｜租后服务" in view.text
 
     markup = build_assurance_keyboard(view, advisor_url="https://t.me/advisor")
     contact = markup.inline_keyboard[1][0]
@@ -86,7 +86,7 @@ async def test_first_click_opens_content_page_and_does_not_send_file(tmp_path):
     outcome = await handle_v3_assurance_callback(_update(query), _context(FakeBot(calls)), repo_root=tmp_path)
     assert outcome.handled and outcome.rendered and not outcome.assets_sent
     assert [call[0] for call in calls] == ["answer", "edit"]
-    assert "入住交接留档" in calls[1][1]
+    assert "入住有记录，退租有依据" in calls[1][1]
     markup = calls[1][2]
     callbacks = [button.callback_data for row in markup.inline_keyboard for button in row if button.callback_data]
     assert "v3u:assure:handover_download" in callbacks

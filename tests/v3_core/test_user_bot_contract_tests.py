@@ -440,7 +440,7 @@ class TestContract6_LeaseTermsNotTruncated:
         # 确认页应包含房源识别信息
         assert "富力城" in view.text
         assert "2房" in view.text
-        assert "实地看房" in view.text
+        assert "实地带看" in view.text
         assert "9月20日" in view.text
         assert "下午" in view.text
 
