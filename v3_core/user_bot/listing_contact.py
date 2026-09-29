@@ -119,6 +119,30 @@ class ListingContactEffectExecutor:
             return None
         snapshot = dict(getattr(view, "snapshot", None) or {})
         canonical = dict(snapshot.get("canonical_facts") or {})
+        clean_question = str(question or "").strip().casefold()
+        if not clean_question:
+            return None
+
+        # A listing's explicit facts always beat project-level reference data.
+        # This prevents a common project fee/rule from overwriting the actual
+        # terms of the unit the customer is asking about.
+        listing_answers = (
+            (("租金", "价格", "多少钱"), "monthly_rent_usd", lambda v: "这套房源记录租金：$" + str(v) + "/月。"),
+            (("电费", "电价"), "electric_rate", lambda v: f"这套房源记录电费：{v}。"),
+            (("水费", "水价"), "water_rate", lambda v: f"这套房源记录水费：{v}。"),
+            (("物业费", "管理费"), "management_fee", lambda v: f"这套房源记录管理费：{v}。"),
+            (("押金", "押几付几"), "deposit_payment_terms", lambda v: f"这套房源记录押金/付款：{v}。"),
+            (("面积", "多大", "多少平"), "size_sqm", lambda v: f"这套房源记录面积：{v}㎡。"),
+            (("楼层", "几楼"), "floor", lambda v: f"这套房源记录楼层：{v}。"),
+            (("户型", "房型", "几房"), "layout", lambda v: f"这套房源记录户型：{v}。"),
+            (("位置", "地址", "哪里", "在哪"), "public_location_display", lambda v: f"这套房源记录位置：{v}。"),
+        )
+        for tokens, field, render in listing_answers:
+            if any(token in clean_question for token in tokens):
+                value = canonical.get(field)
+                if value not in (None, ""):
+                    return render(value)
+
         project_key = canonical.get("project_key")
         if not project_key:
             return None
