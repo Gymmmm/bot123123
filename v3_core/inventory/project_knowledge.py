@@ -497,15 +497,21 @@ def _project_reference_name(reference: dict[str, Any]) -> str:
 
 
 def _range_text(living: dict[str, Any], prefix: str, unit_key: str) -> str | None:
-    low = str(living.get(f"{prefix}_min") or "").strip()
-    high = str(living.get(f"{prefix}_max") or "").strip()
+    def clean_number(value: object) -> str:
+        text = str(value or "").strip()
+        if text.endswith(".0"):
+            text = text[:-2]
+        return text
+
+    low = clean_number(living.get(f"{prefix}_min"))
+    high = clean_number(living.get(f"{prefix}_max"))
     if not low and not high:
         return None
     unit = str(living.get(unit_key) or "").strip()
     value = low or high
     if low and high and low != high:
         value = f"{low}–{high}"
-    return f"{value} {unit}".strip()
+    return f"{value} {unit}".strip() if unit else f"{value}（单位待核）"
 
 
 def project_reference_summary(project_key: object) -> str | None:
