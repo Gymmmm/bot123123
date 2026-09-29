@@ -1,0 +1,51 @@
+<PARSED TEXT FOR SHEET: 1 / 1 TABS
+48,Agile Sky Residence,agileskyresidence,PROJECT,雅居乐天悦（天空公馆）,project:agile-sky-residence,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+49,BKK,bkk,PROJECT,BKK Mansion,project:bkk-mansion,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,NEEDS_VERIFICATION,纯地理词不能直接映射某个PROJECT。；纯GEO/地标词不能直接解析到具体PROJECT。
+50,BKK1,bkk1,PROJECT,王府观邸,project:le-conde-bkk1,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,纯地理词不能直接映射某个PROJECT。；纯GEO/地标词不能直接解析到具体PROJECT。
+51,BKK1雅居乐,bkk1雅居乐,PROJECT,雅居乐天悦（天空公馆）,project:agile-sky-residence,STRONG_PROJECT_ALIAS,95,True,True,DEPRECATE_PROJECT_ALIAS,VERIFIED,官方canonical在BKK3/莫尼旺，BKK1雅居乐应弃用。
+52,BKK3雅居乐,bkk3雅居乐,PROJECT,雅居乐天悦（天空公馆）,project:agile-sky-residence,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+53,BKK Mansion,bkkmansion,PROJECT,BKK Mansion,project:bkk-mansion,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,NEEDS_VERIFICATION,
+54,BKK雅居乐,bkk雅居乐,PROJECT,雅居乐天悦（天空公馆）,project:agile-sky-residence,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+55,Boeung Snor炳发,boeungsnor炳发,PROJECT,炳发 The Star Platinum,project:the-star-platinum,FAMILY_GEO,70,True,False,DIRECT_RESOLVE,VERIFIED,
+56,Borey New World Kour Srov 1&2,boreynewworldkoursrov1&2,PROJECT,新世界 Kour Srov 1&2,project:new-world-kour-srov-1-2,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+57,Borey New World Kour Srov 3,boreynewworldkoursrov3,PROJECT,新世界 Kour Srov 3,project:new-world-kour-srov-3,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+58,Borey Peng Huoth,boreypenghuoth,FAMILY / MARKET_GEO,炳发,family:peng-huoth,AMBIGUOUS_FAMILY,70,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,先按道路/地标缩小family，再解析具体项目；开发商名“炳发”不得直接当PROJECT。
+59,Borey Peng Huoth Chamkardong,boreypenghuothchamkardong,PROJECT,炳发 Chamkar Dong,project:peng-huoth-chamkardong,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+60,Borey Peng Huoth Veng Sreng,boreypenghuothvengsreng,PROJECT,炳发 Veng Sreng,project:peng-huoth-veng-sreng,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+61,Borey Piphup Thmey Chamkar Dong,boreypiphupthmeychamkardong,PROJECT,Piphup Thmey Chamkar Dong,project:piphup-thmey-chamkar-dong,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+62,Borey Piphup Thmey National Road 4,boreypiphupthmeynationalroad4,PROJECT,Piphup Thmey 4号路社区,project:piphup-thmey-nr4,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,NEEDS_VERIFICATION,
+63,Borey Piphup Thmey Sen Sok,boreypiphupthmeysensok,PROJECT,Piphup Thmey 森速社区,project:piphup-thmey-sen-sok,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+64,Bridge,bridge,PROJECT,桥牌公寓（世桥）,project:the-bridge,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+65,CA&SA,ca&sa,PROJECT,钻石凯撒酒店式公寓,project:new:casa-service-apartment,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,与CASA by Meridian不是同一项目，需严格分开。
+66,CASA by Meridian,casabymeridian,PROJECT,钻石庭（CASA Meridian）,project:casa-meridian,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+67,CASA Meridian,casameridian,PROJECT,钻石庭（CASA Meridian）,project:casa-meridian,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+68,Chamkar Dong,chamkardong,PROJECT,集茂50米,project:chip-mong-park-land-50m,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,VERIFIED,
+69,Chamkar Dong Chip Mong,chamkardongchipmong,PROJECT,集茂 Land Riche Chamkar Dong,project:chip-mong-landriche-chamkar-dong,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+70,Chamkar Dong Piphup Thmey,chamkardongpiphupthmey,PROJECT,Piphup Thmey Chamkar Dong,project:piphup-thmey-chamkar-dong,STRONG_PROJECT_ALIAS,95,True,False,DIRECT_RESOLVE,PARTIAL,
+71,Chamkar Dong炳发,chamkardong炳发,PROJECT,炳发 Chamkar Dong,project:peng-huoth-chamkardong,FAMILY_GEO,70,True,False,DIRECT_RESOLVE,VERIFIED,
+72,Chankiri,chankiri,FAMILY / MARKET_GEO,Chankiri,family:chankiri,FAMILY_GEO,70,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,当前可确认Palm Creek；其它同名/后续分期不自动合并。
+73,Chankiri Palm Creek,chankiripalmcreek,PROJECT,Chankiri Palm Creek（棕榈溪）,project:chankiri-palm-creek,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+74,Chief Tower,chieftower,PROJECT,Chief Tower,project:chief-tower,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,NEEDS_VERIFICATION,
+75,Chip Mong,chipmong,FAMILY / MARKET_GEO,Chip Mong,family:chip-mong,AMBIGUOUS_FAMILY,20,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,道路/项目词优先：598、50M、60M、271、6A、TK、Sen Sok。
+76,Chip Mong 271附近,chipmong271附近,PROJECT,集茂271,project:chip-mong-landmark-271,PROJECT_LANDMARK,85,True,False,DIRECT_RESOLVE,VERIFIED,
+77,Chip Mong Grand Phnom Penh City,chipmonggrandphnompenhcity,PROJECT,集茂金边大城,project:chip-mong-grand-phnom-penh-city,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+78,Chip Mong Land,chipmongland,FAMILY / MARKET_GEO,Chip Mong,family:chip-mong,FAMILY_GEO,70,True,False,RESOLVE_WITH_PROJECT_OR_GEO_CONTEXT,VERIFIED,道路/项目词优先：598、50M、60M、271、6A、TK、Sen Sok。
+79,Chip Mong Landmark 271,chipmonglandmark271,PROJECT,集茂271,project:chip-mong-landmark-271,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+80,Chip Mong Landmark 60M,chipmonglandmark60m,PROJECT,集茂60米,project:chip-mong-landmark-60m,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+81,Chip Mong Land Riche Chamkar Dong,chipmonglandrichechamkardong,PROJECT,集茂 Land Riche Chamkar Dong,project:chip-mong-landriche-chamkar-dong,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+82,Chip Mong Park Land 50M,chipmongparkland50m,PROJECT,集茂50米,project:chip-mong-park-land-50m,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+83,Chip Mong Park Land 598,chipmongparkland598,PROJECT,集茂598,project:chip-mong-park-land-598,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+84,Chip Mong Park Land 6A,chipmongparkland6a,PROJECT,集茂6A,project:chip-mong-park-land-6a,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+85,Chip Mong Park Land Sen Sok,chipmongparklandsensok,PROJECT,集茂森速,project:chip-mong-park-land-sen-sok,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+86,Chip Mong Park Land TK,chipmongparklandtk,PROJECT,集茂TK,project:chip-mong-park-land-tk,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+87,Chip Mong Park Land TK 公寓,chipmongparklandtk公寓,PROJECT,集茂TK公寓,project:chip-mong-park-land-tk-condo,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,VERIFIED,
+88,De Castle Royal,decastleroyal,PROJECT,De Castle Royal（德卡斯尔皇家）,project:de-castle-royal,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+89,Diamond Bay Garden,diamondbaygarden,PROJECT,钻石湾花园,project:diamond-bay-garden,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+90,Diamond CA&SA,diamondca&sa,PROJECT,钻石凯撒酒店式公寓,project:new:casa-service-apartment,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,与CASA by Meridian不是同一项目，需严格分开。
+91,Diamond CA&SA Service Apartment,diamondca&saserviceapartment,PROJECT,钻石凯撒酒店式公寓,project:new:casa-service-apartment,NEW_VERIFIED_ALIAS,95,False,False,DIRECT_RESOLVE,VERIFIED,与CASA by Meridian不是同一项目，需严格分开。
+92,Diamond One,diamondone,PROJECT,钻石一号,project:diamond-one,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+93,Diamond Twin Tower,diamondtwintower,PROJECT,钻石双子塔,project:diamond-twin-tower,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,PARTIAL,
+94,Ding Li Tower,dinglitower,PROJECT,鼎利大厦,project:ding-li-tower,EXACT_PROJECT_NAME,100,False,False,DIRECT_RESOLVE,NEEDS_VERIFICATION,
+95,Eco区炳发,eco区炳发,PROJECT,炳发 Eco Delta,project:the-star-platinum-eco-delta,STRONG_PROJECT_ALIAS,95,True,True,CANDIDATE_ONLY,VERIFIED,
+96,Eco区炳发,eco区炳发,PROJECT,炳发 Eco Melody,project:the-star-platinum-eco-melody,STRONG_PROJECT_ALIAS,95,True,True,CANDIDATE_ONLY,VERIFIED,
+97,Eco区炳发,eco区炳发,PROJECT,炳发 Eco Romance,project:the-star-platinum-eco-romance,STRONG_PROJECT_ALIAS,95,True,True,CANDIDATE_ONLY,VERIFIED,
