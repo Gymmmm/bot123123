@@ -29,6 +29,68 @@ _TAXONOMY_TO_KNOWLEDGE = {
 }
 _KNOWLEDGE_TO_TAXONOMY = {value: key for key, value in _TAXONOMY_TO_KNOWLEDGE.items()}
 
+_WEB_VERIFIED_PROJECTS: dict[str, dict[str, Any]] = {
+    "the_penthouse_residence": {
+        "knowledge_key": "web:the-penthouse-residence",
+        "reference_kind": "web_verified_project",
+        "display_name": "The Penthouse Residence",
+        "project_type": "公寓 / 服务式住宅",
+        "location": "Tonle Bassac · Sothearos Boulevard",
+        "address": "No. 83B, Sothearos Boulevard, Phnom Penh",
+        "amenities": ["泳池", "健身房", "停车", "Sky Bar"],
+        "notes": "楼层口径在公开资料中存在差异，系统不把总楼层作为自动继承事实。",
+        "source_urls": [
+            "https://thepenthouseresidence.com/our-facilities/",
+            "https://www.realestate.com.kh/new-developments/the-penthouse-residence-51335/2-bed-1-bath-condo-268415/",
+        ],
+    },
+    "bali_3": {
+        "knowledge_key": "web:bali-3",
+        "reference_kind": "web_verified_project",
+        "display_name": "Bali 3 Condominium",
+        "project_type": "公寓",
+        "location": "Chroy Changvar, Phnom Penh",
+        "amenities": ["泳池", "健身房", "停车", "安保"],
+        "notes": "管理费/停车是否包含随具体租约变化，不作为项目统一收费自动继承。",
+        "source_urls": [
+            "https://camrealtyservice.com/building/bali-3-resort-and-hotel/",
+            "https://www.realtor.com/international/kh/tonle-bassac-chamkarmon-phnom-penh-360107136896/",
+        ],
+    },
+    "peninsula_private_residence": {
+        "knowledge_key": "web:peninsula-private-residences",
+        "reference_kind": "web_verified_project",
+        "display_name": "The Peninsula Private Residences",
+        "project_type": "公寓 / 商业",
+        "location": "Chroy Changvar · 日本桥附近",
+        "building_profile": "公开项目资料称约25层、161个住宅单位，含Studio/1房/2房/3房。",
+        "source_urls": [
+            "https://www.realestate.com.kh/new-developments/the-peninsula-private-residences/offices-222379/",
+        ],
+    },
+    "borey_angkor": {
+        "knowledge_key": "web:borey-angkor-phnom-penh",
+        "reference_kind": "web_verified_project",
+        "display_name": "Borey Angkor Phnom Penh",
+        "project_type": "Borey / 别墅住宅社区",
+        "location": "Russey Keo · Angkor Boulevard",
+        "developer": "Angkor Continent Group Co., Ltd.",
+        "property_types": ["排屋", "双拼", "别墅"],
+        "source_urls": ["https://www.boreyapp.com/"],
+    },
+    "yuetai_ecc": {
+        "knowledge_key": "web:yuetai-ecc",
+        "reference_kind": "web_verified_project",
+        "display_name": "YUETAI ECC",
+        "project_type": "综合楼 / 公寓办公用途",
+        "location": "Norodom Boulevard · Tonle Bassac, Chamkarmon",
+        "notes": "当前公开证据足以确认建筑与位置；统一住宅收费/配套规则仍按具体房源核验。",
+        "source_urls": [
+            "https://www.ppcbank.com.kh/atm-branches/ppcbank-atm-yuetai-ecc-building/",
+        ],
+    },
+}
+
 
 def _clean_row(row: dict[str, Any]) -> dict[str, str]:
     clean = {
@@ -172,11 +234,24 @@ def _peng_huoth_family_reference() -> dict[str, Any]:
 
 
 def project_reference_for_key(project_key: object) -> dict[str, Any] | None:
-    if str(project_key or "").strip() == "peng_huoth_city":
+    taxonomy_key = str(project_key or "").strip()
+    if taxonomy_key == "peng_huoth_city":
         return _peng_huoth_family_reference()
-    knowledge_key = knowledge_key_for_taxonomy(project_key)
+    knowledge_key = knowledge_key_for_taxonomy(taxonomy_key)
     if not knowledge_key:
-        return None
+        web_profile = _WEB_VERIFIED_PROJECTS.get(taxonomy_key)
+        if not web_profile:
+            return None
+        result = deepcopy(web_profile)
+        result["knowledge_version"] = KNOWLEDGE_VERSION
+        result["reference_only"] = True
+        result["inheritance_policy"] = {
+            "listing_fact_precedence": True,
+            "owner_specific_not_project_default": True,
+            "conflicts_require_confirmation": True,
+            "needs_verification_not_asserted": True,
+        }
+        return result
     payload = _bundle().get(knowledge_key)
     if not payload:
         return None
