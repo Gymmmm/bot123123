@@ -176,7 +176,7 @@ def test_strict_search_applies_project_name_from_natural_language(tmp_path):
         db,
         suffix="P",
         public_id="QL-PC-P1A2",
-        project_name="太子中央广场",
+        project_name="Prince Central Plaza 太子中央广场",
         location_key="百色河",
         rent=780,
         layout="1房1厅",
