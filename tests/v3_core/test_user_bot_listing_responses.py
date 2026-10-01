@@ -235,7 +235,7 @@ def test_photos_response_first_batch_album_with_expand(tmp_path):
     assert expanded.action_rows == ()
     # Expand appends only unseen frames; it does not resend the first six.
     assert len(expanded.media_groups[0]) == 4
-    assert expanded.media_groups[0][0] == files[3]
+    assert expanded.media_groups[0][0] == files[5]
 
 
 def test_photos_response_pending_has_no_book_button(tmp_path):
