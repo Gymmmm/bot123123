@@ -38,6 +38,11 @@ class CanonicalWorker:
                 """SELECT id FROM source_posts
                    WHERE parse_status='pending'
                       OR (
+                          parse_status='insufficient_media'
+                          AND length(trim(COALESCE(raw_text,''))) > 0
+                          AND json_array_length(COALESCE(raw_images_json,'[]')) >= 1
+                      )
+                      OR (
                           parse_status='parsed'
                           AND NOT EXISTS (
                               SELECT 1 FROM canonical_records c
