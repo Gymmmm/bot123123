@@ -61,3 +61,10 @@ def test_studio_keeps_production_dual_signal_property_and_room_type():
     assert "钻石岛" in criteria.location_keys
     assert criteria.budget_min == 400
     assert criteria.budget_max == 800
+
+
+def test_landmark_proximity_prefers_location_over_same_named_project():
+    criteria = parse_search_criteria("想找离永旺1近一点的")
+
+    assert "永旺商圈" in criteria.location_keys
+    assert criteria.project_terms == ()
