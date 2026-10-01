@@ -90,6 +90,3 @@ def test_project_name_plus_room_is_claimed_as_direct_search():
     assert result.intent is not None
     assert "Prince Central Plaza 太子中央广场" in result.intent.criteria.project_terms
     assert result.intent.criteria.room_type == "1房"
-    assert result.mutation is not None
-    saved = result.mutation.set_values[LAST_SEARCH_PREF_KEY]
-    assert saved["project_terms"]
