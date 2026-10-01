@@ -143,9 +143,16 @@ def parse_search_criteria(text: str) -> SearchCriteria:
     raw = str(text or "").strip()
     budget_min, budget_max = parse_budget_range(raw)
     project_terms = detect_project_terms(raw)
+    location_keys = detect_location_keys(raw)
+    # Proximity wording names a landmark/area target, not a same-named project.
+    # Example: "想找离永旺1近一点的" should search the 永旺1 vicinity.
+    if project_terms and location_keys and re.search(r"(附近|周边|旁边|靠近|离.{0,16}近)", raw, re.I):
+        project_terms = ()
+    elif project_terms:
+        location_keys = ()
     return SearchCriteria(
         property_type=detect_property_type(raw),
-        location_keys=() if project_terms else detect_location_keys(raw),
+        location_keys=location_keys,
         project_terms=project_terms,
         budget_min=budget_min,
         budget_max=budget_max,
