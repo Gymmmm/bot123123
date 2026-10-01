@@ -314,7 +314,7 @@ def test_strict_search_applies_canonical_project_filter(tmp_path):
     _seed_listing(
         db,
         suffix="P",
-        public_id="QL-PP-P1A2",
+        public_id="QL-PP-Y8M8",
         property_type="公寓",
         location_key="诺罗敦大道",
         rent=650,
@@ -327,4 +327,4 @@ def test_strict_search_applies_canonical_project_filter(tmp_path):
     result = service.strict(criteria, limit=5)
 
     assert result.mode == "strict"
-    assert [item.public_listing_id for item in result.items] == ["QL-PP-P1A2"]
+    assert [item.public_listing_id for item in result.items] == ["QL-PP-Y8M8"]
