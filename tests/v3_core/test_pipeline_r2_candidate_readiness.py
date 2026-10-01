@@ -153,11 +153,11 @@ def test_canonical_blocking_flag_fails(tmp_path):
     assert repo.readiness[-1] == ("OFF_1", False, "canonical_error")
 
 
-def test_insufficient_and_unreadable_media_fail(tmp_path):
-    # Gallery excludes cover-source; 2 other shots + cover = 3 < min_media(4).
+def test_low_photo_count_is_allowed_but_unreadable_cover_fails(tmp_path):
+    # One or more usable photos are enough for Pillow cover generation.
     result, workflow, repo = _run(tmp_path, media=_media(tmp_path, count=2))
-    assert result.reason_code == "insufficient_media"
-    assert repo.readiness[-1] == ("OFF_1", False, "insufficient_media")
+    assert result.status == "ready"
+    assert repo.readiness[-1] == ("OFF_1", True, "")
 
     other = tmp_path / "other"
     other.mkdir()
