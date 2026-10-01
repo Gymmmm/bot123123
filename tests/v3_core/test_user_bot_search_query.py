@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from v3_core.user_bot.search_query import (
     detect_location_keys,
-    detect_property_type,
+    detect_project_terms,\n    detect_property_type,
     detect_room_type,
     parse_budget_range,
     parse_search_criteria,
@@ -54,3 +54,17 @@ def test_studio_keeps_production_dual_signal_property_and_room_type():
     assert "钻石岛" in criteria.location_keys
     assert criteria.budget_min == 400
     assert criteria.budget_max == 800
+
+
+def test_project_detection_uses_production_canonical_taxonomy():
+    assert "富力城" in detect_project_terms("富力城两房")
+    assert "Prince Central Plaza 太子中央广场" in detect_project_terms("太子中央广场一房")
+    assert "太子·寰宇中心" in detect_project_terms("太子寰宇一房")
+    assert detect_project_terms("BKK1 一房 600左右") == ()
+
+
+def test_parse_search_criteria_keeps_project_filter():
+    criteria = parse_search_criteria("太子中央广场一房")
+    assert criteria.project_terms
+    assert "Prince Central Plaza 太子中央广场" in criteria.project_terms
+    assert criteria.room_type == "1房"
