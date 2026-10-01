@@ -152,3 +152,18 @@ def test_overlapping_new_airport_aliases_are_one_location_not_ambiguous_l216():
     facts = _parse(raw)
     assert facts["public_location_display"] == "德崇机场方向"
     assert "ambiguous_market_location" not in facts["quality"]["blocking_flags"]
+
+
+def test_compact_chinese_room_count_after_price_is_layout():
+    from v3_core.inventory.canonical_facts import canonicalize_source
+
+    facts = canonicalize_source(
+        raw_text="21877号：1号公路炳发双拼别墅\n出租价格：1800房间4+1\n押金费用：2个月\n合约情况：1年",
+        sanitized_text="21877号：1号公路炳发双拼别墅\n出租价格：1800房间4+1\n押金费用：2个月\n合约情况：1年",
+        source_identity={"source_post_id": 1},
+        media_summary={"image_count": 3, "video_count": 0, "media_type": "image"},
+        manual_overrides={},
+    )
+    assert facts["layout"] == "4+1房"
+    assert facts["bedrooms"] == 4
+    assert facts["monthly_rent_usd"] == 1800
