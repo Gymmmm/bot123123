@@ -22,6 +22,7 @@ def _seed_listing(
     offer_status: str = "active",
     published: bool = True,
     layout: str = "2房1厅",
+    project_name: str | None = None,
 ):
     listing_id = f"LST_{suffix}"
     canonical_id = f"CAN_{suffix}"
@@ -50,7 +51,7 @@ def _seed_listing(
                 listing_id,
                 public_id,
                 canonical_id,
-                f"项目{suffix}",
+                project_name or f"项目{suffix}",
                 property_type,
                 location_key,
                 location_key,
