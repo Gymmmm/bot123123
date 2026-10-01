@@ -130,6 +130,7 @@ class CoverRenderService:
             source_image=str(cover_source),
             output_path=str(target),
             data=data,
+            source_images=media.gallery_paths,
         )
         rendered_path = Path(rendered).expanduser().resolve()
         if not rendered_path.is_file():
