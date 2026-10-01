@@ -81,6 +81,23 @@ def _extract_layout(text: str) -> tuple[str | None, dict[str, int | None], list[
             "helper_rooms": None,
         }, [_evidence(layout, "raw_explicit_layout", "high", labelled_compact.group(0), labelled_compact.start(1), labelled_compact.end(1))]
 
+    # Common Chinese agent shorthand: "出租价格：1800房间4+1" / "房间4".
+    labelled_room_count = re.search(
+        r"(?:房间(?:数量|户型)?|房数)\s*[:：]?\s*(\d{1,2}(?:\s*\+\s*\d{1,2})?)\s*(?:房)?",
+        source,
+        flags=re.I,
+    )
+    if labelled_room_count:
+        compact = re.sub(r"\s+", "", labelled_room_count.group(1))
+        bedrooms = int(compact.split("+", 1)[0])
+        layout = f"{compact}房"
+        return layout, {
+            "bedrooms": bedrooms,
+            "living_rooms": None,
+            "bathrooms": None,
+            "helper_rooms": None,
+        }, [_evidence(layout, "raw_explicit_layout", "high", labelled_room_count.group(0), labelled_room_count.start(1), labelled_room_count.end(1))]
+
     # ``两室一厅`` normalizes to ``2室1厅``.  Treat 室 as the ordinary bedroom
     # noun, but do not infer bathrooms or any other absent field.
     room_living = re.search(r"(?<!\d)(\d{1,2})\s*室\s*(\d{1,2})\s*厅", source)
