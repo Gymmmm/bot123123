@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import re
 
-from v3_core.inventory.listing_taxonomy import MARKET_LOCATIONS, PHYSICAL_AREAS, clean_text
+from v3_core.inventory.listing_taxonomy import (\n    MARKET_LOCATIONS,\n    PHYSICAL_AREAS,\n    classify_listing_taxonomy,\n    clean_text,\n)
 
 
 _ROOM_TYPE_HINTS = {
@@ -61,6 +61,16 @@ def detect_property_type(text: str) -> str:
         if any(alias in lowered for alias in aliases):
             return canonical
     return ""
+
+
+def detect_project_terms(text: str) -> tuple[str, ...]:
+    """Resolve verified project names/aliases through the production taxonomy."""
+    raw = str(text or "").strip()
+    if not raw:
+        return ()
+    taxonomy = classify_listing_taxonomy(raw)
+    values = (taxonomy.project_name, taxonomy.project_alias)
+    return tuple(dict.fromkeys(str(value or "").strip() for value in values if str(value or "").strip()))
 
 
 def _location_aliases() -> tuple[tuple[str, tuple[str, ...]], ...]:
