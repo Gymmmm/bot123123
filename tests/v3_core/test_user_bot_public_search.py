@@ -175,7 +175,7 @@ def test_strict_search_applies_project_name_from_natural_language(tmp_path):
     _seed_listing(
         db,
         suffix="P",
-        public_id="QL-PP-P1A2",
+        public_id="QL-PP-P2A3",
         project_name="Prince Central Plaza 太子中央广场",
         location_key="百色河",
         rent=780,
@@ -184,7 +184,7 @@ def test_strict_search_applies_project_name_from_natural_language(tmp_path):
     service = PublicSearchService(PublicSearchReader(db))
     result = service.strict(parse_search_criteria("太子中央广场一房"), limit=5)
     assert result.mode == "strict"
-    assert [item.public_listing_id for item in result.items] == ["QL-PP-P1A2"]
+    assert [item.public_listing_id for item in result.items] == ["QL-PP-P2A3"]
 
 
 def test_strict_search_applies_room_type_filter(tmp_path):
