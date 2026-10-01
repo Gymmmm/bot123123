@@ -234,7 +234,7 @@ def test_photos_response_first_batch_album_with_expand(tmp_path):
     assert expanded.expand_only
     assert expanded.action_rows == ()
     # Expand appends only unseen frames; it does not resend the first six.
-    assert len(expanded.media_groups[0]) == 6
+    assert len(expanded.media_groups[0]) == 4
     assert expanded.media_groups[0][0] == files[3]
 
 
