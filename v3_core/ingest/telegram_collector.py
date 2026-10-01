@@ -91,7 +91,7 @@ class TelegramCollectorApp:
         session_path: str,
         api_id: int,
         api_hash: str,
-        min_listing_images: int = 4,
+        min_listing_images: int = 1,
     ):
         self.db_path = str(Path(db_path).expanduser().resolve())
         self.sources_path = str(Path(sources_path).expanduser().resolve())
@@ -107,7 +107,7 @@ class TelegramCollectorApp:
         self.runtime = RuntimeStateRepository(self.db_path)
         self.intake = IntakeService(
             self.repository,
-            min_listing_images=max(4, int(min_listing_images or 4)),
+            min_listing_images=max(1, int(min_listing_images or 1)),
         )
 
     async def _heartbeat_loop(self) -> None:
@@ -363,7 +363,7 @@ def from_environment(repo_root: str | Path | None = None) -> TelegramCollectorAp
         session_path=session,
         api_id=int(os.getenv("TG_API_ID", "0") or 0),
         api_hash=os.getenv("TG_API_HASH", ""),
-        min_listing_images=int(os.getenv("COLLECTOR_MIN_IMAGES", "4") or 4),
+        min_listing_images=int(os.getenv("COLLECTOR_MIN_IMAGES", "1") or 1),
     )
 
 
