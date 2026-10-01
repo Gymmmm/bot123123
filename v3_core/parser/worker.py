@@ -37,6 +37,7 @@ class CanonicalWorker:
             rows = conn.execute(
                 """SELECT id FROM source_posts
                    WHERE parse_status='pending'
+                      OR (parse_status='insufficient_media' AND json_array_length(raw_images_json)>=1)
                       OR (
                           parse_status='parsed'
                           AND NOT EXISTS (
