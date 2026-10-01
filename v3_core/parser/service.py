@@ -67,7 +67,7 @@ class CanonicalParseService:
         video_count = int(raw_meta.get("raw_video_count") or 0) or self._json_list_count(
             row["raw_videos_json"]
         )
-        media_summary = {
+        if str(row["parse_status"] or "") == "insufficient_media" and image_count < 1:\n            raise ValueError("source post is blocked by insufficient_media")\n\n        media_summary = {
             "image_count": image_count,
             "video_count": video_count,
             "media_type": (
