@@ -252,6 +252,9 @@ jobs:
           if [ ! -d "$RELEASE/.git" ]; then rm -rf -- "$RELEASE"; git clone -q "$BUNDLE_PATH" --branch actions-production "$RELEASE"; fi
           test "$(git -C "$RELEASE" rev-parse HEAD)" = "$EXPECTED_SHA"
           printf '%s\n' "$EXPECTED_SHA" > "$RELEASE/.deployed_sha"; chmod 0644 "$RELEASE/.deployed_sha"; chown -R qiaolianbot:qiaolianbot "$RELEASE"
+          install -d -m 0750 -o qiaolianbot -g qiaolianbot "$ROOT/runtime/playwright-browsers"
+          runuser -u qiaolianbot -- env PLAYWRIGHT_BROWSERS_PATH="$ROOT/runtime/playwright-browsers" "$VENV/bin/python" -m playwright install chromium
+          test -x "$ROOT/runtime/playwright-browsers/chromium_headless_shell-1187/chrome-linux/headless_shell" || { echo "DEPLOY_BLOCKED playwright_browser_missing"; exit 1; }
           runuser -u qiaolianbot -- bash -lc "set -a; source '$RUNTIME_ENV'; set +a; export QIAOLIAN_CODE_ROOT='$RELEASE'; exec '$PYTHON_BOOTSTRAP' '$RELEASE/run_v3_preflight.py' --component all --db '$DB'"
           trap rollback_release ERR
           ln -sfn "$RELEASE" "$ROOT/current.next"; mv -Tf "$ROOT/current.next" "$CURRENT"; SWITCHED=1
