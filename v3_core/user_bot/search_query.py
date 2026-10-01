@@ -142,10 +142,11 @@ class SearchCriteria:
 def parse_search_criteria(text: str) -> SearchCriteria:
     raw = str(text or "").strip()
     budget_min, budget_max = parse_budget_range(raw)
+    project_terms = detect_project_terms(raw)
     return SearchCriteria(
         property_type=detect_property_type(raw),
-        location_keys=detect_location_keys(raw),
-        project_terms=detect_project_terms(raw),
+        location_keys=() if project_terms else detect_location_keys(raw),
+        project_terms=project_terms,
         budget_min=budget_min,
         budget_max=budget_max,
         room_type=detect_room_type(raw),
