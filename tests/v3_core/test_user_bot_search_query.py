@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from v3_core.user_bot.search_query import (
     detect_location_keys,
+    detect_project_terms,
     detect_property_type,
     detect_room_type,
     parse_budget_range,
@@ -35,10 +36,16 @@ def test_location_detection_is_derived_from_canonical_taxonomy():
     assert detect_location_keys("不限区域") == ()
 
 
+def test_project_detection_uses_canonical_project_aliases():
+    assert "太子中央广场" in detect_project_terms("太子中央广场一房")
+    assert "富力城" in detect_project_terms("富力城两房")
+
+
 def test_parse_search_criteria_records_room_type_without_promoting_it_to_property_filter():
     criteria = parse_search_criteria("BKK1 一房 800以内")
 
     assert criteria.location_keys == ("BKK1",)
+    assert criteria.project_terms == ()
     assert criteria.room_type == "1房"
     assert criteria.property_type == ""
     assert criteria.budget_min is None
