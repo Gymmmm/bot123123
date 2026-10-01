@@ -15,6 +15,7 @@ def _seed_listing(
     suffix: str,
     public_id: str,
     property_type: str = "公寓",
+    project_name: str | None = None,
     location_key: str = "BKK1",
     rent: int | None = 800,
     sale: int | None = None,
@@ -50,7 +51,7 @@ def _seed_listing(
                 listing_id,
                 public_id,
                 canonical_id,
-                f"项目{suffix}",
+                project_name or f"项目{suffix}",
                 property_type,
                 location_key,
                 location_key,
@@ -167,6 +168,23 @@ def test_search_returns_only_current_durably_published_rent_inventory(tmp_path):
 
     assert [item.public_listing_id for item in items] == ["QL-BK-A2B3"]
     assert all(item.bookable for item in items)
+
+
+def test_strict_search_applies_project_name_from_natural_language(tmp_path):
+    db = _db(tmp_path)
+    _seed_listing(
+        db,
+        suffix="P",
+        public_id="QL-PC-P1A2",
+        project_name="太子中央广场",
+        location_key="百色河",
+        rent=780,
+        layout="1房1厅",
+    )
+    service = PublicSearchService(PublicSearchReader(db))
+    result = service.strict(parse_search_criteria("太子中央广场一房"), limit=5)
+    assert result.mode == "strict"
+    assert [item.public_listing_id for item in result.items] == ["QL-PC-P1A2"]
 
 
 def test_strict_search_applies_room_type_filter(tmp_path):
