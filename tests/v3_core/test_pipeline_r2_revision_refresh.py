@@ -108,3 +108,61 @@ def test_current_revision_is_not_reselected(tmp_path):
     facts = canonicalize_source("富力城 公寓 2房1厅 租金 $800/月")
     inventory.store_canonical(source_post_id=source_id, facts=facts)
     assert CanonicalWorker(str(db)).pending_ids() == []
+
+
+def test_legacy_missing_layout_exception_reenters_worker_once(tmp_path):
+    db = tmp_path / "legacy-layout-recovery.sqlite3"
+    initialize_v3_storage(db)
+    sources = SourceRepository(str(db))
+    inventory = InventoryRepository(str(db))
+    source_id = sources.save_source_post(
+        source_id=None,
+        source_type="telegram_channel",
+        source_name="collector",
+        source_post_id="legacy-layout",
+        source_url="",
+        source_author="",
+        raw_text="1号公路炳发双拼别墅\n出租价格：1800房间4+1",
+        raw_images=_images(),
+        raw_videos=[],
+        raw_contact="",
+        raw_meta={},
+        dedupe_hash="legacy-layout",
+        parse_status="parsed",
+    )
+    old = canonicalize_source("1号公路炳发双拼别墅\n出租价格：1800")
+    old["layout"] = None
+    old["bedrooms"] = None
+    old["canonical_facts_hash"] = "legacy-layout-old"
+    canonical = inventory.store_canonical(source_post_id=source_id, facts=old)
+    result = InventoryMaterializationService(inventory).materialize(
+        canonical_record_id=str(canonical["canonical_record_id"]),
+        listing_id="l_900",
+        public_listing_id="QL-PP-C8D8",
+        create_review=True,
+    )
+    offer_id = result.offer_ids[0]
+    review_id = result.review_ids[0]
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            "UPDATE canonical_records SET created_at='2026-09-30 00:00:00' WHERE canonical_record_id=?",
+            (str(canonical["canonical_record_id"]),),
+        )
+        conn.execute(
+            """INSERT INTO publisher_auto_items_v3
+               (offer_id,listing_id,review_id,state,reason_code,reason_text,ignored,origin)
+               VALUES (?,?,?,'exception','missing_listing_info','房源信息不完整',0,'collector')""",
+            (offer_id, "l_900", review_id),
+        )
+        conn.commit()
+
+    worker = CanonicalWorker(str(db))
+    assert worker.pending_ids() == [source_id]
+    refreshed = worker.process_one(source_id)
+    assert refreshed.status == "materialized"
+    assert refreshed.listing_id == "l_900"
+    assert worker.pending_ids() == []
+
+    listing = InventoryReader(str(db)).listing("l_900")
+    assert listing["layout"] == "4+1房"
+    assert listing["bedrooms"] == 4
