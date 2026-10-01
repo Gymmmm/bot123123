@@ -37,7 +37,7 @@ def test_location_detection_is_derived_from_canonical_taxonomy():
 
 
 def test_project_detection_uses_canonical_project_aliases():
-    assert "太子中央广场" in detect_project_terms("太子中央广场一房")
+    assert "Prince Central Plaza 太子中央广场" in detect_project_terms("太子中央广场一房")
     assert "富力城" in detect_project_terms("富力城两房")
 
 
