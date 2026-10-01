@@ -82,3 +82,14 @@ def test_keyword_search_parses_existing_v3_criteria_and_builds_public_session_cl
     assert AWAITING_KEYWORD_SESSION_KEY in result.mutation.delete_keys
     assert SEARCH_PREF_SESSION_KEY in result.mutation.delete_keys
     assert "room_type" not in result.mutation.set_values[LAST_SEARCH_PREF_KEY]
+
+
+def test_project_name_plus_room_is_claimed_as_direct_search():
+    result = KeywordSearchActionService().apply("太子中央广场一房", {})
+    assert result.ok
+    assert result.intent is not None
+    assert "Prince Central Plaza 太子中央广场" in result.intent.criteria.project_terms
+    assert result.intent.criteria.room_type == "1房"
+    assert result.mutation is not None
+    saved = result.mutation.set_values[LAST_SEARCH_PREF_KEY]
+    assert saved["project_terms"]
