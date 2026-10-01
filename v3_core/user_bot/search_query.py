@@ -10,7 +10,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 import re
 
-from v3_core.inventory.listing_taxonomy import (\n    MARKET_LOCATIONS,\n    PHYSICAL_AREAS,\n    classify_listing_taxonomy,\n    clean_text,\n)
+from v3_core.inventory.listing_taxonomy import (
+    MARKET_LOCATIONS,
+    PHYSICAL_AREAS,
+    classify_listing_taxonomy,
+    clean_text,
+)
 
 
 _ROOM_TYPE_HINTS = {
