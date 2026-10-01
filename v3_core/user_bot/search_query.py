@@ -116,6 +116,7 @@ def detect_location_keys(text: str) -> tuple[str, ...]:
 class SearchCriteria:
     property_type: str = ""
     location_keys: tuple[str, ...] = ()
+    project_terms: tuple[str, ...] = ()
     budget_min: int | None = None
     budget_max: int | None = None
     room_type: str = ""
@@ -126,6 +127,7 @@ class SearchCriteria:
         return bool(
             self.property_type
             or self.location_keys
+            or self.project_terms
             or self.room_type
             or self.budget_min is not None
             or self.budget_max is not None
@@ -138,6 +140,7 @@ def parse_search_criteria(text: str) -> SearchCriteria:
     return SearchCriteria(
         property_type=detect_property_type(raw),
         location_keys=detect_location_keys(raw),
+        project_terms=detect_project_terms(raw),
         budget_min=budget_min,
         budget_max=budget_max,
         room_type=detect_room_type(raw),
@@ -148,6 +151,7 @@ def parse_search_criteria(text: str) -> SearchCriteria:
 __all__ = [
     "SearchCriteria",
     "detect_location_keys",
+    "detect_project_terms",
     "detect_property_type",
     "detect_room_type",
     "parse_budget_range",
