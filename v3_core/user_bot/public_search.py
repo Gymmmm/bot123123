@@ -224,6 +224,7 @@ class PublicSearchService:
     def strict(self, criteria: SearchCriteria, *, limit: int = 3) -> SearchExecution:
         items = self.reader.search(
             property_type=criteria.property_type,
+            project_terms=criteria.project_terms,
             location_keys=criteria.location_keys,
             room_type=criteria.room_type,
             budget_min=criteria.budget_min,
