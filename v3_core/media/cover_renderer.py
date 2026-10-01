@@ -92,7 +92,6 @@ def _paste_gallery(canvas: Image.Image, images: list[Image.Image]) -> None:
     canvas.paste(_fit(images[0], (1080, 850)), (0, 0))
     secondary = images[1:4]
     if not secondary:
-        canvas.paste(_fit(images[0], (1080, BOTTOM_HEIGHT)), (0, BOTTOM_TOP))
         return
     count = len(secondary)
     total_gutter = GUTTER * (count - 1)
