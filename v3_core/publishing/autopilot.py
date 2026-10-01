@@ -373,6 +373,21 @@ class AutoPublishRepository:
                         state, reason_code, reason_text, ignored,
                     ),
                 )
+            # Recover exceptions created only by the retired four-photo rule.
+            # Zero-image and unrelated exceptions remain untouched.
+            conn.execute(
+                """UPDATE publisher_auto_items_v3
+                   SET state='queued',reason_code='',reason_text='',updated_at=CURRENT_TIMESTAMP
+                   WHERE state='exception' AND reason_code='insufficient_media' AND ignored=0
+                     AND EXISTS (
+                       SELECT 1
+                       FROM listings_v3 l
+                       JOIN canonical_records c ON c.canonical_record_id=l.canonical_record_id
+                       JOIN source_posts sp ON CAST(sp.id AS TEXT)=c.source_post_id
+                       WHERE l.listing_id=publisher_auto_items_v3.listing_id
+                         AND json_array_length(sp.raw_images_json)>=1
+                     )"""
+            )
             conn.commit()
         return len(rows)
 
