@@ -60,7 +60,6 @@ def _last_pref(criteria: SearchCriteria) -> dict[str, object]:
     return {
         "property_type": criteria.property_type,
         "location_keys": list(criteria.location_keys),
-        "project_terms": list(criteria.project_terms),
         "budget_min": criteria.budget_min,
         "budget_max": criteria.budget_max,
     }
