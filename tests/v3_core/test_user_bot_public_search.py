@@ -328,3 +328,24 @@ def test_strict_search_applies_canonical_project_filter(tmp_path):
 
     assert result.mode == "strict"
     assert [item.public_listing_id for item in result.items] == ["QL-PP-Y8M8"]
+
+
+def test_project_single_result_does_not_append_unrelated_inventory(tmp_path):
+    db = _db(tmp_path)
+    _seed_listing(
+        db,
+        suffix="P",
+        public_id="QL-PP-Y8M8",
+        property_type="公寓",
+        location_key="诺罗敦大道",
+        rent=650,
+        layout="1房1厅",
+        project_name="Prince Central Plaza 太子中央广场",
+    )
+    service = PublicSearchService(PublicSearchReader(db))
+    criteria = parse_search_criteria("太子中央广场一房")
+
+    result = service.strict_for_results(criteria, limit=5)
+
+    assert result.mode == "strict"
+    assert [item.public_listing_id for item in result.items] == ["QL-PP-Y8M8"]
