@@ -234,6 +234,21 @@ class PublicSearchService:
         return SearchExecution(items=items, mode="strict" if items else "no_match")
 
     def similar(self, criteria: SearchCriteria, *, limit: int = 3) -> SearchExecution:
+        # A named project is the strongest similarity signal. Never widen an
+        # exact project query into unrelated city-wide inventory just to fill
+        # a carousel.
+        if criteria.project_terms:
+            items = self.reader.search(
+                project_terms=criteria.project_terms,
+                budget_min=criteria.budget_min,
+                budget_max=criteria.budget_max,
+                limit=limit,
+            )
+            return SearchExecution(
+                items=items,
+                mode="same_project" if items else "no_match",
+            )
+
         attempts = (
             (
                 "no_type",
