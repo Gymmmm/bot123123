@@ -815,7 +815,7 @@ class AutoPublishService:
         public_photos = len(tuple(getattr(media, "gallery_paths", ()) or ())) + (
             1 if cover_ok else 0
         )
-        if public_photos < cfg.min_media:
+        if public_photos < 1:
             blocking.append("insufficient_media")
         if not cover_ok:
             blocking.append("unreadable_media")
@@ -908,16 +908,19 @@ class AutoPublishService:
             if package.canonical_facts_hash != str(detail.canonical.get("facts_hash") or ""):
                 return self._mark_exception(offer_id, "canonical_error")
         else:
-            package = await asyncio.to_thread(
-                self.workflow.build_package_for_review,
-                review_id=str(item["review_id"]),
-                inventory_status_override="active",
-            )
-            package = await asyncio.to_thread(
-                self.workflow.approve_package,
-                package_id=package.package_id,
-                approved_by="system:auto_publish",
-            )
+            try:
+                package = await asyncio.to_thread(
+                    self.workflow.build_package_for_review,
+                    review_id=str(item["review_id"]),
+                    inventory_status_override="active",
+                )
+                package = await asyncio.to_thread(
+                    self.workflow.approve_package,
+                    package_id=package.package_id,
+                    approved_by="system:auto_publish",
+                )
+            except (OSError, ValueError):
+                return self._mark_exception(offer_id, "unreadable_media")
         self.repository.set_item(offer_id, state="sending", package_id=package.package_id, origin=origin)
         try:
             result = await deliver_approved_package(
