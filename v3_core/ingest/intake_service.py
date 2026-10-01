@@ -94,9 +94,9 @@ def _decoded_list(raw: object) -> list[Any]:
 
 
 class IntakeService:
-    def __init__(self, repository: SourceRepository, *, min_listing_images: int = 4):
+    def __init__(self, repository: SourceRepository, *, min_listing_images: int = 1):
         self.repository = repository
-        self.min_listing_images = max(1, int(min_listing_images or 4))
+        self.min_listing_images = max(1, int(min_listing_images or 1))
 
     def persist(self, source: SourceIntake) -> IntakeResult:
         source_type = str(source.source_type or "telegram_channel")
