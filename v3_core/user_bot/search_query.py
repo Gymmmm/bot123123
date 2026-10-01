@@ -114,6 +114,10 @@ def detect_location_keys(text: str) -> tuple[str, ...]:
     # matches (for example "BKK2 / BKK3").
     if "BKK" in matched and any(key in matched for key in ("BKK1", "BKK2", "BKK3")):
         matched = [key for key in matched if key != "BKK"]
+    # 永旺1 is a renter landmark inside Tonle Bassac. Published inventory may
+    # carry the physical 百色河 key while displaying 永旺1附近, so search both.
+    if "永旺商圈" in matched and "百色河" not in matched:
+        matched.append("百色河")
     return tuple(matched)
 
 
