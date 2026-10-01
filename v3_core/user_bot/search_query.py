@@ -87,15 +87,15 @@ def detect_project_terms(text: str) -> tuple[str, ...]:
     for item in PROJECT_IDENTITIES:
         if item.kind != "project":
             continue
-        best = 0
+        best_alias = ""
         for alias in item.aliases:
-            token = clean_text(alias).casefold()
-            if token and token in raw:
-                best = max(best, len(token))
-        if best:
-            hits.append((best, item.display))
+            token = clean_text(alias)
+            if token and token.casefold() in raw and len(token) > len(best_alias):
+                best_alias = token
+        if best_alias:
+            hits.append((len(best_alias), best_alias))
     hits.sort(key=lambda pair: -pair[0])
-    return tuple(dict.fromkeys(display for _length, display in hits))
+    return tuple(dict.fromkeys(alias for _length, alias in hits))
 
 
 def detect_location_keys(text: str) -> tuple[str, ...]:
