@@ -143,13 +143,14 @@ class PublicSearchReader:
             )
         )
         if clean_projects:
-            placeholders = ",".join("?" for _ in clean_projects)
-            clauses.append(
-                f"(l.project_name COLLATE NOCASE IN ({placeholders}) "
-                f"OR l.project_alias COLLATE NOCASE IN ({placeholders}))"
-            )
-            params.extend(clean_projects)
-            params.extend(clean_projects)
+            project_clauses: list[str] = []
+            for term in clean_projects:
+                project_clauses.append(
+                    "(l.project_name COLLATE NOCASE LIKE ? OR l.project_alias COLLATE NOCASE LIKE ?)"
+                )
+                pattern = f"%{term}%"
+                params.extend((pattern, pattern))
+            clauses.append("(" + " OR ".join(project_clauses) + ")")
 
         clean_locations = tuple(
             dict.fromkeys(
