@@ -57,13 +57,15 @@ def _budget_label(criteria: SearchCriteria) -> str:
 def _last_pref(criteria: SearchCriteria) -> dict[str, object]:
     # Keep the already-locked V3 history schema. Room type stays on the current
     # search criteria/touch payload and is not added to last_search_pref.
-    return {
+    pref: dict[str, object] = {
         "property_type": criteria.property_type,
         "location_keys": list(criteria.location_keys),
-        "project_terms": list(criteria.project_terms),
         "budget_min": criteria.budget_min,
         "budget_max": criteria.budget_max,
     }
+    if criteria.project_terms:
+        pref["project_terms"] = list(criteria.project_terms)
+    return pref
 
 
 def _looks_like_direct_search(criteria: SearchCriteria) -> bool:
