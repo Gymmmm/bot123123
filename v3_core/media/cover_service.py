@@ -125,13 +125,15 @@ class CoverRenderService:
             else self.output_dir / f"{public_id}_{normalized_style}.png"
         )
         target.parent.mkdir(parents=True, exist_ok=True)
-        rendered = self.renderer(
-            style=normalized_style,
-            source_image=str(cover_source),
-            output_path=str(target),
-            data=data,
-            source_images=media.gallery_paths,
-        )
+        render_kwargs = {
+            "style": normalized_style,
+            "source_image": str(cover_source),
+            "output_path": str(target),
+            "data": data,
+        }
+        if self.renderer is render_cover:
+            render_kwargs["source_images"] = media.gallery_paths
+        rendered = self.renderer(**render_kwargs)
         rendered_path = Path(rendered).expanduser().resolve()
         if not rendered_path.is_file():
             raise RuntimeError("cover_renderer_did_not_create_output")
