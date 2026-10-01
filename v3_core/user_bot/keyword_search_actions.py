@@ -60,6 +60,7 @@ def _last_pref(criteria: SearchCriteria) -> dict[str, object]:
     return {
         "property_type": criteria.property_type,
         "location_keys": list(criteria.location_keys),
+        "project_terms": list(criteria.project_terms),
         "budget_min": criteria.budget_min,
         "budget_max": criteria.budget_max,
     }
@@ -73,11 +74,12 @@ def _looks_like_direct_search(criteria: SearchCriteria) -> bool:
     location/budget search when paired with another housing cue.
     """
     has_location = bool(criteria.location_keys)
+    has_project = bool(criteria.project_terms)
     has_budget = criteria.budget_min is not None or criteria.budget_max is not None
     has_property_type = bool(str(criteria.property_type or "").strip())
     has_room_type = bool(str(criteria.room_type or "").strip())
 
-    if has_location and (has_budget or has_property_type or has_room_type):
+    if (has_location or has_project) and (has_budget or has_property_type or has_room_type):
         return True
     if has_budget and (has_property_type or has_room_type):
         return True
