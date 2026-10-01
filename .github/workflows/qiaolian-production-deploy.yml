@@ -272,6 +272,29 @@ jobs:
           echo "V3_DEPLOYMENT_OK sha=$EXPECTED_SHA backup=$BACKUP_PATH"
           REMOTE
 
+      - name: Verify two real Publisher deliveries
+        if: env.DEPLOY_SHA == 'a899d96bc623e78b4602e8dc2c897e0b11d80933'
+        run: |
+          set -Eeuo pipefail
+          ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 "$PROD_SSH_USER@$PROD_HOST" "bash -s" <<'REMOTE'
+          set -Eeuo pipefail
+          cd /opt/qiaolian_v3/current
+          set -a; source /opt/qiaolian_v3/runtime.env; set +a
+          runuser -u qiaolianbot --preserve-environment -- /opt/qiaolian_v3/.venv/bin/python - <<'PY'
+          import asyncio
+          from telegram import Bot
+          from v3_core.publishing.admin_bot import load_settings
+          from v3_core.publishing.publisher_app import V3PublisherApplication
+          async def main():
+              settings=load_settings(); app=V3PublisherApplication(settings); bot=Bot(settings.token)
+              for offer in ("OFF_3ddae62e8b7a45fb9643fc5565d6ebb9","OFF_480dd91f8efa41ba8c4fc844ba1a1fd5"):
+                  result=await app.autopilot.process_one(bot=bot, force_offer_id=offer, origin="collector")
+                  print(result)
+                  if result.status not in {"published","already_published"}: raise SystemExit("publish_failed:"+repr(result))
+          asyncio.run(main())
+          PY
+          REMOTE
+
       - name: Remove temporary SSH material
         if: always()
         run: rm -f "$HOME/.ssh/qiaolian_production"
