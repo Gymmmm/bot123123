@@ -14,6 +14,9 @@ from v3_core.parser.service import CanonicalParseService
 from v3_core.storage.inventory_repository import InventoryRepository
 
 
+LEGACY_LAYOUT_RECOVERY_BEFORE = "2026-10-01 19:20:24"
+
+
 @dataclass(frozen=True)
 class WorkerItemResult:
     source_post_id: int
