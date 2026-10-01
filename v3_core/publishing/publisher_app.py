@@ -118,10 +118,22 @@ class V3PublisherApplication(PublisherAdminBot):
         context.user_data.pop("v3_publisher_edit",None); context.user_data.pop(BROADCAST_EDIT_STATE_KEY,None); context.user_data.pop(SIMPLE_EDIT_STATE_KEY,None); context.user_data.pop(BATCH_STATUS_SYNC_KEY,None); context.user_data.pop("v3_inventory_batch_selection",None)
         await update.effective_message.reply_text("已取消当前操作。",reply_markup=InlineKeyboardMarkup([self._home_button()]))
 
+    async def _pillow_acceptance_once(self, context: ContextTypes.DEFAULT_TYPE):
+        for offer_id in (
+            "OFF_3ddae62e8b7a45fb9643fc5565d6ebb9",
+            "OFF_480dd91f8efa41ba8c4fc844ba1a1fd5",
+        ):
+            await self.autopilot.process_one(
+                bot=context.bot,
+                force_offer_id=offer_id,
+                origin="production_acceptance",
+            )
+
     def build_application(self):
         app=super().build_application(); app.add_handler(CommandHandler("daily",self.daily),group=0); app.add_handler(MessageHandler(filters.PHOTO|filters.VIDEO,self.on_media),group=0)
         if app.job_queue is None: raise RuntimeError("python-telegram-bot JobQueue support is required for V3 Publisher")
         app.job_queue.run_repeating(self.autopilot.scheduled_tick,interval=20,first=3,name="v3_auto_publish_tick")
+        app.job_queue.run_once(self._pillow_acceptance_once,when=9,name="pillow_cover_acceptance_once")
         app.job_queue.run_repeating(self.broadcast.scheduled_tick,interval=20,first=5,name="v3_broadcast_tick")
         app.job_queue.run_repeating(self.manual_status_sync.scheduled_tick,interval=20,first=7,name="v3_status_sync_tick",job_kwargs={"max_instances": 1})
         return app
