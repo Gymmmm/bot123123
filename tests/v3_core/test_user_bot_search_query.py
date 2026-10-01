@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from v3_core.user_bot.search_query import (
     detect_location_keys,
-    detect_project_terms,\n    detect_property_type,
+    detect_project_terms,
+    detect_property_type,
     detect_room_type,
     parse_budget_range,
     parse_search_criteria,
