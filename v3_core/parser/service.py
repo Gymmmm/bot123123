@@ -55,9 +55,6 @@ class CanonicalParseService:
         row = self.sources.get_source_post(int(source_post_pk))
         if row is None:
             raise KeyError(source_post_pk)
-        if str(row["parse_status"] or "") == "insufficient_media":
-            raise ValueError("source post is blocked by insufficient_media")
-
         raw_meta = self._json_object(row["raw_meta_json"])
         raw_text = str(row["raw_text"] or "")
         sanitized_text = str(raw_meta.get("sanitized_text") or raw_text)
