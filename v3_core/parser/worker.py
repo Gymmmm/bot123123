@@ -50,8 +50,25 @@ class CanonicalWorker:
                                 AND c.parser_revision=?
                           )
                       )
+                      OR (
+                          parse_status='parsed'
+                          AND EXISTS (
+                              SELECT 1
+                              FROM canonical_records c
+                              JOIN listings_v3 l ON l.canonical_record_id=c.canonical_record_id
+                              JOIN listing_offers o ON o.listing_id=l.listing_id
+                              JOIN publisher_auto_items_v3 a ON a.offer_id=o.offer_id
+                              WHERE c.source_post_id=CAST(source_posts.id AS TEXT)
+                                AND c.created_at < ?
+                                AND o.offer_type='rent' AND o.offer_status='active'
+                                AND a.state='exception' AND a.ignored=0
+                                AND a.reason_code='missing_listing_info'
+                                AND length(trim(COALESCE(l.layout,'')))=0
+                                AND l.bedrooms IS NULL
+                          )
+                      )
                    ORDER BY id ASC LIMIT ?""",
-                (PARSER_REVISION, max(1, int(limit))),
+                (PARSER_REVISION, LEGACY_LAYOUT_RECOVERY_BEFORE, max(1, int(limit))),
             ).fetchall()
         return [int(row[0]) for row in rows]
 
