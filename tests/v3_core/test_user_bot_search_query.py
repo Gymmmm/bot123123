@@ -69,3 +69,10 @@ def test_parse_search_criteria_keeps_project_filter():
     assert criteria.project_terms
     assert "Prince Central Plaza 太子中央广场" in criteria.project_terms
     assert criteria.room_type == "1房"
+
+
+def test_landmark_proximity_prefers_location_over_same_named_project():
+    criteria = parse_search_criteria("想找离永旺1近一点的")
+
+    assert "永旺商圈" in criteria.location_keys
+    assert criteria.project_terms == ()
