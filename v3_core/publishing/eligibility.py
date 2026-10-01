@@ -63,7 +63,10 @@ def evaluate_offer_eligibility(
         media_count=int(media_count or 0),
         cover_exists=bool(cover_exists),
     )
-    blocking.extend(str(value) for value in contract.get("blocking") or [])
+    contract_blocking = [str(value) for value in contract.get("blocking") or []]
+    if int(media_count or 0) >= 1:
+        contract_blocking = [value for value in contract_blocking if value != "insufficient_media"]
+    blocking.extend(contract_blocking)
     warnings.extend(str(value) for value in contract.get("warnings") or [])
 
     blocking = list(dict.fromkeys(value for value in blocking if value))
