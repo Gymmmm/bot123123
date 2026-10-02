@@ -214,12 +214,16 @@ def test_photos_response_first_batch_album_with_expand(tmp_path):
         ["💬 咨询这套"],
         ["⬅️ 返回房源"],
     ]
-    assert first.action_rows[0][0].target_index == 6
-    expanded=build_photos_response(_view(gallery=files),offset=6)
-    assert expanded.expand_only
-    assert expanded.action_rows == ()
-    assert len(expanded.media_groups[0]) == 10
-    assert expanded.media_groups[0][0] == files[0]
+    assert first.action_rows[0][0].target_index == 1
+    page1=build_photos_response(_view(gallery=files),offset=1)
+    assert not page1.expand_only
+    assert page1.media_groups == ()
+    assert page1.photo_path.endswith(".jpg")
+    assert "实拍 1/3｜共10张" in page1.text
+    assert _labels(page1.action_rows)[0] == ["下一页 ➡️"]
+    page2=build_photos_response(_view(gallery=files),offset=2)
+    assert "实拍 2/3｜共10张" in page2.text
+    assert _labels(page2.action_rows)[0] == ["⬅️ 上一页", "下一页 ➡️"]
 
 
 def test_photos_response_pending_has_no_book_button(tmp_path):
@@ -282,8 +286,10 @@ def test_photo_preview_uses_gallery_not_channel_cover(tmp_path):
     assert response.photo_total == 1
     assert response.media_groups == ()
     assert response.photo_path == str(room.resolve())
-    expanded=build_photos_response(view,offset=6)
-    assert expanded.media_groups == ((str(room.resolve()),),)
+    page=build_photos_response(view,offset=1)
+    assert page.media_groups == ()
+    assert page.photo_path == str(room.resolve())
+    assert "实拍 1/1｜共1张" in page.text
 
 
 def test_build_detail_caption_alias_matches_public_fact_body():
