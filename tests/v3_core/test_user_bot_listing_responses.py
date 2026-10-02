@@ -553,7 +553,7 @@ def test_paged_album_buttons_include_prev_page_next_only_when_multi_page(tmp_pat
     assert "下一页 ➡️" in flat1
     assert "2/3" not in flat1
     mid_inline_row = single_inline_row(mid_page)
-    assert mid_inline_row and set(mid_inline_row) == {"⬅️ 上一页", "2/3", "下一页 ➡️"}
+    assert mid_inline_row == ["⬅️ 上一页", "下一页 ➡️"]
 
     last_page = build_photos_page_response(multi_view, page=2)
     flat2 = [a.label for row in last_page.action_rows for a in row]
