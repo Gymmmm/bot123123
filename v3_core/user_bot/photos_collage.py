@@ -167,4 +167,127 @@ def render_side_stack_collage(
     return str(target.resolve())
 
 
-__all__ = ["render_side_stack_collage"]
+
+def render_listing_preview_collage(
+    photo_paths: list[str] | tuple[str, ...],
+    *,
+    property_type: str = "",
+    public_listing_id: str = "",
+    out_path: str | Path | None = None,
+) -> str:
+    """Render the Bot gallery entry preview.
+
+    Apartments use three selected frames: one wide hero + two supporting rooms.
+    Villas / low-density homes use four equal frames so exterior and interior
+    can be understood at a glance. Input ordering is already the frozen media
+    ranking from the publication package; this renderer never reorders Canonical
+    data and never stretches images.
+    """
+    readable = [Path(p) for p in photo_paths if p and Path(p).is_file()]
+    is_apartment = "公寓" in str(property_type or "")
+    needed = 3 if is_apartment else 4
+    if len(readable) < needed:
+        raise ValueError(f"listing_preview_needs_at_least_{needed}_photos")
+    selected = readable[:needed]
+
+    digest = hashlib.sha1(
+        "|".join([
+            str(public_listing_id or ""),
+            str(property_type or ""),
+            *[str(p.resolve()) for p in selected],
+            "preview-v2",
+        ]).encode("utf-8")
+    ).hexdigest()[:16]
+    target = Path(out_path) if out_path else _cache_dir() / f"preview_{digest}.jpg"
+    if target.is_file() and out_path is None:
+        return str(target.resolve())
+
+    width, height = 1280, 900
+    footer_h = 76
+    grid_h = height - footer_h
+    canvas = Image.new("RGB", (width, height), (255, 255, 255))
+
+    if is_apartment:
+        hero_h = 520
+        hero = _cover_fit(selected[0], width, hero_h)
+        canvas.paste(hero, (0, 0))
+        half = (width - GAP) // 2
+        support_h = grid_h - hero_h - GAP
+        canvas.paste(_cover_fit(selected[1], half, support_h), (0, hero_h + GAP))
+        canvas.paste(_cover_fit(selected[2], width - half - GAP, support_h), (half + GAP, hero_h + GAP))
+    else:
+        cell_w = (width - GAP) // 2
+        cell_h = (grid_h - GAP) // 2
+        for idx, path in enumerate(selected[:4]):
+            x = 0 if idx % 2 == 0 else cell_w + GAP
+            y = 0 if idx < 2 else cell_h + GAP
+            this_w = cell_w if idx % 2 == 0 else width - cell_w - GAP
+            this_h = cell_h if idx < 2 else grid_h - cell_h - GAP
+            canvas.paste(_cover_fit(path, this_w, this_h), (x, y))
+
+    draw = ImageDraw.Draw(canvas)
+    brand = _font(_SERIF, 34)
+    english = _font(_SANS, 14)
+    draw.text((22, grid_h + 10), "侨联地产", font=brand, fill=(28, 26, 22))
+    draw.text((210, grid_h + 28), "OVERSEAS UNITED REAL ESTATE", font=english, fill=(110, 106, 98))
+    target.parent.mkdir(parents=True, exist_ok=True)
+    canvas.save(target, format="JPEG", quality=91, optimize=True)
+    return str(target.resolve())
+
+
+def render_photo_page_collage(
+    photo_paths: list[str] | tuple[str, ...],
+    *,
+    public_listing_id: str = "",
+    page: int = 1,
+    out_path: str | Path | None = None,
+) -> str:
+    """Render one large 2x2 gallery page, up to four real photos.
+
+    The page is a single Telegram-editable image, allowing 上一页/下一页 without
+    creating a media-group plus a second control bubble.
+    """
+    readable = [Path(p) for p in photo_paths if p and Path(p).is_file()][:4]
+    if not readable:
+        raise ValueError("photo_page_needs_photo")
+
+    digest = hashlib.sha1(
+        "|".join([
+            str(public_listing_id or ""),
+            str(max(1, int(page))),
+            *[str(p.resolve()) for p in readable],
+            "page-2x2-v1",
+        ]).encode("utf-8")
+    ).hexdigest()[:16]
+    target = Path(out_path) if out_path else _cache_dir() / f"page_{digest}.jpg"
+    if target.is_file() and out_path is None:
+        return str(target.resolve())
+
+    width = height = 1280
+    canvas = Image.new("RGB", (width, height), (255, 255, 255))
+    if len(readable) == 1:
+        canvas.paste(_cover_fit(readable[0], width, height), (0, 0))
+    elif len(readable) == 2:
+        half = (width - GAP) // 2
+        canvas.paste(_cover_fit(readable[0], half, height), (0, 0))
+        canvas.paste(_cover_fit(readable[1], width - half - GAP, height), (half + GAP, 0))
+    else:
+        cell_w = (width - GAP) // 2
+        cell_h = (height - GAP) // 2
+        for idx, path in enumerate(readable):
+            x = 0 if idx % 2 == 0 else cell_w + GAP
+            y = 0 if idx < 2 else cell_h + GAP
+            this_w = cell_w if idx % 2 == 0 else width - cell_w - GAP
+            this_h = cell_h if idx < 2 else height - cell_h - GAP
+            canvas.paste(_cover_fit(path, this_w, this_h), (x, y))
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    canvas.save(target, format="JPEG", quality=92, optimize=True)
+    return str(target.resolve())
+
+
+__all__ = [
+    "render_listing_preview_collage",
+    "render_photo_page_collage",
+    "render_side_stack_collage",
+]
