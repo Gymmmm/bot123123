@@ -177,7 +177,7 @@ async def test_channel_details_return_home_without_channel_or_change_conditions_
 
 
 @pytest.mark.asyncio
-async def test_photos_send_frozen_media_then_action_message(tmp_path):
+async def test_photos_preview_edits_to_one_message(tmp_path):
     one = tmp_path / "1.jpg"
     two = tmp_path / "2.jpg"
     three = tmp_path / "3.jpg"
@@ -221,13 +221,8 @@ async def test_photos_send_frozen_media_then_action_message(tmp_path):
 
     assert outcome.handled and outcome.response is not None
     assert outcome.response.kind == "photos"
-    assert [call[0] for call in context.bot.calls] == ["send_media_group", "send_message"]
-    media = context.bot.calls[0][1]["media"]
-    assert len(media) == 3
-    assert getattr(media[0], "caption", None)
-    assert not getattr(media[1], "caption", None)
-    assert "🟢 当前可预约" in context.bot.calls[1][1]["text"]
-    assert [call[0] for call in query.calls] == ["answer"]
+    assert context.bot.calls == []
+    assert [call[0] for call in query.calls] == ["answer", "edit_message_media"]
 
 
 @pytest.mark.asyncio
