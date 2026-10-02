@@ -8,6 +8,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from v3_core.presentation.location_display import display_location
+
 from .formatting import display_floor, display_layout, display_property_type
 from .public_ids import normalize_public_id
 
@@ -99,7 +101,7 @@ def render_channel_caption(*, listing: dict[str, Any], offer: dict[str, Any], pu
     if not public_id:
         raise ValueError("valid public_listing_id is required")
     project = _clean(listing.get("project_name") or listing.get("project"), 28)
-    area = _clean(listing.get("public_location_display") or listing.get("area"), 28)
+    area = _clean(display_location(listing.get("public_location_display") or listing.get("area"), project=project), 28)
     heading = project if project and project not in _GENERIC_HEADINGS else area
     if not heading:
         heading = "金边房源"
@@ -107,7 +109,7 @@ def render_channel_caption(*, listing: dict[str, Any], offer: dict[str, Any], pu
     property_type = _clean(display_property_type(property_type_raw), 24)
     raw_layout = listing.get("layout") or ""
     layout = _clean(display_layout(raw_layout, property_type), 20)
-    heading_line = "｜".join(value for value in (heading, layout) if value)
+    heading_line = "｜".join(value for value in (heading, area if project and area else "", layout) if value)
     offer_type = str(offer.get("offer_type") or "rent").strip().lower()
     if offer_type == "rent":
         price = offer.get("monthly_rent_usd")
