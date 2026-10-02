@@ -151,8 +151,10 @@ def _photo_actions(
     if bookable or status in {"active", "reserved"}:
         return (
             tuple(first),
-            (SemanticAction("💬 咨询这套", "consult", target),),
-            (SemanticAction("⬅️ 返回房源", "details", target),),
+            (
+                SemanticAction("💬 咨询这套", "consult", target),
+                SemanticAction("⬅️ 返回房源", "details", target),
+            ),
         )
     return (
         (SemanticAction("💬 咨询这套", "consult", target),),
@@ -487,7 +489,7 @@ def _try_side_collage(
 
 
 def _photos_preview_text(details, *, total: int) -> str:
-    lines = [f"📷 <b>实拍｜共{max(0, int(total))}张</b>"]
+    lines = [f"📷 <b>{max(0, int(total))}张实拍</b>"]
     subject = "｜".join(part for part in (
         str(details.property_type or "").strip(),
         str(details.layout or "").strip(),
