@@ -203,7 +203,7 @@ def test_channel_caption_matches_final_format_and_hides_internal_ids():
         public_listing_id="QL-PP-A2B3",
         status="active",
     )
-    assert text == "🏡 公寓｜2房2卫\\n📍 炳发城\\n💵 $800/月\\n🟢 可预约\\n\\nQL-PP-A2B3"
+    assert text == "🏡 公寓｜2房2卫\n📍 炳发城\n💵 $800/月\n🔑 押一付一｜一年起租\n🟢 可预约\n\nQL-PP-A2B3"
     assert "95㎡" not in text and "19楼" not in text and "押一付一" not in text
     assert "#" not in text
 
