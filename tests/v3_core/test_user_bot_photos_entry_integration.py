@@ -210,7 +210,7 @@ def test_start_property_photos_dl_drops_user_into_4_raw_originals_not_cover(tmp_
     actions = _actions(result.photos)
 
     paging_row = [a.label for a in result.photos.action_rows[0]]
-    assert "1/3" in paging_row, paging_row
+    assert paging_row == ["下一页 ➡️"]
     assert "下一页 ➡️" in paging_row, paging_row
     assert "⬅️ 上一页" not in paging_row, paging_row
 
@@ -219,10 +219,10 @@ def test_start_property_photos_dl_drops_user_into_4_raw_originals_not_cover(tmp_
     assert "📷 查看全部实拍" not in labels
 
     # Exit / book / consultant links remain reachable through the album.
-    # 2026-10-03 fix: ⬅️ 返回房源 replaces 📷 房源详情; consult is "咨询这套".
-    assert "📷 房源详情" not in labels
-    assert "⬅️ 返回房源" in labels
-    assert "📅 在线预约" in labels
+    # 2026-10-03 fix: ⬅️ 返回房源 replaces 📋 房源详情; consult is "咨询这套".
+    assert "📋 房源详情" not in labels
+    assert "📋 房源详情" in labels
+    assert "📅 预约看房" in labels
     assert "💬 咨询这套" in labels
     assert "💬 中文顾问" not in labels
 
@@ -297,7 +297,7 @@ def test_start_property_photos_dl_keyboard_has_prev_page_count_next(tmp_path):
         "QL-RF-A2B3", "photos", source="listing_callback", photo_page=0
     )
     row0 = [a.label for a in page0.photos.action_rows[0]]
-    assert "1/3" in row0
+    assert row0 == ["下一页 ➡️"]
     assert "下一页 ➡️" in row0
     assert "⬅️ 上一页" not in row0
 
@@ -306,7 +306,7 @@ def test_start_property_photos_dl_keyboard_has_prev_page_count_next(tmp_path):
     )
     row1 = [a.label for a in page1.photos.action_rows[0]]
     assert "⬅️ 上一页" in row1
-    assert "2/3" in row1
+    assert row1 == ["⬅️ 上一页", "下一页 ➡️"]
     assert "下一页 ➡️" in row1
 
     page2 = service.resolve_action(
@@ -314,16 +314,16 @@ def test_start_property_photos_dl_keyboard_has_prev_page_count_next(tmp_path):
     )
     row2 = [a.label for a in page2.photos.action_rows[0]]
     assert "⬅️ 上一页" in row2
-    assert "3/3" in row2
+    assert row2 == ["⬅️ 上一页"]
     assert "下一页 ➡️" not in row2
 
     # Every page exposes the same exit / book / consultant row.
-    # 2026-10-03 fix: ⬅️ 返回房源 replaces 📷 房源详情; consult is "咨询这套".
+    # 2026-10-03 fix: ⬅️ 返回房源 replaces 📋 房源详情; consult is "咨询这套".
     for page in (page0, page1, page2):
         flat_labels = _labels(page.photos)
-        assert "📷 房源详情" not in flat_labels
-        assert "⬅️ 返回房源" in flat_labels
-        assert "📅 在线预约" in flat_labels
+        assert "📋 房源详情" not in flat_labels
+        assert "📋 房源详情" in flat_labels
+        assert "📅 预约看房" in flat_labels
         assert "💬 咨询这套" in flat_labels
         assert "💬 中文顾问" not in flat_labels
 
