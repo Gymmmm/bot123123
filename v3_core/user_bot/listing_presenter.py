@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from v3_core.presentation.location_display import display_location
 from v3_core.publishing.formatting import display_layout
 from v3_core.status_labels import inventory_status_presentation
 
@@ -137,7 +138,7 @@ def build_public_listing_details(view: PublishedListingView) -> PublicListingDet
     raw_layout = _visible_text(listing.get("layout"))
     layout = _visible_text(display_layout(raw_layout or property_type, property_type))
     subject = "｜".join(value for value in (project, layout) if value)
-    location = _visible_text(listing.get("public_location_display"))
+    location = display_location(_visible_text(listing.get("public_location_display")), project=project)
     inventory_status = str(view.listing.get("inventory_status") or "pending").strip().lower()
     status_icon, status_label = inventory_status_presentation(inventory_status)
 
