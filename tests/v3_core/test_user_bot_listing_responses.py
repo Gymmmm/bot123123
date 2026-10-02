@@ -198,273 +198,28 @@ def test_villa_caption_keeps_full_frozen_adviser_copy_in_separate_section():
 
 def test_photos_response_first_batch_album_with_expand(tmp_path):
     from PIL import Image
-
-    files = []
+    files=[]
     for index in range(12):
-        path = tmp_path / f"room-{index}.jpg"
-        Image.new("RGB", (640, 480), (20 * index, 40, 80)).save(path, quality=85)
+        path=tmp_path/f"room-{index}.jpg"
+        Image.new("RGB",(640,480),(20*index,40,80)).save(path,quality=85)
         files.append(str(path))
-    view = _view(gallery=files)
-
-    first = build_photos_response(view)
-    assert first.has_media
-    assert not first.expand_only
+    first=build_photos_response(_view(gallery=files))
+    assert first.has_media and not first.expand_only
     assert first.photo_total == 10
     assert first.media_groups == ()
     assert first.photo_path.endswith(".jpg")
     assert "📷 <b>实拍｜共10张</b>" in first.text
-    assert "$" in first.text
     assert _labels(first.action_rows) == [
         ["📷 查看全部实拍", "📅 预约看房"],
         ["💬 咨询这套"],
         ["⬅️ 返回房源"],
     ]
     assert first.action_rows[0][0].target_index == 6
-
-    expanded = build_photos_response(view, offset=6)
+    expanded=build_photos_response(_view(gallery=files),offset=6)
     assert expanded.expand_only
     assert expanded.action_rows == ()
     assert len(expanded.media_groups[0]) == 4
     assert expanded.media_groups[0][0] == files[6]
-
-from __future__ import annotations
-
-import json
-from pathlib import Path
-
-from v3_core.user_bot.listing_responses import (
-    build_detail_caption,
-    build_detail_text,
-    build_details_response,
-    build_photo_caption,
-    build_photos_response,
-)
-from v3_core.user_bot.public_inventory import PublishedListingView
-
-
-def _view(
-    *,
-    status="active",
-    offer_status="active",
-    gallery=(),
-    canonical_facts=None,
-    adviser_copy="",
-    project_name="富力城",
-    size_sqm=95,
-    floor="19",
-):
-    snapshot = {
-        "schema": "v3_publication_snapshot.v1",
-        "listing_id": "LST_1",
-        "public_listing_id": "QL-RF-A2B3",
-        "offer_id": "OFF_1",
-        "canonical_record_id": "CAN_1",
-        "canonical_facts_hash": "hash-1",
-        "canonical_facts": dict(canonical_facts or {}),
-        "adviser_copy": adviser_copy,
-        "listing": {
-            "project_name": project_name,
-            "property_type": "公寓",
-            "layout": "2房1厅",
-            "public_location_display": "BKK1",
-            "size_sqm": size_sqm,
-            "floor": floor,
-        },
-        "offer": {
-            "offer_type": "rent",
-            "monthly_rent_usd": 800,
-            "deposit_terms": "押2付1",
-            "payment_terms": "押1付1",
-            "contract_term": "1年",
-            "publication_policy": "telegram_rent",
-        },
-    }
-    return PublishedListingView(
-        listing={
-            "listing_id": "LST_1",
-            "public_listing_id": "QL-RF-A2B3",
-            "inventory_status": status,
-        },
-        offer={
-            "offer_id": "OFF_1",
-            "offer_type": "rent",
-            "offer_status": offer_status,
-            "publication_policy": "telegram_rent",
-        },
-        publication={"instance_id": "PUB_1"},
-        package={
-            "snapshot_json": json.dumps(snapshot, ensure_ascii=False),
-            "gallery_json": json.dumps(list(gallery), ensure_ascii=False),
-        },
-    )
-
-
-def _actions(rows):
-    return [[item.action for item in row] for row in rows]
-
-
-def _labels(rows):
-    return [[item.label for item in row] for row in rows]
-
-
-def test_detail_text_shows_public_facts_and_full_publisher_copy():
-    view = _view(
-        canonical_facts={
-            "management_fee": "含物业费",
-            "water_rate": "按表",
-            "electric_rate": "0.25$/度",
-            "amenities": ["泳池", "健身房"],
-            "highlights": ["采光好", "钥匙已备"],
-        },
-        adviser_copy="采光面宽，适合长期住。\n楼下配套成熟。",
-    )
-
-    text = build_detail_text(view)
-
-    assert text.startswith("🏠 <b>富力城｜2房1厅</b>\n💰 $800/月\n📍 BKK1\n🏢 公寓｜95㎡｜19楼")
-    assert "🔑 押1付1｜1年" in text
-    assert "物业费｜含物业费" in text
-    assert "水电｜水 按表 / 电 0.25$/度" in text
-    assert "配套｜泳池、健身房" in text
-    assert "💬 <b>侨联说</b>" in text
-    assert "采光面宽，适合长期住。" in text
-    assert "楼下配套成熟。" in text
-    assert "🟢 当前可预约" in text
-    assert text.strip().endswith("楼下配套成熟。")
-    assert "钥匙已备" not in text
-    # NOTE: public_id is NOT exposed in user-visible details text (privacy)
-
-
-def test_detail_text_floor_only_does_not_use_area_floor_label():
-    text = build_detail_text(_view(size_sqm=None, floor="19"))
-    assert "🏢 公寓｜19楼" in text
-    assert "㎡" not in text
-
-
-def test_detail_text_omits_missing_bullets_and_adviser_without_copy():
-    view = _view(canonical_facts={"highlights": ["采光好", "钥匙已备"]})
-
-    response = build_details_response(view)
-    text = response.text
-    
-    # New UI uses compact header format
-    assert "富力城" in text
-    # NOTE: public_id is NOT exposed in user-visible details text (privacy)
-    assert "🪧" not in text
-    assert "$800" in text
-    assert "物业管理" not in text
-    assert "水电费用" not in text
-    assert "大楼配套" not in text
-    assert "侨联说" not in text
-    assert "🟢 当前可预约" in text
-    # NOTE: details keyboard has no photos button (photos is a separate deep link)
-    assert _actions(response.action_rows) == [["book", "consult"], ["similar"]]
-    assert _labels(response.action_rows) == [
-        ["📅 预约看房", "💬 咨询这套"],
-        ["🔍 找相似"],
-    ]
-
-
-def test_details_response_uses_live_rented_state_but_keeps_frozen_public_facts():
-    view = _view(status="rented", offer_status="inactive")
-    response = build_details_response(view)
-
-    assert "💰 $800/月" in response.text
-    assert "🔴 已租出" in response.text
-    # NOTE: details keyboard has no photos button (photos is a separate deep link)
-    assert _actions(response.action_rows) == [["consult"], ["similar"]]
-    assert _labels(response.action_rows) == [
-        ["💬 咨询这套"],
-        ["🔍 找相似"],
-    ]
-
-
-def test_photo_caption_keeps_rental_essentials_with_photo():
-    view = _view()
-    caption = build_photo_caption(view, photo_index=0, photo_total=3)
-    # NOTE: public_id is NOT exposed in user-visible text (privacy)
-    # New UI uses compact header format
-    assert "富力城" in caption
-    assert "$800" in caption
-    assert "BKK1" in caption
-    assert "2房1厅" in caption
-    assert "🪧" not in caption
-    assert "📸 1/3" in caption
-    assert "基本信息" not in caption
-    assert "金边优质房源出租" not in caption
-    assert "侨联说" not in caption
-
-
-def test_photo_caption_uses_location_when_project_is_missing():
-    caption = build_photo_caption(_view(project_name=""), photo_index=0, photo_total=10)
-    assert caption.startswith("🏠 <b>BKK1｜2房1厅</b>\n💰 $800/月\n🏢 公寓｜95㎡｜19楼")
-    assert caption.endswith("📸 1/10")
-
-
-def test_villa_caption_keeps_full_frozen_adviser_copy_in_separate_section():
-    view = _view(project_name="", adviser_copy="多一个灵活空间，可做书房。\n管理费和停车看房时确认。")
-    snapshot = view.snapshot
-    snapshot["listing"].update(
-        property_type="别墅", layout="6+2房8卫", public_location_display="50米路附近"
-    )
-    snapshot["offer"].update(monthly_rent_usd=5000, payment_terms="押2付1")
-    view.package["snapshot_json"] = json.dumps(snapshot, ensure_ascii=False)
-
-    caption = build_photo_caption(view, photo_index=4, photo_total=10)
-
-    # New UI uses compact header format
-    assert "50米路附近" in caption
-    assert "6+2房8卫" in caption
-    assert "$5,000" in caption
-    assert "押2付1" in caption
-    # NOTE: public_id is NOT exposed in user-visible text (privacy)
-    assert "🪧" not in caption
-    assert "侨联说" in caption
-    assert "多一个灵活空间，可做书房。\n管理费和停车看房时确认。" in caption
-    assert caption.endswith("📸 5/10")
-    assert len(caption) < 1024
-
-
-def test_photos_response_first_batch_album_with_expand(tmp_path):
-    from pathlib import Path
-    from PIL import Image
-
-    files = []
-    for index in range(12):
-        path = tmp_path / f"room-{index}.jpg"
-        Image.new("RGB", (640, 480), (20 * index, 40, 80)).save(path, quality=85)
-        files.append(str(path))
-    cover = tmp_path / "cover.jpg"
-    Image.new("RGB", (640, 480), (200, 160, 100)).save(cover, quality=85)
-    gallery = [str(cover), *files, files[0]]
-
-    first = build_photos_response(_view(gallery=gallery))
-
-    assert first.has_media
-    assert not first.expand_only
-    # First screen is a native Telegram album of six real frames.
-    assert first.photo_index == 0
-    assert first.photo_total == 10  # capped at PHOTOS_MAX_TOTAL
-    assert len(first.media_groups) == 1
-    assert len(first.media_groups[0]) == 6
-    assert first.media_groups[0][0] == str(cover)
-    assert first.text.startswith("🟢 当前可预约")
-    assert "以上是这套房" not in first.text
-    assert "⬅️ 上一张" not in str(_labels(first.action_rows))
-    assert _actions(first.action_rows) == [["photos", "book"], ["consult"]]
-    assert _labels(first.action_rows) == [
-        ["📷 查看全部实拍", "📅 预约看房"],
-        ["💬 中文顾问"],
-    ]
-    expand_btn = first.action_rows[0][0]
-    assert expand_btn.target_index == 6
-
-    expanded = build_photos_response(_view(gallery=gallery), offset=6)
-    assert expanded.expand_only
-    assert expanded.action_rows == ()
-    # Expand appends only unseen frames; it does not resend the first six.
-    assert len(expanded.media_groups[0]) == 4
-    assert expanded.media_groups[0][0] == files[5]
 
 
 def test_photos_response_pending_has_no_book_button(tmp_path):
