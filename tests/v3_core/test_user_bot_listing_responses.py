@@ -226,11 +226,12 @@ def test_photos_response_first_batch_album_with_expand(tmp_path):
     assert "⬅️ 上一张" not in str(_labels(first.action_rows))
     assert _actions(first.action_rows) == [["photos", "book"], ["consult"]]
     assert _labels(first.action_rows) == [
-        ["📷 查看全部实拍", "📅 预约看房"],
+        ["📷 更多实拍", "📅 预约看房"],
         ["💬 中文顾问"],
     ]
     expand_btn = first.action_rows[0][0]
-    assert expand_btn.target_index == 4
+    assert expand_btn.target_index == 0
+    assert expand_btn.label == "📷 更多实拍"
 
     expanded = build_photos_response(_view(gallery=gallery), offset=4)
     assert expanded.expand_only
@@ -253,7 +254,7 @@ def test_photos_response_pending_has_no_book_button(tmp_path):
 
     assert response.text.startswith("🔵 房态待确认")
     assert _labels(response.action_rows) == [
-        ["📷 查看全部实拍", "💬 中文顾问"],
+        ["📷 更多实拍", "💬 中文顾问"],
         ["🏠 帮我找房", "🔍 找相似"],
     ]
     assert all(action.action != "book" for row in response.action_rows for action in row)
@@ -451,7 +452,7 @@ def _fake_jpegs(tmp_path, count):
     return paths
 
 
-def _view_with_files(files):
+def _view_with_files(files, *, cover_path: str = ""):
     snapshot = {
         "schema": "v3_publication_snapshot.v1",
         "listing_id": "LST_X",
@@ -493,7 +494,7 @@ def _view_with_files(files):
         },
         publication={"public_listing_id": "QL-RF-A2B3"},
         package={
-            "cover_path": "",
+            "cover_path": str(cover_path or ""),
             "cover_style": "premium_photo",
             "public_listing_id": "QL-RF-A2B3",
             "snapshot_json": json.dumps(snapshot, ensure_ascii=False),
@@ -526,31 +527,37 @@ def test_paged_album_handles_zero_one_three_four_photos(tmp_path):
 
 def test_paged_album_buttons_include_prev_page_next_only_when_multi_page(tmp_path):
     body = _fake_jpegs(tmp_path, 10)
-    # 4-photo album fits on a single page (no paging controls).
+    # 3-photo album fits on a single page (no paging controls).
     small = _view_with_files(body[:3])
     single = build_photos_page_response(small, page=0)
     flat = [a.label for row in single.action_rows for a in row]
-    assert "▶ 下一页" not in flat
-    assert "◀ 上一页" not in flat
+    assert "下一页 ➡️" not in flat
+    assert "⬅️ 上一页" not in flat
     assert "📷 房源详情" in flat
 
     multi_view = _view_with_files(body)
     first_page = build_photos_page_response(multi_view, page=0)
     flat0 = [a.label for row in first_page.action_rows for a in row]
-    assert "◀ 上一页" not in flat0  # first page never shows ◀
-    assert "▶ 下一页" in flat0
-    assert any("1/3" in label for label in flat0)
+    # Paging 2026-10-02 fix: ⬅️ 下一页 ➡️ on a single row + N/total counter.
+    assert "⬅️ 上一页" not in flat0  # first page never shows ⬅️
+    assert "下一页 ➡️" in flat0
+    assert "1/3" in flat0
+    # Make sure the three controls sit on a single inline-keyboard row.
+    first_inline_row = single_inline_row(first_page)
+    assert first_inline_row and set(first_inline_row) == {"1/3", "下一页 ➡️"} | set()
 
     mid_page = build_photos_page_response(multi_view, page=1)
     flat1 = [a.label for row in mid_page.action_rows for a in row]
-    assert "◀ 上一页" in flat1
-    assert "▶ 下一页" in flat1
-    assert any("2/3" in label for label in flat1)
+    assert "⬅️ 上一页" in flat1
+    assert "下一页 ➡️" in flat1
+    assert "2/3" in flat1
+    mid_inline_row = single_inline_row(mid_page)
+    assert mid_inline_row and set(mid_inline_row) == {"⬅️ 上一页", "2/3", "下一页 ➡️"}
 
     last_page = build_photos_page_response(multi_view, page=2)
     flat2 = [a.label for row in last_page.action_rows for a in row]
-    assert "◀ 上一页" in flat2
-    assert "▶ 下一页" not in flat2
+    assert "⬅️ 上一页" in flat2
+    assert "下一页 ➡️" not in flat2
     assert "📷 房源详情" in flat2
 
 
@@ -566,3 +573,75 @@ def test_paged_album_is_idempotent_on_same_page(tmp_path):
     last_explicit = build_photos_page_response(view, page=1)
     assert last.media_caption == last_explicit.media_caption
     assert [g for g in last.media_groups] == [g for g in last_explicit.media_groups]
+
+
+def _paging_labels(response) -> list[str]:
+    """Return labels of the first action row (the paging row)."""
+    if not response or not response.action_rows:
+        return []
+    return [a.label for a in response.action_rows[0]]
+
+
+def single_inline_row(response):
+    """Helper for paging-row assertions."""
+    if response is None or not response.action_rows:
+        return None
+    return [a.label for a in response.action_rows[0]]
+
+
+def test_paged_album_uses_only_raw_photos_excludes_cover(tmp_path):
+    """Paging 2026-10-02 fix: page 1 must NOT include the cover render.
+
+    ``_raw_photo_paths_for_pages`` skips the cover file by name and by
+    package.cover_path. A 9-photo gallery should produce pages of 4/4/1.
+    """
+    body = _fake_jpegs(tmp_path, 9)
+    cover_path = Path(body[0]).parent / "cover_photo.png"
+    cover_path.write_bytes(b"\x89PNG\r\n\x1a\n")
+    view = _view_with_files(
+        body,
+        # Override the default package.cover_path so the cover render lives at
+        # a different file than the gallery originals.
+        cover_path=str(cover_path),
+    )
+
+    page0 = build_photos_page_response(view, page=0)
+    page1 = build_photos_page_response(view, page=1)
+    page2 = build_photos_page_response(view, page=2)
+
+    # First page: exactly the first 4 originals, NOT cover.
+    assert page0.photo_total == 9
+    assert [path for path in page0.media_groups[0]] == [str(p) for p in body[:4]]
+    # Cover is never part of the paged album.
+    for page in (page0, page1, page2):
+        for group in page.media_groups:
+            assert str(cover_path) not in group
+
+    # Page sizes 4 / 4 / 1 for 9 originals.
+    assert len(page1.media_groups[0]) == 4
+    assert [path for path in page1.media_groups[0]] == [str(p) for p in body[4:8]]
+    assert [path for path in page2.media_groups[0]] == [str(p) for p in body[8:9]]
+
+
+def test_more_photos_button_wires_page0_not_legacy_offset():
+    """First-screen album action bar must launch paged album page 0.
+
+    The action's ``target_index`` should be ``0`` so the encoded callback is
+    ``v3u:listing:photos:{id}:pg:0`` — that routes through
+    ``build_photos_page_response`` (raw originals, no cover).
+    """
+    from v3_core.user_bot.listing_responses import _photo_actions
+
+    rows = _photo_actions(
+        bookable=True,
+        inventory_status="active",
+        public_listing_id="QL-RF-A2B3",
+        has_more=True,
+    )
+    flat = [a for row in rows for a in row]
+    more = next((a for a in flat if a.label == "📷 更多实拍"), None)
+    assert more is not None, flat
+    assert more.action == "photos"
+    assert more.target_index == 0
+    # No legacy "查看全部实拍" should remain anywhere.
+    assert not any(a.label == "📷 查看全部实拍" for a in flat)

@@ -136,7 +136,14 @@ def _photo_actions(
     public_listing_id: str,
     has_more: bool,
 ) -> tuple[tuple[SemanticAction, ...], ...]:
-    """FINAL LOCK status matrix for the album action bar.
+    """Album entry bar.
+
+    The 「更多实拍」button opens the paged album at page 0 — never the legacy
+    cover-then-offset expansion. ``target_index=0`` is encoded as
+    ``:pg:0`` so ``PublicListingFlowService`` routes through
+    ``build_photos_page_response``, which uses raw originals only (no cover,
+    no collage). When the listing has no extra photos the button collapses to
+    "📷 房源详情" so the album never advertises an empty second page.
 
     Bookability still comes from the unified ``bookable`` flag (active/reserved
     via inventory_status_bookable / PublishedListingView.bookable). Never invent
@@ -145,19 +152,19 @@ def _photo_actions(
     target = str(public_listing_id or "").strip()
     status = str(inventory_status or "").strip().lower()
 
-    def _expand_or_details() -> SemanticAction:
+    def _more_or_details() -> SemanticAction:
         if has_more:
             return SemanticAction(
-                "📷 查看全部实拍",
+                "📷 更多实拍",
                 "photos",
                 target,
-                target_index=PHOTOS_FIRST_BATCH,
+                target_index=0,
             )
         return SemanticAction("📷 房源详情", "details", target)
 
     if bookable or status in {"active", "reserved"}:
         # Book button only when unified bookable is true.
-        first: list[SemanticAction] = [_expand_or_details()]
+        first: list[SemanticAction] = [_more_or_details()]
         if bookable:
             first.append(SemanticAction("📅 预约看房", "book", target))
         return (
@@ -170,10 +177,10 @@ def _photo_actions(
         if has_more:
             first_row.append(
                 SemanticAction(
-                    "📷 查看全部实拍",
+                    "📷 更多实拍",
                     "photos",
                     target,
-                    target_index=PHOTOS_FIRST_BATCH,
+                    target_index=0,
                 )
             )
         first_row.append(SemanticAction("💬 中文顾问", "consult", target))
@@ -433,6 +440,42 @@ def _frozen_cover_path(view: PublishedListingView) -> str:
 
     return ""
 
+
+def _raw_photo_paths_for_pages(view: PublishedListingView) -> tuple[str, ...]:
+    """Raw original photos for the 「更多实拍」paged album.
+
+    Product lock (Paging 2026-10-02 fix): the paged album never starts with the
+    frozen cover render, the side collage, or any thumbnail derivative. It must
+    show only the listing's original photos so every page (1/3, 2/3, 3/3) is a
+    real photo that opens in Telegram's native viewer. The cover is reserved for
+    the search-card entry and the channel post — those surfaces are unchanged.
+    """
+    output: list[str] = []
+    seen: set[str] = set()
+    cover_path = str((getattr(view, "package", {}) or {}).get("cover_path") or "").strip()
+    cover_name = Path(cover_path).name.lower() if cover_path else ""
+
+    for raw in getattr(view, "gallery", ()) or ():
+        path = _existing_file(raw)
+        if not path:
+            continue
+        name = Path(path).name.lower()
+        # Defensive: any cover-named asset is excluded even if it slips into
+        # the gallery_json (e.g. legacy packages with cover.jpg included).
+        if name in {"cover.jpg", "cover.jpeg", "cover.png", "cover.webp"}:
+            continue
+        if cover_name and name == cover_name:
+            continue
+        if path in seen:
+            continue
+        seen.add(path)
+        output.append(path)
+    return tuple(output)
+
+
+# Back-compat alias used by older call sites / tests (pointed at the
+# cover-first ordering before the paged-album fix split the two surfaces).
+_flipper_photo_paths = None  # placeholder, replaced at end of module
 
 def _gallery_photo_paths(view: PublishedListingView) -> tuple[str, ...]:
     """Cover first, then remaining gallery photos (deduped by path / near-dup).
@@ -717,7 +760,9 @@ def build_photos_page_response(
         page callback is idempotent (deterministic slice + deterministic caption).
     """
     details = build_public_listing_details(view)
-    all_photos = _gallery_photo_paths(view)[:PHOTOS_MAX_TOTAL]
+    # Paged 2026-10-02 fix: only raw originals — cover render is excluded so
+    # every page (1/3, 2/3, 3/3) is a real photo, not the channel thumbnail.
+    all_photos = _raw_photo_paths_for_pages(view)[:PHOTOS_MAX_TOTAL]
     total = len(all_photos)
     total_pages = _photos_page_count(total)
     summary = listing_summary_bits(
@@ -804,11 +849,11 @@ def _photo_page_actions(
     bookable: bool,
     inventory_status: str,
 ) -> tuple[tuple[SemanticAction, ...], ...]:
-    """Album paging keyboard: ◀ page N/total ▶ + book/consult/exit.
+    """Album paging keyboard: single row ⬅️ 上一页｜N/total｜下一页 ➡️ + book/consult/exit.
 
-    First page hides ◀; last page hides ▶ and shows "房源详情" as the exit. The
-    bookable row stays consistent with ``_photo_actions`` so behavior never
-    silently diverges.
+    First page hides ⬅️; last page hides 下一页➡️ and falls back to a no-op
+    "·N/total·" so the page counter still appears. The bookable row stays
+    consistent with ``_photo_actions`` so behavior never silently diverges.
     """
     target = str(public_listing_id or "").strip()
     safe_page = max(0, min(int(page or 0), max(total_pages - 1, 0)))
@@ -818,12 +863,12 @@ def _photo_page_actions(
     paging: list[SemanticAction] = []
     if safe_page > 0:
         paging.append(
-            SemanticAction("◀ 上一页", "photos", target, target_index=safe_page - 1)
+            SemanticAction("⬅️ 上一页", "photos", target, target_index=safe_page - 1)
         )
-    paging.append(SemanticAction(f"·{safe_page + 1}/{total_pages}·", "photos", target, target_index=safe_page))
+    paging.append(SemanticAction(f"{safe_page + 1}/{total_pages}", "photos", target, target_index=safe_page))
     if safe_page + 1 < total_pages:
         paging.append(
-            SemanticAction("▶ 下一页", "photos", target, target_index=safe_page + 1)
+            SemanticAction("下一页 ➡️", "photos", target, target_index=safe_page + 1)
         )
 
     rows: list[tuple[SemanticAction, ...]] = [tuple(paging)]
@@ -842,7 +887,8 @@ def _photo_page_actions(
 
 
 
-# Back-compat alias used by older call sites / tests.
+# Back-compat alias used by older call sites / tests (cover-first ordering
+# before the 2026-10-02 paged-album fix split the two surfaces).
 _flipper_photo_paths = _gallery_photo_paths
 
 build_detail_caption = build_detail_text  # product alias used by open-details copy locks
