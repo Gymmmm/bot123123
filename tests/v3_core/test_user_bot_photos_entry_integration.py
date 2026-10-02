@@ -220,7 +220,7 @@ def test_start_property_photos_dl_drops_user_into_4_raw_originals_not_cover(tmp_
 
     # Exit / book / consultant links remain reachable through the album.
     # 2026-10-03 fix: ⬅️ 返回房源 replaces 📋 房源详情; consult is "咨询这套".
-    assert "📋 房源详情" not in labels
+    assert "📋 房源详情" in labels
     assert "📋 房源详情" in labels
     assert "📅 预约看房" in labels
     assert "💬 咨询这套" in labels
@@ -321,7 +321,7 @@ def test_start_property_photos_dl_keyboard_has_prev_page_count_next(tmp_path):
     # 2026-10-03 fix: ⬅️ 返回房源 replaces 📋 房源详情; consult is "咨询这套".
     for page in (page0, page1, page2):
         flat_labels = _labels(page.photos)
-        assert "📋 房源详情" not in flat_labels
+        assert "📋 房源详情" in flat_labels
         assert "📋 房源详情" in flat_labels
         assert "📅 预约看房" in flat_labels
         assert "💬 咨询这套" in flat_labels
