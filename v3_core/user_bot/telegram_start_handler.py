@@ -255,6 +255,7 @@ async def _render_photos(
             photos,
             advisor_url=advisor_url,
             channel_url=channel_url,
+            add_home=False,
         )
     if not bool(getattr(photos, "expand_only", False)):
         preview = Path(str(getattr(photos, "photo_path", "") or ""))
