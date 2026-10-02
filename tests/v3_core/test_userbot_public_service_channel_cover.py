@@ -172,17 +172,12 @@ async def test_channel_deeplink_start_handler_keeps_listing_context(tmp_path, pa
         keyboard_data = repr(reply_markup)
         assert "book" in keyboard_data or "consult" in keyboard_data
     elif expected_kind == "photos":
-        # photos deep link: sends photo (send_photo) + action bar message (send_message)
-        # Caption shows public_id for reference; action bar message shows full details
-        assert [call[0] for call in bot.calls] == ["send_photo", "send_message"]
+        assert [call[0] for call in bot.calls] == ["send_photo"]
         caption = bot.calls[0][2]["caption"]
-        # Caption contains public_id reference (for user to identify the listing)
         assert "📷" in caption
-        assert PUBLIC_ID in caption  # public_id in caption for listing identification
-        # Action bar shows listing details (no public_id exposure)
-        action_bar = bot.calls[1][2]["text"]
-        assert "富力城" in action_bar
-        assert "🪧" not in action_bar  # public_id NOT in action bar
+        assert "富力城" in caption
+        assert PUBLIC_ID not in caption
+        assert bot.calls[0][2]["reply_markup"] is not None
     else:
         # book deep link: sends text message with transition keyboard
         rendered = message.calls[-1][1]
