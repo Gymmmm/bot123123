@@ -103,6 +103,26 @@ def _remember_album_sent(state: dict[str, Any], *, message_ids: list[str], page:
     state["page"] = int(page)
 
 
+def remember_photos_album(
+    update: Any,
+    context: Any,
+    public_listing_id: str,
+    *,
+    message_ids: list[int | str],
+    page: int = 0,
+) -> None:
+    """Record a rendered album so the next page can delete it cleanly."""
+    public_id = str(public_listing_id or "").strip()
+    if not public_id:
+        return
+    state = _album_state(update, context, public_id)
+    _remember_album_sent(
+        state,
+        message_ids=[str(value) for value in message_ids if str(value).strip()],
+        page=int(page),
+    )
+
+
 async def _render_photos(
     update: Any,
     context: Any,
@@ -306,11 +326,12 @@ async def handle_v3_callback(
         public_id_for_album = ""
         page_for_album = 0
         callback_obj = dispatched.callback
-        if callback_obj is not None and getattr(callback_obj, "page_index", None) is not None:
-            page_for_album = int(getattr(callback_obj, "page_index") or 0)
+        if callback_obj is not None:
             public_id_for_album = str(
                 getattr(callback_obj, "public_listing_id", "") or ""
             ).strip()
+            if getattr(callback_obj, "page_index", None) is not None:
+                page_for_album = int(getattr(callback_obj, "page_index") or 0)
         await _render_photos(
             update,
             context,
@@ -387,5 +408,6 @@ __all__ = [
     "SEARCH_SESSION_KEY",
     "TelegramCallbackHandlerOutcome",
     "handle_v3_callback",
+    "remember_photos_album",
     "render_search_card_response",
 ]
