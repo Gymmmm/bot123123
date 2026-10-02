@@ -233,10 +233,10 @@ def test_photos_response_pending_has_no_book_button(tmp_path):
 
     response = build_photos_response(_view(status="pending", gallery=files))
 
-    assert response.text.startswith("🔵 房态待确认")
+    assert "🔵 待确认" in response.text
     assert _labels(response.action_rows) == [
         ["📷 查看全部实拍", "💬 中文顾问"],
-        ["🏠 帮我找房", "🔍 找相似"],
+        ["⬅️ 返回房源"],
     ]
     assert all(action.action != "book" for row in response.action_rows for action in row)
 
@@ -248,11 +248,13 @@ def test_photos_response_single_photo_uses_details_not_expand(tmp_path):
     Image.new("RGB", (640, 480), (90, 90, 90)).save(one, quality=85)
     response = build_photos_response(_view(gallery=[str(one)]))
 
-    assert response.media_groups == ((str(one),),)
+    assert response.media_groups == ()
+    assert response.photo_path == str(one.resolve())
     assert response.photo_total == 1
     assert _labels(response.action_rows) == [
-        ["📷 房源详情", "📅 预约看房"],
-        ["💬 中文顾问"],
+        ["📷 查看全部实拍", "📅 预约看房"],
+        ["💬 咨询这套"],
+        ["⬅️ 返回房源"],
     ]
 
 
@@ -269,74 +271,19 @@ def test_photos_response_drops_missing_files_and_keeps_text_fallback(tmp_path):
     assert response.detail_text == ""
 
 
-def test_album_starts_on_package_cover_path(tmp_path):
-    cover = tmp_path / "frozen-cover.png"
-    cover.write_bytes(b"COVER")
-    room = tmp_path / "living.jpg"
-    room.write_bytes(b"room")
-    view = _view(gallery=[str(room)])
-    # Inject package cover_path
-    package = dict(view.package)
-    package["cover_path"] = str(cover)
-    view = PublishedListingView(
-        listing=view.listing,
-        offer=view.offer,
-        publication=view.publication,
-        package=package,
-    )
-    response = build_photos_response(view)
-    assert response.photo_total == 2
-    assert response.has_media
-    # Native album keeps both real frames when available.
-    assert len(response.media_groups[0]) == 2
-    expanded = build_photos_response(view, offset=4)
-    assert expanded.expand_only
-    assert expanded.has_media
-    assert str(Path(cover).resolve()) in {
-        str(Path(p).resolve()) for p in expanded.media_groups[0]
-    }
-
-
-def test_album_recovers_rendered_cover_when_package_path_stale(tmp_path):
-    """Runtime often has gallery files but a stale absolute cover_path.
-
-    Album frame 1 must still open on the rendered cover under covers_v3, not gallery[0].
-    """
-    public_id = "QL-RF-A2B3"
-    style = "classic_blue"
-    media_root = tmp_path / "media"
-    covers = media_root / "covers_v3"
-    gallery_dir = media_root / "prepared_v3" / "42" / "gallery"
-    covers.mkdir(parents=True)
-    gallery_dir.mkdir(parents=True)
-
-    rendered = covers / f"{public_id}_{style}.png"
-    rendered.write_bytes(b"RENDERED_COVER")
-    room = gallery_dir / "classic_blue_abc_gallery.jpg"
-    room.write_bytes(b"room")
-
-    stale = tmp_path / "missing-elsewhere" / "old-cover.png"  # does not exist
-    view = _view(gallery=[str(room)])
-    package = dict(view.package)
-    package["cover_path"] = str(stale)
-    package["cover_style"] = style
-    view = PublishedListingView(
-        listing=view.listing,
-        offer=view.offer,
-        publication=view.publication,
-        package=package,
-    )
-
-    response = build_photos_response(view)
-    # First screen is a native album; recovered cover stays in the source set.
-    assert response.photo_total == 2
-    assert response.has_media
-    expanded = build_photos_response(view, offset=4)
-    assert expanded.expand_only
-    assert expanded.has_media
-    assert str(rendered.resolve()) in {
-        str(Path(p).resolve()) for p in expanded.media_groups[0]
-    }
+def test_photo_preview_uses_gallery_not_channel_cover(tmp_path):
+    from PIL import Image
+    cover=tmp_path/"frozen-cover.png"
+    room=tmp_path/"living.jpg"
+    Image.new("RGB",(1080,1350),(20,40,60)).save(cover)
+    Image.new("RGB",(1200,800),(80,100,120)).save(room)
+    view=_with_package(_view(gallery=[str(room)]), cover_path=str(cover), cover_style="classic_blue")
+    response=build_photos_response(view)
+    assert response.photo_total == 1
+    assert response.media_groups == ()
+    assert response.photo_path == str(room.resolve())
+    expanded=build_photos_response(view,offset=6)
+    assert expanded.media_groups == ((str(room.resolve()),),)
 
 
 def test_build_detail_caption_alias_matches_public_fact_body():
@@ -358,58 +305,6 @@ def _with_package(view, **changes):
         package=package,
     )
 
-
-def test_cover_fallback_never_crosses_public_listing_ids(tmp_path):
-    media = tmp_path / "media"
-    covers = media / "covers_v3"
-    gallery_dir = media / "prepared_v3" / "1" / "gallery"
-    covers.mkdir(parents=True)
-    gallery_dir.mkdir(parents=True)
-    wrong = covers / "QL-RF-B9C8_classic_blue.png"
-    wrong.write_bytes(b"WRONG")
-    gallery = gallery_dir / "room.jpg"
-    gallery.write_bytes(b"ROOM")
-    view = _with_package(
-        _view(gallery=[str(gallery)]),
-        cover_path=str(tmp_path / "stale.png"),
-        cover_style="classic_blue",
-    )
-    response = build_photos_response(view)
-    assert response.photo_path == str(gallery.resolve())
-    assert str(wrong.resolve()) not in response.media_groups[0]
-
-
-def test_stale_cover_path_recovers_current_listing_exact_rendered_cover(tmp_path):
-    public_id = "QL-RF-A2B3"
-    media = tmp_path / "media"
-    covers = media / "covers_v3"
-    gallery_dir = media / "prepared_v3" / "1" / "gallery"
-    covers.mkdir(parents=True)
-    gallery_dir.mkdir(parents=True)
-    rendered = covers / f"{public_id}_classic_blue.png"
-    rendered.write_bytes(b"RIGHT")
-    (covers / "QL-RF-B9C8_classic_blue.png").write_bytes(b"WRONG")
-    room = gallery_dir / "room.jpg"
-    room.write_bytes(b"ROOM")
-    view = _with_package(
-        _view(gallery=[str(room)]),
-        cover_path=str(tmp_path / "stale.png"),
-        cover_style="classic_blue",
-    )
-    response = build_photos_response(view)
-    assert response.photo_path == str(rendered.resolve())
-
-
-def test_no_rendered_cover_falls_back_only_to_current_listing_gallery(tmp_path):
-    gallery = tmp_path / "current-room.jpg"
-    gallery.write_bytes(b"ROOM")
-    view = _with_package(
-        _view(gallery=[str(gallery)]),
-        cover_path=str(tmp_path / "missing.png"),
-        cover_style="classic_blue",
-    )
-    response = build_photos_response(view)
-    assert response.photo_path == str(gallery.resolve())
 
 def test_customer_photo_surface_never_exposes_public_listing_id():
     response = build_photos_response(_view())
