@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from v3_core.adviser_copy import build_adviser_copy, validate_adviser_copy, verified_canonical_adviser_facts
+from v3_core.presentation.location_display import display_location
 from v3_core.publishing.channel_contract import official_channel_action_urls
 from v3_core.publishing.channel_renderer import render_channel_caption
 from v3_core.publishing.eligibility import evaluate_offer_eligibility
@@ -119,7 +120,7 @@ class PackageBuildService:
                 str(listing.get("project_name") or "").strip(),
                 str(listing.get("layout") or "").strip(),
                 rent_bit,
-                str(listing.get("public_location_display") or listing.get("area") or "").strip(),
+                display_location(listing.get("public_location_display") or listing.get("area"), project=listing.get("project_name")),
             )
             if part
         )
