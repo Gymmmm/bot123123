@@ -20,7 +20,7 @@ from .public_inventory import PublishedListingView
 
 
 # First screen album size; remaining frames (if any) expand on demand.
-PHOTOS_FIRST_BATCH = 6
+# Preview selection count is property-aware (apartment 3 / villa 4).\nPHOTOS_FIRST_BATCH = 4\nPHOTOS_PAGE_SIZE = 4
 # Hard cap for one listing photos view (first batch + expand).
 PHOTOS_MAX_TOTAL = 10
 
@@ -140,7 +140,7 @@ def _photo_actions(
     status = str(inventory_status or "").strip().lower()
     first: list[SemanticAction] = []
     if has_more:
-        first.append(SemanticAction("📷 查看全部实拍", "photos", target, target_index=PHOTOS_FIRST_BATCH))
+        first.append(SemanticAction("📷 查看全部实拍", "photos", target, target_index=1))
     else:
         first.append(SemanticAction("📷 房源详情", "details", target))
     if bookable:
@@ -462,28 +462,71 @@ def _photos_action_text(details) -> str:
     return chr(10).join(lines)
 
 
-def _try_side_collage(
+def _try_listing_preview(
     photos: tuple[str, ...],
     *,
+    property_type: str,
     public_listing_id: str,
 ) -> str:
-    """Build left-large + right-3 collage.
-
-    Collector policy: listings with fewer than 4 usable photos are not kept, so
-    collage is only attempted when ≥4 frames are available. Short galleries fall
-    back to native send without inventing duplicate thumbs.
-    """
-    if len(photos) < 4:
+    """Property-aware Bot preview: apartment 3 frames, villa/other 4."""
+    needed = 3 if "公寓" in str(property_type or "") else 4
+    if len(photos) < needed:
         return ""
     try:
-        from .photos_collage import render_side_stack_collage
+        from .photos_collage import render_listing_preview_collage
 
-        return render_side_stack_collage(
-            photos[:4],
+        return render_listing_preview_collage(
+            photos[:needed],
+            property_type=property_type,
             public_listing_id=public_listing_id,
         )
     except Exception:
         return ""
+
+
+def _try_photo_page(
+    photos: tuple[str, ...],
+    *,
+    public_listing_id: str,
+    page: int,
+) -> str:
+    if not photos:
+        return ""
+    try:
+        from .photos_collage import render_photo_page_collage
+
+        return render_photo_page_collage(
+            photos[:PHOTOS_PAGE_SIZE],
+            public_listing_id=public_listing_id,
+            page=page,
+        )
+    except Exception:
+        return ""
+
+
+def _photo_page_actions(
+    *,
+    page: int,
+    total_pages: int,
+    bookable: bool,
+    public_listing_id: str,
+) -> tuple[tuple[SemanticAction, ...], ...]:
+    target = str(public_listing_id or "").strip()
+    nav: list[SemanticAction] = []
+    if page > 1:
+        nav.append(SemanticAction("⬅️ 上一页", "photos", target, target_index=page - 1))
+    if page < total_pages:
+        nav.append(SemanticAction("下一页 ➡️", "photos", target, target_index=page + 1))
+    rows: list[tuple[SemanticAction, ...]] = []
+    if nav:
+        rows.append(tuple(nav))
+    action_row: list[SemanticAction] = []
+    if bookable:
+        action_row.append(SemanticAction("📅 预约看房", "book", target))
+    action_row.append(SemanticAction("💬 咨询这套", "consult", target))
+    rows.append(tuple(action_row))
+    rows.append((SemanticAction("⬅️ 返回房源", "details", target),))
+    return tuple(rows)
 
 
 def _photos_preview_text(details, *, total: int) -> str:
@@ -522,23 +565,41 @@ def build_photos_response(
         monthly_rent_usd=details.monthly_rent_usd,
         location=details.location,
     )
-    start = max(0, int(offset or 0))
-    if start > 0:
-        originals = all_photos[:PHOTOS_MAX_TOTAL]
+    page = max(0, int(offset or 0))
+    if page > 0:
+        total_pages = max(1, (total + PHOTOS_PAGE_SIZE - 1) // PHOTOS_PAGE_SIZE)
+        page = min(page, total_pages)
+        start_index = (page - 1) * PHOTOS_PAGE_SIZE
+        page_photos = all_photos[start_index : start_index + PHOTOS_PAGE_SIZE]
+        page_image = _try_photo_page(
+            page_photos,
+            public_listing_id=details.public_listing_id,
+            page=page,
+        )
+        text = f"📷 <b>实拍 {page}/{total_pages}｜共{total}张</b>"
         return PublicPhotosResponse(
-            media_groups=_as_media_groups(originals),
-            text="",
+            media_groups=(),
+            text=text,
             media_caption="",
             detail_text="",
-            photo_path=originals[0] if originals else "",
-            photo_index=start,
+            photo_path=page_image or (page_photos[0] if page_photos else ""),
+            photo_index=start_index,
             photo_total=total,
             listing_summary=summary,
-            action_rows=(),
-            expand_only=True,
+            action_rows=_photo_page_actions(
+                page=page,
+                total_pages=total_pages,
+                bookable=details.bookable,
+                public_listing_id=details.public_listing_id,
+            ),
+            expand_only=False,
         )
 
-    preview = _try_side_collage(all_photos[:PHOTOS_FIRST_BATCH], public_listing_id=details.public_listing_id)
+    preview = _try_listing_preview(
+        all_photos,
+        property_type=details.property_type,
+        public_listing_id=details.public_listing_id,
+    )
     first = preview or (all_photos[0] if all_photos else "")
     if all_photos:
         text = _photos_preview_text(details, total=total)
@@ -575,7 +636,7 @@ build_detail_caption = build_detail_text  # product alias used by open-details c
 __all__ = [
     "InternalListingAction",
     "PHOTOS_FIRST_BATCH",
-    "PHOTOS_MAX_TOTAL",
+    "PHOTOS_MAX_TOTAL",\n    "PHOTOS_PAGE_SIZE",
     "PublicDetailsResponse",
     "PublicPhotosResponse",
     "SemanticAction",
