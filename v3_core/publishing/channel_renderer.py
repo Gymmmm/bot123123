@@ -74,7 +74,7 @@ def _layout_tag(value: Any, property_type: Any = "") -> str:
     raw = _clean(display_layout(value, property_type), 20)
     if raw == "单间":
         return "单间"
-    match = re.search(r"\d+房", raw)
+    match = re.search(r"\\d+(?:[+＋]\\d+)?房", raw)
     return match.group(0) if match else raw
 
 
