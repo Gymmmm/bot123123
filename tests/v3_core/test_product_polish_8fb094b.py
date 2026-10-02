@@ -266,3 +266,14 @@ async def test_listing_contact_missing_advisor_url_uses_existing_bot_contact_flo
     first = query.kwargs["reply_markup"].inline_keyboard[0][0]
     assert first.url is None
     assert first.callback_data == "v3u:home:contact"
+
+def test_plus_layout_hashtag_never_degrades_to_one_room():
+    caption = render_channel_caption(
+        listing={"project_name":"测试别墅","public_location_display":"60米大道","property_type":"别墅","layout":"4+1房6卫","inventory_status":"active"},
+        offer={"offer_type":"rent","monthly_rent_usd":1500,"payment_terms":"押2付1","contract_term":"1年"},
+        public_listing_id="QL-PP-X1",
+        status="active",
+    )
+    assert "#1房" not in caption
+    assert "4+1房" in caption
+    assert "$1,500/月" in caption
