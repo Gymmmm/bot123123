@@ -527,7 +527,9 @@ def _photos_action_text(details, *, total: int) -> str:
     price = _format_price(details.monthly_rent_usd)
     if price:
         lines.append(f"💵 {he(price)}")
-    lines.append(_detail_status_line(details).replace("当前", "").replace("房态", "").strip())
+    status = _detail_status_line(details)
+    status = status.replace("当前可预约", "可预约").replace("房态待确认", "待确认")
+    lines.append(status)
     return chr(10).join(lines)
 
 
@@ -580,11 +582,8 @@ def build_photos_response(
     start = max(0, int(offset or 0))
     if start > 0:
         # The first batch is already visible; only append unseen original frames.
-        originals = (
-            all_photos[start:PHOTOS_MAX_TOTAL]
-            if start < total
-            else all_photos[:PHOTOS_MAX_TOTAL]
-        )
+        # Preview is a derived collage, so no original has been sent yet.
+        originals = all_photos[:PHOTOS_MAX_TOTAL]
         groups = _as_media_groups(originals)
         first = originals[0] if originals else ""
         caption = (
