@@ -74,7 +74,7 @@ def _layout_tag(value: Any, property_type: Any = "") -> str:
     raw = _clean(display_layout(value, property_type), 20)
     if raw == "单间":
         return "单间"
-    match = re.search(r"\d+房", raw)
+    match = re.search(r"\d+(?:[+＋]\d+)?房", raw)
     return match.group(0) if match else raw
 
 
@@ -120,12 +120,11 @@ def render_channel_caption(*, listing: dict[str, Any], offer: dict[str, Any], pu
     except (TypeError, ValueError):
         amount = 0
     price_text = f"${amount:,}" + ("/月" if offer_type == "rent" else "") if amount > 0 else ""
-    size = _display_size(listing.get("size_sqm") or listing.get("size"))
-    floor = _clean(display_floor(_clean(listing.get("floor"), 16), property_type), 18)
-    property_bits = [value for value in (property_type, size, floor) if value]
+    property_bits = [value for value in (property_type,) if value]
     deposit = _clean(offer.get("payment_terms") or offer.get("deposit_terms"), 20)
     contract = _normalize_contract(offer.get("contract_term"))
-    deposit_contract = "｜".join(value for value in (deposit, contract) if value)
+    is_villa = "别墅" in property_type
+    deposit_contract = "｜".join(value for value in (deposit, contract) if value) if is_villa else ""
     effective_status = str(status if status is not None else listing.get("inventory_status") or "pending")
     sections: list[str] = []
     top_lines = [f"🏡 {heading_line}"]
