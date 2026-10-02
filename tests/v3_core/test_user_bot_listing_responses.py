@@ -288,7 +288,8 @@ def test_photo_preview_uses_gallery_not_channel_cover(tmp_path):
     assert response.photo_path == str(room.resolve())
     page=build_photos_response(view,offset=1)
     assert page.media_groups == ()
-    assert page.photo_path == str(room.resolve())
+    assert page.photo_path != str(cover.resolve())
+    assert Path(page.photo_path).is_file()
     assert "实拍 1/1｜共1张" in page.text
 
 
