@@ -49,3 +49,14 @@ def test_all_bad_images_follow_business_failure_not_worker_crash(tmp_path):
     bad=tmp_path/"bad.jpg"; bad.write_bytes(b"bad")
     with pytest.raises(ValueError, match="cover_no_usable_images"):
         render_cover(style="x", source_image=str(bad), output_path=str(tmp_path/"x.png"), data=CoverRenderData(public_listing_id="QL"))
+
+
+def test_formal_cover_keeps_brand_strip_and_thumbnails(tmp_path):
+    paths=[make(tmp_path/f"formal-{i}.jpg", size=((1600,900) if i == 0 else (700,1400)), value=60+i*25) for i in range(4)]
+    out=tmp_path/"formal.png"
+    render_cover(style="formal", source_image=paths[0], source_images=paths[1:], output_path=str(out),
+                 data=CoverRenderData(public_listing_id="QL-PP-X", project="60米大道", layout="4+1房", price="1500"))
+    with Image.open(out) as im:
+        assert im.size == (1080,1350)
+        # Brand strip is distinct from the thumbnail row and remains dark/solid.
+        assert im.getpixel((10,1320)) != im.getpixel((10,1100))
