@@ -311,7 +311,7 @@ async def handle_v3_callback(
                 back_to_search_callback=back_to_search_callback,
                 listing_summary=str(getattr(response, "listing_summary", "") or ""),
                 add_home=(
-                    response.kind in {"details", "photos"}
+                    response.kind == "details"
                     and not bool(getattr(response, "expand_only", False))
                 ),
                 add_channel=False,
