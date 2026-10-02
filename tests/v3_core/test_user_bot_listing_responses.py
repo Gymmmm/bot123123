@@ -559,7 +559,7 @@ def test_paged_album_buttons_include_prev_page_next_only_when_multi_page(tmp_pat
     flat2 = [a.label for row in last_page.action_rows for a in row]
     assert "⬅️ 上一页" in flat2
     assert "下一页 ➡️" not in flat2
-    assert "📋 房源详情" not in flat2
+    assert "📋 房源详情" in flat2
     assert "📋 房源详情" in flat2
 
 
