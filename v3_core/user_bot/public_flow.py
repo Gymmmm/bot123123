@@ -139,10 +139,21 @@ class PublicListingFlowService:
             if decision.route is not None
             else ""
         )
+        # Deep-link /start entry into a listing's photos page must hit the
+        # raw-only paged album (page 0). The cover render + 3-frame collage
+        # + 「更多实拍」expander are an old surface that no longer ships
+        # from any /start route. resolve_action callers can still pass
+        # photo_offset when they really mean the offset expand (none do today).
+        photo_page = (
+            0
+            if decision.route is not None and decision.route.action == "photos"
+            else None
+        )
         return self._render(
             decision,
             source=route_source or "channel_deeplink",
             start_payload=clean_payload,
+            photo_page=photo_page,
         )
 
     def resolve_action(
