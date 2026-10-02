@@ -8,7 +8,7 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 
 # Canvas roughly matching the mock aspect (wide listing card).
@@ -44,17 +44,14 @@ def _font(path: str, size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
 
 
 def _cover_fit(path: Path, width: int, height: int) -> Image.Image:
-    img = Image.open(path).convert("RGB")
-    src_w, src_h = img.size
-    if src_w <= 0 or src_h <= 0:
-        return Image.new("RGB", (width, height), (230, 228, 222))
-    scale = max(width / src_w, height / src_h)
-    new_w = max(1, int(src_w * scale + 0.5))
-    new_h = max(1, int(src_h * scale + 0.5))
-    resized = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
-    left = max(0, (new_w - width) // 2)
-    top = max(0, (new_h - height) // 2)
-    return resized.crop((left, top, left + width, top + height))
+    with Image.open(path) as raw:
+        image = ImageOps.exif_transpose(raw).convert("RGB")
+    return ImageOps.fit(
+        image,
+        (width, height),
+        method=Image.Resampling.LANCZOS,
+        centering=(0.5, 0.5),
+    )
 
 
 def _rounded(img: Image.Image, radius: int) -> Image.Image:
