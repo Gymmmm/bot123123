@@ -9,10 +9,10 @@ CANVAS = (1080, 1350)
 GUTTER = 8
 INFO_TOP = 820
 INFO_HEIGHT = 150
-THUMBS_TOP = 978
-THUMBS_HEIGHT = 278
-BRAND_TOP = 1264
-BRAND_HEIGHT = 86
+THUMBS_TOP = 970
+THUMBS_HEIGHT = 286
+BRAND_TOP = 1256
+BRAND_HEIGHT = 94
 FONT_CANDIDATES = (
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
@@ -42,8 +42,16 @@ class CoverRenderData:
         if not raw:
             return ""
         negotiable = raw in {"售价面议", "租金面议", "价格面议", "面议"}
-        price = raw if raw.startswith("$") or negotiable else "$" + raw
-        return price + "/月" if str(self.deal_type or "rent").lower() == "rent" and not negotiable else price
+        if negotiable:
+            return raw
+        numeric = raw.replace("$", "").replace(",", "").replace("/月", "").strip()
+        try:
+            value = float(numeric)
+            rendered = f"{int(value):,}" if value.is_integer() else f"{value:,.2f}".rstrip("0").rstrip(".")
+            price = f"${rendered}"
+        except (TypeError, ValueError):
+            price = raw if raw.startswith("$") else "$" + raw
+        return price + "/月" if str(self.deal_type or "rent").lower() == "rent" and "/月" not in price else price
 
 def _display_size(value: Any) -> str:
     text = str(value or "").strip().replace("平方米", "㎡").replace("平米", "㎡")
@@ -111,22 +119,29 @@ def _text(draw: ImageDraw.ImageDraw, xy: tuple[int, int], value: str, *, size: i
         draw.text(xy, value, font=_font(size, bold=bold), fill=(255, 255, 255), stroke_width=1, stroke_fill=(20, 20, 20))
 
 def _overlay(canvas: Image.Image, data: CoverRenderData) -> None:
+    """Formal channel cover: facts on hero, thumbnails unobstructed, white brand strip."""
     layer = Image.new("RGBA", CANVAS, (0, 0, 0, 0))
     draw = ImageDraw.Draw(layer)
-    draw.rectangle((0, INFO_TOP, 1080, INFO_TOP + INFO_HEIGHT), fill=(248, 246, 241, 255))
-    identity = " · ".join(part for part in (
-        str(data.project or data.project_alias or data.area or "").strip(),
-        str(data.layout or "").strip(),
-    ) if part)
+    fade_top = 585
+    for y in range(fade_top, INFO_TOP):
+        progress = (y - fade_top) / max(1, INFO_TOP - fade_top)
+        alpha = int(205 * (progress ** 1.35))
+        draw.line([(0, y), (1080, y)], fill=(8, 8, 8, alpha), width=1)
+    location = str(data.project or data.project_alias or data.area or "").strip()
+    layout = str(data.layout or "").strip()
+    identity = "｜".join(part for part in (location, layout) if part)
     if identity:
-        draw.text((42, INFO_TOP + 25), identity, font=_font(32, bold=True), fill=(35, 40, 45))
+        draw.text((42, 682), identity, font=_font(38, bold=True), fill=(255, 255, 255))
     price = data.price_line()
     if price:
-        draw.text((42, INFO_TOP + 76), price, font=_font(54, bold=True), fill=(20, 65, 94))
-    draw.rectangle((0, BRAND_TOP, 1080, 1350), fill=(20, 65, 94, 255))
-    draw.text((42, BRAND_TOP + 13), "侨联地产", font=_font(30, bold=True), fill=(255, 255, 255))
-    draw.text((210, BRAND_TOP + 20), "OVERSEAS UNITED REAL ESTATE", font=_font(17), fill=(224, 234, 239))
-    draw.text((890, BRAND_TOP + 20), "出租房源", font=_font(24, bold=True), fill=(255, 255, 255))
+        draw.text((42, 742), price, font=_font(60, bold=True), fill=(246, 207, 113))
+    draw.rectangle((0, INFO_TOP, 1080, THUMBS_TOP), fill=(244, 240, 233, 255))
+    draw.rectangle((0, BRAND_TOP, 1080, 1350), fill=(255, 255, 255, 255))
+    draw.text((42, BRAND_TOP + 12), "侨联地产", font=_font(31, bold=True), fill=(28, 26, 22))
+    draw.text((210, BRAND_TOP + 22), "OVERSEAS UNITED REAL ESTATE", font=_font(16), fill=(105, 100, 92))
+    draw.line([(575, BRAND_TOP + 45), (790, BRAND_TOP + 45)], fill=(198, 154, 67), width=2)
+    draw.rounded_rectangle((835, BRAND_TOP + 15, 1040, BRAND_TOP + 75), radius=30, fill=(246, 232, 197))
+    draw.text((876, BRAND_TOP + 27), "出租房源", font=_font(24, bold=True), fill=(45, 40, 32))
     canvas.paste(layer, (0, 0), layer)
 
 def render_cover(*, style: str, source_image: str, output_path: str, data: CoverRenderData,
