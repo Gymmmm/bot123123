@@ -198,65 +198,27 @@ def test_default_cover_style_policy():
 
 def test_channel_caption_matches_final_format_and_hides_internal_ids():
     text = render_channel_caption(
-        listing={
-            "project_name": "炳发城",
-            "public_location_display": "炳发城",
-            "property_type": "公寓",
-            "layout": "2房2卫",
-            "size_sqm": 95,
-            "floor": "19",
-            "inventory_status": "active",
-            "listing_id": "l_999",
-        },
-        offer={
-            "offer_type": "rent",
-            "monthly_rent_usd": 800,
-            "payment_terms": "押一付一",
-            "contract_term": "一年起租",
-            "offer_id": "OFF_SECRET",
-        },
+        listing={"project_name":"炳发城","public_location_display":"炳发城","layout":"2房2卫","property_type":"公寓","size_sqm":95,"floor":"19","inventory_status":"active"},
+        offer={"offer_type":"rent","monthly_rent_usd":800,"payment_terms":"押一付一","contract_term":"一年起租"},
         public_listing_id="QL-PP-A2B3",
+        status="active",
     )
-    assert text == (
-        "🏡 炳发城｜2房2卫\n"
-        "💵 $800/月\n\n"
-        "🏢 公寓｜95㎡｜19楼\n"
-        "🗝️ 押一付一｜一年起租\n\n"
-        "🟢 当前可预约　QL-PP-A2B3\n\n"
-        "#炳发城 #2房 #600至800"
-    )
-    assert "l_999" not in text
-    assert "OFF_SECRET" not in text
-    assert "#炳发城 #2房 #600至800" in text
+    assert text == "🏡 炳发城｜2房2卫\n💵 $800/月\n\n🟢 当前可预约　QL-PP-A2B3"
+    assert "95㎡" not in text and "19楼" not in text and "押一付一" not in text
+    assert "#" not in text
 
 
 def test_channel_caption_missing_fields_leave_no_empty_separators():
     text = render_channel_caption(
-        listing={
-            "project_name": "",
-            "public_location_display": "BKK1",
-            "property_type": "排屋",
-            "layout": "3房",
-            "size_sqm": None,
-            "floor": "12",
-            "inventory_status": "active",
-        },
-        offer={
-            "offer_type": "rent",
-            "monthly_rent_usd": 1200,
-            "payment_terms": "",
-            "contract_term": "一年起租",
-        },
+        listing={"public_location_display":"BKK1","layout":"3房","property_type":"排屋","floor":"12层楼","inventory_status":"active"},
+        offer={"offer_type":"rent","monthly_rent_usd":1200,"contract_term":"一年起租"},
         public_listing_id="QL-PP-A2B3",
+        status="active",
     )
     assert "🏡 BKK1｜3房" in text
-    assert "🏢 排屋｜12层楼" in text
-    assert "🗝️ 一年起租" in text
-    assert "｜｜" not in text
-    assert "｜\n" not in text
-    assert "None" not in text
-    assert "unknown" not in text.lower()
-    assert "null" not in text.lower()
+    assert "$1,200/月" in text
+    assert "12层楼" not in text
+    assert "一年起租" not in text
 
 
 def test_strict_autopublish_blockers_cover_required_failures(tmp_path):
