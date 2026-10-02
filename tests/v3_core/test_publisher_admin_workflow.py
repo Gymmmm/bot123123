@@ -295,7 +295,7 @@ def test_pending_autopublish_success_commits_publication_then_activates_and_is_b
     assert reader.listing(listing_id)["inventory_status"] == "active"
     package = workflow.package(result.package_id)
     assert package.status == "published"
-    assert "🟢 当前可预约" in package.post_text
+    assert "🟢 可预约" in package.post_text
     assert package.snapshot["listing"]["inventory_status"] == "active"
     assert len(bot.calls) == 1
     labels = [button.text for row in bot.calls[0]["reply_markup"].inline_keyboard for button in row]
@@ -369,5 +369,5 @@ def test_pending_autopublish_package_freezes_active_without_pre_send_db_activati
     assert seen["snapshot_status"] == "active"
     assert seen["db_status"] == "pending"
     assert seen["delivery_override"] == "active"
-    assert "🟢 当前可预约" in seen["caption"]
+    assert "🟢 可预约" in seen["caption"]
     assert reader.listing(listing_id)["inventory_status"] == "pending"
