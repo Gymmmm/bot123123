@@ -84,19 +84,56 @@ async def _render_photos(
     *,
     query: Any | None = None,
 ) -> None:
-    """Send native album (+ optional action bar). Never flips in place."""
+    """Preview edits in place; only 查看全部实拍 appends native originals."""
     from .telegram_photos_render import send_listing_photos_album
 
-    del query  # Album always appends new messages; do not edit prior frames.
-    await send_listing_photos_album(
-        context.bot,
+    if bool(getattr(response, "expand_only", False)):
+        await send_listing_photos_album(
+            context.bot,
+            chat_id=_chat_id(update),
+            media_groups=response.media_groups,
+            media_caption="",
+            photo_path=str(getattr(response, "photo_path", "") or ""),
+            text="",
+            reply_markup=None,
+            expand_only=True,
+        )
+        return
+
+    photo_path = Path(str(getattr(response, "photo_path", "") or ""))
+    message = getattr(query, "message", None) if query is not None else None
+    if query is not None and photo_path.is_file():
+        await query.edit_message_media(
+            media=InputMediaPhoto(
+                media=photo_path.read_bytes(),
+                caption=response.text,
+                parse_mode=ParseMode.HTML,
+            ),
+            reply_markup=response.keyboard,
+        )
+        return
+    if query is not None and getattr(message, "photo", None):
+        await query.edit_message_caption(
+            caption=response.text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=response.keyboard,
+        )
+        return
+    if photo_path.is_file():
+        with photo_path.open("rb") as handle:
+            await context.bot.send_photo(
+                chat_id=_chat_id(update),
+                photo=handle,
+                caption=response.text,
+                parse_mode=ParseMode.HTML,
+                reply_markup=response.keyboard,
+            )
+        return
+    await context.bot.send_message(
         chat_id=_chat_id(update),
-        media_groups=response.media_groups,
-        media_caption=str(getattr(response, "media_caption", "") or ""),
-        photo_path=str(getattr(response, "photo_path", "") or ""),
         text=response.text,
+        parse_mode=ParseMode.HTML,
         reply_markup=response.keyboard,
-        expand_only=bool(getattr(response, "expand_only", False)),
     )
 
 
