@@ -136,6 +136,12 @@ img { display:block; max-width:100% }
 .stat-label { font-size:12px; color: rgba(255,255,255,0.65) }
 .stat-sep { color: rgba(255,255,255,0.4); font-size:12px }
 .stat-update { font-size:11px; color: rgba(255,255,255,0.55) }
+.hero-actions { display:flex; gap:8px; margin-top:18px }
+.hero-actions a { min-height:42px; display:inline-flex; align-items:center; justify-content:center; padding:0 16px; font-size:12px; border-radius:3px; transition:background .2s, color .2s, border-color .2s }
+.hero-primary { background:#fff; color:var(--accent); font-weight:600 }
+.hero-primary:hover { background:var(--gold); color:#fff }
+.hero-secondary { border:1px solid rgba(255,255,255,.58); color:#fff }
+.hero-secondary:hover { background:rgba(255,255,255,.14); border-color:#fff }
 
 /* ──────────────────────────────────────────────────────────────────────────
    FILTER BAR
@@ -356,7 +362,7 @@ img { display:block; max-width:100% }
 }
 .card-actions a:hover { background: var(--accent-bg) }
 
-/* ──────────────────────────────────────────────────────────────────────────
+/* ───────────────────────────────────────────��──────────────────────────────
    IMAGE STATES
 ─────────────────────────────────────────────────────────────────────────── */
 .image-fallback {
@@ -630,14 +636,16 @@ img { display:block; max-width:100% }
    MOBILE ADJUSTMENTS
 ─────────────────────────────────────────────────────────────────────────── */
 @media (max-width: 480px) {
-  .header-inner { height:48px; padding-inline:12px }
-  .advisor-btn { padding:7px 12px; font-size:11px }
+  .header-inner { height:52px; padding-inline:12px }
+  .guide-nav-link { display:none }
+  .advisor-btn { min-height:40px; padding:8px 12px; font-size:11px }
   .hero { height:220px }
   .catalog-inner { padding-inline:12px }
   .listing-grid { grid-template-columns:1fr; gap:14px }
   .filter-bar-inner { padding-inline:12px }
-  .filter-row { gap:6px }
-  .filter-select-wrap select { min-width:84px; font-size:11px; height:34px }
+  .filter-row { display:grid; grid-template-columns:1fr 1fr; gap:6px; overflow:visible }
+  .filter-select-wrap select { width:100%; min-width:0; font-size:11px; height:38px }
+  .filter-reset { min-height:38px; grid-column:2; width:100% }
   .detail-body { padding:16px 14px 14px }
   .detail-price { font-size:28px }
   .advisor-strip { padding:16px 12px }
