@@ -576,9 +576,7 @@ async def test_first_photos_entry_without_pg_suffix_is_remembered_for_next_page(
     )
     prior_ids = list(ctx.bot.returned_ids)
     assert len(prior_ids) == 5
-    assert ctx.user_data[PHOTOS_ALBUM_KEY]["12345::QL-RF-A2B3"]["message_ids"] == [
-        str(value) for value in prior_ids
-    ]
+    assert ctx.user_data[PHOTOS_ALBUM_KEY]["12345::QL-RF-A2B3"]["message_ids"] == prior_ids
 
     next_raw = "v3u:listing:photos:QL-RF-A2B3:pg:1"
     await handle_v3_callback(
