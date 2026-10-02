@@ -295,6 +295,8 @@ async def handle_v3_service_callback(
     action = raw[len(prefix):].strip()
     # Accept pre-lock callbacks already present in old Telegram messages, while
     # every newly rendered coordination button uses the coordination_* family.
+    if action == "billing":
+        action = "utilities"
     if action == "property":
         action = "coordination"
     elif action.startswith("property_"):
