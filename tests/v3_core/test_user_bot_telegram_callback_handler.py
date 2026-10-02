@@ -222,7 +222,7 @@ async def test_photos_preview_edits_to_one_message(tmp_path):
     assert outcome.handled and outcome.response is not None
     assert outcome.response.kind == "photos"
     assert context.bot.calls == []
-    assert [call[0] for call in query.calls] == ["answer", "edit_message_media"]
+    assert [call[0] for call in query.calls] == ["answer", "edit_media"]
 
 
 @pytest.mark.asyncio
