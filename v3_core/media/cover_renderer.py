@@ -111,42 +111,30 @@ def _text(draw: ImageDraw.ImageDraw, xy: tuple[int, int], value: str, *, size: i
         draw.text(xy, value, font=_font(size, bold=bold), fill=(255, 255, 255), stroke_width=1, stroke_fill=(20, 20, 20))
 
 def _overlay(canvas: Image.Image, data: CoverRenderData) -> None:
+    """Single locked Channel Cover visual: photo overlay + three shots + white brand strip."""
     layer = Image.new("RGBA", CANVAS, (0, 0, 0, 0))
     draw = ImageDraw.Draw(layer)
-    draw.rectangle((0, INFO_TOP, 1080, INFO_TOP + INFO_HEIGHT), fill=(248, 246, 241, 255))
-    identity = " · ".join(part for part in (
+    # Keep core facts on the main-photo safe area; never insert a web-card band.
+    shade_top = 650
+    for y in range(shade_top, THUMBS_TOP):
+        progress = (y - shade_top) / max(1, THUMBS_TOP - shade_top)
+        alpha = int(35 + 170 * progress)
+        draw.line([(0, y), (1080, y)], fill=(0, 0, 0, alpha))
+    identity = "｜".join(part for part in (
         str(data.project or data.project_alias or data.area or "").strip(),
         str(data.layout or "").strip(),
     ) if part)
     if identity:
-        draw.text((42, INFO_TOP + 25), identity, font=_font(32, bold=True), fill=(35, 40, 45))
+        draw.text((42, 748), identity, font=_font(38, bold=True), fill=(255, 255, 255), stroke_width=2, stroke_fill=(20, 20, 20))
     price = data.price_line()
     if price:
-        draw.text((42, INFO_TOP + 76), price, font=_font(54, bold=True), fill=(20, 65, 94))
-    draw.rectangle((0, BRAND_TOP, 1080, 1350), fill=(20, 65, 94, 255))
-    draw.text((42, BRAND_TOP + 13), "侨联地产", font=_font(30, bold=True), fill=(255, 255, 255))
-    draw.text((210, BRAND_TOP + 20), "OVERSEAS UNITED REAL ESTATE", font=_font(17), fill=(224, 234, 239))
-    draw.text((890, BRAND_TOP + 20), "出租房源", font=_font(24, bold=True), fill=(255, 255, 255))
+        draw.text((42, 805), price, font=_font(62, bold=True), fill=(255, 255, 255), stroke_width=2, stroke_fill=(20, 20, 20))
+
+    # Locked white brand strip.
+    draw.rectangle((0, BRAND_TOP, 1080, 1350), fill=(255, 255, 255, 255))
+    draw.text((42, BRAND_TOP + 10), "侨联地产", font=_font(31, bold=True), fill=(30, 28, 24))
+    draw.text((42, BRAND_TOP + 53), "OVERSEAS UNITED REAL ESTATE", font=_font(15), fill=(95, 91, 84))
+    draw.line((390, BRAND_TOP + 47, 815, BRAND_TOP + 47), fill=(198, 154, 67), width=2)
+    draw.text((860, BRAND_TOP + 28), "出租房源", font=_font(24, bold=True), fill=(45, 42, 36))
     canvas.paste(layer, (0, 0), layer)
 
-def render_cover(*, style: str, source_image: str, output_path: str, data: CoverRenderData,
-                 source_images: Iterable[str] | None = None) -> str:
-    """Render a fixed 1080x1350 Telegram cover using readable source photos."""
-    del style
-    candidates = [source_image]
-    candidates.extend(list(source_images or ()))
-    images = _usable_images(candidates)
-    if not images:
-        raise ValueError("cover_no_usable_images")
-    canvas = Image.new("RGB", CANVAS, (244, 240, 233))
-    _paste_gallery(canvas, images)
-    _overlay(canvas, data)
-    output = Path(output_path).expanduser().resolve()
-    output.parent.mkdir(parents=True, exist_ok=True)
-    if output.suffix.lower() in {".jpg", ".jpeg"}:
-        canvas.save(output, format="JPEG", quality=92, optimize=True)
-    else:
-        canvas.save(output, format="PNG", optimize=True)
-    return str(output)
-
-__all__ = ["CoverRenderData", "render_cover"]
