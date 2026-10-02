@@ -25,7 +25,9 @@ def test_price_chinese_and_bad_image_are_tolerated(tmp_path):
     bad=tmp_path/"bad.jpg"; bad.write_bytes(b"not-an-image")
     out=tmp_path/"cover.jpg"
     data=CoverRenderData(public_listing_id="QL-PP-T2", project="太子中央广场", area="金边", price="650")
-    assert data.price_line() == "$650/月"\n    assert CoverRenderData(public_listing_id="QL", price="1200").price_line() == "$1,200/月"\n    assert CoverRenderData(public_listing_id="QL", price="$5000/月").price_line() == "$5,000/月"
+    assert data.price_line() == "$650/月"
+    assert CoverRenderData(public_listing_id="QL", price="1200").price_line() == "$1,200/月"
+    assert CoverRenderData(public_listing_id="QL", price="$5000/月").price_line() == "$5,000/月"
     render_cover(style="anything", source_image=str(bad), source_images=[good], output_path=str(out), data=data)
     with Image.open(out) as im:
         assert im.size == (1080,1350)
