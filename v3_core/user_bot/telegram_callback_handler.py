@@ -127,7 +127,7 @@ async def _render_photos(
     state: dict[str, Any] = {}
     if public_listing_id and bot is not None:
         state = _album_state(update, context, public_listing_id)
-        last_page = int(state.get("page") or -1)
+        last_page = int(state["page"]) if "page" in state else -1
         if int(page) == last_page and _album_message_ids(state):
             # Idempotent: same page, album already up-to-date.
             return

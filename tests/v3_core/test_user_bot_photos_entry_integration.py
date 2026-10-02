@@ -219,9 +219,12 @@ def test_start_property_photos_dl_drops_user_into_4_raw_originals_not_cover(tmp_
     assert "📷 查看全部实拍" not in labels
 
     # Exit / book / consultant links remain reachable through the album.
-    assert "📷 房源详情" in labels
+    # 2026-10-03 fix: ⬅️ 返回房源 replaces 📷 房源详情; consult is "咨询这套".
+    assert "📷 房源详情" not in labels
+    assert "⬅️ 返回房源" in labels
     assert "📅 预约看房" in labels
-    assert "💬 中文顾问" in labels
+    assert "💬 咨询这套" in labels
+    assert "💬 中文顾问" not in labels
 
     # No legacy cover-collage copy in caption or status text.
     assert "查看全部" not in result.photos.text
@@ -315,11 +318,14 @@ def test_start_property_photos_dl_keyboard_has_prev_page_count_next(tmp_path):
     assert "下一页 ➡️" not in row2
 
     # Every page exposes the same exit / book / consultant row.
+    # 2026-10-03 fix: ⬅️ 返回房源 replaces 📷 房源详情; consult is "咨询这套".
     for page in (page0, page1, page2):
         flat_labels = _labels(page.photos)
-        assert "📷 房源详情" in flat_labels
+        assert "📷 房源详情" not in flat_labels
+        assert "⬅️ 返回房源" in flat_labels
         assert "📅 预约看房" in flat_labels
-        assert "💬 中文顾问" in flat_labels
+        assert "💬 咨询这套" in flat_labels
+        assert "💬 中文顾问" not in flat_labels
 
 
 def test_start_property_photos_dl_idempotent_on_repeated_callback(tmp_path):

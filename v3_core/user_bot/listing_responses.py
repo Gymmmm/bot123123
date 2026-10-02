@@ -169,7 +169,7 @@ def _photo_actions(
             first.append(SemanticAction("📅 预约看房", "book", target))
         return (
             tuple(first),
-            (SemanticAction("💬 中文顾问", "consult", target),),
+            (SemanticAction("💬 咨询这套", "consult", target),),
         )
 
     if status == "pending":
@@ -183,7 +183,7 @@ def _photo_actions(
                     target_index=0,
                 )
             )
-        first_row.append(SemanticAction("💬 中文顾问", "consult", target))
+        first_row.append(SemanticAction("💬 咨询这套", "consult", target))
         return (
             tuple(first_row),
             (
@@ -198,7 +198,7 @@ def _photo_actions(
             SemanticAction("🏠 帮我找房", "change_search", target),
             SemanticAction("🔍 找相似", "similar", target),
         ),
-        (SemanticAction("💬 中文顾问", "consult", target),),
+        (SemanticAction("💬 咨询这套", "consult", target),),
     )
 
 def _utilities_line(*, water: str, electric: str) -> str:
@@ -556,7 +556,7 @@ def _album_media_caption(
 
 
 def _photos_action_text(details) -> str:
-    """Compact status bar under the album — no explanatory fluff."""
+    """Compact status bar under the first-screen album (no paged entry)."""
     lines = [_detail_status_line(details)]
     subject = " · ".join(
         part
@@ -575,6 +575,111 @@ def _photos_action_text(details) -> str:
     if price:
         lines.append(f"💰 {he(price)}")
     return chr(10).join(lines)
+
+
+def _status_label_for(details) -> str:
+    """Return the real inventory status line — empty when status is unknown.
+
+    Paged-album card spec: only show the status badge when we have a
+    Publisher-frozen status. Never fabricate a placeholder like 「待确认」.
+    """
+    status = str(details.inventory_status or "").strip().lower()
+    return {
+        "active": "🟢 当前可预约",
+        "reserved": "🟡 已有预约，仍可预约",
+        "rented": "🔴 已租出",
+        "leased": "🔴 已租出",
+        "inactive": "⚫ 已下架",
+        "offline": "⚫ 已下架",
+    }.get(status, "")
+
+
+def _photos_page_action_text(
+    view: PublishedListingView,
+    details,
+    *,
+    page: int,
+    total_pages: int,
+    total: int,
+) -> str:
+    """Complete, fact-only card shown below one page of original photos.
+
+    Paged-album spec (2026-10-03 fix):
+
+    📷 实拍房源 <公开ID>
+    第 N/M 页 · 共 X 张
+
+    <项目>｜<户型>  <真实房态>
+
+    💵 <租金>/月
+    📍 <项目或位置>
+    🏠 <户型>
+    📐 <面积>
+    🏢 <楼层>
+    💰 <付款/押金>
+    💡 <真实费用说明>
+
+    Only the real Publisher-frozen adviser copy is shown via 「💬 侨联说」.
+    Missing fields are dropped from the card entirely — no "待确认" placeholder,
+    no fabricated values, no leaked internal IDs beyond the public_listing_id
+    already in the header.
+    """
+    project = str(details.project_name or "").strip()
+    location = str(details.location or "").strip()
+    layout = str(details.layout or "").strip()
+    identity = project or location or str(details.property_type or "").strip()
+    status_text = _status_label_for(details)
+    public_id = str(details.public_listing_id or "").strip()
+
+    header_id = public_id or "实拍"
+    lines: list[str] = [
+        f"📷 实拍房源 {he(header_id)}",
+        f"第 {page + 1}/{total_pages} 页 · 共 {total} 张",
+    ]
+
+    headline = "｜".join(part for part in (identity, layout) if part)
+    headline_block = "  ".join(part for part in (headline, status_text) if part)
+    if headline_block:
+        lines.append("")
+        lines.append(he(headline_block))
+
+    price = _format_price(details.monthly_rent_usd)
+    if price:
+        lines.append("")
+        lines.append(f"💵 {he(price)}")
+
+    for icon, value in (
+        ("📍", location),
+        ("🏠", layout),
+        ("📐", _format_size(details.size_sqm)),
+        ("🏢", display_floor(details.floor)),
+        ("💰", str(details.deposit_terms or "").strip()),
+    ):
+        if value:
+            lines.append(f"{icon} {he(value)}")
+
+    fee_parts: list[str] = []
+    management = str(details.management_fee or "").strip()
+    utilities = _utilities_line(
+        water=str(details.water_rate or "").strip(),
+        electric=str(details.electric_rate or "").strip(),
+    )
+    if management:
+        fee_parts.append(management)
+    if utilities:
+        fee_parts.append(utilities)
+    if fee_parts:
+        lines.append(f"💡 {he('｜'.join(fee_parts))}")
+
+    notes = _adviser_copy_for_view(view)
+    if notes:
+        lines.append("")
+        lines.append("💬 <b>侨联说</b>")
+        for line in notes.splitlines():
+            cleaned = str(line or "").strip()
+            if cleaned:
+                lines.append(he(cleaned))
+    return chr(10).join(lines).strip()
 
 
 def _try_side_collage(
@@ -811,25 +916,28 @@ def build_photos_page_response(
     groups = _as_media_groups(page_rows)
     first = page_rows[0] if page_rows else ""
 
-    if pages == 1:
-        action_rows = _photo_actions(
-            bookable=details.bookable,
-            inventory_status=details.inventory_status,
-            public_listing_id=details.public_listing_id,
-            has_more=False,
-        )
-    else:
-        action_rows = _photo_page_actions(
-            public_listing_id=details.public_listing_id,
-            page=safe_page,
-            total_pages=pages,
-            bookable=details.bookable,
-            inventory_status=details.inventory_status,
-        )
+    # 2026-10-03 fix: the paged album always uses the paged keyboard contract
+    # so the button row layout (⬅️ 返回房源 + book/consult) is consistent
+    # regardless of how many pages the listing has. Single-page listings
+    # only render a no-op "1/1" counter (no prev / next buttons) — the same
+    # controls that multi-page listings use on the same N/M cell.
+    action_rows = _photo_page_actions(
+        public_listing_id=details.public_listing_id,
+        page=safe_page,
+        total_pages=pages,
+        bookable=details.bookable,
+        inventory_status=details.inventory_status,
+    )
 
     return PublicPhotosResponse(
         media_groups=groups,
-        text=_photos_action_text(details),
+        text=_photos_page_action_text(
+            view,
+            details,
+            page=safe_page,
+            total_pages=pages,
+            total=total,
+        ),
         media_caption=caption,
         detail_text="",
         photo_path=first,
@@ -876,12 +984,9 @@ def _photo_page_actions(
     book_row: list[SemanticAction] = []
     if can_book:
         book_row.append(SemanticAction("📅 预约看房", "book", target))
-    book_row.append(SemanticAction("💬 中文顾问", "consult", target))
-
-    # Multi-page album always carries an explicit 房源详情 exit so the user
-    # never has to drain ◀/▶ before they can return to the listing details.
-    rows.append((SemanticAction("📷 房源详情", "details", target),))
+    book_row.append(SemanticAction("💬 咨询这套", "consult", target))
     rows.append(tuple(book_row))
+    rows.append((SemanticAction("⬅️ 返回房源", "details", target),))
 
     return tuple(rows)
 

@@ -98,8 +98,9 @@ def polish_listing_keyboard(
 
     existing_labels = {str(button.text or "") for row in rows for button in row}
     back_search = str(back_to_search_callback or "").strip()
-    if back_search and "返回房源" not in existing_labels:
-        rows.append([InlineKeyboardButton("返回房源", callback_data=back_search)])
+    has_back_listing = any(label.endswith("返回房源") for label in existing_labels)
+    if back_search and not has_back_listing:
+        rows.append([InlineKeyboardButton("⬅️ 返回房源", callback_data=back_search)])
         existing_labels.add("返回房源")
     clean_channel = str(channel_url or "").strip()
     if add_channel and clean_channel and not back_search and "返回频道" not in existing_labels:

@@ -13,6 +13,7 @@ from v3_core.user_bot.search_cards import SearchCardResponse
 from v3_core.user_bot.search_session import SearchSessionNavigation
 from v3_core.user_bot.telegram_callback_handler import (
     LISTING_SOURCE_KEY,
+    PHOTOS_ALBUM_KEY,
     SEARCH_ANCHOR_KEY,
     SEARCH_SESSION_KEY,
     handle_v3_callback,
@@ -52,18 +53,39 @@ class FakeBot:
     def __init__(self):
         self.calls = []
         self.next_message_id = 900
+        self.returned_ids: list[int] = []
+
+    def _alloc_id(self) -> int:
+        current = self.next_message_id
+        self.next_message_id += 1
+        return current
 
     async def send_photo(self, **kwargs):
         self.calls.append(("send_photo", kwargs))
-        return SimpleNamespace(chat_id=kwargs["chat_id"], message_id=self.next_message_id)
+        mid = self._alloc_id()
+        self.returned_ids.append(mid)
+        return SimpleNamespace(chat_id=kwargs["chat_id"], message_id=mid)
 
     async def send_media_group(self, **kwargs):
         self.calls.append(("send_media_group", kwargs))
-        return []
+        frames = list(kwargs.get("media") or [])
+        ids = []
+        for _ in frames:
+            mid = self._alloc_id()
+            ids.append(mid)
+            self.returned_ids.append(mid)
+        return [
+            SimpleNamespace(chat_id=kwargs["chat_id"], message_id=mid) for mid in ids
+        ]
 
     async def send_message(self, **kwargs):
         self.calls.append(("send_message", kwargs))
-        return SimpleNamespace(chat_id=kwargs["chat_id"], message_id=self.next_message_id)
+        mid = self._alloc_id()
+        self.returned_ids.append(mid)
+        return SimpleNamespace(chat_id=kwargs["chat_id"], message_id=mid)
+
+    async def delete_message(self, **kwargs):
+        self.calls.append(("delete_message", kwargs))
 
 
 def _update(query):
@@ -156,7 +178,7 @@ async def test_details_from_search_session_offer_one_tap_return_to_same_card():
 
     markup = query.calls[-1][2]["reply_markup"]
     buttons = [button for row in markup.inline_keyboard for button in row]
-    back = next(button for button in buttons if button.text == "返回房源")
+    back = next(button for button in buttons if button.text == "⬅️ 返回房源")
     assert back.callback_data == "v3u:card:1:QL-RF-A2B3"
 
 
@@ -448,3 +470,69 @@ def test_photos_expand_sends_remaining_without_action_bar(tmp_path):
     assert [call[0] for call in query.calls] == ["answer"]
     assert [call[0] for call in context.bot.calls] == ["send_media_group"]
     assert context.user_data.get("v3_listing_touchpoint") == "listing_photos_expand"
+
+
+@pytest.mark.asyncio
+async def test_photos_paging_deletes_prior_4_frames_and_old_card_then_sends_new_4_plus_new_card(tmp_path):
+    """Page 1 → Page 2 must clear the previous 4 photo frames + 1 action card,
+    then send exactly 4 new frames + 1 new action card. No old messages leak."""
+    frames = []
+    for index in range(8):
+        path = tmp_path / f"frame_{index}.jpg"
+        path.write_bytes(b"jpg")
+        frames.append(str(path))
+    page_frames = (tuple(frames[:4]), tuple(frames[4:]))
+
+    def _dispatch(page: int) -> CallbackDispatchResult:
+        return CallbackDispatchResult(
+            status="ok",
+            callback=parse_callback(f"v3u:listing:photos:QL-RF-A2B3:pg:{page}"),
+            action="photos",
+            listing=PublicListingFlowResult(
+                status="ok",
+                action="photos",
+                public_listing_id="QL-RF-A2B3",
+                photos=PublicPhotosResponse(
+                    media_groups=(page_frames[page],),
+                    text=f"📷 实拍房源 QL-RF-A2B3\n第 {page + 1}/2 页 · 共 8 张",
+                    media_caption=f"📷 实拍 第 {page + 1}/2 页",
+                    photo_path=page_frames[page][0],
+                    photo_total=8,
+                    action_rows=(
+                        (SemanticAction("📅 预约看房", "book", "QL-RF-A2B3"),),
+                        (SemanticAction("⬅️ 返回房源", "details", "QL-RF-A2B3"),),
+                    ),
+                ),
+            ),
+        )
+
+    ctx = _context()
+    first = await handle_v3_callback(
+        _update(FakeQuery("v3u:listing:photos:QL-RF-A2B3:pg:0")),
+        ctx,
+        router=RouterStub(_dispatch(page=0)),
+    )
+    assert first.handled
+
+    prior_ids = list(ctx.bot.returned_ids)
+    assert len(prior_ids) == 5  # 4 album frames + 1 action card.
+
+    await handle_v3_callback(
+        _update(FakeQuery("v3u:listing:photos:QL-RF-A2B3:pg:1")),
+        ctx,
+        router=RouterStub(_dispatch(page=1)),
+    )
+
+    deleted = [call[1]["message_id"] for call in ctx.bot.calls if call[0] == "delete_message"]
+    assert deleted == prior_ids, (deleted, prior_ids)
+
+    second_calls = [call for call in ctx.bot.calls if call[0] != "delete_message"][2:]
+    kinds = [call[0] for call in second_calls]
+    assert kinds == ["send_media_group", "send_message"], kinds
+    assert len(second_calls[0][1]["media"]) == 4
+    assert "第 2/2 页" in second_calls[1][1]["text"]
+
+    state = ctx.user_data[PHOTOS_ALBUM_KEY]["12345::QL-RF-A2B3"]
+    new_ids = list(state["message_ids"])
+    assert len(new_ids) == 5
+    assert set(new_ids).isdisjoint(set(prior_ids))

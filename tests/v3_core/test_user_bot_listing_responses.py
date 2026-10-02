@@ -227,7 +227,7 @@ def test_photos_response_first_batch_album_with_expand(tmp_path):
     assert _actions(first.action_rows) == [["photos", "book"], ["consult"]]
     assert _labels(first.action_rows) == [
         ["📷 更多实拍", "📅 预约看房"],
-        ["💬 中文顾问"],
+        ["💬 咨询这套"],
     ]
     expand_btn = first.action_rows[0][0]
     assert expand_btn.target_index == 0
@@ -254,7 +254,7 @@ def test_photos_response_pending_has_no_book_button(tmp_path):
 
     assert response.text.startswith("🔵 房态待确认")
     assert _labels(response.action_rows) == [
-        ["📷 更多实拍", "💬 中文顾问"],
+        ["📷 更多实拍", "💬 咨询这套"],
         ["🏠 帮我找房", "🔍 找相似"],
     ]
     assert all(action.action != "book" for row in response.action_rows for action in row)
@@ -271,7 +271,7 @@ def test_photos_response_single_photo_uses_details_not_expand(tmp_path):
     assert response.photo_total == 1
     assert _labels(response.action_rows) == [
         ["📷 房源详情", "📅 预约看房"],
-        ["💬 中文顾问"],
+        ["💬 咨询这套"],
     ]
 
 
@@ -533,7 +533,8 @@ def test_paged_album_buttons_include_prev_page_next_only_when_multi_page(tmp_pat
     flat = [a.label for row in single.action_rows for a in row]
     assert "下一页 ➡️" not in flat
     assert "⬅️ 上一页" not in flat
-    assert "📷 房源详情" in flat
+    # 2026-10-03 fix: ⬅️ 返回房源 replaces 📷 房源详情 in the paged album.
+    assert "⬅️ 返回房源" in flat
 
     multi_view = _view_with_files(body)
     first_page = build_photos_page_response(multi_view, page=0)
@@ -558,7 +559,8 @@ def test_paged_album_buttons_include_prev_page_next_only_when_multi_page(tmp_pat
     flat2 = [a.label for row in last_page.action_rows for a in row]
     assert "⬅️ 上一页" in flat2
     assert "下一页 ➡️" not in flat2
-    assert "📷 房源详情" in flat2
+    assert "📷 房源详情" not in flat2
+    assert "⬅️ 返回房源" in flat2
 
 
 def test_paged_album_is_idempotent_on_same_page(tmp_path):
