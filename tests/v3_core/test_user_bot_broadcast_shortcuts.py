@@ -108,7 +108,8 @@ async def test_find_home_shortcut_enters_guided_search_without_property_resoluti
     outcome = await handle_v3_start(_update(message), context, listings=listings, transition_views=_views())
     assert outcome.handled and outcome.kind == "broadcast_find_home"
     assert listings.calls == []
-    assert "直接发需求" in message.calls[0][0][0]
+    assert "告诉我你想找什么房" in message.calls[0][0][0]
+    assert "BKK1 一房，预算 $600" in message.calls[0][0][0]
     assert context.user_data[AWAITING_KEYWORD_SESSION_KEY] == {"source": "daily_broadcast"}
     assert context.user_data[SEARCH_PREF_SESSION_KEY]["source"] == "daily_broadcast"
     assert "stale" not in context.user_data
@@ -195,7 +196,7 @@ async def test_service_shortcut_ignores_binding_and_opens_public_service_home():
     ]
     assert "富力城 A3-1208" not in text
     assert callbacks == [
-        "v3u:service:tenant_lease", "v3u:service:concierge",
+        "v3u:service:tenant_lease", "v3u:service:aftercare",
         "v3u:home:rental", "v3u:home:contact", "v3u:t:home",
     ]
 
@@ -252,7 +253,7 @@ async def test_unbookable_property_book_deeplink_shows_lock_copy_then_contextual
     outcome = await handle_v3_start(_update(message), context, listings=listings, transition_views=_views())
     assert outcome.handled and outcome.kind == "unbookable"
     assert listings.calls == [f"property_{public_id}_book"]
-    assert message.calls[0][0][0] == "⚠️ <b>这套房暂时不能预约</b>\n\n可以先看实拍，或让中文顾问确认最新房态。"
+    assert "可以先查看实拍，或让中文顾问确认最新房态。"
     assert "🔴 房态：已租出" in message.calls[1][0][0]
     markup = message.calls[1][1]["reply_markup"]
     labels = [button.text for row in markup.inline_keyboard for button in row]

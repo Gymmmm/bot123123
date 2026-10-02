@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 
 from v3_core.user_bot.assurance_views import build_assurance_home_view
-from v3_core.user_bot.service_views import concierge_home_view, repair_home_view, service_home_view
+from v3_core.user_bot.service_views import aftercare_home_view, repair_home_view, service_home_view
 from v3_core.user_bot.tenant_v1 import lease_view, missing_lease_view
 
 
@@ -23,44 +23,48 @@ def test_p15_service_hub_copy_buttons_and_callbacks_locked():
     assert view.text == (
         "🛎️ <b>侨联服务</b>\n\n"
         "找房只是开始。\n\n"
-        "签约、入住，以及住进去后的房屋问题，都可以继续找侨联。"
+        "视频带看、入住留档、租后问题，都可以继续找侨联。"
     )
     assert _rows(view) == [
-        ["📋 我的租约", "🛡️ 入住服务"],
-        ["🏠 安心租房", "💬 中文顾问"],
+        ["📋 我的租约", "🤝 租后服务"],
+        ["🛡️ 看房与交接", "💬 中文顾问"],
         ["⬅️ 返回首页"],
     ]
     assert _callbacks(view) == [
         "v3u:service:tenant_lease",
-        "v3u:service:concierge",
+        "v3u:service:aftercare",
         "v3u:home:rental",
         "v3u:home:contact",
         "v3u:t:home",
     ]
 
 
-def test_p16_resident_service_copy_buttons_and_coordination_callbacks_locked():
-    view = concierge_home_view()
-    assert view.text == "🛡️ <b>入住服务</b>\n\n入住后的房屋和生活问题，可以从这里处理。"
+def test_p16_aftercare_copy_buttons_and_coordination_callbacks_locked():
+    view = aftercare_home_view()
+    assert view.text == (
+        "🤝 <b>租后服务</b>\n\n"
+        "签完合同不是结束。\n"
+        "报修、物业、账单、搬家、保洁和网络，都可以继续找侨联。"
+    )
     assert _rows(view) == [
         ["🔧 房屋报修", "🏢 物业协调"],
-        ["🔌 水电协助", "🚚 搬家协助"],
-        ["🧹 保洁服务", "🌐 网络协助"],
-        ["❓ 其他住房问题"],
+        ["🔌 账单协助", "❓ 其他住房问题"],
         ["⬅️ 返回侨联服务"],
     ]
     callbacks = _callbacks(view)
     assert callbacks == [
         "v3u:service:repair",
         "v3u:service:coordination",
-        "v3u:service:utilities",
-        "v3u:service:moving",
-        "v3u:service:cleaning",
-        "v3u:service:network_help",
+        "v3u:service:billing",
         "v3u:service:general",
         "v3u:home:service",
     ]
     assert not any(callback.startswith("v3u:service:property") for callback in callbacks)
+    # Migration / cleaning / moving / network are intentionally absent in the
+    # locked copy — Section 9 keeps only descriptive naming until the
+    # underlying capability is signed off.
+    for blocked in ("v3u:service:utilities", "v3u:service:moving", "v3u:service:cleaning", "v3u:service:network_help"):
+        assert blocked not in callbacks
 
 
 def test_p20_repair_copy_buttons_and_callbacks_locked():

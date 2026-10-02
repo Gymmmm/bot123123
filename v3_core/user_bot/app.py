@@ -494,7 +494,7 @@ def build_v3_user_bot_application(
                 advisor_url=config.advisor_url,
             )
             return
-        if raw.startswith("v3u:assure:"):
+        if raw.startswith("v3u:assure:") or raw.startswith("v3u:rental:"):
             await handle_v3_assurance_callback(
                 update,
                 context,

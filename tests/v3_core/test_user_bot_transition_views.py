@@ -33,12 +33,12 @@ def test_booking_starts_with_mode_surface():
     service=TransitionViewService(InventoryStub(_published_view()))
     view=service.build(_book_plan(),today=date(2026,9,19))
     assert view.kind=="appointment_mode"
-    assert "预约看房" in view.text
+    assert "没空到场？选择视频带看" in view.text
     assert "富力城" in view.text
     assert "🏠 富力城｜2房1厅" in view.text
-    assert "💰 $800/月" in view.text
+    assert "💵 $800/月" in view.text
     assert "请选择看房方式" in view.text
-    assert _labels(view)==["🚶 实地看房","🎥 视频代看","⬅️ 返回房源"]
+    assert _labels(view)==["🚶 实地带看","🎥 视频带看","⬅️ 返回房源"]
     assert "LST_1" not in view.text
 
 def test_date_and_time_steps_are_light_and_supported():
@@ -83,7 +83,7 @@ def test_villa_without_project_keeps_location_and_layout_through_booking():
     ):
         assert "50米路附近｜6+2房8卫" in view.text
         assert "LST_1" not in view.text
-    assert "💰 $5,000/月" in service.appointment_mode(draft).text
+    assert "💵 $5,000/月" in service.appointment_mode(draft).text
     assert "顾问会联系你确认" in build_appointment_confirmation_view(ready, inventory).text
 
 def test_bookability_rechecked_before_booking_surface():
@@ -97,8 +97,8 @@ def test_search_entry_is_final_direct_filter_panel():
     view=service.build(plan)
     assert _labels(view)==["📍 按区域","💰 按预算","🏠 按户型","💬 中文顾问","⬅️ 返回首页"]
     assert "BKK1 一房，预算 $600" in view.text
-    assert "富力城两房，要能做饭" in view.text
-    assert "钻石岛公寓，想看实拍" in view.text
+    assert "富力城两房，可以做饭" in view.text
+    assert "钻石岛公寓，想先看实拍" in view.text
 
 def test_similar_returns_to_same_search_panel():
     service=TransitionViewService(InventoryStub(None))

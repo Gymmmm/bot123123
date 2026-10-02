@@ -92,24 +92,51 @@ def _resolve_bookable_details(inventory: PublicInventoryReader, public_listing_i
 
 
 
+_APPOINTMENT_MODE_TEXT = (
+    "没空到场？选择视频带看，顾问到现场实时带你看。\n\n"
+    "请选择看房方式："
+)
+
+
 def _appointment_mode_view(draft: PublicAppointmentDraft, inventory: PublicInventoryReader) -> TransitionView:
     details = _resolve_bookable_details(inventory, draft.public_listing_id)
     subject = booking_subject(details)
-    price_line = f"💰 {_format_price(details.monthly_rent_usd)}\n" if details.monthly_rent_usd else ""
+    price_line = f"💵 {_format_price(details.monthly_rent_usd)}\n" if details.monthly_rent_usd else ""
     return TransitionView(
         kind="appointment_mode",
         text=(
-            "📅 <b>预约看房</b>\n\n"
             f"🏠 {he(subject)}\n"
-            f"{price_line}"
-            "\n请选择看房方式："
+            f"{price_line}\n"
+            f"{_APPOINTMENT_MODE_TEXT}"
         ),
         rows=(
             (
-                TransitionChoice("🚶 实地看房", "appointment_mode", "offline"),
-                TransitionChoice("🎥 视频代看", "appointment_mode", "video"),
+                TransitionChoice("🚶 实地带看", "appointment_mode", "offline"),
+                TransitionChoice("🎥 视频带看", "appointment_mode", "video"),
             ),
             (TransitionChoice("⬅️ 返回房源", "listing_details", public_listing_id=draft.public_listing_id),),
+        ),
+    )
+
+
+_APPOINTMENT_VIDEO_EXPLAIN_TEXT = (
+    "🎥 <b>视频带看</b>\n\n"
+    "你不用去，我们到房子里和你开视频。\n"
+    "想看哪里，现场给你看哪里。"
+)
+
+_APPOINTMENT_VIDEO_FOOTNOTE = (
+    "现场带看需提前预约；时间有变化，可以提前取消或修改。"
+)
+
+
+def _appointment_video_explain_view(draft: PublicAppointmentDraft) -> TransitionView:
+    return TransitionView(
+        kind="appointment_video_explain",
+        text=f"{_APPOINTMENT_VIDEO_EXPLAIN_TEXT}\n\n{_APPOINTMENT_VIDEO_FOOTNOTE}",
+        rows=(
+            (TransitionChoice("📅 预约视频带看", "appointment_video_proceed", draft.public_listing_id),),
+            (TransitionChoice("⬅️ 返回", "appointment_back_mode"),),
         ),
     )
 
@@ -157,7 +184,7 @@ def _appointment_date_view(draft: PublicAppointmentDraft, inventory: PublicInven
         text=(
             "🕐 <b>选择看房时间</b>\n\n"
             f"{he(subject)}\n"
-            f"已选：{he('视频代看' if draft.mode == 'video' else '实地看房')}\n\n"
+            f"已选：{he('视频带看' if draft.mode == 'video' else '实地带看')}\n\n"
             "常用时段可直接选；没有合适时间再自己输入。"
         ),
         rows=tuple(rows),
@@ -320,12 +347,14 @@ def _similar_view(plan: TransitionPlan) -> TransitionView:
 
 
 _SEARCH_ENTRY_TEXT = (
-    "🔍 <b>想找什么样的房子？</b>\n\n"
-    "直接发需求就可以，例如：\n"
+    "🔍 <b>1V1 找房</b>\n\n"
+    "告诉我你想找什么房。\n"
+    "区域、预算、几房、入住时间都可以直接发。\n\n"
+    "例如：\n"
     "<code>BKK1 一房，预算 $600</code>\n"
-    "<code>富力城两房，要能做饭</code>\n"
-    "<code>钻石岛公寓，想看实拍</code>\n\n"
-    "也可以按条件筛选："
+    "<code>富力城两房，可以做饭</code>\n"
+    "<code>钻石岛公寓，想先看实拍</code>\n\n"
+    "也可以按条件一步一步筛选。"
 )
 
 
@@ -356,6 +385,12 @@ class TransitionViewService:
 
     def appointment_mode(self, draft: PublicAppointmentDraft) -> TransitionView:
         return _appointment_mode_view(draft, self.inventory)
+
+    @staticmethod
+    def appointment_video_explain(public_listing_id: str = "") -> TransitionView:
+        return _appointment_video_explain_view(
+            PublicAppointmentDraft(public_listing_id=str(public_listing_id or ""))
+        )
 
     def appointment_date(self, draft: PublicAppointmentDraft, *, today: date | None = None) -> TransitionView:
         return _appointment_date_view(draft, self.inventory, today=today or _phnom_penh_today())

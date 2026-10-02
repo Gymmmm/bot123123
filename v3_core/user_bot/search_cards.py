@@ -43,9 +43,10 @@ def _card_actions(views: tuple[PublishedListingView, ...], *, index: int, bookab
             SemanticAction("下一套","next",views[next_i].public_listing_id,next_i),
         ))
     if bookable:
-        rows.append((SemanticAction("📷 看实拍","photos",target),SemanticAction("📅 预约看房","book",target)))
+        rows.append((SemanticAction("📷 查看实拍","photos",target),SemanticAction("📅 在线预约","book",target)))
     else:
-        rows.append((SemanticAction("📷 看实拍","photos",target),))
+        rows.append((SemanticAction("📷 查看实拍","photos",target),))
+    rows.append((SemanticAction("💬 咨询这套","consult",target),SemanticAction("🔍 找相似","similar",target)))
     rows.append((SemanticAction("🔄 调整条件","change_search"),))
     return tuple(rows)
 
@@ -66,18 +67,14 @@ def build_search_card(views: Iterable[PublishedListingView], index: int) -> Sear
         else ""
     )
     headline = "｜".join(v for v in (project or area, layout) if v) or "房源"
-    lines=[f"🏠 <b>{he(headline)}</b>"]
+    lines=[f"{he(headline)}"]
     if rent:
-        lines.append(f"💰 {he(rent)}")
-    meta=[]
+        lines.append(f"💵 {he(rent)}")
     if project and area and not location_display_overlaps_project(project, area):
-        meta.append(area)
-    if floor:
-        meta.append(floor)
-    if meta:
-        prefix = "📍" if project and area and not location_display_overlaps_project(project, area) else "🏢"
-        lines.append(f"{prefix} {he('｜'.join(meta))}")
-    lines.append(f"{details.status_icon} {he(details.status_label)} · {position+1}/{len(items)}")
+        lines.append(f"📍 {he(area)}")
+    status_line = _status_line_for(details)
+    if status_line:
+        lines.append(status_line)
     return SearchCardResponse(
         public_listing_id=details.public_listing_id,
         text="\n".join(lines),
@@ -86,6 +83,29 @@ def build_search_card(views: Iterable[PublishedListingView], index: int) -> Sear
         index=position,
         total=len(items),
     )
+
+
+_STATUS_LABELS = {
+    "active": "🟢 当前可预约",
+    "reserved": "🟡 已有预约，仍可预约",
+    "pending": "🔵 房态待确认",
+    "rented": "🔴 已租出",
+    "leased": "🔴 已租出",
+    "inactive": "⚫ 已下架",
+    "offline": "⚫ 已下架",
+}
+
+
+def _status_line_for(details) -> str:
+    """Locked five-state status badge (Section 3)."""
+    label = _STATUS_LABELS.get(str(getattr(details, "inventory_status", "") or "").strip().lower())
+    if label:
+        return label
+    fallback = str(getattr(details, "status_label", "") or "").strip()
+    icon = str(getattr(details, "status_icon", "") or "").strip()
+    if icon and fallback:
+        return f"{icon} {he(fallback)}"
+    return ""
 
 def build_search_cards(views: Iterable[PublishedListingView]) -> tuple[SearchCardResponse, ...]:
     items=tuple(views)

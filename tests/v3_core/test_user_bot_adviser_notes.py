@@ -107,5 +107,5 @@ def test_other_details_and_actions_remain_present_with_authoritative_copy():
     assert "$800" in response.text
     assert "🟢 当前可预约" in response.text
     labels = [action.label for row in response.action_rows for action in row]
-    assert "📅 预约看房" in labels
+    assert "📅 在线预约" in labels
     assert "💬 咨询这套" in labels

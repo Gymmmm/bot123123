@@ -118,7 +118,7 @@ def _details_actions(
     if bookable:
         return (
             (
-                SemanticAction("📅 预约看房", "book", target),
+                SemanticAction("📅 在线预约", "book", target),
                 SemanticAction("💬 咨询这套", "consult", target),
             ),
             (SemanticAction("🔍 找相似", "similar", target),),
@@ -166,7 +166,7 @@ def _photo_actions(
         # Book button only when unified bookable is true.
         first: list[SemanticAction] = [_more_or_details()]
         if bookable:
-            first.append(SemanticAction("📅 预约看房", "book", target))
+            first.append(SemanticAction("📅 在线预约", "book", target))
         return (
             tuple(first),
             (SemanticAction("💬 咨询这套", "consult", target),),
@@ -983,7 +983,7 @@ def _photo_page_actions(
 
     book_row: list[SemanticAction] = []
     if can_book:
-        book_row.append(SemanticAction("📅 预约看房", "book", target))
+        book_row.append(SemanticAction("📅 在线预约", "book", target))
     book_row.append(SemanticAction("💬 咨询这套", "consult", target))
     rows.append(tuple(book_row))
     rows.append((SemanticAction("⬅️ 返回房源", "details", target),))

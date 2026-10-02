@@ -14,7 +14,7 @@ from .home_views import build_about_view, build_appointment_history_home_view, b
 from .lead_service import LeadUser
 from .service_flow import TenantService
 from .service_product_views import service_home_view
-from .service_views import local_life_view
+from .service_views import local_life_view, rental_service_home_view
 from .telegram_assurance_handler import render_assurance_view
 from .telegram_edit import edit_query_panel
 from .telegram_home_ui import build_home_keyboard
@@ -132,7 +132,7 @@ async def handle_v3_home_callback(
         return TelegramHomeOutcome(handled=True, action=action, rendered=True)
 
     if action == "rental":
-        await render_assurance_view(query, build_assurance_home_view(), advisor_url=advisor_url)
+        await render_service_view(query, rental_service_home_view(), advisor_url=advisor_url)
         return TelegramHomeOutcome(handled=True, action=action, rendered=True)
 
     if action == "service":

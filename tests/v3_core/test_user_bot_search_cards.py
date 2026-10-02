@@ -69,7 +69,11 @@ def _actions(card):
     return [[item.action for item in row] for row in card.action_rows]
 
 
-def test_search_card_preserves_fixed_sha_copy_and_uses_frozen_cover(tmp_path):
+def _labels(card):
+    return [[item.label for item in row] for row in card.action_rows]
+
+
+def test_search_card_uses_locked_copy_and_frozen_cover(tmp_path):
     cover = tmp_path / "cover.jpg"
     cover.write_bytes(b"frozen-cover")
     first = _view(
@@ -90,12 +94,20 @@ def test_search_card_preserves_fixed_sha_copy_and_uses_frozen_cover(tmp_path):
 
     card = build_search_card((first, second), 0)
 
-    assert card.text == "🏠 <b>富力城｜2房1厅</b>\n💰 $800/月\n📍 BKK1｜19楼\n🟢 当前可预约 · 1/2"
+    # Locked copy per Section 3: title + 价格 + 区域 + 房态
+    assert card.text == "富力城｜2房1厅\n💵 $800/月\n📍 BKK1\n🟢 当前可预约"
     assert card.photo_path == str(cover)
     assert _actions(card) == [
         ["previous", "next"],
         ["photos", "book"],
+        ["consult", "similar"],
         ["change_search"],
+    ]
+    assert _labels(card) == [
+        ["上一套", "下一套"],
+        ["📷 查看实拍", "📅 在线预约"],
+        ["💬 咨询这套", "🔍 找相似"],
+        ["🔄 调整条件"],
     ]
 
 
@@ -153,10 +165,11 @@ def test_search_card_listing_actions_target_current_public_identity():
 
     assert _actions(card) == [
         ["photos", "book"],
+        ["consult", "similar"],
         ["change_search"],
     ]
     for action in actions:
-        if action.action != "change_search":
+        if action.action not in {"change_search"}:
             assert action.target_public_listing_id == "QL-RF-A2B3"
 
 
@@ -188,11 +201,11 @@ def test_live_reserved_status_changes_badge_without_changing_frozen_facts():
 
     card = build_search_card((view,), 0)
 
-    assert "🏠 <b>富力城｜2房1厅</b>" in card.text
+    assert "富力城｜2房1厅" in card.text
     assert "$800/月" in card.text
-    assert "19楼" in card.text
     assert "🟡 已有预约，仍可预约" in card.text
     assert _actions(card)[0] == ["photos", "book"]
+    assert _actions(card)[1] == ["consult", "similar"]
 
 
 def test_build_search_cards_builds_one_card_per_result():

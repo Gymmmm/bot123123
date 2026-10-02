@@ -33,14 +33,12 @@ def phnom_penh_greeting() -> str:
 
 def welcome_text(*, first_name: str, greeting: str) -> str:
     return (
-        f"👋 <b>{he(str(first_name))}</b>，{he(str(greeting))}\n\n"
-        "🏠 <b>侨联地产｜金边中文租房</b>\n"
-        "💬 中文顾问｜实地看房 / 视频带看\n\n"
-        "📍 富力城｜炳发城｜BKK1｜钻石岛\n"
-        "🛎️ 找房 · 看房 · 签约 · 入住 · 售后\n\n"
-        "⭐ 金边本地6年经验\n"
+        f"👋 {he(str(first_name))}，{he(str(greeting))}\n\n"
+        "🏠 <b>侨联地产｜金边中文租房</b>\n\n"
         "📸 真实房源｜实拍更新\n"
-        "📹 没时间到现场？可约视频带看实拍\n\n"
+        "🎥 视频带看｜没空到场，也能现场看房\n"
+        "🛡️ 入住留档｜入住有记录，退租有依据\n"
+        "🤝 租后服务｜签完合同，还有人继续跟\n\n"
         "请选择服务："
     )
 

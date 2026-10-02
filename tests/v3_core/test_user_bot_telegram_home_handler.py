@@ -75,7 +75,7 @@ async def test_search_home_edits_existing_panel_then_sets_session():
     assert outcome.handled and outcome.rendered
     assert [c[0] for c in query.calls]==["answer","edit_text"]
     assert message.calls==[]
-    assert "想找什么样的房子？" in query.calls[-1][1][0]
+    assert "1V1 找房" in query.calls[-1][1][0]
     assert "BKK1 一房，预算 $600" in query.calls[-1][1][0]
     callbacks=[b.callback_data for row in query.calls[-1][2]["reply_markup"].inline_keyboard for b in row]
     assert callbacks==[
@@ -121,7 +121,7 @@ async def test_service_home_edits_existing_surface():
     assert [c[0] for c in query.calls]==["answer","edit_text"]
     assert "侨联服务" in query.calls[-1][1][0]
     labels=[b.text for row in query.calls[-1][2]["reply_markup"].inline_keyboard for b in row]
-    assert labels==["📋 我的租约","🛡️ 入住服务","🏠 安心租房","💬 中文顾问","⬅️ 返回首页"]
+    assert labels==["📋 我的租约","🤝 租后服务","🛡️ 看房与交接","💬 中文顾问","⬅️ 返回首页"]
 
 
 @pytest.mark.asyncio

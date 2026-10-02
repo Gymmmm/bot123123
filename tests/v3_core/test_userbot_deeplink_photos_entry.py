@@ -142,7 +142,7 @@ def test_deeplink_photos_routes_to_paged_album_page_zero_raw_only(tmp_path):
     # ⬅️ 返回房源 replaces 📷 房源详情; consult is "咨询这套" (2026-10-03).
     assert "📷 房源详情" not in labels
     assert "⬅️ 返回房源" in labels
-    assert "📅 预约看房" in labels
+    assert "📅 在线预约" in labels
     assert "💬 咨询这套" in labels
 
     # No caption text in the album carries the old "查看全部实拍" copy.
@@ -430,7 +430,7 @@ async def test_entry_integration_nine_photos_opens_page_zero_raw_only_via_start(
     assert "📷 更多实拍" not in keyboard_text
     assert "📷 房源详情" not in keyboard_text
     assert "⬅️ 返回房源" in keyboard_text
-    assert "📅 预约看房" in keyboard_text
+    assert "📅 在线预约" in keyboard_text
     assert "💬 咨询这套" in keyboard_text
     # Privacy: internal listing_id never leaks to the bot.
     assert "LST_INT_1" not in action_text

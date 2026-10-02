@@ -133,7 +133,7 @@ def test_detail_text_omits_missing_bullets_and_adviser_without_copy():
     # NOTE: details keyboard has no photos button (photos is a separate deep link)
     assert _actions(response.action_rows) == [["book", "consult"], ["similar"]]
     assert _labels(response.action_rows) == [
-        ["📅 预约看房", "💬 咨询这套"],
+        ["📅 在线预约", "💬 咨询这套"],
         ["🔍 找相似"],
     ]
 
@@ -226,7 +226,7 @@ def test_photos_response_first_batch_album_with_expand(tmp_path):
     assert "⬅️ 上一张" not in str(_labels(first.action_rows))
     assert _actions(first.action_rows) == [["photos", "book"], ["consult"]]
     assert _labels(first.action_rows) == [
-        ["📷 更多实拍", "📅 预约看房"],
+        ["📷 更多实拍", "📅 在线预约"],
         ["💬 咨询这套"],
     ]
     expand_btn = first.action_rows[0][0]
@@ -270,7 +270,7 @@ def test_photos_response_single_photo_uses_details_not_expand(tmp_path):
     assert response.media_groups == ((str(one),),)
     assert response.photo_total == 1
     assert _labels(response.action_rows) == [
-        ["📷 房源详情", "📅 预约看房"],
+        ["📷 房源详情", "📅 在线预约"],
         ["💬 咨询这套"],
     ]
 

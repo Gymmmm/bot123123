@@ -17,6 +17,8 @@ from .assurance_views import (
     build_moving_view,
     build_signing_view,
 )
+from .service_views import handover_record_view
+from .telegram_service_handler import build_service_keyboard
 
 
 @dataclass(frozen=True)
@@ -88,8 +90,13 @@ async def handle_v3_assurance_callback(
 ) -> TelegramAssuranceOutcome:
     query = getattr(update, "callback_query", None)
     raw = str(getattr(query, "data", "") or "") if query is not None else ""
+    if query is None:
+        return TelegramAssuranceOutcome(handled=False)
+    # New locked surface: 看房与交接 / 入住留档 (Section 7 + 8).
+    if raw.startswith("v3u:rental:"):
+        return await _handle_v3_rental_callback(update, context, raw=raw, repo_root=repo_root, advisor_url=advisor_url)
     prefix = "v3u:assure:"
-    if query is None or not raw.startswith(prefix):
+    if not raw.startswith(prefix):
         return TelegramAssuranceOutcome(handled=False)
     action = raw[len(prefix):].strip().lower()
     allowed = {
@@ -128,6 +135,43 @@ async def handle_v3_assurance_callback(
         "deposit_download": "deposit",
     }[action]
     await send_assurance_pdf(update, context, repo_root=repo_root, kind=kind)
+    return TelegramAssuranceOutcome(True, action, False, True)
+
+
+async def _handle_v3_rental_callback(
+    update: Any,
+    context: Any,
+    *,
+    raw: str,
+    repo_root: str | Path,
+    advisor_url: str = "",
+) -> TelegramAssuranceOutcome:
+    """Locked copy: 看房与交接 (Section 7) + 入住留档 (Section 8).
+
+    Only the two locked callbacks live under v3u:rental::
+      - handover         -> render 入住留档 page
+      - handover_download -> send the existing 入住交接清单.pdf asset
+    The asset path/filename stay frozen so we don't drift from the PDF that
+    the rest of the system already produces.
+    """
+    query = getattr(update, "callback_query", None)
+    if query is None:
+        return TelegramAssuranceOutcome(handled=False)
+    action = raw[len("v3u:rental:"):].strip().lower()
+    allowed = {"handover", "handover_download"}
+    if action not in allowed:
+        return TelegramAssuranceOutcome(handled=False)
+    await query.answer()
+    if action == "handover":
+        view = handover_record_view()
+        await edit_query_panel(
+            query,
+            text=view.text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=build_service_keyboard(view, advisor_url=advisor_url),
+        )
+        return TelegramAssuranceOutcome(True, action, True, False)
+    await send_assurance_pdf(update, context, repo_root=repo_root, kind="handover")
     return TelegramAssuranceOutcome(True, action, False, True)
 
 

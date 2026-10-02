@@ -185,37 +185,94 @@ def rfcity_category_view(category: str) -> ServiceView:
 # Final surface overrides. Kept at the bottom so legacy helpers remain available
 # without exposing their old copy/buttons.
 
+# Section 6 — 侨联服务 (locked hub).
+SERVICE_HOME_TEXT = (
+    "🛎️ <b>侨联服务</b>\n\n"
+    "找房只是开始。\n\n"
+    "视频带看、入住留档、租后问题，都可以继续找侨联。"
+)
+
+
 def service_home_view() -> ServiceView:
     return ServiceView(
         kind="service_home",
-        text=(
-            "🛎️ <b>侨联服务</b>\n\n"
-            "找房只是开始。\n\n"
-            "签约、入住，以及住进去后的房屋问题，都可以继续找侨联。"
-        ),
+        text=SERVICE_HOME_TEXT,
         rows=(
-            (ServiceChoice("📋 我的租约", "v3u:service:tenant_lease"), ServiceChoice("🛡️ 入住服务", "v3u:service:concierge")),
-            (ServiceChoice("🏠 安心租房", "v3u:home:rental"), ServiceChoice("💬 中文顾问", "v3u:home:contact")),
+            (ServiceChoice("📋 我的租约", "v3u:service:tenant_lease"), ServiceChoice("🤝 租后服务", "v3u:service:aftercare")),
+            (ServiceChoice("🛡️ 看房与交接", "v3u:home:rental"), ServiceChoice("💬 中文顾问", "v3u:home:contact")),
             (ServiceChoice("⬅️ 返回首页", "v3u:t:home"),),
         ),
     )
 
 
-def concierge_home_view() -> ServiceView:
+# Section 9 — 租后服务 (descriptive naming per locked status).
+AFTERCARE_TEXT = (
+    "🤝 <b>租后服务</b>\n\n"
+    "签完合同不是结束。\n"
+    "报修、物业、账单、搬家、保洁和网络，都可以继续找侨联。"
+)
+
+
+def aftercare_home_view() -> ServiceView:
     return ServiceView(
-        kind="concierge_home",
-        text=(
-            "🛡️ <b>入住服务</b>\n\n"
-            "入住后的房屋和生活问题，可以从这里处理。"
-        ),
+        kind="aftercare_home",
+        text=AFTERCARE_TEXT,
         rows=(
             (ServiceChoice("🔧 房屋报修", "v3u:service:repair"), ServiceChoice("🏢 物业协调", "v3u:service:coordination")),
-            (ServiceChoice("🔌 水电协助", "v3u:service:utilities"), ServiceChoice("🚚 搬家协助", "v3u:service:moving")),
-            (ServiceChoice("🧹 保洁服务", "v3u:service:cleaning"), ServiceChoice("🌐 网络协助", "v3u:service:network_help")),
-            (ServiceChoice("❓ 其他住房问题", "v3u:service:general"),),
+            (ServiceChoice("🔌 账单协助", "v3u:service:billing"), ServiceChoice("❓ 其他住房问题", "v3u:service:general")),
             (ServiceChoice("⬅️ 返回侨联服务", "v3u:home:service"),),
         ),
     )
+
+
+# Section 7 — 看房与交接 (locked rename from 安心租房 / 侨联安心租 / 侨联保障).
+RENTAL_SERVICE_TEXT = (
+    "🛡️ <b>看房与交接</b>\n\n"
+    "看房更省事，入住更有据，租后有人跟。\n\n"
+    "视频带看｜费用说明｜入住留档｜租后服务"
+)
+
+
+def rental_service_home_view() -> ServiceView:
+    return ServiceView(
+        kind="rental_service_home",
+        text=RENTAL_SERVICE_TEXT,
+        rows=(
+            (ServiceChoice("🛡️ 入住留档", "v3u:rental:handover"),),
+            (ServiceChoice("💬 中文顾问", "v3u:home:contact"),),
+            (ServiceChoice("⬅️ 返回侨联服务", "v3u:home:service"),),
+        ),
+    )
+
+
+# Section 8 — 入住留档 (重点权益页，保留最多细节).
+HANDOVER_RECORD_TEXT = (
+    "🛡️ <b>入住留档</b>\n\n"
+    "入住有记录，退租有依据。\n\n"
+    "入住当天建议记录：\n"
+    "• 水电表\n"
+    "• 家具家电\n"
+    "• 钥匙和门卡\n"
+    "• 墙面 / 地板 / 卫浴已有问题\n"
+    "• 需要房东或物业处理的事项\n\n"
+    "建议照片和视频一起保存。"
+)
+
+
+def handover_record_view() -> ServiceView:
+    return ServiceView(
+        kind="rental_handover",
+        text=HANDOVER_RECORD_TEXT,
+        rows=(
+            (ServiceChoice("📋 查看入住清单", "v3u:rental:handover_download"),),
+            (ServiceChoice("⬅️ 返回看房与交接", "v3u:home:rental"),),
+        ),
+    )
+
+
+# Legacy alias — old code paths still import concierge_home_view; route them to 租后服务.
+def concierge_home_view() -> ServiceView:
+    return aftercare_home_view()
 
 
 def repair_home_view() -> ServiceView:
@@ -519,7 +576,16 @@ def rfcity_home_view() -> ServiceView:
     )
 
 __all__ = [
-    "ServiceChoice", "ServiceView", "general_prompt_view", "general_success_view", "issue_prompt_view",
-    "concierge_home_view", "local_life_view", "nearby_view", "property_view", "property_description_view", "property_time_view", "property_contacted_view", "property_confirm_view", "property_result_view", "property_exit_view", "repair_home_view", "repair_media_view", "repair_confirm_view", "repair_result_view", "repair_exit_view", "repair_success_view",
-    "rfcity_category_view", "rfcity_home_view", "service_home_view", "slot_view", "utility_stub_view",
+    "AFTERCARE_TEXT", "HANDOVER_RECORD_TEXT", "RENTAL_SERVICE_TEXT", "SERVICE_HOME_TEXT",
+    "ServiceChoice", "ServiceView",
+    "aftercare_home_view", "concierge_home_view",
+    "general_prompt_view", "general_success_view", "handover_record_view",
+    "issue_prompt_view", "local_life_view", "nearby_view",
+    "property_view", "property_description_view", "property_time_view",
+    "property_contacted_view", "property_confirm_view", "property_result_view",
+    "property_exit_view", "repair_home_view", "repair_media_view",
+    "repair_confirm_view", "repair_result_view", "repair_exit_view",
+    "repair_success_view", "rental_service_home_view",
+    "rfcity_category_view", "rfcity_home_view",
+    "service_home_view", "slot_view", "utility_stub_view",
 ]

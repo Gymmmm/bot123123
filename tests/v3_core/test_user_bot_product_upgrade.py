@@ -52,12 +52,12 @@ def test_service_hub_is_public_and_does_not_require_binding():
     view = service_home_view()
     labels = _labels(view)
     assert labels == [
-        "📋 我的租约", "🛡️ 入住服务", "🏠 安心租房",
+        "📋 我的租约", "🤝 租后服务", "🛡️ 看房与交接",
         "💬 中文顾问", "⬅️ 返回首页",
     ]
     callbacks = _callbacks(view)
     assert callbacks == [
-        "v3u:service:tenant_lease", "v3u:service:concierge",
+        "v3u:service:tenant_lease", "v3u:service:aftercare",
         "v3u:home:rental", "v3u:home:contact", "v3u:t:home",
     ]
     assert "没有显示你的住房信息" not in view.text
