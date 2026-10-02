@@ -33,8 +33,12 @@ async def send_listing_photos_album(
     text: str = "",
     reply_markup: Any = None,
     expand_only: bool = False,
-) -> None:
+) -> list[int]:
     """Send album frames, then optional action message.
+
+    Returns the list of message ids (album frames + optional status message)
+    so callers can revoke them on subsequent paging without leaving stale
+    media in the chat.
 
     Rules:
     - 0 frames: action / fallback text only
@@ -49,17 +53,19 @@ async def send_listing_photos_album(
             paths = [fallback]
 
     caption = str(media_caption or "").strip()
-    sent_media = False
+    sent_media_ids: list[int] = []
 
     if len(paths) == 1:
         with Path(paths[0]).open("rb") as handle:
-            await bot.send_photo(
+            sent = await bot.send_photo(
                 chat_id=chat_id,
                 photo=handle,
                 caption=caption or None,
                 parse_mode=ParseMode.HTML if caption else None,
             )
-        sent_media = True
+        media_id = getattr(sent, "message_id", None)
+        if media_id is not None:
+            sent_media_ids.append(int(media_id))
     elif len(paths) >= 2:
         media: list[InputMediaPhoto] = []
         for index, raw in enumerate(paths[:10]):
@@ -75,37 +81,49 @@ async def send_listing_photos_album(
             else:
                 media.append(InputMediaPhoto(media=data))
         try:
-            await bot.send_media_group(chat_id=chat_id, media=media)
-            sent_media = True
+            sent_group = await bot.send_media_group(chat_id=chat_id, media=media)
+            for msg in sent_group or []:
+                mid = getattr(msg, "message_id", None)
+                if mid is not None:
+                    sent_media_ids.append(int(mid))
         except Exception:
             # Do not crash the whole photos flow on a MediaGroup rejection.
             with Path(paths[0]).open("rb") as handle:
-                await bot.send_photo(
+                sent = await bot.send_photo(
                     chat_id=chat_id,
                     photo=handle,
                     caption=caption or None,
                     parse_mode=ParseMode.HTML if caption else None,
                 )
-            sent_media = True
+            media_id = getattr(sent, "message_id", None)
+            if media_id is not None:
+                sent_media_ids.append(int(media_id))
 
     if expand_only:
-        return
+        return sent_media_ids
 
     body = str(text or "").strip()
     if not body and reply_markup is None:
-        if not sent_media:
+        if not sent_media_ids:
             await bot.send_message(
                 chat_id=chat_id,
                 text="这套房的实拍暂时没有加载出来。",
             )
-        return
+        return sent_media_ids
 
-    await bot.send_message(
+    action_msg = await bot.send_message(
         chat_id=chat_id,
         text=body or "📷 实拍",
         parse_mode=ParseMode.HTML,
         reply_markup=reply_markup,
     )
+    action_mid = getattr(action_msg, "message_id", None)
+    if action_mid is not None:
+        sent_media_ids.append(int(action_mid))
+    return sent_media_ids
+
+
+__all__ = ["send_listing_photos_album"]
 
 
 __all__ = ["send_listing_photos_album"]

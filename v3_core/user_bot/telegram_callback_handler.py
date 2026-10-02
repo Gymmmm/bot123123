@@ -23,6 +23,7 @@ SEARCH_SESSION_KEY = "v3_find_card_public_ids"
 SEARCH_ANCHOR_KEY = "v3_find_card_anchor"
 LISTING_SOURCE_KEY = "v3_listing_source"
 LISTING_TOUCHPOINT_KEY = "v3_listing_touchpoint"
+PHOTOS_ALBUM_KEY = "v3_listing_photos_album"
 
 
 @dataclass(frozen=True)
@@ -69,12 +70,37 @@ def _chat_id(update: Any) -> int | str:
     return value
 
 
-async def _render_details(query: Any, response: TelegramCallbackResponse) -> None:
-    message = getattr(query, "message", None)
-    if getattr(message, "photo", None):
-        await query.edit_message_caption(caption=response.text, parse_mode=ParseMode.HTML, reply_markup=response.keyboard)
-        return
-    await query.edit_message_text(response.text, parse_mode=ParseMode.HTML, reply_markup=response.keyboard)
+def _album_state(update: Any, context: Any, public_listing_id: str) -> dict[str, Any]:
+    """Return mutable album state for ``(chat_id, public_listing_id)``."""
+    data = getattr(context, "user_data", None)
+    if not isinstance(data, dict):
+        return {}
+    albums = data.get(PHOTOS_ALBUM_KEY)
+    if not isinstance(albums, dict):
+        albums = {}
+        data[PHOTOS_ALBUM_KEY] = albums
+    try:
+        chat_key = str(_chat_id(update))
+    except Exception:
+        chat_key = ""
+    key = f"{chat_key}::{public_listing_id}"
+    state = albums.get(key)
+    if not isinstance(state, dict):
+        state = {}
+        albums[key] = state
+    return state
+
+
+def _album_message_ids(state: dict[str, Any]) -> list[str]:
+    raw = state.get("message_ids") or []
+    if not isinstance(raw, list):
+        return []
+    return [str(value) for value in raw if str(value).strip()]
+
+
+def _remember_album_sent(state: dict[str, Any], *, message_ids: list[str], page: int) -> None:
+    state["message_ids"] = list(message_ids)
+    state["page"] = int(page)
 
 
 async def _render_photos(
@@ -83,14 +109,39 @@ async def _render_photos(
     response: TelegramCallbackResponse,
     *,
     query: Any | None = None,
+    page: int = 0,
+    public_listing_id: str = "",
 ) -> None:
-    """Send native album (+ optional action bar). Never flips in place."""
+    """Send native album (+ optional action bar). Never flips in place.
+
+    For paged callbacks (``page`` > 0 or paging explicitly requested) the prior
+    album frame message ids stored under ``PHOTOS_ALBUM_KEY`` are deleted before
+    the new album is sent, so repeated ◀/▶ presses never leave residual album
+    spam. ``page`` matching the recorded last-page is a no-op (just answers the
+    callback) — keeps paged buttons safe under flaky connections.
+    """
     from .telegram_photos_render import send_listing_photos_album
 
-    del query  # Album always appends new messages; do not edit prior frames.
-    await send_listing_photos_album(
-        context.bot,
-        chat_id=_chat_id(update),
+    bot = getattr(context, "bot", None)
+    chat_id_value = _chat_id(update)
+    state: dict[str, Any] = {}
+    if public_listing_id and bot is not None:
+        state = _album_state(update, context, public_listing_id)
+        last_page = int(state.get("page") or -1)
+        if int(page) == last_page and _album_message_ids(state):
+            # Idempotent: same page, album already up-to-date.
+            return
+        prior_ids = _album_message_ids(state)
+        if prior_ids:
+            for raw in prior_ids:
+                try:
+                    await bot.delete_message(chat_id=chat_id_value, message_id=int(raw))
+                except Exception:
+                    continue
+
+    sent_ids = await send_listing_photos_album(
+        bot,
+        chat_id=chat_id_value,
         media_groups=response.media_groups,
         media_caption=str(getattr(response, "media_caption", "") or ""),
         photo_path=str(getattr(response, "photo_path", "") or ""),
@@ -98,6 +149,18 @@ async def _render_photos(
         reply_markup=response.keyboard,
         expand_only=bool(getattr(response, "expand_only", False)),
     )
+
+    if public_listing_id and bot is not None:
+        state = _album_state(update, context, public_listing_id)
+        _remember_album_sent(state, message_ids=[int(s) for s in sent_ids], page=int(page))
+
+
+async def _render_details(query: Any, response: TelegramCallbackResponse) -> None:
+    message = getattr(query, "message", None)
+    if getattr(message, "photo", None):
+        await query.edit_message_caption(caption=response.text, parse_mode=ParseMode.HTML, reply_markup=response.keyboard)
+        return
+    await query.edit_message_text(response.text, parse_mode=ParseMode.HTML, reply_markup=response.keyboard)
 
 
 async def _render_transition_view(query: Any, view: TransitionView) -> None:
@@ -240,7 +303,22 @@ async def handle_v3_callback(
         await _render_details(query, response)
         _set_listing_touchpoint(context, "listing_details")
     elif response.kind == "photos":
-        await _render_photos(update, context, response, query=query)
+        public_id_for_album = ""
+        page_for_album = 0
+        callback_obj = dispatched.callback
+        if callback_obj is not None and getattr(callback_obj, "page_index", None) is not None:
+            page_for_album = int(getattr(callback_obj, "page_index") or 0)
+            public_id_for_album = str(
+                getattr(callback_obj, "public_listing_id", "") or ""
+            ).strip()
+        await _render_photos(
+            update,
+            context,
+            response,
+            query=query,
+            page=page_for_album,
+            public_listing_id=public_id_for_album,
+        )
         action = str(getattr(dispatched, "action", "") or "")
         callback = dispatched.callback
         is_expand = bool(

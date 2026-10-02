@@ -659,6 +659,188 @@ def build_photos_response(
     )
 
 
+# ---- Paged album ----
+PHOTOS_PAGE_SIZE = 4
+
+
+def _photos_page_count(total: int) -> int:
+    if total <= 0:
+        return 0
+    return (total + PHOTOS_PAGE_SIZE - 1) // PHOTOS_PAGE_SIZE
+
+
+def _photos_page_slice(total: int, page: int) -> tuple[int, int]:
+    """Clamp ``page`` into [0, page_count) and return (start, end)."""
+    pages = _photos_page_count(total)
+    if pages <= 0:
+        return 0, 0
+    safe_page = max(0, min(int(page or 0), pages - 1))
+    start = safe_page * PHOTOS_PAGE_SIZE
+    end = min(start + PHOTOS_PAGE_SIZE, total)
+    return start, end
+
+
+def _photos_page_caption(
+    *,
+    public_listing_id: str,
+    page: int,
+    total_pages: int,
+    total: int,
+    start: int,
+    end: int,
+) -> str:
+    shown = max(0, end - start)
+    if shown <= 0 or total <= 0:
+        return f"📷 实拍{chr(10)}暂无图片{chr(10)}{public_listing_id}"
+    return (
+        f"📷 实拍 {public_listing_id}{chr(10)}"
+        f"第 {page + 1}/{total_pages} 页 · 共 {total} 张{chr(10)}"
+        f"本页 {start + 1}–{end}"
+    )
+
+
+def build_photos_page_response(
+    view: PublishedListingView,
+    *,
+    page: int = 0,
+) -> PublicPhotosResponse:
+    """Paged album entry — exactly ``PHOTOS_PAGE_SIZE`` frames per page.
+
+    Edge cases honored:
+      * ``0`` photos → status bar + advisor button, no media.
+      * ``1–3`` photos → single page, no paging buttons.
+      * ``4``/``5``/``8``/``9+`` photos → page through ``PHOTOS_PAGE_SIZE`` chunks
+        with prev/next/page buttons; ``next`` on last page falls back to
+        "房源详情" so the album always has a usable exit.
+      * Broken / duplicate paths are filtered before paging (see
+        ``_gallery_photo_paths`` dedupe + ``_existing_file``). Re-running the same
+        page callback is idempotent (deterministic slice + deterministic caption).
+    """
+    details = build_public_listing_details(view)
+    all_photos = _gallery_photo_paths(view)[:PHOTOS_MAX_TOTAL]
+    total = len(all_photos)
+    total_pages = _photos_page_count(total)
+    summary = listing_summary_bits(
+        project_name=details.project_name,
+        layout=details.layout,
+        monthly_rent_usd=details.monthly_rent_usd,
+        location=details.location,
+    )
+
+    if total <= 0 or total_pages <= 0:
+        text = (
+            f"{_detail_status_line(details)}{chr(10)}{chr(10)}"
+            f"这套房的实拍暂时没有加载出来。{chr(10)}"
+            f"可以稍后再试，或直接联系顾问。"
+        )
+        return PublicPhotosResponse(
+            media_groups=(),
+            text=text,
+            media_caption="",
+            detail_text="",
+            photo_path="",
+            photo_index=0,
+            photo_total=0,
+            listing_summary=summary,
+            action_rows=_photo_actions(
+                bookable=details.bookable,
+                inventory_status=details.inventory_status,
+                public_listing_id=details.public_listing_id,
+                has_more=False,
+            ),
+            expand_only=False,
+        )
+
+    start, end = _photos_page_slice(total, page)
+    page_rows = all_photos[start:end]
+    pages = total_pages
+    safe_page = max(0, min(int(page or 0), pages - 1))
+    caption = _photos_page_caption(
+        public_listing_id=details.public_listing_id,
+        page=safe_page,
+        total_pages=pages,
+        total=total,
+        start=start,
+        end=end,
+    )
+    groups = _as_media_groups(page_rows)
+    first = page_rows[0] if page_rows else ""
+
+    if pages == 1:
+        action_rows = _photo_actions(
+            bookable=details.bookable,
+            inventory_status=details.inventory_status,
+            public_listing_id=details.public_listing_id,
+            has_more=False,
+        )
+    else:
+        action_rows = _photo_page_actions(
+            public_listing_id=details.public_listing_id,
+            page=safe_page,
+            total_pages=pages,
+            bookable=details.bookable,
+            inventory_status=details.inventory_status,
+        )
+
+    return PublicPhotosResponse(
+        media_groups=groups,
+        text=_photos_action_text(details),
+        media_caption=caption,
+        detail_text="",
+        photo_path=first,
+        photo_index=start,
+        photo_total=total,
+        listing_summary=summary,
+        action_rows=action_rows,
+        expand_only=False,
+    )
+
+
+def _photo_page_actions(
+    *,
+    public_listing_id: str,
+    page: int,
+    total_pages: int,
+    bookable: bool,
+    inventory_status: str,
+) -> tuple[tuple[SemanticAction, ...], ...]:
+    """Album paging keyboard: ◀ page N/total ▶ + book/consult/exit.
+
+    First page hides ◀; last page hides ▶ and shows "房源详情" as the exit. The
+    bookable row stays consistent with ``_photo_actions`` so behavior never
+    silently diverges.
+    """
+    target = str(public_listing_id or "").strip()
+    safe_page = max(0, min(int(page or 0), max(total_pages - 1, 0)))
+    status = str(inventory_status or "").strip().lower()
+    can_book = bool(bookable) or status in {"active", "reserved"}
+
+    paging: list[SemanticAction] = []
+    if safe_page > 0:
+        paging.append(
+            SemanticAction("◀ 上一页", "photos", target, target_index=safe_page - 1)
+        )
+    paging.append(SemanticAction(f"·{safe_page + 1}/{total_pages}·", "photos", target, target_index=safe_page))
+    if safe_page + 1 < total_pages:
+        paging.append(
+            SemanticAction("▶ 下一页", "photos", target, target_index=safe_page + 1)
+        )
+
+    rows: list[tuple[SemanticAction, ...]] = [tuple(paging)]
+
+    book_row: list[SemanticAction] = []
+    if can_book:
+        book_row.append(SemanticAction("📅 预约看房", "book", target))
+    book_row.append(SemanticAction("💬 中文顾问", "consult", target))
+
+    # Multi-page album always carries an explicit 房源详情 exit so the user
+    # never has to drain ◀/▶ before they can return to the listing details.
+    rows.append((SemanticAction("📷 房源详情", "details", target),))
+    rows.append(tuple(book_row))
+
+    return tuple(rows)
+
+
 
 # Back-compat alias used by older call sites / tests.
 _flipper_photo_paths = _gallery_photo_paths
@@ -669,6 +851,7 @@ __all__ = [
     "InternalListingAction",
     "PHOTOS_FIRST_BATCH",
     "PHOTOS_MAX_TOTAL",
+    "PHOTOS_PAGE_SIZE",
     "PublicDetailsResponse",
     "PublicPhotosResponse",
     "SemanticAction",
@@ -676,6 +859,7 @@ __all__ = [
     "build_detail_text",
     "build_details_response",
     "build_photo_caption",
+    "build_photos_page_response",
     "build_photos_response",
     "listing_summary_bits",
 ]

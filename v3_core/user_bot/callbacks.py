@@ -31,6 +31,7 @@ class UserBotCallback:
     action: str = ""
     public_listing_id: str = ""
     target_index: int | None = None
+    page_index: int | None = None
 
 
 def _public_id(value: object) -> str:
@@ -45,11 +46,17 @@ def encode_listing_callback(
     public_listing_id: object,
     *,
     photo_offset: int | None = None,
+    photo_page: int | None = None,
 ) -> str:
     clean_action = str(action or "").strip().lower()
     if clean_action not in _LISTING_ACTIONS:
         raise ValueError("unsupported_listing_callback_action")
     base = f"{PREFIX}:listing:{clean_action}:{_public_id(public_listing_id)}"
+    if clean_action == "photos" and photo_page is not None:
+        page = int(photo_page)
+        if page < 0:
+            raise ValueError("invalid_photo_page")
+        return f"{base}:pg:{page}"
     if clean_action == "photos" and photo_offset is not None:
         offset = int(photo_offset)
         if offset < 0:
@@ -80,12 +87,16 @@ def encode_semantic_action(action: SemanticAction) -> str:
         return encode_change_search_callback()
     if clean in _LISTING_ACTIONS:
         photo_offset = None
+        photo_page = None
         if clean == "photos" and action.target_index is not None:
-            photo_offset = int(action.target_index)
+            # Paging actions target the photo page; offset stays reserved for
+            # the legacy "查看全部实拍" expand deep link.
+            photo_page = int(action.target_index)
         return encode_listing_callback(
             clean,
             action.target_public_listing_id,
             photo_offset=photo_offset,
+            photo_page=photo_page,
         )
     raise ValueError("unsupported_semantic_action")
 
@@ -121,6 +132,25 @@ def parse_callback(value: object) -> UserBotCallback | None:
             action="photos",
             public_listing_id=public_id,
             target_index=offset,
+        )
+
+    # Photo paging index: v3u:listing:photos:{public_id}:pg:{page}
+    # Page index is the 0-based page number; offsets stay compatible with the
+    # legacy 5-part format so old "查看全部实拍" deep links keep working.
+    if len(parts) == 6 and parts[:2] == [PREFIX, "listing"] and parts[2].strip().lower() == "photos" and parts[4].strip().lower() in {"pg", "page"}:
+        public_id = normalize_public_id(parts[3])
+        try:
+            page = int(parts[5])
+        except (TypeError, ValueError):
+            return None
+        if public_id is None or page < 0:
+            return None
+        return UserBotCallback(
+            kind="listing",
+            action="photos",
+            public_listing_id=public_id,
+            target_index=page,
+            page_index=page,
         )
 
     if len(parts) == 4 and parts[:2] == [PREFIX, "card"]:

@@ -40,11 +40,11 @@ def test_gallery_cover_fill_uses_thin_white_frame_and_shared_canvas(tmp_path: Pa
         assert img.getpixel((540, 432)) != (255, 255, 255)
 
 
-def test_portrait_force_orientation_uses_1200x1500(tmp_path: Path):
+def test_portrait_force_orientation_uses_1080x1350(tmp_path: Path):
     source = _room(tmp_path / "mixed.jpg", (1200, 900), 60)
     output = tmp_path / "port.jpg"
     info = format_gallery_photo(source, output, add_logo=False, force_orientation="portrait")
-    assert info["canvas"] == {"width": 1200, "height": 1500}
+    assert info["canvas"] == {"width": 1080, "height": 1350}
     assert info["orientation"] == "portrait"
     with Image.open(output) as img:
         assert img.size == CANVAS_PRESETS["portrait"]["size"]

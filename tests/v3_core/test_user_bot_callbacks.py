@@ -47,7 +47,7 @@ def test_photos_callback_optional_index_round_trip_keeps_listing_context():
         target_public_listing_id="QL-RF-A2B3",
         target_index=8,
     )
-    assert encode_semantic_action(semantic) == "v3u:listing:photos:QL-RF-A2B3:8"
+    assert encode_semantic_action(semantic) == "v3u:listing:photos:QL-RF-A2B3:pg:8"
 
 
 def test_all_supported_listing_actions_are_explicit_and_round_trip():

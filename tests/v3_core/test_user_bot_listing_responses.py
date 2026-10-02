@@ -8,7 +8,9 @@ from v3_core.user_bot.listing_responses import (
     build_detail_text,
     build_details_response,
     build_photo_caption,
+    build_photos_page_response,
     build_photos_response,
+    PHOTOS_PAGE_SIZE,
 )
 from v3_core.user_bot.public_inventory import PublishedListingView
 
@@ -432,3 +434,135 @@ def test_customer_photo_surface_never_exposes_public_listing_id():
     assert "🆔" not in response.text
     assert "QL-RF-A2B3" not in response.text
     assert "QL-RF-A2B3" not in response.media_caption
+
+
+def _fake_jpegs(tmp_path, count):
+    body = bytes.fromhex(
+        "FFD8FFE000104A46494600010101006000600000"
+        "FFC00011080001000103012200021101031101"
+        "FFDA0008010100003F00D66B00314000"
+        "FFD9"
+    )
+    paths = []
+    for i in range(count):
+        p = tmp_path / f"photo_{i}.jpg"
+        p.write_bytes(body)
+        paths.append(str(p))
+    return paths
+
+
+def _view_with_files(files):
+    snapshot = {
+        "schema": "v3_publication_snapshot.v1",
+        "listing_id": "LST_X",
+        "public_listing_id": "QL-RF-A2B3",
+        "offer_id": "OFF_X",
+        "canonical_record_id": "CAN_X",
+        "canonical_facts_hash": "h",
+        "canonical_facts": {},
+        "adviser_copy": "",
+        "listing": {
+            "project_name": "富力城",
+            "property_type": "公寓",
+            "layout": "2房1厅",
+            "public_location_display": "BKK1",
+            "size_sqm": 80,
+            "floor": "10",
+        },
+        "offer": {
+            "offer_type": "rent",
+            "monthly_rent_usd": 700,
+            "deposit_terms": "押2付1",
+            "payment_terms": "押1付1",
+            "contract_term": "1年",
+            "publication_policy": "telegram_rent",
+        },
+    }
+    return PublishedListingView(
+        listing={
+            "listing_id": "LST_X",
+            "public_listing_id": "QL-RF-A2B3",
+            "inventory_status": "active",
+        },
+        offer={
+            "offer_id": "OFF_X",
+            "monthly_rent_usd": 700,
+            "offer_type": "rent",
+            "publication_policy": "telegram_rent",
+            "offer_status": "active",
+        },
+        publication={"public_listing_id": "QL-RF-A2B3"},
+        package={
+            "cover_path": "",
+            "cover_style": "premium_photo",
+            "public_listing_id": "QL-RF-A2B3",
+            "snapshot_json": json.dumps(snapshot, ensure_ascii=False),
+            "gallery_json": json.dumps(list(files), ensure_ascii=False),
+        },
+    )
+
+
+def test_paged_album_handles_zero_one_three_four_photos(tmp_path):
+    body = _fake_jpegs(tmp_path, 9)
+    for count in (0, 1, 3, 4, 5, 8, 9):
+        view = _view_with_files(body[:count])
+        # Iterate through every possible page to make sure out-of-range pages
+        # clamp to a valid window and produce a stable slice.
+        for page in (-1, 0, 1, 2, 99):
+            response = build_photos_page_response(view, page=page)
+            assert response.photo_total == count
+            if count == 0:
+                assert response.media_groups == ()
+                assert response.media_caption == ""
+                continue
+            # Out-of-range pages must clamp to the last valid page; same total
+            # photos but the slice is whatever the last page actually holds.
+            pages = max(1, (count + PHOTOS_PAGE_SIZE - 1) // PHOTOS_PAGE_SIZE)
+            clamped_page = max(0, min(page, pages - 1))
+            expected_start = clamped_page * PHOTOS_PAGE_SIZE
+            expected_end = min(expected_start + PHOTOS_PAGE_SIZE, count)
+            assert len(response.media_groups[0]) == expected_end - expected_start
+
+
+def test_paged_album_buttons_include_prev_page_next_only_when_multi_page(tmp_path):
+    body = _fake_jpegs(tmp_path, 10)
+    # 4-photo album fits on a single page (no paging controls).
+    small = _view_with_files(body[:3])
+    single = build_photos_page_response(small, page=0)
+    flat = [a.label for row in single.action_rows for a in row]
+    assert "▶ 下一页" not in flat
+    assert "◀ 上一页" not in flat
+    assert "📷 房源详情" in flat
+
+    multi_view = _view_with_files(body)
+    first_page = build_photos_page_response(multi_view, page=0)
+    flat0 = [a.label for row in first_page.action_rows for a in row]
+    assert "◀ 上一页" not in flat0  # first page never shows ◀
+    assert "▶ 下一页" in flat0
+    assert any("1/3" in label for label in flat0)
+
+    mid_page = build_photos_page_response(multi_view, page=1)
+    flat1 = [a.label for row in mid_page.action_rows for a in row]
+    assert "◀ 上一页" in flat1
+    assert "▶ 下一页" in flat1
+    assert any("2/3" in label for label in flat1)
+
+    last_page = build_photos_page_response(multi_view, page=2)
+    flat2 = [a.label for row in last_page.action_rows for a in row]
+    assert "◀ 上一页" in flat2
+    assert "▶ 下一页" not in flat2
+    assert "📷 房源详情" in flat2
+
+
+def test_paged_album_is_idempotent_on_same_page(tmp_path):
+    body = _fake_jpegs(tmp_path, 8)
+    view = _view_with_files(body)
+    page0a = build_photos_page_response(view, page=0)
+    page0b = build_photos_page_response(view, page=0)
+    assert page0a.media_caption == page0b.media_caption
+    assert [g for g in page0a.media_groups] == [g for g in page0b.media_groups]
+    # Page index out of range clamps to the last page, not an empty album.
+    last = build_photos_page_response(view, page=99)
+    last_explicit = build_photos_page_response(view, page=1)
+    assert last.media_caption == last_explicit.media_caption
+    assert [g for g in last.media_groups] == [g for g in last_explicit.media_groups]

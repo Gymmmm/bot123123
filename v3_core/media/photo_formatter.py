@@ -20,7 +20,7 @@ PORTRAIT_THRESHOLD = 0.90
 # Gallery canvases match cover standards so 更多实拍 flips stay size-stable.
 CANVAS_PRESETS = {
     "landscape": {"size": (1080, 864), "logo_width_ratio": 0.26},
-    "portrait": {"size": (1200, 1500), "logo_width_ratio": 0.26},
+    "portrait": {"size": (1080, 1350), "logo_width_ratio": 0.26},
     # Near-square sources join the landscape family for flipper continuity.
     "square": {"size": (1080, 864), "logo_width_ratio": 0.26},
 }

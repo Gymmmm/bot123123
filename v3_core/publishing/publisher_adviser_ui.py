@@ -167,7 +167,7 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
         await message.reply_text(
             "<b>🖼 选择主图</b>\n\n"
             "点下方按钮，选一张原图作为频道封面底图。\n"
-            "系统会按所选「封面格式」生成封面（横版 1200×900）。\n"
+            "系统会按所选「封面格式」生成封面（横版 1080×864 · 竖版 1080×1350）。\n"
             "更多实拍相册仍用全部照片，并加上侨联角标。",
             parse_mode=ParseMode.HTML,
         )
@@ -493,7 +493,7 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
                 await query.message.reply_text(
                     "<b>🎨 选择封面格式</b>\n\n"
                     "四套风格；画幅跟主图自动走：\n"
-                    "横图 → 1080×864 · 竖图 → 1200×1500\n"
+                    "横图 → 1080×864 · 竖图 → 1080×1350\n"
                     "普通房默认「极简实拍」；别墅建议「黑金」。",
                     parse_mode=ParseMode.HTML,
                     reply_markup=InlineKeyboardMarkup([

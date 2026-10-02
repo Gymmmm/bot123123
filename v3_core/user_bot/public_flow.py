@@ -13,6 +13,7 @@ from .listing_responses import (
     PublicDetailsResponse,
     PublicPhotosResponse,
     build_details_response,
+    build_photos_page_response,
     build_photos_response,
 )
 from .route_service import DecisionStatus, PublicRouteDecision, PublicRouteService
@@ -56,6 +57,7 @@ class PublicListingFlowService:
         source: str,
         start_payload: str,
         photo_offset: int = 0,
+        photo_page: int | None = None,
     ) -> PublicListingFlowResult:
         clean_source = str(source or "").strip()
         route = decision.route
@@ -96,14 +98,23 @@ class PublicListingFlowService:
                 details=build_details_response(view),
             )
         if route.action == "photos":
+            # ``photo_page`` is the new paged album contract (preferred).
+            # ``photo_offset`` keeps the legacy expand behavior for any older
+            # caller that still passes it through.
+            if photo_page is not None:
+                photos = build_photos_page_response(
+                    view, page=int(photo_page or 0)
+                )
+            else:
+                photos = build_photos_response(
+                    view, offset=int(photo_offset or 0)
+                )
             return PublicListingFlowResult(
                 status="ok",
                 action="photos",
                 public_listing_id=public_id,
                 source=clean_source,
-                photos=build_photos_response(
-                    view, offset=int(photo_offset or 0)
-                ),
+                photos=photos,
             )
         if route.action == "book":
             return PublicListingFlowResult(
@@ -141,12 +152,18 @@ class PublicListingFlowService:
         *,
         source: str = "listing_callback",
         photo_offset: int = 0,
+        photo_page: int | None = None,
     ) -> PublicListingFlowResult:
         return self._render(
             self.routes.resolve_action(public_listing_id, action),
             source=source,
             start_payload="",
             photo_offset=int(photo_offset or 0),
+            photo_page=(
+                int(photo_page)
+                if photo_page is not None
+                else None
+            ),
         )
 
 

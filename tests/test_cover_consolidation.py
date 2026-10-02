@@ -17,7 +17,7 @@ from qiaolian_dual.cover_styles import (
 def test_only_four_horizontal_cover_styles_are_active():
     assert FINAL_COVER_STYLES == ("classic_blue", "right_price", "black_gold", "premium_photo")
     assert COVER_CANVAS["landscape"] == (1080, 864)
-    assert COVER_CANVAS["portrait"] == (1200, 1500)
+    assert COVER_CANVAS["portrait"] == (1080, 1350)
     assert set(COVER_TEMPLATE_MAP) == {
         *FINAL_COVER_STYLES,
         *PORTRAIT_COVER_STYLES,

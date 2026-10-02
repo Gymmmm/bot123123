@@ -1,7 +1,7 @@
 """侨联房源封面的唯一风格注册表。
 
 正式图片封面四套风格；画幅由选中主图自动决定：
-  横图 → 1080×864；竖图 → 1200×1500（共用竖版标准模板按风格换配色）。
+  横图 → 1080×864；竖图 → 1080×1350（4:5，共用竖版标准模板按风格换配色）。
 单视频封面另有横版 / 竖版专用模板，同样跟主图方向走。
 旧名称只做兼容映射，不再形成新的渲染分支。
 """
@@ -36,10 +36,10 @@ STYLE_LABELS = {
 }
 
 # Standard canvas sizes used by HTML posters (Playwright screenshots .poster).
-# Image landscape 1080×864 (5:4); image portrait 1200×1500 (4:5 / 用户称 5:4 竖版).
+# Image landscape 1080×864 (5:4); image portrait 1080×1350 (4:5 主频道缩略图).
 COVER_CANVAS = {
     "landscape": (1080, 864),
-    "portrait": (1200, 1500),
+    "portrait": (1080, 1350),
     "video_landscape": (1600, 900),
     "video_portrait": (1080, 1920),
 }
