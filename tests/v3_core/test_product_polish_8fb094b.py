@@ -67,7 +67,7 @@ def test_channel_keyboard_booking_follows_inventory_status(status, has_book):
 
 def test_channel_status_copy_uses_v1_final_lock_without_changing_inventory_logic():
     expected = {
-        "active": "🟢 当前可预约",
+        "active": "🟢 可预约",
         "reserved": "🟡 已有预约，仍可预约",
         "high_demand": "🟠 预约较多",
         "pending": "🔵 房态确认中",
