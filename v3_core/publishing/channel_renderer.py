@@ -102,45 +102,38 @@ def render_channel_caption(*, listing: dict[str, Any], offer: dict[str, Any], pu
         raise ValueError("valid public_listing_id is required")
     project = _clean(listing.get("project_name") or listing.get("project"), 28)
     area = _clean(display_location(listing.get("public_location_display") or listing.get("area"), project=project), 28)
-    heading = project if project and project not in _GENERIC_HEADINGS else area
-    if not heading:
-        heading = "金边房源"
     property_type_raw = _clean(listing.get("property_type"), 24)
     property_type = _clean(display_property_type(property_type_raw), 24)
-    raw_layout = listing.get("layout") or ""
-    layout = _clean(display_layout(raw_layout, property_type), 20)
-    heading_line = "｜".join(value for value in (heading, area if project and area else "", layout) if value)
+    layout = _clean(display_layout(listing.get("layout") or "", property_type), 20)
     offer_type = str(offer.get("offer_type") or "rent").strip().lower()
-    if offer_type == "rent":
-        price = offer.get("monthly_rent_usd")
-    elif offer_type == "sale":
-        price = offer.get("sale_price_usd")
-    else:
-        raise ValueError(f"unsupported offer_type:{offer_type}")
+    price = offer.get("monthly_rent_usd") if offer_type == "rent" else offer.get("sale_price_usd")
     try:
         amount = int(float(price or 0))
     except (TypeError, ValueError):
         amount = 0
     price_text = f"${amount:,}" + ("/月" if offer_type == "rent" else "") if amount > 0 else ""
-    property_bits = [property_type] if "别墅" in property_type else []
+    effective_status = str(status if status is not None else listing.get("inventory_status") or "pending")
+    icon, status_label = channel_status_presentation(effective_status)
+    if status_label == "当前可预约":
+        status_label = "可预约"
+
+    lines: list[str] = []
+    home_bits = [part for part in (property_type, layout) if part]
+    if home_bits:
+        lines.append(f"🏡 {'｜'.join(home_bits)}")
+    location = project or area
+    if project and area and not display_location(area, project=project) == "":
+        location = "｜".join(dict.fromkeys(part for part in (project, area) if part))
+    if location:
+        lines.append(f"📍 {location}")
+    if price_text:
+        lines.append(f"💵 {price_text}")
     deposit = _clean(offer.get("payment_terms") or offer.get("deposit_terms"), 20)
     contract = _normalize_contract(offer.get("contract_term"))
-    deposit_contract = "｜".join(value for value in (deposit, contract) if value) if "别墅" in property_type else ""
-    effective_status = str(status if status is not None else listing.get("inventory_status") or "pending")
-    sections: list[str] = []
-    top_lines = [f"🏡 {heading_line}"]
-    if price_text:
-        top_lines.append(f"💵 {price_text}")
-    sections.append("\n".join(top_lines))
-    fact_lines: list[str] = []
-    if property_bits:
-        fact_lines.append(f"🏢 {'｜'.join(property_bits)}")
-    if offer_type == "rent" and deposit_contract:
-        fact_lines.append(f"🗝️ {deposit_contract}")
-    if fact_lines:
-        sections.append("\n".join(fact_lines))
-    sections.append(_status_line(effective_status, public_id))
-    return "\n\n".join(sections).strip()[:1024]
+    terms = "｜".join(value for value in (deposit, contract) if value)
+    if offer_type == "rent" and terms:
+        lines.append(f"🔑 {terms}")
+    lines.append(f"{icon} {status_label}")
+    lines.extend(["", public_id])
+    return "\n".join(lines).strip()[:1024]
 
-
-__all__ = ["channel_status_presentation", "render_channel_caption"]
