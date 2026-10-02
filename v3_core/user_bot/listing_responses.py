@@ -636,7 +636,8 @@ build_detail_caption = build_detail_text  # product alias used by open-details c
 __all__ = [
     "InternalListingAction",
     "PHOTOS_FIRST_BATCH",
-    "PHOTOS_MAX_TOTAL",\n    "PHOTOS_PAGE_SIZE",
+    "PHOTOS_MAX_TOTAL",
+    "PHOTOS_PAGE_SIZE",
     "PublicDetailsResponse",
     "PublicPhotosResponse",
     "SemanticAction",
