@@ -89,7 +89,7 @@ def _fit(image: Image.Image, size: tuple[int, int]) -> Image.Image:
     return ImageOps.fit(image, size, method=Image.Resampling.LANCZOS, centering=(0.5, 0.5))
 
 def _paste_gallery(canvas: Image.Image, images: list[Image.Image]) -> None:
-    canvas.paste(_fit(images[0], (1080, 850)), (0, 0))
+    canvas.paste(_fit(images[0], (1080, INFO_TOP)), (0, 0))
     secondary = images[1:4]
     if not secondary:
         return
@@ -99,7 +99,7 @@ def _paste_gallery(canvas: Image.Image, images: list[Image.Image]) -> None:
     widths[-1] += 1080 - total_gutter - sum(widths)
     x = 0
     for image, width in zip(secondary, widths):
-        canvas.paste(_fit(image, (width, BOTTOM_HEIGHT)), (x, BOTTOM_TOP))
+        canvas.paste(_fit(image, (width, THUMBS_HEIGHT)), (x, THUMBS_TOP))
         x += width + GUTTER
 
 def _text(draw: ImageDraw.ImageDraw, xy: tuple[int, int], value: str, *, size: int, bold: bool = False) -> None:
@@ -109,32 +109,20 @@ def _text(draw: ImageDraw.ImageDraw, xy: tuple[int, int], value: str, *, size: i
 def _overlay(canvas: Image.Image, data: CoverRenderData) -> None:
     layer = Image.new("RGBA", CANVAS, (0, 0, 0, 0))
     draw = ImageDraw.Draw(layer)
-    for y in range(0, 230):
-        alpha = int(115 * (1 - y / 230))
-        draw.rectangle((0, y, 1080, y + 1), fill=(16, 34, 55, alpha))
-    draw.rounded_rectangle((42, 42, 390, 146), radius=20, fill=(20, 65, 94, 155))
-    _text(draw, (66, 58), "侨联地产", size=34, bold=True)
-    _text(draw, (66, 103), "Overseas United Real Estate", size=18)
+    draw.rectangle((0, INFO_TOP, 1080, INFO_TOP + INFO_HEIGHT), fill=(248, 246, 241, 255))
+    identity = " · ".join(part for part in (
+        str(data.project or data.project_alias or data.area or "").strip(),
+        str(data.layout or "").strip(),
+    ) if part)
+    if identity:
+        draw.text((42, INFO_TOP + 25), identity, font=_font(32, bold=True), fill=(35, 40, 45))
     price = data.price_line()
     if price:
-        font = _font(54, bold=True)
-        bbox = draw.textbbox((0, 0), price, font=font)
-        width = bbox[2] - bbox[0]
-        x = max(42, 1038 - width - 24)
-        draw.rounded_rectangle((x - 20, 714, 1038, 814), radius=24, fill=(20, 65, 94, 185))
-        draw.text((x, 731), price, font=font, fill=(255, 255, 255))
-    ident = " · ".join(part for part in (
-        str(data.project or data.project_alias or "").strip(),
-        str(data.layout or "").strip(),
-        str(data.area or "").strip(),
-    ) if part)
-    if ident:
-        font = _font(27, bold=True)
-        while draw.textbbox((0, 0), ident, font=font)[2] > 880 and len(ident) > 12:
-            ident = ident[:-2].rstrip() + "…"
-        width = draw.textbbox((0, 0), ident, font=font)[2]
-        draw.rounded_rectangle((42, 765, min(970, 82 + width), 824), radius=18, fill=(0, 0, 0, 105))
-        draw.text((62, 778), ident, font=font, fill=(255, 255, 255))
+        draw.text((42, INFO_TOP + 76), price, font=_font(54, bold=True), fill=(20, 65, 94))
+    draw.rectangle((0, BRAND_TOP, 1080, 1350), fill=(20, 65, 94, 255))
+    draw.text((42, BRAND_TOP + 13), "侨联地产", font=_font(30, bold=True), fill=(255, 255, 255))
+    draw.text((210, BRAND_TOP + 20), "OVERSEAS UNITED REAL ESTATE", font=_font(17), fill=(224, 234, 239))
+    draw.text((890, BRAND_TOP + 20), "出租房源", font=_font(24, bold=True), fill=(255, 255, 255))
     canvas.paste(layer, (0, 0), layer)
 
 def render_cover(*, style: str, source_image: str, output_path: str, data: CoverRenderData,
