@@ -219,7 +219,9 @@ def aftercare_home_view() -> ServiceView:
         text=AFTERCARE_TEXT,
         rows=(
             (ServiceChoice("🔧 房屋报修", "v3u:service:repair"), ServiceChoice("🏢 物业协调", "v3u:service:coordination")),
-            (ServiceChoice("🔌 账单协助", "v3u:service:billing"), ServiceChoice("❓ 其他住房问题", "v3u:service:general")),
+            (ServiceChoice("🔌 账单协助", "v3u:service:billing"), ServiceChoice("🚚 搬家服务", "v3u:service:moving")),
+            (ServiceChoice("🧹 保洁服务", "v3u:service:cleaning"), ServiceChoice("🌐 网络办理", "v3u:service:network_help")),
+            (ServiceChoice("❓ 其他住房问题", "v3u:service:general"),),
             (ServiceChoice("⬅️ 返回侨联服务", "v3u:home:service"),),
         ),
     )
@@ -521,10 +523,10 @@ def property_exit_view() -> ServiceView:
 
 def utility_stub_view(kind: str) -> ServiceView:
     labels = {
-        "utilities": ("🔌 水电协助", "把账单或需要处理的情况直接发给中文顾问。"),
-        "moving": ("🚚 搬家协助", "请说明搬家日期、出发地、目的地，以及大概物品情况。"),
+        "utilities": ("🔌 账单协助", "把水电、物业或其他住房账单发给中文顾问。"),
+        "moving": ("🚚 搬家服务", "请说明搬家日期、出发地、目的地，以及大概物品情况。"),
         "cleaning": ("🧹 保洁服务", "请说明需要哪种保洁，以及希望安排的日期：\n\n日常保洁 / 入住保洁 / 退租保洁 / 深度保洁"),
-        "network_help": ("🌐 网络协助", "请说明需要处理的问题：\n\n新装 / 续费 / 故障 / 其他"),
+        "network_help": ("🌐 网络办理", "请说明需要处理的问题：\n\n新装 / 续费 / 故障 / 其他"),
     }
     title, body = labels.get(kind, ("住房服务", "请直接说明需要协助的事情。"))
     return ServiceView(
