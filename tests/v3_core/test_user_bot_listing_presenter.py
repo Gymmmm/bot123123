@@ -62,7 +62,7 @@ def test_presenter_uses_frozen_snapshot_for_public_facts():
     assert details.project_name == "富力城"
     assert details.layout == "2房1厅"
     assert details.subject == "富力城｜2房1厅"
-    assert details.location == "金边·富力城"
+    assert details.location == ""  # project-overlapping display alias is not repeated publicly
     assert details.monthly_rent_usd == 9999
     assert details.published_monthly_rent_usd == 800
     assert details.size_sqm == 95.0
