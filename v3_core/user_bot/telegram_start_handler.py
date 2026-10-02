@@ -203,6 +203,7 @@ def _listing_keyboard(
     *,
     advisor_url: str = "",
     channel_url: str = "",
+    add_home: bool = True,
 ):
     if not result.action_rows:
         return None
@@ -211,7 +212,7 @@ def _listing_keyboard(
         advisor_url=advisor_url,
         channel_url=channel_url,
         listing_summary=str(getattr(result, "listing_summary", "") or ""),
-        add_home=True,
+        add_home=add_home,
         add_channel=False,
     )
 
@@ -255,6 +256,7 @@ async def _render_photos(
             photos,
             advisor_url=advisor_url,
             channel_url=channel_url,
+            add_home=False,
         )
     if not bool(getattr(photos, "expand_only", False)):
         preview = Path(str(getattr(photos, "photo_path", "") or ""))
