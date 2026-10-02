@@ -240,3 +240,265 @@ def test_deeplink_photos_collage_path_is_unreachable_from_start_route():
     # ``else`` branch which is unreachable from ``resolve()``.
     assert "build_photos_page_response(" in src
     assert "build_photos_response(" in src
+
+
+# ---------------------------------------------------------------------------
+# Entry integration tests: /start property_<id>_photos through handle_v3_start.
+# ---------------------------------------------------------------------------
+
+
+from types import SimpleNamespace
+
+from v3_core.user_bot.telegram_start_handler import handle_v3_start
+
+
+class _StubMessage:
+    def __init__(self):
+        self.calls: list[tuple] = []
+
+    async def reply_text(self, text, **kwargs):
+        self.calls.append(("reply_text", text, kwargs))
+        return SimpleNamespace(message_id=len(self.calls), delete=None)
+
+
+class _StubBot:
+    def __init__(self):
+        self.calls: list[tuple] = []
+
+    async def send_photo(self, **kwargs):
+        photo = kwargs.get("photo")
+        self.calls.append(("send_photo", getattr(photo, "name", ""), kwargs))
+        return SimpleNamespace(
+            message_id=len(self.calls),
+            chat_id=kwargs.get("chat_id"),
+        )
+
+    async def send_media_group(self, **kwargs):
+        self.calls.append(("send_media_group", "", kwargs))
+        group = [
+            SimpleNamespace(message_id=len(self.calls) + idx)
+            for idx in range(len(kwargs.get("media") or ()))
+        ]
+        return group
+
+    async def send_message(self, **kwargs):
+        self.calls.append(("send_message", kwargs.get("text", ""), kwargs))
+        return SimpleNamespace(
+            message_id=len(self.calls),
+            chat_id=kwargs.get("chat_id"),
+        )
+
+
+def _start_update(message):
+    return SimpleNamespace(
+        effective_message=message,
+        effective_chat=SimpleNamespace(id=1001),
+        effective_user=SimpleNamespace(id=123, username="alice", full_name="Alice"),
+    )
+
+
+def _entry_view(*, gallery=(), cover_path=""):
+    snapshot = {
+        "schema": "v3_publication_snapshot.v1",
+        "listing_id": "LST_INT_1",
+        "public_listing_id": "QL-RF-A2B3",
+        "listing": {
+            "project_name": "富力城",
+            "property_type": "公寓",
+            "layout": "2房1厅",
+            "public_location_display": "富力城",
+            "size_sqm": 95,
+            "floor": "19",
+        },
+        "offer": {
+            "offer_type": "rent",
+            "monthly_rent_usd": 800,
+            "payment_terms": "押1付1",
+            "contract_term": "1年",
+            "publication_policy": "telegram_rent",
+        },
+    }
+    return PublishedListingView(
+        listing={
+            "listing_id": "LST_INT_1",
+            "public_listing_id": "QL-RF-A2B3",
+            "inventory_status": "active",
+        },
+        offer={
+            "offer_id": "OFF_1",
+            "offer_type": "rent",
+            "offer_status": "active",
+            "publication_policy": "telegram_rent",
+        },
+        publication={"instance_id": "PUB_1"},
+        package={
+            "snapshot_json": json.dumps(snapshot, ensure_ascii=False),
+            "gallery_json": json.dumps(list(gallery), ensure_ascii=False),
+            "cover_path": cover_path,
+        },
+    )
+
+
+@pytest.mark.asyncio
+async def test_entry_integration_nine_photos_opens_page_zero_raw_only_via_start(tmp_path):
+    """``/start property_<id>_photos`` opens page 0 of the paged album end-to-end.
+
+    Drives handle_v3_start with a 9-original listing + a separate cover. Page 0
+    must send the first 4 raw frames (cover render excluded, no collage, no
+    legacy "更多实拍") and the action bar must show "1/3" + "下一页 ➡️" only
+    (no ⬅️ 上一页 on first page). The keyboard still carries 房源详情 /
+    预约 / 中文顾问 so the user can exit cleanly.
+    """
+    cover = tmp_path / "cover.jpg"
+    cover.write_bytes(b"COVER")
+    gallery = _write_photos(tmp_path, 9)
+
+    view = _entry_view(gallery=gallery, cover_path=str(cover))
+    inventory = MemoryPublishedInventory(view)
+    listings = PublicListingFlowService(PublicRouteService(inventory))
+    message = _StubMessage()
+    bot = _StubBot()
+    context = SimpleNamespace(
+        args=["property_QL-RF-A2B3_photos__ch"],
+        bot=bot,
+        user_data={},
+    )
+
+    outcome = await handle_v3_start(
+        _start_update(message),
+        context,
+        listings=listings,
+        transition_views=SimpleNamespace(build=lambda _plan: None),
+        channel_url="https://t.me/qiaolian",
+    )
+
+    # Entry contract: /start property_photos beats the public flow → page 0.
+    assert outcome.handled and outcome.kind == "photos"
+    assert outcome.payload == "property_QL-RF-A2B3_photos__ch"
+    assert outcome.result is not None
+    assert outcome.result.public_listing_id == "QL-RF-A2B3"
+    assert outcome.result.source == "channel_listing"
+
+    # Page 0: a single MediaGroup of exactly 4 raw frames.
+    media_calls = [c for c in bot.calls if c[0] == "send_media_group"]
+    assert len(media_calls) == 1
+    frames = media_calls[0][2]["media"]
+    assert len(frames) == 4
+    # Cover render is excluded from every page of the paged album.
+    cover_bytes = cover.read_bytes()
+    for frame in frames:
+        raw = (
+            frame.media.input_file_content
+            if hasattr(frame.media, "input_file_content")
+            else frame.media
+        )
+        assert raw != cover_bytes
+    # First 4 originals go out byte-for-byte, in gallery order.
+    actual_frame_bytes = []
+    for frame in frames:
+        if hasattr(frame.media, "input_file_content"):
+            actual_frame_bytes.append(frame.media.input_file_content)
+        elif isinstance(frame.media, (bytes, bytearray)):
+            actual_frame_bytes.append(bytes(frame.media))
+        else:
+            actual_frame_bytes.append(bytes(frame.media.read()))
+    assert actual_frame_bytes == [
+        Path(gallery[i]).read_bytes() for i in range(4)
+    ]
+    # Caption says 1/3 and references the listing (page index, not a cover).
+    caption = frames[0].caption
+    assert "1/3" in caption
+    assert "9 张" in caption
+    # No legacy collages, no "查看全部实拍" copy on the /start entry.
+    assert "查看全部实拍" not in repr(bot.calls)
+    assert "更多实拍" not in repr(bot.calls)
+
+    # Action bar message has the paged-album keyboard.
+    send_msg = [c for c in bot.calls if c[0] == "send_message"]
+    assert len(send_msg) == 1
+    action_text = send_msg[0][2]["text"]
+    keyboard = send_msg[0][2].get("reply_markup")
+    assert "🟢 当前可预约" in action_text  # status bar
+    assert keyboard is not None
+    keyboard_text = repr(keyboard)
+    # Single-row paging: 1/3 + 下一页 ➡️ on first page, no ⬅️.
+    assert "1/3" in keyboard_text
+    assert "下一页 ➡️" in keyboard_text
+    assert "⬅️ 上一页" not in keyboard_text
+    # Legacy expander gone, exit + book + advisor stay reachable.
+    assert "📷 更多实拍" not in keyboard_text
+    assert "📷 房源详情" in keyboard_text
+    assert "📅 预约看房" in keyboard_text
+    assert "💬 中文顾问" in keyboard_text
+    # Privacy: internal listing_id never leaks to the bot.
+    assert "LST_INT_1" not in action_text
+    assert "LST_INT_1" not in caption
+    assert "LST_INT_1" not in keyboard_text
+
+
+@pytest.mark.asyncio
+async def test_entry_integration_pagination_through_callback_router_4_4_1(tmp_path):
+    """In-app paging callbacks route to page 1 (next 4 frames) and page 2 (last 1).
+
+    Drives ``CallbackRouter.dispatch`` with ``v3u:listing:photos:QL-*:pg:1``
+    → page 1 must produce ``raw_gallery[4:8]`` with a keyboard containing
+    ⬅️ 上一页 + 2/3 + 下一页 ➡️; ``...:pg:2`` → page 2 must produce
+    ``raw_gallery[8:9]`` with ⬅️ 上一页 + 3/3 + 房源详情 exit.
+    """
+    from v3_core.user_bot.callback_router import CallbackRouter
+
+    gallery = _write_photos(tmp_path, 9)
+    cover = tmp_path / "cover.jpg"
+    cover.write_bytes(b"COVER")
+    view = _entry_view(gallery=gallery, cover_path=str(cover))
+    inventory = MemoryPublishedInventory(view)
+    listings = PublicListingFlowService(PublicRouteService(inventory))
+    router = CallbackRouter(
+        listings=listings,
+        search_sessions=SimpleNamespace(
+            navigate=lambda *_a, **_k: SimpleNamespace(status="ok", card=None)
+        ),
+    )
+
+    # Page 1
+    result_p1 = router.dispatch(
+        "v3u:listing:photos:QL-RF-A2B3:pg:1",
+        source="listing_callback",
+    )
+    assert result_p1.status == "ok"
+    assert result_p1.action == "photos"
+    photos_p1 = result_p1.listing.photos
+    assert photos_p1 is not None
+    assert photos_p1.photo_total == 9
+    # Page 1: 4 raw originals gallery[4:8], no cover.
+    assert len(photos_p1.media_groups[0]) == 4
+    assert [str(p) for p in photos_p1.media_groups[0]] == gallery[4:8]
+    # Paging row: ⬅️ 上一页 + 2/3 + 下一页 ➡️.
+    flat_labels_p1 = [a.label for row in photos_p1.action_rows for a in row]
+    assert "⬅️ 上一页" in flat_labels_p1
+    assert "下一页 ➡️" in flat_labels_p1
+    assert "2/3" in flat_labels_p1
+
+    # Page 2: last 1 frame, only ⬅️, exit button.
+    result_p2 = router.dispatch(
+        "v3u:listing:photos:QL-RF-A2B3:pg:2",
+        source="listing_callback",
+    )
+    assert result_p2.status == "ok"
+    photos_p2 = result_p2.listing.photos
+    assert photos_p2 is not None
+    # Page 2: 1 trailing raw original gallery[8:9], no cover.
+    assert [str(p) for p in photos_p2.media_groups[0]] == gallery[8:9]
+    flat_labels_p2 = [a.label for row in photos_p2.action_rows for a in row]
+    assert "⬅️ 上一页" in flat_labels_p2
+    assert "下一页 ➡️" not in flat_labels_p2
+    assert "3/3" in flat_labels_p2
+    assert "📷 房源详情" in flat_labels_p2
+
+    # And the legacy expander never appears in any keyboard.
+    assert "📷 更多实拍" not in flat_labels_p1
+    assert "📷 更多实拍" not in flat_labels_p2
+    # Cover render excluded from every page's media.
+    cover_str = str(cover)
+    for group in (photos_p1.media_groups[0], photos_p2.media_groups[0]):
+        assert cover_str not in {str(p) for p in group}
