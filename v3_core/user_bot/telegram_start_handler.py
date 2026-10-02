@@ -26,7 +26,11 @@ from .public_flow import PublicListingFlowResult, PublicListingFlowService
 from .search_no_match_view import build_search_no_match_view
 from .search_query import SearchCriteria
 from .search_submit_executor import SearchSubmitExecutor
-from .telegram_callback_handler import LISTING_SOURCE_KEY, LISTING_TOUCHPOINT_KEY
+from .telegram_callback_handler import (
+    LISTING_SOURCE_KEY,
+    LISTING_TOUCHPOINT_KEY,
+    remember_photos_album,
+)
 from .telegram_assurance_handler import build_assurance_keyboard
 from .telegram_home_ui import build_home_keyboard
 from .telegram_navigation import advisor_handoff_url, polish_listing_keyboard
@@ -256,7 +260,7 @@ async def _render_photos(
             advisor_url=advisor_url,
             channel_url=channel_url,
         )
-    await send_listing_photos_album(
+    sent_ids = await send_listing_photos_album(
         context.bot,
         chat_id=_chat_id(update),
         media_groups=photos.media_groups,
@@ -266,6 +270,14 @@ async def _render_photos(
         reply_markup=keyboard,
         expand_only=bool(getattr(photos, "expand_only", False)),
     )
+    if not bool(getattr(photos, "expand_only", False)):
+        remember_photos_album(
+            update,
+            context,
+            str(getattr(result, "public_listing_id", "") or ""),
+            message_ids=list(sent_ids),
+            page=0,
+        )
 
 
 def _support_keyboard(*, advisor_url: str = "", channel_url: str = "") -> InlineKeyboardMarkup:
