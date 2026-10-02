@@ -54,7 +54,7 @@ class PublicDetailsResponse:
 
 @dataclass(frozen=True)
 class PublicPhotosResponse:
-    """Native album payload + separate status/action message.
+    """Single preview payload; expand_only carries original Telegram media.
 
     ``expand_only`` means the user already saw the first batch and only remaining
     frames should be sent (no second action keyboard).
@@ -162,7 +162,8 @@ def _photo_actions(
             first.append(SemanticAction("📅 预约看房", "book", target))
         return (
             tuple(first),
-            (SemanticAction("💬 中文顾问", "consult", target),),
+            (SemanticAction("💬 咨询这套", "consult", target),),
+            (SemanticAction("⬅️ 返回房源", "details", target),),
         )
 
     if status == "pending":
@@ -179,10 +180,7 @@ def _photo_actions(
         first_row.append(SemanticAction("💬 中文顾问", "consult", target))
         return (
             tuple(first_row),
-            (
-                SemanticAction("🏠 帮我找房", "change_search", target),
-                SemanticAction("🔍 找相似", "similar", target),
-            ),
+            (SemanticAction("⬅️ 返回房源", "details", target),),
         )
 
     # rented / offline / inactive / withdrawn / unknown non-bookable
@@ -512,25 +510,24 @@ def _album_media_caption(
     return f"📷 实拍相册{chr(10)}共 {shown} 张{chr(10)}{public_listing_id}"
 
 
-def _photos_action_text(details) -> str:
-    """Compact status bar under the album — no explanatory fluff."""
-    lines = [_detail_status_line(details)]
-    subject = " · ".join(
-        part
-        for part in (
-            str(details.property_type or details.project_name or "").strip(),
+def _photos_action_text(details, *, total: int) -> str:
+    """One-message photo-preview caption."""
+    lines = [f"📷 <b>实拍｜共{max(0, int(total))}张</b>"]
+    subject = "｜".join(
+        part for part in (
+            str(details.property_type or "").strip(),
             str(details.layout or "").strip(),
-        )
-        if part
+        ) if part
     )
     if subject:
         lines.append(f"🏠 {he(subject)}")
-    location = str(details.location or "").strip()
+    location = str(details.location or details.project_name or "").strip()
     if location:
         lines.append(f"📍 {he(location)}")
     price = _format_price(details.monthly_rent_usd)
     if price:
-        lines.append(f"💰 {he(price)}")
+        lines.append(f"💵 {he(price)}")
+    lines.append(_detail_status_line(details).replace("当前", "").replace("房态", "").strip())
     return chr(10).join(lines)
 
 
@@ -613,25 +610,15 @@ def build_photos_response(
             expand_only=True,
         )
 
-    # Public photos open as native Telegram originals. Keep collage rendering
-    # available for other surfaces, but never hide the real-photo entry point.
-    if total > PHOTOS_FIRST_BATCH:
-        batch = all_photos[:PHOTOS_FIRST_BATCH]
-        has_more = True
-    else:
-        batch = all_photos
-        has_more = False
-
-    groups = _as_media_groups(batch)
-    first = batch[0] if batch else ""
+    # First screen is one independent Pillow thumbnail preview, not an album.
+    batch = all_photos[:PHOTOS_FIRST_BATCH]
+    has_more = total > 0
+    preview = _try_side_collage(batch, public_listing_id=details.public_listing_id)
+    groups = ()
+    first = preview or (batch[0] if batch else "")
     if batch:
-        caption = _album_media_caption(
-            public_listing_id=details.public_listing_id,
-            shown=len(batch),
-            total=total,
-            expand=False,
-        )
-        text = _photos_action_text(details)
+        caption = ""
+        text = _photos_action_text(details, total=total)
     else:
         caption = ""
         text = (
