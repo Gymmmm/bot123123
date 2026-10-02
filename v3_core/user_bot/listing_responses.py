@@ -118,7 +118,7 @@ def _details_actions(
     if bookable:
         return (
             (
-                SemanticAction("📅 在线预约", "book", target),
+                SemanticAction("📅 预约看房", "book", target),
                 SemanticAction("💬 咨询这套", "consult", target),
             ),
             (SemanticAction("🔍 找相似", "similar", target),),
@@ -160,13 +160,13 @@ def _photo_actions(
                 target,
                 target_index=0,
             )
-        return SemanticAction("📷 房源详情", "details", target)
+        return SemanticAction("📋 房源详情", "details", target)
 
     if bookable or status in {"active", "reserved"}:
         # Book button only when unified bookable is true.
         first: list[SemanticAction] = [_more_or_details()]
         if bookable:
-            first.append(SemanticAction("📅 在线预约", "book", target))
+            first.append(SemanticAction("📅 预约看房", "book", target))
         return (
             tuple(first),
             (SemanticAction("💬 咨询这套", "consult", target),),
@@ -187,7 +187,7 @@ def _photo_actions(
         return (
             tuple(first_row),
             (
-                SemanticAction("🏠 帮我找房", "change_search", target),
+                SemanticAction("🔍 继续找房", "change_search", target),
                 SemanticAction("🔍 找相似", "similar", target),
             ),
         )
@@ -195,7 +195,7 @@ def _photo_actions(
     # rented / offline / inactive / withdrawn / unknown non-bookable
     return (
         (
-            SemanticAction("🏠 帮我找房", "change_search", target),
+            SemanticAction("🔍 继续找房", "change_search", target),
             SemanticAction("🔍 找相似", "similar", target),
         ),
         (SemanticAction("💬 咨询这套", "consult", target),),
@@ -602,85 +602,9 @@ def _photos_page_action_text(
     total_pages: int,
     total: int,
 ) -> str:
-    """Complete, fact-only card shown below one page of original photos.
-
-    Paged-album spec (2026-10-03 fix):
-
-    📷 实拍房源 <公开ID>
-    第 N/M 页 · 共 X 张
-
-    <项目>｜<户型>  <真实房态>
-
-    💵 <租金>/月
-    📍 <项目或位置>
-    🏠 <户型>
-    📐 <面积>
-    🏢 <楼层>
-    💰 <付款/押金>
-    💡 <真实费用说明>
-
-    Only the real Publisher-frozen adviser copy is shown via 「💬 侨联说」.
-    Missing fields are dropped from the card entirely — no "待确认" placeholder,
-    no fabricated values, no leaked internal IDs beyond the public_listing_id
-    already in the header.
-    """
-    project = str(details.project_name or "").strip()
-    location = str(details.location or "").strip()
-    layout = str(details.layout or "").strip()
-    identity = project or location or str(details.property_type or "").strip()
-    status_text = _status_label_for(details)
-    public_id = str(details.public_listing_id or "").strip()
-
-    header_id = public_id or "实拍"
-    lines: list[str] = [
-        f"📷 实拍房源 {he(header_id)}",
-        f"第 {page + 1}/{total_pages} 页 · 共 {total} 张",
-    ]
-
-    headline = "｜".join(part for part in (identity, layout) if part)
-    headline_block = "  ".join(part for part in (headline, status_text) if part)
-    if headline_block:
-        lines.append("")
-        lines.append(he(headline_block))
-
-    price = _format_price(details.monthly_rent_usd)
-    if price:
-        lines.append("")
-        lines.append(f"💵 {he(price)}")
-
-    for icon, value in (
-        ("📍", location),
-        ("🏠", layout),
-        ("📐", _format_size(details.size_sqm)),
-        ("🏢", display_floor(details.floor)),
-        ("💰", str(details.deposit_terms or "").strip()),
-    ):
-        if value:
-            lines.append(f"{icon} {he(value)}")
-
-    fee_parts: list[str] = []
-    management = str(details.management_fee or "").strip()
-    utilities = _utilities_line(
-        water=str(details.water_rate or "").strip(),
-        electric=str(details.electric_rate or "").strip(),
-    )
-    if management:
-        fee_parts.append(management)
-    if utilities:
-        fee_parts.append(utilities)
-    if fee_parts:
-        lines.append(f"💡 {he('｜'.join(fee_parts))}")
-
-    notes = _adviser_copy_for_view(view)
-    if notes:
-        lines.append("")
-        lines.append("💬 <b>侨联说</b>")
-        for line in notes.splitlines():
-            cleaned = str(line or "").strip()
-            if cleaned:
-                lines.append(he(cleaned))
-    return chr(10).join(lines).strip()
-
+    """Compact action card below the native album; page info stays in caption."""
+    del view, page, total_pages, total
+    return _photos_action_text(details)
 
 def _try_side_collage(
     photos: tuple[str, ...],
@@ -837,14 +761,10 @@ def _photos_page_caption(
     start: int,
     end: int,
 ) -> str:
-    shown = max(0, end - start)
-    if shown <= 0 or total <= 0:
-        return f"📷 实拍{chr(10)}暂无图片{chr(10)}{public_listing_id}"
-    return (
-        f"📷 实拍 {public_listing_id}{chr(10)}"
-        f"第 {page + 1}/{total_pages} 页 · 共 {total} 张{chr(10)}"
-        f"本页 {start + 1}–{end}"
-    )
+    del public_listing_id, start, end
+    if total <= 0:
+        return "📷 房源实拍 · 暂无图片"
+    return f"📷 房源实拍 · 第 {page + 1}/{total_pages} 页 · 共 {total} 张"
 
 
 def build_photos_page_response(
@@ -957,37 +877,29 @@ def _photo_page_actions(
     bookable: bool,
     inventory_status: str,
 ) -> tuple[tuple[SemanticAction, ...], ...]:
-    """Album paging keyboard: single row ⬅️ 上一页｜N/total｜下一页 ➡️ + book/consult/exit.
-
-    First page hides ⬅️; last page hides 下一页➡️ and falls back to a no-op
-    "·N/total·" so the page counter still appears. The bookable row stays
-    consistent with ``_photo_actions`` so behavior never silently diverges.
-    """
+    """Photo controls: navigation only when needed, then clear listing actions."""
     target = str(public_listing_id or "").strip()
     safe_page = max(0, min(int(page or 0), max(total_pages - 1, 0)))
     status = str(inventory_status or "").strip().lower()
     can_book = bool(bookable) or status in {"active", "reserved"}
 
+    rows: list[tuple[SemanticAction, ...]] = []
     paging: list[SemanticAction] = []
     if safe_page > 0:
-        paging.append(
-            SemanticAction("⬅️ 上一页", "photos", target, target_index=safe_page - 1)
-        )
-    paging.append(SemanticAction(f"{safe_page + 1}/{total_pages}", "photos", target, target_index=safe_page))
+        paging.append(SemanticAction("⬅️ 上一页", "photos", target, target_index=safe_page - 1))
     if safe_page + 1 < total_pages:
-        paging.append(
-            SemanticAction("下一页 ➡️", "photos", target, target_index=safe_page + 1)
-        )
+        paging.append(SemanticAction("下一页 ➡️", "photos", target, target_index=safe_page + 1))
+    if paging:
+        rows.append(tuple(paging))
 
-    rows: list[tuple[SemanticAction, ...]] = [tuple(paging)]
-
-    book_row: list[SemanticAction] = []
+    primary: list[SemanticAction] = [SemanticAction("📋 房源详情", "details", target)]
     if can_book:
-        book_row.append(SemanticAction("📅 在线预约", "book", target))
-    book_row.append(SemanticAction("💬 咨询这套", "consult", target))
-    rows.append(tuple(book_row))
-    rows.append((SemanticAction("⬅️ 返回房源", "details", target),))
-
+        primary.append(SemanticAction("📅 预约看房", "book", target))
+    rows.append(tuple(primary))
+    rows.append((
+        SemanticAction("💬 咨询这套", "consult", target),
+        SemanticAction("🔍 找相似", "similar", target),
+    ))
     return tuple(rows)
 
 
