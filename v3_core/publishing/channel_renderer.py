@@ -125,7 +125,7 @@ def render_channel_caption(*, listing: dict[str, Any], offer: dict[str, Any], pu
     property_bits = [value for value in (property_type, size, floor) if value]
     deposit = _clean(offer.get("payment_terms") or offer.get("deposit_terms"), 20)
     contract = _normalize_contract(offer.get("contract_term"))
-    deposit_contract = "｜".join(value for value in (deposit, contract) if value)
+    deposit_contract = "｜".join(value for value in (deposit, contract) if value) if "别墅" in property_type else ""
     effective_status = str(status if status is not None else listing.get("inventory_status") or "pending")
     sections: list[str] = []
     top_lines = [f"🏡 {heading_line}"]
@@ -140,10 +140,6 @@ def render_channel_caption(*, listing: dict[str, Any], offer: dict[str, Any], pu
     if fact_lines:
         sections.append("\n".join(fact_lines))
     sections.append(_status_line(effective_status, public_id))
-    tags = [_hashtag(area), _hashtag(_layout_tag(raw_layout, property_type)), _hashtag(_price_tag(amount))]
-    tags = [tag for tag in tags if tag]
-    if tags:
-        sections.append(" ".join(tags))
     return "\n\n".join(sections).strip()[:1024]
 
 
