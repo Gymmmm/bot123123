@@ -58,6 +58,9 @@ def test_p16_aftercare_copy_buttons_and_coordination_callbacks_locked():
         "v3u:service:repair",
         "v3u:service:coordination",
         "v3u:service:billing",
+        "v3u:service:moving",
+        "v3u:service:cleaning",
+        "v3u:service:network_help",
         "v3u:service:general",
         "v3u:home:service",
     ]
