@@ -545,7 +545,7 @@ def test_paged_album_buttons_include_prev_page_next_only_when_multi_page(tmp_pat
     assert "1/3" not in flat0
     # Make sure the three controls sit on a single inline-keyboard row.
     first_inline_row = single_inline_row(first_page)
-    assert first_inline_row and set(first_inline_row) == {"1/3", "下一页 ➡️"} | set()
+    assert first_inline_row == ["下一页 ➡️"]
 
     mid_page = build_photos_page_response(multi_view, page=1)
     flat1 = [a.label for row in mid_page.action_rows for a in row]
