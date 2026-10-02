@@ -120,9 +120,7 @@ def render_channel_caption(*, listing: dict[str, Any], offer: dict[str, Any], pu
     except (TypeError, ValueError):
         amount = 0
     price_text = f"${amount:,}" + ("/月" if offer_type == "rent" else "") if amount > 0 else ""
-    size = _display_size(listing.get("size_sqm") or listing.get("size"))
-    floor = _clean(display_floor(_clean(listing.get("floor"), 16), property_type), 18)
-    property_bits = [value for value in (property_type, size, floor) if value]
+    property_bits = [property_type] if "别墅" in property_type else []
     deposit = _clean(offer.get("payment_terms") or offer.get("deposit_terms"), 20)
     contract = _normalize_contract(offer.get("contract_term"))
     deposit_contract = "｜".join(value for value in (deposit, contract) if value) if "别墅" in property_type else ""
