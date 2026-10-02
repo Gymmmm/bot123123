@@ -65,11 +65,11 @@ def test_p16_aftercare_copy_buttons_and_coordination_callbacks_locked():
         "v3u:home:service",
     ]
     assert not any(callback.startswith("v3u:service:property") for callback in callbacks)
-    # Migration / cleaning / moving / network are intentionally absent in the
-    # locked copy — Section 9 keeps only descriptive naming until the
-    # underlying capability is signed off.
-    for blocked in ("v3u:service:utilities", "v3u:service:moving", "v3u:service:cleaning", "v3u:service:network_help"):
-        assert blocked not in callbacks
+    # Public labels route to the already-supported service handlers.
+    assert "v3u:service:billing" in callbacks
+    assert "v3u:service:moving" in callbacks
+    assert "v3u:service:cleaning" in callbacks
+    assert "v3u:service:network_help" in callbacks
 
 
 def test_p20_repair_copy_buttons_and_callbacks_locked():
