@@ -7,9 +7,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 CANVAS = (1080, 1350)
 GUTTER = 8
-BOTTOM_TOP = 858
-BOTTOM_HEIGHT = 492
-FONT_CANDIDATES = (
+INFO_TOP = 820\nINFO_HEIGHT = 150\nTHUMBS_TOP = 978\nTHUMBS_HEIGHT = 278\nBRAND_TOP = 1264\nBRAND_HEIGHT = 86\nFONT_CANDIDATES = (
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
     "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
