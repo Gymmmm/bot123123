@@ -536,3 +536,59 @@ async def test_photos_paging_deletes_prior_4_frames_and_old_card_then_sends_new_
     new_ids = list(state["message_ids"])
     assert len(new_ids) == 5
     assert set(new_ids).isdisjoint(set(prior_ids))
+
+
+@pytest.mark.asyncio
+async def test_first_photos_entry_without_pg_suffix_is_remembered_for_next_page(tmp_path):
+    """Real 查看实拍 entry must be tracked before the first 下一页 press."""
+    frames = []
+    for index in range(8):
+        path = tmp_path / f"real_entry_{index}.jpg"
+        path.write_bytes(b"jpg")
+        frames.append(str(path))
+
+    def _dispatch(raw: str, page: int) -> CallbackDispatchResult:
+        return CallbackDispatchResult(
+            status="ok",
+            callback=parse_callback(raw),
+            action="photos",
+            listing=PublicListingFlowResult(
+                status="ok",
+                action="photos",
+                public_listing_id="QL-RF-A2B3",
+                photos=PublicPhotosResponse(
+                    media_groups=(tuple(frames[page * 4:(page + 1) * 4]),),
+                    text=f"第 {page + 1}/2 页 · 共 8 张",
+                    media_caption=f"实拍 {page + 1}/2",
+                    photo_path=frames[page * 4],
+                    photo_total=8,
+                    action_rows=((SemanticAction("⬅️ 返回房源", "details", "QL-RF-A2B3"),),),
+                ),
+            ),
+        )
+
+    ctx = _context()
+    first_raw = "v3u:listing:photos:QL-RF-A2B3"
+    await handle_v3_callback(
+        _update(FakeQuery(first_raw)),
+        ctx,
+        router=RouterStub(_dispatch(first_raw, 0)),
+    )
+    prior_ids = list(ctx.bot.returned_ids)
+    assert len(prior_ids) == 5
+    assert ctx.user_data[PHOTOS_ALBUM_KEY]["12345::QL-RF-A2B3"]["message_ids"] == [
+        str(value) for value in prior_ids
+    ]
+
+    next_raw = "v3u:listing:photos:QL-RF-A2B3:pg:1"
+    await handle_v3_callback(
+        _update(FakeQuery(next_raw)),
+        ctx,
+        router=RouterStub(_dispatch(next_raw, 1)),
+    )
+    deleted = [
+        call[1]["message_id"]
+        for call in ctx.bot.calls
+        if call[0] == "delete_message"
+    ]
+    assert deleted == prior_ids
