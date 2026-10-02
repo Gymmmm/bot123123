@@ -20,7 +20,9 @@ from .public_inventory import PublishedListingView
 
 
 # First screen album size; remaining frames (if any) expand on demand.
-# Preview selection count is property-aware (apartment 3 / villa 4).\nPHOTOS_FIRST_BATCH = 4\nPHOTOS_PAGE_SIZE = 4
+# Preview selection count is property-aware (apartment 3 / villa 4).
+PHOTOS_FIRST_BATCH = 4
+PHOTOS_PAGE_SIZE = 4
 # Hard cap for one listing photos view (first batch + expand).
 PHOTOS_MAX_TOTAL = 10
 
