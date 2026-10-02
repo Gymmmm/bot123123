@@ -145,6 +145,10 @@ def test_legacy_missing_layout_exception_reenters_worker_once(tmp_path):
     review_id = result.review_ids[0]
     with sqlite3.connect(db) as conn:
         conn.execute(
+            "INSERT INTO listing_identity_reservations_v3(listing_id,public_id,canonical_record_id) VALUES (?,?,?)",
+            ("l_900", "QL-PP-C8D8", str(canonical["canonical_record_id"])),
+        )
+        conn.execute(
             "UPDATE canonical_records SET created_at='2026-09-30 00:00:00' WHERE canonical_record_id=?",
             (str(canonical["canonical_record_id"]),),
         )
