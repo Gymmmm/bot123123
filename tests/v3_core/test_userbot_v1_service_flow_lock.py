@@ -48,7 +48,9 @@ def test_p16_aftercare_copy_buttons_and_coordination_callbacks_locked():
     )
     assert _rows(view) == [
         ["🔧 房屋报修", "🏢 物业协调"],
-        ["🔌 账单协助", "❓ 其他住房问题"],
+        ["🔌 账单协助", "🚚 搬家服务"],
+        ["🧹 保洁服务", "🌐 网络办理"],
+        ["❓ 其他住房问题"],
         ["⬅️ 返回侨联服务"],
     ]
     callbacks = _callbacks(view)
