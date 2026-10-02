@@ -41,9 +41,16 @@ class CoverRenderData:
         raw = str(self.price or "").strip()
         if not raw:
             return ""
-        negotiable = raw in {"售价面议", "租金面议", "价格面议", "面议"}
-        price = raw if raw.startswith("$") or negotiable else "$" + raw
-        return price + "/月" if str(self.deal_type or "rent").lower() == "rent" and not negotiable else price
+        if raw in {"售价面议", "租金面议", "价格面议", "面议"}:
+            return raw
+        numeric = raw.replace("$", "").replace(",", "").replace("/月", "").strip()
+        try:
+            amount = float(numeric)
+            shown = f"{int(amount):,}" if amount.is_integer() else f"{amount:,.2f}".rstrip("0").rstrip(".")
+            price = "$" + shown
+        except (TypeError, ValueError):
+            price = raw if raw.startswith("$") else "$" + raw
+        return price + "/月" if str(self.deal_type or "rent").lower() == "rent" else price
 
 def _display_size(value: Any) -> str:
     text = str(value or "").strip().replace("平方米", "㎡").replace("平米", "㎡")
