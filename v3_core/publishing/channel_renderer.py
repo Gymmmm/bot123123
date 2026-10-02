@@ -75,7 +75,7 @@ def _layout_tag(value: Any, property_type: Any = "") -> str:
     if raw == "单间":
         return "单间"
     match = re.search(r"\\d+(?:[+＋]\\d+)?房", raw)
-    return match.group(0) if match else raw
+    return match.group(0).replace("+", "加").replace("＋", "加") if match else raw
 
 
 def _price_tag(amount: int) -> str:
