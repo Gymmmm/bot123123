@@ -140,7 +140,7 @@ def test_deeplink_photos_routes_to_paged_album_page_zero_raw_only(tmp_path):
     assert "📷 更多实拍" not in labels
 
     # ⬅️ 返回房源 replaces 📋 房源详情; consult is "咨询这套" (2026-10-03).
-    assert "📋 房源详情" not in labels
+    assert "📋 房源详情" in labels
     assert "📋 房源详情" in labels
     assert "📅 预约看房" in labels
     assert "💬 咨询这套" in labels
@@ -428,7 +428,7 @@ async def test_entry_integration_nine_photos_opens_page_zero_raw_only_via_start(
     assert "⬅️ 上一页" not in keyboard_text
     # Legacy expander gone, exit + book + advisor stay reachable.
     assert "📷 更多实拍" not in keyboard_text
-    assert "📋 房源详情" not in keyboard_text
+    assert "📋 房源详情" in keyboard_text
     assert "⬅️ 返回房源" in keyboard_text
     assert "📅 预约看房" in keyboard_text
     assert "💬 咨询这套" in keyboard_text
@@ -495,7 +495,7 @@ async def test_entry_integration_pagination_through_callback_router_4_4_1(tmp_pa
     assert "⬅️ 上一页" in flat_labels_p2
     assert "下一页 ➡️" not in flat_labels_p2
     assert "3/3" not in flat_labels_p2
-    assert "📋 房源详情" not in flat_labels_p2
+    assert "📋 房源详情" in flat_labels_p2
     assert "📋 房源详情" in flat_labels_p2
 
     # And the legacy expander never appears in any keyboard.
