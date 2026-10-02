@@ -256,11 +256,23 @@ async def _render_photos(
             advisor_url=advisor_url,
             channel_url=channel_url,
         )
+    if not bool(getattr(photos, "expand_only", False)):
+        preview = Path(str(getattr(photos, "photo_path", "") or ""))
+        if preview.is_file():
+            with preview.open("rb") as handle:
+                await context.bot.send_photo(
+                    chat_id=_chat_id(update),
+                    photo=handle,
+                    caption=photos.text,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=keyboard,
+                )
+            return
     await send_listing_photos_album(
         context.bot,
         chat_id=_chat_id(update),
         media_groups=photos.media_groups,
-        media_caption=str(getattr(photos, "media_caption", "") or ""),
+        media_caption="",
         photo_path=str(getattr(photos, "photo_path", "") or ""),
         text=photos.text,
         reply_markup=keyboard,
