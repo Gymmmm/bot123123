@@ -204,13 +204,7 @@ def test_channel_caption_matches_final_format_and_hides_internal_ids():
         status="active",
     )
     assert text.splitlines() == [
-        "🏡 公寓｜2房2卫",
-        "📍 炳发城",
-        "💵 $800/月",
-        "🔑 押一付一｜一年起租",
-        "🟢 可预约",
-        "",
-        "QL-PP-A2B3",
+        "🏡 公寓｜2房2卫", "📍 炳发城", "💵 $800/月", "🔑 押一付一｜一年起租", "🟢 可预约", "", "QL-PP-A2B3",
     ]
     assert "95㎡" not in text and "19楼" not in text
     assert "#" not in text
@@ -500,8 +494,6 @@ def test_invalid_link_copy_is_exact_and_has_three_recovery_buttons():
 
     message = Message()
     asyncio.run(_render_invalid_link(message))
-    assert message.text == "⚠️ <b>这套房的信息已经更新</b>
-
-可以重新查看最新房源，或让中文顾问继续帮你找。"
+    assert message.text == "⚠️ <b>这套房的信息已经更新</b>\n\n可以重新查看最新房源，或让中文顾问继续帮你找。"
     labels = [button.text for row in message.markup.inline_keyboard for button in row]
     assert labels == ["🔍 开始找房", "💬 中文顾问", "⬅️ 返回首页"]
