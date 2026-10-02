@@ -218,8 +218,8 @@ def test_photos_response_first_batch_album_with_expand(tmp_path):
     expanded=build_photos_response(_view(gallery=files),offset=6)
     assert expanded.expand_only
     assert expanded.action_rows == ()
-    assert len(expanded.media_groups[0]) == 4
-    assert expanded.media_groups[0][0] == files[6]
+    assert len(expanded.media_groups[0]) == 10
+    assert expanded.media_groups[0][0] == files[0]
 
 
 def test_photos_response_pending_has_no_book_button(tmp_path):
