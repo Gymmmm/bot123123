@@ -220,8 +220,10 @@ def test_start_property_photos_dl_drops_user_into_4_raw_originals_not_cover(tmp_
 
     # Exit / book / consultant links remain reachable through the album.
     # 2026-10-03 fix: ⬅️ 返回房源 replaces 📋 房源详情; consult is "咨询这套".
-    assert "📋 房源详情" not in labels\n    assert "⬅️ 返回房源" in labels
-    assert "📋 房源详情" not in labels\n    assert "⬅️ 返回房源" in labels
+    assert "📋 房源详情" not in labels
+    assert "⬅️ 返回房源" in labels
+    assert "📋 房源详情" not in labels
+    assert "⬅️ 返回房源" in labels
     assert "📅 预约看房" in labels
     assert "💬 咨询这套" in labels
     assert "💬 中文顾问" not in labels
@@ -321,8 +323,10 @@ def test_start_property_photos_dl_keyboard_has_prev_page_count_next(tmp_path):
     # 2026-10-03 fix: ⬅️ 返回房源 replaces 📋 房源详情; consult is "咨询这套".
     for page in (page0, page1, page2):
         flat_labels = _labels(page.photos)
-        assert "📋 房源详情" not in flat\n    assert "⬅️ 返回房源" in flat_labels
-        assert "📋 房源详情" not in flat\n    assert "⬅️ 返回房源" in flat_labels
+        assert "📋 房源详情" not in flat
+    assert "⬅️ 返回房源" in flat_labels
+        assert "📋 房源详情" not in flat
+    assert "⬅️ 返回房源" in flat_labels
         assert "📅 预约看房" in flat_labels
         assert "💬 咨询这套" in flat_labels
         assert "💬 中文顾问" not in flat_labels
@@ -373,7 +377,8 @@ def test_start_property_photos_dl_collage_path_unreachable_from_route():
 
     src = Path(flow_mod.__file__).read_text(encoding="utf-8")
     # Deep-link wrapper auto-forwards page 0 for any photos route.
-    assert "photo_page = (\n            0" in src or "photo_page = (0" in src
+    assert "photo_page = (
+            0" in src or "photo_page = (0" in src
     # The paged builder is the real entry. The legacy builder is wired but
     # only via _render's offset branch, never through resolve().
     assert "build_photos_page_response(" in src
