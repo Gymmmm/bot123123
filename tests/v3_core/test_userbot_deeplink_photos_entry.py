@@ -237,8 +237,7 @@ def test_deeplink_photos_collage_path_is_unreachable_from_start_route():
     src = Path(flow_mod.__file__).read_text(encoding="utf-8")
     # PublicListingFlowService.resolve must always forward photo_page=0 for
     # the photos action, so _render never falls back to build_photos_response.
-    assert "photo_page = (
-            0" in src or "photo_page = (0" in src
+    assert "photo_page = (\n            0" in src or "photo_page = (0" in src
     # The deep-link wrapper (resolve) is now the only entry that auto-sets
     # page 0; the cover/collage branch lives behind the explicit _render
     # ``else`` branch which is unreachable from ``resolve()``.
@@ -499,9 +498,9 @@ async def test_entry_integration_pagination_through_callback_router_4_4_1(tmp_pa
     assert "⬅️ 上一页" in flat_labels_p2
     assert "下一页 ➡️" not in flat_labels_p2
     assert "3/3" in flat_labels_p2
-    assert "📋 房源详情" not in flat
+    assert "📋 房源详情" not in flat_labels_p2
     assert "⬅️ 返回房源" in flat_labels_p2
-    assert "📋 房源详情" not in flat
+    assert "📋 房源详情" not in flat_labels_p2
     assert "⬅️ 返回房源" in flat_labels_p2
 
     # And the legacy expander never appears in any keyboard.
