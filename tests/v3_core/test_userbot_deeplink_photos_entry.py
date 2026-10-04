@@ -432,7 +432,6 @@ async def test_entry_integration_nine_photos_opens_page_zero_raw_only_via_start(
     assert "📷 更多实拍" not in keyboard_text
     assert "📋 房源详情" not in keyboard_text
     assert "⬅️ 返回房源" in keyboard_text
-    assert "⬅️ 返回房源" not in keyboard_text
     assert "📅 预约看房" in keyboard_text
     assert "💬 咨询这套" in keyboard_text
     # Privacy: internal listing_id never leaks to the bot.
