@@ -534,7 +534,8 @@ def test_paged_album_buttons_include_prev_page_next_only_when_multi_page(tmp_pat
     assert "下一页 ➡️" not in flat
     assert "⬅️ 上一页" not in flat
     # 2026-10-03 fix: ⬅️ 返回房源 replaces 📋 房源详情 in the paged album.
-    assert "📋 房源详情" not in flat\n    assert "⬅️ 返回房源" in flat
+    assert "📋 房源详情" not in flat
+    assert "⬅️ 返回房源" in flat
 
     multi_view = _view_with_files(body)
     first_page = build_photos_page_response(multi_view, page=0)
@@ -559,8 +560,10 @@ def test_paged_album_buttons_include_prev_page_next_only_when_multi_page(tmp_pat
     flat2 = [a.label for row in last_page.action_rows for a in row]
     assert "⬅️ 上一页" in flat2
     assert "下一页 ➡️" not in flat2
-    assert "📋 房源详情" not in flat\n    assert "⬅️ 返回房源" in flat2
-    assert "📋 房源详情" not in flat\n    assert "⬅️ 返回房源" in flat2
+    assert "📋 房源详情" not in flat
+    assert "⬅️ 返回房源" in flat2
+    assert "📋 房源详情" not in flat
+    assert "⬅️ 返回房源" in flat2
 
 
 def test_paged_album_is_idempotent_on_same_page(tmp_path):
