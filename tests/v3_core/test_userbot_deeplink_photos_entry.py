@@ -132,7 +132,7 @@ def test_deeplink_photos_routes_to_paged_album_page_zero_raw_only(tmp_path):
     actions = _actions(result.photos)
 
     # Paging row: 1/3 + 下一页 (no prev on first page).
-    assert "1/3" not in labels
+    assert "1/3" in labels
     assert "下一页 ➡️" in labels
     assert "⬅️ 上一页" not in labels
 
@@ -140,8 +140,8 @@ def test_deeplink_photos_routes_to_paged_album_page_zero_raw_only(tmp_path):
     assert "📷 更多实拍" not in labels
 
     # ⬅️ 返回房源 replaces 📋 房源详情; consult is "咨询这套" (2026-10-03).
-    assert "📋 房源详情" in labels
-    assert "📋 房源详情" in labels
+    assert "📋 房源详情" not in labels\n    assert "⬅️ 返回房源" in labels
+    assert "📋 房源详情" not in labels\n    assert "⬅️ 返回房源" in labels
     assert "📅 预约看房" in labels
     assert "💬 咨询这套" in labels
 
@@ -171,7 +171,7 @@ def test_deeplink_photos_page_one_returns_raw_slice_four_to_eight(tmp_path):
     assert _flatten(page1.photos.media_groups) == gallery[4:8]
     labels = _labels(page1.photos)
     assert labels[0] == "⬅️ 上一页"
-    assert "2/3" not in labels
+    assert "2/3" in labels
     assert "下一页 ➡️" in labels
 
 
@@ -191,7 +191,7 @@ def test_deeplink_photos_page_two_returns_last_raw_frame_with_prev_only(tmp_path
     assert _flatten(page2.photos.media_groups) == gallery[8:9]
     labels = _labels(page2.photos)
     assert "⬅️ 上一页" in labels
-    assert "3/3" not in labels
+    assert "3/3" in labels
     # Last page hides the "next" arrow to prevent overshoot.
     assert "下一页 ➡️" not in labels
 
@@ -213,7 +213,7 @@ def test_deeplink_photos_excludes_cover_named_assets_from_paging(tmp_path):
     assert flat == framed[0:4]
     # 5 frames → 2 pages, page 0 still pure originals.
     assert "下一页 ➡️" in _labels(result.photos)
-    assert "1/2" not in _labels(result.photos)
+    assert "1/2" in _labels(result.photos)
 
 
 def test_deeplink_photos_collage_path_is_unreachable_from_start_route():
@@ -423,12 +423,12 @@ async def test_entry_integration_nine_photos_opens_page_zero_raw_only_via_start(
     assert keyboard is not None
     keyboard_text = repr(keyboard)
     # Single-row paging: 1/3 + 下一页 ➡️ on first page, no ⬅️.
-    assert "1/3" not in keyboard_text
+    assert "1/3" in keyboard_text
     assert "下一页 ➡️" in keyboard_text
     assert "⬅️ 上一页" not in keyboard_text
     # Legacy expander gone, exit + book + advisor stay reachable.
     assert "📷 更多实拍" not in keyboard_text
-    assert "📋 房源详情" in keyboard_text
+    assert "📋 房源详情" not in keyboard_text\n    assert "⬅️ 返回房源" in keyboard_text
     assert "⬅️ 返回房源" not in keyboard_text
     assert "📅 预约看房" in keyboard_text
     assert "💬 咨询这套" in keyboard_text
@@ -479,7 +479,7 @@ async def test_entry_integration_pagination_through_callback_router_4_4_1(tmp_pa
     flat_labels_p1 = [a.label for row in photos_p1.action_rows for a in row]
     assert "⬅️ 上一页" in flat_labels_p1
     assert "下一页 ➡️" in flat_labels_p1
-    assert "2/3" not in flat_labels_p1
+    assert "2/3" in flat_labels_p1
 
     # Page 2: last 1 frame, only ⬅️, exit button.
     result_p2 = router.dispatch(
@@ -494,9 +494,9 @@ async def test_entry_integration_pagination_through_callback_router_4_4_1(tmp_pa
     flat_labels_p2 = [a.label for row in photos_p2.action_rows for a in row]
     assert "⬅️ 上一页" in flat_labels_p2
     assert "下一页 ➡️" not in flat_labels_p2
-    assert "3/3" not in flat_labels_p2
-    assert "📋 房源详情" in flat_labels_p2
-    assert "📋 房源详情" in flat_labels_p2
+    assert "3/3" in flat_labels_p2
+    assert "📋 房源详情" not in flat\n    assert "⬅️ 返回房源" in flat_labels_p2
+    assert "📋 房源详情" not in flat\n    assert "⬅️ 返回房源" in flat_labels_p2
 
     # And the legacy expander never appears in any keyboard.
     assert "📷 更多实拍" not in flat_labels_p1
