@@ -543,7 +543,7 @@ def test_paged_album_buttons_include_prev_page_next_only_when_multi_page(tmp_pat
     # Paging 2026-10-02 fix: ⬅️ 下一页 ➡️ on a single row + N/total counter.
     assert "⬅️ 上一页" not in flat0  # first page never shows ⬅️
     assert "下一页 ➡️" in flat0
-    assert "1/3" not in flat0
+    assert "1/3" in flat0
     # Make sure the three controls sit on a single inline-keyboard row.
     first_inline_row = single_inline_row(first_page)
     assert first_inline_row == ["下一页 ➡️"]
@@ -552,7 +552,7 @@ def test_paged_album_buttons_include_prev_page_next_only_when_multi_page(tmp_pat
     flat1 = [a.label for row in mid_page.action_rows for a in row]
     assert "⬅️ 上一页" in flat1
     assert "下一页 ➡️" in flat1
-    assert "2/3" not in flat1
+    assert "2/3" in flat1
     mid_inline_row = single_inline_row(mid_page)
     assert mid_inline_row == ["⬅️ 上一页", "下一页 ➡️"]
 
@@ -560,9 +560,9 @@ def test_paged_album_buttons_include_prev_page_next_only_when_multi_page(tmp_pat
     flat2 = [a.label for row in last_page.action_rows for a in row]
     assert "⬅️ 上一页" in flat2
     assert "下一页 ➡️" not in flat2
-    assert "📋 房源详情" not in flat
+    assert "📋 房源详情" not in flat2
     assert "⬅️ 返回房源" in flat2
-    assert "📋 房源详情" not in flat
+    assert "📋 房源详情" not in flat2
     assert "⬅️ 返回房源" in flat2
 
 
