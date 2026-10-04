@@ -20,73 +20,14 @@ class ServiceView:
     rows: tuple[tuple[ServiceChoice, ...], ...]
 
 
-def service_home_view() -> ServiceView:
-    return ServiceView(
-        kind="service_home",
-        text=(
-            "🛠 <b>入住服务</b>\n\n"
-            "房子定下来以后，入住和居住过程中需要处理的事情，可以从这里找侨联。"
-        ),
-        rows=(
-            (ServiceChoice("📋 入住交接留档", "v3u:assure:handover"), ServiceChoice("🚚 搬家协助", "v3u:assure:moving")),
-            (ServiceChoice("🔧 房屋问题报修", "v3u:service:repair"), ServiceChoice("🏢 物业沟通", "v3u:service:property")),
-            (ServiceChoice("📍 周边生活", "v3u:service:local"), ServiceChoice("💬 中文顾问", "v3u:home:contact")),
-            (ServiceChoice("⬅️ 返回首页", "v3u:t:home"),),
-        ),
-    )
 
 
-def repair_home_view() -> ServiceView:
-    return ServiceView(
-        kind="repair_home",
-        text="🔧 <b>报修与维护</b>\n\n请选择问题类型。下一步请发送文字说明问题。",
-        rows=(
-            (ServiceChoice("❄️ 空调", "v3u:service:issue:repair_ac"), ServiceChoice("🚿 热水 / 漏水", "v3u:service:issue:repair_water")),
-            (ServiceChoice("💡 灯具 / 电路", "v3u:service:issue:repair_power"), ServiceChoice("🔐 门锁 / 门禁", "v3u:service:issue:repair_door")),
-            (ServiceChoice("🧺 洗衣机", "v3u:service:issue:repair_washer"), ServiceChoice("🧊 冰箱", "v3u:service:issue:repair_fridge")),
-            (ServiceChoice("📶 网络", "v3u:service:issue:repair_network"), ServiceChoice("🪑 家具损坏", "v3u:service:issue:repair_furniture")),
-            (ServiceChoice("🔧 其他问题", "v3u:service:issue:repair_other"),),
-            (ServiceChoice("⬅️ 返回入住服务", "v3u:home:service"),),
-        ),
-    )
 
 
-def property_view() -> ServiceView:
-    return ServiceView(
-        kind="property",
-        text=(
-            "🏢 <b>物业沟通</b>\n\n"
-            "噪音、停车、门禁、公共区域、垃圾处理等需要物业协调的问题，可以联系中文顾问。\n\n"
-            "说明 <b>发生了什么 + 大概时间 + 是否已经联系过物业</b>，我们会协助整理并跟进。"
-        ),
-        rows=((ServiceChoice("💬 中文顾问", "v3u:home:contact"),), (ServiceChoice("⬅️ 返回入住服务", "v3u:home:service"),)),
-    )
 
 
-def issue_prompt_view(draft: ServiceRequestDraft) -> ServiceView:
-    urgent = draft.issue_key in {"repair_water", "repair_power", "repair_door"}
-    note = "\n\n如涉及持续漏水、断电或无法正常进出，请同时联系中文顾问。" if urgent else ""
-    return ServiceView(
-        kind="repair_issue",
-        text=(
-            f"🔧 <b>{he(draft.issue_label)}</b>\n\n"
-            "请直接发送文字说明问题。\n"
-            f"例如：<code>空调可以启动，但一直不制冷。</code>{note}"
-        ),
-        rows=((ServiceChoice("💬 中文顾问", "v3u:home:contact"),), (ServiceChoice("⬅️ 重新选择问题", "v3u:service:repair"),)),
-    )
 
 
-def slot_view(draft: ServiceRequestDraft) -> ServiceView:
-    return ServiceView(
-        kind="repair_slot",
-        text=f"✅ <b>问题已记录</b>\n\n{he(draft.detail[:500])}\n\n请选择方便处理的时间：",
-        rows=(
-            (ServiceChoice("今天内", "v3u:service:slot:today"), ServiceChoice("明天上午", "v3u:service:slot:tomorrow_am")),
-            (ServiceChoice("明天下午", "v3u:service:slot:tomorrow_pm"),),
-            (ServiceChoice("⬅️ 返回入住服务", "v3u:home:service"),),
-        ),
-    )
 
 
 def repair_success_view(*, urgent: bool) -> ServiceView:
@@ -117,29 +58,8 @@ def general_success_view(*, nearby: bool = False) -> ServiceView:
     return ServiceView(kind="general_success", text=text, rows=((ServiceChoice("⬅️ 返回入住服务", "v3u:home:service"),),))
 
 
-def local_life_view() -> ServiceView:
-    return ServiceView(
-        kind="local_life",
-        text=(
-            "🗺 <b>金边华人生活配套</b>\n\n"
-            "侨联逐步整理各区域常用生活信息：\n\n"
-            "• 中餐 / 夜宵\n"
-            "• 超市 / 送货 / 搬家\n"
-            "• 洗衣 / 保洁 / 维修\n"
-            "• 医院 / 药店\n"
-            "• 其他日常生活服务"
-        ),
-        rows=(
-            (ServiceChoice("🏙 富力城周边", "v3u:service:rfcity"),),
-            (ServiceChoice("📍 其他区域需求", "v3u:service:nearby_other"),),
-            (ServiceChoice("⬅️ 返回入住服务", "v3u:home:service"),),
-        ),
-    )
 
 
-def nearby_view() -> ServiceView:
-    view = local_life_view()
-    return ServiceView(kind="nearby", text=view.text, rows=view.rows)
 
 
 _RFCITY_FOOTER = (
@@ -160,18 +80,6 @@ _RFCITY_TEXTS = {
 }
 
 
-def rfcity_home_view() -> ServiceView:
-    return ServiceView(
-        kind="rfcity",
-        text="🏙 <b>富力城生活导航</b>\n\n选择分类查看已整理的商家联系方式。",
-        rows=(
-            (ServiceChoice("🍴 餐厅小吃", "v3u:service:rfcity:restaurant"), ServiceChoice("🔥 烧烤夜宵", "v3u:service:rfcity:bbq")),
-            (ServiceChoice("🥤 奶茶饮品", "v3u:service:rfcity:drinks"), ServiceChoice("🛒 超市便利", "v3u:service:rfcity:supermarket")),
-            (ServiceChoice("🏨 酒店住宿", "v3u:service:rfcity:hotel"), ServiceChoice("🏋️ 运动休闲", "v3u:service:rfcity:recreation")),
-            (ServiceChoice("🚚 快递物流", "v3u:service:rfcity:logistics"), ServiceChoice("👨‍💻 物业", "v3u:service:rfcity:property")),
-            (ServiceChoice("⬅️ 返回周边生活", "v3u:service:nearby"),),
-        ),
-    )
 
 
 def rfcity_category_view(category: str) -> ServiceView:
