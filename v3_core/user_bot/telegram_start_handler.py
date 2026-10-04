@@ -602,22 +602,31 @@ async def _handle_video_inventory_start(
         "🎥 <b>视频带看</b>",
         "",
         "没时间到现场，可以先通过视频确认房屋和周边情况。",
-        "",
-        f"区域｜{area}",
-        f"预算｜{budget}",
-        f"户型｜{layout}",
-        "",
-        "先为你匹配 1–2 套：",
     ]
+    criteria_lines = []
+    if area != "未填写":
+        criteria_lines.append(f"区域｜{area}")
+    if budget != "未填写":
+        criteria_lines.append(f"预算｜{budget}")
+    if layout != "未填写":
+        criteria_lines.append(f"户型｜{layout}")
+    if criteria_lines:
+        lines.extend(["", *criteria_lines])
+    lines.extend(["", "先为你匹配 1–2 套："])
     for index, card in enumerate(cards[:2], start=1):
         published = transition_views.inventory.resolve(card.public_listing_id)
         if published is None:
             continue
         details = build_public_listing_details(published)
-        price = ("$" + f"{int(details.monthly_rent_usd):,}") if details.monthly_rent_usd else "价格待确认"
-        lines.extend([
-            f"{index}. {details.location or '位置待确认'}｜{details.layout or '户型待确认'}｜{price}",
-        ])
+        bits = [
+            str(details.location or "").strip(),
+            str(details.layout or "").strip(),
+        ]
+        if details.monthly_rent_usd:
+            bits.append("$" + f"{int(details.monthly_rent_usd):,}")
+        bits = [bit for bit in bits if bit]
+        if bits:
+            lines.append(f"{index}. " + "｜".join(bits))
     lines.extend([
         "",
         "可以先咨询房源，或直接安排视频带看。",
