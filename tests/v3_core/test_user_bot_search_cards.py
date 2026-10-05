@@ -100,13 +100,13 @@ def test_search_card_uses_locked_copy_and_frozen_cover(tmp_path):
     assert _actions(card) == [
         ["previous", "next"],
         ["photos", "book"],
-        ["consult", "similar"],
+        ["consult"],
         ["change_search"],
     ]
     assert _labels(card) == [
         ["上一套", "下一套"],
-        ["📷 查看实拍", "📅 在线预约"],
-        ["💬 咨询这套", "🔍 找相似"],
+        ["📷 查看实拍", "📅 预约看房"],
+        ["💬 咨询这套"],
         ["🔄 调整条件"],
     ]
 
@@ -165,7 +165,7 @@ def test_search_card_listing_actions_target_current_public_identity():
 
     assert _actions(card) == [
         ["photos", "book"],
-        ["consult", "similar"],
+        ["consult"],
         ["change_search"],
     ]
     for action in actions:
@@ -205,7 +205,7 @@ def test_live_reserved_status_changes_badge_without_changing_frozen_facts():
     assert "$800/月" in card.text
     assert "🟡 已有预约，仍可预约" in card.text
     assert _actions(card)[0] == ["photos", "book"]
-    assert _actions(card)[1] == ["consult", "similar"]
+    assert _actions(card)[1] == ["consult"]
 
 
 def test_build_search_cards_builds_one_card_per_result():

@@ -67,11 +67,11 @@ class SimplePublisherAdminController:
     def home_keyboard() -> InlineKeyboardMarkup:
         return InlineKeyboardMarkup(
             [
-                [InlineKeyboardButton("➕ 新建房源", callback_data="v3smp|new")],
+                [InlineKeyboardButton("➕ 发布房源", callback_data="v3smp|new")],
                 [InlineKeyboardButton("🟢 运行状态", callback_data="v3smp|runtime")],
-                [InlineKeyboardButton("📣 每日广播", callback_data="v3bc")],
-                [InlineKeyboardButton("📊 今日统计", callback_data="v3smp|stats")],
-                [InlineKeyboardButton("🏠 房源状态", callback_data="v3smp|listings")],
+                [InlineKeyboardButton("📢 广播中心", callback_data="v3bc")],
+                [InlineKeyboardButton("📊 今日概况", callback_data="v3smp|stats")],
+                [InlineKeyboardButton("🔵 房态工作台", callback_data="v3smp|listings")],
                 [InlineKeyboardButton("🕒 发帖时段", callback_data="v3smp|windows")],
                 [InlineKeyboardButton("📡 采集源", callback_data="v3smp|sources")],
             ]
@@ -118,10 +118,10 @@ class SimplePublisherAdminController:
     async def show_home(self, message: Any) -> None:
         cfg = self.repository.config()
         await message.reply_text(
-            "<b>侨联 V3 发布机器人</b>\n\n"
+            "<b>📣 侨联发布助手</b>\n\n"
             f"自动发布：<b>{'运行中' if cfg.enabled else '已暂停'}</b>\n"
-            "正常采集房源会自动解析、检查、生成封面和文案，并在允许时段自动发布。\n"
-            "不符合条件的房源只进入异常列表，不会降低门槛发布。",
+            "新房源会自动整理并生成发布预览，符合条件后按发布设置处理。\n"
+            "资料不完整的房源会进入待处理列表，不会直接发布。",
             parse_mode=ParseMode.HTML,
             reply_markup=self.home_keyboard(),
         )
@@ -150,7 +150,7 @@ class SimplePublisherAdminController:
         text = (
             "<b>🟢 运行状态</b>\n\n"
             f"自动采集：{'运行中' if self._fresh(components.get('collector')) else '已停止'}\n"
-            f"自动解析：{'运行中' if self._fresh(components.get('canonical')) else '已停止'}\n"
+            f"资料整理：{'运行中' if self._fresh(components.get('canonical')) else '已停止'}\n"
             f"自动发布：{'运行中' if cfg.enabled and self._fresh(components.get('publisher')) else ('已暂停' if not cfg.enabled else '已停止')}\n"
             f"用户机器人：{'运行中' if self._fresh(components.get('user')) else '已停止'}\n\n"
             f"最近采集时间：{escape(last_collected)}\n"
@@ -617,7 +617,7 @@ class SimplePublisherAdminController:
             "cover_index": 0,
         }
         await message.reply_text(
-            "<b>➕ 新建房源</b>\n\n"
+            "<b>➕ 发布房源</b>\n\n"
             "直接发送房源文字、图片、带文字的多张图片，或转发房源消息。\n"
             "系统会自动合并、解析和检查；资料满足发布条件后会直接显示最终预览。\n"
             "如果资料不完整，可以继续补发，不需要重新开始。",

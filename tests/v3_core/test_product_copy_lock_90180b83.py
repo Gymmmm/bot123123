@@ -70,7 +70,7 @@ class MemoryPublishedInventory:
 def test_channel_and_sync_keyboards_use_locked_details_label():
     publish = _labels(build_channel_keyboard(dict(ACTIONS), inventory_status="active"))
     sync = _labels(appointment_channel_keyboard(username="qiaolian_rent_bot", public_listing_id="QL-RF-A2B3", status="reserved", advisor_url="https://t.me/advisor"))
-    expected = ["📷 更多实拍", "📅 预约看房", "💬 中文顾问"]
+    expected = ["📸 全部实拍", "📅 预约看房", "💬 中文顾问"]
     assert publish == expected
     assert sync == expected
     assert "📷 更多详情" not in publish + sync
@@ -140,9 +140,9 @@ async def test_start_handler_renders_chinese_unbookable_copy_then_details():
     outcome = await handle_v3_start(update, context, listings=_Listings(), transition_views=SimpleNamespace(build=lambda plan: None))
     assert outcome.kind == "unbookable"
     assert outcome.handled is True
-    assert "暂时不能预约" in message.texts[0] or "不能预约" in message.texts[0]
-    assert "富力城" in message.texts[1] and "1房" in message.texts[1]
-    actions = [button.text for row in message.markups[1].inline_keyboard for button in row]
+    assert len(message.texts) == 1
+    assert "富力城" in message.texts[0] and "1房" in message.texts[0]
+    assert "🔴 已租出" in message.texts[0]
+    actions = [button.text for row in message.markups[0].inline_keyboard for button in row]
     assert any("咨询这套" in a for a in actions)
-    assert "更多实拍" not in actions
     assert "📅 预约看房" not in actions

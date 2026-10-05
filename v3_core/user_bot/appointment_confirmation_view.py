@@ -28,7 +28,7 @@ def build_appointment_confirmation_view(draft: PublicAppointmentDraft, inventory
         raise ValueError("listing_not_bookable")
     details=build_public_listing_details(published)
     subject=booking_subject(details)
-    mode="视频代看" if draft.mode=="video" else "实地看房"
+    mode="视频带看" if draft.mode=="video" else "实地看房"
     lines=[
         "✅ <b>确认预约</b>",
         "",

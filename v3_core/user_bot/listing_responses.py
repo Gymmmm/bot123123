@@ -113,16 +113,13 @@ def _details_actions(
     bookable: bool,
     public_listing_id: str,
 ) -> tuple[tuple[SemanticAction, ...], ...]:
-    """Details page actions: book/consult/similar — no photos button (photos is a separate deep link)."""
+    """Details page actions: keep the current listing primary; similar is only offered when it is not bookable."""
     target = str(public_listing_id or "").strip()
     if bookable:
-        return (
-            (
-                SemanticAction("📅 预约看房", "book", target),
-                SemanticAction("💬 咨询这套", "consult", target),
-            ),
-            (SemanticAction("🔍 找相似", "similar", target),),
-        )
+        return ((
+            SemanticAction("📅 预约看房", "book", target),
+            SemanticAction("💬 咨询这套", "consult", target),
+        ),)
     return (
         (SemanticAction("💬 咨询这套", "consult", target),),
         (SemanticAction("🔍 找相似", "similar", target),),
@@ -138,12 +135,9 @@ def _photo_actions(
 ) -> tuple[tuple[SemanticAction, ...], ...]:
     """Album entry bar.
 
-    The 「更多实拍」button opens the paged album at page 0 — never the legacy
-    cover-then-offset expansion. ``target_index=0`` is encoded as
-    ``:pg:0`` so ``PublicListingFlowService`` routes through
-    ``build_photos_page_response``, which uses raw originals only (no cover,
-    no collage). When the listing has no extra photos the button collapses to
-    "📷 房源详情" so the album never advertises an empty second page.
+    The 「全部实拍」button opens the thumbnail overview first. Explicit
+    ``:pg:N`` callbacks are reserved for the raw-original album pages. When
+    the listing has no extra photos the button collapses to 「房源详情」.
 
     Bookability still comes from the unified ``bookable`` flag (active/reserved
     via inventory_status_bookable / PublishedListingView.bookable). Never invent
@@ -155,10 +149,9 @@ def _photo_actions(
     def _more_or_details() -> SemanticAction:
         if has_more:
             return SemanticAction(
-                "📷 更多实拍",
+                "📸 全部实拍",
                 "photos",
-                target,
-                target_index=0,
+                target
             )
         return SemanticAction("📋 房源详情", "details", target)
 
@@ -177,10 +170,9 @@ def _photo_actions(
         if has_more:
             first_row.append(
                 SemanticAction(
-                    "📷 更多实拍",
+                    "📸 全部实拍",
                     "photos",
                     target,
-                    target_index=0,
                 )
             )
         first_row.append(SemanticAction("💬 咨询这套", "consult", target))
@@ -587,6 +579,7 @@ def _status_label_for(details) -> str:
     return {
         "active": "🟢 当前可预约",
         "reserved": "🟡 已有预约，仍可预约",
+        "pending": "🔵 房态待确认",
         "rented": "🔴 已租出",
         "leased": "🔴 已租出",
         "inactive": "⚫ 已下架",
@@ -778,8 +771,24 @@ def build_photos_response(
     )
 
 
-# ---- Paged album ----
-PHOTOS_PAGE_SIZE = 4
+# ---- Paged raw album ----
+# Telegram allows at most 10 frames per sendMediaGroup.
+PHOTOS_PAGE_SIZE = 10
+PHOTOS_ALBUM_MAX_TOTAL = 30
+
+
+def _album_photo_paths(view: PublishedListingView) -> tuple[str, ...]:
+    """Cover-source hero first, then de-duplicated raw gallery originals."""
+    raw = _raw_photo_paths_for_pages(view)
+    hero = ""
+    try:
+        from v3_core.media.album_hero import album_hero_for_package
+        hero = album_hero_for_package(getattr(view, "package", {}) or {}, raw)
+    except Exception:
+        hero = ""
+    ordered = [hero, *raw] if hero else list(raw)
+    return tuple(dict.fromkeys(path for path in ordered if path))[:PHOTOS_ALBUM_MAX_TOTAL]
+
 
 
 def _photos_page_count(total: int) -> int:
@@ -799,19 +808,70 @@ def _photos_page_slice(total: int, page: int) -> tuple[int, int]:
     return start, end
 
 
-def _photos_page_caption(
-    *,
-    public_listing_id: str,
-    page: int,
-    total_pages: int,
-    total: int,
-    start: int,
-    end: int,
-) -> str:
-    del public_listing_id, start, end
+def _album_title(details) -> str:
+    project = str(details.project_name or "").strip()
+    location = str(details.location or "").strip()
+    property_type = str(details.property_type or "").strip()
+    layout = str(details.layout or "").strip().replace(" ", "")
+    identity = project or location or property_type
+    return " · ".join(part for part in (identity, layout) if part)
+
+
+def _photos_page_caption(details, *, page: int, total_pages: int, total: int) -> str:
     if total <= 0:
-        return "📷 房源实拍 · 暂无图片"
-    return f"📷 房源实拍 · 第 {page + 1}/{total_pages} 页 · 共 {total} 张"
+        return ""
+    title = _album_title(details)
+    parts = [f"📷 {he(title)}" if title else "📷 实拍", f"共 {total} 张"]
+    if total_pages > 1:
+        parts.append(f"第 {page + 1}/{total_pages} 页")
+    return " · ".join(parts)
+
+
+def _photos_page_action_text(details) -> str:
+    project = str(details.project_name or "").strip()
+    location = str(details.location or "").strip()
+    property_type = str(details.property_type or "").strip()
+    layout = str(details.layout or "").strip()
+    identity = project or location or property_type
+    title = "｜".join(part for part in (identity, layout) if part) or "这套房"
+    lines = [f"🏠 <b>{he(title)}</b>"]
+    price = _format_price(details.monthly_rent_usd)
+    if price:
+        lines.append(f"💵 {he(price)}")
+    status = _status_label_for(details)
+    if status:
+        lines.append(status)
+    public_id = str(details.public_listing_id or "").strip()
+    if public_id:
+        lines.append(f"🆔 {he(public_id)}")
+    return chr(10).join(lines)
+
+
+def build_photos_overview_response(view: PublishedListingView) -> PublicPhotosResponse:
+    """Thumbnail overview shown before the raw Telegram album."""
+    details = build_public_listing_details(view)
+    all_photos = _album_photo_paths(view)
+    total = len(all_photos)
+    summary = listing_summary_bits(project_name=details.project_name, layout=details.layout, monthly_rent_usd=details.monthly_rent_usd, location=details.location)
+    target = str(details.public_listing_id or "").strip()
+    if not all_photos:
+        return PublicPhotosResponse(media_groups=(), text=f"{_detail_status_line(details)}\n\n这套房的实拍还没传上来，可以直接问顾问要更多图/视频。", media_caption="", detail_text="", photo_path="", photo_index=0, photo_total=0, listing_summary=summary, action_rows=_details_actions(bookable=details.bookable, public_listing_id=target), expand_only=False)
+    from .photo_overview import MAX_PREVIEW, render_photo_overview
+    import tempfile
+    overview = Path(tempfile.gettempdir()) / "qiaolian_photo_overviews" / f"{target or 'listing'}.jpg"
+    rendered = render_photo_overview(all_photos, output_path=overview)
+    lines = _listing_fact_lines(details)
+    adviser = _adviser_copy_for_view(view)
+    if adviser:
+        lines.extend(["", "💬 <b>侨联说</b>", he(adviser)])
+    lines.extend(["", f"📸 共 {total} 张实拍 · 当前预览 {min(total, MAX_PREVIEW)} 张"])
+    actions = [(SemanticAction("📸 查看全部原图", "photos", target, target_index=0),)]
+    if details.bookable:
+        actions.append((SemanticAction("📅 预约看房", "book", target), SemanticAction("💬 咨询这套", "consult", target)))
+    else:
+        actions.append((SemanticAction("💬 咨询这套", "consult", target), SemanticAction("🔍 找相似", "similar", target)))
+    actions.append((SemanticAction("⬅️ 返回房源", "details", target),))
+    return PublicPhotosResponse(media_groups=((rendered,),) if rendered else (), text="\n".join(lines), media_caption="", detail_text="", photo_path=rendered, photo_index=0, photo_total=total, listing_summary=summary, action_rows=tuple(actions), expand_only=False)
 
 
 def build_photos_page_response(
@@ -819,7 +879,8 @@ def build_photos_page_response(
     *,
     page: int = 0,
 ) -> PublicPhotosResponse:
-    """Paged album entry — exactly ``PHOTOS_PAGE_SIZE`` frames per page.
+    """Raw Telegram album page (up to 10 originals per page).
+
 
     Edge cases honored:
       * ``0`` photos → status bar + advisor button, no media.
@@ -834,7 +895,7 @@ def build_photos_page_response(
     details = build_public_listing_details(view)
     # Paged 2026-10-02 fix: only raw originals — cover render is excluded so
     # every page (1/3, 2/3, 3/3) is a real photo, not the channel thumbnail.
-    all_photos = _raw_photo_paths_for_pages(view)[:PHOTOS_MAX_TOTAL]
+    all_photos = _album_photo_paths(view)
     total = len(all_photos)
     total_pages = _photos_page_count(total)
     summary = listing_summary_bits(
@@ -873,12 +934,7 @@ def build_photos_page_response(
     pages = total_pages
     safe_page = max(0, min(int(page or 0), pages - 1))
     caption = _photos_page_caption(
-        public_listing_id=details.public_listing_id,
-        page=safe_page,
-        total_pages=pages,
-        total=total,
-        start=start,
-        end=end,
+        details, page=safe_page, total_pages=pages, total=total
     )
     groups = _as_media_groups(page_rows)
     first = page_rows[0] if page_rows else ""
@@ -898,13 +954,7 @@ def build_photos_page_response(
 
     return PublicPhotosResponse(
         media_groups=groups,
-        text=_photos_page_action_text(
-            view,
-            details,
-            page=safe_page,
-            total_pages=pages,
-            total=total,
-        ),
+        text=_photos_page_action_text(details),
         media_caption=caption,
         detail_text="",
         photo_path=first,
@@ -927,19 +977,18 @@ def _photo_page_actions(
     """Final photo UX: page counter/navigation, booking/consult, return to listing."""
     target = str(public_listing_id or "").strip()
     safe_page = max(0, min(int(page or 0), max(total_pages - 1, 0)))
-    status = str(inventory_status or "").strip().lower()
-    can_book = bool(bookable) or status in {"active", "reserved"}
-
+    del inventory_status  # availability comes from the unified bookable flag only
     rows: list[tuple[SemanticAction, ...]] = []
-    paging: list[SemanticAction] = []
-    if safe_page > 0:
-        paging.append(SemanticAction("⬅️ 上一页", "photos", target, target_index=safe_page - 1))
-    paging.append(SemanticAction(f"{safe_page + 1}/{max(total_pages, 1)}", "photos", target, target_index=safe_page))
-    if safe_page + 1 < total_pages:
-        paging.append(SemanticAction("下一页 ➡️", "photos", target, target_index=safe_page + 1))
-    rows.append(tuple(paging))
+    if total_pages > 1:
+        paging: list[SemanticAction] = []
+        if safe_page > 0:
+            paging.append(SemanticAction("⬅️ 上一页", "photos", target, target_index=safe_page - 1))
+        paging.append(SemanticAction(f"{safe_page + 1}/{total_pages}", "photos", target, target_index=safe_page))
+        if safe_page + 1 < total_pages:
+            paging.append(SemanticAction("下一页 ➡️", "photos", target, target_index=safe_page + 1))
+        rows.append(tuple(paging))
 
-    if can_book:
+    if bookable:
         rows.append((
             SemanticAction("📅 预约看房", "book", target),
             SemanticAction("💬 咨询这套", "consult", target),
@@ -969,6 +1018,7 @@ __all__ = [
     "build_detail_text",
     "build_details_response",
     "build_photo_caption",
+    "build_photos_overview_response",
     "build_photos_page_response",
     "build_photos_response",
     "listing_summary_bits",

@@ -141,9 +141,9 @@ async def test_pending_manual_preview_restores_pending_and_only_send_activates(t
     callbacks = [button.callback_data for row in preview_markup.inline_keyboard for button in row if button.callback_data]
     assert callbacks == [
         "v3smp|manual_send",
-        "v3smp|manual_adviser",
-        "v3smp|manual_cover",
+        "v3smp|manual_cover_next",
         "v3smp|manual_templates",
+        "v3smp|manual_adviser",
         "v3smp|manual_back_confirm",
     ]
     assert all(len(data.encode("utf-8")) <= 64 for data in callbacks)
@@ -208,15 +208,9 @@ async def test_manual_preview_short_callbacks_recover_real_length_session_ids(tm
     context = SimpleNamespace(user_data={NEW_LISTING_STATE_KEY: dict(real_ids)}, bot=object())
 
     cover_message = _Message()
-    update = SimpleNamespace(callback_query=SimpleNamespace(data="v3smp|manual_cover", message=cover_message))
+    update = SimpleNamespace(callback_query=SimpleNamespace(data="v3smp|manual_cover_next", message=cover_message))
     assert await controller.handle_callback(update, context) is True
-    cover_callbacks = [
-        b.callback_data
-        for call in cover_message.calls if call.get("kind") == "photo"
-        for row in call["reply_markup"].inline_keyboard for b in row if b.callback_data
-    ]
-    assert cover_callbacks == ["v3smp|manual_cover_pick|0"]
-    assert all(len(data.encode("utf-8")) <= 64 for data in cover_callbacks)
+    assert calls[-1] == {"review_id": real_ids["review_id"], "offer_id": real_ids["offer_id"], "advance_cover": True}
 
     update = SimpleNamespace(callback_query=SimpleNamespace(data="v3smp|manual_style|black_gold", message=_Message()))
     assert await controller.handle_callback(update, context) is True
@@ -227,11 +221,12 @@ async def test_manual_preview_short_callbacks_recover_real_length_session_ids(tm
     assert await controller.handle_callback(update, context) is True
     template_callbacks = [b.callback_data for row in templates_message.calls[-1]["reply_markup"].inline_keyboard for b in row if b.callback_data]
     assert all(len(data.encode("utf-8")) <= 64 for data in template_callbacks)
-    assert "v3smp|manual_style|black_gold" in template_callbacks
+    assert "v3smp|manual_style|black_gold" not in template_callbacks
+    assert "v3smp|manual_style|classic_blue" not in template_callbacks
 
     expired = SimpleNamespace(user_data={}, bot=object())
     expired_message = _Message()
-    update = SimpleNamespace(callback_query=SimpleNamespace(data="v3smp|manual_cover", message=expired_message))
+    update = SimpleNamespace(callback_query=SimpleNamespace(data="v3smp|manual_cover_next", message=expired_message))
     assert await controller.handle_callback(update, expired) is True
     assert calls[-1] == {"review_id": real_ids["review_id"], "offer_id": real_ids["offer_id"], "style": "black_gold"}
     assert "已经失效" in expired_message.calls[-1]["text"]

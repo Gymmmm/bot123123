@@ -88,7 +88,23 @@ def _usable_images(paths: Iterable[str | Path]) -> list[Image.Image]:
 def _fit(image: Image.Image, size: tuple[int, int]) -> Image.Image:
     return ImageOps.fit(image, size, method=Image.Resampling.LANCZOS, centering=(0.5, 0.5))
 
-def _paste_gallery(canvas: Image.Image, images: list[Image.Image]) -> None:
+def _paste_gallery(canvas: Image.Image, images: list[Image.Image], *, layout: str = "hero_three") -> None:
+    if layout == "three_left" and len(images) >= 3:
+        left_w = 704
+        right_w = 1080 - left_w - GUTTER
+        half_h = (1350 - GUTTER) // 2
+        canvas.paste(_fit(images[0], (left_w, 1350)), (0, 0))
+        canvas.paste(_fit(images[1], (right_w, half_h)), (left_w + GUTTER, 0))
+        canvas.paste(_fit(images[2], (right_w, 1350 - half_h - GUTTER)), (left_w + GUTTER, half_h + GUTTER))
+        return
+    if layout == "three_top" and len(images) >= 3:
+        top_h = 858
+        bottom_h = 1350 - top_h - GUTTER
+        half_w = (1080 - GUTTER) // 2
+        canvas.paste(_fit(images[0], (1080, top_h)), (0, 0))
+        canvas.paste(_fit(images[1], (half_w, bottom_h)), (0, top_h + GUTTER))
+        canvas.paste(_fit(images[2], (1080 - half_w - GUTTER, bottom_h)), (half_w + GUTTER, top_h + GUTTER))
+        return
     canvas.paste(_fit(images[0], (1080, 850)), (0, 0))
     secondary = images[1:4]
     if not secondary:
@@ -138,7 +154,7 @@ def _overlay(canvas: Image.Image, data: CoverRenderData) -> None:
     canvas.paste(layer, (0, 0), layer)
 
 def render_cover(*, style: str, source_image: str, output_path: str, data: CoverRenderData,
-                 source_images: Iterable[str] | None = None) -> str:
+                 source_images: Iterable[str] | None = None, layout: str = "hero_three") -> str:
     """Render a fixed 1080x1350 Telegram cover using readable source photos."""
     del style
     candidates = [source_image]
@@ -147,7 +163,7 @@ def render_cover(*, style: str, source_image: str, output_path: str, data: Cover
     if not images:
         raise ValueError("cover_no_usable_images")
     canvas = Image.new("RGB", CANVAS, (244, 240, 233))
-    _paste_gallery(canvas, images)
+    _paste_gallery(canvas, images, layout=layout)
     _overlay(canvas, data)
     output = Path(output_path).expanduser().resolve()
     output.parent.mkdir(parents=True, exist_ok=True)

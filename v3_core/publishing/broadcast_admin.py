@@ -71,7 +71,7 @@ class BroadcastAdminController:
 
     def _center_keyboard(self):
         return self._markup([
-            [InlineKeyboardButton("🌤 每日天气汇率", callback_data="v3bc|weather"), InlineKeyboardButton("🗓 本周营销计划", callback_data="v3bc|marketing")],
+            [InlineKeyboardButton("🌤 每日天气汇率", callback_data="v3bc|weather"), InlineKeyboardButton("🗓 本周营销", callback_data="v3bc|marketing")],
             [InlineKeyboardButton("✏️ 临时广播", callback_data="v3bc|custom"), InlineKeyboardButton("📚 广播记录", callback_data="v3bc|logs")],
             [InlineKeyboardButton("⚙️ 广播设置", callback_data="v3bc|settings")],
             [InlineKeyboardButton("🏠 返回首页", callback_data="v3h")],
@@ -141,8 +141,8 @@ class BroadcastAdminController:
             + f"今日状态：{escape(today_state)}",
             parse_mode=ParseMode.HTML,
             reply_markup=self._markup([
-                [InlineKeyboardButton("👀 查看今日内容", callback_data="v3bc|today"), InlineKeyboardButton("💱 汇率设置", callback_data="v3bc|fx")],
-                [InlineKeyboardButton("✏️ 修改文案", callback_data="v3bc|daily_copy"), InlineKeyboardButton("🔘 选择按钮", callback_data="v3bc|daily_button")],
+                [InlineKeyboardButton("👀 今日预览", callback_data="v3bc|today"), InlineKeyboardButton("💱 汇率设置", callback_data="v3bc|fx")],
+                [InlineKeyboardButton("✏️ 修改文案", callback_data="v3bc|daily_copy"), InlineKeyboardButton("🔘 设置按钮", callback_data="v3bc|daily_button")],
                 [InlineKeyboardButton("↩️ 恢复自动天气文案", callback_data="v3bc|daily_reset")],
                 [InlineKeyboardButton("📤 立即发送", callback_data="v3bc|send"), InlineKeyboardButton("⏰ 修改时间", callback_data="v3bc|time_menu")],
                 [InlineKeyboardButton("⏸ 暂停" if c.enabled else "▶️ 开启", callback_data="v3bc|off" if c.enabled else "v3bc|on")],
@@ -157,7 +157,7 @@ class BroadcastAdminController:
         marketing_button = self.marketing.button_key(today_index)
         today_state = self._today_delivery_state("marketing_" + today.key)
         lines = [
-            "<b>🗓 本周营销计划</b>", "",
+            "<b>🗓 本周营销</b>", "",
             "周一  🏠 本周找房", "周二  📋 看房准备", "周三  💰 租房预算",
             "周四  🔍 房源怎么选", "周五  📝 签约提醒", "周六  🏠 周末看房", "周日  🛡 侨联保障", "",
             f"自动营销：{'🟢 已开启' if self.marketing.enabled else '⏸ 已暂停'}",
@@ -170,7 +170,7 @@ class BroadcastAdminController:
             prefix + "\n".join(lines),
             parse_mode=ParseMode.HTML,
             reply_markup=self._markup([
-                [InlineKeyboardButton("👀 查看今天", callback_data="v3bc|m_today"), InlineKeyboardButton("📅 查看整周", callback_data="v3bc|m_week")],
+                [InlineKeyboardButton("👀 今日预览", callback_data="v3bc|m_today"), InlineKeyboardButton("📅 查看整周", callback_data="v3bc|m_week")],
                 [InlineKeyboardButton("✏️ 修改今日文案", callback_data=f"v3bc|m_edit|{today_index}"), InlineKeyboardButton("🔘 修改今日按钮", callback_data=f"v3bc|m_button|{today_index}")],
                 [InlineKeyboardButton("📤 立即发送", callback_data="v3bc|m_send"), InlineKeyboardButton("⏰ 修改时间", callback_data="v3bc|m_time_menu")],
                 [InlineKeyboardButton("⏸ 暂停营销" if self.marketing.enabled else "▶️ 开启营销", callback_data="v3bc|m_off" if self.marketing.enabled else "v3bc|m_on")],
@@ -338,7 +338,7 @@ class BroadcastAdminController:
                 parse_mode=ParseMode.HTML,
                 reply_markup=self._markup([
                     [InlineKeyboardButton("📤 立即发送", callback_data="v3bc|custom_send")],
-                    [InlineKeyboardButton("🔘 选择按钮", callback_data="v3bc|custom_button")],
+                    [InlineKeyboardButton("🔘 设置按钮", callback_data="v3bc|custom_button")],
                     [InlineKeyboardButton("✏️ 重新编辑", callback_data="v3bc|custom")],
                     [InlineKeyboardButton("⬅️ 返回广播中心", callback_data="v3bc")],
                 ]),
@@ -489,7 +489,7 @@ class BroadcastAdminController:
             await q.message.reply_text(
                 f"周{'一二三四五六日'[weekday]}内容设置：",
                 reply_markup=self._markup([
-                    [InlineKeyboardButton("✏️ 修改文案", callback_data=f"v3bc|m_edit|{weekday}"), InlineKeyboardButton("🔘 修改按钮", callback_data=f"v3bc|m_button|{weekday}")],
+                    [InlineKeyboardButton("✏️ 修改文案", callback_data=f"v3bc|m_edit|{weekday}"), InlineKeyboardButton("🔘 设置按钮", callback_data=f"v3bc|m_button|{weekday}")],
                     [InlineKeyboardButton("↩️ 恢复默认文案", callback_data=f"v3bc|m_reset|{weekday}")],
                     [InlineKeyboardButton("⬅️ 返回整周", callback_data="v3bc|m_week")],
                 ]),

@@ -18,7 +18,7 @@ SOURCE_DISPLAY_LABELS = {
     "channel_listing": "频道房源",
     "search_result": "找房结果",
     "listing_details": "租赁详情",
-    "listing_photos": "更多实拍",
+    "listing_photos": "全部实拍",
     "similar_listing": "相近房源",
     "appointment_success": "预约完成",
 }

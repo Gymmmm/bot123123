@@ -100,18 +100,22 @@ class CallbackRouter:
             if callback.action not in {"details", "photos", "book"}:
                 return CallbackDispatchResult(status="unsupported", callback=callback, action=callback.action, reason="unsupported_not_wired")
 
-            page_index = (
-                int(callback.page_index or 0)
-                if callback.action == "photos" and callback.page_index is not None
-                else None
-            )
-            photo_offset = (
-                int(callback.target_index or 0)
-                if callback.action == "photos"
-                and callback.page_index is None
-                and callback.target_index is not None
-                else 0
-            )
+            if callback.action == "photos" and callback.page_index is not None:
+                # 6-part :pg:N callback → paged album (raw originals).
+                page_index = int(callback.page_index or 0)
+                photo_offset = 0
+            elif callback.action == "photos" and callback.target_index is not None:
+                # 5-part legacy "查看全部实拍" deep link → offset expand.
+                page_index = None
+                photo_offset = int(callback.target_index or 0)
+            elif callback.action == "photos":
+                # Bare photos entry opens the thumbnail overview. Explicit
+                # :pg:N callbacks retain the historical raw-album contract.
+                page_index = -1
+                photo_offset = 0
+            else:
+                page_index = None
+                photo_offset = 0
             listing = self.listings.resolve_action(
                 callback.public_listing_id,
                 callback.action,

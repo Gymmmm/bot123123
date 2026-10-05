@@ -34,5 +34,5 @@ def test_cover_style_extraction_matches_locked_production_contract():
 def test_production_cover_recommendation_uses_right_price_except_for_villas():
     assert recommended_cover_style("公寓", "2房1厅") == "premium_photo"
     assert recommended_cover_style("商铺") == "premium_photo"
-    assert recommended_cover_style("独栋别墅") == "black_gold"
-    assert recommended_cover_style("Villa") == "black_gold"
+    assert recommended_cover_style("独栋别墅") == "premium_photo"
+    assert recommended_cover_style("Villa") == "premium_photo"

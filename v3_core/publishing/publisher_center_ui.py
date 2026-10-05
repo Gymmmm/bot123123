@@ -24,7 +24,7 @@ class PublisherCenterAdminController(BroadcastAdminController):
             [
                 [
                     InlineKeyboardButton("🌤 每日天气汇率", callback_data="v3bc|weather"),
-                    InlineKeyboardButton("🗓 本周营销计划", callback_data="v3bc|marketing"),
+                    InlineKeyboardButton("🗓 本周营销", callback_data="v3bc|marketing"),
                 ],
                 [
                     InlineKeyboardButton("✏️ 临时发布", callback_data="v3bc|custom"),
@@ -59,11 +59,11 @@ class PublisherCenterAdminController(BroadcastAdminController):
             reply_markup=self._markup(
                 [
                     [
-                        InlineKeyboardButton("👀 查看今日内容", callback_data="v3bc|today"),
-                        InlineKeyboardButton("✏️ 修改模板", callback_data="v3bc|daily_copy"),
+                        InlineKeyboardButton("👀 今日预览", callback_data="v3bc|today"),
+                        InlineKeyboardButton("✏️ 修改文案", callback_data="v3bc|daily_copy"),
                     ],
                     [
-                        InlineKeyboardButton("🔘 按钮设置", callback_data="v3bc|daily_button"),
+                        InlineKeyboardButton("🔘 设置按钮", callback_data="v3bc|daily_button"),
                         InlineKeyboardButton("💱 汇率设置", callback_data="v3bc|fx"),
                     ],
                     [
@@ -86,7 +86,7 @@ class PublisherCenterAdminController(BroadcastAdminController):
         today = self.marketing.template()
         today_state = self._today_delivery_state("marketing_" + today.key)
         lines = [
-            "<b>🗓 本周营销计划</b>",
+            "<b>🗓 本周营销</b>",
             "",
             "周一  📊 本周租房库存",
             "周二  💰 预算能租什么",
@@ -106,12 +106,12 @@ class PublisherCenterAdminController(BroadcastAdminController):
             reply_markup=self._markup(
                 [
                     [
-                        InlineKeyboardButton("👀 查看今天", callback_data="v3bc|m_today"),
+                        InlineKeyboardButton("👀 今日预览", callback_data="v3bc|m_today"),
                         InlineKeyboardButton("📅 查看整周", callback_data="v3bc|m_week"),
                     ],
                     [
-                        InlineKeyboardButton("✏️ 编辑模板", callback_data="v3bc|m_templates"),
-                        InlineKeyboardButton("🔘 按钮设置", callback_data="v3bc|m_buttons"),
+                        InlineKeyboardButton("✏️ 编辑文案", callback_data="v3bc|m_templates"),
+                        InlineKeyboardButton("🔘 设置按钮", callback_data="v3bc|m_buttons"),
                     ],
                     [
                         InlineKeyboardButton("📤 立即发送", callback_data="v3bc|m_send"),
@@ -176,7 +176,7 @@ class PublisherCenterAdminController(BroadcastAdminController):
                 reply_markup=self._markup(
                     [
                         [InlineKeyboardButton("📤 立即发送", callback_data="v3bc|custom_send")],
-                        [InlineKeyboardButton("🔘 按钮设置", callback_data="v3bc|custom_button")],
+                        [InlineKeyboardButton("🔘 设置按钮", callback_data="v3bc|custom_button")],
                         [InlineKeyboardButton("✏️ 重新编辑", callback_data="v3bc|custom")],
                         [InlineKeyboardButton("⬅️ 返回发布中心", callback_data="v3bc")],
                     ]

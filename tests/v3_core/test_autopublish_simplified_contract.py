@@ -180,15 +180,15 @@ def test_base_simple_home_keyboard_has_seven_inheritance_entries():
     ]
     assert not forbidden.intersection(rendered_labels)
     # No orphan zero badges — only the high-attention rows.
-    assert "🕘 最近发布" in rendered_labels
-    assert "⚙️ 更多" in rendered_labels
+    assert "📚 发布记录" in rendered_labels
+    assert "⚙️ 发布设置" in rendered_labels
 
 
 def test_default_cover_style_policy():
     assert recommended_cover_style("公寓") == "premium_photo"
     assert recommended_cover_style("排屋") == "premium_photo"
-    assert recommended_cover_style("别墅") == "black_gold"
-    assert recommended_cover_style("Villa") == "black_gold"
+    assert recommended_cover_style("别墅") == "premium_photo"
+    assert recommended_cover_style("Villa") == "premium_photo"
     assert "classic_blue" in FINAL_COVER_STYLES
     assert "right_price" in FINAL_COVER_STYLES
     assert "black_gold" in FINAL_COVER_STYLES

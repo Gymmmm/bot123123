@@ -129,8 +129,9 @@ def _flow(view):
     ],
 )
 async def test_channel_deeplink_start_handler_keeps_listing_context(tmp_path, payload, expected_kind):
+    from PIL import Image
     photo = tmp_path / "room.jpg"
-    photo.write_bytes(b"room")
+    Image.new("RGB", (800, 600), (50, 80, 100)).save(photo)
     view = _view(gallery=(str(photo),))
     listings, transition_views = _flow(view)
     message = FakeMessage()
@@ -172,15 +173,12 @@ async def test_channel_deeplink_start_handler_keeps_listing_context(tmp_path, pa
         keyboard_data = repr(reply_markup)
         assert "book" in keyboard_data or "consult" in keyboard_data
     elif expected_kind == "photos":
-        # photos deep link: sends photo (send_photo) + action bar message (send_message)
-        # Caption identifies the current photo page; the action card carries details.
+        # photos deep link sends one composed overview image plus one action card.
         assert [call[0] for call in bot.calls] == ["send_photo", "send_message"]
-        caption = bot.calls[0][2]["caption"]
-        assert caption == "📷 房源实拍 · 第 1/1 页 · 共 1 张"
-        # Action bar shows listing details (no public_id exposure)
+        assert not bot.calls[0][2].get("caption")
         action_bar = bot.calls[1][2]["text"]
         assert "富力城" in action_bar
-        assert "🪧" not in action_bar  # public_id NOT in action bar
+        assert "共 1 张实拍 · 当前预览 1 张" in action_bar
     else:
         # book deep link: sends text message with transition keyboard
         rendered = message.calls[-1][1]

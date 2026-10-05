@@ -119,28 +119,6 @@ def _appointment_mode_view(draft: PublicAppointmentDraft, inventory: PublicInven
     )
 
 
-_APPOINTMENT_VIDEO_EXPLAIN_TEXT = (
-    "🎥 <b>视频带看</b>\n\n"
-    "你不用去，我们到房子里和你开视频。\n"
-    "想看哪里，现场给你看哪里。"
-)
-
-_APPOINTMENT_VIDEO_FOOTNOTE = (
-    "现场带看需提前预约；时间有变化，可以提前取消或修改。"
-)
-
-
-def _appointment_video_explain_view(draft: PublicAppointmentDraft) -> TransitionView:
-    return TransitionView(
-        kind="appointment_video_explain",
-        text=f"{_APPOINTMENT_VIDEO_EXPLAIN_TEXT}\n\n{_APPOINTMENT_VIDEO_FOOTNOTE}",
-        rows=(
-            (TransitionChoice("📅 预约视频带看", "appointment_video_proceed", draft.public_listing_id),),
-            (TransitionChoice("⬅️ 返回", "appointment_back_mode"),),
-        ),
-    )
-
-
 def _appointment_date_view(draft: PublicAppointmentDraft, inventory: PublicInventoryReader, *, today: date) -> TransitionView:
     details = _resolve_bookable_details(inventory, draft.public_listing_id)
     subject = booking_subject(details)

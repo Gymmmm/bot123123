@@ -25,7 +25,7 @@ def build_appointment_success_view(draft: PublicAppointmentDraft, inventory: Pub
     else:
         details=build_public_listing_details(published)
         subject=booking_subject(details)
-    mode="视频代看" if draft.mode=="video" else "实地看房"
+    mode="视频带看" if draft.mode=="video" else "实地看房"
     lines=[
         "✅ <b>预约已提交</b>",
         "",
@@ -39,6 +39,7 @@ def build_appointment_success_view(draft: PublicAppointmentDraft, inventory: Pub
         kind="appointment_success",
         text="\n".join(lines),
         rows=(
+            (TransitionChoice("⬅️ 返回房源", "listing_details", public_listing_id=draft.public_listing_id),),
             (TransitionChoice("📋 我的预约","home","appointments"),TransitionChoice("💬 中文顾问","home","contact")),
             (TransitionChoice("🔍 继续找房","home","search"),),
         ),

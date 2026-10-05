@@ -71,12 +71,12 @@ def test_active_operator_home_shows_only_attention_entries():
     keyboard = controller.home_keyboard()
     rows = [[button.text for button in row] for row in keyboard.inline_keyboard]
     # New compact layout: high-attention entries only, no orphan zero badges.
-    assert rows[0] == ["➕ 新建房源", "📢 频道运营"]
-    assert rows[1][0].startswith("🔵 房态管理")
+    assert rows[0] == ["➕ 发布房源", "📢 广播中心"]
+    assert rows[1][0].startswith("🔵 房态工作台")
     assert rows[1][1].startswith("⚠️ 异常房源")
     last = rows[-1]
-    assert last[0] == "🕘 最近发布"
-    assert last[1] == "⚙️ 更多"
+    assert last[0] == "📚 发布记录"
+    assert last[1] == "⚙️ 发布设置"
     callbacks = _callbacks(keyboard)
     assert "v3smp|new" in callbacks
     assert "v3bc" in callbacks

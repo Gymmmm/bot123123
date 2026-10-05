@@ -246,10 +246,10 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
                 parse_mode=ParseMode.HTML,
                 reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton("📤 确认发布到频道", callback_data="v3smp|manual_send")],
-                    [InlineKeyboardButton("💬 调整侨联说", callback_data="v3smp|manual_adviser")],
                     [
-                        InlineKeyboardButton("🖼 选主图", callback_data="v3smp|manual_cover"),
-                        InlineKeyboardButton("🎨 选封面格式", callback_data="v3smp|manual_templates"),
+                        InlineKeyboardButton("🖼 换主图", callback_data="v3smp|manual_cover_next"),
+                        InlineKeyboardButton("🎨 封面", callback_data="v3smp|manual_templates"),
+                        InlineKeyboardButton("💬 侨联说", callback_data="v3smp|manual_adviser"),
                     ],
                     [InlineKeyboardButton("⬅️ 返回资料确认", callback_data="v3smp|manual_back_confirm")],
                 ]),
@@ -441,7 +441,7 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
                     ),
                 )
             return True
-        if raw in {"v3smp|manual_send", "v3smp|manual_cover", "v3smp|manual_templates"} or (
+        if raw in {"v3smp|manual_send", "v3smp|manual_cover_next", "v3smp|manual_templates"} or (
             len(parts) == 3 and parts[1] in {"manual_style", "manual_cover_pick"}
         ):
             state = context.user_data.get(NEW_LISTING_STATE_KEY)
@@ -473,8 +473,8 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
                     ),
                 )
                 return True
-            if raw == "v3smp|manual_cover":
-                await self.show_manual_cover_picker(query.message, context, review_id=current_review)
+            if raw == "v3smp|manual_cover_next":
+                await self.prepare_manual_preview(query.message, context, review_id=current_review, offer_id=current_offer, advance_cover=True)
                 return True
             if len(parts) == 3 and parts[1] == "manual_cover_pick":
                 try:
@@ -499,8 +499,6 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
                     reply_markup=InlineKeyboardMarkup([
                         [InlineKeyboardButton("极简实拍渐变（默认）", callback_data="v3smp|manual_style|premium_photo")],
                         [InlineKeyboardButton("右侧价格牌", callback_data="v3smp|manual_style|right_price")],
-                        [InlineKeyboardButton("黑金高级感（别墅）", callback_data="v3smp|manual_style|black_gold")],
-                        [InlineKeyboardButton("经典蓝卡", callback_data="v3smp|manual_style|classic_blue")],
                         self.home_row(),
                     ]),
                 )

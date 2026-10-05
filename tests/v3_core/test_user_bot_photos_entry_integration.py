@@ -1,11 +1,10 @@
 """End-to-end /start deep-link entry contract for the V3 User Bot.
 
 This is the integration-level entry contract that proves the real /start entry
-surface (``property_<id>_photos`` and friends) lands on the raw-only paged album
-from the moment the user opens the channel link — no cover render, no collage,
-no legacy 「更多实拍」 expander, and the album splits 9 originals into pages of
-``4 / 4 / 1`` so every page is a real photo that opens in Telegram's native
-viewer.
+surface (``property_<id>_photos`` and friends) lands on a compact thumbnail
+overview first. 「查看全部原图」 then enters the raw-only paged album. One raw
+page = one native Telegram album of up to 10 real photos (23 originals →
+``10 / 10 / 3``).
 
 The contract covers the full path:
     payload -> parse_channel_start_payload -> PublicRouteService
@@ -122,7 +121,8 @@ def _write_photos(tmp_path, n: int, *, prefix="photo") -> list[str]:
     paths = []
     for i in range(n):
         p = tmp_path / f"{prefix}_{i + 1}.jpg"
-        p.write_bytes(f"frame-{i}".encode("utf-8"))
+        from PIL import Image
+        Image.new("RGB", (800 + i * 5, 600 + i * 3), (40 + i, 70, 100)).save(p)
         paths.append(str(p))
     return paths
 
@@ -179,77 +179,44 @@ def test_route_decision_unblocks_rooms_photos_for_live_owner():
 # --- layer 3: full flow integration -----------------------------------------
 
 
-def test_start_property_photos_dl_drops_user_into_4_raw_originals_not_cover(tmp_path):
-    """``/start property_<id>_photos__ch`` lands on page 0 = raw[0:4].
-
-    Cover (frozen package render + side collage + "更多实拍" expander) MUST
-    NOT be present in any layer. This is the entry the user sees when they
-    open the channel post deep link.
-    """
-    cover = tmp_path / "cover.jpg"
-    cover.write_bytes(b"cover-render")
+def test_start_property_photos_dl_opens_thumbnail_overview_first(tmp_path):
     gallery = _write_photos(tmp_path, 9)
+    result = _service(_view(gallery=gallery)).resolve("property_QL-RF-A2B3_photos__ch")
 
-    view = _view(gallery=gallery, cover_path=str(cover))
-    result = _service(view).resolve("property_QL-RF-A2B3_photos__ch")
-
-    assert result.ok, result
-    assert result.action == "photos"
+    assert result.ok and result.action == "photos"
     assert result.public_listing_id == "QL-RF-A2B3"
-    assert result.source == "channel_listing"  # __ch wired correctly
+    assert result.source == "channel_listing"
     assert result.photos is not None
-
-    # Page 0 = first 4 raw originals. Cover explicitly excluded.
-    flat = _flatten(result.photos.media_groups)
-    assert flat == gallery[0:4]
-    assert str(cover) not in flat
     assert result.photos.photo_total == 9
-
-    # Single inline keyboard row for paging (no legacy "更多实拍" expander).
-    labels = _labels(result.photos)
-    actions = _actions(result.photos)
-
-    paging_row = [a.label for a in result.photos.action_rows[0]]
-    assert paging_row == ["1/3", "下一页 ➡️"]
-    assert "下一页 ➡️" in paging_row, paging_row
-    assert "⬅️ 上一页" not in paging_row, paging_row
-
-    # Legacy expander + cover collage are gone from the real /start surface.
-    assert "📷 更多实拍" not in labels
-    assert "📷 查看全部实拍" not in labels
-
-    # Exit / book / consultant links remain reachable through the album.
-    # 2026-10-03 fix: ⬅️ 返回房源 replaces 📋 房源详情; consult is "咨询这套".
-    assert "📋 房源详情" not in labels
-    assert "⬅️ 返回房源" in labels
-    assert "📋 房源详情" not in labels
-    assert "⬅️ 返回房源" in labels
-    assert "📅 预约看房" in labels
-    assert "💬 咨询这套" in labels
-    assert "💬 中文顾问" not in labels
-
-    # No legacy cover-collage copy in caption or status text.
-    assert "查看全部" not in result.photos.text
-    assert "查看全部" not in result.photos.media_caption
-
-    # Paging controls carry the paged callback format, not the legacy offset.
-    next_btn = next(a for a in actions if a.label == "下一页 ➡️")
-    next_callback = encode_semantic_action(next_btn)
-    parsed = parse_callback(next_callback)
-    assert parsed is not None
-    assert parsed.action == "photos"
-    assert parsed.public_listing_id == "QL-RF-A2B3"
-    assert parsed.page_index == 1
+    assert len(_flatten(result.photos.media_groups)) == 1
+    assert "共 9 张实拍 · 当前预览 8 张" in result.photos.text
+    rows = [[a.label for a in row] for row in result.photos.action_rows]
+    assert rows[0] == ["📸 查看全部原图"]
+    assert rows[-1] == ["⬅️ 返回房源"]
+    raw_btn = result.photos.action_rows[0][0]
+    parsed = parse_callback(encode_semantic_action(raw_btn))
+    assert parsed is not None and parsed.page_index == 0
 
 
-@pytest.mark.parametrize("count", [4, 5, 8, 9])
-def test_start_property_photos_dl_paging_split_is_4_4_1_or_short(tmp_path, count):
-    """9 originals must split into 4 / 4 / 1 pages; smaller counts roll up.
+def test_overview_raw_button_enters_page_zero_then_next_page(tmp_path):
+    gallery = _write_photos(tmp_path, 23)
+    service = _service(_view(gallery=gallery))
+    overview = service.resolve("property_QL-RF-A2B3_photos__ch")
+    raw_btn = overview.photos.action_rows[0][0]
+    parsed = parse_callback(encode_semantic_action(raw_btn))
+    assert parsed is not None and parsed.page_index == 0
 
-    Every page (1, 2, …) must be a real photo, never the cover render or any
-    thumbnail derivative. Page sizes are ``PHOTOS_PAGE_SIZE`` chunks with a
-    final short tail of ``count % 4``.
-    """
+    page0 = service.resolve_action("QL-RF-A2B3", "photos", photo_page=0)
+    assert _flatten(page0.photos.media_groups) == gallery[0:10]
+    next_btn = next(a for a in _actions(page0.photos) if a.label == "下一页 ➡️")
+    parsed_next = parse_callback(encode_semantic_action(next_btn))
+    assert parsed_next is not None and parsed_next.page_index == 1
+
+
+@pytest.mark.parametrize("count", [4, 9, 10, 11, 23])
+def test_start_property_photos_dl_paging_split_by_ten(tmp_path, count):
+    """Pages are ``PHOTOS_PAGE_SIZE`` (10) chunks; every frame is a real photo."""
+    assert PHOTOS_PAGE_SIZE == 10
     cover = tmp_path / "cover.jpg"
     cover.write_bytes(b"cover")
     gallery = _write_photos(tmp_path, count)
@@ -258,78 +225,42 @@ def test_start_property_photos_dl_paging_split_is_4_4_1_or_short(tmp_path, count
     service = _service(view)
 
     expected_pages = (count + PHOTOS_PAGE_SIZE - 1) // PHOTOS_PAGE_SIZE
-    expected_slices = []
+    expected_slices = [
+        gallery[page * PHOTOS_PAGE_SIZE:min((page + 1) * PHOTOS_PAGE_SIZE, count)]
+        for page in range(expected_pages)
+    ]
     for page in range(expected_pages):
-        start = page * PHOTOS_PAGE_SIZE
-        end = min(start + PHOTOS_PAGE_SIZE, count)
-        expected_slices.append(gallery[start:end])
-
-    for page in range(expected_pages):
-        result = service.page(
-            "QL-RF-A2B3", "photos", page=page
-        ) if hasattr(service, "page") else None
-        # PublicListingFlowService exposes resolve_action(photo_page=…)
         result = service.resolve_action(
             "QL-RF-A2B3", "photos", source="listing_callback", photo_page=page
         )
         assert result.ok, (page, result)
         flat = _flatten(result.photos.media_groups)
         assert flat == expected_slices[page], (page, flat, expected_slices[page])
-        # Cover must never appear on any page.
         assert str(cover) not in flat
+        first_row = [a.label for a in result.photos.action_rows[0]]
+        has_pager = any("/" in label for label in first_row)
+        assert has_pager == (expected_pages > 1)
 
-    # 9 → 3 pages of (4, 4, 1). Other counts follow the same chunking.
-    if count == 9:
-        sizes = [len(s) for s in expected_slices]
-        assert sizes == [4, 4, 1]
+    if count == 23:
+        assert [len(s) for s in expected_slices] == [10, 10, 3]
 
 
-def test_start_property_photos_dl_keyboard_has_prev_page_count_next(tmp_path):
-    """First page: 1/total + 下一页 ➡️ (no prev).
-
-    Middle page: ⬅️ 上一页 + N/total + 下一页 ➡️.
-    Last page: ⬅️ 上一页 + N/total + 房源详情 exit (no next).
-    Book + 中文顾问 row is identical to the first-screen listing actions.
-    """
-    gallery = _write_photos(tmp_path, 9)
-    view = _view(gallery=gallery)
-    service = _service(view)
-
-    page0 = service.resolve_action(
-        "QL-RF-A2B3", "photos", source="listing_callback", photo_page=0
-    )
-    row0 = [a.label for a in page0.photos.action_rows[0]]
-    assert row0 == ["1/3", "下一页 ➡️"]
-    assert "下一页 ➡️" in row0
-    assert "⬅️ 上一页" not in row0
-
-    page1 = service.resolve_action(
-        "QL-RF-A2B3", "photos", source="listing_callback", photo_page=1
-    )
-    row1 = [a.label for a in page1.photos.action_rows[0]]
-    assert "⬅️ 上一页" in row1
-    assert row1 == ["⬅️ 上一页", "2/3", "下一页 ➡️"]
-    assert "下一页 ➡️" in row1
-
-    page2 = service.resolve_action(
-        "QL-RF-A2B3", "photos", source="listing_callback", photo_page=2
-    )
-    row2 = [a.label for a in page2.photos.action_rows[0]]
-    assert "⬅️ 上一页" in row2
-    assert row2 == ["⬅️ 上一页", "3/3"]
-    assert "下一页 ➡️" not in row2
-
-    # Every page exposes the same exit / book / consultant row.
-    # 2026-10-03 fix: ⬅️ 返回房源 replaces 📋 房源详情; consult is "咨询这套".
-    for page in (page0, page1, page2):
-        flat_labels = _labels(page.photos)
-        assert "📋 房源详情" not in flat_labels
-        assert "⬅️ 返回房源" in flat_labels
-        assert "📋 房源详情" not in flat_labels
-        assert "⬅️ 返回房源" in flat_labels
-        assert "📅 预约看房" in flat_labels
-        assert "💬 咨询这套" in flat_labels
-        assert "💬 中文顾问" not in flat_labels
+def test_start_property_photos_dl_keyboard_pager_rows(tmp_path):
+    """First: 下一页 › only. Middle: ‹ 上一页 + 下一页 ›. Last: ‹ 上一页 only."""
+    gallery = _write_photos(tmp_path, 23)
+    service = _service(_view(gallery=gallery))
+    pages = [
+        service.resolve_action("QL-RF-A2B3", "photos", source="listing_callback", photo_page=n)
+        for n in (0, 1, 2)
+    ]
+    assert [[a.label for a in p.photos.action_rows[0]] for p in pages] == [
+        ["1/3", "下一页 ➡️"],
+        ["⬅️ 上一页", "2/3", "下一页 ➡️"],
+        ["⬅️ 上一页", "3/3"],
+    ]
+    for page in pages:
+        rows = [[a.label for a in row] for row in page.photos.action_rows]
+        assert rows[1:] == [["📅 预约看房", "💬 咨询这套"], ["⬅️ 返回房源"]]
 
 
 def test_start_property_photos_dl_idempotent_on_repeated_callback(tmp_path):
@@ -348,7 +279,7 @@ def test_start_property_photos_dl_idempotent_on_repeated_callback(tmp_path):
 
 def test_start_property_photos_dl_out_of_range_page_clamps_to_last(tmp_path):
     """A tampered / late page callback lands on the last page, not an empty album."""
-    gallery = _write_photos(tmp_path, 9)
+    gallery = _write_photos(tmp_path, 23)
     view = _view(gallery=gallery)
     service = _service(view)
 
@@ -361,24 +292,13 @@ def test_start_property_photos_dl_out_of_range_page_clamps_to_last(tmp_path):
     assert last.ok and explicit.ok
     assert last.photos.media_groups == explicit.photos.media_groups
     assert last.photos.media_caption == explicit.photos.media_caption
-    # Last page is the trailing 1-frame slice.
-    assert _flatten(last.photos.media_groups) == gallery[8:9]
+    assert _flatten(last.photos.media_groups) == gallery[20:23]
 
 
-def test_start_property_photos_dl_collage_path_unreachable_from_route():
-    """``resolve()`` never enters the cover-collage builder.
-
-    The deep-link entry must hit the paged-album builder exclusively; the
-    legacy cover-first builder is reserved for surfaces that opt in via
-    ``build_photos_response(..., offset=…)``. This locks the contract by
-    inspecting the resolved flow module.
-    """
+def test_start_property_photos_dl_uses_overview_before_raw_pages():
     import v3_core.user_bot.public_flow as flow_mod
 
     src = Path(flow_mod.__file__).read_text(encoding="utf-8")
-    # Deep-link wrapper auto-forwards page 0 for any photos route.
-    assert "photo_page = (\n            0" in src or "photo_page = (0" in src
-    # The paged builder is the real entry. The legacy builder is wired but
-    # only via _render's offset branch, never through resolve().
+    assert "photo_page = (\n            -1" in src or "photo_page = (-1" in src
+    assert "build_photos_overview_response(" in src
     assert "build_photos_page_response(" in src
-    assert "build_photos_response(" in src

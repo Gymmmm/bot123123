@@ -43,10 +43,10 @@ def _card_actions(views: tuple[PublishedListingView, ...], *, index: int, bookab
             SemanticAction("下一套","next",views[next_i].public_listing_id,next_i),
         ))
     if bookable:
-        rows.append((SemanticAction("📷 查看实拍","photos",target),SemanticAction("📅 在线预约","book",target)))
+        rows.append((SemanticAction("📷 查看实拍","photos",target),SemanticAction("📅 预约看房","book",target)))
     else:
         rows.append((SemanticAction("📷 查看实拍","photos",target),))
-    rows.append((SemanticAction("💬 咨询这套","consult",target),SemanticAction("🔍 找相似","similar",target)))
+    rows.append((SemanticAction("💬 咨询这套","consult",target),))
     rows.append((SemanticAction("🔄 调整条件","change_search"),))
     return tuple(rows)
 

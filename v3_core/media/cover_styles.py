@@ -101,7 +101,7 @@ def is_villa_listing(*values: object) -> bool:
 
 def recommended_cover_style(*values: object) -> str:
     """Return the production default: premium photo for ordinary, black gold for villas."""
-    return "black_gold" if is_villa_listing(*values) else "premium_photo"
+    return "premium_photo"
 
 
 def resolve_cover_room_preference(*values: object) -> str:

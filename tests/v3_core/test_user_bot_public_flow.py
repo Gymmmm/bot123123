@@ -84,8 +84,9 @@ def test_details_payload_resolves_all_the_way_to_frozen_public_response():
 
 
 def test_photos_payload_returns_frozen_existing_gallery_response(tmp_path):
+    from PIL import Image
     photo = tmp_path / "room.jpg"
-    photo.write_bytes(b"room")
+    Image.new("RGB", (800, 600), (50, 80, 100)).save(photo)
     result = _service(_view(gallery=[str(photo)])).resolve(
         "property_QL-RF-A2B3_photos"
     )
@@ -93,15 +94,15 @@ def test_photos_payload_returns_frozen_existing_gallery_response(tmp_path):
     assert result.ok
     assert result.action == "photos"
     assert result.photos is not None
-    assert result.photos.media_groups == ((str(photo),),)
-    assert result.photos.photo_path == str(photo)
-    assert result.photos.text.startswith("📷 <b>实拍房源 QL-RF-A2B3</b>")
+    assert result.photos.photo_total == 1
+    assert len(result.photos.media_groups) == 1
+    assert len(result.photos.media_groups[0]) == 1
+    assert result.photos.photo_path.endswith("QL-RF-A2B3.jpg")
+    assert "共 1 张实拍 · 当前预览 1 张" in result.photos.text
     assert "🟢 当前可预约" in result.photos.text
-    assert "📐 95㎡" in result.photos.text
-    assert "💰 押1付1｜1年" in result.photos.text
     assert "富力城" in result.photos.text
     assert "$800/月" in result.photos.text
-    assert "基本信息" not in result.photos.text
+    assert result.photos.action_rows[0][0].label == "📸 查看全部原图"
     assert result.details is None
     assert result.book is None
 

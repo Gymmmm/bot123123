@@ -2,7 +2,7 @@
 
 The service owns cover output naming and the inventory -> renderer contract.
 It does not read drafts or mutate publication packages. ``renderer`` is
-injectable so contracts can be tested without launching Chromium.
+injectable so rendering contracts can be tested independently. Pillow is the production renderer.
 """
 from __future__ import annotations
 

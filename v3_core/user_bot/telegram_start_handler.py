@@ -317,15 +317,18 @@ async def _render_unbookable(
     advisor_url: str = "",
     channel_url: str = "",
 ) -> None:
-    await message.reply_text(
-        "⚠️ <b>这套房暂时不能预约</b>\n\n可以先查看实拍，或让中文顾问确认最新房态。",
-        parse_mode=ParseMode.HTML,
-    )
     if getattr(result, "details", None) is not None:
+        # The details card already carries the precise live state (待确认 / 已租 /
+        # 已下架) and the correct next actions. Do not prepend a second generic
+        # warning message that makes a normal inventory change look like an error.
         await _render_details(
             message, result, advisor_url=advisor_url, channel_url=channel_url
         )
         return
+    await message.reply_text(
+        "⚠️ <b>这套房暂时不能预约</b>\n\n可以让中文顾问确认最新房态。",
+        parse_mode=ParseMode.HTML,
+    )
     await _render_invalid_link(
         message, advisor_url=advisor_url, channel_url=channel_url
     )

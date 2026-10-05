@@ -92,7 +92,7 @@ def test_cover_styles_map_to_distinct_template_paths_and_render_differently(tmp_
 
 
 @pytest.mark.asyncio
-async def test_manual_cover_picker_selects_real_photo_and_preserves_it_across_template_change(tmp_path: Path):
+async def test_manual_cover_next_cycles_real_photos_and_preserves_template(tmp_path: Path):
     candidates = []
     for index, value in enumerate((40, 100, 180)):
         path = tmp_path / f"photo_{index}.jpg"
@@ -123,47 +123,49 @@ async def test_manual_cover_picker_selects_real_photo_and_preserves_it_across_te
     }
     context = SimpleNamespace(user_data={NEW_LISTING_STATE_KEY: state}, bot=object())
 
-    # Default preview uses candidate 0.
     preview = _Message()
     await controller.prepare_manual_preview(preview, context, review_id=workflow.review["review_id"], offer_id=workflow.offer["offer_id"])
     assert workflow.build_calls[-1]["manual_cover_path"] == candidates[0]
 
-    # Picker shows every real candidate and uses short callbacks.
-    picker_message = _Message()
-    update = SimpleNamespace(callback_query=SimpleNamespace(data="v3smp|manual_cover", message=picker_message))
-    assert await controller.handle_callback(update, context) is True
-    photo_calls = [call for call in picker_message.calls if call["kind"] == "photo"]
-    assert [call["path"] for call in photo_calls] == candidates
-    callbacks = [call["reply_markup"].inline_keyboard[0][0].callback_data for call in photo_calls]
-    assert callbacks == ["v3smp|manual_cover_pick|0", "v3smp|manual_cover_pick|1", "v3smp|manual_cover_pick|2"]
-    assert all(len(value.encode("utf-8")) <= 64 for value in callbacks)
-
-    # Select photo 1.
-    update = SimpleNamespace(callback_query=SimpleNamespace(data="v3smp|manual_cover_pick|1", message=_Message()))
+    # Preview-first UX: one tap advances the hero and immediately rebuilds preview.
+    update = SimpleNamespace(callback_query=SimpleNamespace(data="v3smp|manual_cover_next", message=_Message()))
     assert await controller.handle_callback(update, context) is True
     assert workflow.build_calls[-1]["manual_cover_path"] == candidates[1]
 
-    # Select photo 2.
-    update = SimpleNamespace(callback_query=SimpleNamespace(data="v3smp|manual_cover_pick|2", message=_Message()))
+    update = SimpleNamespace(callback_query=SimpleNamespace(data="v3smp|manual_cover_next", message=_Message()))
     assert await controller.handle_callback(update, context) is True
     assert workflow.build_calls[-1]["manual_cover_path"] == candidates[2]
 
-    # Switch template: selected photo 2 survives and the style is persisted.
-    update = SimpleNamespace(callback_query=SimpleNamespace(data="v3smp|manual_style|black_gold", message=_Message()))
+    # Operator menu only exposes current styles; legacy render keys stay backend-compatible.
+    menu_message = _Message()
+    update = SimpleNamespace(callback_query=SimpleNamespace(data="v3smp|manual_templates", message=menu_message))
+    assert await controller.handle_callback(update, context) is True
+    callbacks = [
+        b.callback_data
+        for row in menu_message.calls[-1]["reply_markup"].inline_keyboard
+        for b in row
+        if getattr(b, "callback_data", None)
+    ]
+    assert "v3smp|manual_style|premium_photo" in callbacks
+    assert "v3smp|manual_style|right_price" in callbacks
+    assert "v3smp|manual_style|black_gold" not in callbacks
+    assert "v3smp|manual_style|classic_blue" not in callbacks
+
+    # Switching current template keeps the selected hero.
+    update = SimpleNamespace(callback_query=SimpleNamespace(data="v3smp|manual_style|right_price", message=_Message()))
     assert await controller.handle_callback(update, context) is True
     assert workflow.build_calls[-1]["manual_cover_path"] == candidates[2]
-    assert workflow.build_calls[-1]["cover_style"] == "black_gold"
-    assert context.user_data[NEW_LISTING_STATE_KEY]["cover_style"] == "black_gold"
+    assert workflow.build_calls[-1]["cover_style"] == "right_price"
+    assert context.user_data[NEW_LISTING_STATE_KEY]["cover_style"] == "right_price"
 
-    # Regenerate without an explicit style: session style and selected photo still win.
     await controller.prepare_manual_preview(_Message(), context, review_id=workflow.review["review_id"], offer_id=workflow.offer["offer_id"])
     assert workflow.build_calls[-1]["manual_cover_path"] == candidates[2]
-    assert workflow.build_calls[-1]["cover_style"] == "black_gold"
+    assert workflow.build_calls[-1]["cover_style"] == "right_price"
 
 
 def test_cover_related_callbacks_stay_within_telegram_contract():
     callbacks = [
-        "v3smp|manual_cover",
+        "v3smp|manual_cover_next",
         "v3smp|manual_templates",
         "v3smp|manual_style|classic_blue",
         "v3smp|manual_style|right_price",

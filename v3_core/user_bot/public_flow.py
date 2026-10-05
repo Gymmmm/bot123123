@@ -13,6 +13,7 @@ from .listing_responses import (
     PublicDetailsResponse,
     PublicPhotosResponse,
     build_details_response,
+    build_photos_overview_response,
     build_photos_page_response,
     build_photos_response,
 )
@@ -101,7 +102,9 @@ class PublicListingFlowService:
             # ``photo_page`` is the new paged album contract (preferred).
             # ``photo_offset`` keeps the legacy expand behavior for any older
             # caller that still passes it through.
-            if photo_page is not None:
+            if photo_page is not None and int(photo_page) < 0:
+                photos = build_photos_overview_response(view)
+            elif photo_page is not None:
                 photos = build_photos_page_response(
                     view, page=int(photo_page or 0)
                 )
@@ -139,13 +142,10 @@ class PublicListingFlowService:
             if decision.route is not None
             else ""
         )
-        # Deep-link /start entry into a listing's photos page must hit the
-        # raw-only paged album (page 0). The cover render + 3-frame collage
-        # + 「更多实拍」expander are an old surface that no longer ships
-        # from any /start route. resolve_action callers can still pass
-        # photo_offset when they really mean the offset expand (none do today).
+        # Channel /start photos opens the thumbnail overview first. Explicit
+        # :pg:N callbacks keep the historical raw-album paging contract.
         photo_page = (
-            0
+            -1
             if decision.route is not None and decision.route.action == "photos"
             else None
         )

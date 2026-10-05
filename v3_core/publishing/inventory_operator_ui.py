@@ -65,12 +65,12 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
         recovery_n = self._recovery_unknown_count()
         rows: list[list[InlineKeyboardButton]] = [
             [
-                InlineKeyboardButton("➕ 新建房源", callback_data="v3smp|new"),
-                InlineKeyboardButton("📢 频道运营", callback_data="v3bc"),
+                InlineKeyboardButton("➕ 发布房源", callback_data="v3smp|new"),
+                InlineKeyboardButton("📢 广播中心", callback_data="v3bc"),
             ],
             [
                 InlineKeyboardButton(
-                    f"🔵 房态管理 {pending_n}",
+                    f"🔵 房态工作台 {pending_n}",
                     callback_data="v3smp|listings",
                 ),
                 InlineKeyboardButton(
@@ -90,8 +90,8 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
             )
         rows.append(
             [
-                InlineKeyboardButton("🕘 最近发布", callback_data="v3smp|inv_rows|recent"),
-                InlineKeyboardButton("⚙️ 更多", callback_data="v3smp|settings"),
+                InlineKeyboardButton("📚 发布记录", callback_data="v3smp|inv_rows|recent"),
+                InlineKeyboardButton("⚙️ 发布设置", callback_data="v3smp|settings"),
             ]
         )
         return InlineKeyboardMarkup(rows)
@@ -103,16 +103,16 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
         lines = [
             "<b>📣 侨联发布助手</b>",
             "",
-            "今天先处理需要关注的非 0 事项，其他低频功能都收进了「⚙️ 更多」。",
+            "优先处理待确认、异常和发布恢复。",
             "",
-            f"🔵 房态管理 <b>{pending_n}</b>　⚠️ 异常房源 <b>{exception_n}</b>",
-            f"⚠️ 发布恢复 <b>{recovery_n}</b>",
+            f"🔵 待确认 <b>{pending_n}</b>　⚠️ 异常 <b>{exception_n}</b>",
+            f"↩️ 发布恢复 <b>{recovery_n}</b>",
         ]
         if recovery_n > 0:
             lines.extend(
                 [
                     "",
-                    "有发送结果未确认的房源，请到「⚠️ 发布恢复」人工结案。",
+                    "有发布结果待确认，请进入「发布恢复」处理。",
                 ]
             )
         await message.reply_text(
@@ -127,17 +127,17 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
         lines = [
             "<b>🚀 自动待发</b>",
             "",
-            f"当前自动投递队列：<b>{queued_n}</b> 套",
+            f"待自动发布：<b>{queued_n}</b> 套",
             f"已暂停旧库存：<b>{held_n}</b> 套",
             "",
-            "新采集房源会继续进入「自动待发」，按现有窗口与间隔发布。",
+            "新采集房源会按当前发帖时段自动发布。",
         ]
         buttons: list[list[InlineKeyboardButton]] = []
         if queued_n > 0:
             lines.extend(
                 [
                     "",
-                    "若要先处理旧库存，请暂停当前整批自动待发。",
+                    "需要先处理旧库存时，可暂停当前自动待发。",
                 ]
             )
             buttons.append(
@@ -164,10 +164,10 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
         held_n = self._held_count()
         rows = list(repo.held_rows(limit=15)) if repo is not None and hasattr(repo, "held_rows") else []
         lines = [
-            "<b>📦 旧库存（已暂停自动投递）</b>",
+            "<b>📦 旧库存</b>",
             "",
-            f"共 <b>{held_n}</b> 套，不会进入自动发帖。",
-            "新采集房源不受影响，仍走「自动待发」。",
+            f"已暂停自动发布：<b>{held_n}</b> 套",
+            "新采集房源仍正常进入自动待发。",
             "",
         ]
         if not rows:
@@ -185,7 +185,7 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
             buttons.append(
                 [
                     InlineKeyboardButton(
-                        f"▶️ 恢复旧库存自动投递（{held_n}）",
+                        f"▶️ 恢复旧库存自动发布（{held_n}）",
                         callback_data="v3smp|release_held",
                     )
                 ]
@@ -223,14 +223,14 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
     async def show_listing_categories(self, message: Any) -> None:
         c = self._inventory_counts()
         lines = [
-            "<b>🔵 房态管理</b>",
+            "<b>🔵 房态工作台</b>",
             "",
             f"🔵 待确认 {c['pending']}｜10套一组",
             f"🟢 可预约       {c['active']}",
             f"🟡 已有预约      {c['reserved']}",
             f"🔴 已租出        {c['rented']}",
             f"⚫ 已下架        {c['offline']}",
-            f"🆕 今天新发布    {c['today']}",
+            f"🆕 今日发布    {c['today']}",
             f"⏰ 超3天未确认   {c['overdue']}",
         ]
         await message.reply_text(
@@ -248,12 +248,12 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
                     ],
                     [InlineKeyboardButton(f"⚫ 已下架 {c['offline']}", callback_data="v3smp|inv_rows|offline")],
                     [
-                        InlineKeyboardButton("🆕 今天新发布", callback_data="v3smp|inv_rows|today"),
-                        InlineKeyboardButton("⏰ 超时未确认", callback_data="v3smp|inv_rows|overdue"),
+                        InlineKeyboardButton("🆕 今日发布", callback_data="v3smp|inv_rows|today"),
+                        InlineKeyboardButton("⏰ 超3天未确认", callback_data="v3smp|inv_rows|overdue"),
                     ],
                     [
                         InlineKeyboardButton("🔍 搜索房源", callback_data="v3smp|inv_search"),
-                        InlineKeyboardButton("☑️ 批量管理", callback_data="v3smp|inv_batch"),
+                        InlineKeyboardButton("☑️ 批量更新", callback_data="v3smp|inv_batch"),
                     ],
                     self.home_row(),
                 ]
@@ -357,9 +357,9 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
             "reserved": "🟡 已有预约",
             "rented": "🔴 已租出",
             "offline": "⚫ 已下架",
-            "today": "🆕 今天新发布",
+            "today": "🆕 今日发布",
             "overdue": "⏰ 超3天未确认",
-            "recent": "🕘 最近发布",
+            "recent": "📚 发布记录",
             "search": "🔍 搜索结果",
         }.get(category, category)
 
@@ -375,8 +375,8 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
             buttons.append(
                 [InlineKeyboardButton(f"{index}. {self._button_title(row)}", callback_data=f"v3smp|listing|{row['listing_id']}")]
             )
-        buttons.append([InlineKeyboardButton("☑️ 批量处理", callback_data="v3smp|inv_batch")])
-        buttons.append([InlineKeyboardButton("⬅️ 房态管理", callback_data="v3smp|listings")])
+        buttons.append([InlineKeyboardButton("☑️ 批量更新", callback_data="v3smp|inv_batch")])
+        buttons.append([InlineKeyboardButton("⬅️ 房态工作台", callback_data="v3smp|listings")])
         await message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(buttons))
 
     async def show_inventory_rows(self, message: Any, category: str) -> None:
@@ -456,7 +456,7 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
             rows.append([InlineKeyboardButton("📨 查看频道原帖", url=post_url)])
         rows.extend(
             [
-                [InlineKeyboardButton("⬅️ 返回房态管理", callback_data="v3smp|listings")],
+                [InlineKeyboardButton("⬅️ 返回房态工作台", callback_data="v3smp|listings")],
                 self.home_row(),
             ]
         )
@@ -464,7 +464,7 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
 
     async def show_batch_menu(self, message: Any) -> None:
         await message.reply_text(
-            "<b>☑️ 批量管理</b>\n\n请选择要处理的房源：",
+            "<b>☑️ 批量更新</b>\n\n请选择要处理的房源：",
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(
                 [
@@ -506,7 +506,7 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
             state.update({"scope": scope, "selected": []})
         chosen = {str(value) for value in state.get("selected", [])}
         buttons: list[list[InlineKeyboardButton]] = []
-        lines = ["<b>☑️ 批量管理</b>", "", f"已选择：{len(chosen)}套", ""]
+        lines = ["<b>☑️ 批量更新</b>", "", f"已选择：{len(chosen)}套", ""]
         if not rows:
             lines.append("这个范围当前没有待确认房源。")
         for index, row in enumerate(rows, start=1):
@@ -531,7 +531,7 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
                     [InlineKeyboardButton("❌ 取消选择", callback_data="v3smp|inv_clear")],
                 ]
             )
-        buttons.append([InlineKeyboardButton("⬅️ 返回批量管理", callback_data="v3smp|inv_batch")])
+        buttons.append([InlineKeyboardButton("⬅️ 返回批量更新", callback_data="v3smp|inv_batch")])
         await message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(buttons))
 
     def _apply_selected(self, context: Any, status: str) -> tuple[int, int]:
@@ -653,7 +653,7 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
             updated, skipped = self._apply_selected(context, parts[2])
             await query.message.reply_text(
                 f"✅ 已处理 {updated} 套。" + (f"\n⏭ {skipped} 套房态已变化，未覆盖。" if skipped else ""),
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ 返回房态管理", callback_data="v3smp|listings")]]),
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ 返回房态工作台", callback_data="v3smp|listings")]]),
             )
             return True
         if action == "pbat":
