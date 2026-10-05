@@ -98,7 +98,7 @@ def _extract_layout(text: str) -> tuple[str | None, dict[str, int | None], list[
     # Real feeds may label bedrooms as "房间4" or "房间6+1" immediately after rent.
     # The label is explicit evidence; keep +N as an extra room without guessing its type.
     labelled_rooms = re.search(
-        r"(?:房间|房数|卧室)\\s*[:：]?\\s*(\\d{1,2})(?:\\s*\\+\\s*(\\d{1,2}))?",
+        r"(?:房间|房数|卧室)\\s*[:：]?\\s*(\\d{1,2})(?:\\s*\\+\\s*(\\d{1,2}))?(?!\\d)",
         source,
         flags=re.I,
     )
