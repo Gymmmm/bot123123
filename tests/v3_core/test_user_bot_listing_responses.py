@@ -525,45 +525,61 @@ def test_paged_album_handles_zero_one_three_four_photos(tmp_path):
             assert len(response.media_groups[0]) == expected_end - expected_start
 
 
-def test_paged_album_buttons_include_prev_page_next_only_when_multi_page(tmp_path):
-    body = _fake_jpegs(tmp_path, 10)
-    # 3-photo album fits on a single page (no paging controls).
-    small = _view_with_files(body[:3])
-    single = build_photos_page_response(small, page=0)
-    flat = [a.label for row in single.action_rows for a in row]
-    assert "下一页 ➡️" not in flat
-    assert "⬅️ 上一页" not in flat
-    # 2026-10-03 fix: ⬅️ 返回房源 replaces 📋 房源详情 in the paged album.
-    assert "📋 房源详情" not in flat
-    assert "⬅️ 返回房源" in flat
+def test_paged_album_buttons_show_pager_only_when_multi_page(tmp_path):
+    body = _fake_jpegs(tmp_path, 23)
+    # ≤10 frames fit one album: no pager, no useless "1/1" counter.
+    for count in (3, 4, 10):
+        single = build_photos_page_response(_view_with_files(body[:count]), page=0)
+        rows = [[a.label for a in row] for row in single.action_rows]
+        assert rows == [["📅 预约看房", "💬 咨询这套"], ["⬅️ 返回房源"]], rows
+        flat = [label for row in rows for label in row]
+        assert not any("/" in label for label in flat), flat
+        assert "📋 房源详情" not in flat
 
-    multi_view = _view_with_files(body)
-    first_page = build_photos_page_response(multi_view, page=0)
-    flat0 = [a.label for row in first_page.action_rows for a in row]
-    # Paging 2026-10-02 fix: ⬅️ 下一页 ➡️ on a single row + N/total counter.
-    assert "⬅️ 上一页" not in flat0  # first page never shows ⬅️
-    assert "下一页 ➡️" in flat0
-    assert "1/3" in flat0
-    # Make sure the three controls sit on a single inline-keyboard row.
-    first_inline_row = single_inline_row(first_page)
-    assert first_inline_row == ["1/3", "下一页 ➡️"]
+    multi_view = _view_with_files(body)  # 23 → pages of 10 / 10 / 3
+    first = build_photos_page_response(multi_view, page=0)
+    assert single_inline_row(first) == ["下一页 ›"]
+    mid = build_photos_page_response(multi_view, page=1)
+    assert single_inline_row(mid) == ["‹ 上一页", "下一页 ›"]
+    nxt = mid.action_rows[0][1]
+    assert (nxt.action, nxt.target_index) == ("photos", 2)
+    last = build_photos_page_response(multi_view, page=2)
+    assert single_inline_row(last) == ["‹ 上一页"]
+    for page in (first, mid, last):
+        rows = [[a.label for a in row] for row in page.action_rows]
+        assert rows[1:] == [["📅 预约看房", "💬 咨询这套"], ["⬅️ 返回房源"]]
+        assert not any("/" in label for row in rows for label in row)
 
-    mid_page = build_photos_page_response(multi_view, page=1)
-    flat1 = [a.label for row in mid_page.action_rows for a in row]
-    assert "⬅️ 上一页" in flat1
-    assert "下一页 ➡️" in flat1
-    assert "2/3" in flat1
-    mid_inline_row = single_inline_row(mid_page)
-    assert mid_inline_row == ["⬅️ 上一页", "2/3", "下一页 ➡️"]
 
-    last_page = build_photos_page_response(multi_view, page=2)
-    flat2 = [a.label for row in last_page.action_rows for a in row]
-    assert "⬅️ 上一页" in flat2
-    assert "下一页 ➡️" not in flat2
-    assert "📋 房源详情" not in flat2
-    assert "⬅️ 返回房源" in flat2
-    assert "📋 房源详情" not in flat2
-    assert "⬅️ 返回房源" in flat2
+def test_paged_album_card_and_caption_are_compact(tmp_path):
+    body = _fake_jpegs(tmp_path, 4)
+    response = build_photos_page_response(_view_with_files(body), page=0)
+    assert response.media_caption == "📷 富力城 · 2房1厅 · 共 4 张"
+    assert response.text == chr(10).join([
+        "🏠 <b>富力城｜2房1厅</b>",
+        "💵 $700/月",
+        "🟢 当前可预约",
+        "🆔 QL-RF-A2B3",
+    ])
+    # Page info never duplicated into the card, and no legacy wording.
+    for legacy in ("第 1/1 页", "房源实拍 ·", "实拍房源", "1/1"):
+        assert legacy not in response.media_caption
+        assert legacy not in response.text
+
+    many = build_photos_page_response(_view_with_files(_fake_jpegs(tmp_path, 12)), page=1)
+    assert many.media_caption == "📷 富力城 · 2房1厅 · 共 12 张 · 第 2/2 页"
+    assert "页" not in many.text
+
+
+def test_paged_album_non_bookable_listing_never_offers_booking(tmp_path):
+    body = _fake_jpegs(tmp_path, 4)
+    for listing_status, offer_status in (("rented", "active"), ("offline", "active"), ("active", "inactive")):
+        view = _view_with_files(body)
+        view.listing["inventory_status"] = listing_status
+        view.offer["offer_status"] = offer_status
+        response = build_photos_page_response(view, page=0)
+        rows = [[a.label for a in row] for row in response.action_rows]
+        assert rows == [["💬 咨询这套"], ["⬅️ 返回房源"]], (listing_status, offer_status, rows)
 
 
 def test_paged_album_is_idempotent_on_same_page(tmp_path):
@@ -595,37 +611,43 @@ def single_inline_row(response):
 
 
 def test_paged_album_uses_only_raw_photos_excludes_cover(tmp_path):
-    """Paging 2026-10-02 fix: page 1 must NOT include the cover render.
-
-    ``_raw_photo_paths_for_pages`` skips the cover file by name and by
-    package.cover_path. A 9-photo gallery should produce pages of 4/4/1.
-    """
-    body = _fake_jpegs(tmp_path, 9)
+    """The rendered channel cover/collage is never part of the album."""
+    body = _fake_jpegs(tmp_path, 12)
     cover_path = Path(body[0]).parent / "cover_photo.png"
     cover_path.write_bytes(b"\x89PNG\r\n\x1a\n")
-    view = _view_with_files(
-        body,
-        # Override the default package.cover_path so the cover render lives at
-        # a different file than the gallery originals.
-        cover_path=str(cover_path),
-    )
+    view = _view_with_files(body, cover_path=str(cover_path))
 
     page0 = build_photos_page_response(view, page=0)
     page1 = build_photos_page_response(view, page=1)
-    page2 = build_photos_page_response(view, page=2)
-
-    # First page: exactly the first 4 originals, NOT cover.
-    assert page0.photo_total == 9
-    assert [path for path in page0.media_groups[0]] == [str(p) for p in body[:4]]
-    # Cover is never part of the paged album.
-    for page in (page0, page1, page2):
+    assert page0.photo_total == 12
+    assert list(page0.media_groups[0]) == [str(p) for p in body[:10]]
+    assert list(page1.media_groups[0]) == [str(p) for p in body[10:12]]
+    for page in (page0, page1):
         for group in page.media_groups:
             assert str(cover_path) not in group
 
-    # Page sizes 4 / 4 / 1 for 9 originals.
-    assert len(page1.media_groups[0]) == 4
-    assert [path for path in page1.media_groups[0]] == [str(p) for p in body[4:8]]
-    assert [path for path in page2.media_groups[0]] == [str(p) for p in body[8:9]]
+
+def test_paged_album_puts_frozen_hero_first(tmp_path):
+    """Hero (branded cover-source, e.g. villa facade) opens the album."""
+    body = _fake_jpegs(tmp_path, 4)
+    hero = tmp_path / "hero_landscape_x_gallery.jpg"
+    hero.write_bytes(Path(body[0]).read_bytes())
+    view = _view_with_files(body)
+    view.package["source_identity_json"] = json.dumps({"album_hero_path": str(hero)})
+    response = build_photos_page_response(view, page=0)
+    assert list(response.media_groups[0]) == [str(hero), *body]
+    assert response.photo_total == 5
+    assert response.media_caption.endswith("共 5 张")
+
+
+def test_paged_album_missing_hero_file_keeps_gallery_order(tmp_path):
+    body = _fake_jpegs(tmp_path, 4)
+    view = _view_with_files(body)
+    view.package["source_identity_json"] = json.dumps(
+        {"album_hero_path": str(tmp_path / "gone.jpg")}
+    )
+    response = build_photos_page_response(view, page=0)
+    assert list(response.media_groups[0]) == body
 
 
 def test_more_photos_button_wires_page0_not_legacy_offset():

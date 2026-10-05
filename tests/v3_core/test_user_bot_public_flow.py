@@ -95,12 +95,13 @@ def test_photos_payload_returns_frozen_existing_gallery_response(tmp_path):
     assert result.photos is not None
     assert result.photos.media_groups == ((str(photo),),)
     assert result.photos.photo_path == str(photo)
-    assert result.photos.text.startswith("📷 <b>实拍房源 QL-RF-A2B3</b>")
-    assert "🟢 当前可预约" in result.photos.text
-    assert "📐 95㎡" in result.photos.text
-    assert "💰 押1付1｜1年" in result.photos.text
-    assert "富力城" in result.photos.text
-    assert "$800/月" in result.photos.text
+    # Compact card under the album: title, price, status, QL id only.
+    assert result.photos.text == "\n".join([
+        "🏠 <b>富力城｜2房1厅</b>",
+        "💵 $800/月",
+        "🟢 当前可预约",
+        "🆔 QL-RF-A2B3",
+    ])
     assert "基本信息" not in result.photos.text
     assert result.details is None
     assert result.book is None

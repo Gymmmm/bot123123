@@ -2,12 +2,13 @@
 
 Channel deep links (``property_<id>_photos`` etc.) MUST go straight to the
 raw-only paged album — never the legacy cover collage + "更多实拍" expander.
-Product lock (Task — 真实入口 photos 上线):
-    * page 0 must equal ``raw_gallery[0:4]`` (cover/collage excluded);
-    * first-page action row is "1/3" + "下一页 ➡️" (no "📷 更多实拍");
-    * page 1 must equal ``raw_gallery[4:8]``;
-    * page 2 must equal ``raw_gallery[8]``;
-    * "房源详情 / 预约 / 中文顾问" stay reachable through the album.
+Product lock (2026-10-05 「更多实拍」 redo):
+    * one page = one native Telegram album of up to 10 real photos
+      (cover render / collage excluded);
+    * pager ``‹ 上一页 / 下一页 ›`` only when there is more than one page,
+      never a ``1/1`` counter;
+    * caption only on the first frame; then exactly ONE compact card with
+      📅 预约看房 + 💬 咨询这套 / ⬅️ 返回房源.
 """
 from __future__ import annotations
 
@@ -110,7 +111,7 @@ def _write_photos(tmp_path, n: int, *, prefix="photo") -> list[str]:
 
 
 def test_deeplink_photos_routes_to_paged_album_page_zero_raw_only(tmp_path):
-    """``/start property_<id>_photos`` → paged album, page 0, no cover."""
+    """``/start property_<id>_photos`` → one album with all 9 originals, no cover."""
     cover = tmp_path / "cover.jpg"
     cover.write_bytes(b"cover")
     gallery = _write_photos(tmp_path, 9)
@@ -120,82 +121,36 @@ def test_deeplink_photos_routes_to_paged_album_page_zero_raw_only(tmp_path):
 
     assert result.ok and result.action == "photos"
     assert result.photos is not None
-
-    # Page 0: first 4 raw gallery frames, cover explicitly excluded.
-    assert _flatten(result.photos.media_groups) == gallery[0:4]
+    assert _flatten(result.photos.media_groups) == gallery
     assert str(cover) not in _flatten(result.photos.media_groups)
-
-    # 9 frames → 3 pages.
     assert result.photos.photo_total == 9
 
-    labels = _labels(result.photos)
-    actions = _actions(result.photos)
-
-    # Paging row: 1/3 + 下一页 (no prev on first page).
-    assert "1/3" in labels
-    assert "下一页 ➡️" in labels
-    assert "⬅️ 上一页" not in labels
-
-    # Old "more raw photos" expander is gone from the real /start entry.
-    assert "📷 更多实拍" not in labels
-
-    # ⬅️ 返回房源 replaces 📋 房源详情; consult is "咨询这套" (2026-10-03).
-    assert "📋 房源详情" not in labels
-    assert "⬅️ 返回房源" in labels
-    assert "📋 房源详情" not in labels
-    assert "⬅️ 返回房源" in labels
-    assert "📅 预约看房" in labels
-    assert "💬 咨询这套" in labels
-
-    # No caption text in the album carries the old "查看全部实拍" copy.
-    assert "查看全部实拍" not in result.photos.text
+    rows = [[a.label for a in row] for row in result.photos.action_rows]
+    assert rows == [["📅 预约看房", "💬 咨询这套"], ["⬅️ 返回房源"]]
+    assert result.photos.media_caption == "📷 富力城 · 2房1厅 · 共 9 张"
     assert "查看全部" not in result.photos.text
+    assert "页" not in result.photos.text
 
 
-def test_deeplink_photos_page_one_returns_raw_slice_four_to_eight(tmp_path):
-    """``/start property_<id>_photos__ph`` still routes to paged album, page 0.
-
-    The action bar can also page forward through the photos callback. Page 1
-    must show the next 4 raw frames and switch the paging row to
-    prev + 2/3 + next.
-    """
-    gallery = _write_photos(tmp_path, 9)
-    view = _view(gallery=gallery)
-
-    page1 = _service(view).resolve_action(
-        "QL-RF-A2B3",
-        "photos",
-        source="listing_callback",
-        photo_page=1,
+def test_deeplink_photos_page_one_returns_raw_slice_ten_to_twenty(tmp_path):
+    gallery = _write_photos(tmp_path, 23)
+    page1 = _service(_view(gallery=gallery)).resolve_action(
+        "QL-RF-A2B3", "photos", source="listing_callback", photo_page=1
     )
-
     assert page1.ok and page1.photos is not None
-    assert _flatten(page1.photos.media_groups) == gallery[4:8]
-    labels = _labels(page1.photos)
-    assert labels[0] == "⬅️ 上一页"
-    assert "2/3" in labels
-    assert "下一页 ➡️" in labels
+    assert _flatten(page1.photos.media_groups) == gallery[10:20]
+    assert [a.label for a in page1.photos.action_rows[0]] == ["‹ 上一页", "下一页 ›"]
+    assert page1.photos.media_caption.endswith("共 23 张 · 第 2/3 页")
 
 
-def test_deeplink_photos_page_two_returns_last_raw_frame_with_prev_only(tmp_path):
-    """Last page is the trailing slice; next is hidden, prev is shown."""
-    gallery = _write_photos(tmp_path, 9)
-    view = _view(gallery=gallery)
-
-    page2 = _service(view).resolve_action(
-        "QL-RF-A2B3",
-        "photos",
-        source="listing_callback",
-        photo_page=2,
+def test_deeplink_photos_last_page_returns_tail_with_prev_only(tmp_path):
+    gallery = _write_photos(tmp_path, 23)
+    page2 = _service(_view(gallery=gallery)).resolve_action(
+        "QL-RF-A2B3", "photos", source="listing_callback", photo_page=2
     )
-
     assert page2.ok and page2.photos is not None
-    assert _flatten(page2.photos.media_groups) == gallery[8:9]
-    labels = _labels(page2.photos)
-    assert "⬅️ 上一页" in labels
-    assert "3/3" in labels
-    # Last page hides the "next" arrow to prevent overshoot.
-    assert "下一页 ➡️" not in labels
+    assert _flatten(page2.photos.media_groups) == gallery[20:23]
+    assert [a.label for a in page2.photos.action_rows[0]] == ["‹ 上一页"]
 
 
 def test_deeplink_photos_excludes_cover_named_assets_from_paging(tmp_path):
@@ -203,7 +158,6 @@ def test_deeplink_photos_excludes_cover_named_assets_from_paging(tmp_path):
     cover = tmp_path / "cover.jpg"
     cover.write_bytes(b"cover")
     framed = _write_photos(tmp_path, 5)
-    # Legacy package: cover listed first inside the gallery array.
     gallery = [str(cover)] + framed
 
     view = _view(gallery=gallery, cover_path=str(cover))
@@ -212,10 +166,9 @@ def test_deeplink_photos_excludes_cover_named_assets_from_paging(tmp_path):
     assert result.ok and result.photos is not None
     flat = _flatten(result.photos.media_groups)
     assert str(cover) not in flat
-    assert flat == framed[0:4]
-    # 5 frames → 2 pages, page 0 still pure originals.
-    assert "下一页 ➡️" in _labels(result.photos)
-    assert "1/2" in _labels(result.photos)
+    assert flat == framed
+    labels = _labels(result.photos)
+    assert not any("页" in label or "/" in label for label in labels)
 
 
 def test_deeplink_photos_collage_path_is_unreachable_from_start_route():
@@ -344,21 +297,18 @@ def _entry_view(*, gallery=(), cover_path=""):
 
 @pytest.mark.asyncio
 async def test_entry_integration_nine_photos_opens_page_zero_raw_only_via_start(tmp_path):
-    """``/start property_<id>_photos`` opens page 0 of the paged album end-to-end.
+    """``/start property_<id>_photos`` end-to-end message sequence.
 
-    Drives handle_v3_start with a 9-original listing + a separate cover. Page 0
-    must send the first 4 raw frames (cover render excluded, no collage, no
-    legacy "更多实拍") and the action bar must show "1/3" + "下一页 ➡️" only
-    (no ⬅️ 上一页 on first page). The keyboard still carries 房源详情 /
-    预约 / 中文顾问 so the user can exit cleanly.
+    Exactly: one sendMediaGroup (9 real frames, caption on frame 1 only) then
+    ONE compact card with 📅 预约看房 + 💬 咨询这套 / ⬅️ 返回房源. No collage,
+    no "1/1" counter, no stray extra 返回房源 message.
     """
     cover = tmp_path / "cover.jpg"
     cover.write_bytes(b"COVER")
     gallery = _write_photos(tmp_path, 9)
 
     view = _entry_view(gallery=gallery, cover_path=str(cover))
-    inventory = MemoryPublishedInventory(view)
-    listings = PublicListingFlowService(PublicRouteService(inventory))
+    listings = PublicListingFlowService(PublicRouteService(MemoryPublishedInventory(view)))
     message = _StubMessage()
     bot = _StubBot()
     context = SimpleNamespace(
@@ -375,88 +325,55 @@ async def test_entry_integration_nine_photos_opens_page_zero_raw_only_via_start(
         channel_url="https://t.me/qiaolian",
     )
 
-    # Entry contract: /start property_photos beats the public flow → page 0.
     assert outcome.handled and outcome.kind == "photos"
-    assert outcome.payload == "property_QL-RF-A2B3_photos__ch"
     assert outcome.result is not None
-    assert outcome.result.public_listing_id == "QL-RF-A2B3"
     assert outcome.result.source == "channel_listing"
 
-    # Page 0: a single MediaGroup of exactly 4 raw frames.
-    media_calls = [c for c in bot.calls if c[0] == "send_media_group"]
-    assert len(media_calls) == 1
-    frames = media_calls[0][2]["media"]
-    assert len(frames) == 4
-    # Cover render is excluded from every page of the paged album.
-    cover_bytes = cover.read_bytes()
-    for frame in frames:
-        raw = (
-            frame.media.input_file_content
-            if hasattr(frame.media, "input_file_content")
-            else frame.media
-        )
-        assert raw != cover_bytes
-    # First 4 originals go out byte-for-byte, in gallery order.
-    actual_frame_bytes = []
-    for frame in frames:
-        if hasattr(frame.media, "input_file_content"):
-            actual_frame_bytes.append(frame.media.input_file_content)
-        elif isinstance(frame.media, (bytes, bytearray)):
-            actual_frame_bytes.append(bytes(frame.media))
-        else:
-            actual_frame_bytes.append(bytes(frame.media.read()))
-    assert actual_frame_bytes == [
-        Path(gallery[i]).read_bytes() for i in range(4)
-    ]
-    # Caption says 1/3 and references the listing (page index, not a cover).
-    caption = frames[0].caption
-    assert "1/3" in caption
-    assert "9 张" in caption
-    # No legacy collages, no "查看全部实拍" copy on the /start entry.
-    assert "查看全部实拍" not in repr(bot.calls)
-    assert "更多实拍" not in repr(bot.calls)
+    # Exact sequence: album, then one card. Nothing via reply_text.
+    assert [c[0] for c in bot.calls] == ["send_media_group", "send_message"]
+    assert message.calls == []
 
-    # Action bar message has the paged-album keyboard.
-    send_msg = [c for c in bot.calls if c[0] == "send_message"]
-    assert len(send_msg) == 1
-    action_text = send_msg[0][2]["text"]
-    keyboard = send_msg[0][2].get("reply_markup")
-    assert "🟢 当前可预约" in action_text  # status bar
-    assert keyboard is not None
-    keyboard_text = repr(keyboard)
-    # Single-row paging: 1/3 + 下一页 ➡️ on first page, no ⬅️.
-    assert "1/3" in keyboard_text
-    assert "下一页 ➡️" in keyboard_text
-    assert "⬅️ 上一页" not in keyboard_text
-    # Legacy expander gone, exit + book + advisor stay reachable.
-    assert "📷 更多实拍" not in keyboard_text
-    assert "📋 房源详情" not in keyboard_text
-    assert "⬅️ 返回房源" in keyboard_text
-    assert "📅 预约看房" in keyboard_text
-    assert "💬 咨询这套" in keyboard_text
-    # Privacy: internal listing_id never leaks to the bot.
-    assert "LST_INT_1" not in action_text
-    assert "LST_INT_1" not in caption
-    assert "LST_INT_1" not in keyboard_text
+    frames = bot.calls[0][2]["media"]
+    assert len(frames) == 9
+    actual = []
+    for frame in frames:
+        media = frame.media
+        if hasattr(media, "input_file_content"):
+            actual.append(media.input_file_content)
+        elif isinstance(media, (bytes, bytearray)):
+            actual.append(bytes(media))
+        else:
+            actual.append(bytes(media.read()))
+    assert actual == [Path(p).read_bytes() for p in gallery]
+    assert cover.read_bytes() not in actual
+    assert frames[0].caption == "📷 富力城 · 2房1厅 · 共 9 张"
+    assert all(not frame.caption for frame in frames[1:])
+
+    card = bot.calls[1][2]
+    assert card["text"] == "\n".join([
+        "🏠 <b>富力城｜2房1厅</b>",
+        "💵 $800/月",
+        "🟢 当前可预约",
+        "🆔 QL-RF-A2B3",
+    ])
+    labels = [[b.text for b in row] for row in card["reply_markup"].inline_keyboard]
+    assert labels == [["📅 预约看房", "💬 咨询这套"], ["⬅️ 返回房源"]]
+    blob = repr(bot.calls)
+    for legacy in ("1/1", "第 1/1 页", "房源实拍 ·", "查看全部实拍", "更多实拍"):
+        assert legacy not in blob
+    assert "LST_INT_1" not in blob
 
 
 @pytest.mark.asyncio
-async def test_entry_integration_pagination_through_callback_router_4_4_1(tmp_path):
-    """In-app paging callbacks route to page 1 (next 4 frames) and page 2 (last 1).
-
-    Drives ``CallbackRouter.dispatch`` with ``v3u:listing:photos:QL-*:pg:1``
-    → page 1 must produce ``raw_gallery[4:8]`` with a keyboard containing
-    ⬅️ 上一页 + 2/3 + 下一页 ➡️; ``...:pg:2`` → page 2 must produce
-    ``raw_gallery[8:9]`` with ⬅️ 上一页 + 3/3 + 房源详情 exit.
-    """
+async def test_entry_integration_pagination_through_callback_router_10_10_3(tmp_path):
+    """In-app paging callbacks: 23 originals → pages of 10 / 10 / 3."""
     from v3_core.user_bot.callback_router import CallbackRouter
 
-    gallery = _write_photos(tmp_path, 9)
+    gallery = _write_photos(tmp_path, 23)
     cover = tmp_path / "cover.jpg"
     cover.write_bytes(b"COVER")
     view = _entry_view(gallery=gallery, cover_path=str(cover))
-    inventory = MemoryPublishedInventory(view)
-    listings = PublicListingFlowService(PublicRouteService(inventory))
+    listings = PublicListingFlowService(PublicRouteService(MemoryPublishedInventory(view)))
     router = CallbackRouter(
         listings=listings,
         search_sessions=SimpleNamespace(
@@ -464,48 +381,18 @@ async def test_entry_integration_pagination_through_callback_router_4_4_1(tmp_pa
         ),
     )
 
-    # Page 1
-    result_p1 = router.dispatch(
-        "v3u:listing:photos:QL-RF-A2B3:pg:1",
-        source="listing_callback",
-    )
-    assert result_p1.status == "ok"
-    assert result_p1.action == "photos"
-    photos_p1 = result_p1.listing.photos
-    assert photos_p1 is not None
-    assert photos_p1.photo_total == 9
-    # Page 1: 4 raw originals gallery[4:8], no cover.
-    assert len(photos_p1.media_groups[0]) == 4
-    assert [str(p) for p in photos_p1.media_groups[0]] == gallery[4:8]
-    # Paging row: ⬅️ 上一页 + 2/3 + 下一页 ➡️.
-    flat_labels_p1 = [a.label for row in photos_p1.action_rows for a in row]
-    assert "⬅️ 上一页" in flat_labels_p1
-    assert "下一页 ➡️" in flat_labels_p1
-    assert "2/3" in flat_labels_p1
+    p1 = router.dispatch("v3u:listing:photos:QL-RF-A2B3:pg:1", source="listing_callback")
+    assert p1.status == "ok" and p1.action == "photos"
+    photos_p1 = p1.listing.photos
+    assert photos_p1.photo_total == 23
+    assert [str(p) for p in photos_p1.media_groups[0]] == gallery[10:20]
+    assert [a.label for a in photos_p1.action_rows[0]] == ["‹ 上一页", "下一页 ›"]
 
-    # Page 2: last 1 frame, only ⬅️, exit button.
-    result_p2 = router.dispatch(
-        "v3u:listing:photos:QL-RF-A2B3:pg:2",
-        source="listing_callback",
-    )
-    assert result_p2.status == "ok"
-    photos_p2 = result_p2.listing.photos
-    assert photos_p2 is not None
-    # Page 2: 1 trailing raw original gallery[8:9], no cover.
-    assert [str(p) for p in photos_p2.media_groups[0]] == gallery[8:9]
-    flat_labels_p2 = [a.label for row in photos_p2.action_rows for a in row]
-    assert "⬅️ 上一页" in flat_labels_p2
-    assert "下一页 ➡️" not in flat_labels_p2
-    assert "3/3" in flat_labels_p2
-    assert "📋 房源详情" not in flat_labels_p2
-    assert "⬅️ 返回房源" in flat_labels_p2
-    assert "📋 房源详情" not in flat_labels_p2
-    assert "⬅️ 返回房源" in flat_labels_p2
+    p2 = router.dispatch("v3u:listing:photos:QL-RF-A2B3:pg:2", source="listing_callback")
+    photos_p2 = p2.listing.photos
+    assert [str(p) for p in photos_p2.media_groups[0]] == gallery[20:23]
+    rows = [[a.label for a in row] for row in photos_p2.action_rows]
+    assert rows == [["‹ 上一页"], ["📅 预约看房", "💬 咨询这套"], ["⬅️ 返回房源"]]
 
-    # And the legacy expander never appears in any keyboard.
-    assert "📷 更多实拍" not in flat_labels_p1
-    assert "📷 更多实拍" not in flat_labels_p2
-    # Cover render excluded from every page's media.
-    cover_str = str(cover)
     for group in (photos_p1.media_groups[0], photos_p2.media_groups[0]):
-        assert cover_str not in {str(p) for p in group}
+        assert str(cover) not in {str(p) for p in group}

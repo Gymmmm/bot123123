@@ -213,3 +213,50 @@ def test_branded_gallery_excludes_cover_source(tmp_path):
     assert cover not in gallery
     # Still keep other framed shots when multiple sources exist.
     assert len(prepared.gallery_paths) == len(paths) - 1
+
+
+def test_prepare_writes_branded_album_hero_outside_gallery(tmp_path):
+    """「更多实拍」 album hero = cover-source, branded like gallery, not in gallery."""
+    db, source_id, paths = _source(tmp_path, "hero")
+    prepared_dir = tmp_path / "prepared-hero"
+    prepared = MediaPreparationService(
+        SourceReader(str(db)), prepared_dir=prepared_dir
+    ).prepare(source_post_id=source_id, cover_style="premium_photo")
+    hero = prepared.source_identity.get("album_hero_path")
+    assert hero and Path(hero).is_file()
+    assert Path(hero).parent.name == "album_hero"
+    assert Path(hero).name.endswith("_gallery.jpg")
+    assert hero not in prepared.gallery_paths
+    # Channel cover pipeline untouched: gallery still excludes the cover source.
+    assert len(prepared.gallery_paths) == len(paths) - 1
+    with Image.open(hero) as hero_img, Image.open(prepared.gallery_paths[0]) as gal_img:
+        assert hero_img.size == gal_img.size  # same canvas as gallery frames
+
+
+def test_album_hero_recovered_for_legacy_package_without_hero_path(tmp_path, monkeypatch):
+    import json
+
+    from v3_core.media.album_hero import _HERO_CACHE, album_hero_for_package
+
+    db, source_id, _paths = _source(tmp_path, "legacy")
+    prepared = MediaPreparationService(
+        SourceReader(str(db)), prepared_dir=tmp_path / "prepared-legacy"
+    ).prepare(source_post_id=source_id, cover_style="premium_photo")
+    identity = dict(prepared.source_identity)
+    identity.pop("album_hero_path", None)
+    monkeypatch.setenv("QIAOLIAN_ALBUM_HERO_CACHE_DIR", str(tmp_path / "hero-cache"))
+    _HERO_CACHE.clear()
+    package = {
+        "package_id": "PKG_LEGACY_1",
+        "source_identity_json": json.dumps(identity),
+        "cover_style": "premium_photo",
+    }
+    hero = album_hero_for_package(package, prepared.gallery_paths)
+    assert hero and Path(hero).is_file()
+    assert Path(hero).parent == (tmp_path / "hero-cache").resolve()
+    assert hero not in prepared.gallery_paths
+    # Ambiguous / foreign identity → no hero, album keeps gallery order.
+    _HERO_CACHE.clear()
+    bad = dict(package, package_id="PKG_LEGACY_2",
+               source_identity_json=json.dumps({**identity, "gallery_brand_revision": "old"}))
+    assert album_hero_for_package(bad, prepared.gallery_paths) == ""

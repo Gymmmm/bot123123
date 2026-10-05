@@ -3,9 +3,9 @@
 This is the integration-level entry contract that proves the real /start entry
 surface (``property_<id>_photos`` and friends) lands on the raw-only paged album
 from the moment the user opens the channel link — no cover render, no collage,
-no legacy 「更多实拍」 expander, and the album splits 9 originals into pages of
-``4 / 4 / 1`` so every page is a real photo that opens in Telegram's native
-viewer.
+no legacy 「更多实拍」 expander. One page = one native Telegram album of up to
+10 real photos (23 originals → ``10 / 10 / 3``); the pager only shows up when
+there is more than one page.
 
 The contract covers the full path:
     payload -> parse_channel_start_payload -> PublicRouteService
@@ -179,8 +179,8 @@ def test_route_decision_unblocks_rooms_photos_for_live_owner():
 # --- layer 3: full flow integration -----------------------------------------
 
 
-def test_start_property_photos_dl_drops_user_into_4_raw_originals_not_cover(tmp_path):
-    """``/start property_<id>_photos__ch`` lands on page 0 = raw[0:4].
+def test_start_property_photos_dl_drops_user_into_raw_album_not_cover(tmp_path):
+    """``/start property_<id>_photos__ch`` lands on page 0 = raw[0:10].
 
     Cover (frozen package render + side collage + "更多实拍" expander) MUST
     NOT be present in any layer. This is the entry the user sees when they
@@ -199,57 +199,42 @@ def test_start_property_photos_dl_drops_user_into_4_raw_originals_not_cover(tmp_
     assert result.source == "channel_listing"  # __ch wired correctly
     assert result.photos is not None
 
-    # Page 0 = first 4 raw originals. Cover explicitly excluded.
+    # 9 originals fit one album. Cover explicitly excluded.
     flat = _flatten(result.photos.media_groups)
-    assert flat == gallery[0:4]
+    assert flat == gallery
     assert str(cover) not in flat
     assert result.photos.photo_total == 9
 
-    # Single inline keyboard row for paging (no legacy "更多实拍" expander).
+    # Single page: no pager, no "1/1" counter, no legacy expander.
+    rows = [[a.label for a in row] for row in result.photos.action_rows]
+    assert rows == [["📅 预约看房", "💬 咨询这套"], ["⬅️ 返回房源"]]
     labels = _labels(result.photos)
-    actions = _actions(result.photos)
-
-    paging_row = [a.label for a in result.photos.action_rows[0]]
-    assert paging_row == ["1/3", "下一页 ➡️"]
-    assert "下一页 ➡️" in paging_row, paging_row
-    assert "⬅️ 上一页" not in paging_row, paging_row
-
-    # Legacy expander + cover collage are gone from the real /start surface.
     assert "📷 更多实拍" not in labels
     assert "📷 查看全部实拍" not in labels
-
-    # Exit / book / consultant links remain reachable through the album.
-    # 2026-10-03 fix: ⬅️ 返回房源 replaces 📋 房源详情; consult is "咨询这套".
-    assert "📋 房源详情" not in labels
-    assert "⬅️ 返回房源" in labels
-    assert "📋 房源详情" not in labels
-    assert "⬅️ 返回房源" in labels
-    assert "📅 预约看房" in labels
-    assert "💬 咨询这套" in labels
     assert "💬 中文顾问" not in labels
 
-    # No legacy cover-collage copy in caption or status text.
+    assert result.photos.media_caption == "📷 富力城 · 2房1厅 · 共 9 张"
     assert "查看全部" not in result.photos.text
-    assert "查看全部" not in result.photos.media_caption
+    assert "页" not in result.photos.text
 
-    # Paging controls carry the paged callback format, not the legacy offset.
-    next_btn = next(a for a in actions if a.label == "下一页 ➡️")
-    next_callback = encode_semantic_action(next_btn)
-    parsed = parse_callback(next_callback)
+
+def test_start_property_photos_dl_next_page_uses_paged_callback(tmp_path):
+    gallery = _write_photos(tmp_path, 23)
+    result = _service(_view(gallery=gallery)).resolve("property_QL-RF-A2B3_photos__ch")
+    assert _flatten(result.photos.media_groups) == gallery[0:10]
+    actions = _actions(result.photos)
+    next_btn = next(a for a in actions if a.label == "下一页 ›")
+    parsed = parse_callback(encode_semantic_action(next_btn))
     assert parsed is not None
     assert parsed.action == "photos"
     assert parsed.public_listing_id == "QL-RF-A2B3"
     assert parsed.page_index == 1
 
 
-@pytest.mark.parametrize("count", [4, 5, 8, 9])
-def test_start_property_photos_dl_paging_split_is_4_4_1_or_short(tmp_path, count):
-    """9 originals must split into 4 / 4 / 1 pages; smaller counts roll up.
-
-    Every page (1, 2, …) must be a real photo, never the cover render or any
-    thumbnail derivative. Page sizes are ``PHOTOS_PAGE_SIZE`` chunks with a
-    final short tail of ``count % 4``.
-    """
+@pytest.mark.parametrize("count", [4, 9, 10, 11, 23])
+def test_start_property_photos_dl_paging_split_by_ten(tmp_path, count):
+    """Pages are ``PHOTOS_PAGE_SIZE`` (10) chunks; every frame is a real photo."""
+    assert PHOTOS_PAGE_SIZE == 10
     cover = tmp_path / "cover.jpg"
     cover.write_bytes(b"cover")
     gallery = _write_photos(tmp_path, count)
@@ -258,78 +243,42 @@ def test_start_property_photos_dl_paging_split_is_4_4_1_or_short(tmp_path, count
     service = _service(view)
 
     expected_pages = (count + PHOTOS_PAGE_SIZE - 1) // PHOTOS_PAGE_SIZE
-    expected_slices = []
+    expected_slices = [
+        gallery[page * PHOTOS_PAGE_SIZE:min((page + 1) * PHOTOS_PAGE_SIZE, count)]
+        for page in range(expected_pages)
+    ]
     for page in range(expected_pages):
-        start = page * PHOTOS_PAGE_SIZE
-        end = min(start + PHOTOS_PAGE_SIZE, count)
-        expected_slices.append(gallery[start:end])
-
-    for page in range(expected_pages):
-        result = service.page(
-            "QL-RF-A2B3", "photos", page=page
-        ) if hasattr(service, "page") else None
-        # PublicListingFlowService exposes resolve_action(photo_page=…)
         result = service.resolve_action(
             "QL-RF-A2B3", "photos", source="listing_callback", photo_page=page
         )
         assert result.ok, (page, result)
         flat = _flatten(result.photos.media_groups)
         assert flat == expected_slices[page], (page, flat, expected_slices[page])
-        # Cover must never appear on any page.
         assert str(cover) not in flat
+        has_pager = any("页" in a.label for a in result.photos.action_rows[0])
+        assert has_pager == (expected_pages > 1)
 
-    # 9 → 3 pages of (4, 4, 1). Other counts follow the same chunking.
-    if count == 9:
-        sizes = [len(s) for s in expected_slices]
-        assert sizes == [4, 4, 1]
+    if count == 23:
+        assert [len(s) for s in expected_slices] == [10, 10, 3]
 
 
-def test_start_property_photos_dl_keyboard_has_prev_page_count_next(tmp_path):
-    """First page: 1/total + 下一页 ➡️ (no prev).
-
-    Middle page: ⬅️ 上一页 + N/total + 下一页 ➡️.
-    Last page: ⬅️ 上一页 + N/total + 房源详情 exit (no next).
-    Book + 中文顾问 row is identical to the first-screen listing actions.
-    """
-    gallery = _write_photos(tmp_path, 9)
-    view = _view(gallery=gallery)
-    service = _service(view)
-
-    page0 = service.resolve_action(
-        "QL-RF-A2B3", "photos", source="listing_callback", photo_page=0
-    )
-    row0 = [a.label for a in page0.photos.action_rows[0]]
-    assert row0 == ["1/3", "下一页 ➡️"]
-    assert "下一页 ➡️" in row0
-    assert "⬅️ 上一页" not in row0
-
-    page1 = service.resolve_action(
-        "QL-RF-A2B3", "photos", source="listing_callback", photo_page=1
-    )
-    row1 = [a.label for a in page1.photos.action_rows[0]]
-    assert "⬅️ 上一页" in row1
-    assert row1 == ["⬅️ 上一页", "2/3", "下一页 ➡️"]
-    assert "下一页 ➡️" in row1
-
-    page2 = service.resolve_action(
-        "QL-RF-A2B3", "photos", source="listing_callback", photo_page=2
-    )
-    row2 = [a.label for a in page2.photos.action_rows[0]]
-    assert "⬅️ 上一页" in row2
-    assert row2 == ["⬅️ 上一页", "3/3"]
-    assert "下一页 ➡️" not in row2
-
-    # Every page exposes the same exit / book / consultant row.
-    # 2026-10-03 fix: ⬅️ 返回房源 replaces 📋 房源详情; consult is "咨询这套".
-    for page in (page0, page1, page2):
-        flat_labels = _labels(page.photos)
-        assert "📋 房源详情" not in flat_labels
-        assert "⬅️ 返回房源" in flat_labels
-        assert "📋 房源详情" not in flat_labels
-        assert "⬅️ 返回房源" in flat_labels
-        assert "📅 预约看房" in flat_labels
-        assert "💬 咨询这套" in flat_labels
-        assert "💬 中文顾问" not in flat_labels
+def test_start_property_photos_dl_keyboard_pager_rows(tmp_path):
+    """First: 下一页 › only. Middle: ‹ 上一页 + 下一页 ›. Last: ‹ 上一页 only."""
+    gallery = _write_photos(tmp_path, 23)
+    service = _service(_view(gallery=gallery))
+    pages = [
+        service.resolve_action("QL-RF-A2B3", "photos", source="listing_callback", photo_page=n)
+        for n in (0, 1, 2)
+    ]
+    assert [[a.label for a in p.photos.action_rows[0]] for p in pages] == [
+        ["下一页 ›"],
+        ["‹ 上一页", "下一页 ›"],
+        ["‹ 上一页"],
+    ]
+    for page in pages:
+        rows = [[a.label for a in row] for row in page.photos.action_rows]
+        assert rows[1:] == [["📅 预约看房", "💬 咨询这套"], ["⬅️ 返回房源"]]
+        assert not any("/" in label for row in rows for label in row)
 
 
 def test_start_property_photos_dl_idempotent_on_repeated_callback(tmp_path):
@@ -348,7 +297,7 @@ def test_start_property_photos_dl_idempotent_on_repeated_callback(tmp_path):
 
 def test_start_property_photos_dl_out_of_range_page_clamps_to_last(tmp_path):
     """A tampered / late page callback lands on the last page, not an empty album."""
-    gallery = _write_photos(tmp_path, 9)
+    gallery = _write_photos(tmp_path, 23)
     view = _view(gallery=gallery)
     service = _service(view)
 
@@ -361,8 +310,7 @@ def test_start_property_photos_dl_out_of_range_page_clamps_to_last(tmp_path):
     assert last.ok and explicit.ok
     assert last.photos.media_groups == explicit.photos.media_groups
     assert last.photos.media_caption == explicit.photos.media_caption
-    # Last page is the trailing 1-frame slice.
-    assert _flatten(last.photos.media_groups) == gallery[8:9]
+    assert _flatten(last.photos.media_groups) == gallery[20:23]
 
 
 def test_start_property_photos_dl_collage_path_unreachable_from_route():

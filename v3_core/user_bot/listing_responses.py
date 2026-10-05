@@ -594,65 +594,6 @@ def _status_label_for(details) -> str:
     }.get(status, "")
 
 
-def _photos_page_action_text(
-    view: PublishedListingView,
-    details,
-    *,
-    page: int,
-    total_pages: int,
-    total: int,
-) -> str:
-    """Final paged-photo card: real listing facts only; no placeholder values."""
-    public_id = str(details.public_listing_id or "").strip()
-    lines = [f"📷 <b>实拍房源 {he(public_id)}</b>"] if public_id else ["📷 <b>实拍房源</b>"]
-    if total > 0 and total_pages > 0:
-        lines.append(f"第 {page + 1}/{total_pages} 页 · 共 {total} 张")
-
-    project = str(details.project_name or "").strip()
-    location = str(details.location or "").strip()
-    layout = str(details.layout or "").strip()
-    property_type = str(details.property_type or "").strip()
-    status = _status_label_for(details)
-    identity = project or location or property_type
-    headline = "｜".join(part for part in (identity, layout) if part)
-    if headline or status:
-        lines.extend(["", "  ".join(part for part in (he(headline), status) if part)])
-
-    price = _format_price(details.monthly_rent_usd)
-    if price:
-        lines.extend(["", f"💵 <b>{he(price)}</b>"])
-
-    facts: list[str] = []
-    if project:
-        facts.append(f"📍 {he(project)}")
-    elif location:
-        facts.append(f"📍 {he(location)}")
-    if layout:
-        facts.append(f"🏠 {he(layout)}")
-    size = _format_size(details.size_sqm)
-    if size:
-        facts.append(f"📐 {he(size)}")
-    floor = display_floor(details.floor)
-    if floor:
-        facts.append(f"🏢 {he(floor)}")
-    terms = "｜".join(he(part) for part in (details.deposit_terms, details.contract_term) if part)
-    if terms:
-        facts.append(f"💰 {terms}")
-    utilities = _utilities_line(
-        water=str(details.water_rate or "").strip(),
-        electric=str(details.electric_rate or "").strip(),
-    )
-    fee_bits = [he(part) for part in (details.management_fee, utilities) if part]
-    if fee_bits:
-        facts.append("💡 " + "｜".join(fee_bits))
-    if facts:
-        lines.extend(["", *facts])
-
-    adviser = _adviser_lines(view, caption=False)
-    if adviser:
-        lines.extend(adviser)
-    return chr(10).join(lines).strip()
-
 def _try_side_collage(
     photos: tuple[str, ...],
     *,
@@ -778,8 +719,31 @@ def build_photos_response(
     )
 
 
-# ---- Paged album ----
-PHOTOS_PAGE_SIZE = 4
+# ---- Paged album (「📷 更多实拍」) ----
+# Telegram allows at most 10 frames per sendMediaGroup, so one page = one album.
+PHOTOS_PAGE_SIZE = 10
+# Paged album may go past the legacy 10-frame cap; pages stay ≤10 frames each.
+PHOTOS_ALBUM_MAX_TOTAL = 30
+
+
+def _album_photo_paths(view: PublishedListingView) -> tuple[str, ...]:
+    """Hero (cover-source shot) first, then raw gallery order.
+
+    The hero is the clean cover-source photo branded like every gallery frame
+    (same top-left corner mark) — never the rendered channel cover/collage.
+    Villas therefore open on the facade the channel cover picked. When no hero
+    is available the album keeps plain gallery order.
+    """
+    raw = _raw_photo_paths_for_pages(view)
+    hero = ""
+    try:
+        from v3_core.media.album_hero import album_hero_for_package
+
+        hero = album_hero_for_package(getattr(view, "package", {}) or {}, raw)
+    except Exception:
+        hero = ""
+    ordered = [hero, *raw] if hero else list(raw)
+    return tuple(dict.fromkeys(path for path in ordered if path))[:PHOTOS_ALBUM_MAX_TOTAL]
 
 
 def _photos_page_count(total: int) -> int:
@@ -799,19 +763,52 @@ def _photos_page_slice(total: int, page: int) -> tuple[int, int]:
     return start, end
 
 
+def _album_title(details) -> str:
+    """「一号路炳发 · 5房+1」 — identity + layout, no filler."""
+    project = str(details.project_name or "").strip()
+    location = str(details.location or "").strip()
+    property_type = str(details.property_type or "").strip()
+    layout = str(details.layout or "").strip().replace(" ", "")
+    identity = project or location or property_type
+    return " · ".join(part for part in (identity, layout) if part)
+
+
 def _photos_page_caption(
+    details,
     *,
-    public_listing_id: str,
     page: int,
     total_pages: int,
     total: int,
-    start: int,
-    end: int,
 ) -> str:
-    del public_listing_id, start, end
+    """Short album caption (first frame only). Page info lives here only."""
     if total <= 0:
-        return "📷 房源实拍 · 暂无图片"
-    return f"📷 房源实拍 · 第 {page + 1}/{total_pages} 页 · 共 {total} 张"
+        return ""
+    title = _album_title(details)
+    parts = [f"📷 {he(title)}" if title else "📷 实拍", f"共 {total} 张"]
+    if total_pages > 1:
+        parts.append(f"第 {page + 1}/{total_pages} 页")
+    return " · ".join(parts)
+
+
+def _photos_page_action_text(details) -> str:
+    """One compact card under the album: title, price, status, QL id."""
+    project = str(details.project_name or "").strip()
+    location = str(details.location or "").strip()
+    property_type = str(details.property_type or "").strip()
+    layout = str(details.layout or "").strip()
+    identity = project or location or property_type
+    title = "｜".join(part for part in (identity, layout) if part) or "这套房"
+    lines = [f"🏠 <b>{he(title)}</b>"]
+    price = _format_price(details.monthly_rent_usd)
+    if price:
+        lines.append(f"💵 {he(price)}")
+    status = _status_label_for(details)
+    if status:
+        lines.append(status)
+    public_id = str(details.public_listing_id or "").strip()
+    if public_id:
+        lines.append(f"🆔 {he(public_id)}")
+    return chr(10).join(lines)
 
 
 def build_photos_page_response(
@@ -819,22 +816,16 @@ def build_photos_page_response(
     *,
     page: int = 0,
 ) -> PublicPhotosResponse:
-    """Paged album entry — exactly ``PHOTOS_PAGE_SIZE`` frames per page.
+    """「📷 更多实拍」: native album page (≤10 real frames) + one compact card.
 
-    Edge cases honored:
-      * ``0`` photos → status bar + advisor button, no media.
-      * ``1–3`` photos → single page, no paging buttons.
-      * ``4``/``5``/``8``/``9+`` photos → page through ``PHOTOS_PAGE_SIZE`` chunks
-        with prev/next/page buttons; ``next`` on last page falls back to
-        "房源详情" so the album always has a usable exit.
-      * Broken / duplicate paths are filtered before paging (see
-        ``_gallery_photo_paths`` dedupe + ``_existing_file``). Re-running the same
-        page callback is idempotent (deterministic slice + deterministic caption).
+    * frame 1 is the cover-source hero (branded like the gallery) when known,
+      then the gallery in its original order; never the rendered cover/collage;
+    * one page = one sendMediaGroup (Telegram cap 10); pager only when >1 page;
+    * caption only on the first frame; the card carries facts + buttons
+      (MediaGroup messages cannot hold an inline keyboard).
     """
     details = build_public_listing_details(view)
-    # Paged 2026-10-02 fix: only raw originals — cover render is excluded so
-    # every page (1/3, 2/3, 3/3) is a real photo, not the channel thumbnail.
-    all_photos = _raw_photo_paths_for_pages(view)[:PHOTOS_MAX_TOTAL]
+    all_photos = _album_photo_paths(view)
     total = len(all_photos)
     total_pages = _photos_page_count(total)
     summary = listing_summary_bits(
@@ -847,8 +838,8 @@ def build_photos_page_response(
     if total <= 0 or total_pages <= 0:
         text = (
             f"{_detail_status_line(details)}{chr(10)}{chr(10)}"
-            f"这套房的实拍暂时没有加载出来。{chr(10)}"
-            f"可以稍后再试，或直接联系顾问。"
+            f"这套房的实拍还没传上来，{chr(10)}"
+            f"可以直接问顾问要更多图/视频。"
         )
         return PublicPhotosResponse(
             media_groups=(),
@@ -859,59 +850,38 @@ def build_photos_page_response(
             photo_index=0,
             photo_total=0,
             listing_summary=summary,
-            action_rows=_photo_actions(
-                bookable=details.bookable,
-                inventory_status=details.inventory_status,
+            action_rows=_photo_page_actions(
                 public_listing_id=details.public_listing_id,
-                has_more=False,
+                page=0,
+                total_pages=0,
+                bookable=details.bookable,
             ),
             expand_only=False,
         )
 
     start, end = _photos_page_slice(total, page)
     page_rows = all_photos[start:end]
-    pages = total_pages
-    safe_page = max(0, min(int(page or 0), pages - 1))
-    caption = _photos_page_caption(
-        public_listing_id=details.public_listing_id,
-        page=safe_page,
-        total_pages=pages,
-        total=total,
-        start=start,
-        end=end,
-    )
-    groups = _as_media_groups(page_rows)
-    first = page_rows[0] if page_rows else ""
-
-    # 2026-10-03 fix: the paged album always uses the paged keyboard contract
-    # so the button row layout (⬅️ 返回房源 + book/consult) is consistent
-    # regardless of how many pages the listing has. Single-page listings
-    # only render a no-op "1/1" counter (no prev / next buttons) — the same
-    # controls that multi-page listings use on the same N/M cell.
-    action_rows = _photo_page_actions(
-        public_listing_id=details.public_listing_id,
-        page=safe_page,
-        total_pages=pages,
-        bookable=details.bookable,
-        inventory_status=details.inventory_status,
-    )
-
+    safe_page = max(0, min(int(page or 0), total_pages - 1))
     return PublicPhotosResponse(
-        media_groups=groups,
-        text=_photos_page_action_text(
-            view,
+        media_groups=_as_media_groups(page_rows),
+        text=_photos_page_action_text(details),
+        media_caption=_photos_page_caption(
             details,
             page=safe_page,
-            total_pages=pages,
+            total_pages=total_pages,
             total=total,
         ),
-        media_caption=caption,
         detail_text="",
-        photo_path=first,
+        photo_path=page_rows[0] if page_rows else "",
         photo_index=start,
         photo_total=total,
         listing_summary=summary,
-        action_rows=action_rows,
+        action_rows=_photo_page_actions(
+            public_listing_id=details.public_listing_id,
+            page=safe_page,
+            total_pages=total_pages,
+            bookable=details.bookable,
+        ),
         expand_only=False,
     )
 
@@ -922,24 +892,28 @@ def _photo_page_actions(
     page: int,
     total_pages: int,
     bookable: bool,
-    inventory_status: str,
+    inventory_status: str = "",
 ) -> tuple[tuple[SemanticAction, ...], ...]:
-    """Final photo UX: page counter/navigation, booking/consult, return to listing."""
+    """Card buttons under the album.
+
+    [‹ 上一页][下一页 ›]   ← only when the album has more than one page
+    [📅 预约看房][💬 咨询这套]  ← 预约 only when the unified ``bookable`` flag is
+                               true (same rule as ``_details_actions``)
+    [⬅️ 返回房源]
+    """
+    del inventory_status  # bookability comes from the unified flag only
     target = str(public_listing_id or "").strip()
-    safe_page = max(0, min(int(page or 0), max(total_pages - 1, 0)))
-    status = str(inventory_status or "").strip().lower()
-    can_book = bool(bookable) or status in {"active", "reserved"}
-
     rows: list[tuple[SemanticAction, ...]] = []
-    paging: list[SemanticAction] = []
-    if safe_page > 0:
-        paging.append(SemanticAction("⬅️ 上一页", "photos", target, target_index=safe_page - 1))
-    paging.append(SemanticAction(f"{safe_page + 1}/{max(total_pages, 1)}", "photos", target, target_index=safe_page))
-    if safe_page + 1 < total_pages:
-        paging.append(SemanticAction("下一页 ➡️", "photos", target, target_index=safe_page + 1))
-    rows.append(tuple(paging))
+    if total_pages > 1:
+        safe_page = max(0, min(int(page or 0), total_pages - 1))
+        paging: list[SemanticAction] = []
+        if safe_page > 0:
+            paging.append(SemanticAction("‹ 上一页", "photos", target, target_index=safe_page - 1))
+        if safe_page + 1 < total_pages:
+            paging.append(SemanticAction("下一页 ›", "photos", target, target_index=safe_page + 1))
+        rows.append(tuple(paging))
 
-    if can_book:
+    if bookable:
         rows.append((
             SemanticAction("📅 预约看房", "book", target),
             SemanticAction("💬 咨询这套", "consult", target),
@@ -960,6 +934,7 @@ build_detail_caption = build_detail_text  # product alias used by open-details c
 __all__ = [
     "InternalListingAction",
     "PHOTOS_FIRST_BATCH",
+    "PHOTOS_ALBUM_MAX_TOTAL",
     "PHOTOS_MAX_TOTAL",
     "PHOTOS_PAGE_SIZE",
     "PublicDetailsResponse",

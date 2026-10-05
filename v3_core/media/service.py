@@ -270,6 +270,22 @@ class MediaPreparationService:
         rejected = [str(path) for path in scrub_rejected]
         rejected.extend(str(path) for path in selected["rejected_paths"])
         gallery_orientation = self._gallery_orientation_for_cover(selected["cover_path"])
+        # The User Bot 「更多实拍」 album opens on the cover-source shot (villa
+        # facade / living room). It is branded like a gallery frame but kept
+        # out of ``gallery_paths`` so the channel cover pipeline is unchanged.
+        album_hero_path = ""
+        try:
+            from .album_hero import brand_album_hero
+
+            album_hero_path = brand_album_hero(
+                selected["cover_path"],
+                target_dir=self.prepared_dir / str(int(source_post_id)) / "album_hero",
+                cover_style=cover_style,
+                gallery_orientation=gallery_orientation,
+            )
+        except Exception:
+            album_hero_path = ""
+        hero_identity = {"album_hero_path": album_hero_path} if album_hero_path else {}
         return PreparedSourceMedia(
             source_post_id=int(source_post_id),
             cover_source_path=str(selected["cover_path"]),
@@ -280,6 +296,7 @@ class MediaPreparationService:
                 "gallery_cover_style": self._gallery_style_key(cover_style),
                 "gallery_orientation": gallery_orientation,
                 "cover_room_preference": preference,
+                **hero_identity,
             },
             duplicates=tuple(dict(item) for item in selected["duplicates"]),
             rejected_paths=tuple(rejected),
