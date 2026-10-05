@@ -408,7 +408,14 @@ class AutoPublishRepository:
                    package_id=CASE WHEN ?<>'' THEN ? ELSE package_id END,
                    channel_message_id=CASE WHEN ?<>'' THEN ? ELSE channel_message_id END,
                    origin=COALESCE(?,origin),
-                   published_at=CASE WHEN ?='published' THEN CURRENT_TIMESTAMP ELSE published_at END,
+                   published_at=CASE
+                     WHEN ?='published' AND published_at IS NULL THEN COALESCE(
+                       (SELECT p.published_at FROM publication_instances p
+                         WHERE p.offer_id=publisher_auto_items_v3.offer_id
+                           AND p.platform='telegram' AND p.publish_status='published'
+                         ORDER BY p.published_at DESC LIMIT 1),
+                       CURRENT_TIMESTAMP)
+                     ELSE published_at END,
                    updated_at=CURRENT_TIMESTAMP WHERE offer_id=?""",
                 (
                     str(state), str(reason_code), str(reason_text),
