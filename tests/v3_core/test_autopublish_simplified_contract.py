@@ -532,3 +532,48 @@ def test_invalid_link_copy_is_exact_and_has_three_recovery_buttons():
     assert message.text == "⚠️ <b>这套房的信息已经更新</b>\n\n可以重新查看最新房源，或让中文顾问继续帮你找。"
     labels = [button.text for row in message.markup.inline_keyboard for button in row]
     assert labels == ["🔍 开始找房", "💬 中文顾问", "⬅️ 返回首页"]
+
+def test_set_item_does_not_refresh_existing_published_at_on_reconcile(tmp_path):
+    db = tmp_path / "qiaolian.db"
+    initialize_v3_storage(db)
+    listing_id, offer_id, _ = _insert_listing(db, suffix="42")
+    repo = FinalAutoPublishRepository(db)
+    repo.ensure_defaults()
+    repo.sync_candidates()
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            "UPDATE publisher_auto_items_v3 SET state='published',published_at='2026-10-01 18:20:01' WHERE offer_id=?",
+            (offer_id,),
+        )
+        conn.commit()
+    repo.set_item(offer_id, state="published", channel_message_id="3477")
+    with sqlite3.connect(db) as conn:
+        row = conn.execute(
+            "SELECT published_at,channel_message_id FROM publisher_auto_items_v3 WHERE offer_id=?",
+            (offer_id,),
+        ).fetchone()
+    assert row == ("2026-10-01 18:20:01", "3477")
+
+
+def test_set_item_backfills_publication_time_when_reconciling_missing_timestamp(tmp_path):
+    db = tmp_path / "qiaolian.db"
+    initialize_v3_storage(db)
+    listing_id, offer_id, _ = _insert_listing(db, suffix="43")
+    repo = FinalAutoPublishRepository(db)
+    repo.ensure_defaults()
+    repo.sync_candidates()
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            """INSERT INTO publication_instances
+               (instance_id,package_id,listing_id,offer_id,platform,channel_chat_id,
+                channel_message_id,publish_status,published_at)
+               VALUES ('PUB_43','PKG_43',?,?,'telegram',?,'3488','published','2026-10-01 19:20:01')""",
+            (listing_id, offer_id, CHANNEL_ID),
+        )
+        conn.commit()
+    repo.set_item(offer_id, state="published", channel_message_id="3488")
+    with sqlite3.connect(db) as conn:
+        published_at = conn.execute(
+            "SELECT published_at FROM publisher_auto_items_v3 WHERE offer_id=?", (offer_id,)
+        ).fetchone()[0]
+    assert published_at == "2026-10-01 19:20:01"
