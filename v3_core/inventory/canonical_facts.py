@@ -16,7 +16,7 @@ from .listing_taxonomy import classify_listing_taxonomy, public_location_from_fi
 from .project_knowledge import project_reference_for_key
 
 SCHEMA_VERSION = "canonical_facts.v1"
-PARSER_REVISION = "v1.5"
+PARSER_REVISION = "v1.6"
 CITY_KEY = "phnom_penh"
 CITY_DISPLAY = "金边"
 
@@ -94,6 +94,24 @@ def _extract_layout(text: str) -> tuple[str | None, dict[str, int | None], list[
             "bathrooms": None,
             "helper_rooms": None,
         }, [_evidence(layout, "raw_explicit_layout", "high", room_living.group(0), room_living.start(), room_living.end())]
+
+    # Real feeds may label bedrooms as "房间4" or "房间6+1" immediately after rent.
+    # The label is explicit evidence; keep +N as an extra room without guessing its type.
+    labelled_rooms = re.search(
+        r"(?:房间|房数|卧室)\\s*[:：]?\\s*(\\d{1,2})(?:\\s*\\+\\s*(\\d{1,2}))?",
+        source,
+        flags=re.I,
+    )
+    if labelled_rooms:
+        bedrooms = int(labelled_rooms.group(1))
+        extra_rooms = int(labelled_rooms.group(2)) if labelled_rooms.group(2) else None
+        layout = f"{bedrooms}房" + (f"+{extra_rooms}" if extra_rooms is not None else "")
+        return layout, {
+            "bedrooms": bedrooms,
+            "living_rooms": None,
+            "bathrooms": None,
+            "helper_rooms": None,
+        }, [_evidence(layout, "raw_explicit_layout", "high", labelled_rooms.group(0), labelled_rooms.start(), labelled_rooms.end())]
 
     english = re.search(
         r"\b(\d{1,2})\s*(?:bedrooms?|beds?|br)\b"
