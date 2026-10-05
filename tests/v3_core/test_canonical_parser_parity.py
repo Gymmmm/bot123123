@@ -101,3 +101,26 @@ def test_legacy_jinjie_callback_keeps_area_label_not_project_name():
     from qiaolian_dual.common import FIND_AREA_CODE_MAP
 
     assert FIND_AREA_CODE_MAP["jinjie"] == "金街附近"
+
+
+def test_real_feed_room_label_after_rent_is_explicit_layout_evidence():
+    cases = {
+        "出租价格：1000房间4": ("4房", 4),
+        "出租价格：2800房间6+1": ("6房+1", 6),
+        "租金 $900/月\n卧室：3": ("3房", 3),
+    }
+    for raw, (layout, bedrooms) in cases.items():
+        source = "1号公路炳发别墅出租\n" + raw
+        facts = v3_canonicalize_source(source)
+        assert facts["layout"] == layout
+        assert facts["bedrooms"] == bedrooms
+        assert "missing_layout" not in facts["quality"]["blocking_flags"]
+        assert facts["evidence"]["layout"][0]["source"] == "raw_explicit_layout"
+        _assert_same(source)
+
+
+def test_unlabelled_compact_number_is_not_guessed_as_layout():
+    facts = v3_canonicalize_source("1号公路别墅出租\n租金 $900/月\n4+1")
+    assert facts["layout"] is None
+    assert facts["bedrooms"] is None
+    assert "missing_layout" in facts["quality"]["blocking_flags"]
