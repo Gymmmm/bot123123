@@ -40,8 +40,7 @@ def test_service_hubs_match_final_layouts():
     ]
     from v3_core.user_bot.service_views import aftercare_home_view
     assert _labels(aftercare_home_view()) == [
-        "🔧 房屋报修", "🏢 物业协调", "🔌 账单协助", "🚚 搬家服务",
-        "🧹 保洁服务", "🌐 网络办理",
+        "🔧 房屋报修", "🏢 物业协调",
         "❓ 其他住房问题", "⬅️ 返回侨联服务",
     ]
 

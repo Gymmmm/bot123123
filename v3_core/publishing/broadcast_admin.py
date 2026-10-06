@@ -73,7 +73,6 @@ class BroadcastAdminController:
         return self._markup([
             [InlineKeyboardButton("🌤 每日天气汇率", callback_data="v3bc|weather"), InlineKeyboardButton("🗓 本周营销", callback_data="v3bc|marketing")],
             [InlineKeyboardButton("✏️ 临时广播", callback_data="v3bc|custom"), InlineKeyboardButton("📚 广播记录", callback_data="v3bc|logs")],
-            [InlineKeyboardButton("⚙️ 广播设置", callback_data="v3bc|settings")],
             [InlineKeyboardButton("🏠 返回首页", callback_data="v3h")],
         ])
 
@@ -119,7 +118,7 @@ class BroadcastAdminController:
     async def show_center(self, message: Any, *, notice: str = ""):
         prefix = f"✅ {escape(notice)}\n\n" if notice else ""
         await message.reply_text(
-            prefix + "<b>📢 广播中心</b>\n\n🌤 每日天气汇率：固定日常服务\n🗓 本周营销计划：周一至周日循环\n✏️ 临时广播：需要时单独发送",
+            prefix + "<b>📢 广播中心</b>\n\n🌤 每日天气汇率：固定日常服务\n🗓 本周营销：周一至周日循环\n✏️ 临时广播：需要时单独发送",
             parse_mode=ParseMode.HTML,
             reply_markup=self._center_keyboard(),
         )

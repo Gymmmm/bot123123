@@ -52,3 +52,32 @@ def test_contact_handoff_and_appointment_history_navigation_are_plain_text():
     appointment = build_appointment_history_home_view(history)
     labels = [b.text for row in build_home_keyboard(appointment).inline_keyboard for b in row]
     assert labels == ["🔍 开始找房", "💬 中文顾问", "⬅️ 返回首页"]
+
+def test_appointment_history_with_upcoming_exposes_real_management_callback():
+    from v3_core.user_bot.appointment_history import AppointmentHistoryItem, AppointmentHistoryView
+    from v3_core.user_bot.telegram_home_ui import build_home_keyboard
+
+    history = AppointmentHistoryView(
+        text="📅 我的预约",
+        items=(AppointmentHistoryItem(
+            appointment_id=7, public_listing_id="QL-1", subject="富力城",
+            viewing_mode="offline", appointment_date="2026-10-07",
+            appointment_time="pm", status="pending",
+        ),),
+        history_count=0,
+    )
+    markup = build_home_keyboard(build_appointment_history_home_view(history))
+    callbacks = [b.callback_data for row in markup.inline_keyboard for b in row]
+    assert "appointment_menu:details" in callbacks
+
+
+def test_contact_view_prefills_last_search_summary_into_advisor_url():
+    view = build_contact_view(
+        advisor_url="https://t.me/qiaolian",
+        search_summary="区域：BKK1；户型：2房；预算：$600–$800/月",
+    )
+    url = view.rows[0][0].url
+    assert "t.me/qiaolian" in url
+    assert "%E5%8C%BA%E5%9F%9F" in url
+    assert "%E6%88%B7%E5%9E%8B" in url
+    assert "%E9%A2%84%E7%AE%97" in url

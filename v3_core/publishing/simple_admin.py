@@ -425,7 +425,7 @@ class SimplePublisherAdminController:
                     )
                 ]
             )
-        buttons.append([InlineKeyboardButton("⬅️ 返回房态管理", callback_data="v3smp|listings")])
+        buttons.append([InlineKeyboardButton("⬅️ 返回房态工作台", callback_data="v3smp|listings")])
         buttons.append(self.home_row())
         title = dict(self._EXCEPTION_TABS).get(code, "全部")
         await message.reply_text(
@@ -510,15 +510,12 @@ class SimplePublisherAdminController:
                 actions.append(
                     [InlineKeyboardButton("补充图片", callback_data=f"v3smp|addmedia|{offer_id}")]
                 )
-            elif reason_code != "sale_store_only":
-                actions.append(
-                    [InlineKeyboardButton("补充图片", callback_data=f"v3smp|addmedia|{offer_id}")]
-                )
         if reason_code != "sale_store_only":
             actions.append([InlineKeyboardButton("标记忽略", callback_data=f"v3smp|ignore|{offer_id}|{return_to}")])
-            actions.append(
-                [InlineKeyboardButton("重新检查并发布", callback_data=f"v3smp|recheck|{offer_id}")]
-            )
+            if reason_code not in {"duplicate_listing", "already_published"}:
+                actions.append(
+                    [InlineKeyboardButton("重新检查并发布", callback_data=f"v3smp|recheck|{offer_id}")]
+                )
         else:
             actions.append(
                 [InlineKeyboardButton("标记忽略", callback_data=f"v3smp|ignore|{offer_id}|{return_to}")]
@@ -902,19 +899,9 @@ class SimplePublisherAdminController:
             status, listing_id = parts[2], parts[3]
             self.repository.set_listing_status(listing_id, status)
             row = self._listing_detail(listing_id)
-            if status == "active" and row.get("offer_id"):
-                self.repository.requeue(str(row["offer_id"]))
-                await query.message.reply_text(
-                    "✅ 已设为可预约，并重新放入发布队列。\n"
-                    "到自动发帖窗口后才会发到频道（不会立刻重发）。",
-                    reply_markup=InlineKeyboardMarkup(
-                        [
-                            [InlineKeyboardButton("查看房源", callback_data=f"v3smp|listing|{listing_id}")],
-                            self.home_row(),
-                        ]
-                    ),
-                )
-                return
+            # Inventory recovery is a status change, not a new publication.
+            # The publisher app synchronizes the existing Telegram post after
+            # this callback; never requeue an already-published offer here.
             await self.show_listing(query.message, listing_id)
         elif action == "windows":
             await self.show_windows(query.message)

@@ -29,15 +29,16 @@ def general_contact_notification(
     user: LeadUser,
     *,
     source: str,
+    search_summary: str = "",
 ) -> AdminNotification:
-    return AdminNotification(
-        title="用户联系我们",
-        lines=(
-            f"用户：{user_mention_html(user)}",
-            f"联系方式：{he(user_contact_text(user))}",
-            f"入口：{he(source_display_label(source))}",
-        ),
-    )
+    lines = [
+        f"用户：{user_mention_html(user)}",
+        f"联系方式：{he(user_contact_text(user))}",
+        f"入口：{he(source_display_label(source))}",
+    ]
+    if str(search_summary or "").strip():
+        lines.append(f"找房条件：{he(str(search_summary).strip())}")
+    return AdminNotification(title="用户联系我们", lines=tuple(lines))
 
 
 def appointment_notification(

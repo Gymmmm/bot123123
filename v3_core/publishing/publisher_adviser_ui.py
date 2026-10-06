@@ -248,7 +248,6 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
                     [InlineKeyboardButton("📤 确认发布到频道", callback_data="v3smp|manual_send")],
                     [
                         InlineKeyboardButton("🖼 换主图", callback_data="v3smp|manual_cover_next"),
-                        InlineKeyboardButton("🎨 封面", callback_data="v3smp|manual_templates"),
                         InlineKeyboardButton("💬 侨联说", callback_data="v3smp|manual_adviser"),
                     ],
                     [InlineKeyboardButton("⬅️ 返回资料确认", callback_data="v3smp|manual_back_confirm")],

@@ -48,8 +48,8 @@ class FakeHistory:
 
 class FakeContactEffects:
     def __init__(self): self.calls=[]
-    async def execute_general(self,*,bot,user,source="hub"):
-        self.calls.append((bot,user,source))
+    async def execute_general(self,*,bot,user,source="hub",search_summary=""):
+        self.calls.append((bot,user,source,search_summary))
         return ContactEffectResult(
             lead=LeadEffectResult(status="recorded"),
             admin=AdminNotificationResult((10,),(10,),()),

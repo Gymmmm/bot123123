@@ -36,7 +36,7 @@ class ProductionSimplePublisherAdminController(SimplePublisherAdminController):
             [
                 [
                     InlineKeyboardButton("➕ 发布房源", callback_data="v3smp|new"),
-                    InlineKeyboardButton("🔵 房态管理", callback_data="v3smp|listings"),
+                    InlineKeyboardButton("🔵 房态工作台", callback_data="v3smp|listings"),
                 ],
                 [
                     InlineKeyboardButton("📢 广播中心", callback_data="v3bc"),
@@ -66,7 +66,7 @@ class ProductionSimplePublisherAdminController(SimplePublisherAdminController):
         queued_n = self._queued_count() if hasattr(self, "_queued_count") else 0
         held_n = self._held_count() if hasattr(self, "_held_count") else 0
         await message.reply_text(
-            "<b>⚙️ 更多</b>\n\n"
+            "<b>⚙️ 发布设置</b>\n\n"
             f"自动发布：<b>{'运行中' if cfg.enabled else '已暂停'}</b>\n"
             "运行状态、发帖时段、统计、自动待发、旧库存、待发预览和采集源都在这里。",
             parse_mode=ParseMode.HTML,
@@ -128,7 +128,7 @@ class ProductionSimplePublisherAdminController(SimplePublisherAdminController):
 
     async def show_listing_categories(self, message: Any) -> None:
         await message.reply_text(
-            "<b>🔵 房态管理</b>\n\n请选择要处理的房源状态：",
+            "<b>🔵 房态工作台</b>\n\n请选择要处理的房源状态：",
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(
                 [
@@ -173,7 +173,7 @@ class ProductionSimplePublisherAdminController(SimplePublisherAdminController):
                     )
                 ]
             )
-        buttons.append([InlineKeyboardButton("⬅️ 返回房态管理", callback_data="v3smp|listings")])
+        buttons.append([InlineKeyboardButton("⬅️ 返回房态工作台", callback_data="v3smp|listings")])
         buttons.append(self.home_row())
         await message.reply_text(
             f"<b>{escape(labels.get(str(category), str(category)))}</b>\n\n"
@@ -264,7 +264,7 @@ class ProductionSimplePublisherAdminController(SimplePublisherAdminController):
             rows.append(
                 [InlineKeyboardButton("🔄 重新检查并发布", callback_data=f"v3smp|recheck|{offer_id}")]
             )
-        rows.append([InlineKeyboardButton("⬅️ 返回房态管理", callback_data="v3smp|listings")])
+        rows.append([InlineKeyboardButton("⬅️ 返回房态工作台", callback_data="v3smp|listings")])
         rows.append(self.home_row())
         await message.reply_text(
             f"<b>{escape(public_id or listing_id)}</b>\n"
@@ -284,30 +284,37 @@ class ProductionSimplePublisherAdminController(SimplePublisherAdminController):
                    FROM publication_instances pi
                    JOIN listings_v3 l ON l.listing_id=pi.listing_id
                    WHERE pi.platform='telegram' AND pi.publish_status='published'
+                     AND pi.id=(
+                         SELECT pi2.id FROM publication_instances pi2
+                         WHERE pi2.listing_id=pi.listing_id
+                           AND pi2.platform='telegram' AND pi2.publish_status='published'
+                         ORDER BY pi2.published_at DESC,pi2.id DESC LIMIT 1
+                     )
                    ORDER BY pi.published_at DESC,pi.id DESC LIMIT 10"""
             ).fetchall()
+        buttons = []
         if not rows:
             text = "<b>📚 发布记录</b>\n\n目前还没有正式发布记录。"
         else:
-            lines = ["<b>📚 最近发布</b>", ""]
-            for row in rows:
+            lines = ["<b>📚 最近发布</b>", "", "点房源可直接查看原帖或修改房态。"]
+            for index, row in enumerate(rows, 1):
                 public_id = str(row["public_listing_id"] or "房源")
                 title = str(row["display_title"] or row["project_name"] or "未命名")
                 published_at = str(row["published_at"] or "")
-                lines.append(f"• <b>{escape(public_id)}</b>｜{escape(title)}")
+                lines.append(f"{index}. <b>{escape(public_id)}</b>｜{escape(title)}")
                 if published_at:
-                    lines.append(f"  {escape(published_at)}")
+                    lines.append(f"   {escape(published_at)}")
+                buttons.append([InlineKeyboardButton(
+                    f"{index}. {public_id}｜{title}"[:60],
+                    callback_data=f"v3smp|listing|{row['listing_id']}",
+                )])
             text = "\n".join(lines)
+        buttons.append([InlineKeyboardButton("🧪 查看最新发布效果", callback_data="v3smp|preview")])
+        buttons.append(self.home_row())
         await message.reply_text(
             text,
             parse_mode=ParseMode.HTML,
-            reply_markup=InlineKeyboardMarkup(
-                [
-                    [InlineKeyboardButton("🧪 查看最新发布效果", callback_data="v3smp|preview")],
-                    [InlineKeyboardButton("🕘 最近发布房源", callback_data="v3smp|ls|recent")],
-                    self.home_row(),
-                ]
-            ),
+            reply_markup=InlineKeyboardMarkup(buttons),
         )
 
     async def show_publish_preview(self, message: Any) -> None:

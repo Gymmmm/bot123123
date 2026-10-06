@@ -39,17 +39,15 @@ def test_p15_service_hub_copy_buttons_and_callbacks_locked():
     ]
 
 
-def test_p16_aftercare_copy_buttons_and_coordination_callbacks_locked():
+def test_p16_aftercare_only_exposes_real_workflows():
     view = aftercare_home_view()
     assert view.text == (
         "🤝 <b>租后服务</b>\n\n"
         "签完合同不是结束。\n"
-        "报修、物业、账单、搬家、保洁和网络，都可以继续找侨联。"
+        "报修、物业协调和其他住房问题，都可以继续找侨联。"
     )
     assert _rows(view) == [
         ["🔧 房屋报修", "🏢 物业协调"],
-        ["🔌 账单协助", "🚚 搬家服务"],
-        ["🧹 保洁服务", "🌐 网络办理"],
         ["❓ 其他住房问题"],
         ["⬅️ 返回侨联服务"],
     ]
@@ -57,19 +55,11 @@ def test_p16_aftercare_copy_buttons_and_coordination_callbacks_locked():
     assert callbacks == [
         "v3u:service:repair",
         "v3u:service:coordination",
-        "v3u:service:billing",
-        "v3u:service:moving",
-        "v3u:service:cleaning",
-        "v3u:service:network_help",
         "v3u:service:general",
         "v3u:home:service",
     ]
-    assert not any(callback.startswith("v3u:service:property") for callback in callbacks)
-    # Public labels route to the already-supported service handlers.
-    assert "v3u:service:billing" in callbacks
-    assert "v3u:service:moving" in callbacks
-    assert "v3u:service:cleaning" in callbacks
-    assert "v3u:service:network_help" in callbacks
+    for stub in ("billing", "moving", "cleaning", "network_help"):
+        assert not any(stub in callback for callback in callbacks)
 
 
 def test_p20_repair_copy_buttons_and_callbacks_locked():

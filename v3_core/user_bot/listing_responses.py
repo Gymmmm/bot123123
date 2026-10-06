@@ -178,18 +178,12 @@ def _photo_actions(
         first_row.append(SemanticAction("💬 咨询这套", "consult", target))
         return (
             tuple(first_row),
-            (
-                SemanticAction("🔍 继续找房", "change_search", target),
-                SemanticAction("🔍 找相似", "similar", target),
-            ),
+            (SemanticAction("🔍 找相似", "similar", target),),
         )
 
     # rented / offline / inactive / withdrawn / unknown non-bookable
     return (
-        (
-            SemanticAction("🔍 继续找房", "change_search", target),
-            SemanticAction("🔍 找相似", "similar", target),
-        ),
+        (SemanticAction("🔍 找相似", "similar", target),),
         (SemanticAction("💬 咨询这套", "consult", target),),
     )
 

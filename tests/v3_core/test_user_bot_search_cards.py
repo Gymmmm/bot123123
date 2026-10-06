@@ -105,7 +105,7 @@ def test_search_card_uses_locked_copy_and_frozen_cover(tmp_path):
     ]
     assert _labels(card) == [
         ["上一套", "下一套"],
-        ["📷 查看实拍", "📅 预约看房"],
+        ["📸 全部实拍", "📅 预约看房"],
         ["💬 咨询这套"],
         ["🔄 调整条件"],
     ]

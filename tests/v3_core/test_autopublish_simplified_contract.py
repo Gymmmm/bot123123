@@ -4,6 +4,7 @@ import asyncio
 from datetime import datetime
 from pathlib import Path
 import sqlite3
+import pytest
 from types import SimpleNamespace
 
 from v3_core.media.cover_styles import FINAL_COVER_STYLES, recommended_cover_style
@@ -180,7 +181,7 @@ def test_base_simple_home_keyboard_has_seven_inheritance_entries():
     ]
     assert not forbidden.intersection(rendered_labels)
     # No orphan zero badges — only the high-attention rows.
-    assert "📚 发布记录" in rendered_labels
+    assert "🕘 最近发布" in rendered_labels
     assert "⚙️ 发布设置" in rendered_labels
 
 
@@ -577,3 +578,20 @@ def test_set_item_backfills_publication_time_when_reconciling_missing_timestamp(
             "SELECT published_at FROM publisher_auto_items_v3 WHERE offer_id=?", (offer_id,)
         ).fetchone()[0]
     assert published_at == "2026-10-01 19:20:01"
+
+
+@pytest.mark.asyncio
+async def test_inventory_search_results_offer_direct_status_changes(tmp_path):
+    from types import SimpleNamespace
+    from v3_core.publishing.inventory_operator_ui import PublisherInventoryAdminController
+
+    controller = object.__new__(PublisherInventoryAdminController)
+    class Message:
+        def __init__(self): self.calls=[]
+        async def reply_text(self, text, **kwargs): self.calls.append((text, kwargs))
+    message=Message()
+    row={"listing_id":"L1","public_listing_id":"QL-1","project_name":"富力城","layout":"2房","monthly_rent_usd":800,"updated_at":"2026-10-06T00:00:00+00:00"}
+    await controller._render_inventory_rows(message,[row],title="🔍 搜索：QL-1",quick_status=True)
+    labels=[[b.text for b in r] for r in message.calls[-1][1]["reply_markup"].inline_keyboard]
+    assert ["🟢 可预约", "🟡 已预约"] in labels
+    assert ["🔴 已租", "⚫ 下架"] in labels

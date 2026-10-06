@@ -22,6 +22,7 @@ from .telegram_service_handler import render_service_view
 from .telegram_transition_ui import build_transition_keyboard
 from .tenant_v1 import tenant_home_view
 from .transition_plan import ChangeSearchTransition, TransitionPlan
+from .transition_actions import LAST_SEARCH_PREF_KEY
 from .transition_session import apply_session_mutation, build_transition_session
 from .transition_views import TransitionView, TransitionViewService
 
@@ -151,11 +152,36 @@ async def handle_v3_home_callback(
     if action == "contact":
         if contact_effects is None:
             return TelegramHomeOutcome(handled=True, action=action, deferred=True)
+        user_data = getattr(context, "user_data", None)
+        pref = user_data.get(LAST_SEARCH_PREF_KEY, {}) if isinstance(user_data, dict) else {}
+        summary_parts = []
+        if isinstance(pref, dict):
+            area_display = str(pref.get("area_display") or "").strip()
+            locations = pref.get("location_keys") or []
+            if area_display:
+                summary_parts.append("区域：" + area_display)
+            elif locations:
+                summary_parts.append("区域：" + "/".join(str(v) for v in locations if v))
+            room = str(pref.get("room_type") or "").strip()
+            if room:
+                summary_parts.append("户型：" + room)
+            budget_label = str(pref.get("budget_label") or "").strip()
+            lo, hi = pref.get("budget_min"), pref.get("budget_max")
+            if budget_label:
+                summary_parts.append("预算：" + budget_label)
+            elif lo is not None or hi is not None:
+                if lo is not None and hi is not None:
+                    summary_parts.append(f"预算：${int(lo):,}–${int(hi):,}/月")
+                elif hi is not None:
+                    summary_parts.append(f"预算：≤${int(hi):,}/月")
+                else:
+                    summary_parts.append(f"预算：≥${int(lo):,}/月")
+        search_summary = "；".join(summary_parts)
         user = _lead_user(update)
         effect = await contact_effects.execute_general(
-            bot=getattr(context, "bot", None), user=user, source="hub"
+            bot=getattr(context, "bot", None), user=user, source="hub", search_summary=search_summary
         )
-        await _edit_home_view(query, build_contact_view(advisor_url=advisor_url))
+        await _edit_home_view(query, build_contact_view(advisor_url=advisor_url, search_summary=search_summary))
         return TelegramHomeOutcome(
             handled=True, action=action, rendered=True, contact_effect=effect
         )

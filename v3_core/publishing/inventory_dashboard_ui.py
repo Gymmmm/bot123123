@@ -203,10 +203,21 @@ class PublisherInventoryDashboardController(PublisherInventoryAdminController):
             "rented": "🔴 已租出",
             "offline": "⚫ 已下架",
         }.get(status, status)
+        scope = str(state.get("scope") or "pending_all")
+        by_id = {str(row["listing_id"]): row for row in self._batch_scope_rows(scope)}
+        preview = []
+        for listing_id in selected[:10]:
+            row = by_id.get(listing_id)
+            if row is not None:
+                preview.append("• " + self._button_title(row))
+        if len(selected) > 10:
+            preview.append(f"• ……另 {len(selected) - 10} 套")
+        preview_text = "\n".join(preview) or "• 已选房源"
         await message.reply_text(
             f"<b>确认批量修改</b>\n\n"
             f"已选择：<b>{len(selected)} 套</b>\n"
             f"目标房态：<b>{label}</b>\n\n"
+            f"{preview_text}\n\n"
             "确认后会同步修改这些房源的房态。",
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(

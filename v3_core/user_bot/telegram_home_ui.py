@@ -8,6 +8,9 @@ from .home_views import HomeChoice, HomeView
 
 
 def encode_home_choice(choice: HomeChoice) -> InlineKeyboardButton:
+    callback_data = str(choice.callback_data or "").strip()
+    if callback_data:
+        return InlineKeyboardButton(choice.label, callback_data=callback_data)
     url = str(choice.url or "").strip()
     if url:
         return InlineKeyboardButton(choice.label, url=url)

@@ -252,7 +252,7 @@ def test_photos_response_pending_has_no_book_button(tmp_path):
     assert response.text.startswith("🔵 房态待确认")
     assert _labels(response.action_rows) == [
         ["📸 全部实拍", "💬 咨询这套"],
-        ["🔍 继续找房", "🔍 找相似"],
+        ["🔍 找相似"],
     ]
     assert all(action.action != "book" for row in response.action_rows for action in row)
 

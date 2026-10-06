@@ -75,7 +75,7 @@ def test_active_operator_home_shows_only_attention_entries():
     assert rows[1][0].startswith("🔵 房态工作台")
     assert rows[1][1].startswith("⚠️ 异常房源")
     last = rows[-1]
-    assert last[0] == "📚 发布记录"
+    assert last[0] == "🕘 最近发布"
     assert last[1] == "⚙️ 发布设置"
     callbacks = _callbacks(keyboard)
     assert "v3smp|new" in callbacks

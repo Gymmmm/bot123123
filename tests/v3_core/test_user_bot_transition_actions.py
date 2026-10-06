@@ -140,6 +140,9 @@ def test_budget_choice_matches_fixed_sha_immediate_search_boundary():
         "location_keys": ["BKK1"],
         "budget_min": 400,
         "budget_max": 600,
+        "room_type": "",
+        "area_display": "BKK1",
+        "budget_label": "$400–600",
     }
     assert SEARCH_PREF_SESSION_KEY in result.mutation.delete_keys
 

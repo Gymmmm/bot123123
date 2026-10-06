@@ -28,10 +28,9 @@ class PublisherCenterAdminController(BroadcastAdminController):
                 ],
                 [
                     InlineKeyboardButton("✏️ 临时发布", callback_data="v3bc|custom"),
-                    InlineKeyboardButton("📚 发布记录", callback_data="v3bc|logs"),
+                    InlineKeyboardButton("📜 广播记录", callback_data="v3bc|logs"),
                 ],
-                [InlineKeyboardButton("⚙️ 发布设置", callback_data="v3bc|settings")],
-                [InlineKeyboardButton("🏠 返回首页", callback_data="v3h")],
+                        [InlineKeyboardButton("🏠 返回首页", callback_data="v3h")],
             ]
         )
 
@@ -134,7 +133,7 @@ class PublisherCenterAdminController(BroadcastAdminController):
                 "SELECT trigger_type,template_key,status,local_date,created_at "
                 "FROM publisher_broadcast_log_v3 ORDER BY id DESC LIMIT 12"
             ).fetchall()
-        lines = ["<b>📚 发布记录</b>", ""]
+        lines = ["<b>📜 广播记录</b>", ""]
         if not rows:
             lines.append("暂无频道发布记录。")
         for row in rows:

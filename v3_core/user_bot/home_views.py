@@ -15,6 +15,7 @@ class HomeChoice:
     label: str
     kind: HomeChoiceKind
     url: str = ""
+    callback_data: str = ""
 
 @dataclass(frozen=True)
 class HomeView:
@@ -115,8 +116,8 @@ def build_booking_view(*, advisor_url: str = "") -> HomeView:
         ),
     )
 
-def build_contact_view(*, advisor_url: str = "") -> HomeView:
-    advisor=advisor_handoff_url(advisor_url)
+def build_contact_view(*, advisor_url: str = "", search_summary: str = "") -> HomeView:
+    advisor=advisor_handoff_url(advisor_url, listing_summary=search_summary)
     first=HomeChoice("💬 中文顾问","contact",url=advisor) if advisor else HomeChoice("💬 中文顾问","contact")
     return HomeView(
         "contact",
@@ -130,6 +131,10 @@ def build_contact_view(*, advisor_url: str = "") -> HomeView:
 
 def build_appointment_history_home_view(history: AppointmentHistoryView) -> HomeView:
     find_label="🔍 开始找房" if not history.items else "🔍 继续找房"
-    return HomeView("appointments",history.text,((HomeChoice(find_label,"search"),HomeChoice("💬 中文顾问","contact")),(HomeChoice("⬅️ 返回首页","root"),)))
+    rows = []
+    if history.items:
+        rows.append((HomeChoice("✏️ 管理预约", "appointments", callback_data="appointment_menu:details"),))
+    rows.extend(((HomeChoice(find_label,"search"),HomeChoice("💬 中文顾问","contact")),(HomeChoice("⬅️ 返回首页","root"),)))
+    return HomeView("appointments",history.text,tuple(rows))
 
 __all__=["ABOUT_TEXT","BOOK_TEXT","CONTACT_TEXT","HomeChoice","HomeChoiceKind","HomeView","WELCOME_TEXT","build_about_view","build_appointment_history_home_view","build_booking_view","build_contact_view","build_home_view","phnom_penh_greeting","welcome_text"]

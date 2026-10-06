@@ -37,11 +37,12 @@ class ContactEffectExecutor:
         bot: Any,
         user: LeadUser,
         source: str = "hub",
+        search_summary: str = "",
     ) -> ContactEffectResult:
         lead = self.leads.record_general_contact(user=user, source=source)
         admin = await self.admins.send(
             bot,
-            general_contact_notification(user, source=source),
+            general_contact_notification(user, source=source, search_summary=search_summary),
         )
         return ContactEffectResult(lead=lead, admin=admin)
 

@@ -117,7 +117,7 @@ def service_home_view() -> ServiceView:
 AFTERCARE_TEXT = (
     "🤝 <b>租后服务</b>\n\n"
     "签完合同不是结束。\n"
-    "报修、物业、账单、搬家、保洁和网络，都可以继续找侨联。"
+    "报修、物业协调和其他住房问题，都可以继续找侨联。"
 )
 
 
@@ -127,8 +127,6 @@ def aftercare_home_view() -> ServiceView:
         text=AFTERCARE_TEXT,
         rows=(
             (ServiceChoice("🔧 房屋报修", "v3u:service:repair"), ServiceChoice("🏢 物业协调", "v3u:service:coordination")),
-            (ServiceChoice("🔌 账单协助", "v3u:service:billing"), ServiceChoice("🚚 搬家服务", "v3u:service:moving")),
-            (ServiceChoice("🧹 保洁服务", "v3u:service:cleaning"), ServiceChoice("🌐 网络办理", "v3u:service:network_help")),
             (ServiceChoice("❓ 其他住房问题", "v3u:service:general"),),
             (ServiceChoice("⬅️ 返回侨联服务", "v3u:home:service"),),
         ),
@@ -138,8 +136,8 @@ def aftercare_home_view() -> ServiceView:
 # Section 7 — 看房与交接 (locked rename from 安心租房 / 侨联安心租 / 侨联保障).
 RENTAL_SERVICE_TEXT = (
     "🛡️ <b>看房与交接</b>\n\n"
-    "看房更省事，入住更有据，租后有人跟。\n\n"
-    "视频带看｜费用说明｜入住留档｜租后服务"
+    "入住前后把房屋情况留清楚，交接时更有依据。\n\n"
+    "这里可以查看入住留档清单；需要协调交接，直接找中文顾问。"
 )
 
 

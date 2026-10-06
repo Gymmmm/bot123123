@@ -138,12 +138,15 @@ def _fresh_search_pref(source: str) -> dict[str, Any]:
     }
 
 
-def _last_pref(criteria: SearchCriteria) -> dict[str, Any]:
+def _last_pref(criteria: SearchCriteria, *, area_display: str = "", budget_label: str = "") -> dict[str, Any]:
     return {
         "property_type": criteria.property_type,
         "location_keys": list(criteria.location_keys),
         "budget_min": criteria.budget_min,
         "budget_max": criteria.budget_max,
+        "room_type": criteria.room_type,
+        "area_display": str(area_display or ""),
+        "budget_label": str(budget_label or ""),
     }
 
 
@@ -419,7 +422,7 @@ class TransitionActionService:
                     touch_payload=touch_payload,
                 ),
                 mutation=SessionMutationPlan(
-                    set_values={LAST_SEARCH_PREF_KEY: _last_pref(criteria)},
+                    set_values={LAST_SEARCH_PREF_KEY: _last_pref(criteria, area_display=str(pref.get("area_display") or ""), budget_label=str(pref.get("budget_label") or ""))},
                     delete_keys=(SEARCH_PREF_SESSION_KEY, SEARCH_AWAITING_AREA_KEY, SEARCH_AWAITING_BUDGET_KEY),
                 ),
             )
@@ -489,7 +492,7 @@ class TransitionActionService:
                     touch_payload=touch_payload,
                 ),
                 mutation=SessionMutationPlan(
-                    set_values={LAST_SEARCH_PREF_KEY: _last_pref(criteria)},
+                    set_values={LAST_SEARCH_PREF_KEY: _last_pref(criteria, area_display=area_display, budget_label=budget_label)},
                     delete_keys=(SEARCH_PREF_SESSION_KEY, SEARCH_AWAITING_AREA_KEY, SEARCH_AWAITING_BUDGET_KEY),
                 ),
             )

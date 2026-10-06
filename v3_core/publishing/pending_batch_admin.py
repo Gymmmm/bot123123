@@ -123,7 +123,7 @@ class PendingBatchOperatorPublisherAdminController(OperatorPublisherAdminControl
             f"🔵 待确认 {pending}｜10套一组" if pending else "✅ 暂无待确认房源"
         )
         await message.reply_text(
-            "<b>🔵 房态管理</b>\n\n"
+            "<b>🔵 房态工作台</b>\n\n"
             "新房源默认进入待确认。先按 10 套一组批量处理，需要例外时再单独处理。",
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(
@@ -172,7 +172,7 @@ class PendingBatchOperatorPublisherAdminController(OperatorPublisherAdminControl
                 "<b>🔵 待确认房源</b>\n\n✅ 当前没有待确认房源。",
                 parse_mode=ParseMode.HTML,
                 reply_markup=InlineKeyboardMarkup(
-                    [[InlineKeyboardButton("⬅️ 返回房态管理", callback_data="v3smp|listings")], self.home_row()]
+                    [[InlineKeyboardButton("⬅️ 返回房态工作台", callback_data="v3smp|listings")], self.home_row()]
                 ),
             )
             return
@@ -213,7 +213,7 @@ class PendingBatchOperatorPublisherAdminController(OperatorPublisherAdminControl
             nav.append(InlineKeyboardButton("下一组 ➡️", callback_data=f"v3smp|pbat|{clean_page + 1}"))
         if nav:
             buttons.append(nav)
-        buttons.append([InlineKeyboardButton("⬅️ 返回房态管理", callback_data="v3smp|listings")])
+        buttons.append([InlineKeyboardButton("⬅️ 返回房态工作台", callback_data="v3smp|listings")])
         buttons.append(self.home_row())
         await message.reply_text(
             "\n".join(lines), parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(buttons)
@@ -351,7 +351,7 @@ class PendingBatchOperatorPublisherAdminController(OperatorPublisherAdminControl
             buttons.append(
                 [InlineKeyboardButton("继续下一组 ➡️", callback_data=f"v3smp|pbat|{next_page}")]
             )
-        buttons.append([InlineKeyboardButton("⬅️ 返回房态管理", callback_data="v3smp|listings")])
+        buttons.append([InlineKeyboardButton("⬅️ 返回房态工作台", callback_data="v3smp|listings")])
         buttons.append(self.home_row())
         await message.reply_text(
             "\n".join(lines), parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(buttons)

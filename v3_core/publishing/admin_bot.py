@@ -495,7 +495,7 @@ class PublisherAdminBot:
 
     def _package_keyboard(self, package: FrozenPackage, *, review_id: str = "") -> InlineKeyboardMarkup:
         rows: list[list[InlineKeyboardButton]] = [
-            [InlineKeyboardButton("📷 更多详情", url=package.actions["details"])],
+            [InlineKeyboardButton("🏠 查看房源", url=package.actions["details"])],
             [InlineKeyboardButton("📅 预约看房", url=package.actions["book"])],
         ]
         if package.status == "package_ready":

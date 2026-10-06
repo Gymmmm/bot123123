@@ -74,7 +74,7 @@ class OperatorPublisherAdminController(ProductionSimplePublisherAdminController)
                     InlineKeyboardButton("📢 广播中心", callback_data="v3bc"),
                 ],
                 [
-                    InlineKeyboardButton("🔵 房态管理", callback_data="v3smp|listings"),
+                    InlineKeyboardButton("🔵 房态工作台", callback_data="v3smp|listings"),
                     InlineKeyboardButton("📡 采集源", callback_data="v3smp|sources"),
                 ],
                 [
@@ -94,7 +94,7 @@ class OperatorPublisherAdminController(ProductionSimplePublisherAdminController)
 
     async def show_listing_categories(self, message: Any) -> None:
         await message.reply_text(
-            "<b>🔵 房态管理</b>\n\n请选择要处理的房源状态：",
+            "<b>🔵 房态工作台</b>\n\n请选择要处理的房源状态：",
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(
                 [

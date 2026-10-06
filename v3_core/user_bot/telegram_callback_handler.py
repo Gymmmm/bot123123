@@ -123,6 +123,33 @@ def remember_photos_album(
     )
 
 
+async def _delete_album_photos(
+    bot: Any,
+    chat_id_value: int | str,
+    state: dict[str, Any],
+    *,
+    keep_action_bar: bool,
+) -> None:
+    """Delete the prior album messages recorded under ``state``.
+
+    ``keep_action_bar=True`` deletes only the 4 photo frames and leaves the
+    action bar message in place so it can be edited in-place. The action bar
+    is always the LAST recorded id (see ``send_listing_photos_album``).
+    ``keep_action_bar=False`` deletes every recorded id, used when the next
+    step replaces the action bar with a brand-new message.
+    """
+    prior_ids = _album_message_ids(state)
+    if not prior_ids:
+        return
+    if keep_action_bar and prior_ids:
+        prior_ids = list(prior_ids[:-1])
+    for raw in prior_ids:
+        try:
+            await bot.delete_message(chat_id=chat_id_value, message_id=int(raw))
+        except Exception:
+            continue
+
+
 async def _render_photos(
     update: Any,
     context: Any,
@@ -151,13 +178,9 @@ async def _render_photos(
         if int(page) == last_page and _album_message_ids(state):
             # Idempotent: same page, album already up-to-date.
             return
-        prior_ids = _album_message_ids(state)
-        if prior_ids:
-            for raw in prior_ids:
-                try:
-                    await bot.delete_message(chat_id=chat_id_value, message_id=int(raw))
-                except Exception:
-                    continue
+        await _delete_album_photos(
+            bot, chat_id_value, state, keep_action_bar=False
+        )
 
     sent_ids = await send_listing_photos_album(
         bot,
@@ -268,6 +291,86 @@ def _dispatch(router: CallbackRouter, raw: str, context: Any):
         )
 
 
+async def _exit_album_to_other_surface(
+    update: Any,
+    context: Any,
+    public_listing_id: str,
+    *,
+    keep_action_bar: bool,
+) -> None:
+    """Drop the 4 album photo frames before switching to details/transition.
+
+    No-op when the user isn't currently sitting on a paged album for this
+    listing (e.g. consult invoked from a search card). The lookup must not
+    create any new ``PHOTOS_ALBUM_KEY`` entry — callers like ``consult`` have
+    tests that assert ``user_data`` stays empty.
+
+    Cleanup of ``message_ids`` / ``page`` happens on EVERY exit path, not only
+    when the action bar is deleted. The next 「📷 查看实拍」entry must always
+    re-send the 4 photos + action bar; otherwise the paged-album idempotent
+    guard in ``_render_photos`` (same ``page == last_page``) would short-circuit
+    and never re-issue the album.
+
+    ``public_listing_id`` may be empty for callbacks that don't carry a target
+    listing id (e.g. ``v3u:change_search``). In that case we fall back to the
+    only listing currently held in the album state — a user only ever sits in
+    one paged album at a time within a single chat.
+    """
+    bot = getattr(context, "bot", None)
+    if bot is None:
+        return
+    data = getattr(context, "user_data", None)
+    if not isinstance(data, dict):
+        return
+    albums = data.get(PHOTOS_ALBUM_KEY)
+    if not isinstance(albums, dict) or not albums:
+        return
+    try:
+        chat_key = str(_chat_id(update))
+    except Exception:
+        return
+    state, resolved_public_id = _resolve_album_state(albums, chat_key, public_listing_id)
+    if not isinstance(state, dict) or not _album_message_ids(state):
+        return
+    if not resolved_public_id:
+        return
+    await _delete_album_photos(
+        bot, chat_key, state, keep_action_bar=keep_action_bar
+    )
+    # Always clear the recorded state so the next album entry is never
+    # blocked by the page-idempotency guard. Even when the action bar is
+    # kept in chat, the recorded message_ids no longer reflect reality
+    # (the 4 photo frames are gone), so the next render must send fresh.
+    state.pop("message_ids", None)
+    state.pop("page", None)
+
+
+def _resolve_album_state(albums: dict, chat_key: str, public_listing_id: str) -> tuple[Any, str]:
+    """Return (state, public_listing_id) for the given chat.
+
+    If ``public_listing_id`` is provided, look up ``<chat>::<public_id>``.
+    If it's empty, fall back to the single active listing in this chat's
+    album map (assumes one-album-per-chat at any time).
+    """
+    if public_listing_id:
+        return albums.get(f"{chat_key}::{public_listing_id}"), public_listing_id
+    matches = [
+        (key.split("::", 1)[1] if "::" in key else "", state)
+        for key, state in albums.items()
+        if key.startswith(f"{chat_key}::") and isinstance(state, dict) and _album_message_ids(state)
+    ]
+    if len(matches) == 1:
+        return matches[0][1], matches[0][0]
+    return None, ""
+
+
+def _callback_public_listing_id(dispatched) -> str:
+    callback = getattr(dispatched, "callback", None)
+    if callback is None:
+        return ""
+    return str(getattr(callback, "public_listing_id", "") or "").strip()
+
+
 async def handle_v3_callback(
     update: Any,
     context: Any,
@@ -320,6 +423,16 @@ async def handle_v3_callback(
     await query.answer()
 
     if response.kind == "details":
+        # Returning to listing details from the paged album: keep the action
+        # bar in place and delete only the 4 photo frames so we can edit the
+        # action bar to the details body.
+        public_id_for_exit = _callback_public_listing_id(dispatched)
+        await _exit_album_to_other_surface(
+            update,
+            context,
+            public_id_for_exit,
+            keep_action_bar=True,
+        )
         await _render_details(query, response)
         _set_listing_touchpoint(context, "listing_details")
     elif response.kind == "photos":
@@ -359,7 +472,35 @@ async def handle_v3_callback(
             )
     elif response.kind == "card":
         await render_search_card_response(update, context, response, query=query)
+    elif response.kind == "transition" and response.transition == "consult":
+        # Consult is a pure intent — no transition view is rendered here. The
+        # higher-level intake handler turns the intent into the actual handoff.
+        # We still need to clear the paged album if the user invoked consult
+        # from inside the album.
+        public_id_for_exit = _callback_public_listing_id(dispatched)
+        if not public_id_for_exit and getattr(response, "consult_intent", None) is not None:
+            public_id_for_exit = str(
+                getattr(response.consult_intent, "public_listing_id", "") or ""
+            ).strip()
+        await _exit_album_to_other_surface(
+            update,
+            context,
+            public_id_for_exit,
+            keep_action_bar=False,
+        )
     elif response.kind == "transition" and response.transition in {"book", "similar", "change_search"} and transition_views is not None:
+        # Book / similar / change_search from the paged album: drop only the
+        # 4 photo frames and KEEP the action bar in chat. The downstream
+        # _render_transition_view uses query.edit_message_text/caption to
+        # rewrite that action bar in place — deleting it would leave the
+        # view to render against an already-deleted message.
+        public_id_for_exit = _callback_public_listing_id(dispatched)
+        await _exit_album_to_other_surface(
+            update,
+            context,
+            public_id_for_exit,
+            keep_action_bar=True,
+        )
         plan = build_transition_plan(response)
         mutation = build_transition_session(plan)
         view = transition_views.build(plan)
