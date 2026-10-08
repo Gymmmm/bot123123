@@ -24,6 +24,8 @@ from .photo_formatter import IMAGE_EXTS
 
 NEAR_DUPLICATE_HAMMING = 2
 SEVERE_REJECT_SCORE = -45.0
+MIN_PUBLICATION_PIXELS = 300_000
+MIN_PUBLICATION_SHORT_EDGE = 360
 
 
 def _sha256(path: Path) -> str:
@@ -109,6 +111,14 @@ def _orientation(img) -> tuple[float, float]:
     else:
         score = 45.0
     return score, ratio
+
+
+def _has_publishable_resolution(width: int, height: int) -> bool:
+    """Accept normal Telegram portrait photos without admitting thumbnails."""
+    return (
+        min(int(width), int(height)) >= MIN_PUBLICATION_SHORT_EDGE
+        and int(width) * int(height) >= MIN_PUBLICATION_PIXELS
+    )
 
 
 def _space(img) -> float:
@@ -414,7 +424,7 @@ def _cv_metrics(path: Path, *, cover_preference: object = "living") -> dict[str,
 
     rejected = False
     reason = ""
-    if w < 700 or h < 500:
+    if not _has_publishable_resolution(w, h):
         rejected, reason = True, "low_resolution"
     elif sharpness < 18:
         rejected, reason = True, "blur"
@@ -564,6 +574,7 @@ def rank_photo_paths(
 __all__ = [
     "NEAR_DUPLICATE_HAMMING",
     "SEVERE_REJECT_SCORE",
+    "_has_publishable_resolution",
     "_dhash",
     "_hamming",
     "_room_cover_tier",

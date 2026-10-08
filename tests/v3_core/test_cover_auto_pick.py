@@ -6,9 +6,17 @@ from v3_core.media import media_selection
 from v3_core.media.ranker import (
     _cover_room_bonus,
     _cover_text_penalty,
+    _has_publishable_resolution,
     _room_cover_tier,
     rank_photo_paths,
 )
+
+
+def test_resolution_gate_accepts_phone_portrait_but_rejects_thumbnails():
+    assert _has_publishable_resolution(540, 1064)
+    assert _has_publishable_resolution(960, 720)
+    assert not _has_publishable_resolution(320, 1200)
+    assert not _has_publishable_resolution(480, 480)
 
 
 def test_room_cover_tier_orders_living_above_toilet():
