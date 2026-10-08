@@ -256,6 +256,9 @@ async def test_layout_choice_crosses_existing_search_executor_boundary():
         "location_keys": [],
         "budget_min": None,
         "budget_max": None,
+        "area_display": "",
+        "budget_label": "",
+        "room_type": "2房",
     }
     assert "LST_" not in repr(user_data)
 

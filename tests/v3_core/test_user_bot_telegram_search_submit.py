@@ -146,6 +146,9 @@ async def test_matched_search_renders_public_card_then_consumes_guided_pref():
         "location_keys": ["BKK1"],
         "budget_min": 400,
         "budget_max": 600,
+        "area_display": "BKK1",
+        "budget_label": "$400–600",
+        "room_type": "",
     }
     assert user_data[SEARCH_SESSION_KEY] == [PUBLIC_ID]
     assert "LST_" not in repr(user_data)
