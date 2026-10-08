@@ -35,6 +35,9 @@ class PreparedSourceMedia:
     duplicates: tuple[dict[str, str], ...]
     rejected_paths: tuple[str, ...]
     ranking: tuple[dict[str, Any], ...]
+    # Clean derivatives used only inside the composite cover. Public gallery
+    # files are separately branded and must never be fed back into the cover.
+    cover_gallery_paths: tuple[str, ...] = ()
 
 
 class MediaPreparationService:
@@ -284,6 +287,7 @@ class MediaPreparationService:
             duplicates=tuple(dict(item) for item in selected["duplicates"]),
             rejected_paths=tuple(rejected),
             ranking=tuple(dict(item) for item in selected["ranking"]),
+            cover_gallery_paths=tuple(gallery_sources),
         )
 
 

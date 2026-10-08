@@ -66,6 +66,9 @@ def test_media_preparation_scrubs_to_derived_files_before_selection(tmp_path):
 
     assert prepared.source_post_id == source_id
     assert prepared.cover_source_path not in prepared.gallery_paths
+    assert prepared.cover_source_path not in prepared.cover_gallery_paths
+    assert len(prepared.cover_gallery_paths) == len(prepared.gallery_paths)
+    assert all(Path(path).parent.name != "gallery" for path in prepared.cover_gallery_paths)
     assert len(prepared.gallery_paths) >= 1
     assert prepared.source_identity["source_post_db_id"] == source_id
     assert prepared.source_identity["source_post_id"] == "100"

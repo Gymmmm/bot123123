@@ -132,7 +132,9 @@ class CoverRenderService:
             "data": data,
         }
         if self.renderer is render_cover:
-            render_kwargs["source_images"] = media.gallery_paths
+            render_kwargs["source_images"] = (
+                media.cover_gallery_paths or media.gallery_paths
+            )
         rendered = self.renderer(**render_kwargs)
         rendered_path = Path(rendered).expanduser().resolve()
         if not rendered_path.is_file():

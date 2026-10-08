@@ -154,3 +154,45 @@ def test_cover_service_rejects_offer_from_another_listing(tmp_path):
             offer_id=str(offer["offer_id"]),
             media=media,
         )
+
+
+def test_production_cover_uses_clean_composite_sources_not_branded_gallery(tmp_path):
+    db = tmp_path / "cover-clean-gallery.sqlite3"
+    initialize_v3_storage(db)
+    repo = InventoryRepository(str(db))
+    facts = _facts()
+    canonical = repo.store_canonical(source_post_id="source-clean", facts=facts)
+    repo.upsert_listing(
+        listing_id="l_clean",
+        public_listing_id="QL-RF-C123",
+        canonical_record_id=str(canonical["canonical_record_id"]),
+        facts=facts,
+    )
+    offer = repo.sync_offers(listing_id="l_clean", facts=facts)[0]
+
+    cover = tmp_path / "cover-source.jpg"
+    clean = tmp_path / "clean-secondary.jpg"
+    branded = tmp_path / "branded-secondary.jpg"
+    Image.new("RGB", (1200, 900), (200, 20, 20)).save(cover)
+    Image.new("RGB", (1200, 900), (20, 200, 20)).save(clean)
+    Image.new("RGB", (1200, 900), (20, 20, 200)).save(branded)
+    media = PreparedSourceMedia(
+        source_post_id=1,
+        cover_source_path=str(cover),
+        gallery_paths=(str(branded),),
+        source_identity={},
+        duplicates=(),
+        rejected_paths=(),
+        ranking=(),
+        cover_gallery_paths=(str(clean),),
+    )
+    result = CoverRenderService(
+        reader=InventoryReader(str(db)), output_dir=tmp_path / "covers"
+    ).render(
+        listing_id="l_clean",
+        offer_id=str(offer["offer_id"]),
+        media=media,
+    )
+    with Image.open(result.output_path).convert("RGB") as rendered:
+        red, green, blue = rendered.getpixel((540, 1100))
+    assert green > red and green > blue
