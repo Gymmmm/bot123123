@@ -240,7 +240,9 @@ def test_auto_cover_villa_prefers_exterior(tmp_path, monkeypatch):
     assert result["cover_preference"] == "exterior"
 
 
-def test_auto_cover_villa_prefers_soft_exterior_over_living(tmp_path, monkeypatch):
+def test_auto_cover_villa_rejects_soft_exterior_instead_of_falling_back(tmp_path, monkeypatch):
+    import pytest
+
     living = tmp_path / "living.jpg"
     exterior = tmp_path / "exterior.jpg"
     for path, payload in ((living, b"L"), (exterior, b"E")):
@@ -267,8 +269,37 @@ def test_auto_cover_villa_prefers_soft_exterior_over_living(tmp_path, monkeypatc
             },
         ],
     )
-    result = media_selection.select_publication_media(
-        [living, exterior],
-        cover_preference="exterior",
+    with pytest.raises(ValueError, match="villa_cover_requires_exterior_review"):
+        media_selection.select_publication_media(
+            [living, exterior],
+            cover_preference="exterior",
+        )
+
+
+def test_villa_auto_publish_stops_when_no_clean_exterior_exists(tmp_path, monkeypatch):
+    import pytest
+
+    living = tmp_path / "living.jpg"
+    kitchen = tmp_path / "kitchen.jpg"
+    for path, payload in ((living, b"L"), (kitchen, b"K")):
+        path.write_bytes(payload)
+    monkeypatch.setattr(media_selection, "_dhash", lambda path: None)
+    monkeypatch.setattr(
+        media_selection,
+        "rank_photo_paths",
+        lambda paths, cover_preference="living": [
+            {
+                "file": str(living.resolve()), "reject": False, "soft_reject": False,
+                "room_label": "living", "score": 95,
+            },
+            {
+                "file": str(kitchen.resolve()), "reject": False, "soft_reject": False,
+                "room_label": "kitchen", "score": 90,
+            },
+        ],
     )
-    assert result["cover_path"] == str(exterior.resolve())
+    with pytest.raises(ValueError, match="villa_cover_requires_exterior_review"):
+        media_selection.select_publication_media(
+            [living, kitchen],
+            cover_preference="exterior",
+        )

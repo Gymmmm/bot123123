@@ -36,8 +36,9 @@ def _pick_auto_cover(
 ) -> str:
     """Choose channel cover source: best ranked shot that is safe to show first.
 
-    Apartments prefer living; villas prefer exterior then living. Skips hard rejects,
-    soft rejects, toilet and bedroom labels while any better alternative exists.
+    Apartments require a living panorama; villas require a clean exterior.
+    Anything less specific is held for manual review instead of silently falling
+    back to a bedroom, kitchen, or other interior.
     """
     gallery_set = {str(Path(path).resolve()) for path in gallery}
     preferred = _normalize_cover_preference(cover_preference)
@@ -60,6 +61,24 @@ def _pick_auto_cover(
             and float(text.get("text_heavy") or 0) < 0.48
         )
 
+    def _passes_villa_exterior_gate(item: dict[str, Any]) -> bool:
+        """Require an unambiguous, clean facade/exterior for unattended covers."""
+        if str(item.get("room_label") or "") != "exterior":
+            return False
+        if item.get("soft_reject"):
+            return False
+        room = item.get("room")
+        text = item.get("text")
+        # Compatibility for reviewed/manual ranking rows that predate CV metrics.
+        if not isinstance(room, dict) or not isinstance(text, dict):
+            return True
+        return (
+            float(room.get("exterior") or 0) >= 0.48
+            and float(room.get("bed") or 0) < 0.36
+            and float(room.get("toilet") or 0) < 0.48
+            and float(text.get("text_heavy") or 0) < 0.48
+        )
+
     def _path(item: dict[str, Any]) -> str:
         return str(Path(str(item.get("file") or "")).resolve())
 
@@ -70,56 +89,11 @@ def _pick_auto_cover(
                 return path
         raise ValueError("apartment_cover_requires_panorama_review")
 
-    # Fallback ladder after the preferred label.
-    label_ladder = ("exterior", "living", "kitchen")
-
-    def _usable(
-        item: dict[str, Any],
-        *,
-        allow_soft: bool,
-        allow_toilet: bool,
-        allow_bedroom: bool,
-        require_labels: tuple[str, ...] | None,
-    ) -> bool:
+    for item in ranking:
         path = _path(item)
-        if not path or path not in gallery_set or item.get("reject"):
-            return False
-        if not allow_soft and item.get("soft_reject"):
-            return False
-        label = str(item.get("room_label") or "")
-        if require_labels is not None and label not in require_labels:
-            return False
-        if not allow_toilet and label == "toilet":
-            return False
-        if not allow_bedroom and label == "bedroom":
-            return False
-        return True
-
-    passes: list[tuple[bool, bool, bool, tuple[str, ...] | None]] = []
-    # Try each preferred label first without soft-reject, then with soft-reject,
-    # before dropping down the ladder (so watermarked exteriors still beat living).
-    for label in label_ladder:
-        passes.append((False, False, False, (label,)))
-        passes.append((True, False, False, (label,)))
-    passes.extend(
-        [
-            (False, False, False, None),
-            (True, False, False, None),
-            (True, False, True, None),
-            (True, True, True, None),
-        ]
-    )
-    for allow_soft, allow_toilet, allow_bedroom, require_labels in passes:
-        for item in ranking:
-            if _usable(
-                item,
-                allow_soft=allow_soft,
-                allow_toilet=allow_toilet,
-                allow_bedroom=allow_bedroom,
-                require_labels=require_labels,
-            ):
-                return _path(item)
-    return gallery[0]
+        if path in gallery_set and not item.get("reject") and _passes_villa_exterior_gate(item):
+            return path
+    raise ValueError("villa_cover_requires_exterior_review")
 
 
 def _ordered_gallery(ranking: list[dict[str, Any]], unique: list[Path], rejected: set[str]) -> list[str]:
@@ -221,7 +195,7 @@ def select_publication_media(
         "policy": (
             "apartment_panorama_hard_gate_manual_review_fallback"
             if preference == "living"
-            else "villa_exterior_first_skip_toilet_text"
+            else "villa_exterior_hard_gate_manual_review_fallback"
         ),
     }
 
