@@ -68,6 +68,8 @@ def test_media_preparation_scrubs_to_derived_files_before_selection(tmp_path):
     assert prepared.cover_source_path not in prepared.gallery_paths
     assert prepared.cover_source_path not in prepared.cover_gallery_paths
     assert len(prepared.cover_gallery_paths) == len(prepared.gallery_paths)
+    assert len(prepared.cover_gallery_labels) == len(prepared.cover_gallery_paths)
+    assert all(label in {"客厅", "卧室", "厨房", "外观", "卫浴", "实拍"} for label in prepared.cover_gallery_labels)
     assert all(Path(path).parent.name != "gallery" for path in prepared.cover_gallery_paths)
     assert len(prepared.gallery_paths) >= 1
     assert prepared.source_identity["source_post_db_id"] == source_id

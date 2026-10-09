@@ -15,10 +15,13 @@ def test_pillow_cover_counts_and_exact_size(tmp_path, count):
         paths.append(make(tmp_path / f"{i}.jpg", size=size, value=40+i*15))
     out=tmp_path/"cover.png"
     render_cover(style="classic_blue", source_image=paths[0], source_images=paths[1:],
-                 output_path=str(out), data=CoverRenderData(public_listing_id="QL-PP-T1", project="富力城", layout="1房", price="650"))
+                 source_labels=("客厅", "卧室", "厨房"), output_path=str(out),
+                 data=CoverRenderData(public_listing_id="QL-PP-T1", project="富力城", layout="1房", price="650"))
     with Image.open(out) as im:
-        assert im.size == (1080,1350)
+        assert im.size == (1080,1360)
         assert im.format == "PNG"
+        # Footer is always a clean white brand strip, independent of photo colors.
+        assert all(channel >= 248 for channel in im.convert("RGB").getpixel((540, 1335)))
 
 def test_price_chinese_and_bad_image_are_tolerated(tmp_path):
     good=make(tmp_path/"good.png", size=(900,1600))
@@ -28,8 +31,17 @@ def test_price_chinese_and_bad_image_are_tolerated(tmp_path):
     assert data.price_line() == "$650/月"
     render_cover(style="anything", source_image=str(bad), source_images=[good], output_path=str(out), data=data)
     with Image.open(out) as im:
-        assert im.size == (1080,1350)
+        assert im.size == (1080,1360)
         assert im.format == "JPEG"
+
+def test_apartment_uses_same_hero_three_portrait_collage(tmp_path):
+    paths = [make(tmp_path / f"apartment-{index}.jpg", value=80 + index * 20) for index in range(4)]
+    out=tmp_path/"apartment-cover.png"
+    render_cover(style="premium_photo", source_image=paths[0], source_images=paths[1:],
+                 source_labels=("客厅", "卧室", "厨房"), output_path=str(out),
+                 data=CoverRenderData(public_listing_id="QL", property_type="公寓", project="太子国际广场", layout="3房", price="800"))
+    with Image.open(out) as im:
+        assert im.size == (1080,1360)
 
 def test_font_missing_falls_back(tmp_path, monkeypatch):
     import v3_core.media.cover_renderer as renderer

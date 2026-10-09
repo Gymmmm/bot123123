@@ -161,6 +161,8 @@ def test_production_cover_uses_clean_composite_sources_not_branded_gallery(tmp_p
     initialize_v3_storage(db)
     repo = InventoryRepository(str(db))
     facts = _facts()
+    facts["property_type"] = "别墅"
+    facts["display_title"] = "一号路别墅"
     canonical = repo.store_canonical(source_post_id="source-clean", facts=facts)
     repo.upsert_listing(
         listing_id="l_clean",
@@ -185,6 +187,7 @@ def test_production_cover_uses_clean_composite_sources_not_branded_gallery(tmp_p
         rejected_paths=(),
         ranking=(),
         cover_gallery_paths=(str(clean),),
+        cover_gallery_labels=("客厅",),
     )
     result = CoverRenderService(
         reader=InventoryReader(str(db)), output_dir=tmp_path / "covers"

@@ -101,7 +101,7 @@ def test_channel_ctas_and_sync_contract_share_one_real_listing():
     )
     rows = official_channel_button_spec(urls, inventory_status="active")
     assert CHANNEL_CTA_LABELS == {
-        "details": "📸 全部实拍",
+        "details": "📷 房源详情",
         "photos": "📸 全部实拍",
         "book": "📅 预约看房",
         "consult": "💬 中文顾问",
@@ -110,47 +110,48 @@ def test_channel_ctas_and_sync_contract_share_one_real_listing():
         "similar": "🔎 更多房源",
     }
     assert [[label for label, _ in row] for row in rows] == [
-        ["📸 全部实拍", "📅 预约看房"], ["💬 中文顾问"],
+        ["📷 房源详情", "📅 预约看房"], ["💬 中文顾问"],
     ]
     assert urls["details"] == f"https://t.me/QiaoLianBot?start=property_{PUBLIC_ID}_details"
     assert urls["photos"] == f"https://t.me/QiaoLianBot?start=property_{PUBLIC_ID}_photos"
     assert urls["book"] == f"https://t.me/QiaoLianBot?start=property_{PUBLIC_ID}_book"
     assert urls["consult"] == f"https://t.me/QiaoLianBot?start=property_{PUBLIC_ID}_contact"
-    # 「全部实拍」仍复用 photos deep link；入口先到缩略总览。
-    assert rows[0][0][1] == urls["photos"]
+    # 「房源详情」先进入统一详情，再由详情打开实拍。
+    assert rows[0][0][1] == urls["details"]
     synced = official_channel_button_spec(urls, inventory_status="reserved")
     assert synced == rows
     unbookable = official_channel_button_spec(urls, inventory_status="pending", area="BKK1")
     assert [[label for label, _ in row] for row in unbookable] == [
-        ["📸 全部实拍"], ["💬 中文顾问"],
+        ["🏠 帮我找房", "🔎 更多房源"], ["💬 中文顾问"],
     ]
-    assert unbookable[0][0][1] == urls["photos"]
+    assert unbookable[0][0][1].endswith("?start=find")
+    assert unbookable[0][1][1].endswith("?start=more_BKK1")
     assert unbookable[1][0][1] == urls["consult"]
     orange = official_channel_button_spec(urls, inventory_status="high_demand", area="BKK1")
     assert [[label for label, _ in row] for row in orange] == [
-        ["📸 全部实拍"], ["💬 中文顾问"],
+        ["🏠 帮我找房", "🔎 更多房源"], ["💬 中文顾问"],
     ]
-    assert orange[0][0][1] == urls["photos"]
+    assert orange[0][0][1].endswith("?start=find")
     rented = official_channel_button_spec(urls, inventory_status="rented", area="BKK1")
     assert [[label for label, _ in row] for row in rented] == [
-        ["📸 全部实拍"], ["💬 中文顾问"],
+        ["🏠 帮我找房", "🔎 更多房源"], ["💬 中文顾问"],
     ]
-    assert rented[0][0][1] == urls["photos"]
+    assert rented[0][0][1].endswith("?start=find")
     offline = official_channel_button_spec(urls, inventory_status="offline", area="BKK1")
     assert [[label for label, _ in row] for row in offline] == [
-        ["📸 全部实拍"], ["💬 中文顾问"],
+        ["🏠 帮我找房", "🔎 更多房源"], ["💬 中文顾问"],
     ]
-    assert offline[0][0][1] == urls["photos"]
+    assert offline[0][0][1].endswith("?start=find")
     assert official_channel_cta_keys("active") == ("details", "book", "consult")
     for status in ("pending", "high_demand", "rented", "offline", "inactive"):
-        assert official_channel_cta_keys(status) == ("details", "consult")
+        assert official_channel_cta_keys(status) == ("find", "more", "consult")
 
 
 def test_details_and_photos_contract_has_real_fields_three_entries_and_no_internal_id():
     view = _published(bookable=True)
     details = build_details_response(view)
     labels = _labels(details.action_rows)
-    # NOTE: details keyboard has no photos button (photos is a separate deep link)
+    assert "📸 查看实拍" in labels
     assert "📅 预约看房" in labels and "💬 咨询这套" in labels
     assert "富力城" in details.text
     # NOTE: public_id is NOT exposed in user-visible details text (privacy)
@@ -242,7 +243,7 @@ def test_new_channel_runtime_never_generates_legacy_buttons():
         labels = {label for row in rows for label, _ in row}
         assert labels.isdisjoint(forbidden)
     pending = official_channel_button_spec(urls, inventory_status="pending")
-    assert [[label for label, _ in row] for row in pending] == [["📸 全部实拍"], ["💬 中文顾问"]]
+    assert [[label for label, _ in row] for row in pending] == [["🏠 帮我找房"], ["💬 中文顾问"]]
     offline = official_channel_button_spec(urls, inventory_status="offline")
     assert "📅 预约看房" not in [label for row in offline for label, _ in row]
-    assert [[label for label, _ in row] for row in offline] == [["📸 全部实拍"], ["💬 中文顾问"]]
+    assert [[label for label, _ in row] for row in offline] == [["🏠 帮我找房"], ["💬 中文顾问"]]

@@ -116,13 +116,19 @@ def _details_actions(
     """Details page actions: keep the current listing primary; similar is only offered when it is not bookable."""
     target = str(public_listing_id or "").strip()
     if bookable:
-        return ((
-            SemanticAction("📅 预约看房", "book", target),
-            SemanticAction("💬 咨询这套", "consult", target),
-        ),)
+        return (
+            (SemanticAction("📸 查看实拍", "photos", target),),
+            (
+                SemanticAction("📅 预约看房", "book", target),
+                SemanticAction("💬 咨询这套", "consult", target),
+            ),
+        )
     return (
-        (SemanticAction("💬 咨询这套", "consult", target),),
-        (SemanticAction("🔍 找相似", "similar", target),),
+        (SemanticAction("📸 查看实拍", "photos", target),),
+        (
+            SemanticAction("💬 咨询这套", "consult", target),
+            SemanticAction("🔍 找相似", "similar", target),
+        ),
     )
 
 
@@ -835,9 +841,6 @@ def _photos_page_action_text(details) -> str:
     status = _status_label_for(details)
     if status:
         lines.append(status)
-    public_id = str(details.public_listing_id or "").strip()
-    if public_id:
-        lines.append(f"🆔 {he(public_id)}")
     return chr(10).join(lines)
 
 

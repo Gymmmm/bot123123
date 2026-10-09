@@ -99,13 +99,13 @@ def test_search_card_uses_locked_copy_and_frozen_cover(tmp_path):
     assert card.photo_path == str(cover)
     assert _actions(card) == [
         ["previous", "next"],
-        ["photos", "book"],
+        ["details", "book"],
         ["consult"],
         ["change_search"],
     ]
     assert _labels(card) == [
         ["上一套", "下一套"],
-        ["📸 全部实拍", "📅 预约看房"],
+        ["📷 房源详情", "📅 预约看房"],
         ["💬 咨询这套"],
         ["🔄 调整条件"],
     ]
@@ -164,7 +164,7 @@ def test_search_card_listing_actions_target_current_public_identity():
     actions = [item for row in card.action_rows for item in row]
 
     assert _actions(card) == [
-        ["photos", "book"],
+        ["details", "book"],
         ["consult"],
         ["change_search"],
     ]
@@ -204,7 +204,7 @@ def test_live_reserved_status_changes_badge_without_changing_frozen_facts():
     assert "富力城｜2房1厅" in card.text
     assert "$800/月" in card.text
     assert "🟡 已有预约，仍可预约" in card.text
-    assert _actions(card)[0] == ["photos", "book"]
+    assert _actions(card)[0] == ["details", "book"]
     assert _actions(card)[1] == ["consult"]
 
 

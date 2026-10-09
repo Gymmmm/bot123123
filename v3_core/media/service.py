@@ -38,6 +38,7 @@ class PreparedSourceMedia:
     # Clean derivatives used only inside the composite cover. Public gallery
     # files are separately branded and must never be fed back into the cover.
     cover_gallery_paths: tuple[str, ...] = ()
+    cover_gallery_labels: tuple[str, ...] = ()
 
 
 class MediaPreparationService:
@@ -264,6 +265,21 @@ class MediaPreparationService:
             for path in selected["gallery_paths"]
             if str(Path(str(path)).resolve()) != cover_resolved
         ]
+        room_names = {
+            "living": "客厅",
+            "bedroom": "卧室",
+            "kitchen": "厨房",
+            "exterior": "外观",
+            "toilet": "卫浴",
+        }
+        ranked_labels = {
+            str(Path(str(item.get("file") or "")).resolve()): room_names.get(
+                str(item.get("room_label") or "").strip().lower(), "实拍"
+            )
+            for item in selected["ranking"]
+            if item.get("file")
+        }
+        gallery_labels = [ranked_labels.get(str(Path(path).resolve()), "实拍") for path in gallery_sources]
         branded_gallery = self._branded_gallery(
             source_post_id=source_post_id,
             paths=gallery_sources,
@@ -288,6 +304,7 @@ class MediaPreparationService:
             rejected_paths=tuple(rejected),
             ranking=tuple(dict(item) for item in selected["ranking"]),
             cover_gallery_paths=tuple(gallery_sources),
+            cover_gallery_labels=tuple(gallery_labels),
         )
 
 

@@ -135,6 +135,7 @@ class CoverRenderService:
             render_kwargs["source_images"] = (
                 media.cover_gallery_paths or media.gallery_paths
             )
+            render_kwargs["source_labels"] = media.cover_gallery_labels
         rendered = self.renderer(**render_kwargs)
         rendered_path = Path(rendered).expanduser().resolve()
         if not rendered_path.is_file():

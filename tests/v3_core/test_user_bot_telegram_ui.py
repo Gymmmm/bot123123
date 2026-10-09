@@ -62,12 +62,13 @@ def _callback_rows(markup):
 
 
 def test_details_keyboard_is_encoded_from_public_listing_identity():
-    """Bookable details keep only the two primary actions."""
+    """Unified details exposes real photos before booking/contact."""
     response = build_details_response(_view())
 
     markup = build_action_keyboard(response.action_rows)
 
     assert _callback_rows(markup) == [
+        ["v3u:listing:photos:QL-RF-A2B3"],
         [
             "v3u:listing:book:QL-RF-A2B3",
             "v3u:listing:consult:QL-RF-A2B3",
@@ -89,7 +90,7 @@ def test_search_card_keyboard_encodes_navigation_with_public_ids():
         "v3u:card:1:QL-BK-C4D5",
     ]
     assert rows[1] == [
-        "v3u:listing:photos:QL-RF-A2B3",
+        "v3u:listing:details:QL-RF-A2B3",
         "v3u:listing:book:QL-RF-A2B3",
     ]
     assert rows[2] == ["v3u:listing:consult:QL-RF-A2B3"]

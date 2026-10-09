@@ -130,9 +130,8 @@ def test_detail_text_omits_missing_bullets_and_adviser_without_copy():
     assert "大楼配套" not in text
     assert "侨联说" not in text
     assert "🟢 当前可预约" in text
-    # NOTE: details keyboard has no photos button (photos is a separate deep link)
-    assert _actions(response.action_rows) == [["book", "consult"]]
-    assert _labels(response.action_rows) == [["📅 预约看房", "💬 咨询这套"]]
+    assert _actions(response.action_rows) == [["photos"], ["book", "consult"]]
+    assert _labels(response.action_rows) == [["📸 查看实拍"], ["📅 预约看房", "💬 咨询这套"]]
 
 
 def test_details_response_uses_live_rented_state_but_keeps_frozen_public_facts():
@@ -141,11 +140,10 @@ def test_details_response_uses_live_rented_state_but_keeps_frozen_public_facts()
 
     assert "💰 $800/月" in response.text
     assert "🔴 已租出" in response.text
-    # NOTE: details keyboard has no photos button (photos is a separate deep link)
-    assert _actions(response.action_rows) == [["consult"], ["similar"]]
+    assert _actions(response.action_rows) == [["photos"], ["consult", "similar"]]
     assert _labels(response.action_rows) == [
-        ["💬 咨询这套"],
-        ["🔍 找相似"],
+        ["📸 查看实拍"],
+        ["💬 咨询这套", "🔍 找相似"],
     ]
 
 
@@ -509,6 +507,8 @@ def test_paged_album_handles_zero_one_three_four_photos(tmp_path):
         for page in (-1, 0, 1, 2, 99):
             response = build_photos_page_response(view, page=page)
             assert response.photo_total == count
+            assert "QL-RF-A2B3" not in response.text
+            assert "🆔" not in response.text
             if count == 0:
                 assert response.media_groups == ()
                 assert response.media_caption == ""

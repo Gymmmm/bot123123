@@ -70,10 +70,10 @@ def test_bookable_keyboard_contract_is_locked_matrix_and_ordered():
     keyboard = build_channel_keyboard(dict(ACTIONS))
     rows = keyboard.inline_keyboard
     assert [[button.text for button in row] for row in rows] == [
-        ["📸 全部实拍", "📅 预约看房"],
+        ["📷 房源详情", "📅 预约看房"],
         ["💬 中文顾问"],
     ]
-    assert rows[0][0].url == ACTIONS["photos"]
+    assert rows[0][0].url == ACTIONS["details"]
     assert rows[0][1].url == ACTIONS["book"]
     assert rows[1][0].url == ACTIONS["consult"]
 

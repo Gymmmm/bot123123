@@ -16,7 +16,7 @@ from .public_ids import normalize_public_id
 
 CHANNEL_ACTION_ORDER = ("details", "photos", "book", "consult")
 CHANNEL_CTA_LABELS = {
-    "details": "📸 全部实拍",
+    "details": "📷 房源详情",
     "photos": "📸 全部实拍",  # kept for package/compat; not shown on channel keyboard
     "book": "📅 预约看房",
     "consult": "💬 中文顾问",
@@ -195,7 +195,7 @@ def official_channel_cta_keys(inventory_status: object = "active") -> tuple[str,
     status = str(inventory_status or "").strip().lower()
     if inventory_status_bookable(status):
         return ("details", "book", "consult")
-    return ("details", "consult")
+    return ("find", "more", "consult")
 
 
 def _bot_from_details_url(details_url: str) -> str:
@@ -209,12 +209,10 @@ def official_channel_button_spec(
     inventory_status: object = "active",
     area: object = "",
 ) -> tuple[tuple[tuple[str, str], ...], ...]:
-    """Channel CTA rows. ``area`` kept for call-site compatibility; unused."""
-    del area
+    """Channel CTA rows route stale inventory back to live inventory."""
     verified = official_channel_action_identity(actions)
     status = str(inventory_status or "").strip().lower()
-    # Label is 📸 全部实拍; deep link opens the photo flipper (_photos).
-    details_btn = (CHANNEL_CTA_LABELS["details"], verified["photos"])
+    details_btn = (CHANNEL_CTA_LABELS["details"], verified["details"])
     consult_btn = (CHANNEL_CTA_LABELS["consult"], verified["consult"])
 
     if inventory_status_bookable(status):
@@ -222,7 +220,16 @@ def official_channel_button_spec(
             (details_btn, (CHANNEL_CTA_LABELS["book"], verified["book"])),
             (consult_btn,),
         )
-    return ((details_btn,), (consult_btn,))
+    bot = _bot_from_details_url(verified["details"])
+    find_btn = (CHANNEL_CTA_LABELS["find"], build_bot_start_url(bot, "find"))
+    clean_area = str(area or "").strip()
+    if clean_area and re.fullmatch(r"[A-Za-z0-9_-]+", clean_area):
+        more_btn = (
+            CHANNEL_CTA_LABELS["more"],
+            build_bot_start_url(bot, f"more_{clean_area}"),
+        )
+        return ((find_btn, more_btn), (consult_btn,))
+    return ((find_btn,), (consult_btn,))
 
 def official_channel_action_identity(actions: dict[str, str]) -> dict[str, str]:
     """Require details/photos/book URLs that share one public listing id."""
