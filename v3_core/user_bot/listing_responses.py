@@ -117,14 +117,14 @@ def _details_actions(
     target = str(public_listing_id or "").strip()
     if bookable:
         return (
-            (SemanticAction("📸 查看实拍", "photos", target),),
+            (SemanticAction("📸 全部实拍", "photos", target),),
             (
                 SemanticAction("📅 预约看房", "book", target),
                 SemanticAction("💬 咨询这套", "consult", target),
             ),
         )
     return (
-        (SemanticAction("📸 查看实拍", "photos", target),),
+        (SemanticAction("📸 全部实拍", "photos", target),),
         (
             SemanticAction("💬 咨询这套", "consult", target),
             SemanticAction("🔍 找相似", "similar", target),
@@ -159,7 +159,7 @@ def _photo_actions(
                 "photos",
                 target
             )
-        return SemanticAction("📋 房源详情", "details", target)
+        return SemanticAction("🏠 查看房源", "details", target)
 
     if bookable or status in {"active", "reserved"}:
         # Book button only when unified bookable is true.

@@ -185,7 +185,7 @@ async def handle_v3_listing_question_text(
         question=question,
     )
     await message.reply_text(
-        "✅ <b>已发给中文顾问</b>\n\n这套房的信息和你的问题已经一起带上，顾问会按这套房继续回复你。",
+        "✅ <b>已发给中文顾问</b>\n\n已附上这套房的信息和你的问题，顾问会继续跟进。",
         parse_mode=ParseMode.HTML,
         reply_markup=markup,
     )

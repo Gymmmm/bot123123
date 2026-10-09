@@ -131,7 +131,7 @@ def test_detail_text_omits_missing_bullets_and_adviser_without_copy():
     assert "侨联说" not in text
     assert "🟢 当前可预约" in text
     assert _actions(response.action_rows) == [["photos"], ["book", "consult"]]
-    assert _labels(response.action_rows) == [["📸 查看实拍"], ["📅 预约看房", "💬 咨询这套"]]
+    assert _labels(response.action_rows) == [["📸 全部实拍"], ["📅 预约看房", "💬 咨询这套"]]
 
 
 def test_details_response_uses_live_rented_state_but_keeps_frozen_public_facts():
@@ -142,7 +142,7 @@ def test_details_response_uses_live_rented_state_but_keeps_frozen_public_facts()
     assert "🔴 已租出" in response.text
     assert _actions(response.action_rows) == [["photos"], ["consult", "similar"]]
     assert _labels(response.action_rows) == [
-        ["📸 查看实拍"],
+        ["📸 全部实拍"],
         ["💬 咨询这套", "🔍 找相似"],
     ]
 
@@ -265,7 +265,7 @@ def test_photos_response_single_photo_uses_details_not_expand(tmp_path):
     assert response.media_groups == ((str(one),),)
     assert response.photo_total == 1
     assert _labels(response.action_rows) == [
-        ["📋 房源详情", "📅 预约看房"],
+        ["🏠 查看房源", "📅 预约看房"],
         ["💬 咨询这套"],
     ]
 
