@@ -36,8 +36,8 @@ def welcome_text(*, first_name: str, greeting: str) -> str:
     return (
         f"👋 {he(str(first_name))}，{he(str(greeting))}\n\n"
         "🏠 <b>侨联地产｜金边中文租房</b>\n\n"
-        "📸 真实房源｜实拍更新\n"
-        "🎥 视频带看｜没空到场，也能现场看房\n"
+        "📸 房源照片｜手机查看实拍\n"
+        "🎥 视频带看｜顾问到现场，你通过视频看房\n"
         "🛡️ 入住留档｜入住有记录，退租有依据\n"
         "🤝 租后服务｜签完合同，还有人继续跟\n\n"
         "请选择服务："
