@@ -148,6 +148,55 @@ def test_auto_cover_skips_toilet_and_soft_reject(tmp_path, monkeypatch):
     ]
 
 
+def test_apartment_cover_requires_clean_landscape_living_panorama(tmp_path, monkeypatch):
+    detail = tmp_path / "tv-wall-detail.jpg"
+    panorama = tmp_path / "living-panorama.jpg"
+    for path, payload in ((detail, b"D"), (panorama, b"P")):
+        path.write_bytes(payload)
+    monkeypatch.setattr(media_selection, "_dhash", lambda path: None)
+    monkeypatch.setattr(
+        media_selection,
+        "rank_photo_paths",
+        lambda paths, cover_preference="living": [
+            {
+                "file": str(detail.resolve()), "reject": False, "soft_reject": False,
+                "room_label": "living", "ratio": 0.9,
+                "room": {"living": 0.9, "bed": 0.0, "toilet": 0.0},
+                "text": {"text_heavy": 0.0},
+            },
+            {
+                "file": str(panorama.resolve()), "reject": False, "soft_reject": False,
+                "room_label": "living", "ratio": 1.45,
+                "room": {"living": 0.8, "bed": 0.1, "toilet": 0.0},
+                "text": {"text_heavy": 0.1},
+            },
+        ],
+    )
+    result = media_selection.select_publication_media([detail, panorama])
+    assert result["cover_path"] == str(panorama.resolve())
+    assert result["policy"] == "apartment_panorama_hard_gate_manual_review_fallback"
+
+
+def test_apartment_auto_publish_stops_when_no_panorama_exists(tmp_path, monkeypatch):
+    import pytest
+
+    bedroom = tmp_path / "bedroom.jpg"
+    bedroom.write_bytes(b"B")
+    monkeypatch.setattr(media_selection, "_dhash", lambda path: None)
+    monkeypatch.setattr(
+        media_selection,
+        "rank_photo_paths",
+        lambda paths, cover_preference="living": [{
+            "file": str(bedroom.resolve()), "reject": False, "soft_reject": False,
+            "room_label": "bedroom", "ratio": 1.4,
+            "room": {"living": 0.1, "bed": 0.8, "toilet": 0.0},
+            "text": {"text_heavy": 0.0},
+        }],
+    )
+    with pytest.raises(ValueError, match="apartment_cover_requires_panorama_review"):
+        media_selection.select_publication_media([bedroom])
+
+
 def test_auto_cover_villa_prefers_exterior(tmp_path, monkeypatch):
     living = tmp_path / "living.jpg"
     exterior = tmp_path / "exterior.jpg"

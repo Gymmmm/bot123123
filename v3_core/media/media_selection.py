@@ -41,14 +41,37 @@ def _pick_auto_cover(
     """
     gallery_set = {str(Path(path).resolve()) for path in gallery}
     preferred = _normalize_cover_preference(cover_preference)
-    # Fallback ladder after the preferred label.
-    if preferred == "exterior":
-        label_ladder = ("exterior", "living", "kitchen")
-    else:
-        label_ladder = ("living", "exterior", "kitchen")
+
+    def _passes_apartment_panorama_gate(item: dict[str, Any]) -> bool:
+        """Require a clean landscape living-room shot for unattended covers."""
+        if str(item.get("room_label") or "") != "living":
+            return False
+        room = item.get("room")
+        text = item.get("text")
+        # Compatibility for older/manual ranking rows that predate CV metrics.
+        if not isinstance(room, dict) or not isinstance(text, dict):
+            return True
+        return (
+            not item.get("soft_reject")
+            and float(item.get("ratio") or 0) >= 1.15
+            and float(room.get("living") or 0) >= 0.55
+            and float(room.get("bed") or 0) < 0.36
+            and float(room.get("toilet") or 0) < 0.48
+            and float(text.get("text_heavy") or 0) < 0.48
+        )
 
     def _path(item: dict[str, Any]) -> str:
         return str(Path(str(item.get("file") or "")).resolve())
+
+    if preferred == "living":
+        for item in ranking:
+            path = _path(item)
+            if path in gallery_set and not item.get("reject") and _passes_apartment_panorama_gate(item):
+                return path
+        raise ValueError("apartment_cover_requires_panorama_review")
+
+    # Fallback ladder after the preferred label.
+    label_ladder = ("exterior", "living", "kitchen")
 
     def _usable(
         item: dict[str, Any],
@@ -195,7 +218,11 @@ def select_publication_media(
         "source_count": len(source_paths),
         "usable_count": len(gallery),
         "cover_preference": preference,
-        "policy": f"rank_ordered_gallery_cover_{preference}_first_skip_toilet_text",
+        "policy": (
+            "apartment_panorama_hard_gate_manual_review_fallback"
+            if preference == "living"
+            else "villa_exterior_first_skip_toilet_text"
+        ),
     }
 
 
