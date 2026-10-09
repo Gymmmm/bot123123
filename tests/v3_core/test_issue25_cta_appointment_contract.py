@@ -151,7 +151,7 @@ def test_details_and_photos_contract_has_real_fields_three_entries_and_no_intern
     view = _published(bookable=True)
     details = build_details_response(view)
     labels = _labels(details.action_rows)
-    assert "📸 查看实拍" in labels
+    assert "📸 全部实拍" in labels
     assert "📅 预约看房" in labels and "💬 咨询这套" in labels
     assert "富力城" in details.text
     # NOTE: public_id is NOT exposed in user-visible details text (privacy)
@@ -183,7 +183,7 @@ def test_contact_entries_have_real_callbacks_when_external_config_is_missing():
         touch_payload={},
     )
     no_match = build_search_no_match_view(intent)
-    contact = next(choice for row in no_match.rows for choice in row if choice.label == "💬 中文顾问")
+    contact = next(choice for row in no_match.rows for choice in row if choice.label == "💬 帮我找房")
     assert contact.kind == "home" and contact.value == "contact"
 
 

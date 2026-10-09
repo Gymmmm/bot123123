@@ -27,7 +27,7 @@ def test_no_match_keeps_conditions_strict_and_offers_adjust_or_advisor_only():
     assert "暂时没有完全符合的房源" in view.text
     assert "相近房源" not in view.text
     labels = [choice.label for row in view.rows for choice in row]
-    assert labels == ["💰 调整预算", "📍 换个区域", "🏠 调整户型", "💬 中文顾问", "⬅️ 返回首页"]
+    assert labels == ["💰 调整预算", "📍 换个区域", "🏠 调整户型", "💬 帮我找房", "⬅️ 返回首页"]
     assert "当前可约" not in " ".join(labels)
     assert [choice.kind for row in view.rows for choice in row] == [
         "search_budget", "search_area", "search_layout", "home", "home",

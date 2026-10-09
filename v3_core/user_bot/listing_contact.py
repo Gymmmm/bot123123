@@ -215,7 +215,7 @@ def build_listing_contact_view(
         "",
         he(identity),
         "",
-        "直接问价格、费用或看房时间，例如：明天下午能看吗？",
+        "问这套房的价格、费用或看房时间，直接在这里发问题，例如：明天下午能看吗？",
         "房源信息已附上，不用重复发送编号。",
     ]
     return ListingContactView(
