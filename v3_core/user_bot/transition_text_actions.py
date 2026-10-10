@@ -158,8 +158,8 @@ class TransitionTextActionService:
                     status="invalid",
                     reason="appointment_date_unrecognized",
                     prompt=(
-                        "日期格式没有识别出来。请试试：<code>0905</code>、"
-                        "<code>9月5日</code> 或 <code>下周三</code>。"
+                        "没看懂具体日期，可以再说清楚一点吗？\n"
+                        "例如：<code>10月15日</code>、<code>1015</code> 或 <code>下周三</code>。"
                     ),
                 )
             updated = draft.with_date(normalized)
@@ -185,8 +185,8 @@ class TransitionTextActionService:
                     status="invalid",
                     reason="appointment_time_unrecognized",
                     prompt=(
-                        "时间格式没有识别出来。请试试：<code>20:00</code> "
-                        "或 <code>晚上8点</code>。"
+                        "没看懂具体时间，可以再说清楚一点吗？\n"
+                        "例如：<code>下午3点</code> 或 <code>15:00</code>。"
                     ),
                 )
             try:
@@ -219,8 +219,8 @@ class TransitionTextActionService:
                     status="invalid",
                     reason="search_area_unrecognized",
                     prompt=(
-                        "位置没有识别出来。请试试：<code>BKK1</code>、"
-                        "<code>永旺1附近</code>、<code>富力城</code>。"
+                        "我还没看懂你说的位置，可以换个说法吗？\n"
+                        "例如：<code>BKK1</code>、<code>永旺1附近</code>、<code>富力城</code>。"
                     ),
                 )
             pref = dict(raw_pref)
@@ -248,8 +248,8 @@ class TransitionTextActionService:
                     status="invalid",
                     reason="budget_unrecognized",
                     prompt=(
-                        "预算没有识别出来。请试试：<code>800以内</code>、"
-                        "<code>600-900</code> 或 <code>1500以上</code>。"
+                        "我还没看懂你的预算，可以换个说法吗？\n"
+                        "例如：<code>800以内</code>、<code>600-900</code> 或 <code>1500以上</code>。"
                     ),
                 )
             pref = dict(raw_pref)

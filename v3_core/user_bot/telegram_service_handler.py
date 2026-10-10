@@ -18,7 +18,7 @@ from .service_views import (
     property_time_view, property_contacted_view, property_confirm_view, property_result_view,
     property_exit_view, repair_home_view, repair_media_view, repair_confirm_view,
     repair_result_view, repair_exit_view, rfcity_category_view, rfcity_home_view,
-    slot_view, utility_stub_view,
+    slot_view, utility_stub_view, video_service_view,
 )
 from .telegram_edit import edit_query_panel
 from .tenant_v1 import (
@@ -573,6 +573,10 @@ async def handle_v3_service_callback(
         user_data.pop(PROPERTY_SESSION_KEY, None)
         user_data.pop(PROPERTY_ANCHOR_KEY, None)
         await render_service_view(query, property_exit_view(), advisor_url=advisor_url)
+        return TelegramServiceOutcome(True, action, True)
+
+    if action == "video":
+        await render_service_view(query, video_service_view(), advisor_url=advisor_url)
         return TelegramServiceOutcome(True, action, True)
 
     if action in {"utilities", "moving", "cleaning", "network_help"}:

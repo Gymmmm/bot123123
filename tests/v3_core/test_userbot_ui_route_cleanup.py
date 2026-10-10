@@ -111,10 +111,7 @@ async def test_property_advisor_buttons_are_only_handoff_and_return():
 
 def test_aftercare_and_public_resident_buttons_stay_frozen():
     assert _labels(build_assurance_home_view()) == ["📋 入住交接留档", "💬 中文顾问", "⬅️ 返回侨联服务"]
-    expected = [
-        "📋 我的租约", "🤝 租后服务", "🛡️ 看房与交接",
-        "💬 中文顾问", "⬅️ 返回首页",
-    ]
+    expected = ["🎥 视频带看", "🛡️ 看房与交接", "🤝 租后服务", "📋 我的租约", "💬 中文顾问", "⬅️ 返回首页"]
     assert _labels(service_home_view()) == expected
     class Service:
         def active_binding(self, user_id): return None

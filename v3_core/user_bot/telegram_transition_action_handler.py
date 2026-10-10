@@ -124,6 +124,18 @@ def _view_for_result(views: TransitionViewService, result: TransitionActionResul
     return None
 
 
+def booking_failed_view(draft: PublicAppointmentDraft) -> TransitionView:
+    return TransitionView(
+        kind="appointment_failed",
+        text="📅 预约暂时没提交成功，请重试或联系中文顾问。",
+        rows=(
+            (TransitionChoice("🔄 重新提交", "appointment_submit"),),
+            (TransitionChoice("💬 中文顾问", "home", "contact"),),
+            (TransitionChoice("⬅️ 返回房源", "listing_details", public_listing_id=draft.public_listing_id),),
+        ),
+    )
+
+
 def search_failed_view() -> TransitionView:
     return TransitionView(
         kind="search_failed",
@@ -255,7 +267,11 @@ async def _submit_confirmed_appointment(
 ) -> TelegramTransitionActionOutcome:
     appointment_user = _telegram_appointment_user(update)
     lead_user = _lead_user(appointment_user)
-    execution = appointment_executor.execute(user=appointment_user, draft=draft)
+    try:
+        execution = appointment_executor.execute(user=appointment_user, draft=draft)
+    except Exception:
+        await _edit_view(query, booking_failed_view(draft))
+        raise
     lead_effect = None
     if lead_effects is not None:
         lead_effect = lead_effects.record_appointment(
@@ -351,7 +367,7 @@ async def handle_v3_transition_action(
 
     result = actions.apply(callback, user_data)
     if not result.ok:
-        await query.answer("操作已过期，请重新选择。", show_alert=True)
+        await query.answer("这个入口已经更新，请返回重新选择。", show_alert=True)
         return TelegramTransitionActionOutcome(handled=True, result=result)
     await query.answer()
 
@@ -424,16 +440,8 @@ async def handle_v3_transition_action(
         similar_result = flow.similar(criteria, limit=5)
         presentation = await present_search_flow_result(update, context, similar_result)
         if not presentation.matched:
-            await _edit_view(query, build_search_no_match_view(
-                result.search or SearchSubmitIntent(
-                    criteria=criteria,
-                    source=str(intent.source or "similar_listing"),
-                    goal="any",
-                    area_display=str(intent.area_display or ""),
-                    budget_label=str(intent.budget_label or ""),
-                    touch_payload={},
-                )
-            ))
+            from .telegram_callback_handler import no_similar_view
+            await _edit_view(query, no_similar_view())
         _apply_success_mutation(user_data, result, callback.kind)
         return TelegramTransitionActionOutcome(
             handled=True,

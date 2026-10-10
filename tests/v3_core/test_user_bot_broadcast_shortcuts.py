@@ -195,10 +195,7 @@ async def test_service_shortcut_ignores_binding_and_opens_public_service_home():
         if button.callback_data
     ]
     assert "富力城 A3-1208" not in text
-    assert callbacks == [
-        "v3u:service:tenant_lease", "v3u:service:aftercare",
-        "v3u:home:rental", "v3u:home:contact", "v3u:t:home",
-    ]
+    assert callbacks == ["v3u:service:video", "v3u:home:rental", "v3u:service:aftercare", "v3u:service:tenant_lease", "v3u:home:contact", "v3u:t:home"]
 
 
 @pytest.mark.asyncio

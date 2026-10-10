@@ -96,8 +96,8 @@ def rfcity_category_view(category: str) -> ServiceView:
 # Section 6 — 侨联服务 (locked hub).
 SERVICE_HOME_TEXT = (
     "🛎️ <b>侨联服务</b>\n\n"
-    "找房只是开始。\n\n"
-    "视频带看、入住留档、租后问题，都可以继续找侨联。"
+    "租房不只是找到房子。\n"
+    "从看房、签约到入住，有需要都可以继续联系侨联。"
 )
 
 
@@ -106,9 +106,30 @@ def service_home_view() -> ServiceView:
         kind="service_home",
         text=SERVICE_HOME_TEXT,
         rows=(
-            (ServiceChoice("📋 我的租约", "v3u:service:tenant_lease"), ServiceChoice("🤝 租后服务", "v3u:service:aftercare")),
-            (ServiceChoice("🛡️ 看房与交接", "v3u:home:rental"), ServiceChoice("💬 中文顾问", "v3u:home:contact")),
-            (ServiceChoice("⬅️ 返回首页", "v3u:t:home"),),
+            (ServiceChoice("🎥 视频带看", "v3u:service:video"), ServiceChoice("🛡️ 看房与交接", "v3u:home:rental")),
+            (ServiceChoice("🤝 租后服务", "v3u:service:aftercare"), ServiceChoice("📋 我的租约", "v3u:service:tenant_lease")),
+            (ServiceChoice("💬 中文顾问", "v3u:home:contact"), ServiceChoice("⬅️ 返回首页", "v3u:t:home")),
+        ),
+    )
+
+
+# V4 — 🎥 视频带看 entry from the service hub. Booking itself still starts
+# from a concrete listing, so this page only explains and routes.
+VIDEO_SERVICE_TEXT = (
+    "🎥 <b>视频带看</b>\n\n"
+    "人不在金边、或者没空过去，都可以视频看房。\n"
+    "顾问到房子里开视频，带你实时看房间和周边。\n\n"
+    "先挑好想看的房子，在房源里点「📅 预约看房」，再选「🎥 视频带看」就行。"
+)
+
+
+def video_service_view() -> ServiceView:
+    return ServiceView(
+        kind="video_service",
+        text=VIDEO_SERVICE_TEXT,
+        rows=(
+            (ServiceChoice("🔍 开始找房", "v3u:home:search"), ServiceChoice("💬 中文顾问", "v3u:home:contact")),
+            (ServiceChoice("⬅️ 返回侨联服务", "v3u:home:service"),),
         ),
     )
 
@@ -440,7 +461,7 @@ def utility_stub_view(kind: str) -> ServiceView:
         text=f"<b>{title}</b>\n\n{body}",
         rows=(
             (ServiceChoice("💬 中文顾问", "v3u:home:contact"),),
-            (ServiceChoice("⬅️ 返回入住服务", "v3u:service:concierge"),),
+            (ServiceChoice("⬅️ 返回租后服务", "v3u:service:concierge"),),
         ),
     )
 

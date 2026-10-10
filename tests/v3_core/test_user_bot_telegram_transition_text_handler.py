@@ -229,7 +229,7 @@ async def test_invalid_custom_date_keeps_waiting_state_and_returns_fixed_copy():
     )
     assert outcome.result is not None and outcome.result.status == "invalid"
     assert APPOINTMENT_AWAITING_DATE_KEY in user_data
-    assert "0905" in message.calls[-1][1][0]
+    assert "没看懂具体日期" in message.calls[-1][1][0]
 
 
 @pytest.mark.asyncio

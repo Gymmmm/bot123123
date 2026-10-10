@@ -16,12 +16,16 @@ from .telegram_transition_ui import build_transition_keyboard
 from .transition_callbacks import parse_transition_callback
 from .transition_plan import build_transition_plan
 from .transition_session import apply_session_mutation, build_transition_session
-from .transition_views import TransitionView, TransitionViewService
+from .transition_views import TransitionChoice, TransitionView, TransitionViewService
 
 
 SEARCH_SESSION_KEY = "v3_find_card_public_ids"
 SEARCH_ANCHOR_KEY = "v3_find_card_anchor"
 SEARCH_CONTEXT_KEY = "v3_find_card_context"
+
+# V4.0 error copy table (异常与系统提示).
+BUTTON_EXPIRED_TEXT = "这个入口已经更新，请返回重新选择。"
+NO_SIMILAR_TEXT = "目前也没有找到合适的相似房源，可以让顾问继续帮你找。"
 LISTING_SOURCE_KEY = "v3_listing_source"
 LISTING_TOUCHPOINT_KEY = "v3_listing_touchpoint"
 PHOTOS_ALBUM_KEY = "v3_listing_photos_album"
@@ -270,8 +274,8 @@ def _error_alert(response: TelegramCallbackResponse) -> str:
     if response.status == "blocked":
         return "这套房当前状态已变化，请查看最新房态。"
     if response.status == "not_found":
-        return "房源信息已更新，请重新打开。"
-    return "这个操作已失效，请重新进入。"
+        return "这套房目前不再展示，看看其他选择吧。"
+    return BUTTON_EXPIRED_TEXT
 
 
 def _search_context(context: Any) -> dict | None:
@@ -280,6 +284,17 @@ def _search_context(context: Any) -> dict | None:
         return None
     value = data.get(SEARCH_CONTEXT_KEY)
     return dict(value) if isinstance(value, dict) else None
+
+
+def no_similar_view() -> TransitionView:
+    return TransitionView(
+        kind="similar_none",
+        text=f"🏘️ {NO_SIMILAR_TEXT}",
+        rows=(
+            (TransitionChoice("💬 帮我找房", "home", "contact"),),
+            (TransitionChoice("🔄 调整条件", "change_search"),),
+        ),
+    )
 
 
 def _dispatch(router: CallbackRouter, raw: str, context: Any):
@@ -540,7 +555,9 @@ async def handle_v3_callback(
                 flow = SearchFlowService(search_executor.flow)
                 similar_result = flow.similar(criteria, limit=5)
                 await _render_transition_view(query, view)
-                await present_search_flow_result(update, context, similar_result)
+                similar_presentation = await present_search_flow_result(update, context, similar_result)
+                if not similar_presentation.matched:
+                    await _render_transition_view(query, no_similar_view())
                 user_data = getattr(context, "user_data", None)
                 if isinstance(user_data, dict):
                     apply_session_mutation(user_data, mutation)

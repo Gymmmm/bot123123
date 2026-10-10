@@ -50,7 +50,7 @@ def test_invalid_custom_date_preserves_waiting_contract_and_fixed_sha_error_copy
 
     assert result.status == "invalid"
     assert result.reason == "appointment_date_unrecognized"
-    assert "0905" in result.prompt
+    assert "没看懂具体日期" in result.prompt
     assert "下周三" in result.prompt
     assert result.mutation is None
 
@@ -74,8 +74,8 @@ def test_invalid_custom_time_returns_fixed_sha_retry_copy():
 
     assert result.status == "invalid"
     assert result.reason == "appointment_time_unrecognized"
-    assert "20:00" in result.prompt
-    assert "晚上8点" in result.prompt
+    assert "没看懂具体时间" in result.prompt
+    assert "下午3点" in result.prompt
     assert result.mutation is None
 
 

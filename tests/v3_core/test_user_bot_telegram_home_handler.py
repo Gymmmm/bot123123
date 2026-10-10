@@ -121,7 +121,7 @@ async def test_service_home_edits_existing_surface():
     assert [c[0] for c in query.calls]==["answer","edit_text"]
     assert "侨联服务" in query.calls[-1][1][0]
     labels=[b.text for row in query.calls[-1][2]["reply_markup"].inline_keyboard for b in row]
-    assert labels==["📋 我的租约","🤝 租后服务","🛡️ 看房与交接","💬 中文顾问","⬅️ 返回首页"]
+    assert labels==["🎥 视频带看", "🛡️ 看房与交接", "🤝 租后服务", "📋 我的租约", "💬 中文顾问", "⬅️ 返回首页"]
 
 
 @pytest.mark.asyncio

@@ -34,10 +34,7 @@ def test_listing_surface_source_contains_final_first_layer_actions():
 
 
 def test_service_hubs_match_final_layouts():
-    assert _labels(service_home_view()) == [
-        "📋 我的租约", "🤝 租后服务", "🛡️ 看房与交接",
-        "💬 中文顾问", "⬅️ 返回首页",
-    ]
+    assert _labels(service_home_view()) == ["🎥 视频带看", "🛡️ 看房与交接", "🤝 租后服务", "📋 我的租约", "💬 中文顾问", "⬅️ 返回首页"]
     from v3_core.user_bot.service_views import aftercare_home_view
     assert _labels(aftercare_home_view()) == [
         "🔧 房屋报修", "🏢 物业问题",

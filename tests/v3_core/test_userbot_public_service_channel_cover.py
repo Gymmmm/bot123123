@@ -213,14 +213,8 @@ def test_public_service_home_matches_frozen_product():
     labels = [choice.label for row in view.rows for choice in row]
     callbacks = [choice.callback_data for row in view.rows for choice in row]
     assert "<b>侨联服务</b>" in view.text
-    assert labels == [
-        "📋 我的租约", "🤝 租后服务", "🛡️ 看房与交接",
-        "💬 中文顾问", "⬅️ 返回首页",
-    ]
-    assert callbacks == [
-        "v3u:service:tenant_lease", "v3u:service:aftercare",
-        "v3u:home:rental", "v3u:home:contact", "v3u:t:home",
-    ]
+    assert labels == ["🎥 视频带看", "🛡️ 看房与交接", "🤝 租后服务", "📋 我的租约", "💬 中文顾问", "⬅️ 返回首页"]
+    assert callbacks == ["v3u:service:video", "v3u:home:rental", "v3u:service:aftercare", "v3u:service:tenant_lease", "v3u:home:contact", "v3u:t:home"]
     assert "没有显示你的住房信息" not in view.text
 
 
