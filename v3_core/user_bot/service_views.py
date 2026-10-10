@@ -195,7 +195,7 @@ def service_home_view() -> ServiceView:
         ),
         rows=(
             (ServiceChoice("📋 我的租约", "v3u:service:tenant_lease"), ServiceChoice("🤝 租后服务", "v3u:service:concierge")),
-            (ServiceChoice("🛡️ 侨联安心租", "v3u:home:rental"), ServiceChoice("💬 中文顾问", "v3u:home:contact")),
+            (ServiceChoice("🛡️ 看房与交接", "v3u:home:rental"), ServiceChoice("💬 中文顾问", "v3u:home:contact")),
             (ServiceChoice("⬅️ 返回首页", "v3u:t:home"),),
         ),
     )
@@ -206,11 +206,11 @@ def concierge_home_view() -> ServiceView:
         kind="concierge_home",
         text=(
             "🤝 <b>租后服务</b>\n\n"
-            "签完合同不是结束。报修、物业、账单、搬家、保洁和网络，都可以继续找侨联。"
+            "住进去以后，报修、物业和账单问题都可以告诉中文顾问。"
         ),
         rows=(
-            (ServiceChoice("🔧 报修直通", "v3u:service:repair"), ServiceChoice("🏢 物业代办", "v3u:service:coordination")),
-            (ServiceChoice("🔌 账单代办", "v3u:service:utilities"), ServiceChoice("🚚 搬家协助", "v3u:service:moving")),
+            (ServiceChoice("🔧 房屋报修", "v3u:service:repair"), ServiceChoice("🏢 物业问题", "v3u:service:coordination")),
+            (ServiceChoice("💡 账单疑问", "v3u:service:utilities"), ServiceChoice("🚚 搬家协助", "v3u:service:moving")),
             (ServiceChoice("🧹 保洁安排", "v3u:service:cleaning"), ServiceChoice("🌐 网络办理", "v3u:service:network_help")),
             (ServiceChoice("❓ 其他住房问题", "v3u:service:general"),),
             (ServiceChoice("⬅️ 返回侨联服务", "v3u:home:service"),),
