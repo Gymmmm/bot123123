@@ -18,10 +18,10 @@ def test_pillow_cover_counts_and_exact_size(tmp_path, count):
                  source_labels=("客厅", "卧室", "厨房"), output_path=str(out),
                  data=CoverRenderData(public_listing_id="QL-PP-T1", project="富力城", layout="1房", price="650"))
     with Image.open(out) as im:
-        assert im.size == (1080,1286)
+        assert im.size == (1080,1350)
         assert im.format == "PNG"
-        # Footer is always a clean white brand strip, independent of photo colors.
-        assert all(channel >= 248 for channel in im.convert("RGB").getpixel((540, 1265)))
+        # Footer is always a clean light brand strip, independent of photo colors.
+        assert all(channel >= 230 for channel in im.convert("RGB").getpixel((540, 1300)))
 
 def test_price_chinese_and_bad_image_are_tolerated(tmp_path):
     good=make(tmp_path/"good.png", size=(900,1600))
@@ -31,7 +31,7 @@ def test_price_chinese_and_bad_image_are_tolerated(tmp_path):
     assert data.price_line() == "$650/月"
     render_cover(style="anything", source_image=str(bad), source_images=[good], output_path=str(out), data=data)
     with Image.open(out) as im:
-        assert im.size == (1080,1286)
+        assert im.size == (1080,1350)
         assert im.format == "JPEG"
 
 def test_price_uses_thousands_separator_and_never_duplicates_month_suffix():
@@ -55,7 +55,7 @@ def test_apartment_uses_same_renderer_with_shorter_hero(tmp_path):
                  source_labels=("客厅", "卧室", "厨房"), output_path=str(out),
                  data=CoverRenderData(public_listing_id="QL", property_type="公寓", project="太子国际广场", layout="3房", price="800"))
     with Image.open(out) as im:
-        assert im.size == (1080,1066)
+        assert im.size == (1080,810)
 
 def test_font_missing_falls_back(tmp_path, monkeypatch):
     import v3_core.media.cover_renderer as renderer
@@ -75,3 +75,95 @@ def test_all_bad_images_follow_business_failure_not_worker_crash(tmp_path):
     bad=tmp_path/"bad.jpg"; bad.write_bytes(b"bad")
     with pytest.raises(ValueError, match="cover_no_usable_images"):
         render_cover(style="x", source_image=str(bad), output_path=str(tmp_path/"x.png"), data=CoverRenderData(public_listing_id="QL"))
+
+
+@pytest.mark.parametrize(
+    "property_type,expected_size,hero_height",
+    [
+        ("独栋别墅", (1080, 1350), 881),
+        ("双拼别墅", (1080, 1350), 881),
+        ("联排别墅", (1080, 1350), 881),
+        ("villa", (1080, 1350), 881),
+        ("", (1080, 1350), 881),
+        ("商铺", (1080, 1350), 881),
+        ("公寓", (1080, 810), 470),
+        ("服务式公寓", (1080, 810), 470),
+        ("服务式", (1080, 810), 470),
+        ("Condo", (1080, 810), 470),
+        ("studio", (1080, 810), 470),
+        ("apartment", (1080, 810), 470),
+    ],
+)
+def test_cover_size_per_property_type(tmp_path, property_type, expected_size, hero_height):
+    from v3_core.media.cover_renderer import _layout_geometry
+    data = CoverRenderData(public_listing_id="QL", property_type=property_type, project="BKK1", layout="3房", price="4000")
+    canvas, hero, gallery_top, gallery_h, footer_top = _layout_geometry(data)
+    assert canvas == expected_size
+    assert hero == hero_height
+    assert hero < gallery_top < gallery_top + gallery_h < footer_top < canvas[1]
+    paths = [make(tmp_path / f"{i}.jpg", value=60 + i * 30) for i in range(4)]
+    out = tmp_path / "cover.jpg"
+    render_cover(style="premium_photo", source_image=paths[0], source_images=paths[1:],
+                 source_labels=("客厅", "卧室", "厨房"), output_path=str(out), data=data)
+    with Image.open(out) as im:
+        assert im.size == expected_size
+        rgb = im.convert("RGB")
+        # Light grey page between hero and thumbnails and left of the first thumbnail.
+        assert min(rgb.getpixel((10, gallery_top + gallery_h // 2))) >= 225
+
+
+def test_canvas_ratios_villa_4_5_and_apartment_4_3():
+    from v3_core.media.cover_renderer import APARTMENT_CANVAS, TALL_CANVAS
+    assert TALL_CANVAS[0] * 5 == TALL_CANVAS[1] * 4
+    assert APARTMENT_CANVAS[0] * 3 == APARTMENT_CANVAS[1] * 4
+
+
+def test_price_card_stays_inside_bounds_and_is_centred():
+    from PIL import ImageDraw
+    from v3_core.media.cover_renderer import _draw_price_card
+    layer = Image.new("RGBA", (1080, 400), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(layer)
+    left = _draw_price_card(draw, CoverRenderData(public_listing_id="QL", price="1250000"), right=1040, bottom=300,
+                            height=78, amount_size=40, suffix_size=19, min_width=200, max_width=340)
+    assert left is not None and 1040 - left <= 340
+    bbox = layer.getchannel("A").getbbox()
+    assert bbox[0] >= left and bbox[2] <= 1041 and bbox[1] >= 222 and bbox[3] <= 301
+
+
+def test_fit_line_never_exceeds_width():
+    from PIL import ImageDraw
+    from v3_core.media.cover_renderer import _fit_line
+    draw = ImageDraw.Draw(Image.new("RGB", (10, 10)))
+    text, font = _fit_line(draw, "非常非常长的项目名称测试太子国际广场豪华服务式公寓三期A座" * 2,
+                           max_width=300, start_size=42, min_size=28)
+    assert draw.textlength(text, font=font) <= 300
+    assert text.endswith("…")
+
+
+@pytest.mark.parametrize("property_type", ["公寓", "独栋别墅"])
+def test_long_title_and_tag_render_without_error(tmp_path, property_type):
+    paths = [make(tmp_path / f"{i}.jpg") for i in range(4)]
+    out = tmp_path / "long.jpg"
+    render_cover(style="x", source_image=paths[0], source_images=paths[1:],
+                 source_labels=("超长的房间标签名字测试测试", "卧室", "厨房"), output_path=str(out),
+                 data=CoverRenderData(public_listing_id="QL", property_type=property_type,
+                                      project="非常非常长的项目名称测试太子国际广场豪华服务式公寓三期",
+                                      layout="3房2卫 · 高层 · 全新精装 · 拎包入住 · 可养宠物", price="12500"))
+    with Image.open(out) as im:
+        assert im.size in {(1080, 1350), (1080, 810)}
+
+
+def test_subtitle_joins_type_and_layout():
+    from v3_core.media.cover_renderer import _cover_subtitle
+    assert _cover_subtitle(CoverRenderData(public_listing_id="QL", property_type="独栋别墅", layout="5房")) == "独栋别墅 | 5房"
+
+
+def test_villa_thumbnails_are_near_square_and_footer_kept():
+    from v3_core.media.cover_renderer import TALL_LAYOUT as geo
+    inner = geo.canvas[0] - 2 * geo.margin - 2 * geo.gallery_gap
+    thumb_w = inner // 3
+    assert 0.85 <= thumb_w / geo.gallery_height <= 1.0
+    assert geo.gallery_top == geo.hero_height + geo.gallery_gap
+    # 16px gap, then the 1px divider drawn at footer_top - 1.
+    assert geo.footer_top - (geo.gallery_top + geo.gallery_height) == geo.gallery_gap + 1
+    assert geo.canvas[1] - geo.footer_top == 86
