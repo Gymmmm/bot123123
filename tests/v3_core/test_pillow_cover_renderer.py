@@ -80,12 +80,12 @@ def test_all_bad_images_follow_business_failure_not_worker_crash(tmp_path):
 @pytest.mark.parametrize(
     "property_type,expected_size,hero_height",
     [
-        ("独栋别墅", (1080, 1350), 881),
-        ("双拼别墅", (1080, 1350), 881),
-        ("联排别墅", (1080, 1350), 881),
-        ("villa", (1080, 1350), 881),
-        ("", (1080, 1350), 881),
-        ("商铺", (1080, 1350), 881),
+        ("独栋别墅", (1080, 1350), 908),
+        ("双拼别墅", (1080, 1350), 908),
+        ("联排别墅", (1080, 1350), 908),
+        ("villa", (1080, 1350), 908),
+        ("", (1080, 1350), 908),
+        ("商铺", (1080, 1350), 908),
         ("公寓", (1080, 810), 470),
         ("服务式公寓", (1080, 810), 470),
         ("服务式", (1080, 810), 470),
@@ -162,8 +162,17 @@ def test_villa_thumbnails_are_near_square_and_footer_kept():
     from v3_core.media.cover_renderer import TALL_LAYOUT as geo
     inner = geo.canvas[0] - 2 * geo.margin - 2 * geo.gallery_gap
     thumb_w = inner // 3
-    assert 0.85 <= thumb_w / geo.gallery_height <= 1.0
+    assert abs(thumb_w / geo.gallery_height - 1) < 0.01
     assert geo.gallery_top == geo.hero_height + geo.gallery_gap
     # 16px gap, then the 1px divider drawn at footer_top - 1.
     assert geo.footer_top - (geo.gallery_top + geo.gallery_height) == geo.gallery_gap + 1
     assert geo.canvas[1] - geo.footer_top == 86
+
+
+def test_apartment_detail_photos_have_room_and_footer_content_fits():
+    from v3_core.media.cover_renderer import APARTMENT_LAYOUT as geo
+    widths = (geo.canvas[0] - 2 * geo.margin - 2 * geo.gallery_gap) / 3
+    assert abs(widths / geo.gallery_height - 4 / 3) < 0.01
+    assert geo.gallery_top + geo.gallery_height < geo.footer_top
+    # The 40px logo and pill need at least 10px breathing room on each side.
+    assert 60 <= geo.canvas[1] - geo.footer_top <= 86

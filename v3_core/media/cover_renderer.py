@@ -30,18 +30,17 @@ class CoverLayout:
     footer_top: int
 
 
-# Geometry measured from the reference PDF rendered at 1080px wide.
-# Villa: shorter hero than the PDF (1011) so thumbnails are near-square
-# (~322x350) instead of flat strips; 16px gaps and the 86px footer are kept.
+# Keep the approved outer ratios. Give villa details square cells and
+# apartment details 4:3 cells; reserve only a compact strip for branding.
 TALL_LAYOUT = CoverLayout(
-    canvas=(1080, 1350), hero_height=881, margin=40,
-    gallery_top=897, gallery_height=350, gallery_gap=16, gallery_radius=14,
+    canvas=(1080, 1350), hero_height=908, margin=40,
+    gallery_top=924, gallery_height=323, gallery_gap=16, gallery_radius=14,
     footer_top=1264,
 )
 APARTMENT_LAYOUT = CoverLayout(
     canvas=(1080, 810), hero_height=470, margin=32,
-    gallery_top=485, gallery_height=140, gallery_gap=14, gallery_radius=14,
-    footer_top=640,
+    gallery_top=484, gallery_height=247, gallery_gap=14, gallery_radius=14,
+    footer_top=746,
 )
 TALL_CANVAS = TALL_LAYOUT.canvas
 APARTMENT_CANVAS = APARTMENT_LAYOUT.canvas
