@@ -1,13 +1,15 @@
 """DB-free Pillow renderer for Telegram property covers (Gym 2026-10-11).
 
-Canvas follows the property type:
+Templates (chosen upstream by ``cover_plan``; ``auto`` follows the property type):
 
-* apartment / 服务式 / condo / studio: 1080x720 landscape. Large hero on the
-  left (718x664, living room) and a right column of three stacked thumbnails
-  (356 wide), 6px white separators, 56px dark brand footer.
-* villa / house / unrecognised types: 1080x1350 portrait. Hero 1080x878
-  (exterior, auto-straightened upstream), three 356x402 thumbnails below,
-  64px dark brand footer.
+* ``apartment_3x2``: 1200x800 landscape. Hero on the left (798x738) and a
+  right column of three stacked thumbnails (396 wide), 6px white separators,
+  62px dark brand footer. Same proportions as the approved 1080x720 sample.
+* ``villa_4x5``: 1080x1350 portrait. Hero 1080x878 (good exterior,
+  straightened upstream), three 356x402 thumbnails below, 64px footer.
+* ``landscape_3x2``: villa without a good exterior — apartment geometry.
+* ``grid_2x2``: 1200x800, four equal photos (no standout hero).
+* ``single``: one photo fills the photo area (no padding with repeats).
 
 Shared treatment: 📍 title (小区/区域) + gold 户型 · 类型 pill top-left, price
 card bottom-right of the hero as the biggest text, thin top/bottom shades
@@ -40,8 +42,12 @@ class CoverLayout:
 
 SEPARATOR = 6
 APARTMENT_LAYOUT = CoverLayout(
-    kind="apartment", canvas=(1080, 720), hero=(718, 664), thumb_extent=356,
-    separator=SEPARATOR, footer_height=56, margin=32, title_size=44, price_size=64,
+    kind="apartment", canvas=(1200, 800), hero=(798, 738), thumb_extent=396,
+    separator=SEPARATOR, footer_height=62, margin=36, title_size=49, price_size=71,
+)
+GRID_LAYOUT = CoverLayout(
+    kind="grid", canvas=(1200, 800), hero=(597, 366), thumb_extent=366,
+    separator=SEPARATOR, footer_height=62, margin=30, title_size=42, price_size=60,
 )
 TALL_LAYOUT = CoverLayout(
     kind="tall", canvas=(1080, 1350), hero=(1080, 878), thumb_extent=402,
@@ -390,8 +396,25 @@ def _is_apartment(data: CoverRenderData) -> bool:
     return any(token in value for token in ("公寓", "服务式", "apartment", "condo", "studio"))
 
 
-def _layout(data: CoverRenderData) -> CoverLayout:
-    return APARTMENT_LAYOUT if _is_apartment(data) else TALL_LAYOUT
+TEMPLATES = ("apartment_3x2", "villa_4x5", "landscape_3x2", "grid_2x2", "single")
+
+
+def _resolve_template(data: CoverRenderData, template: str | None) -> str:
+    value = str(template or "").strip().lower()
+    if value in TEMPLATES:
+        return value
+    return "apartment_3x2" if _is_apartment(data) else "villa_4x5"
+
+
+def _layout(data: CoverRenderData, template: str | None = None) -> CoverLayout:
+    value = _resolve_template(data, template)
+    if value == "grid_2x2":
+        return GRID_LAYOUT
+    if value == "villa_4x5":
+        return TALL_LAYOUT
+    if value == "single":
+        return APARTMENT_LAYOUT if _is_apartment(data) else TALL_LAYOUT
+    return APARTMENT_LAYOUT
 
 
 def _thumb_boxes(geo: CoverLayout, count: int) -> list[tuple[int, int, int, int]]:
@@ -399,6 +422,12 @@ def _thumb_boxes(geo: CoverLayout, count: int) -> list[tuple[int, int, int, int]
     if count <= 0:
         return []
     sep = geo.separator
+    if geo.kind == "grid":
+        w = (geo.canvas[0] - sep) // 2
+        h = (geo.footer_top - sep) // 2
+        cells = [(0, 0, w, h), (w + sep, 0, geo.canvas[0] - w - sep, h),
+                 (0, h + sep, w, geo.footer_top - h - sep), (w + sep, h + sep, geo.canvas[0] - w - sep, geo.footer_top - h - sep)]
+        return cells[1:1 + count]
     if geo.kind == "apartment":
         x, total = geo.hero[0] + sep, geo.hero[1] - sep * (count - 1)
         heights = [total // count] * count
@@ -418,45 +447,72 @@ def _thumb_boxes(geo: CoverLayout, count: int) -> list[tuple[int, int, int, int]
     return boxes
 
 
-def _layout_geometry(data: CoverRenderData) -> dict[str, Any]:
-    geo = _layout(data)
-    return {"canvas": geo.canvas, "hero": geo.hero, "thumbs": _thumb_boxes(geo, 3),
-            "footer_top": geo.footer_top, "footer_height": geo.footer_height}
+def _layout_geometry(data: CoverRenderData, template: str | None = None) -> dict[str, Any]:
+    geo = _layout(data, template)
+    hero = geo.hero
+    if _resolve_template(data, template) == "single":
+        hero = (geo.canvas[0], geo.footer_top)
+    return {"canvas": geo.canvas, "hero": hero, "thumbs": [] if _resolve_template(data, template) == "single"
+            else _thumb_boxes(geo, 3), "footer_top": geo.footer_top, "footer_height": geo.footer_height,
+            "template": _resolve_template(data, template)}
 
 
 def render_cover(*, style: str, source_image: str, output_path: str, data: CoverRenderData,
                  source_images: Iterable[str] | None = None, source_labels: Iterable[str] | None = None,
-                 layout: str = "hero_three") -> str:
-    """Render one hero plus up to three room thumbnails in the type-specific layout."""
-    # All style aliases intentionally converge on the same channel-first layout.
-    del style, layout
+                 layout: str = "auto") -> str:
+    """Render the hero plus up to three photos in the planned template.
+
+    ``layout`` is a template name from ``TEMPLATES`` (``auto``/unknown → by
+    property type). Empty labels are not drawn: an uncertain room is shown as a
+    plain photo, never with a guessed name.
+    """
+    del style
+    template = _resolve_template(data, layout)
     candidates = [source_image]
-    candidates.extend(list(source_images or ()))
+    if template != "single":
+        candidates.extend(list(source_images or ()))
     images = _usable_images(candidates)
     if not images:
         raise ValueError("cover_no_usable_images")
-    geo = _layout(data)
+    geo = _layout(data, template)
     W, H = geo.canvas
     canvas = Image.new("RGB", geo.canvas, PAGE_BG)
     hero_w, hero_h = geo.hero
     thumbs = images[1:4]
+    if template == "grid_2x2" and len(thumbs) < 3:
+        template, geo = "apartment_3x2", APARTMENT_LAYOUT
+        W, H = geo.canvas
+        canvas = Image.new("RGB", geo.canvas, PAGE_BG)
+        hero_w, hero_h = geo.hero
     if not thumbs:
         # No detail photos: the hero takes the whole photo area (no empty band).
         hero_w, hero_h = W, geo.footer_top
     canvas.paste(_fit(images[0], (hero_w, hero_h)), (0, 0))
     layer = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
     labels = list(source_labels or ())
-    for index, (image, (x, y, w, h)) in enumerate(zip(thumbs, _thumb_boxes(geo, len(thumbs)))):
+    boxes = _thumb_boxes(geo, len(thumbs))
+    for index, (image, (x, y, w, h)) in enumerate(zip(thumbs, boxes)):
         canvas.paste(_fit(image, (w, h)), (x, y))
-        _thumb_label(layer, x, y, w, labels[index] if index < len(labels) else "实拍")
+        label = labels[index] if index < len(labels) else ""
+        if label:
+            _thumb_label(layer, x, y, w, label)
     m = geo.margin
-    _shade(layer, (0, 0, hero_w, hero_h), top_alpha=170, bottom_alpha=200 if geo.kind == "apartment" else 210)
-    _draw_price(layer, data, right=hero_w - m - (0 if geo.kind == "apartment" else 8),
-                bottom=hero_h - m - (0 if geo.kind == "apartment" else 4),
-                size=geo.price_size, max_width=hero_w - 2 * m)
-    _draw_title_block(layer, data, x=m + (0 if geo.kind == "apartment" else 8),
-                      y=m - (6 if geo.kind == "apartment" else 0),
-                      max_width=(hero_w - 2 * m) if geo.kind == "apartment" else 640, size=geo.title_size)
+    if geo.kind == "grid":
+        _shade(layer, (0, 0, hero_w, hero_h), top_alpha=170, bottom_alpha=0, top_span=200, bottom_span=1)
+        last = boxes[-1] if boxes else (0, 0, hero_w, hero_h)
+        _shade(layer, (last[0], last[1], last[0] + last[2], last[1] + last[3]), top_alpha=0, bottom_alpha=200,
+               top_span=1, bottom_span=200)
+        _draw_price(layer, data, right=last[0] + last[2] - m, bottom=last[1] + last[3] - m,
+                    size=geo.price_size, max_width=last[2] - 2 * m)
+        _draw_title_block(layer, data, x=m, y=m - 6, max_width=hero_w - 2 * m, size=geo.title_size)
+    else:
+        tall = geo.kind == "tall"
+        _shade(layer, (0, 0, hero_w, hero_h), top_alpha=170, bottom_alpha=210 if tall else 200)
+        _draw_price(layer, data, right=hero_w - m - (8 if tall else 0),
+                    bottom=hero_h - m - (4 if tall else 0),
+                    size=geo.price_size, max_width=hero_w - 2 * m)
+        _draw_title_block(layer, data, x=m + (8 if tall else 0), y=m - (0 if tall else 6),
+                          max_width=640 if tall else (hero_w - 2 * m), size=geo.title_size)
     _draw_footer(layer, geo, _brand_lockup())
     canvas.paste(layer, (0, 0), layer)
     output = Path(output_path).expanduser().resolve()
@@ -468,4 +524,4 @@ def render_cover(*, style: str, source_image: str, output_path: str, data: Cover
     return str(output)
 
 
-__all__ = ["CoverRenderData", "render_cover"]
+__all__ = ["CoverRenderData", "TEMPLATES", "render_cover"]

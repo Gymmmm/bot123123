@@ -57,7 +57,7 @@ def test_apartment_uses_same_renderer_with_shorter_hero(tmp_path):
                  source_labels=("客厅", "卧室", "厨房"), output_path=str(out),
                  data=CoverRenderData(public_listing_id="QL", property_type="公寓", project="太子国际广场", layout="3房", price="800"))
     with Image.open(out) as im:
-        assert im.size == (1080,720)
+        assert im.size == (1200,800)
 
 def test_font_missing_falls_back(tmp_path, monkeypatch):
     import v3_core.media.cover_renderer as renderer
@@ -88,12 +88,12 @@ def test_all_bad_images_follow_business_failure_not_worker_crash(tmp_path):
         ("villa", (1080, 1350), (1080, 878)),
         ("", (1080, 1350), (1080, 878)),
         ("商铺", (1080, 1350), (1080, 878)),
-        ("公寓", (1080, 720), (718, 664)),
-        ("服务式公寓", (1080, 720), (718, 664)),
-        ("服务式", (1080, 720), (718, 664)),
-        ("Condo", (1080, 720), (718, 664)),
-        ("studio", (1080, 720), (718, 664)),
-        ("apartment", (1080, 720), (718, 664)),
+        ("公寓", (1200, 800), (798, 738)),
+        ("服务式公寓", (1200, 800), (798, 738)),
+        ("服务式", (1200, 800), (798, 738)),
+        ("Condo", (1200, 800), (798, 738)),
+        ("studio", (1200, 800), (798, 738)),
+        ("apartment", (1200, 800), (798, 738)),
     ],
 )
 def test_cover_size_per_property_type(tmp_path, property_type, expected_size, hero):
@@ -118,13 +118,15 @@ def test_cover_size_per_property_type(tmp_path, property_type, expected_size, he
 
 def test_apartment_landscape_side_column_geometry():
     from v3_core.media.cover_renderer import APARTMENT_LAYOUT as geo, _thumb_boxes
-    assert geo.canvas == (1080, 720)
-    assert geo.hero == (718, 664) and geo.footer_height == 56
+    # Gym spec 2026-10-11: 1200×800 (3:2), same proportions as the approved 1080×720 sample.
+    assert geo.canvas == (1200, 800)
+    assert geo.hero == (798, 738) and geo.footer_height == 62
+    assert abs(geo.hero[0] / geo.canvas[0] - 718 / 1080) < 0.003
     boxes = _thumb_boxes(geo, 3)
-    assert [b[0] for b in boxes] == [724, 724, 724] and all(b[2] == 356 for b in boxes)
+    assert [b[0] for b in boxes] == [804, 804, 804] and all(b[2] == 396 for b in boxes)
     assert boxes[0][1] == 0 and boxes[-1][1] + boxes[-1][3] == geo.footer_top
     assert boxes[1][1] - (boxes[0][1] + boxes[0][3]) == 6
-    assert geo.hero[0] + 6 + 356 == geo.canvas[0]
+    assert geo.hero[0] + 6 + 396 == geo.canvas[0]
 
 
 def test_villa_portrait_geometry():
@@ -144,8 +146,8 @@ def test_white_separators_only_between_photos(tmp_path):
                  data=CoverRenderData(public_listing_id="QL", property_type="公寓", project="BKK1", price="800"))
     with Image.open(out) as im:
         rgb = im.convert("RGB")
-        assert min(rgb.getpixel((720, 300))) >= 245        # vertical line hero | thumbs
-        assert min(rgb.getpixel((900, 219))) >= 245        # line between thumbs 1 and 2
+        assert min(rgb.getpixel((800, 300))) >= 245        # vertical line hero | thumbs
+        assert min(rgb.getpixel((1000, 244))) >= 245       # line between thumbs 1 and 2
         assert min(rgb.getpixel((0, 330))) < 240           # hero touches the left edge
         assert min(rgb.getpixel((1079, 100))) < 240        # thumbs touch the right edge
 
@@ -203,7 +205,7 @@ def test_long_title_and_tag_render_without_error(tmp_path, property_type):
                                       project="非常非常长的项目名称测试太子国际广场豪华服务式公寓三期",
                                       layout="3房2卫 · 高层 · 全新精装 · 拎包入住 · 可养宠物", price="12500"))
     with Image.open(out) as im:
-        assert im.size in {(1080, 1350), (1080, 720)}
+        assert im.size in {(1080, 1350), (1200, 800)}
 
 
 def test_subtitle_joins_type_and_layout():

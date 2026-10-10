@@ -137,9 +137,15 @@ class CoverRenderService:
                 media.cover_gallery_paths or media.gallery_paths
             )
             render_kwargs["source_labels"] = media.cover_gallery_labels
-            if not _is_apartment(data):
-                # Portrait (villa) hero: level the walls. Real-estate standard
-                # vertical correction; any failure keeps the original photo.
+            template = str(getattr(media, "cover_template", "") or "")
+            if template:
+                render_kwargs["layout"] = template
+            planned = str(getattr(media, "cover_render_source", "") or "")
+            if planned and Path(planned).is_file():
+                # Bounded correction already ran in media preparation (shared with the bot album).
+                render_kwargs["source_image"] = planned
+            elif not template and not _is_apartment(data):
+                # Legacy media without a plan: level the villa walls; failure keeps the original.
                 straight = straighten_file(
                     cover_source, target.parent / f"{public_id}_hero_straight.jpg"
                 )

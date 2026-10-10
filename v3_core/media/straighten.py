@@ -1,4 +1,4 @@
-"""Auto-straighten exterior hero photos (roll + vertical keystone).
+"""Bounded geometric correction for cover heroes (roll + vertical keystone).
 
 Detect near-vertical building edges (OpenCV LSD), fit their lean as a linear
 function of x (lean = p + q*x), then warp so walls stand vertical:
@@ -7,6 +7,12 @@ function of x (lean = p + q*x), then warp so walls stand vertical:
 * vertical keystone (q) is corrected at 85% — a full correction stretches the
   top of the frame and looks unnatural;
 * the result is cropped inward so no empty (black) corners remain.
+
+Bounds (Gym spec §四): interior shots get a light roll-only fix (±3°, no
+keystone); photos that are already level are left untouched; low resolution,
+severe up-tilt or a crop that would cut the subject are refused; and every
+accepted warp is measured before/after (local aspect change of the transform,
+crop kept, residual lean). Exceeding a limit reverts to the original photo.
 
 OpenCV is optional. Any failure (no cv2, too few lines, unreadable image,
 excessive crop) returns ``None`` and the caller keeps the original photo.
@@ -28,7 +34,14 @@ MAX_ROLL_DEG = 8.0
 KEYSTONE_STRENGTH = 0.85
 MAX_LEAN_DEG = 20.0
 MIN_SEGMENTS = 6
-MIN_CROP_KEPT = 0.6
+MIN_CROP_KEPT = 0.7
+INTERIOR_MAX_ROLL_DEG = 3.0
+LEVEL_LEAN_DEG = 0.8          # already upright: never warp
+SEVERE_LEAN_DEG = 15.0        # strong up-shot / fisheye: refuse, pick another photo
+MIN_SHORT_SIDE = 600
+MAX_ASPECT_CHANGE = 0.10      # max local |sx/sy - 1| over the central subject (20–80%)
+MAX_EDGE_ASPECT_CHANGE = 0.25 # same, over the whole kept crop (corners)
+KEYSTONE_STEPS = (KEYSTONE_STRENGTH, 0.7, 0.55, 0.4)  # back off until within bounds
 
 
 def _vertical_segments(gray: "np.ndarray") -> list[tuple[float, float, float, float]]:
@@ -78,21 +91,41 @@ def mean_abs_lean_deg(gray: "np.ndarray") -> float | None:
     return math.degrees(math.atan(lean))
 
 
-def straighten_array(img: "np.ndarray") -> tuple["np.ndarray", dict[str, Any]] | None:
+def _aspect_change(M: "np.ndarray", box: tuple[int, int, int, int], H: int, W: int) -> float:
+    """Max local anisotropy |sx/sy - 1| of the warp over the kept region (output space)."""
+    Minv = np.linalg.inv(M)
+    left, top, right, bottom = box
+    worst = 0.0
+    for fy in np.linspace(0.0, 1.0, 5):
+        for fx in np.linspace(0.0, 1.0, 5):
+            x, y = left + fx * (right - left), top + fy * (bottom - top)
+            pts = np.float32([[[x, y], [x + 1.0, y], [x, y + 1.0]]])
+            src = cv2.perspectiveTransform(pts, Minv)[0]
+            sx = 1.0 / max(1e-6, float(np.hypot(*(src[1] - src[0]))))
+            sy = 1.0 / max(1e-6, float(np.hypot(*(src[2] - src[0]))))
+            worst = max(worst, abs(sx / sy - 1.0))
+    return worst
+
+
+def assess(img: "np.ndarray") -> dict[str, Any] | None:
+    """Tilt of the photo without changing it (None when there is no usable line evidence)."""
     if cv2 is None or img is None or img.ndim != 3:
         return None
     H, W = img.shape[:2]
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    segments = _vertical_segments(gray)
+    segments = _vertical_segments(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY))
     if len(segments) < MIN_SEGMENTS:
         return None
     p, q, inliers = _fit_lean(segments, W)
     if inliers < MIN_SEGMENTS:
         return None
-    roll = math.degrees(math.atan(p))
-    if abs(roll) > MAX_ROLL_DEG:
-        p = math.tan(math.radians(math.copysign(MAX_ROLL_DEG, roll)))
-    qk = q * KEYSTONE_STRENGTH
+    before = math.degrees(math.atan(float(np.average([abs(s[2]) for s in segments], weights=[s[3] for s in segments]))))
+    return {"roll_deg": math.degrees(math.atan(p)), "p": p, "q": q, "lean_before_deg": before,
+            "segments": len(segments), "short_side": min(H, W)}
+
+
+def _warp(img: "np.ndarray", p: float, qk: float):
+    """Perspective warp for lean p + qk*x, cropped inward until no empty pixels remain."""
+    H, W = img.shape[:2]
     src, dst = [], []
     for fx in (0.2, 0.8):
         x = fx * W
@@ -112,41 +145,104 @@ def straighten_array(img: "np.ndarray") -> tuple["np.ndarray", dict[str, Any]] |
         if right - left < W * 0.5 or bottom - top < H * 0.5:
             return None
         if mask[top:bottom, left:right].min() == 255:
-            break
+            kept = (right - left) * (bottom - top) / float(W * H)
+            return warped, M, (left, top, right, bottom), kept
         left, top, right, bottom = left + 3, top + 3, right - 3, bottom - 3
+    return None
+
+
+def correct_array(img: "np.ndarray", *, mode: str = "exterior") -> tuple[str, "np.ndarray | None", dict[str, Any]]:
+    """Return (status, corrected | None, metrics).
+
+    status: ``corrected`` | ``level`` (already upright, untouched) | ``no_lines`` |
+    ``refused:<reason>`` (low_resolution / severe_tilt / would_crop_subject) |
+    ``reverted:<reason>`` (aspect_change / no_improvement). Only ``corrected``
+    carries an image; every other status means "use the original photo".
+    """
+    if cv2 is None or img is None or img.ndim != 3:
+        return "no_lines", None, {}
+    H, W = img.shape[:2]
+    if min(H, W) < MIN_SHORT_SIDE:
+        return "refused:low_resolution", None, {"short_side": min(H, W)}
+    info = assess(img)
+    if info is None:
+        return "no_lines", None, {}
+    metrics: dict[str, Any] = {"lean_before_deg": round(info["lean_before_deg"], 2), "roll_before_deg": round(info["roll_deg"], 2)}
+    if info["lean_before_deg"] > SEVERE_LEAN_DEG:
+        return "refused:severe_tilt", None, metrics
+    interior = mode != "exterior"
+    max_roll = INTERIOR_MAX_ROLL_DEG if interior else MAX_ROLL_DEG
+    p, q = info["p"], (0.0 if interior else info["q"])
+    if info["lean_before_deg"] < LEVEL_LEAN_DEG and abs(info["roll_deg"]) < LEVEL_LEAN_DEG / 2:
+        return "level", None, metrics
+    roll = math.degrees(math.atan(p))
+    if abs(roll) > max_roll:
+        p = math.tan(math.radians(math.copysign(max_roll, roll)))
+    last_reason = "reverted:aspect_change"
+    for strength in (KEYSTONE_STEPS if q else (0.0,)):
+        result = _warp(img, p, q * strength)
+        if result is None:
+            return "refused:would_crop_subject", None, metrics
+        warped, M, (left, top, right, bottom), kept = result
+        width, height = right - left, bottom - top
+        centre = (left + int(0.2 * width), top + int(0.2 * height), left + int(0.8 * width), top + int(0.8 * height))
+        metrics.update({
+            "roll_deg": round(math.degrees(math.atan(p)), 2),
+            "keystone": round(q * strength, 4),
+            "keystone_strength": strength,
+            "crop_kept": round(kept, 3),
+            "aspect_change": round(_aspect_change(M, centre, H, W), 4),
+            "edge_aspect_change": round(_aspect_change(M, (left, top, right, bottom), H, W), 4),
+        })
+        if kept < MIN_CROP_KEPT:
+            return "refused:would_crop_subject", None, metrics
+        if metrics["aspect_change"] <= MAX_ASPECT_CHANGE and metrics["edge_aspect_change"] <= MAX_EDGE_ASPECT_CHANGE:
+            break
     else:
-        return None
-    kept = (right - left) * (bottom - top) / float(W * H)
-    if kept < MIN_CROP_KEPT:
-        return None
+        return last_reason, None, metrics
     out = warped[top:bottom, left:right]
-    before = math.degrees(math.atan(float(np.average([abs(s[2]) for s in segments], weights=[s[3] for s in segments]))))
-    return out, {
-        "roll_deg": round(math.degrees(math.atan(p)), 2),
-        "keystone": round(qk, 4),
-        "lean_before_deg": round(before, 2),
-        "crop_kept": round(kept, 3),
-    }
+    after = mean_abs_lean_deg(cv2.cvtColor(out, cv2.COLOR_BGR2GRAY))
+    metrics["lean_after_deg"] = None if after is None else round(after, 2)
+    if after is not None and after > info["lean_before_deg"] - 0.2:
+        return "reverted:no_improvement", None, metrics
+    return "corrected", out, metrics
 
 
-def straighten_file(source: str | Path, output: str | Path) -> dict[str, Any] | None:
-    """Write a straightened copy of ``source``; ``None`` means keep the original."""
+def straighten_array(img: "np.ndarray", *, mode: str = "exterior") -> tuple["np.ndarray", dict[str, Any]] | None:
+    status, out, metrics = correct_array(img, mode=mode)
+    if status != "corrected" or out is None:
+        return None
+    return out, metrics
+
+
+def correct_file(source: str | Path, output: str | Path, *, mode: str = "exterior") -> dict[str, Any]:
+    """Always returns a report; ``report["path"]`` is set only when a corrected copy was written."""
+    report: dict[str, Any] = {"status": "no_lines", "mode": mode}
     try:
         if cv2 is None:
-            return None
+            return {**report, "status": "unavailable"}
         img = cv2.imread(str(source), cv2.IMREAD_COLOR)
-        result = straighten_array(img)
-        if result is None:
-            return None
-        out, info = result
-        output = Path(output)
-        output.parent.mkdir(parents=True, exist_ok=True)
-        if not cv2.imwrite(str(output), out, [cv2.IMWRITE_JPEG_QUALITY, 95]):
-            return None
-        info["path"] = str(output)
-        return info
-    except Exception:
-        return None
+        if img is None:
+            return {**report, "status": "unreadable"}
+        status, out, metrics = correct_array(img, mode=mode)
+        report.update(metrics)
+        report["status"] = status
+        if status == "corrected" and out is not None:
+            output = Path(output)
+            output.parent.mkdir(parents=True, exist_ok=True)
+            if cv2.imwrite(str(output), out, [cv2.IMWRITE_JPEG_QUALITY, 95]):
+                report["path"] = str(output)
+            else:
+                report["status"] = "write_failed"
+        return report
+    except Exception as exc:  # pragma: no cover - defensive
+        return {**report, "status": f"error:{type(exc).__name__}"}
 
 
-__all__ = ["mean_abs_lean_deg", "straighten_array", "straighten_file"]
+def straighten_file(source: str | Path, output: str | Path, *, mode: str = "exterior") -> dict[str, Any] | None:
+    """Write a corrected copy of ``source``; ``None`` means keep the original."""
+    report = correct_file(source, output, mode=mode)
+    return report if report.get("path") else None
+
+
+__all__ = ["assess", "correct_array", "correct_file", "mean_abs_lean_deg", "straighten_array", "straighten_file"]

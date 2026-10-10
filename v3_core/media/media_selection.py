@@ -272,6 +272,20 @@ def select_publication_media(
         if item.get("reject")
     }
     gallery = _ordered_gallery(ranking, unique, rejected)
+    quality_fallback = False
+    if not gallery:
+        # Gym spec §七: when every photo is merely low quality (blur / dark /
+        # exposure) still build the cover from what exists and flag it, instead
+        # of failing. Tiny / unreadable images stay excluded.
+        soft = [item for item in ranking if item.get("reject") and item.get("reason") in {"blur", "bad_brightness", "bad_exposure"}]
+        if soft:
+            quality_fallback = True
+            rejected -= {str(Path(item["file"]).resolve()) for item in soft}
+            for item in soft:
+                item["reject"] = False
+                item["soft_reject"] = True
+                item["low_quality_fallback"] = True
+            gallery = _ordered_gallery(ranking, unique, rejected)
     if not gallery:
         raise ValueError("missing_usable_images")
 
@@ -295,6 +309,7 @@ def select_publication_media(
         "usable_count": len(gallery),
         "cover_preference": preference,
         "cover_reason": cover_reason,
+        "low_quality_fallback": quality_fallback,
         "cover_thumbnails": order_cover_thumbnails(ranking, gallery, cover)[:3],
         "policy": (
             "apartment_living_then_bright_spacious_fallback"

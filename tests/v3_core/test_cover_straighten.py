@@ -36,7 +36,7 @@ def test_straighten_levels_tilted_verticals_without_black_corners():
 
 
 def test_roll_is_clamped_to_eight_degrees():
-    result = straighten.straighten_array(_facade(15.0))
+    result = straighten.straighten_array(_facade(12.0))
     assert result is not None
     assert abs(result[1]["roll_deg"]) <= 8.0 + 1e-6
 

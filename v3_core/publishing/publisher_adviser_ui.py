@@ -166,8 +166,8 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
         selected = str(state.get("selected_cover_path") or "")
         await message.reply_text(
             "<b>🖼 选择主图</b>\n\n"
-            "点下方按钮，选一张原图作为频道封面底图。\n"
-            "封面版式按房型自动定：公寓横版 1080×720（左大图 + 右三小图）· 别墅竖版 1080×1350（大图 + 下三小图）。\n"
+            "封面已全自动选好；这里只是可选纠错：点下方按钮，选一张原图作为频道封面主图。\n"
+            "版式自动定：公寓横版 1200×800（左大图 + 右三小图）· 别墅外观好 → 竖版 1080×1350，否则横版 · 没有突出主图 → 四宫格 · 只有一张 → 单图。\n"
             "更多实拍相册仍用全部照片，并加上侨联角标。",
             parse_mode=ParseMode.HTML,
         )
@@ -239,6 +239,12 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
         await self.send_manual_preview(message, package, review_id=review_id, offer_id=offer_id)
 
     async def send_manual_preview(self, message: Any, package: FrozenPackage, *, review_id: str, offer_id: str) -> None:
+        plan = dict((getattr(package, "source_identity", {}) or {}).get("cover_plan") or {})
+        if plan.get("low_quality"):
+            await message.reply_text(
+                "⚠️ 图片质量较低：这套房的实拍整体偏暗/偏糊，封面已按现有最好的照片生成。"
+                "可以直接发，也可以先找房东要更清楚的照片。"
+            )
         with Path(package.cover_path).open("rb") as handle:
             await message.reply_photo(
                 photo=handle,
@@ -248,8 +254,9 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
                     [InlineKeyboardButton("📤 确认发布到频道", callback_data="v3smp|manual_send")],
                     [
                         InlineKeyboardButton("🖼 换主图", callback_data="v3smp|manual_cover_next"),
-                        InlineKeyboardButton("💬 侨联说", callback_data="v3smp|manual_adviser"),
+                        InlineKeyboardButton("🔄 重新生成", callback_data="v3smp|manual_preview"),
                     ],
+                    [InlineKeyboardButton("💬 侨联说", callback_data="v3smp|manual_adviser")],
                     [InlineKeyboardButton("⬅️ 返回资料确认", callback_data="v3smp|manual_back_confirm")],
                 ]),
             )
@@ -492,8 +499,9 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
                 await query.message.reply_text(
                     "<b>🎨 选择封面格式</b>\n\n"
                     "封面统一侨联实拍版式，版式按房型自动定（跟主图横竖无关）：\n"
-                    "公寓/服务式 → 横版 1080×720（左大图 + 右三小图）\n"
-                    "别墅/独栋等 → 竖版 1080×1350（大图 + 下三小图，外观自动扶正）",
+                    "公寓/服务式 → 横版 1200×800（左大图 + 右三小图）\n"
+                    "别墅/独栋等 → 外观好用竖版 1080×1350（外观自动扶正），否则横版 1200×800\n"
+                    "没有突出主图 → 四宫格；只有一张 → 单图；房间看不准就不标房间名",
                     parse_mode=ParseMode.HTML,
                     reply_markup=InlineKeyboardMarkup([
                         [InlineKeyboardButton("极简实拍渐变（默认）", callback_data="v3smp|manual_style|premium_photo")],
