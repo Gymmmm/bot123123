@@ -51,11 +51,12 @@ from .transition_session import (
     SessionMutationPlan,
     apply_session_mutation,
 )
-from .transition_views import TransitionView, TransitionViewService
+from .transition_views import TransitionChoice, TransitionView, TransitionViewService, searching_view
 
 
 _GUIDED_SEARCH_CALLBACKS = frozenset(
     {
+        "search_back",
         "search_area",
         "area_choice",
         "area_other",
@@ -124,6 +125,49 @@ def _view_for_result(views: TransitionViewService, result: TransitionActionResul
     return None
 
 
+def booking_failed_view(draft: PublicAppointmentDraft) -> TransitionView:
+    return TransitionView(
+        kind="appointment_failed",
+        text="📅 预约暂时没提交成功，请重试或联系中文顾问。",
+        rows=(
+            (TransitionChoice("🔄 重新提交", "appointment_submit"),),
+            (TransitionChoice("💬 中文顾问", "home", "contact"),),
+            (TransitionChoice("⬅️ 返回房源", "listing_details", public_listing_id=draft.public_listing_id),),
+        ),
+    )
+
+
+def search_failed_view() -> TransitionView:
+    return TransitionView(
+        kind="search_failed",
+        text="🔍 刚刚没能完成搜索，请再试一次。",
+        rows=(
+            (TransitionChoice("🔄 再找一次", "change_search"),),
+            (TransitionChoice("💬 中文顾问", "home", "contact"),),
+        ),
+    )
+
+
+async def _drop_interim_panel(query: Any, presentation: TelegramSearchPresentation) -> None:
+    """A photo card is sent as a new message; remove the 「正在帮你找房…」 panel.
+
+    Text-only cards already edited the interim panel in place, so nothing to do.
+    """
+    response = getattr(presentation, "response", None)
+    if response is None or not str(getattr(response, "photo_path", "") or ""):
+        return
+    message = getattr(query, "message", None)
+    if getattr(message, "photo", None):
+        return  # the card replaced this photo message in place
+    delete = getattr(message, "delete", None)
+    if not callable(delete):
+        return
+    try:
+        await delete()
+    except Exception:
+        return
+
+
 def _navigation_view(
     views: TransitionViewService,
     result: TransitionActionResult,
@@ -135,22 +179,15 @@ def _navigation_view(
     preview = deepcopy(user_data)
     if result.mutation is not None:
         apply_session_mutation(preview, result.mutation)
+    pref = preview.get(SEARCH_PREF_SESSION_KEY)
+    if navigation == "search_entry":
+        return views.search_entry()
     if navigation == "search_area":
-        return views.search_area()
+        return views.search_area(pref if isinstance(pref, dict) else None)
     if navigation == "search_layout":
-        pref = preview.get(SEARCH_PREF_SESSION_KEY)
-        area_display = ""
-        budget_label = ""
-        if isinstance(pref, dict):
-            area_display = str(pref.get("area_display") or "").strip()
-            budget_label = str(pref.get("budget_label") or "").strip()
-        return views.search_layout(area_display, budget_label)
+        return views.search_layout(pref=pref if isinstance(pref, dict) else {})
     if navigation == "search_budget":
-        pref = preview.get(SEARCH_PREF_SESSION_KEY)
-        area_display = ""
-        if isinstance(pref, dict):
-            area_display = str(pref.get("area_display") or "").strip()
-        return views.search_budget(area_display)
+        return views.search_budget(pref=pref if isinstance(pref, dict) else {})
     raise ValueError(f"unsupported_transition_navigation:{navigation}")
 
 
@@ -233,7 +270,11 @@ async def _submit_confirmed_appointment(
 ) -> TelegramTransitionActionOutcome:
     appointment_user = _telegram_appointment_user(update)
     lead_user = _lead_user(appointment_user)
-    execution = appointment_executor.execute(user=appointment_user, draft=draft)
+    try:
+        execution = appointment_executor.execute(user=appointment_user, draft=draft)
+    except Exception:
+        await _edit_view(query, booking_failed_view(draft))
+        raise
     lead_effect = None
     if lead_effects is not None:
         lead_effect = lead_effects.record_appointment(
@@ -329,7 +370,7 @@ async def handle_v3_transition_action(
 
     result = actions.apply(callback, user_data)
     if not result.ok:
-        await query.answer("操作已过期，请重新选择。", show_alert=True)
+        await query.answer("这个入口已经更新，请返回重新选择。", show_alert=True)
         return TelegramTransitionActionOutcome(handled=True, result=result)
     await query.answer()
 
@@ -359,10 +400,18 @@ async def handle_v3_transition_action(
     if result.next_step == "search_submit" and search_executor is not None:
         if result.search is None:
             raise ValueError("search_submit_action_missing_intent")
-        execution = search_executor.execute(result.search)
+        # V4: show one interim panel, then turn that same panel into the result.
+        await _edit_view(query, searching_view())
+        try:
+            execution = search_executor.execute(result.search)
+        except Exception:
+            await _edit_view(query, search_failed_view())
+            raise
         presentation = await present_search_flow_result(update, context, execution.result)
         if not presentation.matched:
             await _edit_view(query, build_search_no_match_view(result.search))
+        else:
+            await _drop_interim_panel(query, presentation)
         lead_effect = None
         if lead_effects is not None:
             lead_effect = lead_effects.record_search(
@@ -394,16 +443,8 @@ async def handle_v3_transition_action(
         similar_result = flow.similar(criteria, limit=5)
         presentation = await present_search_flow_result(update, context, similar_result)
         if not presentation.matched:
-            await _edit_view(query, build_search_no_match_view(
-                result.search or SearchSubmitIntent(
-                    criteria=criteria,
-                    source=str(intent.source or "similar_listing"),
-                    goal="any",
-                    area_display=str(intent.area_display or ""),
-                    budget_label=str(intent.budget_label or ""),
-                    touch_payload={},
-                )
-            ))
+            from .telegram_callback_handler import no_similar_view
+            await _edit_view(query, no_similar_view())
         _apply_success_mutation(user_data, result, callback.kind)
         return TelegramTransitionActionOutcome(
             handled=True,

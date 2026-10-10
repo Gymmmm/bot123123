@@ -29,7 +29,9 @@ from .search_submit_executor import SearchSubmitExecutor
 from .telegram_callback_handler import (
     LISTING_SOURCE_KEY,
     LISTING_TOUCHPOINT_KEY,
+    PHOTOS_ALBUM_KEY,
     remember_photos_album,
+    send_listing_details,
 )
 from .telegram_assurance_handler import build_assurance_keyboard
 from .telegram_home_ui import build_home_keyboard
@@ -179,6 +181,8 @@ async def _handle_video_start(
                 result,
                 advisor_url=advisor_url,
                 channel_url=channel_url,
+                update=update,
+                context=context,
             )
             return TelegramStartOutcome(True, "unbookable", raw, result)
         await _render_invalid_link(
@@ -227,17 +231,36 @@ async def _render_details(
     *,
     advisor_url: str = "",
     channel_url: str = "",
+    update: Any = None,
+    context: Any = None,
 ) -> None:
     if result.details is None:
         raise ValueError("start_details_result_missing_response")
+    keyboard = _listing_keyboard(
+        result.details,
+        advisor_url=advisor_url,
+        channel_url=channel_url,
+    )
+    media_groups = tuple(getattr(result.details, "media_groups", ()) or ())
+    if media_groups and update is not None and getattr(context, "bot", None) is not None:
+        # V4.1 channel deep link → detail with 3–4 real photos, then the
+        # detail text + buttons right below. Re-tapping the same channel
+        # button replaces the previous detail instead of stacking a copy.
+        await send_listing_details(
+            update,
+            context,
+            public_listing_id=str(getattr(result, "public_listing_id", "") or ""),
+            media_groups=media_groups,
+            media_caption=str(getattr(result.details, "media_caption", "") or ""),
+            text=result.details.text,
+            reply_markup=keyboard,
+            force=True,
+        )
+        return
     await message.reply_text(
         result.details.text,
         parse_mode=ParseMode.HTML,
-        reply_markup=_listing_keyboard(
-            result.details,
-            advisor_url=advisor_url,
-            channel_url=channel_url,
-        ),
+        reply_markup=keyboard,
     )
 
 
@@ -316,13 +339,16 @@ async def _render_unbookable(
     *,
     advisor_url: str = "",
     channel_url: str = "",
+    update: Any = None,
+    context: Any = None,
 ) -> None:
     if getattr(result, "details", None) is not None:
         # The details card already carries the precise live state (待确认 / 已租 /
         # 已下架) and the correct next actions. Do not prepend a second generic
         # warning message that makes a normal inventory change look like an error.
         await _render_details(
-            message, result, advisor_url=advisor_url, channel_url=channel_url
+            message, result, advisor_url=advisor_url, channel_url=channel_url,
+            update=update, context=context,
         )
         return
     await message.reply_text(
@@ -679,7 +705,12 @@ async def handle_v3_start(
         dict(stored_search_pref) if isinstance(stored_search_pref, dict) else {}
     )
     args = tuple(getattr(context, "args", None) or ())
+    # Keep the record of listing photo/detail messages already in this chat so
+    # a repeated channel tap can replace them instead of stacking duplicates.
+    album_messages = user_data.get(PHOTOS_ALBUM_KEY)
     user_data.clear()
+    if isinstance(album_messages, dict) and album_messages:
+        user_data[PHOTOS_ALBUM_KEY] = album_messages
     if not args:
         home = build_home_view(channel_url=channel_url, advisor_url=advisor_url)
         await message.reply_text(home.text, parse_mode=ParseMode.HTML, reply_markup=build_home_keyboard(home))
@@ -746,6 +777,8 @@ async def handle_v3_start(
                 result,
                 advisor_url=advisor_url,
                 channel_url=channel_url,
+                update=update,
+                context=context,
             )
             return TelegramStartOutcome(handled=True, kind="unbookable", payload=payload, result=result)
         await _render_invalid_link(
@@ -755,7 +788,8 @@ async def handle_v3_start(
 
     if result.action == "details":
         await _render_details(
-            message, result, advisor_url=advisor_url, channel_url=channel_url
+            message, result, advisor_url=advisor_url, channel_url=channel_url,
+            update=update, context=context,
         )
         return TelegramStartOutcome(True, "details", payload, result)
     if result.action == "photos":

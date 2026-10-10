@@ -118,10 +118,7 @@ async def handle_v3_transition_text(
         if result.mutation is not None:
             apply_session_mutation(preview, result.mutation)
         pref = preview.get(SEARCH_PREF_SESSION_KEY)
-        area_display = ""
-        if isinstance(pref, dict):
-            area_display = str(pref.get("area_display") or "").strip()
-        await _reply_view(message, views.search_budget(area_display))
+        await _reply_view(message, views.search_budget(pref=pref if isinstance(pref, dict) else {}))
         if result.mutation is not None:
             apply_session_mutation(user_data, result.mutation)
         return TelegramTransitionTextOutcome(handled=True, result=result)
@@ -131,12 +128,7 @@ async def handle_v3_transition_text(
         if result.mutation is not None:
             apply_session_mutation(preview, result.mutation)
         pref = preview.get(SEARCH_PREF_SESSION_KEY)
-        area_display = ""
-        budget_label = ""
-        if isinstance(pref, dict):
-            area_display = str(pref.get("area_display") or "").strip()
-            budget_label = str(pref.get("budget_label") or "").strip()
-        await _reply_view(message, views.search_layout(area_display, budget_label))
+        await _reply_view(message, views.search_layout(pref=pref if isinstance(pref, dict) else {}))
         if result.mutation is not None:
             apply_session_mutation(user_data, result.mutation)
         return TelegramTransitionTextOutcome(handled=True, result=result)

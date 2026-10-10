@@ -95,18 +95,19 @@ def test_search_card_uses_locked_copy_and_frozen_cover(tmp_path):
     card = build_search_card((first, second), 0)
 
     # Locked copy per Section 3: title + 价格 + 区域 + 房态
-    assert card.text == "富力城｜2房1厅\n💵 $800/月\n📍 BKK1\n🟢 当前可预约"
+    assert card.text == "🏠 <b>找到这些房源</b> · 1/2\n\n富力城｜2房1厅\n💵 $800/月\n📍 BKK1\n🟢 当前可预约"
     assert card.photo_path == str(cover)
+    # No gallery on this fixture → no 📸 看实拍 entry.
     assert _actions(card) == [
+        ["details"],
+        ["book", "consult"],
         ["previous", "next"],
-        ["details", "book"],
-        ["consult"],
         ["change_search"],
     ]
     assert _labels(card) == [
-        ["上一套", "下一套"],
-        ["🏠 查看房源", "📅 预约看房"],
-        ["💬 咨询这套"],
+        ["🏠 房源详情"],
+        ["📅 预约看房", "💬 咨询这套"],
+        ["⬅️ 上一套", "下一套 ➡️"],
         ["🔄 调整条件"],
     ]
 
@@ -137,7 +138,7 @@ def test_search_card_navigation_wraps_by_public_listing_id():
     )
 
     first = build_search_card(items, 0)
-    previous, next_ = first.action_rows[0]
+    previous, next_ = first.action_rows[2]
 
     assert previous.action == "previous"
     assert previous.target_public_listing_id == "QL-B2-E6F7"
@@ -164,8 +165,8 @@ def test_search_card_listing_actions_target_current_public_identity():
     actions = [item for row in card.action_rows for item in row]
 
     assert _actions(card) == [
-        ["details", "book"],
-        ["consult"],
+        ["details"],
+        ["book", "consult"],
         ["change_search"],
     ]
     for action in actions:
@@ -204,8 +205,8 @@ def test_live_reserved_status_changes_badge_without_changing_frozen_facts():
     assert "富力城｜2房1厅" in card.text
     assert "$800/月" in card.text
     assert "🟡 已有预约，仍可预约" in card.text
-    assert _actions(card)[0] == ["details", "book"]
-    assert _actions(card)[1] == ["consult"]
+    assert _actions(card)[0] == ["details"]
+    assert _actions(card)[1] == ["book", "consult"]
 
 
 def test_build_search_cards_builds_one_card_per_result():

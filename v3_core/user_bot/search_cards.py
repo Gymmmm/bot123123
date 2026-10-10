@@ -9,6 +9,8 @@ from v3_core.publishing.formatting import display_floor
 from .listing_presenter import build_public_listing_details
 from .listing_responses import SemanticAction, _frozen_cover_path
 from .public_inventory import PublishedListingView
+from .search_query import SearchCriteria
+from .similar_differences import listing_differences
 
 @dataclass(frozen=True)
 class SearchCardResponse:
@@ -30,34 +32,54 @@ def _frozen_cover(view: PublishedListingView) -> str:
             return str(Path(path).expanduser().resolve())
     return ""
 
+def _has_photos(view: PublishedListingView) -> bool:
+    return any(str(raw or "").strip() for raw in (getattr(view, "gallery", ()) or ()))
+
+
 def _card_actions(views: tuple[PublishedListingView, ...], *, index: int, bookable: bool) -> tuple[tuple[SemanticAction, ...], ...]:
+    """V4 result card: 看实拍 goes straight to the album, no detour via details."""
     current=views[index]
     target=current.public_listing_id
     rows=[]
+    first=[]
+    if _has_photos(current):
+        first.append(SemanticAction("📸 看实拍","photos",target))
+    first.append(SemanticAction("🏠 房源详情","details",target))
+    rows.append(tuple(first))
+    if bookable:
+        rows.append((SemanticAction("📅 预约看房","book",target),SemanticAction("💬 咨询这套","consult",target)))
+    else:
+        rows.append((SemanticAction("💬 咨询这套","consult",target),))
     total=len(views)
     if total > 1:
         prev_i=(index-1)%total
         next_i=(index+1)%total
         rows.append((
-            SemanticAction("上一套","previous",views[prev_i].public_listing_id,prev_i),
-            SemanticAction("下一套","next",views[next_i].public_listing_id,next_i),
+            SemanticAction("⬅️ 上一套","previous",views[prev_i].public_listing_id,prev_i),
+            SemanticAction("下一套 ➡️","next",views[next_i].public_listing_id,next_i),
         ))
-    if bookable:
-        rows.append((SemanticAction("🏠 查看房源","details",target),SemanticAction("📅 预约看房","book",target)))
-    else:
-        rows.append((SemanticAction("🏠 查看房源","details",target),))
-    rows.append((SemanticAction("💬 咨询这套","consult",target),))
     rows.append((SemanticAction("🔄 调整条件","change_search"),))
     return tuple(rows)
 
-def build_search_card(views: Iterable[PublishedListingView], index: int) -> SearchCardResponse:
+
+def card_header(index: int, total: int, *, similar: bool = False) -> str:
+    title = "🏘️ <b>这几套也值得看看</b>" if similar else "🏠 <b>找到这些房源</b>"
+    return f"{title} · {index + 1}/{total}" if total > 1 else title
+
+
+def build_search_card(
+    views: Iterable[PublishedListingView],
+    index: int,
+    *,
+    criteria: SearchCriteria | None = None,
+    similar: bool = False,
+) -> SearchCardResponse:
     items=tuple(views)
     if not items:
         raise ValueError("search_card_requires_results")
     position=int(index)%len(items)
     view=items[position]
     details=build_public_listing_details(view)
-    floor=display_floor(details.floor)
     project=str(details.project_name or "").strip()
     area=str(details.location or "").strip()
     layout=str(details.layout or "").strip()
@@ -67,7 +89,7 @@ def build_search_card(views: Iterable[PublishedListingView], index: int) -> Sear
         else ""
     )
     headline = "｜".join(v for v in (project or area, layout) if v) or "房源"
-    lines=[f"{he(headline)}"]
+    lines=[card_header(position, len(items), similar=similar), "", f"{he(headline)}"]
     if rent:
         lines.append(f"💵 {he(rent)}")
     if project and area and not location_display_overlaps_project(project, area):
@@ -75,6 +97,16 @@ def build_search_card(views: Iterable[PublishedListingView], index: int) -> Sear
     status_line = _status_line_for(details)
     if status_line:
         lines.append(status_line)
+    differences = listing_differences(
+        view,
+        criteria,
+        rent=int(details.monthly_rent_usd) if details.monthly_rent_usd else None,
+        location=area,
+        layout=layout,
+    )
+    if differences:
+        lines.append("")
+        lines.extend(he(item) for item in differences)
     return SearchCardResponse(
         public_listing_id=details.public_listing_id,
         text="\n".join(lines),
@@ -107,8 +139,13 @@ def _status_line_for(details) -> str:
         return f"{icon} {he(fallback)}"
     return ""
 
-def build_search_cards(views: Iterable[PublishedListingView]) -> tuple[SearchCardResponse, ...]:
+def build_search_cards(
+    views: Iterable[PublishedListingView],
+    *,
+    criteria: SearchCriteria | None = None,
+    similar: bool = False,
+) -> tuple[SearchCardResponse, ...]:
     items=tuple(views)
-    return tuple(build_search_card(items,index) for index in range(len(items)))
+    return tuple(build_search_card(items,index,criteria=criteria,similar=similar) for index in range(len(items)))
 
-__all__=["SearchCardResponse","build_search_card","build_search_cards"]
+__all__=["SearchCardResponse","build_search_card","build_search_cards","card_header"]

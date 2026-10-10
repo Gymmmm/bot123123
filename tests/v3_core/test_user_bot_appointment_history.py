@@ -112,8 +112,8 @@ def test_empty_history_matches_fixed_sha_empty_copy(tmp_path):
 
     assert view.items == ()
     assert view.history_count == 0
-    assert "目前没有待进行的预约" in view.text
-    assert "看到合适的房源后，可以直接预约看房" in view.text
+    assert "还没有看房预约" in view.text
+    assert "看到喜欢的房子，可以直接预约实地看房或视频带看" in view.text
 
 
 def test_history_shows_only_two_upcoming_and_counts_terminal_or_past_rows(tmp_path):
@@ -131,8 +131,11 @@ def test_history_shows_only_two_upcoming_and_counts_terminal_or_past_rows(tmp_pa
 
     assert [item.appointment_id for item in view.items] == [3, 2]
     assert view.history_count == 2
-    assert "🟡 待确认" in view.text
-    assert "实时视频看房" in view.text
+    assert "🟡 待顾问确认" in view.text
+    assert "🟢 已确认" in view.text
+    assert "⚪ 已取消" in view.text  # recent cancelled record is listed
+    assert "🎥 视频带看" in view.text
+    assert "实时视频看房" not in view.text  # V4.1: user-facing wording only
     assert PUBLIC_ID not in view.text
     assert "LST_PRIVATE_1" not in view.text
     assert "更多预约记录请联系中文顾问。" in view.text
@@ -145,4 +148,24 @@ def test_other_users_appointments_are_not_visible(tmp_path):
     view = service.build(123, now=datetime(2026, 9, 9, tzinfo=ZoneInfo("Asia/Phnom_Penh")))
 
     assert view.items == ()
-    assert "目前没有待进行的预约" in view.text
+    assert "还没有看房预约" in view.text
+
+def test_v4_status_mapping_only_shows_completed_when_derivable():
+    from v3_core.user_bot.appointment_history import display_status
+
+    assert display_status("pending") == ("🟡", "待顾问确认")
+    assert display_status("contacted") == ("🟡", "待顾问确认")
+    assert display_status("confirmed") == ("🟢", "已确认")
+    assert display_status("confirmed", past=True) == ("✅", "已完成")
+    assert display_status("done") == ("✅", "已完成")
+    assert display_status("cancelled") == ("⚪", "已取消")
+    assert display_status("pending", past=True) == ("🟡", "待顾问确认")
+
+
+def test_past_confirmed_booking_is_listed_as_completed(tmp_path):
+    db, service = _service(tmp_path)
+    _insert_appointment(db, appointment_id=1, date="09-01", time="am", status="confirmed", created_at="2026-08-30 10:00:00")
+    view = service.build(123, now=datetime(2026, 9, 9, 12, 0, tzinfo=ZoneInfo("Asia/Phnom_Penh")))
+    assert view.items == ()
+    assert "最近记录" in view.text
+    assert "✅ 已完成" in view.text

@@ -96,8 +96,8 @@ def rfcity_category_view(category: str) -> ServiceView:
 # Section 6 — 侨联服务 (locked hub).
 SERVICE_HOME_TEXT = (
     "🛎️ <b>侨联服务</b>\n\n"
-    "找房只是开始。\n\n"
-    "视频带看、入住留档、租后问题，都可以继续找侨联。"
+    "租房不只是找到房子。\n"
+    "从看房、签约到入住，有需要都可以继续联系侨联。"
 )
 
 
@@ -106,9 +106,30 @@ def service_home_view() -> ServiceView:
         kind="service_home",
         text=SERVICE_HOME_TEXT,
         rows=(
-            (ServiceChoice("📋 我的租约", "v3u:service:tenant_lease"), ServiceChoice("🤝 租后服务", "v3u:service:aftercare")),
-            (ServiceChoice("🛡️ 看房与交接", "v3u:home:rental"), ServiceChoice("💬 中文顾问", "v3u:home:contact")),
-            (ServiceChoice("⬅️ 返回首页", "v3u:t:home"),),
+            (ServiceChoice("🎥 视频带看", "v3u:service:video"), ServiceChoice("🛡️ 看房与交接", "v3u:home:rental")),
+            (ServiceChoice("🤝 租后服务", "v3u:service:aftercare"), ServiceChoice("📋 我的租约", "v3u:service:tenant_lease")),
+            (ServiceChoice("💬 中文顾问", "v3u:home:contact"), ServiceChoice("⬅️ 返回首页", "v3u:t:home")),
+        ),
+    )
+
+
+# V4 — 🎥 视频带看 entry from the service hub. Booking itself still starts
+# from a concrete listing, so this page only explains and routes.
+VIDEO_SERVICE_TEXT = (
+    "🎥 <b>视频带看</b>\n\n"
+    "人不在金边、或者没空过去，都可以视频看房。\n"
+    "顾问到房子里开视频，带你实时看房间和周边。\n\n"
+    "先挑好想看的房子，在房源里点「📅 预约看房」，再选「🎥 视频带看」就行。"
+)
+
+
+def video_service_view() -> ServiceView:
+    return ServiceView(
+        kind="video_service",
+        text=VIDEO_SERVICE_TEXT,
+        rows=(
+            (ServiceChoice("🔍 开始找房", "v3u:home:search"), ServiceChoice("💬 中文顾问", "v3u:home:contact")),
+            (ServiceChoice("⬅️ 返回侨联服务", "v3u:home:service"),),
         ),
     )
 
@@ -116,8 +137,8 @@ def service_home_view() -> ServiceView:
 # Section 9 — 租后服务 (descriptive naming per locked status).
 AFTERCARE_TEXT = (
     "🤝 <b>租后服务</b>\n\n"
-    "签完合同不是结束。\n"
-    "报修、物业协调和其他住房问题，都可以继续找侨联。"
+    "住进去以后，有问题也能找我们。\n"
+    "房屋报修、物业沟通、账单看不明白，都可以告诉中文顾问。"
 )
 
 
@@ -126,8 +147,8 @@ def aftercare_home_view() -> ServiceView:
         kind="aftercare_home",
         text=AFTERCARE_TEXT,
         rows=(
-            (ServiceChoice("🔧 房屋报修", "v3u:service:repair"), ServiceChoice("🏢 物业协调", "v3u:service:coordination")),
-            (ServiceChoice("❓ 其他住房问题", "v3u:service:general"),),
+            (ServiceChoice("🔧 房屋报修", "v3u:service:repair"), ServiceChoice("🏢 物业问题", "v3u:service:coordination")),
+            (ServiceChoice("💡 账单疑问", "v3u:service:utilities"), ServiceChoice("❓ 其他住房问题", "v3u:service:general")),
             (ServiceChoice("⬅️ 返回侨联服务", "v3u:home:service"),),
         ),
     )
@@ -330,7 +351,7 @@ def property_view() -> ServiceView:
     choices = [ServiceChoice(label, f"v3u:service:property_category:{key}") for label, key in _PROPERTY_CATEGORIES]
     return ServiceView(
         kind="property",
-        text="🏢 <b>物业协调</b>\n\n请选择需要协调的问题：",
+        text="🏢 <b>物业问题</b>\n\n门禁、电梯、公共设施或者跟物业沟通有问题？选一个类型告诉我们：",
         rows=(
             (choices[0], choices[1]),
             (choices[2], choices[3]),
@@ -429,7 +450,7 @@ def property_exit_view() -> ServiceView:
 
 def utility_stub_view(kind: str) -> ServiceView:
     labels = {
-        "utilities": ("🔌 账单协助", "把水电、物业或其他住房账单发给中文顾问。"),
+        "utilities": ("💡 账单疑问", "水电、物业费或者其他住房费用看不明白？把账单内容或照片发给中文顾问就行。"),
         "moving": ("🚚 搬家服务", "请说明搬家日期、出发地、目的地，以及大概物品情况。"),
         "cleaning": ("🧹 保洁服务", "请说明需要哪种保洁，以及希望安排的日期：\n\n日常保洁 / 入住保洁 / 退租保洁 / 深度保洁"),
         "network_help": ("🌐 网络办理", "请说明需要处理的问题：\n\n新装 / 续费 / 故障 / 其他"),
@@ -440,7 +461,7 @@ def utility_stub_view(kind: str) -> ServiceView:
         text=f"<b>{title}</b>\n\n{body}",
         rows=(
             (ServiceChoice("💬 中文顾问", "v3u:home:contact"),),
-            (ServiceChoice("⬅️ 返回入住服务", "v3u:service:concierge"),),
+            (ServiceChoice("⬅️ 返回租后服务", "v3u:service:concierge"),),
         ),
     )
 

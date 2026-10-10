@@ -26,6 +26,7 @@ from .public_appointment import PublicAppointmentDraft
 from .search_navigation import area_selection, layout_selection
 from .search_query import SearchCriteria, detect_property_type
 from .transition_callbacks import TransitionCallback
+from .search_nav import STEP_RESULTS, pop_step, push_step
 from .transition_session import (
     APPOINTMENT_SESSION_KEY,
     AWAITING_KEYWORD_SESSION_KEY,
@@ -57,6 +58,7 @@ TransitionNextStep = Literal[
 ]
 TransitionNavigation = Literal[
     "home",
+    "search_entry",
     "search_area",
     "search_budget",
     "search_layout",
@@ -138,7 +140,28 @@ def _fresh_search_pref(source: str) -> dict[str, Any]:
     }
 
 
-def _last_pref(criteria: SearchCriteria, *, area_display: str = "", budget_label: str = "") -> dict[str, Any]:
+def _entry_pref(session: Mapping[str, Any], step: str) -> dict[str, Any]:
+    """Open a filter page from the search entry.
+
+    An in-progress guided search keeps its already selected filters (the user
+    went back to the entry and picked another filter); otherwise start fresh.
+    The navigation history restarts at this page.
+    """
+    pref = _search_pref(session)
+    if pref is None or str(pref.get("source") or "") == "similar_listing":
+        pref = _fresh_search_pref(f"home_{step.split('_', 1)[1]}")
+    pref.pop("resume", None)
+    pref["nav"] = []
+    return push_step(pref, step)
+
+
+def _last_pref(
+    criteria: SearchCriteria,
+    *,
+    area_display: str = "",
+    budget_label: str = "",
+    layout_label: str = "",
+) -> dict[str, Any]:
     return {
         "property_type": criteria.property_type,
         "location_keys": list(criteria.location_keys),
@@ -147,7 +170,92 @@ def _last_pref(criteria: SearchCriteria, *, area_display: str = "", budget_label
         "room_type": criteria.room_type,
         "area_display": str(area_display or ""),
         "budget_label": str(budget_label or ""),
+        "layout_label": str(layout_label or ""),
     }
+
+
+_ADJUST_NAVIGATION = {
+    "adjust_area": "search_area",
+    "adjust_budget": "search_budget",
+    "adjust_layout": "search_layout",
+}
+
+
+def _adjust_pref(session: Mapping[str, Any], kind: str) -> dict[str, Any]:
+    """Seed a guided-search preference from the last submitted search.
+
+    Used by the no-match page: the user changes one condition and the others
+    stay as they were (V4 「返回保留筛选状态」). Without a previous search the
+    flow degrades to a fresh guided search instead of expiring.
+    """
+    pref = _fresh_search_pref(f"home_{kind.split('_', 1)[1]}")
+    last = session.get(LAST_SEARCH_PREF_KEY)
+    if not isinstance(last, Mapping):
+        return pref
+    pref["resume"] = True
+    pref["nav"] = [STEP_RESULTS]
+    if kind != "adjust_area":
+        pref["location_keys"] = [str(v) for v in (last.get("location_keys") or ()) if str(v or "").strip()]
+        pref["area_display"] = str(last.get("area_display") or "")
+    if kind != "adjust_budget":
+        if last.get("budget_min") is not None:
+            pref["budget_min"] = last.get("budget_min")
+        if last.get("budget_max") is not None:
+            pref["budget_max"] = last.get("budget_max")
+        pref["budget_label"] = str(last.get("budget_label") or "")
+    if kind != "adjust_layout":
+        pref["room_type"] = str(last.get("room_type") or "")
+        pref["layout_property_type"] = str(last.get("property_type") or "")
+        pref["layout_label"] = str(last.get("layout_label") or "")
+    return pref
+
+
+def _resume_submit(pref: Mapping[str, Any]) -> TransitionActionResult:
+    """Submit a resumed (adjusted) search with every kept condition."""
+    location_keys = tuple(
+        str(value).strip() for value in (pref.get("location_keys") or ()) if str(value or "").strip()
+    )
+    budget_min = pref.get("budget_min")
+    budget_max = pref.get("budget_max")
+    room_type = str(pref.get("room_type") or "").strip()
+    property_type = str(pref.get("layout_property_type") or "").strip() or _goal_property_type(pref.get("goal"))
+    criteria = SearchCriteria(
+        property_type=property_type,
+        location_keys=location_keys,
+        budget_min=int(budget_min) if budget_min is not None else None,
+        budget_max=int(budget_max) if budget_max is not None else None,
+        room_type=room_type,
+        raw_text=room_type,
+    )
+    area_display = str(pref.get("area_display") or "").strip()
+    budget_label = str(pref.get("budget_label") or "").strip()
+    layout_label = str(pref.get("layout_label") or "").strip()
+    touch_payload = dict(pref.get("touch_payload") or {}) if isinstance(pref.get("touch_payload"), Mapping) else {}
+    if room_type:
+        touch_payload["room_type"] = room_type
+    return TransitionActionResult(
+        status="ok",
+        next_step="search_submit",
+        search=SearchSubmitIntent(
+            criteria=criteria,
+            source=str(pref.get("source") or "user_search").strip(),
+            goal=layout_label or str(pref.get("goal") or "any").strip(),
+            area_display=area_display,
+            budget_label=budget_label,
+            touch_payload=touch_payload,
+        ),
+        mutation=SessionMutationPlan(
+            set_values={
+                LAST_SEARCH_PREF_KEY: _last_pref(
+                    criteria,
+                    area_display=area_display,
+                    budget_label=budget_label,
+                    layout_label=layout_label,
+                )
+            },
+            delete_keys=(SEARCH_PREF_SESSION_KEY, SEARCH_AWAITING_AREA_KEY, SEARCH_AWAITING_BUDGET_KEY),
+        ),
+    )
 
 
 def _home_mutation() -> SessionMutationPlan:
@@ -322,7 +430,7 @@ class TransitionActionService:
                 next_step="navigation",
                 navigation="search_area",
                 mutation=SessionMutationPlan(
-                    set_values={SEARCH_PREF_SESSION_KEY: _fresh_search_pref("home_area")},
+                    set_values={SEARCH_PREF_SESSION_KEY: _entry_pref(session, "search_area")},
                     delete_keys=(SEARCH_AWAITING_AREA_KEY, SEARCH_AWAITING_BUDGET_KEY),
                 ),
             )
@@ -338,12 +446,14 @@ class TransitionActionService:
             updated_pref = dict(pref)
             updated_pref["location_keys"] = list(location_keys)
             updated_pref["area_display"] = display
+            if updated_pref.get("resume") and updated_pref.get("budget_label"):
+                return _resume_submit(updated_pref)
             return TransitionActionResult(
                 status="ok",
                 next_step="navigation",
                 navigation="search_budget",
                 mutation=SessionMutationPlan(
-                    set_values={SEARCH_PREF_SESSION_KEY: updated_pref},
+                    set_values={SEARCH_PREF_SESSION_KEY: push_step(updated_pref, "search_budget")},
                     delete_keys=(SEARCH_AWAITING_AREA_KEY, SEARCH_AWAITING_BUDGET_KEY),
                 ),
             )
@@ -366,7 +476,7 @@ class TransitionActionService:
                 next_step="navigation",
                 navigation="search_budget",
                 mutation=SessionMutationPlan(
-                    set_values={SEARCH_PREF_SESSION_KEY: _fresh_search_pref("home_budget")},
+                    set_values={SEARCH_PREF_SESSION_KEY: _entry_pref(session, "search_budget")},
                     delete_keys=(SEARCH_AWAITING_AREA_KEY, SEARCH_AWAITING_BUDGET_KEY),
                 ),
             )
@@ -377,7 +487,7 @@ class TransitionActionService:
                 next_step="navigation",
                 navigation="search_layout",
                 mutation=SessionMutationPlan(
-                    set_values={SEARCH_PREF_SESSION_KEY: _fresh_search_pref("home_layout")},
+                    set_values={SEARCH_PREF_SESSION_KEY: _entry_pref(session, "search_layout")},
                     delete_keys=(SEARCH_AWAITING_AREA_KEY, SEARCH_AWAITING_BUDGET_KEY),
                 ),
             )
@@ -422,7 +532,7 @@ class TransitionActionService:
                     touch_payload=touch_payload,
                 ),
                 mutation=SessionMutationPlan(
-                    set_values={LAST_SEARCH_PREF_KEY: _last_pref(criteria, area_display=str(pref.get("area_display") or ""), budget_label=str(pref.get("budget_label") or ""))},
+                    set_values={LAST_SEARCH_PREF_KEY: _last_pref(criteria, area_display=str(pref.get("area_display") or ""), budget_label=str(pref.get("budget_label") or ""), layout_label=display if room_type else "")},
                     delete_keys=(SEARCH_PREF_SESSION_KEY, SEARCH_AWAITING_AREA_KEY, SEARCH_AWAITING_BUDGET_KEY),
                 ),
             )
@@ -471,12 +581,14 @@ class TransitionActionService:
                         "budget_label": budget_label,
                     }
                 )
+                if updated_pref.get("resume"):
+                    return _resume_submit(updated_pref)
                 return TransitionActionResult(
                     status="ok",
                     next_step="navigation",
                     navigation="search_layout",
                     mutation=SessionMutationPlan(
-                        set_values={SEARCH_PREF_SESSION_KEY: updated_pref},
+                        set_values={SEARCH_PREF_SESSION_KEY: push_step(updated_pref, "search_layout")},
                         delete_keys=(SEARCH_AWAITING_AREA_KEY, SEARCH_AWAITING_BUDGET_KEY),
                     ),
                 )
@@ -509,6 +621,73 @@ class TransitionActionService:
                 mutation=SessionMutationPlan(
                     set_values={SEARCH_AWAITING_BUDGET_KEY: True},
                     delete_keys=(SEARCH_AWAITING_AREA_KEY,),
+                ),
+            )
+
+        if kind == "search_back":
+            target, pref = pop_step(_search_pref(session))
+            if target == STEP_RESULTS:
+                last = session.get(LAST_SEARCH_PREF_KEY)
+                if isinstance(last, Mapping):
+                    previous = dict(last)
+                    previous["layout_property_type"] = str(last.get("property_type") or "")
+                    previous["source"] = str(pref.get("source") or "user_search")
+                    return _resume_submit(previous)
+                target = "entry"
+            if target == "entry":
+                pref.pop("resume", None)
+                return TransitionActionResult(
+                    status="ok",
+                    next_step="navigation",
+                    navigation="search_entry",
+                    mutation=SessionMutationPlan(
+                        set_values={SEARCH_PREF_SESSION_KEY: pref},
+                        delete_keys=(SEARCH_AWAITING_AREA_KEY, SEARCH_AWAITING_BUDGET_KEY),
+                    ),
+                )
+            return TransitionActionResult(
+                status="ok",
+                next_step="navigation",
+                navigation=target,  # type: ignore[arg-type]
+                mutation=SessionMutationPlan(
+                    set_values={SEARCH_PREF_SESSION_KEY: pref},
+                    delete_keys=(SEARCH_AWAITING_AREA_KEY, SEARCH_AWAITING_BUDGET_KEY),
+                ),
+            )
+
+        if kind in {"search_back_area", "search_back_budget"}:
+            pref = _search_pref(session)
+            target = "search_area" if kind == "search_back_area" else "search_budget"
+            if pref is None:
+                pref = _fresh_search_pref(f"home_{target.split('_', 1)[1]}")
+            else:
+                pref = dict(pref)
+                if kind == "search_back_area":
+                    # Going back to the area step re-opens area; budget/layout
+                    # chosen later are kept only for display until re-picked.
+                    pref.pop("resume", None)
+                else:
+                    pref.pop("budget_min", None)
+                    pref.pop("budget_max", None)
+                    pref.pop("budget_label", None)
+            return TransitionActionResult(
+                status="ok",
+                next_step="navigation",
+                navigation=target,  # type: ignore[arg-type]
+                mutation=SessionMutationPlan(
+                    set_values={SEARCH_PREF_SESSION_KEY: pref},
+                    delete_keys=(SEARCH_AWAITING_AREA_KEY, SEARCH_AWAITING_BUDGET_KEY),
+                ),
+            )
+
+        if kind in _ADJUST_NAVIGATION:
+            return TransitionActionResult(
+                status="ok",
+                next_step="navigation",
+                navigation=_ADJUST_NAVIGATION[kind],  # type: ignore[arg-type]
+                mutation=SessionMutationPlan(
+                    set_values={SEARCH_PREF_SESSION_KEY: push_step(_adjust_pref(session, kind), _ADJUST_NAVIGATION[kind])},
+                    delete_keys=(SEARCH_AWAITING_AREA_KEY, SEARCH_AWAITING_BUDGET_KEY),
                 ),
             )
 

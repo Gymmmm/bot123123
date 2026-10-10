@@ -160,17 +160,17 @@ async def test_channel_deeplink_start_handler_keeps_listing_context(tmp_path, pa
 
     # Verify deep link behavior per action type
     if expected_kind == "details":
-        # details deep link: sends text message with inline keyboard (no bot photo)
-        # Public_id is NOT exposed in the user-visible text for privacy
-        assert message.calls  # reply_text called
-        rendered = message.calls[-1][1]
-        # Text contains listing info but no public_id (keyboard has action buttons)
+        # V4.1: channel details deep link opens the detail directly (no home):
+        # the listing's real photo(s) first, then detail text + buttons.
+        assert message.calls == []
+        assert [call[0] for call in bot.calls] == ["send_photo", "send_message"]
+        caption = bot.calls[0][2].get("caption") or ""
+        assert len(caption) <= 1024 and PUBLIC_ID not in caption
+        rendered = bot.calls[1][2]["text"]
         assert "富力城" in rendered
-        assert "🪧" not in rendered  # public_id NOT exposed to user in details text
-        # Verify keyboard was attached (contains action buttons)
-        reply_markup = message.calls[-1][2].get("reply_markup")
-        assert reply_markup is not None
-        keyboard_data = repr(reply_markup)
+        assert PUBLIC_ID not in rendered
+        keyboard_data = repr(bot.calls[1][2]["reply_markup"])
+        assert "查看全部 1 张实拍" in keyboard_data
         assert "book" in keyboard_data or "consult" in keyboard_data
     elif expected_kind == "photos":
         # photos deep link sends one composed overview image plus one action card.
@@ -178,7 +178,7 @@ async def test_channel_deeplink_start_handler_keeps_listing_context(tmp_path, pa
         assert not bot.calls[0][2].get("caption")
         action_bar = bot.calls[1][2]["text"]
         assert "富力城" in action_bar
-        assert "共 1 张实拍 · 当前预览 1 张" in action_bar
+        assert "共 1 张实拍 · 先看 1 张" in action_bar
     else:
         # book deep link: sends text message with transition keyboard
         rendered = message.calls[-1][1]
@@ -213,14 +213,8 @@ def test_public_service_home_matches_frozen_product():
     labels = [choice.label for row in view.rows for choice in row]
     callbacks = [choice.callback_data for row in view.rows for choice in row]
     assert "<b>侨联服务</b>" in view.text
-    assert labels == [
-        "📋 我的租约", "🤝 租后服务", "🛡️ 看房与交接",
-        "💬 中文顾问", "⬅️ 返回首页",
-    ]
-    assert callbacks == [
-        "v3u:service:tenant_lease", "v3u:service:aftercare",
-        "v3u:home:rental", "v3u:home:contact", "v3u:t:home",
-    ]
+    assert labels == ["🎥 视频带看", "🛡️ 看房与交接", "🤝 租后服务", "📋 我的租约", "💬 中文顾问", "⬅️ 返回首页"]
+    assert callbacks == ["v3u:service:video", "v3u:home:rental", "v3u:service:aftercare", "v3u:service:tenant_lease", "v3u:home:contact", "v3u:t:home"]
     assert "没有显示你的住房信息" not in view.text
 
 
@@ -298,7 +292,7 @@ def _unbound_service(tmp_path):
     ("callback", "expected"),
     [
         ("v3u:service:repair", "房屋报修"),
-        ("v3u:service:property", "物业协调"),
+        ("v3u:service:property", "物业问题"),
         ("v3u:service:local", "周边生活"),
     ],
 )

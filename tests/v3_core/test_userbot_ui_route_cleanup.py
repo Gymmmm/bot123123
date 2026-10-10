@@ -111,10 +111,7 @@ async def test_property_advisor_buttons_are_only_handoff_and_return():
 
 def test_aftercare_and_public_resident_buttons_stay_frozen():
     assert _labels(build_assurance_home_view()) == ["📋 入住交接留档", "💬 中文顾问", "⬅️ 返回侨联服务"]
-    expected = [
-        "📋 我的租约", "🤝 租后服务", "🛡️ 看房与交接",
-        "💬 中文顾问", "⬅️ 返回首页",
-    ]
+    expected = ["🎥 视频带看", "🛡️ 看房与交接", "🤝 租后服务", "📋 我的租约", "💬 中文顾问", "⬅️ 返回首页"]
     assert _labels(service_home_view()) == expected
     class Service:
         def active_binding(self, user_id): return None
@@ -130,7 +127,7 @@ def test_search_card_order_and_public_identity(monkeypatch):
     monkeypatch.setattr(mod, "build_public_listing_details", lambda view: D())
     card = build_search_card((V(),), 0)
     labels = [choice.label for row in card.action_rows for choice in row]
-    assert labels == ["🏠 查看房源", "📅 预约看房", "💬 咨询这套", "🔄 调整条件"]
+    assert labels == ["🏠 房源详情", "📅 预约看房", "💬 咨询这套", "🔄 调整条件"]
     assert "l_" not in repr(card).lower()
 
 

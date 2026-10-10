@@ -242,6 +242,6 @@ async def test_stale_transition_is_owned_and_shows_expired_feedback_without_muta
     assert outcome.handled and outcome.result is not None
     assert outcome.result.status == "expired"
     assert [call[0] for call in query.calls] == ["answer"]
-    assert query.calls[0][1] == ("操作已过期，请重新选择。",)
+    assert query.calls[0][1] == ("这个入口已经更新，请返回重新选择。",)
     assert query.calls[0][2] == {"show_alert": True}
     assert user_data == {}

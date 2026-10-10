@@ -68,7 +68,6 @@ def test_details_keyboard_is_encoded_from_public_listing_identity():
     markup = build_action_keyboard(response.action_rows)
 
     assert _callback_rows(markup) == [
-        ["v3u:listing:photos:QL-RF-A2B3"],
         [
             "v3u:listing:book:QL-RF-A2B3",
             "v3u:listing:consult:QL-RF-A2B3",
@@ -85,15 +84,15 @@ def test_search_card_keyboard_encodes_navigation_with_public_ids():
     markup = build_action_keyboard(card.action_rows)
 
     rows = _callback_rows(markup)
-    assert rows[0] == [
-        "v3u:card:1:QL-BK-C4D5",
-        "v3u:card:1:QL-BK-C4D5",
-    ]
+    assert rows[0] == ["v3u:listing:details:QL-RF-A2B3"]
     assert rows[1] == [
-        "v3u:listing:details:QL-RF-A2B3",
         "v3u:listing:book:QL-RF-A2B3",
+        "v3u:listing:consult:QL-RF-A2B3",
     ]
-    assert rows[2] == ["v3u:listing:consult:QL-RF-A2B3"]
+    assert rows[2] == [
+        "v3u:card:1:QL-BK-C4D5",
+        "v3u:card:1:QL-BK-C4D5",
+    ]
     assert rows[3] == ["v3u:change_search"]
     assert "LST_" not in repr(rows)
 
@@ -106,7 +105,7 @@ def test_three_card_navigation_distinguishes_previous_and_next_targets():
     )
     markup = build_action_keyboard(build_search_card(items, 0).action_rows)
 
-    assert _callback_rows(markup)[0] == [
+    assert _callback_rows(markup)[2] == [
         "v3u:card:2:QL-B2-E6F7",
         "v3u:card:1:QL-BK-C4D5",
     ]

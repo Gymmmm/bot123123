@@ -25,15 +25,15 @@ def test_v3_home_uses_final_conversion_navigation():
     view = build_home_view(channel_url="https://t.me/qiaolian")
     labels = _labels(view)
     assert labels == [
-        "🔍 开始找房", "🛎️ 侨联服务",
-        "📢 最新房源", "💬 中文顾问",
+        "🔍 开始找房", "💬 中文顾问",
+        "📢 最新房源", "🛎️ 侨联服务",
     ]
 
 
 def test_home_without_channel_keeps_core_conversion_actions():
     labels = _labels(build_home_view())
     assert labels == [
-        "🔍 开始找房", "🛎️ 侨联服务", "💬 中文顾问",
+        "🔍 开始找房", "💬 中文顾问", "🛎️ 侨联服务",
     ]
 
 
@@ -51,15 +51,9 @@ def test_about_and_booking_are_compatible_secondary_home_actions():
 def test_service_hub_is_public_and_does_not_require_binding():
     view = service_home_view()
     labels = _labels(view)
-    assert labels == [
-        "📋 我的租约", "🤝 租后服务", "🛡️ 看房与交接",
-        "💬 中文顾问", "⬅️ 返回首页",
-    ]
+    assert labels == ["🎥 视频带看", "🛡️ 看房与交接", "🤝 租后服务", "📋 我的租约", "💬 中文顾问", "⬅️ 返回首页"]
     callbacks = _callbacks(view)
-    assert callbacks == [
-        "v3u:service:tenant_lease", "v3u:service:aftercare",
-        "v3u:home:rental", "v3u:home:contact", "v3u:t:home",
-    ]
+    assert callbacks == ["v3u:service:video", "v3u:home:rental", "v3u:service:aftercare", "v3u:service:tenant_lease", "v3u:home:contact", "v3u:t:home"]
     assert "没有显示你的住房信息" not in view.text
 
 

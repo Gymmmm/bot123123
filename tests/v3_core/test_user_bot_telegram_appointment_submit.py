@@ -157,7 +157,8 @@ async def test_persistence_failure_keeps_session_and_never_renders_success():
 
     assert APPOINTMENT_SESSION_KEY in user_data
     assert user_data[APPOINTMENT_SESSION_KEY]["time"] == "pm"
-    assert [call[0] for call in query.calls] == ["answer"]
+    assert [call[0] for call in query.calls] == ["answer", "edit_text"]
+    assert "预约暂时没提交成功" in query.calls[-1][1][0]
 
 
 @pytest.mark.asyncio

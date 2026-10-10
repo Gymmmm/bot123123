@@ -123,7 +123,7 @@ async def test_search_area_renders_v3_only_choices_then_initializes_pref():
     assert "v3u:t:area_choice:bkk1" in callbacks
     assert "v3u:t:area_choice:rf" in callbacks
     assert "v3u:t:area_other" in callbacks
-    assert "v3u:change_search" in callbacks
+    assert "v3u:t:search_back" in callbacks  # V4.1: back follows real navigation history
     assert not any(value.startswith(("findarea:", "hub:")) for value in callbacks)
     assert user_data[SEARCH_PREF_SESSION_KEY]["source"] == "home_area"
     assert user_data[SEARCH_PREF_SESSION_KEY]["location_keys"] == []
@@ -151,7 +151,7 @@ async def test_area_choice_renders_budget_with_canonical_location_after_edit():
 
     assert outcome.handled and outcome.result is not None
     assert outcome.result.navigation == "search_budget"
-    assert "已选：BKK1" in query.calls[-1][1][0]
+    assert "已选：📍 BKK1" in query.calls[-1][1][0]
     assert user_data[SEARCH_PREF_SESSION_KEY]["location_keys"] == ["BKK1"]
     assert user_data[SEARCH_PREF_SESSION_KEY]["area_display"] == "BKK1（市中心）"
     callbacks = _callbacks(query)
@@ -259,6 +259,7 @@ async def test_layout_choice_crosses_existing_search_executor_boundary():
         "area_display": "",
         "budget_label": "",
         "room_type": "2房",
+        "layout_label": "两房",
     }
     assert "LST_" not in repr(user_data)
 

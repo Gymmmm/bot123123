@@ -46,11 +46,11 @@ def _location_display(criteria: SearchCriteria) -> str:
 def _budget_label(criteria: SearchCriteria) -> str:
     low, high = criteria.budget_min, criteria.budget_max
     if low is not None and high is not None:
-        return f"{low}-{high} USD/月"
+        return f"${low:,}–{high:,}"
     if low is not None:
-        return f">= {low} USD/月"
+        return f"${low:,} 以上"
     if high is not None:
-        return f"<= {high} USD/月"
+        return f"${high:,} 以内"
     return ""
 
 
