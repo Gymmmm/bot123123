@@ -25,15 +25,15 @@ def test_v3_home_uses_final_conversion_navigation():
     view = build_home_view(channel_url="https://t.me/qiaolian")
     labels = _labels(view)
     assert labels == [
-        "🔍 开始找房", "🛎️ 侨联服务",
-        "📢 最新房源", "💬 中文顾问",
+        "🔍 开始找房", "💬 中文顾问",
+        "📢 最新房源", "🛎️ 侨联服务",
     ]
 
 
 def test_home_without_channel_keeps_core_conversion_actions():
     labels = _labels(build_home_view())
     assert labels == [
-        "🔍 开始找房", "🛎️ 侨联服务", "💬 中文顾问",
+        "🔍 开始找房", "💬 中文顾问", "🛎️ 侨联服务",
     ]
 
 

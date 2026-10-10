@@ -43,18 +43,19 @@ def test_p16_aftercare_only_exposes_real_workflows():
     view = aftercare_home_view()
     assert view.text == (
         "🤝 <b>租后服务</b>\n\n"
-        "签完合同不是结束。\n"
-        "报修、物业协调和其他住房问题，都可以继续找侨联。"
+        "住进去以后，有问题也能找我们。\n"
+        "房屋报修、物业沟通、账单看不明白，都可以告诉中文顾问。"
     )
     assert _rows(view) == [
-        ["🔧 房屋报修", "🏢 物业协调"],
-        ["❓ 其他住房问题"],
+        ["🔧 房屋报修", "🏢 物业问题"],
+        ["💡 账单疑问", "❓ 其他住房问题"],
         ["⬅️ 返回侨联服务"],
     ]
     callbacks = _callbacks(view)
     assert callbacks == [
         "v3u:service:repair",
         "v3u:service:coordination",
+        "v3u:service:utilities",
         "v3u:service:general",
         "v3u:home:service",
     ]

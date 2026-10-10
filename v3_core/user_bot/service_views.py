@@ -116,8 +116,8 @@ def service_home_view() -> ServiceView:
 # Section 9 — 租后服务 (descriptive naming per locked status).
 AFTERCARE_TEXT = (
     "🤝 <b>租后服务</b>\n\n"
-    "签完合同不是结束。\n"
-    "报修、物业协调和其他住房问题，都可以继续找侨联。"
+    "住进去以后，有问题也能找我们。\n"
+    "房屋报修、物业沟通、账单看不明白，都可以告诉中文顾问。"
 )
 
 
@@ -126,8 +126,8 @@ def aftercare_home_view() -> ServiceView:
         kind="aftercare_home",
         text=AFTERCARE_TEXT,
         rows=(
-            (ServiceChoice("🔧 房屋报修", "v3u:service:repair"), ServiceChoice("🏢 物业协调", "v3u:service:coordination")),
-            (ServiceChoice("❓ 其他住房问题", "v3u:service:general"),),
+            (ServiceChoice("🔧 房屋报修", "v3u:service:repair"), ServiceChoice("🏢 物业问题", "v3u:service:coordination")),
+            (ServiceChoice("💡 账单疑问", "v3u:service:utilities"), ServiceChoice("❓ 其他住房问题", "v3u:service:general")),
             (ServiceChoice("⬅️ 返回侨联服务", "v3u:home:service"),),
         ),
     )
@@ -330,7 +330,7 @@ def property_view() -> ServiceView:
     choices = [ServiceChoice(label, f"v3u:service:property_category:{key}") for label, key in _PROPERTY_CATEGORIES]
     return ServiceView(
         kind="property",
-        text="🏢 <b>物业协调</b>\n\n请选择需要协调的问题：",
+        text="🏢 <b>物业问题</b>\n\n门禁、电梯、公共设施或者跟物业沟通有问题？选一个类型告诉我们：",
         rows=(
             (choices[0], choices[1]),
             (choices[2], choices[3]),
@@ -429,7 +429,7 @@ def property_exit_view() -> ServiceView:
 
 def utility_stub_view(kind: str) -> ServiceView:
     labels = {
-        "utilities": ("🔌 账单协助", "把水电、物业或其他住房账单发给中文顾问。"),
+        "utilities": ("💡 账单疑问", "水电、物业费或者其他住房费用看不明白？把账单内容或照片发给中文顾问就行。"),
         "moving": ("🚚 搬家服务", "请说明搬家日期、出发地、目的地，以及大概物品情况。"),
         "cleaning": ("🧹 保洁服务", "请说明需要哪种保洁，以及希望安排的日期：\n\n日常保洁 / 入住保洁 / 退租保洁 / 深度保洁"),
         "network_help": ("🌐 网络办理", "请说明需要处理的问题：\n\n新装 / 续费 / 故障 / 其他"),

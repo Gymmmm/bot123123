@@ -34,13 +34,12 @@ def phnom_penh_greeting() -> str:
 
 def welcome_text(*, first_name: str, greeting: str) -> str:
     return (
-        f"👋 {he(str(first_name))}，{he(str(greeting))}\n\n"
+        f"👋 {he(str(first_name))}，{he(str(greeting))}，欢迎来侨联！\n\n"
         "🏠 <b>侨联地产｜金边中文租房</b>\n\n"
-        "📸 房源照片｜手机查看实拍\n"
-        "🎥 视频带看｜顾问到现场，你通过视频看房\n"
-        "🛡️ 入住留档｜入住有记录，退租有依据\n"
-        "🤝 租后服务｜签完合同，还有人继续跟\n\n"
-        "请选择服务："
+        "找房、看实拍、预约看房，手机上就能搞定。\n"
+        "🎥 不方便到场？可以视频带看。\n"
+        "🤝 从看房到入住，有问题都能找中文顾问。\n\n"
+        "想先做什么？"
     )
 
 
@@ -75,7 +74,7 @@ def build_home_view(
     rows: list[tuple[HomeChoice, ...]] = [
         (
             HomeChoice("🔍 开始找房", "search"),
-            HomeChoice("🛎️ 侨联服务", "service"),
+            HomeChoice("💬 中文顾问", "contact"),
         ),
     ]
     clean_channel = str(channel_url or "").strip()
@@ -83,11 +82,11 @@ def build_home_view(
         rows.append(
             (
                 HomeChoice("📢 最新房源", "root", url=clean_channel),
-                HomeChoice("💬 中文顾问", "contact"),
+                HomeChoice("🛎️ 侨联服务", "service"),
             )
         )
     else:
-        rows.append((HomeChoice("💬 中文顾问", "contact"),))
+        rows.append((HomeChoice("🛎️ 侨联服务", "service"),))
     resolved_greeting = str(greeting or "").strip() or phnom_penh_greeting()
     return HomeView(
         "home",

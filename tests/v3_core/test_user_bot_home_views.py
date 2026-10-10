@@ -25,8 +25,8 @@ def test_home_uses_compact_four_action_surface_when_channel_exists():
     )
     markup = build_home_keyboard(view)
     labels = [b.text for row in markup.inline_keyboard for b in row]
-    assert labels == ["🔍 开始找房", "🛎️ 侨联服务", "📢 最新房源", "💬 中文顾问"]
-    assert _callbacks(markup) == ["v3u:home:search", "v3u:home:service", "v3u:home:contact"]
+    assert labels == ["🔍 开始找房", "💬 中文顾问", "📢 最新房源", "🛎️ 侨联服务"]
+    assert _callbacks(markup) == ["v3u:home:search", "v3u:home:contact", "v3u:home:service"]
     assert markup.inline_keyboard[1][0].url == "https://t.me/qiaolian"
     assert "Gym" in view.text
     assert "晚上好" in view.text
@@ -37,8 +37,8 @@ def test_home_without_channel_keeps_three_core_actions():
         build_home_view(channel_url="", first_name="Gym", greeting="上午好")
     )
     labels = [b.text for row in markup.inline_keyboard for b in row]
-    assert labels == ["🔍 开始找房", "🛎️ 侨联服务", "💬 中文顾问"]
-    assert _callbacks(markup) == ["v3u:home:search", "v3u:home:service", "v3u:home:contact"]
+    assert labels == ["🔍 开始找房", "💬 中文顾问", "🛎️ 侨联服务"]
+    assert _callbacks(markup) == ["v3u:home:search", "v3u:home:contact", "v3u:home:service"]
 
 
 def test_contact_handoff_and_appointment_history_navigation_are_plain_text():

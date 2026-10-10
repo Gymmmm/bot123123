@@ -298,7 +298,7 @@ def _unbound_service(tmp_path):
     ("callback", "expected"),
     [
         ("v3u:service:repair", "房屋报修"),
-        ("v3u:service:property", "物业协调"),
+        ("v3u:service:property", "物业问题"),
         ("v3u:service:local", "周边生活"),
     ],
 )
