@@ -125,9 +125,10 @@ def _sort_key(record: AppointmentHistoryRecord) -> tuple[int, int, str]:
         return (0, 0, "")
 
 
-def _is_upcoming(record: AppointmentHistoryRecord, *, now: datetime) -> bool:
-    if record.status not in {"pending", "confirmed"}:
-        return False
+_OPEN_STATUSES = frozenset({"pending", "assigned", "contacted", "confirmed"})
+
+
+def _record_date(record: AppointmentHistoryRecord, *, now: datetime):
     bits = record.appointment_date.replace("/", "-").split("-")
     try:
         nums = [int(part) for part in bits if part.isdigit()]
@@ -136,9 +137,42 @@ def _is_upcoming(record: AppointmentHistoryRecord, *, now: datetime) -> bool:
         else:
             month, day = nums[-2], nums[-1]
             year = now.year
-        return datetime(year, month, day, tzinfo=now.tzinfo).date() >= now.date()
+        return datetime(year, month, day, tzinfo=now.tzinfo).date()
     except (ValueError, IndexError):
+        return None
+
+
+def _is_upcoming(record: AppointmentHistoryRecord, *, now: datetime) -> bool:
+    if record.status not in _OPEN_STATUSES:
         return False
+    when = _record_date(record, now=now)
+    return when is not None and when >= now.date()
+
+
+def display_status(status: str, *, past: bool = False) -> tuple[str, str]:
+    """V4 user-facing booking status, mapped from the real status model.
+
+    「已完成」 is only shown when it can be derived: an explicit ``done`` status,
+    or a ``confirmed`` booking whose date has already passed.
+    """
+    clean = str(status or "").strip().lower()
+    if clean == "done" or (clean == "confirmed" and past):
+        return "✅", "已完成"
+    if clean == "confirmed":
+        return "🟢", "已确认"
+    if clean in {"cancelled", "canceled"}:
+        return "⚪", "已取消"
+    return "🟡", "待顾问确认"
+
+
+def _is_recent_history(record: AppointmentHistoryRecord, *, now: datetime) -> bool:
+    """Past records worth showing: cancelled, done, or confirmed-and-passed."""
+    if record.status in {"cancelled", "canceled", "done"}:
+        return True
+    if record.status == "confirmed":
+        when = _record_date(record, now=now)
+        return when is not None and when < now.date()
+    return False
 
 
 def _subject(record: AppointmentHistoryRecord, inventory: PublicInventoryReader) -> str:
@@ -161,15 +195,22 @@ def _item(record: AppointmentHistoryRecord, inventory: PublicInventoryReader) ->
     )
 
 
-def _lines(item: AppointmentHistoryItem) -> list[str]:
-    status_icon, status_label = {"pending": ("🟡", "待确认"), "confirmed": ("🟢", "已确认"), "cancelled": ("🔴", "已取消"), "canceled": ("🔴", "已取消")}.get(item.status, ("🟡", "待确认"))
+def _lines(item: AppointmentHistoryItem, *, past: bool = False) -> list[str]:
+    status_icon, status_label = display_status(item.status, past=past)
     mode = APPOINTMENT_MODE_LABELS.get(item.viewing_mode, item.viewing_mode or "待确认")
+    mode_icon = "🎥" if item.viewing_mode == "video" else "🚶"
     return [
         f"🏠 {he(item.subject)}",
-        f"方式｜{he(mode)}",
-        f"时间｜{he(_date_compact(item.appointment_date))} · {he(_time_compact(item.appointment_time))}",
-        f"状态｜{status_icon} {he(status_label)}",
+        f"🗓️ {he(_date_compact(item.appointment_date))} · {he(_time_compact(item.appointment_time))}",
+        f"{mode_icon} {he(mode)}",
+        f"📌 {status_icon} {he(status_label)}",
     ]
+
+
+EMPTY_HISTORY_TEXT = (
+    "📋 <b>还没有看房预约</b>\n\n"
+    "看到喜欢的房子，可以直接预约实地看房或视频带看。"
+)
 
 
 class AppointmentHistoryService:
@@ -185,38 +226,33 @@ class AppointmentHistoryService:
     def build(self, user_id: int, *, now: datetime | None = None) -> AppointmentHistoryView:
         records = self.reader.list_for_user(user_id, limit=20)
         if not records:
-            return AppointmentHistoryView(
-                text=(
-                    "📅 <b>我的预约</b>\n\n"
-                    "目前没有待进行的预约。\n\n"
-                    "看到合适的房源后，可以直接预约看房。"
-                ),
-                items=(),
-                history_count=0,
-            )
+            return AppointmentHistoryView(text=EMPTY_HISTORY_TEXT, items=(), history_count=0)
 
         local_now = now or datetime.now(ZoneInfo("Asia/Phnom_Penh"))
         upcoming_records = tuple(record for record in records if _is_upcoming(record, now=local_now))
         history_records = tuple(record for record in records if record not in upcoming_records)
-        if not upcoming_records:
+        recent_records = tuple(r for r in history_records if _is_recent_history(r, now=local_now))[:2]
+        if not upcoming_records and not recent_records:
             return AppointmentHistoryView(
-                text=(
-                    "📅 <b>我的预约</b>\n\n"
-                    "目前没有待进行的预约。\n\n"
-                    "看到合适的房源后，可以直接预约看房。"
-                ),
+                text=EMPTY_HISTORY_TEXT,
                 items=(),
                 history_count=len(history_records),
             )
         items = tuple(_item(record, self.inventory) for record in upcoming_records[:2])
 
-        parts = ["📅 <b>我的预约</b>"]
-        for index, item in enumerate(items):
+        parts = ["📋 <b>我的看房预约</b>"]
+        for item in items:
+            parts.append("")
             parts.extend(_lines(item))
-            if index < len(items) - 1:
-                parts.append("")
         if len(upcoming_records) > 2:
             parts.extend(["", "更多预约记录请联系中文顾问。"])
+        if recent_records:
+            parts.extend(["", "<b>最近记录</b>"])
+            for record in recent_records:
+                parts.append("")
+                parts.extend(_lines(_item(record, self.inventory), past=True))
+        if any(item.status in {"pending", "assigned", "contacted"} for item in items):
+            parts.extend(["", "「待顾问确认」表示还没定下来，顾问确认后会在 Telegram 通知你。"])
         return AppointmentHistoryView(
             text="\n".join(parts),
             items=items,
@@ -230,4 +266,5 @@ __all__ = [
     "AppointmentHistoryService",
     "AppointmentHistoryView",
     "SQLiteAppointmentHistoryReader",
+    "display_status",
 ]

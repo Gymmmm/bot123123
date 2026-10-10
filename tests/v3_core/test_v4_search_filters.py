@@ -118,3 +118,19 @@ def test_adjust_without_previous_search_degrades_to_fresh_flow():
     nav = _apply(session, "v3u:t:adjust_area")
     assert nav.navigation == "search_area"
     assert not session[SEARCH_PREF_SESSION_KEY].get("resume")
+
+
+def test_booking_success_says_not_yet_confirmed():
+    from v3_core.user_bot.appointment_success_view import build_appointment_success_view
+    from v3_core.user_bot.public_appointment import PublicAppointmentDraft
+
+    class _Inv:
+        def resolve(self, _):
+            return None
+
+    draft = PublicAppointmentDraft(public_listing_id="QL-RF-A2B3", mode="video", date="10-15", time="pm", source="user_bot")
+    view = build_appointment_success_view(draft, _Inv())
+    assert "预约已提交" in view.text
+    assert "预约目前尚未确认" in view.text
+    assert "🎥 视频带看" in view.text
+    assert _labels(view)[:3] == ["📋 我的预约", "💬 中文顾问", "🔍 继续找房"]
