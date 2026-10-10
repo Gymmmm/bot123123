@@ -210,8 +210,7 @@ def concierge_home_view() -> ServiceView:
         ),
         rows=(
             (ServiceChoice("🔧 房屋报修", "v3u:service:repair"), ServiceChoice("🏢 物业问题", "v3u:service:coordination")),
-            (ServiceChoice("💡 账单疑问", "v3u:service:utilities"), ServiceChoice("🚚 搬家协助", "v3u:service:moving")),
-            (ServiceChoice("🧹 保洁安排", "v3u:service:cleaning"), ServiceChoice("🌐 网络办理", "v3u:service:network_help")),
+            (ServiceChoice("💡 账单疑问", "v3u:service:utilities"),),
             (ServiceChoice("❓ 其他住房问题", "v3u:service:general"),),
             (ServiceChoice("⬅️ 返回侨联服务", "v3u:home:service"),),
         ),
@@ -221,7 +220,7 @@ def concierge_home_view() -> ServiceView:
 def repair_home_view() -> ServiceView:
     return ServiceView(
         kind="repair_home",
-        text="🔧 <b>报修直通</b>\n\n请选择需要处理的问题：",
+        text="🔧 <b>房屋报修</b>\n\n请选择需要处理的问题：",
         rows=(
             (ServiceChoice("❄️ 空调", "v3u:service:issue:repair_ac"), ServiceChoice("🚿 热水 / 漏水", "v3u:service:issue:repair_water")),
             (ServiceChoice("💡 灯具 / 电路", "v3u:service:issue:repair_power"), ServiceChoice("🔐 门锁 / 门禁", "v3u:service:issue:repair_door")),
