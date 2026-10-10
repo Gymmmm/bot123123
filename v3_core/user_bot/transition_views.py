@@ -98,7 +98,7 @@ def _appointment_mode_view(draft: PublicAppointmentDraft, inventory: PublicInven
     return TransitionView(
         kind="appointment_mode",
         text=(
-            "📅 <b>在线预约看房</b>\n\n"
+            "📅 <b>想怎么来看这套房？</b>\n\n"
             f"🏠 {he(subject)}\n"
             f"{price_line}"
             "\n没空到场？选择视频带看，顾问到现场实时带你看。\n\n"
@@ -106,7 +106,7 @@ def _appointment_mode_view(draft: PublicAppointmentDraft, inventory: PublicInven
         ),
         rows=(
             (
-                TransitionChoice("🚶 实地带看", "appointment_mode", "offline"),
+                TransitionChoice("🚶 实地看房", "appointment_mode", "offline"),
                 TransitionChoice("🎥 视频带看", "appointment_mode", "video"),
             ),
             (TransitionChoice("⬅️ 返回房源", "listing_details", public_listing_id=draft.public_listing_id),),
@@ -219,12 +219,12 @@ def _search_budget_view(area_display: str = "", *, back_label: str = "⬅️ 返
         (choices[0], choices[1]),
         (choices[2], choices[3]),
         (choices[4], choices[5]),
-        (TransitionChoice("自己输入", "budget_custom"),),
+        (TransitionChoice("✏️ 自己填预算", "budget_custom"),),
         (TransitionChoice("⬅️ 返回找房", "change_search"),),
     )
     return TransitionView(
         kind="search_budget",
-        text=f"💰 <b>选择预算</b>{area_line}\n\n每月租金预算：",
+        text=f"💰 <b>每月房租准备控制在多少？</b>{area_line}\n\n每月租金预算：",
         rows=rows,
     )
 
@@ -239,12 +239,12 @@ def _search_area_view() -> TransitionView:
         (choices[7],),
         (choices[8], choices[9]),
         (choices[10],),
-        (TransitionChoice("其他位置", "area_other"),),
+        (TransitionChoice("✏️ 输入其他位置", "area_other"),),
         (TransitionChoice("⬅️ 返回找房", "change_search"),),
     )
     return TransitionView(
         kind="search_area",
-        text="📍 <b>选择区域</b>\n\n请选择想找的位置：",
+        text="📍 <b>想住在哪个区域？</b>\n\n请选择想找的位置：",
         rows=rows,
     )
 
@@ -261,7 +261,7 @@ def _search_layout_view(area_display: str = "", budget_label: str = "") -> Trans
         (choices[4], choices[5]),
         (TransitionChoice("⬅️ 返回找房", "change_search"),),
     )
-    return TransitionView(kind="search_layout", text=f"🏠 <b>选择户型</b>{selected_line}", rows=rows)
+    return TransitionView(kind="search_layout", text=f"🏠 <b>需要几间卧室？</b>{selected_line}", rows=rows)
 
 def _similar_view(plan: TransitionPlan) -> TransitionView:
     """Render similar listing view.
@@ -306,12 +306,12 @@ _SEARCH_ENTRY_TEXT = (
 def _search_entry_view() -> TransitionView:
     rows = (
         (
-            TransitionChoice("📍 按区域", "search_area"),
-            TransitionChoice("💰 按预算", "search_budget"),
+            TransitionChoice("📍 选区域", "search_area"),
+            TransitionChoice("💰 选预算", "search_budget"),
         ),
         (
-            TransitionChoice("🏠 按户型", "search_layout"),
-            TransitionChoice("💬 中文顾问", "home", "contact"),
+            TransitionChoice("🏠 选户型", "search_layout"),
+            TransitionChoice("💬 联系中文顾问", "home", "contact"),
         ),
         (TransitionChoice("⬅️ 返回首页", "home"),),
     )
