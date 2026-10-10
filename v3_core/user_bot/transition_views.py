@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from html import escape as he
-from typing import Literal
+from typing import Literal, Mapping
 from zoneinfo import ZoneInfo
 
 from .listing_presenter import booking_subject, build_public_listing_details
@@ -41,6 +41,7 @@ TransitionChoiceKind = Literal[
     "area_choice",
     "area_other",
     "layout_choice",
+    "search_back",
     "search_back_area",
     "search_back_budget",
     "adjust_area",
@@ -347,21 +348,35 @@ def _search_layout_view(
     )
 
 
+def _history_back(pref: object) -> str:
+    """「返回上一步」follows the recorded navigation history when there is one."""
+    from .search_nav import nav_stack
+
+    stack = nav_stack(pref if isinstance(pref, Mapping) else None)
+    if not stack:
+        return ""  # no recorded history (legacy session): derive from filled fields
+    # Pop the recorded history; the first page pops back to the entry while
+    # keeping the already selected filters.
+    return "search_back"
+
+
 def search_area_for_pref(pref: object) -> TransitionView:
     area, budget, layout = _pref_fields(pref)
-    # Area is the first guided step: back always returns to the search entry.
-    return _search_area_view(summary=filter_summary("", budget, layout))
+    back = _history_back(pref) or "change_search"
+    return _search_area_view(summary=filter_summary("", budget, layout), back_kind=back)
 
 
 def search_budget_for_pref(pref: object) -> TransitionView:
     area, budget, layout = _pref_fields(pref)
-    back = "search_back_area" if area else "change_search"
+    back = _history_back(pref) or ("search_back_area" if area else "change_search")
     return _search_budget_view(area, layout_label=layout, back_kind=back)
 
 
 def search_layout_for_pref(pref: object) -> TransitionView:
     area, budget, _layout = _pref_fields(pref)
-    if budget:
+    if _history_back(pref):
+        back = "search_back"
+    elif budget:
         back = "search_back_budget"
     elif area:
         back = "search_back_area"

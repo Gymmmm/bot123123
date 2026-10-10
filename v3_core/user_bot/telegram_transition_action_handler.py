@@ -56,6 +56,7 @@ from .transition_views import TransitionChoice, TransitionView, TransitionViewSe
 
 _GUIDED_SEARCH_CALLBACKS = frozenset(
     {
+        "search_back",
         "search_area",
         "area_choice",
         "area_other",
@@ -179,6 +180,8 @@ def _navigation_view(
     if result.mutation is not None:
         apply_session_mutation(preview, result.mutation)
     pref = preview.get(SEARCH_PREF_SESSION_KEY)
+    if navigation == "search_entry":
+        return views.search_entry()
     if navigation == "search_area":
         return views.search_area(pref if isinstance(pref, dict) else None)
     if navigation == "search_layout":

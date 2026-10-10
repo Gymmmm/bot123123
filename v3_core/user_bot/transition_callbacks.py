@@ -42,6 +42,7 @@ _FLAG_KINDS = frozenset(
         "search_budget",
         "search_layout",
         "area_other",
+        "search_back",
         "search_back_area",
         "search_back_budget",
         "adjust_area",

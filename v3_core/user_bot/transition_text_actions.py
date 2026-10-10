@@ -21,6 +21,7 @@ from .transition_actions import (
     SEARCH_AWAITING_BUDGET_KEY,
     SearchSubmitIntent,
 )
+from .search_nav import push_step
 from .transition_session import APPOINTMENT_SESSION_KEY, SEARCH_PREF_SESSION_KEY, SessionMutationPlan
 
 
@@ -226,6 +227,7 @@ class TransitionTextActionService:
             pref = dict(raw_pref)
             pref["location_keys"] = list(location_keys)
             pref["area_display"] = value
+            pref = push_step(pref, "search_budget")
             return TransitionTextActionResult(
                 status="ok",
                 next_step="search_budget",
@@ -263,6 +265,7 @@ class TransitionTextActionService:
                         "touch_payload": intent.touch_payload,
                     }
                 )
+                pref = push_step(pref, "search_layout")
                 return TransitionTextActionResult(
                     status="ok",
                     next_step="search_layout",
