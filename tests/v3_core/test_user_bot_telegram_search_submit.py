@@ -139,7 +139,9 @@ async def test_matched_search_renders_public_card_then_consumes_guided_pref():
     assert outcome.search_execution is not None
     assert outcome.search_presentation is not None
     assert outcome.search_presentation.matched
-    assert [call[0] for call in query.calls] == ["answer", "edit_text"]
+    # V4: interim 「正在帮你找房…」 panel is edited in place into the result.
+    assert [call[0] for call in query.calls] == ["answer", "edit_text", "edit_text"]
+    assert "正在帮你找房" in query.calls[1][1][0]
     assert SEARCH_PREF_SESSION_KEY not in user_data
     assert user_data[LAST_SEARCH_PREF_KEY] == {
         "property_type": "",
@@ -173,7 +175,7 @@ async def test_no_match_renders_locked_copy_with_strict_recovery_actions():
     assert outcome.search_presentation is not None
     assert not outcome.search_presentation.matched
     assert SEARCH_PREF_SESSION_KEY not in user_data
-    assert [call[0] for call in query.calls] == ["answer", "edit_text"]
+    assert [call[0] for call in query.calls] == ["answer", "edit_text", "edit_text"]
     text = query.calls[-1][1][0]
     assert "还没找到完全符合的房子" in text
     assert "你的要求：BKK1｜$400–600" in text
@@ -207,7 +209,8 @@ async def test_search_executor_failure_keeps_guided_pref_unchanged():
         )
 
     assert repr(user_data) == before
-    assert [call[0] for call in query.calls] == ["answer"]
+    assert [call[0] for call in query.calls] == ["answer", "edit_text", "edit_text"]
+    assert "刚刚没能完成搜索" in query.calls[-1][1][0]
 
 
 @pytest.mark.asyncio

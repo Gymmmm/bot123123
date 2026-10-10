@@ -117,14 +117,14 @@ def _details_actions(
     target = str(public_listing_id or "").strip()
     if bookable:
         return (
-            (SemanticAction("📸 全部实拍", "photos", target),),
+            (SemanticAction("📸 看全部实拍", "photos", target),),
             (
                 SemanticAction("📅 预约看房", "book", target),
                 SemanticAction("💬 咨询这套", "consult", target),
             ),
         )
     return (
-        (SemanticAction("📸 全部实拍", "photos", target),),
+        (SemanticAction("📸 看全部实拍", "photos", target),),
         (
             SemanticAction("💬 咨询这套", "consult", target),
             SemanticAction("🔍 找相似", "similar", target),
@@ -155,11 +155,11 @@ def _photo_actions(
     def _more_or_details() -> SemanticAction:
         if has_more:
             return SemanticAction(
-                "📸 全部实拍",
+                "📸 看全部实拍",
                 "photos",
                 target
             )
-        return SemanticAction("🏠 查看房源", "details", target)
+        return SemanticAction("🏠 房源详情", "details", target)
 
     if bookable or status in {"active", "reserved"}:
         # Book button only when unified bookable is true.
@@ -176,7 +176,7 @@ def _photo_actions(
         if has_more:
             first_row.append(
                 SemanticAction(
-                    "📸 全部实拍",
+                    "📸 看全部实拍",
                     "photos",
                     target,
                 )
@@ -772,6 +772,11 @@ def build_photos_response(
 
 
 # ---- Paged raw album ----
+NO_PHOTOS_TEXT = (
+    "📸 <b>这套房暂时还没有照片</b>\n\n"
+    "想看房间内部？可以联系中文顾问询问图片或视频。"
+)
+
 # Telegram allows at most 10 frames per sendMediaGroup.
 PHOTOS_PAGE_SIZE = 10
 PHOTOS_ALBUM_MAX_TOTAL = 30
@@ -852,7 +857,7 @@ def build_photos_overview_response(view: PublishedListingView) -> PublicPhotosRe
     summary = listing_summary_bits(project_name=details.project_name, layout=details.layout, monthly_rent_usd=details.monthly_rent_usd, location=details.location)
     target = str(details.public_listing_id or "").strip()
     if not all_photos:
-        return PublicPhotosResponse(media_groups=(), text=f"{_detail_status_line(details)}\n\n这套房的实拍还没传上来，可以直接问顾问要更多图/视频。", media_caption="", detail_text="", photo_path="", photo_index=0, photo_total=0, listing_summary=summary, action_rows=_details_actions(bookable=details.bookable, public_listing_id=target), expand_only=False)
+        return PublicPhotosResponse(media_groups=(), text=NO_PHOTOS_TEXT, media_caption="", detail_text="", photo_path="", photo_index=0, photo_total=0, listing_summary=summary, action_rows=((SemanticAction("💬 咨询这套", "consult", target),), (SemanticAction("⬅️ 返回房源", "details", target),)), expand_only=False)
     from .photo_overview import MAX_PREVIEW, render_photo_overview
     import tempfile
     overview = Path(tempfile.gettempdir()) / "qiaolian_photo_overviews" / f"{target or 'listing'}.jpg"
@@ -861,8 +866,8 @@ def build_photos_overview_response(view: PublishedListingView) -> PublicPhotosRe
     adviser = _adviser_copy_for_view(view)
     if adviser:
         lines.extend(["", "💬 <b>侨联说</b>", he(adviser)])
-    lines.extend(["", f"📸 共 {total} 张实拍 · 当前预览 {min(total, MAX_PREVIEW)} 张"])
-    actions = [(SemanticAction("📸 查看全部原图", "photos", target, target_index=0),)]
+    lines.extend(["", f"📸 共 {total} 张实拍 · 先看 {min(total, MAX_PREVIEW)} 张"])
+    actions = [(SemanticAction("🖼️ 查看全部原图", "photos", target, target_index=0),)]
     if details.bookable:
         actions.append((SemanticAction("📅 预约看房", "book", target), SemanticAction("💬 咨询这套", "consult", target)))
     else:

@@ -114,9 +114,9 @@ def test_deeplink_photos_routes_to_thumbnail_overview_first(tmp_path):
     assert result.photos is not None
     assert result.photos.photo_total == 9
     assert len(_flatten(result.photos.media_groups)) == 1
-    assert "共 9 张实拍 · 当前预览 8 张" in result.photos.text
+    assert "共 9 张实拍 · 先看 8 张" in result.photos.text
     rows = [[a.label for a in row] for row in result.photos.action_rows]
-    assert rows[0] == ["📸 查看全部原图"]
+    assert rows[0] == ["🖼️ 查看全部原图"]
     assert rows[-1] == ["⬅️ 返回房源"]
     parsed = parse_callback(encode_semantic_action(result.photos.action_rows[0][0]))
     assert parsed is not None and parsed.page_index == 0
@@ -149,7 +149,7 @@ def test_deeplink_photos_overview_excludes_cover_named_asset(tmp_path):
     result = _service(_view(gallery=[str(cover), *framed], cover_path=str(cover))).resolve("property_QL-RF-A2B3_photos")
     assert result.ok and result.photos is not None
     assert result.photos.photo_total == 5
-    assert "共 5 张实拍 · 当前预览 5 张" in result.photos.text
+    assert "共 5 张实拍 · 先看 5 张" in result.photos.text
 
 
 def test_deeplink_photos_route_uses_overview_before_raw_pages():
@@ -277,9 +277,9 @@ async def test_entry_integration_nine_photos_opens_overview_via_start(tmp_path):
     assert [c[0] for c in bot.calls] == ["send_photo", "send_message"]
     assert message.calls == []
     card = bot.calls[1][2]
-    assert "共 9 张实拍 · 当前预览 8 张" in card["text"]
+    assert "共 9 张实拍 · 先看 8 张" in card["text"]
     labels = [[b.text for b in row] for row in card["reply_markup"].inline_keyboard]
-    assert labels[0] == ["📸 查看全部原图"]
+    assert labels[0] == ["🖼️ 查看全部原图"]
     assert labels[-1] == ["⬅️ 返回房源"]
 
 

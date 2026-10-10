@@ -21,6 +21,7 @@ from .transition_views import TransitionView, TransitionViewService
 
 SEARCH_SESSION_KEY = "v3_find_card_public_ids"
 SEARCH_ANCHOR_KEY = "v3_find_card_anchor"
+SEARCH_CONTEXT_KEY = "v3_find_card_context"
 LISTING_SOURCE_KEY = "v3_listing_source"
 LISTING_TOUCHPOINT_KEY = "v3_listing_touchpoint"
 PHOTOS_ALBUM_KEY = "v3_listing_photos_album"
@@ -273,6 +274,14 @@ def _error_alert(response: TelegramCallbackResponse) -> str:
     return "这个操作已失效，请重新进入。"
 
 
+def _search_context(context: Any) -> dict | None:
+    data = getattr(context, "user_data", None)
+    if not isinstance(data, dict):
+        return None
+    value = data.get(SEARCH_CONTEXT_KEY)
+    return dict(value) if isinstance(value, dict) else None
+
+
 def _dispatch(router: CallbackRouter, raw: str, context: Any):
     """Use the attributed contract while accepting older injected adapters."""
     kwargs = {
@@ -280,6 +289,13 @@ def _dispatch(router: CallbackRouter, raw: str, context: Any):
         "source": _listing_source(context),
         "touchpoint": _listing_touchpoint(context),
     }
+    search_context = _search_context(context)
+    if search_context is not None:
+        try:
+            return router.dispatch(raw, search_context=search_context, **kwargs)
+        except TypeError as exc:
+            if "unexpected keyword argument" not in str(exc):
+                raise
     try:
         return router.dispatch(raw, **kwargs)
     except TypeError as exc:
@@ -546,6 +562,7 @@ __all__ = [
     "LISTING_SOURCE_KEY",
     "LISTING_TOUCHPOINT_KEY",
     "SEARCH_ANCHOR_KEY",
+    "SEARCH_CONTEXT_KEY",
     "SEARCH_SESSION_KEY",
     "TelegramCallbackHandlerOutcome",
     "handle_v3_callback",

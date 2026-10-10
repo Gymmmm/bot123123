@@ -178,7 +178,7 @@ async def test_channel_deeplink_start_handler_keeps_listing_context(tmp_path, pa
         assert not bot.calls[0][2].get("caption")
         action_bar = bot.calls[1][2]["text"]
         assert "富力城" in action_bar
-        assert "共 1 张实拍 · 当前预览 1 张" in action_bar
+        assert "共 1 张实拍 · 先看 1 张" in action_bar
     else:
         # book deep link: sends text message with transition keyboard
         rendered = message.calls[-1][1]

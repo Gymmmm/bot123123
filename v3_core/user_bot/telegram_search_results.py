@@ -16,8 +16,10 @@ from typing import Any, Literal
 from v3_core.publishing.public_ids import normalize_public_id
 
 from .search_flow import SearchFlowResult
+from .search_session import search_context_payload
 from .telegram_callback_handler import (
     SEARCH_ANCHOR_KEY,
+    SEARCH_CONTEXT_KEY,
     SEARCH_SESSION_KEY,
     render_search_card_response,
 )
@@ -70,6 +72,7 @@ async def present_search_flow_result(
         if isinstance(user_data, dict):
             user_data.pop(SEARCH_SESSION_KEY, None)
             user_data.pop(SEARCH_ANCHOR_KEY, None)
+            user_data.pop(SEARCH_CONTEXT_KEY, None)
         return TelegramSearchPresentation(
             status="no_match",
             mode=result.mode,
@@ -91,6 +94,12 @@ async def present_search_flow_result(
         response,
         query=getattr(update, "callback_query", None),
     )
+    user_data = getattr(context, "user_data", None)
+    if isinstance(user_data, dict):
+        user_data[SEARCH_CONTEXT_KEY] = search_context_payload(
+            getattr(result, "criteria", None),
+            similar=bool(getattr(result, "similar", False)),
+        )
     return TelegramSearchPresentation(
         status="presented",
         mode=result.mode,

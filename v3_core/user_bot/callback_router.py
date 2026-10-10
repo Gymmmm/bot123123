@@ -56,6 +56,7 @@ class CallbackRouter:
         session_public_listing_ids: tuple[str, ...] | list[str] = (),
         source: str = "listing_callback",
         touchpoint: str = "",
+        search_context: object = None,
     ) -> CallbackDispatchResult:
         clean_source = str(source or "").strip() or "listing_callback"
         clean_touchpoint = str(touchpoint or "").strip()
@@ -67,7 +68,14 @@ class CallbackRouter:
             return CallbackDispatchResult(status="ok", callback=callback, action="change_search", change_search=True)
 
         if callback.kind == "card":
-            navigation = self.search_sessions.navigate(callback, session_public_listing_ids)
+            try:
+                navigation = self.search_sessions.navigate(
+                    callback, session_public_listing_ids, search_context=search_context
+                )
+            except TypeError as exc:
+                if "unexpected keyword argument" not in str(exc):
+                    raise
+                navigation = self.search_sessions.navigate(callback, session_public_listing_ids)
             if navigation.status == "invalid_callback":
                 return CallbackDispatchResult(status="invalid_callback", callback=callback, action="show_card", reason="stale_or_tampered_search_callback", navigation=navigation)
             if navigation.status == "expired":

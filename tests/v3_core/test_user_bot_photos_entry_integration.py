@@ -189,9 +189,9 @@ def test_start_property_photos_dl_opens_thumbnail_overview_first(tmp_path):
     assert result.photos is not None
     assert result.photos.photo_total == 9
     assert len(_flatten(result.photos.media_groups)) == 1
-    assert "共 9 张实拍 · 当前预览 8 张" in result.photos.text
+    assert "共 9 张实拍 · 先看 8 张" in result.photos.text
     rows = [[a.label for a in row] for row in result.photos.action_rows]
-    assert rows[0] == ["📸 查看全部原图"]
+    assert rows[0] == ["🖼️ 查看全部原图"]
     assert rows[-1] == ["⬅️ 返回房源"]
     raw_btn = result.photos.action_rows[0][0]
     parsed = parse_callback(encode_semantic_action(raw_btn))

@@ -51,7 +51,7 @@ from .transition_session import (
     SessionMutationPlan,
     apply_session_mutation,
 )
-from .transition_views import TransitionView, TransitionViewService
+from .transition_views import TransitionChoice, TransitionView, TransitionViewService, searching_view
 
 
 _GUIDED_SEARCH_CALLBACKS = frozenset(
@@ -122,6 +122,37 @@ def _view_for_result(views: TransitionViewService, result: TransitionActionResul
             rows=(),
         )
     return None
+
+
+def search_failed_view() -> TransitionView:
+    return TransitionView(
+        kind="search_failed",
+        text="🔍 刚刚没能完成搜索，请再试一次。",
+        rows=(
+            (TransitionChoice("🔄 再找一次", "change_search"),),
+            (TransitionChoice("💬 中文顾问", "home", "contact"),),
+        ),
+    )
+
+
+async def _drop_interim_panel(query: Any, presentation: TelegramSearchPresentation) -> None:
+    """A photo card is sent as a new message; remove the 「正在帮你找房…」 panel.
+
+    Text-only cards already edited the interim panel in place, so nothing to do.
+    """
+    response = getattr(presentation, "response", None)
+    if response is None or not str(getattr(response, "photo_path", "") or ""):
+        return
+    message = getattr(query, "message", None)
+    if getattr(message, "photo", None):
+        return  # the card replaced this photo message in place
+    delete = getattr(message, "delete", None)
+    if not callable(delete):
+        return
+    try:
+        await delete()
+    except Exception:
+        return
 
 
 def _navigation_view(
@@ -350,10 +381,18 @@ async def handle_v3_transition_action(
     if result.next_step == "search_submit" and search_executor is not None:
         if result.search is None:
             raise ValueError("search_submit_action_missing_intent")
-        execution = search_executor.execute(result.search)
+        # V4: show one interim panel, then turn that same panel into the result.
+        await _edit_view(query, searching_view())
+        try:
+            execution = search_executor.execute(result.search)
+        except Exception:
+            await _edit_view(query, search_failed_view())
+            raise
         presentation = await present_search_flow_result(update, context, execution.result)
         if not presentation.matched:
             await _edit_view(query, build_search_no_match_view(result.search))
+        else:
+            await _drop_interim_panel(query, presentation)
         lead_effect = None
         if lead_effects is not None:
             lead_effect = lead_effects.record_search(

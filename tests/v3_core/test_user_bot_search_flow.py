@@ -130,8 +130,8 @@ def test_flow_preserves_single_result_augmentation_marker_without_reclassifying_
     assert result.mode == "strict"
     assert result.has_similar
     assert result.public_listing_ids == ("QL-BK-A2B3", "QL-BK-C4D5")
-    assert result.cards[0].action_rows[0][0].action == "previous"
-    assert result.cards[0].action_rows[0][1].action == "next"
+    assert result.cards[0].action_rows[2][0].action == "previous"
+    assert result.cards[0].action_rows[2][1].action == "next"
 
 
 def test_normal_no_match_never_calls_explicit_similar_path():

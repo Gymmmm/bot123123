@@ -98,11 +98,11 @@ def test_photos_payload_returns_frozen_existing_gallery_response(tmp_path):
     assert len(result.photos.media_groups) == 1
     assert len(result.photos.media_groups[0]) == 1
     assert result.photos.photo_path.endswith("QL-RF-A2B3.jpg")
-    assert "共 1 张实拍 · 当前预览 1 张" in result.photos.text
+    assert "共 1 张实拍 · 先看 1 张" in result.photos.text
     assert "🟢 当前可预约" in result.photos.text
     assert "富力城" in result.photos.text
     assert "$800/月" in result.photos.text
-    assert result.photos.action_rows[0][0].label == "📸 查看全部原图"
+    assert result.photos.action_rows[0][0].label == "🖼️ 查看全部原图"
     assert result.details is None
     assert result.book is None
 

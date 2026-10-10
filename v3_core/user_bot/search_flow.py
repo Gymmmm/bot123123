@@ -18,6 +18,9 @@ from .search_cards import SearchCardResponse, build_search_cards
 from .search_query import SearchCriteria, parse_search_criteria
 
 
+SIMILAR_MODES = frozenset({"no_type", "no_area", "budget_only"})
+
+
 @dataclass(frozen=True)
 class SearchFlowResult:
     criteria: SearchCriteria
@@ -30,6 +33,10 @@ class SearchFlowResult:
     def matched(self) -> bool:
         return bool(self.cards)
 
+    @property
+    def similar(self) -> bool:
+        return self.mode in SIMILAR_MODES
+
 
 class SearchFlowService:
     """Compose already-locked search policy into Telegram-neutral responses."""
@@ -39,7 +46,11 @@ class SearchFlowService:
 
     @staticmethod
     def _result(criteria: SearchCriteria, execution: SearchExecution) -> SearchFlowResult:
-        cards = build_search_cards(execution.items)
+        cards = build_search_cards(
+            execution.items,
+            criteria=criteria,
+            similar=execution.mode in SIMILAR_MODES,
+        )
         return SearchFlowResult(
             criteria=criteria,
             mode=execution.mode,
@@ -74,4 +85,4 @@ class SearchFlowService:
         return self._result(criteria, execution)
 
 
-__all__ = ["SearchFlowResult", "SearchFlowService"]
+__all__ = ["SIMILAR_MODES", "SearchFlowResult", "SearchFlowService"]
