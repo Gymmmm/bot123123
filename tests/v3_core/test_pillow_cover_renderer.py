@@ -20,8 +20,9 @@ def test_pillow_cover_counts_and_exact_size(tmp_path, count):
     with Image.open(out) as im:
         assert im.size == (1080,1350)
         assert im.format == "PNG"
-        # Footer is always a clean light brand strip, independent of photo colors.
-        assert all(channel >= 230 for channel in im.convert("RGB").getpixel((540, 1300)))
+        # The final row remains real imagery; branding is overlaid on the hero.
+        if count > 1:
+            assert im.convert("RGB").getpixel((540, 1300)) != (238, 240, 243)
 
 def test_price_chinese_and_bad_image_are_tolerated(tmp_path):
     good=make(tmp_path/"good.png", size=(900,1600))
@@ -80,18 +81,18 @@ def test_all_bad_images_follow_business_failure_not_worker_crash(tmp_path):
 @pytest.mark.parametrize(
     "property_type,expected_size,hero_height",
     [
-        ("独栋别墅", (1080, 1350), 908),
-        ("双拼别墅", (1080, 1350), 908),
-        ("联排别墅", (1080, 1350), 908),
-        ("villa", (1080, 1350), 908),
-        ("", (1080, 1350), 908),
-        ("商铺", (1080, 1350), 908),
-        ("公寓", (1080, 810), 470),
-        ("服务式公寓", (1080, 810), 470),
-        ("服务式", (1080, 810), 470),
-        ("Condo", (1080, 810), 470),
-        ("studio", (1080, 810), 470),
-        ("apartment", (1080, 810), 470),
+        ("独栋别墅", (1080, 1350), 930),
+        ("双拼别墅", (1080, 1350), 930),
+        ("联排别墅", (1080, 1350), 930),
+        ("villa", (1080, 1350), 930),
+        ("", (1080, 1350), 930),
+        ("商铺", (1080, 1350), 930),
+        ("公寓", (1080, 810), 500),
+        ("服务式公寓", (1080, 810), 500),
+        ("服务式", (1080, 810), 500),
+        ("Condo", (1080, 810), 500),
+        ("studio", (1080, 810), 500),
+        ("apartment", (1080, 810), 500),
     ],
 )
 def test_cover_size_per_property_type(tmp_path, property_type, expected_size, hero_height):
@@ -100,16 +101,15 @@ def test_cover_size_per_property_type(tmp_path, property_type, expected_size, he
     canvas, hero, gallery_top, gallery_h, footer_top = _layout_geometry(data)
     assert canvas == expected_size
     assert hero == hero_height
-    assert hero < gallery_top < gallery_top + gallery_h < footer_top < canvas[1]
+    assert hero < gallery_top < gallery_top + gallery_h == footer_top == canvas[1]
     paths = [make(tmp_path / f"{i}.jpg", value=60 + i * 30) for i in range(4)]
     out = tmp_path / "cover.jpg"
     render_cover(style="premium_photo", source_image=paths[0], source_images=paths[1:],
                  source_labels=("客厅", "卧室", "厨房"), output_path=str(out), data=data)
     with Image.open(out) as im:
         assert im.size == expected_size
-        rgb = im.convert("RGB")
-        # Light grey page between hero and thumbnails and left of the first thumbnail.
-        assert min(rgb.getpixel((10, gallery_top + gallery_h // 2))) >= 225
+        # The gallery reaches both edges and is filled with real photo pixels.
+        assert im.convert("RGB").getpixel((10, gallery_top + gallery_h // 2)) != (238, 240, 243)
 
 
 def test_canvas_ratios_villa_4_5_and_apartment_4_3():
@@ -158,21 +158,19 @@ def test_subtitle_joins_type_and_layout():
     assert _cover_subtitle(CoverRenderData(public_listing_id="QL", property_type="独栋别墅", layout="5房")) == "独栋别墅 | 5房"
 
 
-def test_villa_thumbnails_are_near_square_and_footer_kept():
+def test_villa_photo_strip_is_edge_to_edge_with_no_footer():
     from v3_core.media.cover_renderer import TALL_LAYOUT as geo
     inner = geo.canvas[0] - 2 * geo.margin - 2 * geo.gallery_gap
     thumb_w = inner // 3
-    assert abs(thumb_w / geo.gallery_height - 1) < 0.01
+    assert 0.84 <= thumb_w / geo.gallery_height <= 0.87
     assert geo.gallery_top == geo.hero_height + geo.gallery_gap
-    # 16px gap, then the 1px divider drawn at footer_top - 1.
-    assert geo.footer_top - (geo.gallery_top + geo.gallery_height) == geo.gallery_gap + 1
-    assert geo.canvas[1] - geo.footer_top == 86
+    assert geo.gallery_top + geo.gallery_height == geo.canvas[1]
+    assert geo.footer_top == geo.canvas[1]
 
 
-def test_apartment_detail_photos_have_room_and_footer_content_fits():
+def test_apartment_detail_photo_strip_fills_the_canvas():
     from v3_core.media.cover_renderer import APARTMENT_LAYOUT as geo
     widths = (geo.canvas[0] - 2 * geo.margin - 2 * geo.gallery_gap) / 3
-    assert abs(widths / geo.gallery_height - 4 / 3) < 0.01
-    assert geo.gallery_top + geo.gallery_height < geo.footer_top
-    # The 40px logo and pill need at least 10px breathing room on each side.
-    assert 60 <= geo.canvas[1] - geo.footer_top <= 86
+    assert 1.16 <= widths / geo.gallery_height <= 1.18
+    assert geo.gallery_top + geo.gallery_height == geo.canvas[1]
+    assert geo.footer_top == geo.canvas[1]

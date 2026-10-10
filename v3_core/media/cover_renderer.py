@@ -30,17 +30,17 @@ class CoverLayout:
     footer_top: int
 
 
-# Keep the approved outer ratios. Give villa details square cells and
-# apartment details 4:3 cells; reserve only a compact strip for branding.
+# Use the entire canvas for photography. The brand, title and price sit on the
+# hero so the final row can remain a compact, edge-to-edge photo strip.
 TALL_LAYOUT = CoverLayout(
-    canvas=(1080, 1350), hero_height=908, margin=40,
-    gallery_top=924, gallery_height=323, gallery_gap=16, gallery_radius=14,
-    footer_top=1264,
+    canvas=(1080, 1350), hero_height=930, margin=0,
+    gallery_top=938, gallery_height=412, gallery_gap=8, gallery_radius=0,
+    footer_top=1350,
 )
 APARTMENT_LAYOUT = CoverLayout(
-    canvas=(1080, 810), hero_height=470, margin=32,
-    gallery_top=484, gallery_height=247, gallery_gap=14, gallery_radius=14,
-    footer_top=746,
+    canvas=(1080, 810), hero_height=500, margin=0,
+    gallery_top=508, gallery_height=302, gallery_gap=8, gallery_radius=0,
+    footer_top=810,
 )
 TALL_CANVAS = TALL_LAYOUT.canvas
 APARTMENT_CANVAS = APARTMENT_LAYOUT.canvas
@@ -414,6 +414,8 @@ def _draw_footer(layer: Image.Image, data: CoverRenderData, geo: CoverLayout, lo
     draw = ImageDraw.Draw(layer)
     W, H = layer.size
     top = geo.footer_top
+    if top >= H:
+        return
     draw.rectangle((0, top, W, H), fill=(*PAGE_BG, 255))
     draw.line((0, top - 1, W, top - 1), fill=(*DIVIDER, 255))
     mid = top + (H - top) // 2
