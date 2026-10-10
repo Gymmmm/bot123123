@@ -97,7 +97,7 @@ async def present_search_flow_result(
     user_data = getattr(context, "user_data", None)
     if isinstance(user_data, dict):
         user_data[SEARCH_CONTEXT_KEY] = search_context_payload(
-            getattr(result, "criteria", None),
+            getattr(result, "label_criteria", getattr(result, "criteria", None)),
             similar=bool(getattr(result, "similar", False)),
         )
     return TelegramSearchPresentation(

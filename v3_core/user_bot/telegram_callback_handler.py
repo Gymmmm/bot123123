@@ -553,7 +553,7 @@ async def handle_v3_callback(
                     raw_text="",
                 )
                 flow = SearchFlowService(search_executor.flow)
-                similar_result = flow.similar(criteria, limit=5)
+                similar_result = flow.similar(criteria, limit=5, from_listing=True)
                 await _render_transition_view(query, view)
                 similar_presentation = await present_search_flow_result(update, context, similar_result)
                 if not similar_presentation.matched:

@@ -72,7 +72,7 @@ def test_single_result_has_no_counter_and_no_photo_button_without_gallery():
 def test_strict_match_has_no_difference_labels():
     criteria = SearchCriteria(location_keys=("BKK1",), budget_max=900, room_type="2房")
     card = build_search_cards((_view(),), criteria=criteria)[0]
-    assert "比预算高" not in card.text and "不在你选的区域" not in card.text and "户型不同" not in card.text
+    assert "超预算" not in card.text and "区域不同" not in card.text and "户型不同" not in card.text
 
 
 def test_similar_cards_label_only_verified_differences():
@@ -81,9 +81,10 @@ def test_similar_cards_label_only_verified_differences():
     cards = build_search_cards((view, _view("QL-BK-C4D5")), criteria=criteria, similar=True)
     text = cards[0].text
     assert text.startswith("🏘️ <b>这几套也值得看看</b> · 1/2")
-    assert "💰 比预算高 $100" in text
-    assert "📍 不在你选的区域（在 堆谷）" in text
-    assert "🛏️ 户型不同：" in text
+    assert "💰 超预算 $100" in text
+    assert "📍 区域不同：堆谷" in text
+    # V4.1: at most two key differences (budget, then area).
+    assert "🛏️ 户型不同" not in text
     assert "相邻" not in text
 
 

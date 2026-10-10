@@ -27,6 +27,7 @@ _LAYOUT_PATTERNS = {
     "4房": ("4房", "四房", "4br", "4 bed", "5房", "五房"),
 }
 _BEDROOMS = {"1房": 1, "2房": 2, "3房": 3}
+MAX_DIFFERENCES = 2
 
 
 def _int(value: object) -> int | None:
@@ -89,14 +90,18 @@ def listing_differences(
     if not isinstance(listing, Mapping):
         return ()
     labels: list[str] = []
+    # Only criteria the user actually chose are compared: an unset budget,
+    # area or room count never produces a label.
     if rent is not None and rent > 0 and criteria.budget_max is not None and rent > int(criteria.budget_max):
-        labels.append(f"💰 比预算高 ${rent - int(criteria.budget_max):,}")
-    if area_matches(listing, tuple(criteria.location_keys or ())) is False:
+        labels.append(f"💰 超预算 ${rent - int(criteria.budget_max):,}")
+    if tuple(criteria.location_keys or ()) and area_matches(listing, tuple(criteria.location_keys)) is False:
         where = re.sub(r"\s+", " ", str(location or "")).strip()
-        labels.append(f"📍 不在你选的区域（在 {where}）" if where else "📍 不在你选的区域")
-    if room_matches(listing, criteria.room_type) is False:
-        labels.append(f"🛏️ 户型不同：{layout}" if layout else "🛏️ 户型不同")
-    return tuple(labels)
+        labels.append(f"📍 区域不同：{where}" if where else "📍 区域不同")
+    if _room_token(criteria.room_type) and room_matches(listing, criteria.room_type) is False:
+        bedrooms = _int(listing.get("bedrooms")) or 0
+        actual = f"{bedrooms}房" if bedrooms > 0 else str(layout or "").strip()
+        labels.append(f"🛏️ 户型不同：{actual}" if actual else "🛏️ 户型不同")
+    return tuple(labels[:MAX_DIFFERENCES])
 
 
 __all__ = ["area_matches", "listing_differences", "room_matches"]
