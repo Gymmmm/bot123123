@@ -90,8 +90,12 @@ def encode_semantic_action(action: SemanticAction) -> str:
         photo_page = None
         if clean == "photos" and action.target_index is not None:
             # Paging actions target the photo page; offset stays reserved for
-            # the legacy "查看全部实拍" expand deep link.
-            photo_page = int(action.target_index)
+            # the legacy "查看全部实拍" expand deep link and for 「下一组实拍」
+            # (detail continuation, offsets >= 1000; see listing_responses).
+            if int(action.target_index) >= 1000:
+                photo_offset = int(action.target_index)
+            else:
+                photo_page = int(action.target_index)
         return encode_listing_callback(
             clean,
             action.target_public_listing_id,

@@ -123,25 +123,28 @@ def _details_actions(
     public_listing_id: str,
     photo_total: int = 0,
 ) -> tuple[tuple[SemanticAction, ...], ...]:
-    """Details page actions (V4.1).
+    """Details page actions (Gym spec 2026-10-11 §八).
 
-    「📸 查看全部 N 张实拍」carries the real photo count and is hidden when the
-    listing has no photos; 「📅 预约看房」only when bookable; similar is only
-    offered when the listing is not bookable.
+    The detail opens with the same 4 photos as the channel cover (hero, thumb
+    1–3) followed by the full listing text. Below: 「📸 下一组实拍」(only when
+    more than the first 4 exist; continues from photo 5), 「📅 预约看房」 when
+    bookable, and 「💬 中文顾问」. Not bookable → 中文顾问 + 找相似.
     """
     target = str(public_listing_id or "").strip()
     rows: list[tuple[SemanticAction, ...]] = []
     total = max(0, int(photo_total or 0))
-    if total > 0:
-        rows.append((SemanticAction(f"📸 查看全部 {total} 张实拍", "photos", target, target_index=0),))
+    if total > DETAIL_PHOTO_COUNT:
+        rows.append((SemanticAction(
+            "📸 下一组实拍", "photos", target, target_index=DETAIL_CONTINUE_OFFSET_BASE + DETAIL_PHOTO_COUNT,
+        ),))
     if bookable:
         rows.append((
             SemanticAction("📅 预约看房", "book", target),
-            SemanticAction("💬 咨询这套", "consult", target),
+            SemanticAction("💬 中文顾问", "consult", target),
         ))
     else:
         rows.append((
-            SemanticAction("💬 咨询这套", "consult", target),
+            SemanticAction("💬 中文顾问", "consult", target),
             SemanticAction("🔍 找相似", "similar", target),
         ))
     return tuple(rows)
@@ -321,6 +324,8 @@ def _detail_fact_lines(details) -> list[str]:
 
 
 DETAIL_PHOTO_COUNT = 4
+# photos offsets >= this base continue the detail album (not the cover-first album).
+DETAIL_CONTINUE_OFFSET_BASE = 1000
 
 
 def _detail_photo_paths(view: PublishedListingView) -> tuple[tuple[str, ...], int]:
@@ -778,8 +783,15 @@ def build_photos_response(
     start = max(0, int(offset or 0))
     if start > 0:
         # The first batch is already visible; only append unseen original frames.
+        if start >= DETAIL_CONTINUE_OFFSET_BASE:
+            # 「下一组实拍」from the detail page: continue the SAME list the
+            # detail showed (hero, thumbs 1–3, …) so it starts at photo 5.
+            start -= DETAIL_CONTINUE_OFFSET_BASE
+            album = _album_photo_paths(view)
+            if album:
+                all_photos, total = album, len(album)
         originals = (
-            all_photos[start:PHOTOS_MAX_TOTAL]
+            all_photos[start:start + PHOTOS_MAX_TOTAL]
             if start < total
             else all_photos[:PHOTOS_MAX_TOTAL]
         )

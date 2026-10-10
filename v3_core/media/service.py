@@ -9,14 +9,17 @@ enhance + cover-style corner mark. Cover rendering remains owned by
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import hashlib
 from pathlib import Path
 import shutil
 from typing import Any, Iterable
 
 from v3_core.ingest.source_reader import SourceReader
+from .cover_plan import plan_cover
 from .media_selection import select_publication_media
+from .straighten import correct_file
+from .vision import VisionClient, analyze_photos, vision_client_from_env
 from .photo_formatter import format_gallery_photo, gallery_canvas_key, resolve_gallery_logo_path
 from .source_scrub import scrub_file
 
@@ -39,11 +42,23 @@ class PreparedSourceMedia:
     # files are separately branded and must never be fed back into the cover.
     cover_gallery_paths: tuple[str, ...] = ()
     cover_gallery_labels: tuple[str, ...] = ()
+    # Cover plan (template / hero / thumbs / labels / per-photo assessment).
+    cover_template: str = ""
+    cover_render_source: str = ""
+    cover_plan: dict[str, Any] = field(default_factory=dict)
 
 
 class MediaPreparationService:
-    def __init__(self, reader: SourceReader, *, prepared_dir: str | Path | None = None):
+    def __init__(
+        self,
+        reader: SourceReader,
+        *,
+        prepared_dir: str | Path | None = None,
+        vision_client: VisionClient | None = None,
+    ):
         self.reader = reader
+        # Provider comes from V3_VISION_* env vars; default is the offline heuristic.
+        self.vision_client = vision_client
         db_path = Path(reader.db_path).expanduser().resolve()
         self.prepared_dir = (
             Path(prepared_dir).expanduser().resolve()
@@ -257,41 +272,51 @@ class MediaPreparationService:
             manual_cover_path=manual_clean or None,
             cover_preference=preference,
         )
-        cover_resolved = str(Path(str(selected["cover_path"])).resolve())
-        # Public flipper is: 1) rendered cover, 2+) other real shots.
-        # Never brand the cover-source again — that duplicates the same room as #2.
-        gallery_sources = [
-            str(path)
-            for path in selected["gallery_paths"]
-            if str(Path(str(path)).resolve()) != cover_resolved
-        ]
-        room_names = {
-            "living": "客厅",
-            "bedroom": "卧室",
-            "kitchen": "厨房",
-            "exterior": "外观",
-            "toilet": "卫浴",
-        }
-        ranked_labels = {
-            str(Path(str(item.get("file") or "")).resolve()): room_names.get(
-                str(item.get("room_label") or "").strip().lower(), "实拍"
-            )
-            for item in selected["ranking"]
-            if item.get("file")
-        }
-        gallery_labels = [ranked_labels.get(str(Path(path).resolve()), "实拍") for path in gallery_sources]
+        client = self.vision_client or vision_client_from_env()
+        vision = analyze_photos(selected["gallery_paths"], client, ranking=selected["ranking"])
+        hero_dir = self.prepared_dir / str(int(source_post_id)) / "hero"
+
+        def _probe(path: str, mode: str) -> dict[str, Any]:
+            target = hero_dir / f"{Path(path).stem}_{mode}_corrected.jpg"
+            return correct_file(path, target, mode=mode)
+
+        plan = plan_cover(
+            gallery=selected["gallery_paths"],
+            ranking=selected["ranking"],
+            vision=vision,
+            property_type="别墅" if preference == "exterior" else "公寓",
+            manual_cover=manual_clean or None,
+            correction_probe=_probe,
+        )
+        correction = dict(plan.hero_correction)
+        if not correction:
+            mode = "exterior" if plan.template == "villa_4x5" else "interior"
+            correction = _probe(plan.hero, mode)
+            plan.hero_correction = correction
+        render_source = str(correction.get("path") or "")
+        if not render_source or not Path(render_source).is_file():
+            render_source = plan.hero
+        cover_resolved = plan.hero
+        # One ordered list for both surfaces: channel cover = hero + thumbs 1–3;
+        # bot detail first 4 standalone photos = the same 4, same order.
+        gallery_sources = list(plan.gallery_order)
+        bot_sources = [render_source if path == cover_resolved else path for path in gallery_sources]
+        cover_thumbs = list(plan.thumbs) + [p for p in gallery_sources if p != cover_resolved and p not in plan.thumbs]
+        thumb_labels = list(plan.labels) + [""] * (len(cover_thumbs) - len(plan.labels))
         branded_gallery = self._branded_gallery(
             source_post_id=source_post_id,
-            paths=gallery_sources,
+            paths=bot_sources,
             cover_style=cover_style,
-            cover_source_path=selected["cover_path"],
+            cover_source_path=cover_resolved,
         )
         rejected = [str(path) for path in scrub_rejected]
         rejected.extend(str(path) for path in selected["rejected_paths"])
-        gallery_orientation = self._gallery_orientation_for_cover(selected["cover_path"])
+        gallery_orientation = self._gallery_orientation_for_cover(cover_resolved)
+        plan_summary = plan.summary()
+        plan_summary["bot_first_batch"] = list(branded_gallery[:4])
         return PreparedSourceMedia(
             source_post_id=int(source_post_id),
-            cover_source_path=str(selected["cover_path"]),
+            cover_source_path=cover_resolved,
             gallery_paths=tuple(branded_gallery),
             source_identity={
                 **self.reader.source_identity(source_post_id),
@@ -299,12 +324,16 @@ class MediaPreparationService:
                 "gallery_cover_style": self._gallery_style_key(cover_style),
                 "gallery_orientation": gallery_orientation,
                 "cover_room_preference": preference,
+                "cover_plan": plan_summary,
             },
             duplicates=tuple(dict(item) for item in selected["duplicates"]),
             rejected_paths=tuple(rejected),
             ranking=tuple(dict(item) for item in selected["ranking"]),
-            cover_gallery_paths=tuple(gallery_sources),
-            cover_gallery_labels=tuple(gallery_labels),
+            cover_gallery_paths=tuple(cover_thumbs),
+            cover_gallery_labels=tuple(thumb_labels),
+            cover_template=plan.template,
+            cover_render_source=render_source,
+            cover_plan={**plan_summary, "photos": [item.as_dict() for item in plan.photos]},
         )
 
 

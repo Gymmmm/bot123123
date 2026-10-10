@@ -142,6 +142,7 @@ async def test_pending_manual_preview_restores_pending_and_only_send_activates(t
     assert callbacks == [
         "v3smp|manual_send",
         "v3smp|manual_cover_next",
+        "v3smp|manual_preview",  # 🔄 重新生成 (optional fix-up, Gym spec §七)
         "v3smp|manual_adviser",
         "v3smp|manual_back_confirm",
     ]

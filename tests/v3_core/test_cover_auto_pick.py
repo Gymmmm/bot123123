@@ -174,12 +174,11 @@ def test_apartment_cover_requires_clean_landscape_living_panorama(tmp_path, monk
     )
     result = media_selection.select_publication_media([detail, panorama])
     assert result["cover_path"] == str(panorama.resolve())
-    assert result["policy"] == "apartment_panorama_hard_gate_manual_review_fallback"
+    assert result["cover_reason"] == "apartment_living"
+    assert result["policy"] == "apartment_living_then_bright_spacious_fallback"
 
 
-def test_apartment_auto_publish_stops_when_no_panorama_exists(tmp_path, monkeypatch):
-    import pytest
-
+def test_apartment_without_living_falls_back_to_brightest_most_spacious(tmp_path, monkeypatch):
     bedroom = tmp_path / "bedroom.jpg"
     bedroom.write_bytes(b"B")
     monkeypatch.setattr(media_selection, "_dhash", lambda path: None)
@@ -193,8 +192,9 @@ def test_apartment_auto_publish_stops_when_no_panorama_exists(tmp_path, monkeypa
             "text": {"text_heavy": 0.0},
         }],
     )
-    with pytest.raises(ValueError, match="apartment_cover_requires_panorama_review"):
-        media_selection.select_publication_media([bedroom])
+    result = media_selection.select_publication_media([bedroom])
+    assert result["cover_path"] == str(bedroom.resolve())
+    assert result["cover_reason"] == "apartment_fallback_bright_spacious"
 
 
 def test_auto_cover_villa_prefers_exterior(tmp_path, monkeypatch):
@@ -240,9 +240,7 @@ def test_auto_cover_villa_prefers_exterior(tmp_path, monkeypatch):
     assert result["cover_preference"] == "exterior"
 
 
-def test_auto_cover_villa_rejects_soft_exterior_instead_of_falling_back(tmp_path, monkeypatch):
-    import pytest
-
+def test_auto_cover_villa_keeps_soft_exterior_before_interior(tmp_path, monkeypatch):
     living = tmp_path / "living.jpg"
     exterior = tmp_path / "exterior.jpg"
     for path, payload in ((living, b"L"), (exterior, b"E")):
@@ -269,16 +267,12 @@ def test_auto_cover_villa_rejects_soft_exterior_instead_of_falling_back(tmp_path
             },
         ],
     )
-    with pytest.raises(ValueError, match="villa_cover_requires_exterior_review"):
-        media_selection.select_publication_media(
-            [living, exterior],
-            cover_preference="exterior",
-        )
+    result = media_selection.select_publication_media([living, exterior], cover_preference="exterior")
+    assert result["cover_path"] == str(exterior.resolve())
+    assert result["cover_reason"] == "villa_exterior_relaxed"
 
 
-def test_villa_auto_publish_stops_when_no_clean_exterior_exists(tmp_path, monkeypatch):
-    import pytest
-
+def test_villa_without_exterior_falls_back_to_best_living_room(tmp_path, monkeypatch):
     living = tmp_path / "living.jpg"
     kitchen = tmp_path / "kitchen.jpg"
     for path, payload in ((living, b"L"), (kitchen, b"K")):
@@ -298,8 +292,57 @@ def test_villa_auto_publish_stops_when_no_clean_exterior_exists(tmp_path, monkey
             },
         ],
     )
-    with pytest.raises(ValueError, match="villa_cover_requires_exterior_review"):
-        media_selection.select_publication_media(
-            [living, kitchen],
-            cover_preference="exterior",
-        )
+    result = media_selection.select_publication_media([living, kitchen], cover_preference="exterior")
+    assert result["cover_path"] == str(living.resolve())
+    assert result["cover_reason"] == "villa_fallback_interior"
+
+
+def _rows(*items):
+    return [
+        {"file": str(path.resolve()), "reject": False, "soft_reject": False, "room_label": label, "score": score}
+        for path, label, score in items
+    ]
+
+
+def test_cover_thumbnails_follow_room_order_and_skip_hero_room(tmp_path):
+    names = ["ext", "living_a", "living_b", "bed_a", "bed_b", "kitchen", "toilet", "pool"]
+    paths = {name: tmp_path / f"{name}.jpg" for name in names}
+    for path in paths.values():
+        path.write_bytes(b"x")
+    ranking = _rows(
+        (paths["pool"], "pool", 90), (paths["toilet"], "toilet", 20), (paths["kitchen"], "kitchen", 70),
+        (paths["bed_b"], "bedroom", 80), (paths["bed_a"], "bedroom", 60), (paths["living_b"], "living", 50),
+        (paths["living_a"], "living", 85), (paths["ext"], "exterior", 99),
+    )
+    gallery = [str(p.resolve()) for p in paths.values()]
+    villa = media_selection.order_cover_thumbnails(ranking, gallery, str(paths["ext"]))
+    assert villa[:3] == [str(paths[n].resolve()) for n in ("living_a", "bed_b", "kitchen")]
+    apartment = media_selection.order_cover_thumbnails(ranking, gallery, str(paths["living_a"]))
+    assert apartment[:3] == [str(paths[n].resolve()) for n in ("bed_b", "kitchen", "toilet")]
+    assert str(paths["living_a"].resolve()) not in apartment
+
+
+def test_cover_thumbnails_fill_without_hero_room_when_rooms_missing(tmp_path):
+    paths = [tmp_path / f"{i}.jpg" for i in range(5)]
+    for path in paths:
+        path.write_bytes(b"x")
+    ranking = _rows((paths[0], "living", 90), (paths[1], "living", 80), (paths[2], "bedroom", 70),
+                    (paths[3], "bedroom", 60), (paths[4], "kitchen", 10))
+    thumbs = media_selection.order_cover_thumbnails(ranking, [str(p) for p in paths], str(paths[0]))[:3]
+    assert thumbs == [str(paths[2].resolve()), str(paths[4].resolve()), str(paths[3].resolve())]
+
+
+def test_villa_prefers_most_level_exterior(tmp_path, monkeypatch):
+    tilted = tmp_path / "tilted.jpg"
+    level = tmp_path / "level.jpg"
+    for path in (tilted, level):
+        path.write_bytes(path.name.encode())
+    monkeypatch.setattr(media_selection, "_dhash", lambda path: None)
+    monkeypatch.setattr(media_selection, "_vertical_lean_deg", lambda path: 9.0 if "tilted" in path else 1.0)
+    monkeypatch.setattr(
+        media_selection, "rank_photo_paths",
+        lambda paths, cover_preference="living": _rows((tilted, "exterior", 95), (level, "exterior", 80)),
+    )
+    result = media_selection.select_publication_media([tilted, level], cover_preference="exterior")
+    assert result["cover_path"] == str(level.resolve())
+    assert result["cover_reason"] == "villa_exterior"

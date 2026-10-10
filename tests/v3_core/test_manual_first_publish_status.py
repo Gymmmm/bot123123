@@ -52,7 +52,7 @@ class FakeAdapter:
     async def send(self, command):
         self.command = command
         labels = _labels(build_channel_keyboard(command.actions, inventory_status=command.inventory_status))
-        assert labels == ["📷 房源详情", "📅 预约看房", "💬 中文顾问"]
+        assert labels == ["🏠 房源详情", "📅 预约看房", "💬 中文顾问"]
         return {"caption_message_id": "99"}
 
 
