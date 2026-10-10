@@ -338,8 +338,8 @@ def _detail_media_caption(details, *, shown: int, total: int) -> str:
     title = _album_title(details)
     head = f"📷 {he(title)}" if title else "📷 实拍"
     if total > shown:
-        return f"{head}\n实拍 {shown}/{total} 张"
-    return f"{head}\n实拍 {total} 张"
+        return f"{head}\n共 {total} 张实拍 · 先看 {shown} 张"
+    return f"{head}\n共 {total} 张实拍"
 
 
 def build_detail_text(view: PublishedListingView) -> str:
