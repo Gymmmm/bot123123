@@ -50,6 +50,15 @@ class PublicDetailsResponse:
     text: str
     action_rows: tuple[tuple[SemanticAction, ...], ...]
     listing_summary: str = ""
+    # V4.1: 3–4 curated real photos sent as a native album right above the
+    # detail text. Empty when the listing has no real photo files.
+    media_groups: tuple[tuple[str, ...], ...] = ()
+    media_caption: str = ""
+    photo_total: int = 0
+
+    @property
+    def has_media(self) -> bool:
+        return bool(self.media_groups)
 
 
 @dataclass(frozen=True)
@@ -112,24 +121,30 @@ def _details_actions(
     *,
     bookable: bool,
     public_listing_id: str,
+    photo_total: int = 0,
 ) -> tuple[tuple[SemanticAction, ...], ...]:
-    """Details page actions: keep the current listing primary; similar is only offered when it is not bookable."""
+    """Details page actions (V4.1).
+
+    「📸 查看全部 N 张实拍」carries the real photo count and is hidden when the
+    listing has no photos; 「📅 预约看房」only when bookable; similar is only
+    offered when the listing is not bookable.
+    """
     target = str(public_listing_id or "").strip()
+    rows: list[tuple[SemanticAction, ...]] = []
+    total = max(0, int(photo_total or 0))
+    if total > 0:
+        rows.append((SemanticAction(f"📸 查看全部 {total} 张实拍", "photos", target, target_index=0),))
     if bookable:
-        return (
-            (SemanticAction("📸 看全部实拍", "photos", target),),
-            (
-                SemanticAction("📅 预约看房", "book", target),
-                SemanticAction("💬 咨询这套", "consult", target),
-            ),
-        )
-    return (
-        (SemanticAction("📸 看全部实拍", "photos", target),),
-        (
+        rows.append((
+            SemanticAction("📅 预约看房", "book", target),
+            SemanticAction("💬 咨询这套", "consult", target),
+        ))
+    else:
+        rows.append((
             SemanticAction("💬 咨询这套", "consult", target),
             SemanticAction("🔍 找相似", "similar", target),
-        ),
-    )
+        ))
+    return tuple(rows)
 
 
 def _photo_actions(
@@ -264,6 +279,69 @@ def _adviser_lines(view: PublishedListingView, *, caption: bool) -> list[str]:
     return ["", "💬 <b>侨联说</b>", *(he(line) for line in notes.splitlines())]
 
 
+def _detail_fact_lines(details) -> list[str]:
+    """V4.1 detail header: title, price, one 📍 line, terms, live status.
+
+    Every line comes from real listing fields; empty fields are hidden.
+    """
+    project = str(details.project_name or "").strip()
+    location = str(details.location or "").strip()
+    layout = str(details.layout or "").strip()
+    property_type = str(details.property_type or "").strip()
+    identity = project or location or property_type
+    title = "｜".join(part for part in (identity, layout) if part) or "房源"
+
+    lines: list[str] = [f"🏠 <b>{he(title)}</b>"]
+    price = _format_price(details.monthly_rent_usd)
+    if price:
+        lines.append(f"<b>{he(price.replace('/月', ''))}</b> /月")
+
+    show_location = bool(location) and not (
+        project and location_display_overlaps_project(project, location)
+    ) and location != identity
+    place = [
+        part
+        for part in (
+            location if show_location else "",
+            property_type if property_type != identity else "",
+            _format_size(details.size_sqm),
+            display_floor(details.floor),
+        )
+        if part
+    ]
+    if place:
+        lines.append("📍 " + " · ".join(he(part) for part in place))
+
+    terms = [he(part) for part in (details.deposit_terms, details.contract_term) if part]
+    if terms:
+        lines.append("🔑 " + "｜".join(terms))
+    lines.append(_detail_status_line(details))
+    # NOTE: public_id is NOT exposed in user-visible details text (privacy)
+    return lines
+
+
+DETAIL_PHOTO_COUNT = 4
+
+
+def _detail_photo_paths(view: PublishedListingView) -> tuple[tuple[str, ...], int]:
+    """Curated real photos for the detail page and the real album total.
+
+    Uses the album ordering (cover-source hero first, then de-duplicated raw
+    originals; cover renders / collages are excluded), keeps only files that
+    really exist, and never pads with placeholders.
+    """
+    real = tuple(path for path in _album_photo_paths(view) if _existing_file(path))
+    return real[:DETAIL_PHOTO_COUNT], len(real)
+
+
+def _detail_media_caption(details, *, shown: int, total: int) -> str:
+    title = _album_title(details)
+    head = f"📷 {he(title)}" if title else "📷 实拍"
+    if total > shown:
+        return f"{head}\n实拍 {shown}/{total} 张"
+    return f"{head}\n实拍 {total} 张"
+
+
 def build_detail_text(view: PublishedListingView) -> str:
     """Text fallback / details surface for listings."""
     details = build_public_listing_details(view)
@@ -271,7 +349,7 @@ def build_detail_text(view: PublishedListingView) -> str:
         water=str(details.water_rate or "").strip(),
         electric=str(details.electric_rate or "").strip(),
     )
-    lines = _listing_fact_lines(details)
+    lines = _detail_fact_lines(details)
     for label, value in (
         ("物业费", details.management_fee),
         ("水电", utilities),
@@ -303,8 +381,12 @@ def build_photo_caption(
 
 def build_details_response(view: PublishedListingView) -> PublicDetailsResponse:
     details = build_public_listing_details(view)
+    photos, photo_total = _detail_photo_paths(view)
     return PublicDetailsResponse(
         text=build_detail_text(view),
+        media_groups=(tuple(photos),) if photos else (),
+        media_caption=_detail_media_caption(details, shown=len(photos), total=photo_total) if photos else "",
+        photo_total=photo_total,
         listing_summary=listing_summary_bits(
             project_name=details.project_name,
             layout=details.layout,
@@ -314,6 +396,7 @@ def build_details_response(view: PublishedListingView) -> PublicDetailsResponse:
         action_rows=_details_actions(
             bookable=details.bookable,
             public_listing_id=details.public_listing_id,
+            photo_total=photo_total,
         ),
     )
 
@@ -535,16 +618,16 @@ def _as_media_groups(paths: tuple[str, ...]) -> tuple[tuple[str, ...], ...]:
 
 def _album_media_caption(
     *,
-    public_listing_id: str,
+    public_listing_id: str = "",  # kept for call-site compatibility; never rendered
     shown: int,
     total: int,
     expand: bool,
 ) -> str:
     if expand:
-        return f"📷 继续看实拍{chr(10)}剩余 {shown} 张{chr(10)}{public_listing_id}"
+        return f"📷 继续看实拍{chr(10)}剩余 {shown} 张"
     if total > shown:
-        return f"📷 实拍精选{chr(10)}共 {total} 张 · 先看 {shown} 张{chr(10)}{public_listing_id}"
-    return f"📷 实拍相册{chr(10)}共 {shown} 张{chr(10)}{public_listing_id}"
+        return f"📷 实拍精选{chr(10)}共 {total} 张 · 先看 {shown} 张"
+    return f"📷 实拍相册{chr(10)}共 {shown} 张"
 
 
 def _photos_action_text(details) -> str:
@@ -596,8 +679,8 @@ def _photos_page_action_text(
     total: int,
 ) -> str:
     """Final paged-photo card: real listing facts only; no placeholder values."""
-    public_id = str(details.public_listing_id or "").strip()
-    lines = [f"📷 <b>实拍房源 {he(public_id)}</b>"] if public_id else ["📷 <b>实拍房源</b>"]
+    # Internal listing ids are never shown to users (V4.1).
+    lines = ["📷 <b>实拍房源</b>"]
     if total > 0 and total_pages > 0:
         lines.append(f"第 {page + 1}/{total_pages} 页 · 共 {total} 张")
 

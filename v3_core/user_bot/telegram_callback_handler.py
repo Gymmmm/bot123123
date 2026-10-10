@@ -29,6 +29,8 @@ NO_SIMILAR_TEXT = "目前也没有找到合适的相似房源，可以让顾问�
 LISTING_SOURCE_KEY = "v3_listing_source"
 LISTING_TOUCHPOINT_KEY = "v3_listing_touchpoint"
 PHOTOS_ALBUM_KEY = "v3_listing_photos_album"
+# Album state ``page`` marker for the listing detail surface (photos + text).
+DETAILS_ALBUM_PAGE = -2
 
 
 @dataclass(frozen=True)
@@ -201,6 +203,97 @@ async def _render_photos(
     if public_listing_id and bot is not None:
         state = _album_state(update, context, public_listing_id)
         _remember_album_sent(state, message_ids=[int(s) for s in sent_ids], page=int(page))
+
+
+async def send_listing_details(
+    update: Any,
+    context: Any,
+    *,
+    public_listing_id: str,
+    media_groups: tuple[tuple[str, ...], ...],
+    media_caption: str,
+    text: str,
+    reply_markup: Any,
+    replace_message: Any = None,
+    force: bool = False,
+) -> bool:
+    """V4.1 detail surface: 3–4 real photos (short caption) + detail text with buttons.
+
+    Telegram media groups cannot carry inline buttons, so the structured detail
+    text and its keyboard go in the message sent right after the album. The
+    sent ids are recorded under the album state (``page=DETAILS_ALBUM_PAGE``):
+    re-opening the same detail is a no-op, and any previous album/detail
+    messages for this listing (plus ``replace_message``, e.g. the search card
+    or the album action bar the user clicked) are removed after the new
+    detail is in place, so repeated clicks never stack duplicates.
+    Returns ``False`` when nothing was sent (detail already on screen).
+    ``force=True`` (a fresh /start deep link) always re-sends and removes the
+    previous copy, because the user's new /start message pushed it up.
+    """
+    from .telegram_photos_render import send_listing_photos_album
+
+    bot = getattr(context, "bot", None)
+    if bot is None:
+        raise ValueError("telegram_bot_missing_for_listing_details")
+    chat_id_value = _chat_id(update)
+    public_id = str(public_listing_id or "").strip()
+    state = _album_state(update, context, public_id) if public_id else {}
+    previous = _album_message_ids(state)
+    replace_id = str(getattr(replace_message, "message_id", "") or "").strip()
+    if (
+        not force
+        and previous
+        and state.get("page") == DETAILS_ALBUM_PAGE
+        and (not replace_id or replace_id in previous)
+    ):
+        return False
+    sent_ids = await send_listing_photos_album(
+        bot,
+        chat_id=chat_id_value,
+        media_groups=media_groups,
+        media_caption=media_caption,
+        text=text,
+        reply_markup=reply_markup,
+    )
+    stale = list(previous)
+    if replace_id and replace_id not in stale:
+        stale.append(replace_id)
+    for raw in stale:
+        try:
+            await bot.delete_message(chat_id=chat_id_value, message_id=int(raw))
+        except Exception:
+            continue
+    if public_id:
+        _remember_album_sent(state, message_ids=[str(i) for i in sent_ids], page=DETAILS_ALBUM_PAGE)
+    return True
+
+
+async def _clear_details_behind(update: Any, context: Any, query: Any) -> None:
+    """After 「返回搜索结果」from a photo detail, drop that detail's photos + text.
+
+    The result card is re-sent as a new photo message, so the old detail
+    surface (album frames + text) would otherwise stay in the chat.
+    """
+    bot = getattr(context, "bot", None)
+    data = getattr(context, "user_data", None)
+    message_id = str(getattr(getattr(query, "message", None), "message_id", "") or "").strip()
+    if bot is None or not isinstance(data, dict) or not message_id:
+        return
+    albums = data.get(PHOTOS_ALBUM_KEY)
+    if not isinstance(albums, dict):
+        return
+    try:
+        chat_key = str(_chat_id(update))
+    except Exception:
+        return
+    for key, state in albums.items():
+        if not key.startswith(f"{chat_key}::") or not isinstance(state, dict):
+            continue
+        if state.get("page") != DETAILS_ALBUM_PAGE or message_id not in _album_message_ids(state):
+            continue
+        await _delete_album_photos(bot, chat_key, state, keep_action_bar=False)
+        state.pop("message_ids", None)
+        state.pop("page", None)
 
 
 async def _render_details(query: Any, response: TelegramCallbackResponse) -> None:
@@ -458,13 +551,26 @@ async def handle_v3_callback(
         # bar in place and delete only the 4 photo frames so we can edit the
         # action bar to the details body.
         public_id_for_exit = _callback_public_listing_id(dispatched)
-        await _exit_album_to_other_surface(
-            update,
-            context,
-            public_id_for_exit,
-            keep_action_bar=True,
-        )
-        await _render_details(query, response)
+        if response.media_groups and getattr(context, "bot", None) is not None and public_id_for_exit:
+            # V4.1: detail = curated real photos + text/buttons right below.
+            await send_listing_details(
+                update,
+                context,
+                public_listing_id=public_id_for_exit,
+                media_groups=response.media_groups,
+                media_caption=response.media_caption,
+                text=response.text,
+                reply_markup=response.keyboard,
+                replace_message=getattr(query, "message", None),
+            )
+        else:
+            await _exit_album_to_other_surface(
+                update,
+                context,
+                public_id_for_exit,
+                keep_action_bar=True,
+            )
+            await _render_details(query, response)
         _set_listing_touchpoint(context, "listing_details")
     elif response.kind == "photos":
         public_id_for_album = ""
@@ -502,7 +608,10 @@ async def handle_v3_callback(
                 "listing_details" if action == "details" else "listing_photos",
             )
     elif response.kind == "card":
+        sent_as_new = bool(response.photo_path) and not bool(getattr(getattr(query, "message", None), "photo", None))
         await render_search_card_response(update, context, response, query=query)
+        if sent_as_new:
+            await _clear_details_behind(update, context, query)
     elif response.kind == "transition" and response.transition == "consult":
         # Consult is a pure intent — no transition view is rendered here. The
         # higher-level intake handler turns the intent into the actual handoff.
@@ -584,5 +693,7 @@ __all__ = [
     "TelegramCallbackHandlerOutcome",
     "handle_v3_callback",
     "remember_photos_album",
+    "send_listing_details",
+    "DETAILS_ALBUM_PAGE",
     "render_search_card_response",
 ]

@@ -6,6 +6,7 @@ from typing import Any
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
+from telegram.error import BadRequest
 
 from .callback_router import CallbackRouter
 from .callbacks import encode_listing_callback
@@ -60,12 +61,27 @@ async def _render_contact(query: Any, *, text: str, public_listing_id: str, advi
         rows.append([InlineKeyboardButton("💬 中文顾问", callback_data="v3u:home:contact")])
     rows.append([InlineKeyboardButton("⬅️ 返回房源", callback_data=encode_listing_callback("details", public_listing_id))])
     markup = InlineKeyboardMarkup(rows)
-    await edit_query_panel(
-        query,
-        text=text,
-        parse_mode=ParseMode.HTML,
-        reply_markup=markup,
-    )
+    try:
+        await edit_query_panel(
+            query,
+            text=text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=markup,
+        )
+    except BadRequest:
+        # The panel was part of an album/detail group that consult just
+        # cleared; send the consult view as a fresh message instead.
+        message = getattr(query, "message", None)
+        chat_id = getattr(message, "chat_id", None)
+        get_bot = getattr(query, "get_bot", None)
+        if chat_id is None or get_bot is None:
+            raise
+        await get_bot().send_message(
+            chat_id=chat_id,
+            text=text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=markup,
+        )
 
 
 def _is_historical_callback(raw: str) -> bool:

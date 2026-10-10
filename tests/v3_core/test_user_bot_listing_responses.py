@@ -94,7 +94,7 @@ def test_detail_text_shows_public_facts_and_full_publisher_copy():
 
     text = build_detail_text(view)
 
-    assert text.startswith("🏠 <b>富力城｜2房1厅</b>\n💰 $800/月\n📍 BKK1\n🏢 公寓｜95㎡｜19楼")
+    assert text.startswith("🏠 <b>富力城｜2房1厅</b>\n<b>$800</b> /月\n📍 BKK1 · 公寓 · 95㎡ · 19楼")
     assert "🔑 押1付1｜1年" in text
     assert "物业费｜含物业费" in text
     assert "水电｜水 按表 / 电 0.25$/度" in text
@@ -110,7 +110,7 @@ def test_detail_text_shows_public_facts_and_full_publisher_copy():
 
 def test_detail_text_floor_only_does_not_use_area_floor_label():
     text = build_detail_text(_view(size_sqm=None, floor="19"))
-    assert "🏢 公寓｜19楼" in text
+    assert "📍 BKK1 · 公寓 · 19楼" in text
     assert "㎡" not in text
 
 
@@ -130,19 +130,19 @@ def test_detail_text_omits_missing_bullets_and_adviser_without_copy():
     assert "大楼配套" not in text
     assert "侨联说" not in text
     assert "🟢 当前可预约" in text
-    assert _actions(response.action_rows) == [["photos"], ["book", "consult"]]
-    assert _labels(response.action_rows) == [["📸 看全部实拍"], ["📅 预约看房", "💬 咨询这套"]]
+    # V4.1: no real photo files in this fixture → the photos button is hidden.
+    assert _actions(response.action_rows) == [["book", "consult"]]
+    assert _labels(response.action_rows) == [["📅 预约看房", "💬 咨询这套"]]
 
 
 def test_details_response_uses_live_rented_state_but_keeps_frozen_public_facts():
     view = _view(status="rented", offer_status="inactive")
     response = build_details_response(view)
 
-    assert "💰 $800/月" in response.text
+    assert "<b>$800</b> /月" in response.text
     assert "🔴 已租出" in response.text
-    assert _actions(response.action_rows) == [["photos"], ["consult", "similar"]]
+    assert _actions(response.action_rows) == [["consult", "similar"]]
     assert _labels(response.action_rows) == [
-        ["📸 看全部实拍"],
         ["💬 咨询这套", "🔍 找相似"],
     ]
 
