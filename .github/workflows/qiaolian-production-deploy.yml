@@ -153,31 +153,6 @@ jobs:
           printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
 
-      - name: Prune stale production deploy artifacts
-        run: |
-          set -Eeuo pipefail
-          ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 "$PROD_SSH_USER@$PROD_HOST" 'bash -s' <<'REMOTE'
-          set -Eeuo pipefail
-          ROOT=/opt/qiaolian_v3
-          CURRENT=$(readlink -f "$ROOT/current")
-          test -d "$CURRENT"
-          for release in "$ROOT"/releases/*; do
-            [ -d "$release" ] || continue
-            [ "$(readlink -f "$release")" = "$CURRENT" ] && continue
-            rm -rf -- "$release"
-          done
-          rm -f /var/tmp/qiaolian-v3-*.bundle || true
-          BACKUP_DIR=/opt/qiaolian_backups
-          mapfile -t BACKUPS < <(ls -1t "$BACKUP_DIR"/qiaolian_before_*.db 2>/dev/null || true)
-          if [ "${#BACKUPS[@]}" -gt 5 ]; then
-            for ((i=5; i<${#BACKUPS[@]}; i++)); do
-              rm -f -- "${BACKUPS[$i]}" "${BACKUPS[$i]}-shm" "${BACKUPS[$i]}-wal"
-            done
-          fi
-          echo "DISK_AFTER_PRUNE"
-          df -h /
-          REMOTE
-
       - name: Upload verified release bundle
         env:
           RELEASE_BUNDLE: '${{ runner.temp }}/qiaolian-v3-release.bundle'
