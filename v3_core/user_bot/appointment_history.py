@@ -195,9 +195,15 @@ def _item(record: AppointmentHistoryRecord, inventory: PublicInventoryReader) ->
     )
 
 
+# User-facing wording only (stored value stays "video"; admin copy unchanged).
+_USER_MODE_LABELS = {"video": "视频带看"}
+
+
 def _lines(item: AppointmentHistoryItem, *, past: bool = False) -> list[str]:
     status_icon, status_label = display_status(item.status, past=past)
-    mode = APPOINTMENT_MODE_LABELS.get(item.viewing_mode, item.viewing_mode or "待确认")
+    mode = _USER_MODE_LABELS.get(item.viewing_mode) or APPOINTMENT_MODE_LABELS.get(
+        item.viewing_mode, item.viewing_mode or "待确认"
+    )
     mode_icon = "🎥" if item.viewing_mode == "video" else "🚶"
     return [
         f"🏠 {he(item.subject)}",
