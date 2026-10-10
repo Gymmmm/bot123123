@@ -38,6 +38,7 @@ from .vision import PhotoVision
 PLAN_VERSION = "cover_plan_v1_20261011"
 LABEL_MIN_CONFIDENCE = 0.75
 NO_EVIDENCE_CONFIDENCE_CAP = 0.7
+MIXED_SCENE_CONFIDENCE_CAP = 0.7
 HERO_STANDOUT_MIN = 0.58
 LOW_QUALITY_MAX = 0.42
 SAME_ANGLE_HAMMING = 10
@@ -66,6 +67,14 @@ SUPPORT = {
     "庭院": {"草坪", "树木", "院墙"}, "泳池": {"泳池水面"}, "阳台": {"栏杆", "洗衣机", "窗景", "高楼景观"},
     "景观": {"窗景", "高楼景观"}, "健身房": {"健身器材"}, "停车位": {"车辆", "车库"}, "入口": {"大门"},
 }
+# Objects that settle an indoor confusion on their own (spec: a living room is never
+# 厨房, a bedroom never 卫生间, a facade never 卧室) even when the model's room also
+# has some evidence. Outdoor rooms (阳台/庭院/泳池…) are never overridden by these.
+STRONG_EVIDENCE = {"卧室": {"床"}, "客厅": {"沙发", "电视", "茶几"}, "外观": {"立面", "屋顶", "车库"}}
+# A label is only SHOWN when its defining object is visible: a wardrobe alone may be a
+# walk-in closet / dressing room, so 卧室 needs a bed.
+SHOW_REQUIRES = {"卧室": {"床"}}
+INDOOR_ROOMS = {"客厅", "卧室", "厨房", "卫生间", "健身房"}
 FORBIDDEN = {("客厅", "厨房"), ("卧室", "卫生间"), ("外观", "卧室")}
 
 HERO_ROOM_FIT = {
@@ -169,11 +178,22 @@ def cross_validate(vision: PhotoVision) -> tuple[str, float, list[str]]:
             evidence_room = candidate
             break
     if evidence_room and evidence_room != room:
-        if room in {"阳台", "景观", "庭院", "入口", "泳池"} and evidence_room in {"外观", "客厅"}:
-            pass  # e.g. 庭院 with a visible facade stays 庭院; balcony furniture stays 阳台
+        seen = "/".join(sorted(objects & dict(EVIDENCE)[evidence_room]))
+        strong = room in INDOOR_ROOMS and bool(objects & STRONG_EVIDENCE.get(evidence_room, set()))
+        if not strong and room != "其他" and objects & SUPPORT.get(room, set()):
+            # Both the model's room and another room have visible evidence (balcony
+            # with a cabinet, garden in front of a facade, bathroom glimpsing a bed):
+            # a mixed scene. Keep the model's room for ranking but never SHOW a label
+            # we cannot back unambiguously.
+            notes.append(f"物件冲突 {room}/{evidence_room}（{seen}），标签隐藏")
+            confidence = min(confidence, MIXED_SCENE_CONFIDENCE_CAP)
         else:
-            notes.append(f"证据改判 {room}→{evidence_room}（{'/'.join(sorted(objects & dict(EVIDENCE)[evidence_room]))}）")
+            notes.append(f"证据改判 {room}→{evidence_room}（{seen}）")
             room, confidence = evidence_room, min(confidence, 0.9) * 0.9
+    required = SHOW_REQUIRES.get(room)
+    if required and not (objects & required) and confidence >= LABEL_MIN_CONFIDENCE:
+        notes.append(f"未见{'/'.join(sorted(required))}，{room}标签隐藏")
+        confidence = min(confidence, NO_EVIDENCE_CONFIDENCE_CAP)
     support = SUPPORT.get(room, set())
     if room != "其他" and not (objects & support):
         if confidence > NO_EVIDENCE_CONFIDENCE_CAP:
