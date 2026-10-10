@@ -16,7 +16,7 @@ import shutil
 from typing import Any, Iterable
 
 from v3_core.ingest.source_reader import SourceReader
-from .media_selection import select_publication_media
+from .media_selection import order_cover_thumbnails, select_publication_media
 from .photo_formatter import format_gallery_photo, gallery_canvas_key, resolve_gallery_logo_path
 from .source_scrub import scrub_file
 
@@ -260,17 +260,17 @@ class MediaPreparationService:
         cover_resolved = str(Path(str(selected["cover_path"])).resolve())
         # Public flipper is: 1) rendered cover, 2+) other real shots.
         # Never brand the cover-source again — that duplicates the same room as #2.
-        gallery_sources = [
-            str(path)
-            for path in selected["gallery_paths"]
-            if str(Path(str(path)).resolve()) != cover_resolved
-        ]
+        # Cover thumbnails lead: 客厅 → 卧室 → 厨房 → 卫生间 → 泳池 (hero's room skipped).
+        gallery_sources = order_cover_thumbnails(
+            selected["ranking"], selected["gallery_paths"], cover_resolved
+        )
         room_names = {
             "living": "客厅",
             "bedroom": "卧室",
             "kitchen": "厨房",
             "exterior": "外观",
-            "toilet": "卫浴",
+            "toilet": "卫生间",
+            "pool": "泳池",
         }
         ranked_labels = {
             str(Path(str(item.get("file") or "")).resolve()): room_names.get(

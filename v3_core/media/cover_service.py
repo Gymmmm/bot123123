@@ -12,7 +12,8 @@ from typing import Callable
 
 from v3_core.publishing.formatting import display_floor, display_layout, display_property_type
 from v3_core.storage.inventory_reader import InventoryReader
-from .cover_renderer import CoverRenderData, render_cover
+from .cover_renderer import CoverRenderData, _is_apartment, render_cover
+from .straighten import straighten_file
 from .cover_styles import (
     is_video_cover_style,
     recommended_cover_style,
@@ -136,6 +137,14 @@ class CoverRenderService:
                 media.cover_gallery_paths or media.gallery_paths
             )
             render_kwargs["source_labels"] = media.cover_gallery_labels
+            if not _is_apartment(data):
+                # Portrait (villa) hero: level the walls. Real-estate standard
+                # vertical correction; any failure keeps the original photo.
+                straight = straighten_file(
+                    cover_source, target.parent / f"{public_id}_hero_straight.jpg"
+                )
+                if straight:
+                    render_kwargs["source_image"] = straight["path"]
         rendered = self.renderer(**render_kwargs)
         rendered_path = Path(rendered).expanduser().resolve()
         if not rendered_path.is_file():

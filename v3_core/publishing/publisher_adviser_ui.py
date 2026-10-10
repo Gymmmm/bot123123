@@ -167,7 +167,7 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
         await message.reply_text(
             "<b>🖼 选择主图</b>\n\n"
             "点下方按钮，选一张原图作为频道封面底图。\n"
-            "系统会按所选「封面格式」生成封面（横版 1080×864 · 竖版 1080×1350）。\n"
+            "封面版式按房型自动定：公寓横版 1080×720（左大图 + 右三小图）· 别墅竖版 1080×1350（大图 + 下三小图）。\n"
             "更多实拍相册仍用全部照片，并加上侨联角标。",
             parse_mode=ParseMode.HTML,
         )
@@ -491,9 +491,9 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
             if raw == "v3smp|manual_templates":
                 await query.message.reply_text(
                     "<b>🎨 选择封面格式</b>\n\n"
-                    "四套风格；画幅跟主图自动走：\n"
-                    "横图 → 1080×864 · 竖图 → 1080×1350\n"
-                    "普通房默认「极简实拍」；别墅建议「黑金」。",
+                    "封面统一侨联实拍版式，版式按房型自动定（跟主图横竖无关）：\n"
+                    "公寓/服务式 → 横版 1080×720（左大图 + 右三小图）\n"
+                    "别墅/独栋等 → 竖版 1080×1350（大图 + 下三小图，外观自动扶正）",
                     parse_mode=ParseMode.HTML,
                     reply_markup=InlineKeyboardMarkup([
                         [InlineKeyboardButton("极简实拍渐变（默认）", callback_data="v3smp|manual_style|premium_photo")],

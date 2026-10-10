@@ -348,6 +348,13 @@ def _room_heuristic(img) -> dict[str, Any]:
     if exterior_score >= 0.48 and blue_frac >= 0.10 and not indoor_ceiling:
         if green_frac >= 0.06 or blue_frac >= 0.18:
             label = "exterior"
+    # Swimming pool: a large turquoise/cyan water body in the lower 70% of the frame.
+    lower = hsv[int(h * 0.30) :, :, :]
+    water = (lower[:, :, 0] >= 80) & (lower[:, :, 0] <= 100) & (lower[:, :, 1] >= 70) & (lower[:, :, 2] >= 90)
+    pool_frac = float(np.mean(water)) if lower.size else 0.0
+    scores["pool"] = round(min(1.0, pool_frac * 4.0), 3)
+    if pool_frac >= 0.12 and not indoor_ceiling:
+        label = "pool"
     scores["label"] = label
     return scores
 
