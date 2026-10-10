@@ -108,8 +108,8 @@ async def test_find_home_shortcut_enters_guided_search_without_property_resoluti
     outcome = await handle_v3_start(_update(message), context, listings=listings, transition_views=_views())
     assert outcome.handled and outcome.kind == "broadcast_find_home"
     assert listings.calls == []
-    assert "告诉我你想找什么房" in message.calls[0][0][0]
-    assert "BKK1 一房，预算 $600" in message.calls[0][0][0]
+    assert "想找什么样的房子" in message.calls[0][0][0]
+    assert "BKK1，两房，预算 $800" in message.calls[0][0][0]
     assert context.user_data[AWAITING_KEYWORD_SESSION_KEY] == {"source": "daily_broadcast"}
     assert context.user_data[SEARCH_PREF_SESSION_KEY]["source"] == "daily_broadcast"
     assert "stale" not in context.user_data
@@ -123,7 +123,7 @@ async def test_budget_shortcut_opens_budget_filter_directly():
     outcome = await handle_v3_start(_update(message), context, listings=listings, transition_views=_views())
     assert outcome.handled and outcome.kind == "broadcast_budget"
     assert listings.calls == []
-    assert "选择预算" in message.calls[-1][0][0]
+    assert "每月租金预算多少" in message.calls[-1][0][0]
     assert context.user_data[SEARCH_PREF_SESSION_KEY]["source"] == "daily_broadcast"
 
 
@@ -141,7 +141,7 @@ async def test_latest_shortcut_uses_published_search_executor_not_property_resol
     assert limit == 5
     assert intent.source == "daily_broadcast_latest"
     assert intent.touch_payload == {"daily_broadcast": True, "latest": True}
-    assert "暂时没有完全符合的房源" in message.calls[-1][0][0]
+    assert "还没找到完全符合的房子" in message.calls[-1][0][0]
 
 
 @pytest.mark.asyncio

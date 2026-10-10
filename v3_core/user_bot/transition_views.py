@@ -41,6 +41,11 @@ TransitionChoiceKind = Literal[
     "area_choice",
     "area_other",
     "layout_choice",
+    "search_back_area",
+    "search_back_budget",
+    "adjust_area",
+    "adjust_budget",
+    "adjust_layout",
 ]
 
 
@@ -221,12 +226,12 @@ def _custom_area_prompt() -> TransitionView:
     )
 
 _BUDGET_OPTIONS = (
-    ("b1", "$400以内", None, 400),
+    ("b1", "$400 以下", None, 400),
     ("b2", "$400–600", 400, 600),
     ("b3", "$600–800", 600, 800),
-    ("b4", "$800–1200", 800, 1200),
-    ("b5", "$1200–1500", 1200, 1500),
-    ("b6", "$1500+", 1500, None),
+    ("b4", "$800–1,200", 800, 1200),
+    ("b5", "$1,200–1,500", 1200, 1500),
+    ("b6", "$1,500 以上", 1500, None),
 )
 
 
@@ -238,10 +243,47 @@ def budget_bounds(code: object) -> tuple[str, int | None, int | None]:
     raise ValueError("unsupported_budget_choice")
 
 
+def filter_summary(area_display: str = "", budget_label: str = "", layout_label: str = "") -> str:
+    """Unified 「已选：」 line shared by every guided-search page (V4 P0)."""
+    parts = []
+    area = str(area_display or "").strip()
+    budget = str(budget_label or "").strip()
+    layout = str(layout_label or "").strip()
+    if area:
+        parts.append(f"📍 {area}")
+    if budget:
+        parts.append(f"💰 {budget}")
+    if layout:
+        parts.append(f"🏠 {layout}")
+    return f"已选：{'｜'.join(parts)}" if parts else ""
 
-def _search_budget_view(area_display: str = "", *, back_label: str = "⬅️ 返回找房") -> TransitionView:
-    clean_area = str(area_display or "").strip()
-    area_line = f"\n\n已选：{he(clean_area)}" if clean_area else ""
+
+def _pref_fields(pref: object) -> tuple[str, str, str]:
+    if not isinstance(pref, dict):
+        return "", "", ""
+    return (
+        str(pref.get("area_display") or "").strip(),
+        str(pref.get("budget_label") or "").strip(),
+        str(pref.get("layout_label") or "").strip(),
+    )
+
+
+def _summary_block(summary: str) -> str:
+    return f"\n\n{he(summary)}" if summary else ""
+
+
+def _back_choice(kind: str) -> TransitionChoice:
+    return TransitionChoice("⬅️ 返回上一步", kind)  # type: ignore[arg-type]
+
+
+def _search_budget_view(
+    area_display: str = "",
+    *,
+    budget_label: str = "",
+    layout_label: str = "",
+    back_kind: str = "change_search",
+) -> TransitionView:
+    summary = filter_summary(area_display, "", layout_label)
     choices = tuple(
         TransitionChoice(label, "budget_choice", code, budget_min=budget_min, budget_max=budget_max)
         for code, label, budget_min, budget_max in _BUDGET_OPTIONS
@@ -250,17 +292,17 @@ def _search_budget_view(area_display: str = "", *, back_label: str = "⬅️ 返
         (choices[0], choices[1]),
         (choices[2], choices[3]),
         (choices[4], choices[5]),
-        (TransitionChoice("自己输入", "budget_custom"),),
-        (TransitionChoice("⬅️ 返回找房", "change_search"),),
+        (TransitionChoice("✏️ 自己填预算", "budget_custom"),),
+        (_back_choice(back_kind),),
     )
     return TransitionView(
         kind="search_budget",
-        text=f"💰 <b>选择预算</b>{area_line}\n\n每月租金预算：",
+        text=f"💰 <b>每月租金预算多少？</b>{_summary_block(summary)}",
         rows=rows,
     )
 
 
-def _search_area_view() -> TransitionView:
+def _search_area_view(*, summary: str = "", back_kind: str = "change_search") -> TransitionView:
     choices = tuple(TransitionChoice(label, "area_choice", code) for code, label in AREA_OPTIONS)
     rows = (
         (choices[0], choices[1]),
@@ -270,29 +312,63 @@ def _search_area_view() -> TransitionView:
         (choices[7],),
         (choices[8], choices[9]),
         (choices[10],),
-        (TransitionChoice("其他位置", "area_other"),),
-        (TransitionChoice("⬅️ 返回找房", "change_search"),),
+        (TransitionChoice("✏️ 输入其他位置", "area_other"),),
+        (_back_choice(back_kind),),
     )
     return TransitionView(
         kind="search_area",
-        text="📍 <b>选择区域</b>\n\n请选择想找的位置：",
+        text=(
+            "📍 <b>想住在哪个区域？</b>\n\n"
+            "选一个区域，或者直接告诉我小区名称。"
+            f"{_summary_block(summary)}"
+        ),
         rows=rows,
     )
 
 
-def _search_layout_view(area_display: str = "", budget_label: str = "") -> TransitionView:
+def _search_layout_view(
+    area_display: str = "",
+    budget_label: str = "",
+    *,
+    back_kind: str = "change_search",
+) -> TransitionView:
     choices = tuple(TransitionChoice(label, "layout_choice", code) for code, label in LAYOUT_OPTIONS)
-    selected = "｜".join(
-        value for value in (str(area_display or "").strip(), str(budget_label or "").strip()) if value
-    )
-    selected_line = f"\n\n已选：{he(selected)}" if selected else ""
+    summary = filter_summary(area_display, budget_label)
     rows = (
         (choices[0], choices[1]),
         (choices[2], choices[3]),
         (choices[4], choices[5]),
-        (TransitionChoice("⬅️ 返回找房", "change_search"),),
+        (_back_choice(back_kind),),
     )
-    return TransitionView(kind="search_layout", text=f"🏠 <b>选择户型</b>{selected_line}", rows=rows)
+    return TransitionView(
+        kind="search_layout",
+        text=f"🏠 <b>需要几间卧室？</b>{_summary_block(summary)}",
+        rows=rows,
+    )
+
+
+def search_area_for_pref(pref: object) -> TransitionView:
+    area, budget, layout = _pref_fields(pref)
+    # Area is the first guided step: back always returns to the search entry.
+    return _search_area_view(summary=filter_summary("", budget, layout))
+
+
+def search_budget_for_pref(pref: object) -> TransitionView:
+    area, budget, layout = _pref_fields(pref)
+    back = "search_back_area" if area else "change_search"
+    return _search_budget_view(area, layout_label=layout, back_kind=back)
+
+
+def search_layout_for_pref(pref: object) -> TransitionView:
+    area, budget, _layout = _pref_fields(pref)
+    if budget:
+        back = "search_back_budget"
+    elif area:
+        back = "search_back_area"
+    else:
+        back = "change_search"
+    return _search_layout_view(area, budget, back_kind=back)
+
 
 def _similar_view(plan: TransitionPlan) -> TransitionView:
     """Render similar listing view.
@@ -325,30 +401,35 @@ def _similar_view(plan: TransitionPlan) -> TransitionView:
 
 
 _SEARCH_ENTRY_TEXT = (
-    "🔍 <b>1V1 找房</b>\n\n"
-    "告诉我你想找什么房。\n"
-    "区域、预算、几房、入住时间都可以直接发。\n\n"
-    "例如：\n"
-    "<code>BKK1 一房，预算 $600</code>\n"
-    "<code>富力城两房，可以做饭</code>\n"
-    "<code>钻石岛公寓，想先看实拍</code>\n\n"
-    "也可以按条件一步一步筛选。"
+    "🔍 <b>想找什么样的房子？</b>\n\n"
+    "直接告诉我你的要求就行。\n"
+    "比如：<code>BKK1，两房，预算 $800</code>\n\n"
+    "也可以从下面开始选："
 )
 
 
 def _search_entry_view() -> TransitionView:
     rows = (
         (
-            TransitionChoice("📍 按区域", "search_area"),
-            TransitionChoice("💰 按预算", "search_budget"),
+            TransitionChoice("📍 选区域", "search_area"),
+            TransitionChoice("💰 选预算", "search_budget"),
         ),
         (
-            TransitionChoice("🏠 按户型", "search_layout"),
-            TransitionChoice("💬 中文顾问", "home", "contact"),
+            TransitionChoice("🏠 选户型", "search_layout"),
+            TransitionChoice("💬 帮我找房", "home", "contact"),
         ),
         (TransitionChoice("⬅️ 返回首页", "home"),),
     )
     return TransitionView(kind="search_entry", text=_SEARCH_ENTRY_TEXT, rows=rows)
+
+
+def searching_view() -> TransitionView:
+    """Interim panel shown while a guided search runs; edited into the result."""
+    return TransitionView(
+        kind="search_running",
+        text="🔍 <b>正在帮你找房…</b>\n\n正在按你的条件查找合适房源。",
+        rows=(),
+    )
 
 
 def _change_search_view(plan: TransitionPlan) -> TransitionView:
@@ -389,16 +470,24 @@ class TransitionViewService:
         return _custom_area_prompt()
 
     @staticmethod
-    def search_area() -> TransitionView:
-        return _search_area_view()
+    def search_area(pref: object = None) -> TransitionView:
+        return search_area_for_pref(pref)
 
     @staticmethod
-    def search_budget(area_display: str = "") -> TransitionView:
-        return _search_budget_view(area_display)
+    def search_budget(area_display: str = "", *, pref: object = None) -> TransitionView:
+        if pref is None:
+            pref = {"area_display": area_display}
+        return search_budget_for_pref(pref)
 
     @staticmethod
-    def search_layout(area_display: str = "", budget_label: str = "") -> TransitionView:
-        return _search_layout_view(area_display, budget_label)
+    def search_layout(area_display: str = "", budget_label: str = "", *, pref: object = None) -> TransitionView:
+        if pref is None:
+            pref = {"area_display": area_display, "budget_label": budget_label}
+        return search_layout_for_pref(pref)
+
+    @staticmethod
+    def searching() -> TransitionView:
+        return searching_view()
 
     @staticmethod
     def search_entry() -> TransitionView:
@@ -418,4 +507,4 @@ class TransitionViewService:
         raise ValueError(f"unsupported_transition_view:{plan.kind}")
 
 
-__all__ = ["TransitionChoice", "TransitionChoiceKind", "TransitionView", "TransitionViewService", "budget_bounds"]
+__all__ = ["TransitionChoice", "TransitionChoiceKind", "TransitionView", "TransitionViewService", "budget_bounds", "filter_summary", "search_area_for_pref", "search_budget_for_pref", "search_layout_for_pref", "searching_view"]

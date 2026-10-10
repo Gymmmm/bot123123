@@ -84,11 +84,11 @@ def _goal_property_type(goal: object) -> str:
 
 def _budget_text(budget_min: int | None, budget_max: int | None) -> str:
     if budget_min is not None and budget_max is not None:
-        return f"{budget_min}-{budget_max} USD/月"
+        return f"${budget_min:,}–{budget_max:,}"
     if budget_min is not None:
-        return f">= {budget_min} USD/月"
+        return f"${budget_min:,} 以上"
     if budget_max is not None:
-        return f"<= {budget_max} USD/月"
+        return f"${budget_max:,} 以内"
     return "-"
 
 

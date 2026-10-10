@@ -175,7 +175,7 @@ def test_keyword_search_lead_keeps_room_type_and_move_in_hint():
         source="direct_text",
         goal="any",
         area_display="BKK1",
-        budget_label="<= 700 USD/月",
+        budget_label="$700 以内",
         touch_payload={
             "message": "BKK1 一房 700以内 10月5日入住",
             "room_type": "1房",

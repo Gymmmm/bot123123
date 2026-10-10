@@ -137,7 +137,7 @@ def test_custom_budget_success_returns_search_intent_and_public_only_last_pref()
     assert result.search.criteria.location_keys == ("BKK1",)
     assert result.search.criteria.budget_min == 600
     assert result.search.criteria.budget_max == 900
-    assert result.search.budget_label == "600-900 USD/月"
+    assert result.search.budget_label == "$600–900"
     assert result.search.touch_payload == {
         "message": "600-900",
         "from_public_listing_id": PUBLIC_ID,
@@ -173,7 +173,7 @@ def test_home_custom_budget_advances_to_layout_and_keeps_selected_filters():
     assert pref["location_keys"] == ["BKK1"]
     assert pref["budget_min"] == 600
     assert pref["budget_max"] == 900
-    assert pref["budget_label"] == "600-900 USD/月"
+    assert pref["budget_label"] == "$600–900"
 
 
 def test_custom_budget_failure_keeps_waiting_state_for_retry():

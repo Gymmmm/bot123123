@@ -67,7 +67,7 @@ def test_keyword_search_parses_existing_v3_criteria_and_builds_public_session_cl
     assert result.intent.criteria.budget_min is None
     assert result.intent.criteria.budget_max == 800
     assert result.intent.area_display == "BKK1"
-    assert result.intent.budget_label == "<= 800 USD/月"
+    assert result.intent.budget_label == "$800 以内"
     assert result.intent.touch_payload == {
         "message": "BKK1 一房 800以内",
         "room_type": "1房",

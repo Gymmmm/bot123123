@@ -95,10 +95,9 @@ def test_search_entry_is_final_direct_filter_panel():
     service=TransitionViewService(InventoryStub(None))
     plan=TransitionPlan(kind="change_search",next_step="search_entry",effects=("render_search_entry",),change_search=ChangeSearchTransition())
     view=service.build(plan)
-    assert _labels(view)==["📍 按区域","💰 按预算","🏠 按户型","💬 中文顾问","⬅️ 返回首页"]
-    assert "BKK1 一房，预算 $600" in view.text
-    assert "富力城两房，可以做饭" in view.text
-    assert "钻石岛公寓，想先看实拍" in view.text
+    assert _labels(view)==["📍 选区域","💰 选预算","🏠 选户型","💬 帮我找房","⬅️ 返回首页"]
+    assert "BKK1，两房，预算 $800" in view.text
+    assert "1V1" not in view.text
 
 def test_similar_returns_to_same_search_panel():
     service=TransitionViewService(InventoryStub(None))

@@ -18,22 +18,24 @@ def build_search_no_match_view(intent: SearchSubmitIntent) -> TransitionView:
         )
         if value
     )
-    summary_block = f"\n\n{he(summary)}" if summary else ""
+    summary_block = f"\n\n你的要求：{he(summary)}" if summary else ""
     return TransitionView(
         kind="search_no_match",
         text=(
-            "🔍 <b>暂时没有完全符合的房源</b>"
+            "🔍 <b>还没找到完全符合的房子</b>"
             f"{summary_block}\n\n"
-            "可以调整条件继续找，也可以让中文顾问按这组条件帮你找。"
+            "可以放宽一点条件再看看，或者让中文顾问继续帮你找。"
         ),
         rows=(
             (
-                TransitionChoice("💰 调整预算", "search_budget"),
-                TransitionChoice("📍 换个区域", "search_area"),
+                TransitionChoice("💰 调整预算", "adjust_budget"),
+                TransitionChoice("📍 换个区域", "adjust_area"),
             ),
-            (TransitionChoice("🏠 调整户型", "search_layout"),),
-            (TransitionChoice("💬 帮我找房", "home", value="contact"),),
-            (TransitionChoice("⬅️ 返回首页", "home"),),
+            (
+                TransitionChoice("🏠 调整户型", "adjust_layout"),
+                TransitionChoice("💬 帮我找房", "home", value="contact"),
+            ),
+            (TransitionChoice("⬅️ 返回找房", "change_search"),),
         ),
     )
 

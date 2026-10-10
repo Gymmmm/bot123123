@@ -135,22 +135,13 @@ def _navigation_view(
     preview = deepcopy(user_data)
     if result.mutation is not None:
         apply_session_mutation(preview, result.mutation)
+    pref = preview.get(SEARCH_PREF_SESSION_KEY)
     if navigation == "search_area":
-        return views.search_area()
+        return views.search_area(pref if isinstance(pref, dict) else None)
     if navigation == "search_layout":
-        pref = preview.get(SEARCH_PREF_SESSION_KEY)
-        area_display = ""
-        budget_label = ""
-        if isinstance(pref, dict):
-            area_display = str(pref.get("area_display") or "").strip()
-            budget_label = str(pref.get("budget_label") or "").strip()
-        return views.search_layout(area_display, budget_label)
+        return views.search_layout(pref=pref if isinstance(pref, dict) else {})
     if navigation == "search_budget":
-        pref = preview.get(SEARCH_PREF_SESSION_KEY)
-        area_display = ""
-        if isinstance(pref, dict):
-            area_display = str(pref.get("area_display") or "").strip()
-        return views.search_budget(area_display)
+        return views.search_budget(pref=pref if isinstance(pref, dict) else {})
     raise ValueError(f"unsupported_transition_navigation:{navigation}")
 
 

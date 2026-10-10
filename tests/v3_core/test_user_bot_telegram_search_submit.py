@@ -149,6 +149,7 @@ async def test_matched_search_renders_public_card_then_consumes_guided_pref():
         "area_display": "BKK1",
         "budget_label": "$400–600",
         "room_type": "",
+        "layout_label": "",
     }
     assert user_data[SEARCH_SESSION_KEY] == [PUBLIC_ID]
     assert "LST_" not in repr(user_data)
@@ -174,16 +175,16 @@ async def test_no_match_renders_locked_copy_with_strict_recovery_actions():
     assert SEARCH_PREF_SESSION_KEY not in user_data
     assert [call[0] for call in query.calls] == ["answer", "edit_text"]
     text = query.calls[-1][1][0]
-    assert "暂时没有完全符合的房源" in text
-    assert "BKK1｜$400–600" in text
+    assert "还没找到完全符合的房子" in text
+    assert "你的要求：BKK1｜$400–600" in text
     markup = query.calls[-1][2]["reply_markup"]
     callbacks = [button.callback_data for row in markup.inline_keyboard for button in row]
     assert callbacks == [
-        "v3u:t:search_budget",
-        "v3u:t:search_area",
-        "v3u:t:search_layout",
+        "v3u:t:adjust_budget",
+        "v3u:t:adjust_area",
+        "v3u:t:adjust_layout",
         "v3u:home:contact",
-        "v3u:t:home",
+        "v3u:change_search",
     ]
     assert "v3u:t:search_available" not in callbacks
     assert not any(value.startswith("find") for value in callbacks)
