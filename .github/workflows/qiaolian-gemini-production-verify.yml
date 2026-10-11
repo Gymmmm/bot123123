@@ -1,4 +1,4 @@
-name: qiaolian-gemini-production-verify
+name: qiaolian-publisher-inspect-and-preview
 on:
   push:
     branches: [ops/gemini-verify-20261011]
@@ -38,35 +38,21 @@ jobs:
           CHECK=$(mktemp /var/tmp/qiaolian-live-vision.XXXXXX.py)
           trap 'rm -f "$CHECK"' EXIT
           cat > "$CHECK" <<'PY'
-          import json, os, sqlite3, subprocess
-          from pathlib import Path
-          from v3_core.media.vision import vision_client_from_env
-          pid = subprocess.check_output(["systemctl", "show", "qiaolian-v3@publisher.service", "-p", "MainPID", "--value"], text=True).strip()
-          live = {}
-          for entry in Path(f"/proc/{pid}/environ").read_bytes().split(b"\0"):
-              if b"=" in entry:
-                  k, v = entry.split(b"=", 1)
-                  live[k.decode()] = v.decode()
-          client = vision_client_from_env(live)
-          print("LIVE_VISION_CONFIG", json.dumps({"provider": client.name, "models": getattr(client, "models", []), "key_present": bool(getattr(client, "_api_key", ""))}))
-          assert client.name == "gemini", "publisher_not_using_gemini_config"
-          roots = [Path("/opt/qiaolian_dual_bots/media")]
-          photos = []
-          for root in roots:
-              for p in root.rglob("*"):
-                  if p.is_file() and p.suffix.lower() in {".jpg", ".jpeg", ".png"} and not any("cover" in part.lower() for part in p.parts) and p.stat().st_size > 15000:
-                      photos.append(p)
-                      if len(photos) == 2:
-                          break
-          assert photos, "production_photo_missing"
-          for index, photo in enumerate(photos, 1):
-              result = client.analyze(str(photo))
-              print("LIVE_VISION_RESULT", json.dumps({"sample": index, "provider": result.provider, "room_type": result.room_type, "confidence": result.confidence, "usage": client.usage_log[-1] if client.usage_log else {}}, ensure_ascii=False))
-              assert result.provider.startswith("gemini:"), "gemini_request_fell_back"
-          db = sqlite3.connect("file:/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db?mode=ro", uri=True)
-          assert db.execute("PRAGMA quick_check").fetchone()[0] == "ok"
-          print("DB_QUICK_CHECK=ok")
-          print("GEMINI_PRODUCTION_VERIFIED")
+          import json, sqlite3
+          db=sqlite3.connect("file:/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db?mode=ro",uri=True)
+          db.row_factory=sqlite3.Row
+          for table in ("publisher_auto_items_v3","publisher_review_exceptions_v3","listings_v3","offers_v3","canonical_facts_v3","publication_records_v3"):
+              cols=[r[1] for r in db.execute(f"PRAGMA table_info({table})")]
+              print("SCHEMA",table,json.dumps(cols))
+              if table=="publisher_auto_items_v3" and cols:
+                  print("AUTO_COUNTS",json.dumps([dict(r) for r in db.execute("SELECT state,reason_code,ignored,COUNT(*) n FROM publisher_auto_items_v3 GROUP BY state,reason_code,ignored")],ensure_ascii=False))
+                  print("AUTO_SAMPLES",json.dumps([dict(r) for r in db.execute("SELECT * FROM publisher_auto_items_v3 WHERE state IN ('exception','queued','held') AND ignored=0 ORDER BY updated_at DESC LIMIT 12")],ensure_ascii=False))
+              if table=="publisher_review_exceptions_v3" and cols:
+                  print("REVIEW_COUNTS",json.dumps([dict(r) for r in db.execute("SELECT reason_code,resolved,ignored,COUNT(*) n FROM publisher_review_exceptions_v3 GROUP BY reason_code,resolved,ignored")],ensure_ascii=False))
+              if table=="listings_v3" and cols:
+                  wanted=[c for c in ("listing_id","title","property_type","layout","bedrooms","status","location","district") if c in cols]
+                  print("LISTING_SAMPLES",json.dumps([dict(r) for r in db.execute(f"SELECT {','.join(wanted)} FROM listings_v3 ORDER BY rowid DESC LIMIT 15")],ensure_ascii=False))
+          
           PY
           chmod 0600 "$CHECK"
           cd /opt/qiaolian_v3/current
