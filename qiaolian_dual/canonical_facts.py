@@ -174,6 +174,10 @@ def _extract_monthly_rent(text: str) -> tuple[int | None, str, list[dict[str, An
         r"(?:月租|租金价格|租金|出租情况|出租价格|出租价|房间价格|租赁价格)\s*[:：]?\s*(?:\$|usd|美金|美元|💵|💰)?\s*(\d[\d,]*(?:\.\d+)?\s*k?)\s*(?:美元|美金|usd|\$|/月|每月|[a-z])?",
         r"(?:\$|usd|美金|美元|💵|💰)\s*(\d[\d,]*(?:\.\d+)?\s*k?)\s*(?:/月|每月|/month|per month)",
         r"(\d[\d,]*(?:\.\d+)?\s*k?)\s*(?:美元|美金|usd|\$)\s*(?:每月|/月|/month|per month)",
+        # Bare currency after the number (common in source captions): 240$ / 550$
+        # Only accepted when the surrounding text has clear rental intent so
+        # deposits, sale figures and utilities stay out of rent facts.
+        r"(\d[\d,]*(?:\.\d+)?\s*k?)\s*(?:\$|usd|美金|美元)",
     )
     for pattern in patterns:
         for m in re.finditer(pattern, text, flags=re.I):
@@ -183,9 +187,20 @@ def _extract_monthly_rent(text: str) -> tuple[int | None, str, list[dict[str, An
                 candidates.append((parsed, m.group(0), m.start(1), m.end(1)))
     unique = {value for value, _excerpt, _start, _end in candidates}
     evidence = [_evidence(value, "raw_explicit_monthly_rent", "high", excerpt, start, end) for value, excerpt, start, end in candidates]
+    # Range prices (500-600$, 500至600) must not be reduced to a single number.
+    range_hit = bool(re.search(r"\d[\d,]*\s*[-~至到]\s*\d", text))
+    if range_hit and unique:
+        return None, "conflict", evidence, ["conflicting_rental_price"]
     if len(unique) > 1:
         return None, "conflict", evidence, ["conflicting_rental_price"]
     if unique:
+        # Bare currency-only matches require rental intent.
+        bare_only = all(
+            re.search(r"\d[\d,]*(?:\.\d+)?\s*k?\s*(?:\$|usd|美金|美元)\s*$", excerpt.strip(), re.I)
+            for _v, excerpt, _s, _e in candidates
+        )
+        if bare_only and not _has_rental_intent(text):
+            return None, "missing", [], ["missing_price"]
         return next(iter(unique)), "confirmed", evidence, []
     return None, "missing", [], ["missing_price"]
 
