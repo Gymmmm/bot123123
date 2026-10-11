@@ -23,31 +23,29 @@ jobs:
           printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
           printf '%s\n' '50.114.74.120 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMvdBaAbAt9/4NCEC4RmiAukQ5KK5S6OF4YEml2iLw+6' > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
-      - name: Read-only exception and service check
+      - name: Sample missing-rent source evidence
         run: |
           set -Eeuo pipefail
           ssh -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 root@50.114.74.120 'bash -s' <<'REMOTE'
           set -Eeuo pipefail
-          echo "=== DEPLOYED ==="
-          cat /opt/qiaolian_v3/.deployed_sha || true
-          readlink -f /opt/qiaolian_v3/current || true
-          echo "=== SERVICES ==="
-          for component in collector canonical publisher user; do
-            unit="qiaolian-v3@$component.service"
-            printf '%s: ' "$unit"
-            systemctl is-active "$unit" || true
-          done
-          echo "=== EXCEPTION COUNTS ==="
-          DB=$(ls /opt/qiaolian_v3/data/*.db 2>/dev/null | head -1)
-          if [ -z "$DB" ]; then DB=/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db; fi
-          echo "DB=$DB"
-          sqlite3 "$DB" <<'SQL'
-          .mode line
-          SELECT 'auto_items_exception' AS k, COUNT(*) AS n FROM publisher_auto_items_v3 WHERE state='exception' AND ignored=0;
-          SELECT 'review_exceptions' AS k, COUNT(*) AS n FROM publisher_review_exceptions_v3 WHERE resolved=0 AND ignored=0;
-          SELECT reason_code, COUNT(*) AS n FROM publisher_auto_items_v3 WHERE state='exception' AND ignored=0 GROUP BY reason_code;
-          SELECT reason_code, COUNT(*) AS n FROM publisher_review_exceptions_v3 WHERE resolved=0 AND ignored=0 GROUP BY reason_code;
+          DB=/opt/qiaolian_v3/data/qiaolian_dual_bot.db
+          sqlite3 -header -column "$DB" <<'SQL'
+          SELECT
+            CASE WHEN length(trim(COALESCE(s.raw_text,'')))=0 THEN 'empty' ELSE 'has_text' END AS text_state,
+            COUNT(*) AS n
+          FROM publisher_review_exceptions_v3 e
+          JOIN review_items r ON r.review_id=e.review_id
+          JOIN canonical_records c ON c.canonical_record_id=r.canonical_record_id
+          LEFT JOIN source_posts s ON s.source_post_id=c.source_post_id
+          WHERE e.resolved=0 AND e.ignored=0 AND e.reason_code='missing_rent'
+          GROUP BY 1;
           SQL
+          echo "--- parser revision in release ---"
+          grep -n "PARSER_REVISION" /opt/qiaolian_v3/current/qiaolian_dual/canonical_facts.py | head -3
+          echo "--- trailing currency pattern present? ---"
+          grep -c "Bare currency after the number" /opt/qiaolian_v3/current/qiaolian_dual/canonical_facts.py || echo 0
+          echo "--- album harvest present? ---"
+          grep -c "harvest the longest" /opt/qiaolian_v3/current/v3_core/ingest/telegram_collector.py || echo 0
           REMOTE
       - name: Remove temporary SSH material
         if: always()
