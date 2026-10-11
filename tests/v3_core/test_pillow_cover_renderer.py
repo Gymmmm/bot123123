@@ -15,7 +15,7 @@ def test_pillow_cover_counts_and_exact_size(tmp_path, count):
         paths.append(make(tmp_path / f"{i}.jpg", size=size, value=40+i*15))
     out=tmp_path/"cover.png"
     render_cover(style="classic_blue", source_image=paths[0], source_images=paths[1:],
-                 source_labels=("客厅", "卧室", "厨房"), output_path=str(out),
+                 source_labels=("客厅", "卧室", "厨房"), output_path=str(out), layout="villa_4x5",
                  data=CoverRenderData(public_listing_id="QL-PP-T1", project="富力城", layout="1房", price="650"))
     with Image.open(out) as im:
         assert im.size == (1080,1350)
@@ -82,12 +82,12 @@ def test_all_bad_images_follow_business_failure_not_worker_crash(tmp_path):
 @pytest.mark.parametrize(
     "property_type,expected_size,hero",
     [
-        ("独栋别墅", (1080, 1350), (1080, 878)),
-        ("双拼别墅", (1080, 1350), (1080, 878)),
-        ("联排别墅", (1080, 1350), (1080, 878)),
-        ("villa", (1080, 1350), (1080, 878)),
-        ("", (1080, 1350), (1080, 878)),
-        ("商铺", (1080, 1350), (1080, 878)),
+        ("独栋别墅", (1080, 1388), (1080, 700)),     # default villa template: villa_black_gold
+        ("双拼别墅", (1080, 1388), (1080, 700)),
+        ("联排别墅", (1080, 1388), (1080, 700)),
+        ("villa", (1080, 1388), (1080, 700)),
+        ("", (1080, 1388), (1080, 700)),
+        ("商铺", (1080, 1388), (1080, 700)),
         ("公寓", (1200, 800), (798, 738)),
         ("服务式公寓", (1200, 800), (798, 738)),
         ("服务式", (1200, 800), (798, 738)),
@@ -112,8 +112,11 @@ def test_cover_size_per_property_type(tmp_path, property_type, expected_size, he
         for x, y, w, h in geo["thumbs"]:
             # Thumbnails are real photo pixels, edge to edge (no white frame).
             assert min(rgb.getpixel((x + w // 2, y + h // 2))) < 240
-        # Dark brand footer across the full width.
-        assert max(rgb.getpixel((expected_size[0] - 5, expected_size[1] - 5))) <= 40
+        corner = rgb.getpixel((expected_size[0] - 5, expected_size[1] - 5))
+        if geo["template"] == "villa_black_gold":
+            assert min(corner) >= 245                    # white footer (reference layout)
+        else:
+            assert max(corner) <= 40                     # dark brand footer across the full width
 
 
 def test_apartment_landscape_side_column_geometry():
@@ -205,7 +208,7 @@ def test_long_title_and_tag_render_without_error(tmp_path, property_type):
                                       project="非常非常长的项目名称测试太子国际广场豪华服务式公寓三期",
                                       layout="3房2卫 · 高层 · 全新精装 · 拎包入住 · 可养宠物", price="12500"))
     with Image.open(out) as im:
-        assert im.size in {(1080, 1350), (1200, 800)}
+        assert im.size in {(1080, 1388), (1080, 1350), (1200, 800)}
 
 
 def test_subtitle_joins_type_and_layout():

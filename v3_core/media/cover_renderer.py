@@ -5,6 +5,10 @@ Templates (chosen upstream by ``cover_plan``; ``auto`` follows the property type
 * ``apartment_3x2``: 1200x800 landscape. Hero on the left (798x738) and a
   right column of three stacked thumbnails (396 wide), 6px white separators,
   62px dark brand footer. Same proportions as the approved 1080x720 sample.
+* ``villa_black_gold`` (default villa template, ``V3_VILLA_COVER_TEMPLATE``): Gym's
+  1080x1388 reference — hero 700, black-gold info bar 700–868 (📍 title, gold rule,
+  类型 | N房 | 押付·租期, gold price card), three rounded 346x384 thumbs, white footer
+  with the 侨联地产 lockup and 出租房源 pill. See ``villa_card``.
 * ``villa_4x5``: 1080x1350 portrait. Hero 1080x878 (good exterior,
   straightened upstream), three 356x402 thumbnails below, 64px footer.
 * ``landscape_3x2``: villa without a good exterior — apartment geometry.
@@ -18,6 +22,7 @@ listing id, no 出租房源 pill, no white frame around the image.
 """
 from __future__ import annotations
 from dataclasses import dataclass
+import os
 from pathlib import Path
 from typing import Any, Iterable
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
@@ -97,6 +102,7 @@ class CoverRenderData:
     highlight_1: str = ""
     highlight_2: str = ""
     highlight_3: str = ""
+    terms: str = ""              # 押付·租期 from the offer (deposit/payment + contract); empty = omitted
 
     def price_line(self) -> str:
         raw = str(self.price or "").strip()
@@ -438,7 +444,9 @@ def _is_apartment(data: CoverRenderData) -> bool:
     return any(token in value for token in ("公寓", "服务式", "apartment", "condo", "studio"))
 
 
-TEMPLATES = ("apartment_3x2", "villa_4x5", "villa_compact", "landscape_3x2", "grid_2x2", "single")
+TEMPLATES = ("apartment_3x2", "villa_black_gold", "villa_4x5", "villa_compact", "landscape_3x2", "grid_2x2", "single")
+VILLA_TEMPLATES = ("villa_black_gold", "villa_4x5", "villa_compact")
+DEFAULT_VILLA_TEMPLATE = "villa_black_gold"
 SKY_TEXT_TEMPLATES = {"villa_4x5", "villa_compact"}
 DARK_INK = (24, 30, 36)
 DARK_GOLD = (170, 122, 30)
@@ -449,14 +457,21 @@ def _resolve_template(data: CoverRenderData, template: str | None) -> str:
     value = str(template or "").strip().lower()
     if value in TEMPLATES:
         return value
-    return "apartment_3x2" if _is_apartment(data) else "villa_4x5"
+    return "apartment_3x2" if _is_apartment(data) else villa_template_from_env()
+
+
+def villa_template_from_env() -> str:
+    """``V3_VILLA_COVER_TEMPLATE``: villa_black_gold (default, Gym's 1080x1388 reference layout),
+    villa_4x5 (V-A 1080x1350, title in the sky) or villa_compact (V-B 1080x1200)."""
+    value = (os.environ.get("V3_VILLA_COVER_TEMPLATE") or "").strip().lower()
+    return value if value in VILLA_TEMPLATES else DEFAULT_VILLA_TEMPLATE
 
 
 def _layout(data: CoverRenderData, template: str | None = None) -> CoverLayout:
     value = _resolve_template(data, template)
     if value == "grid_2x2":
         return GRID_LAYOUT
-    if value == "villa_4x5":
+    if value in ("villa_4x5", "villa_black_gold"):
         return TALL_LAYOUT
     if value == "villa_compact":
         return TALL_COMPACT_LAYOUT
@@ -496,6 +511,13 @@ def _thumb_boxes(geo: CoverLayout, count: int) -> list[tuple[int, int, int, int]
 
 
 def _layout_geometry(data: CoverRenderData, template: str | None = None) -> dict[str, Any]:
+    if _resolve_template(data, template) == "villa_black_gold":
+        from .villa_card import GEOMETRY as g, thumb_columns
+
+        return {"canvas": g.canvas, "hero": (g.canvas[0], g.hero_height),
+                "thumbs": [(x, g.thumb_top, w, g.thumb_bottom - g.thumb_top) for x, w in thumb_columns(3)],
+                "footer_top": g.footer_top, "footer_height": g.canvas[1] - g.footer_top,
+                "bar": (g.hero_height, g.bar_bottom), "price_card": g.price_card, "template": "villa_black_gold"}
     geo = _layout(data, template)
     hero = geo.hero
     if _resolve_template(data, template) == "single":
@@ -522,6 +544,13 @@ def render_cover(*, style: str, source_image: str, output_path: str, data: Cover
     images = _usable_images(candidates)
     if not images:
         raise ValueError("cover_no_usable_images")
+    if template == "villa_black_gold":
+        if len(images) > 1:
+            from .villa_card import render_villa_card
+
+            return str(render_villa_card(data=data, images=images, labels=source_labels or (),
+                                         output=Path(output_path).expanduser().resolve()))
+        template = "villa_4x5"              # no detail photos: the full-height hero template
     geo = _layout(data, template)
     W, H = geo.canvas
     canvas = Image.new("RGB", geo.canvas, PAGE_BG)
@@ -591,4 +620,4 @@ def render_cover(*, style: str, source_image: str, output_path: str, data: Cover
     return str(output)
 
 
-__all__ = ["CoverRenderData", "TEMPLATES", "render_cover"]
+__all__ = ["CoverRenderData", "DEFAULT_VILLA_TEMPLATE", "TEMPLATES", "VILLA_TEMPLATES", "render_cover", "villa_template_from_env"]

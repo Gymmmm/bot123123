@@ -21,6 +21,22 @@ from .cover_styles import (
 )
 from .service import PreparedSourceMedia
 
+_EMPTY_TERMS = {"", "none", "null", "未知", "待确认", "-", "无"}
+
+
+def cover_terms(offer: dict) -> str:
+    """'押2付1 · 1年' from the offer's real fields (payment/deposit + contract); missing parts omitted."""
+    if str(offer.get("offer_type") or "rent").strip().lower() != "rent":
+        return ""
+    def clean(value: object) -> str:
+        text = " ".join(str(value or "").split())
+        return "" if text.lower() in _EMPTY_TERMS else text[:16]
+    deposit = clean(offer.get("payment_terms")) or clean(offer.get("deposit_terms"))
+    contract = clean(offer.get("contract_term"))
+    for prefix in ("租期", "合同"):
+        contract = contract.removeprefix(prefix).lstrip(":： ")
+    return " · ".join(part for part in (deposit, contract) if part)
+
 
 @dataclass(frozen=True)
 class RenderedCover:
@@ -119,6 +135,7 @@ class CoverRenderService:
             highlight_1="",
             highlight_2="",
             highlight_3="",
+            terms=cover_terms(offer),
         )
         target = (
             Path(output_path).expanduser().resolve()

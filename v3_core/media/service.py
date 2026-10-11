@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import hashlib
-import os
 from pathlib import Path
 import shutil
 from typing import Any, Iterable
@@ -24,13 +23,7 @@ from .vision import VisionClient, analyze_photos, vision_client_from_env
 from .photo_formatter import format_gallery_photo, gallery_canvas_key, resolve_gallery_logo_path
 from .source_scrub import scrub_file
 
-VILLA_TEMPLATES = ("villa_4x5", "villa_compact")
-
-
-def villa_template_from_env() -> str:
-    """``V3_VILLA_COVER_TEMPLATE``: villa_4x5 (V-A, default, 1080x1350) or villa_compact (V-B, 1080x1200)."""
-    value = (os.environ.get("V3_VILLA_COVER_TEMPLATE") or "").strip().lower()
-    return value if value in VILLA_TEMPLATES else "villa_4x5"
+from .cover_renderer import VILLA_TEMPLATES, villa_template_from_env  # noqa: E402  (single source)
 
 
 MAX_SCRUB_COVERAGE = 0.08
@@ -297,8 +290,8 @@ class MediaPreparationService:
             manual_cover=manual_clean or None,
             correction_probe=_probe,
         )
-        if plan.template == "villa_4x5" and villa_template_from_env() == "villa_compact":
-            plan.template = "villa_compact"
+        if plan.template == "villa_4x5":
+            plan.template = villa_template_from_env()
         correction = dict(plan.hero_correction)
         if not correction:
             mode = "exterior" if plan.template in VILLA_TEMPLATES else "interior"

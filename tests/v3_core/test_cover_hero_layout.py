@@ -104,8 +104,9 @@ def test_without_sky_the_legacy_top_left_title_is_used(tmp_path):
 
 def test_villa_template_env(monkeypatch):
     monkeypatch.delenv("V3_VILLA_COVER_TEMPLATE", raising=False)
-    assert villa_template_from_env() == "villa_4x5"
-    monkeypatch.setenv("V3_VILLA_COVER_TEMPLATE", "villa_compact")
-    assert villa_template_from_env() == "villa_compact"
+    assert villa_template_from_env() == "villa_black_gold"
+    for name in ("villa_compact", "villa_4x5", "villa_black_gold"):
+        monkeypatch.setenv("V3_VILLA_COVER_TEMPLATE", name)
+        assert villa_template_from_env() == name
     monkeypatch.setenv("V3_VILLA_COVER_TEMPLATE", "bogus")
-    assert villa_template_from_env() == "villa_4x5"
+    assert villa_template_from_env() == "villa_black_gold"
