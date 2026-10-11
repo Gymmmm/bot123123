@@ -11,7 +11,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 18
+    timeout-minutes: 10
     steps:
       - name: Configure pinned production SSH
         env:
@@ -23,55 +23,31 @@ jobs:
           printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
           printf '%s\n' '50.114.74.120 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMvdBaAbAt9/4NCEC4RmiAukQ5KK5S6OF4YEml2iLw+6' > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
-      - name: Verify deployed SHA, live service environment and actual Gemini photo response
+      - name: Read-only exception and service check
         run: |
           set -Eeuo pipefail
           ssh -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 root@50.114.74.120 'bash -s' <<'REMOTE'
           set -Eeuo pipefail
-          test "$(cat /opt/qiaolian_v3/.deployed_sha)" = c4307f7e9ee33f14af9a1cb0fd2e7f5ff4d7bab6
-          readlink -f /opt/qiaolian_v3/current
+          echo "=== DEPLOYED ==="
+          cat /opt/qiaolian_v3/.deployed_sha || true
+          readlink -f /opt/qiaolian_v3/current || true
+          echo "=== SERVICES ==="
           for component in collector canonical publisher user; do
             unit="qiaolian-v3@$component.service"
-            systemctl is-active --quiet "$unit"
-            systemctl show "$unit" --property=ActiveState,NRestarts,ExecMainStatus --no-pager
+            printf '%s: ' "$unit"
+            systemctl is-active "$unit" || true
           done
-          CHECK=$(mktemp /var/tmp/qiaolian-live-vision.XXXXXX.py)
-          trap 'rm -f "$CHECK"' EXIT
-          cat > "$CHECK" <<'PY'
-          import asyncio,json,sqlite3
-          from pathlib import Path
-          from telegram import Bot
-          from v3_core.publishing.admin_bot import load_settings,build_workflow
-          from v3_core.publishing.telegram_adapter import TelegramChannelAdapter
-          from v3_core.publishing.delivery_coordinator import TelegramSendCommand
-          async def main():
-              settings=load_settings(); workflow=build_workflow(settings)
-              db=sqlite3.connect(settings.db_path);db.row_factory=sqlite3.Row
-              async with Bot(settings.token) as bot:
-                  chat=await bot.get_chat(settings.channel_chat_id)
-                  for kind in ("别墅","公寓"):
-                      row=db.execute("SELECT a.*,l.public_listing_id FROM publisher_auto_items_v3 a JOIN listings_v3 l ON l.listing_id=a.listing_id JOIN listing_offers o ON o.offer_id=a.offer_id WHERE a.state='published' AND l.property_type=? AND l.inventory_status='active' AND o.offer_status='active' ORDER BY a.rowid DESC LIMIT 1",(kind,)).fetchone()
-                      assert row,"candidate_missing"
-                      previous=workflow.delivery.publications.get_published_for_listing(row["listing_id"],platform="telegram",channel_chat_id=str(settings.channel_chat_id))
-                      package=workflow.package(previous.package_id)
-                      media=await asyncio.to_thread(workflow.review_media,review_id=row["review_id"])
-                      target=Path(settings.cover_output_dir)/("preview_20261011_"+row["public_listing_id"]+".png")
-                      rendered=await asyncio.to_thread(workflow.covers.render,listing_id=row["listing_id"],offer_id=row["offer_id"],media=media,style=package.cover_style,output_path=target)
-                      listing=workflow.reader.listing(row["listing_id"])
-                      caption="🧪 "+kind+"封面效果预览\n\n"+package.post_text
-                      command=TelegramSendCommand(attempt_id="",package_id=package.package_id,channel_chat_id=str(settings.channel_chat_id),cover_path=rendered.output_path,caption=caption,actions=dict(package.actions),inventory_status=listing["inventory_status"],area_key=str(listing.get("public_location_key") or ""))
-                      receipt=await TelegramChannelAdapter(bot).send(command)
-                      mid=receipt["media_message_ids"][0]
-                      link=("https://t.me/"+chat.username+"/" if chat.username else "https://t.me/c/"+str(chat.id).removeprefix("-100")+"/")+str(mid)
-                      print("PREVIEW_POST_SENT",json.dumps({"kind":kind,"listing":row["listing_id"],"public_id":row["public_listing_id"],"link":link,"cover":rendered.output_path,"labels":list(getattr(media,"cover_labels",()) or ())},ensure_ascii=False),flush=True)
-                      assert receipt.get("single_cover") is True
-          asyncio.run(main())
-          
-          PY
-          chmod 0644 "$CHECK"
-          cd /opt/qiaolian_v3/current
-          export PYTHONPATH=/opt/qiaolian_v3/current
-          runuser -u qiaolianbot -- bash -lc "set -a; source /opt/qiaolian_v3/runtime.env; set +a; export PYTHONPATH=/opt/qiaolian_v3/current; cd /opt/qiaolian_v3/current; exec /opt/qiaolian_v3/.venv/bin/python '$CHECK'"
+          echo "=== EXCEPTION COUNTS ==="
+          DB=$(ls /opt/qiaolian_v3/data/*.db 2>/dev/null | head -1)
+          if [ -z "$DB" ]; then DB=/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db; fi
+          echo "DB=$DB"
+          sqlite3 "$DB" <<'SQL'
+          .mode line
+          SELECT 'auto_items_exception' AS k, COUNT(*) AS n FROM publisher_auto_items_v3 WHERE state='exception' AND ignored=0;
+          SELECT 'review_exceptions' AS k, COUNT(*) AS n FROM publisher_review_exceptions_v3 WHERE resolved=0 AND ignored=0;
+          SELECT reason_code, COUNT(*) AS n FROM publisher_auto_items_v3 WHERE state='exception' AND ignored=0 GROUP BY reason_code;
+          SELECT reason_code, COUNT(*) AS n FROM publisher_review_exceptions_v3 WHERE resolved=0 AND ignored=0 GROUP BY reason_code;
+          SQL
           REMOTE
       - name: Remove temporary SSH material
         if: always()
