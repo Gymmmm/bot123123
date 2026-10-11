@@ -11,7 +11,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 10
     steps:
       - name: Configure pinned production SSH
         env:
@@ -23,50 +23,35 @@ jobs:
           printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
           printf '%s\n' '50.114.74.120 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMvdBaAbAt9/4NCEC4RmiAukQ5KK5S6OF4YEml2iLw+6' > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
-      - name: Full flow check
+      - name: Inspect new empty sources and queue movement
         run: |
           set -Eeuo pipefail
           ssh -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 root@50.114.74.120 'bash -s' <<'REMOTE'
           set -Eeuo pipefail
-          echo "=== DEPLOY ==="
-          cat /opt/qiaolian_v3/.deployed_sha
-          readlink -f /opt/qiaolian_v3/current
-          echo "=== FIX MARKERS ==="
-          grep -c "Bare currency after the number" /opt/qiaolian_v3/current/qiaolian_dual/canonical_facts.py
-          grep -c "longest non-empty caption" /opt/qiaolian_v3/current/v3_core/ingest/telegram_collector.py
-          echo "=== SERVICES ==="
-          for c in collector canonical publisher user; do
-            u="qiaolian-v3@$c.service"
-            printf '%s ' "$u"
-            systemctl is-active "$u" || true
-            systemctl show "$u" --property=NRestarts,MainPID --no-pager | tr '\n' ' '
-            echo
-          done
-          echo "=== JOURNAL ERRORS 30m ==="
-          journalctl -u 'qiaolian-v3@*' --since '-30 min' --no-pager -o cat 2>/dev/null | grep -Ei 'Traceback|ModuleNotFoundError|Failed with result|database is locked' | tail -20 || echo none
           DB=/opt/qiaolian_v3/data/qiaolian_dual_bot.db
-          echo "=== COUNTS ==="
+          echo "=== NEW EMPTY SOURCES ==="
           sqlite3 -header -column "$DB" <<'SQL'
-          SELECT 'auto_exception' AS k, COUNT(*) AS n FROM publisher_auto_items_v3 WHERE state='exception' AND ignored=0
-          UNION ALL SELECT 'review_exception', COUNT(*) FROM publisher_review_exceptions_v3 WHERE resolved=0 AND ignored=0
-          UNION ALL SELECT 'auto_queued', COUNT(*) FROM publisher_auto_items_v3 WHERE state='queued' AND ignored=0
-          UNION ALL SELECT 'auto_published', COUNT(*) FROM publisher_auto_items_v3 WHERE state='published'
-          UNION ALL SELECT 'auto_sending', COUNT(*) FROM publisher_auto_items_v3 WHERE state='sending';
-          SELECT reason_code, COUNT(*) n FROM publisher_auto_items_v3 WHERE state='exception' AND ignored=0 GROUP BY reason_code;
-          SELECT reason_code, COUNT(*) n FROM publisher_review_exceptions_v3 WHERE resolved=0 AND ignored=0 GROUP BY reason_code;
+          SELECT id, source_post_id, parse_status, length(COALESCE(raw_text,'')) text_len,
+                 json_extract(raw_meta_json,'$.ingest_kind') kind,
+                 json_extract(raw_meta_json,'$.message_count') msgs,
+                 created_at
+          FROM source_posts
+          WHERE id >= 888
+          ORDER BY id;
           SQL
-          echo "=== RENT TEXT SPLIT ==="
+          echo "=== QUEUED ==="
+          sqlite3 -header -column "$DB" "SELECT state, reason_code, COUNT(*) n FROM publisher_auto_items_v3 WHERE ignored=0 AND state IN ('queued','exception','sending') GROUP BY state, reason_code;"
+          echo "=== REVIEW NEW ==="
           sqlite3 -header -column "$DB" <<'SQL'
-          SELECT CASE WHEN length(trim(COALESCE(s.raw_text,'')))=0 THEN 'empty' ELSE 'has_text' END AS text_state, COUNT(*) n
+          SELECT e.review_id, e.updated_at, length(trim(COALESCE(s.raw_text,''))) text_len,
+                 json_extract(s.raw_meta_json,'$.ingest_kind') kind
           FROM publisher_review_exceptions_v3 e
           JOIN review_items r ON r.review_id=e.review_id
           JOIN canonical_records c ON c.canonical_record_id=r.canonical_record_id
           JOIN source_posts s ON CAST(s.id AS TEXT)=CAST(c.source_post_id AS TEXT)
           WHERE e.resolved=0 AND e.ignored=0 AND e.reason_code='missing_rent'
-          GROUP BY 1;
+          ORDER BY e.updated_at DESC LIMIT 6;
           SQL
-          echo "=== RECENT SOURCE ==="
-          sqlite3 -header -column "$DB" "SELECT id, parse_status, length(COALESCE(raw_text,'')) text_len, created_at FROM source_posts ORDER BY id DESC LIMIT 5;"
           REMOTE
       - name: Remove temporary SSH material
         if: always()
