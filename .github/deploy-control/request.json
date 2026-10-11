@@ -1,1 +1,5 @@
-{"confirm":"DEPLOY","deploy_sha":"c4307f7e9ee33f14af9a1cb0fd2e7f5ff4d7bab6","request_id":"cover-hero-aesthetic-gemini-20261011"}
+{
+  "confirm": "DEPLOY",
+  "deploy_sha": "0704b823d7e1510ba181ffaeb0d8c0bea6065aea",
+  "request_id": "fix-rent-album-exceptions-20261011"
+}
