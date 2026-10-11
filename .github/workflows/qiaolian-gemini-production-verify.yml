@@ -1,0 +1,78 @@
+name: qiaolian-gemini-production-verify
+on:
+  push:
+    branches: [ops/gemini-verify-20261011]
+    paths: [.github/workflows/qiaolian-gemini-production-verify.yml]
+permissions:
+  contents: read
+concurrency:
+  group: qiaolian-v3-production
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Configure pinned production SSH
+        env:
+          PROD_SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+        run: |
+          set -Eeuo pipefail
+          test -n "$PROD_SSH_PRIVATE_KEY"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
+          printf '%s\n' '50.114.74.120 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMvdBaAbAt9/4NCEC4RmiAukQ5KK5S6OF4YEml2iLw+6' > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
+      - name: Verify deployed SHA, live service environment and actual Gemini photo response
+        run: |
+          set -Eeuo pipefail
+          ssh -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 root@50.114.74.120 'bash -s' <<'REMOTE'
+          set -Eeuo pipefail
+          test "$(cat /opt/qiaolian_v3/.deployed_sha)" = c4307f7e9ee33f14af9a1cb0fd2e7f5ff4d7bab6
+          readlink -f /opt/qiaolian_v3/current
+          for component in collector canonical publisher user; do
+            unit="qiaolian-v3@$component.service"
+            systemctl is-active --quiet "$unit"
+            systemctl show "$unit" --property=ActiveState,NRestarts,ExecMainStatus --no-pager
+          done
+          CHECK=$(mktemp /var/tmp/qiaolian-live-vision.XXXXXX.py)
+          trap 'rm -f "$CHECK"' EXIT
+          cat > "$CHECK" <<'PY'
+          import json, os, sqlite3, subprocess
+          from pathlib import Path
+          from v3_core.media.vision import vision_client_from_env
+          pid = subprocess.check_output(["systemctl", "show", "qiaolian-v3@publisher.service", "-p", "MainPID", "--value"], text=True).strip()
+          live = {}
+          for entry in Path(f"/proc/{pid}/environ").read_bytes().split(b"\0"):
+              if b"=" in entry:
+                  k, v = entry.split(b"=", 1)
+                  live[k.decode()] = v.decode()
+          client = vision_client_from_env(live)
+          print("LIVE_VISION_CONFIG", json.dumps({"provider": client.name, "models": getattr(client, "models", []), "key_present": bool(getattr(client, "_api_key", ""))}))
+          assert client.name == "gemini", "publisher_not_using_gemini_config"
+          roots = [Path("/opt/qiaolian_dual_bots/media")]
+          photos = []
+          for root in roots:
+              for p in root.rglob("*"):
+                  if p.is_file() and p.suffix.lower() in {".jpg", ".jpeg", ".png"} and not any("cover" in part.lower() for part in p.parts) and p.stat().st_size > 15000:
+                      photos.append(p)
+                      if len(photos) == 2:
+                          break
+          assert photos, "production_photo_missing"
+          for index, photo in enumerate(photos, 1):
+              result = client.analyze(str(photo))
+              print("LIVE_VISION_RESULT", json.dumps({"sample": index, "provider": result.provider, "room_type": result.room_type, "confidence": result.confidence, "usage": client.usage_log[-1] if client.usage_log else {}}, ensure_ascii=False))
+              assert result.provider.startswith("gemini:"), "gemini_request_fell_back"
+          db = sqlite3.connect("file:/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db?mode=ro", uri=True)
+          assert db.execute("PRAGMA quick_check").fetchone()[0] == "ok"
+          print("DB_QUICK_CHECK=ok")
+          print("GEMINI_PRODUCTION_VERIFIED")
+          PY
+          chmod 0600 "$CHECK"
+          cd /opt/qiaolian_v3/current
+          export PYTHONPATH=/opt/qiaolian_v3/current
+          /opt/qiaolian_v3/.venv/bin/python "$CHECK"
+          REMOTE
+      - name: Remove temporary SSH material
+        if: always()
+        run: rm -f "$HOME/.ssh/qiaolian_production"
