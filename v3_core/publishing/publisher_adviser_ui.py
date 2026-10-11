@@ -167,7 +167,7 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
         await message.reply_text(
             "<b>🖼 选择主图</b>\n\n"
             "封面已全自动选好；这里只是可选纠错：点下方按钮，选一张原图作为频道封面主图。\n"
-            "版式自动定：公寓横版 1200×800（左大图 + 右三小图）· 别墅外观好 → 竖版 1080×1350，否则横版 · 没有突出主图 → 四宫格 · 只有一张 → 单图。\n"
+            "版式自动定：公寓横版 1200×800（左大图 + 右三小图）· 别墅 → 黑金竖版 1080×1388（外观轻度扶正；外观仰拍/仍倾斜 → 客厅做主图） · 没有突出主图 → 四宫格 · 只有一张 → 单图。\n"
             "更多实拍相册仍用全部照片，并加上侨联角标。",
             parse_mode=ParseMode.HTML,
         )
@@ -500,7 +500,7 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
                     "<b>🎨 选择封面格式</b>\n\n"
                     "封面统一侨联实拍版式，版式按房型自动定（跟主图横竖无关）：\n"
                     "公寓/服务式 → 横版 1200×800（左大图 + 右三小图）\n"
-                    "别墅/独栋等 → 外观好用竖版 1080×1350（外观自动扶正），否则横版 1200×800\n"
+                    "别墅/独栋等 → 黑金竖版 1080×1388：外观好用外观（轻度扶正），仰拍/仍倾斜就用客厅\n"
                     "没有突出主图 → 四宫格；只有一张 → 单图；房间看不准就不标房间名",
                     parse_mode=ParseMode.HTML,
                     reply_markup=InlineKeyboardMarkup([

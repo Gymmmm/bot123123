@@ -154,18 +154,19 @@ def test_villa_perspective_correction_does_not_stretch_the_building(photos_copy,
     src = [p for p in photos_copy("6735") if p.stem == "01"][0]
     report = correct_file(src, tmp_path / "out.jpg", mode="exterior")
     assert report["status"] == "corrected"
-    assert report["aspect_change"] <= 0.10          # centre of the building: <10 % wider/thinner
+    assert report["aspect_change"] <= 0.13          # gentle 85 %: centre of the building barely changes
     assert report["edge_aspect_change"] <= 0.25
     assert report["crop_kept"] >= 0.7
     assert report["lean_after_deg"] < report["lean_before_deg"]
-    assert report["residual_after_deg"] <= 1.0          # verticals within 1 degree
+    assert report["method"] == "gentle" and report["keystone_strength"] == 0.85
+    assert report["residual_after_deg"] < 3.5 and report["hero_ok"] is True   # the approved 6735 look
 
 
 def test_correction_reverts_or_refuses_outside_bounds(tmp_path, monkeypatch):
     from v3_core.media import straighten
 
-    monkeypatch.setattr(straighten, "EXTERIOR_MAX_ASPECT_CHANGE", 0.001)
-    monkeypatch.setattr(straighten, "EXTERIOR_MAX_EDGE_ASPECT_CHANGE", 0.001)
+    monkeypatch.setattr(straighten, "GUARD_ASPECT_CHANGE", 0.001)
+    monkeypatch.setattr(straighten, "GUARD_EDGE_ASPECT_CHANGE", 0.001)
     src = FIXTURES / "photos" / "6735" / "01.jpg"
     report = straighten.correct_file(src, tmp_path / "x.jpg", mode="exterior")
     assert report["status"] == "reverted:aspect_change" and "path" not in report
@@ -390,3 +391,62 @@ def test_real_provider_results_are_cached_per_photo(tmp_path):
     assert len(calls) == 3                      # parallel first pass, cached second pass
     assert list(first) == list(second) == [str(Path(p).resolve()) for p in photos]
     assert all(v.room_type == "客厅" for v in second.values())
+
+
+def _tilted_exterior_probe(path, mode):
+    if mode == "exterior":
+        return {"status": "corrected", "mode": mode, "hero_ok": False, "severe_upshot": True,
+                "residual_after_deg": 4.2, "edge_lean_before_deg": 23.6}
+    return {"status": "level", "mode": mode}
+
+
+def test_exterior_still_tilted_after_gentle_fix_falls_back_to_living_room(photos_copy):
+    paths = photos_copy("6735")
+    selected = select_publication_media(paths, cover_preference="exterior")
+    vision = analyze_photos(selected["gallery_paths"], FixtureVisionClient(FIXTURES), ranking=selected["ranking"],
+                            use_cache=False)
+    probed = []
+    def probe(p, m):
+        probed.append(m)
+        return _tilted_exterior_probe(p, m)
+    plan = plan_cover(gallery=selected["gallery_paths"], ranking=selected["ranking"], vision=vision,
+                      property_type="独栋别墅", correction_probe=probe)
+    items = {i.path: i for i in plan.photos}
+    assert items[plan.hero].room_type == "客厅"
+    assert "近距离仰拍" in plan.hero_reason and "用客厅做主图" in plan.hero_reason
+    assert probed.count("exterior") == 1                       # no weaker side exterior tried after it
+    assert any("不做主图" in a for i in plan.photos for a in i.adjustments)
+
+
+def test_gentle_ok_exterior_stays_hero(photos_copy):
+    plan, items = _plan("6735", "独栋别墅", photos=photos_copy("6735"))
+    assert items[plan.hero].room_type == "外观"
+    assert plan.hero_correction.get("hero_ok") is True and plan.hero_correction.get("method") == "gentle"
+
+
+def test_service_keeps_black_gold_for_living_room_fallback(tmp_path, photos_copy, monkeypatch):
+    import v3_core.media.service as svc
+
+    monkeypatch.delenv("V3_VILLA_COVER_TEMPLATE", raising=False)
+    paths = [str(p) for p in photos_copy("6735")]
+    modes = []
+    real = svc.correct_file
+    def fake(src, dst, *, mode="exterior"):
+        modes.append(mode)
+        return _tilted_exterior_probe(src, mode) if mode == "exterior" else real(src, dst, mode=mode)
+    monkeypatch.setattr(svc, "correct_file", fake)
+
+    class Reader:
+        db_path = str(tmp_path / "db" / "x.db")
+        def source_image_paths(self, _pid):
+            return paths
+        def source_identity(self, pid):
+            return {"source_post_id": int(pid)}
+
+    media = svc.MediaPreparationService(Reader(), prepared_dir=tmp_path / "prepared",
+                                        vision_client=FixtureVisionClient(FIXTURES)).prepare(
+        source_post_id=6735, property_hints=("独栋别墅",))
+    plan = media.source_identity["cover_plan"]
+    assert media.cover_template == "villa_black_gold"
+    assert "用客厅做主图" in plan["hero_reason"]
+    assert modes[-1] == "interior"                            # the living room is never keystoned as a facade

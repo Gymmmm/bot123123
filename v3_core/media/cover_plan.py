@@ -373,21 +373,32 @@ def _auto_hero(eligible: list[PhotoAssessment], kind: str, probe) -> tuple[Photo
     by_score = sorted(eligible, key=lambda i: -i.hero_score)
     if kind == "villa":
         exteriors = sorted((i for i in eligible if _exterior_ok(i)), key=lambda i: -_exterior_rank(i))
+        rejected_tilt: list[PhotoAssessment] = []
         for candidate in exteriors:
             report = dict(probe(candidate.path, "exterior")) if probe else {}
             status = str(report.get("status") or "")
             if status.startswith("refused"):
                 candidate.adjustments.append(f"外观矫正被拒（{status}），换下一张")
                 continue
+            if report.get("hero_ok") is False:
+                # Gentle correction left it leaning (> HERO_MAX_RESIDUAL_DEG) or it is a close
+                # upward shot: never straighten harder (it stretches) — just don't use it as hero.
+                why = "近距离仰拍" if report.get("severe_upshot") else "矫正后仍倾斜"
+                candidate.adjustments.append(
+                    f"外观{why}（残余 {report.get('residual_after_deg')}°，边缘 {report.get('edge_lean_before_deg')}°），不做主图")
+                rejected_tilt.append(candidate)
+                break   # Gym 2026-10-11: best exterior unusable → best living room (not a weaker side view)
             return (candidate, f"外观完整度 {candidate.completeness:.2f}、遮挡 {candidate.obstruction:.2f}，"
                                f"在 {len(exteriors)} 张合格外观中最佳", TEMPLATE_VILLA, report)
         rejected = [i for i in eligible if i.room_type in {"外观", "入口"} and i.show_label and not _exterior_ok(i)]
         why = "外观不合格（" + "；".join(
             f"完整度{i.completeness:.2f}/遮挡{i.obstruction:.2f}" for i in rejected) + "）" if rejected else "没有可信外观"
+        if rejected_tilt:
+            why = rejected_tilt[0].adjustments[-1].replace("，不做主图", "")
         preferred = [i for i in by_score if i.show_label and i.room_type in {"客厅", "庭院", "泳池"}]
         hero = preferred[0] if preferred and preferred[0].hero_score >= by_score[0].hero_score - 0.05 else by_score[0]
         room = hero.room_type if hero.show_label else "最佳空间"
-        return hero, f"{why} → 用{room}做主图，横版 3:2", TEMPLATE_LANDSCAPE, {}
+        return hero, f"{why} → 用{room}做主图", TEMPLATE_LANDSCAPE, {}
     living = [i for i in by_score if i.show_label and i.room_type == "客厅" and i.quality >= 0.55]
     if living:
         hero = living[0]

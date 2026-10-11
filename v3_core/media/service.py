@@ -290,11 +290,17 @@ class MediaPreparationService:
             manual_cover=manual_clean or None,
             correction_probe=_probe,
         )
+        villa_template = villa_template_from_env()
         if plan.template == "villa_4x5":
-            plan.template = villa_template_from_env()
+            plan.template = villa_template
+        elif plan.kind == "villa" and plan.template == "landscape_3x2" and villa_template == "villa_black_gold":
+            # No usable exterior: the best living room is the hero, still in the villa black-gold layout.
+            plan.template = villa_template
         correction = dict(plan.hero_correction)
         if not correction:
-            mode = "exterior" if plan.template in VILLA_TEMPLATES else "interior"
+            hero_item = next((i for i in plan.photos if i.path == plan.hero), None)
+            exterior_hero = hero_item is not None and hero_item.show_label and hero_item.room_type in {"外观", "入口"}
+            mode = "exterior" if exterior_hero else "interior"
             correction = _probe(plan.hero, mode)
             plan.hero_correction = correction
         render_source = str(correction.get("path") or "")
