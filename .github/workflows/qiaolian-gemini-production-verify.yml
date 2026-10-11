@@ -38,23 +38,25 @@ jobs:
           CHECK=$(mktemp /var/tmp/qiaolian-live-vision.XXXXXX.py)
           trap 'rm -f "$CHECK"' EXIT
           cat > "$CHECK" <<'PY'
-          import json,sqlite3
+          import os,signal
           from pathlib import Path
-          from v3_core.publishing.admin_bot import load_settings,build_workflow
-          settings=load_settings(); workflow=build_workflow(settings)
-          db=sqlite3.connect(settings.db_path); db.row_factory=sqlite3.Row
-          for row in db.execute("SELECT e.listing_id,c.source_post_id,c.facts_json FROM publisher_review_exceptions_v3 e JOIN review_items r ON r.review_id=e.review_id JOIN canonical_records c ON c.canonical_record_id=r.canonical_record_id WHERE e.resolved=0 AND e.ignored=0"):
-              source=workflow.media.reader.source_post(int(row["source_post_id"]))
-              print("RENT_SOURCE",json.dumps({"listing":row["listing_id"],"facts":json.loads(row["facts_json"] or "{}"),"raw":str(source.get("raw_text") or "")[:1400]},ensure_ascii=False))
-          for row in db.execute("SELECT a.listing_id,c.source_post_id FROM publisher_auto_items_v3 a JOIN review_items r ON r.review_id=a.review_id JOIN canonical_records c ON c.canonical_record_id=r.canonical_record_id WHERE a.state='exception' AND a.reason_code IN ('unreadable_media','insufficient_media') AND a.ignored=0"):
-              paths=workflow.media.reader.source_image_paths(row["source_post_id"])
-              print("RAW_MEDIA",json.dumps({"listing":row["listing_id"],"total":len(paths),"exists":sum(Path(p).is_file() for p in paths),"paths":paths[:2]},ensure_ascii=False))
+          for proc in Path("/proc").iterdir():
+              if not proc.name.isdigit(): continue
+              try:
+                  args=(proc/"cmdline").read_bytes().split(b"\0")
+                  candidates=[Path(x.decode()) for x in args if x.startswith(b"/var/tmp/qiaolian-live-vision.") and x.endswith(b".py")]
+                  for script in candidates:
+                      text=script.read_text()
+                      if 'print("MEDIA_CHECK"' in text and 'print("POST_UPDATED"' in text:
+                          os.kill(int(proc.name),signal.SIGINT)
+                          print("STOPPED_OWN_BULK_MEDIA_PROBE",proc.name)
+              except (PermissionError,FileNotFoundError,ProcessLookupError): pass
           
           PY
-          chmod 0644 "$CHECK"
+          chmod 0600 "$CHECK"
           cd /opt/qiaolian_v3/current
           export PYTHONPATH=/opt/qiaolian_v3/current
-          runuser -u qiaolianbot -- bash -lc "set -a; source /opt/qiaolian_v3/runtime.env; set +a; export PYTHONPATH=/opt/qiaolian_v3/current; cd /opt/qiaolian_v3/current; exec /opt/qiaolian_v3/.venv/bin/python '$CHECK'"
+          /opt/qiaolian_v3/.venv/bin/python "$CHECK"
           REMOTE
       - name: Remove temporary SSH material
         if: always()
