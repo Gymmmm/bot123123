@@ -6,7 +6,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: qiaolian-publisher-readonly-diagnostics
+  group: qiaolian-channel-cover-preview
   cancel-in-progress: false
 jobs:
   verify:
@@ -38,28 +38,40 @@ jobs:
           CHECK=$(mktemp /var/tmp/qiaolian-live-vision.XXXXXX.py)
           trap 'rm -f "$CHECK"' EXIT
           cat > "$CHECK" <<'PY'
-          import json,os,pwd,sqlite3
+          import asyncio,json,sqlite3
           from pathlib import Path
-          from PIL import Image
-          account=pwd.getpwnam("qiaolianbot")
-          db=sqlite3.connect("file:/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db?mode=ro",uri=True); db.row_factory=sqlite3.Row
-          rows=db.execute("SELECT a.listing_id,c.source_post_id FROM publisher_auto_items_v3 a JOIN review_items r ON r.review_id=a.review_id JOIN canonical_records c ON c.canonical_record_id=r.canonical_record_id WHERE a.state='exception' AND a.reason_code IN ('unreadable_media','insufficient_media') AND a.ignored=0").fetchall()
-          for row in rows:
-              root=Path("/opt/qiaolian_dual_bots/media/prepared_v3")/str(int(row["source_post_id"]))
-              fixed=0
-              if root.exists():
-                  for path in [root,*root.rglob("*")]:
-                      if path.is_symlink(): continue
-                      if path.stat().st_uid==0:
-                          os.chown(path,account.pw_uid,account.pw_gid); fixed+=1
-                  print("MEDIA_PERMISSION",json.dumps({"listing":row["listing_id"],"fixed":fixed}))
-          print("PERMISSION_REPAIR_DONE")
+          from telegram import Bot
+          from v3_core.publishing.admin_bot import load_settings,build_workflow
+          from v3_core.publishing.telegram_adapter import TelegramChannelAdapter
+          from v3_core.publishing.delivery_coordinator import TelegramSendCommand
+          async def main():
+              settings=load_settings(); workflow=build_workflow(settings)
+              db=sqlite3.connect(settings.db_path);db.row_factory=sqlite3.Row
+              async with Bot(settings.token) as bot:
+                  chat=await bot.get_chat(settings.channel_chat_id)
+                  for kind in ("别墅","公寓"):
+                      row=db.execute("SELECT a.*,l.public_listing_id FROM publisher_auto_items_v3 a JOIN listings_v3 l ON l.listing_id=a.listing_id JOIN listing_offers o ON o.offer_id=a.offer_id WHERE a.state='published' AND l.property_type=? AND l.inventory_status='active' AND o.offer_status='active' ORDER BY a.rowid DESC LIMIT 1",(kind,)).fetchone()
+                      assert row,"candidate_missing"
+                      previous=workflow.delivery.publications.get_published_for_listing(row["listing_id"],platform="telegram",channel_chat_id=str(settings.channel_chat_id))
+                      package=workflow.package(previous.package_id)
+                      media=await asyncio.to_thread(workflow.review_media,review_id=row["review_id"])
+                      target=Path(settings.cover_output_dir)/("preview_20261011_"+row["public_listing_id"]+".png")
+                      rendered=await asyncio.to_thread(workflow.covers.render,listing_id=row["listing_id"],offer_id=row["offer_id"],media=media,style=package.cover_style,output_path=target)
+                      listing=workflow.reader.listing(row["listing_id"])
+                      caption="🧪 "+kind+"封面效果预览\n\n"+package.post_text
+                      command=TelegramSendCommand(attempt_id="",package_id=package.package_id,channel_chat_id=str(settings.channel_chat_id),cover_path=rendered.output_path,caption=caption,actions=dict(package.actions),inventory_status=listing["inventory_status"],area_key=str(listing.get("public_location_key") or ""))
+                      receipt=await TelegramChannelAdapter(bot).send(command)
+                      mid=receipt["media_message_ids"][0]
+                      link=("https://t.me/"+chat.username+"/" if chat.username else "https://t.me/c/"+str(chat.id).removeprefix("-100")+"/")+str(mid)
+                      print("PREVIEW_POST_SENT",json.dumps({"kind":kind,"listing":row["listing_id"],"public_id":row["public_listing_id"],"link":link,"cover":rendered.output_path,"labels":list(getattr(media,"cover_labels",()) or ())},ensure_ascii=False),flush=True)
+                      assert receipt.get("single_cover") is True
+          asyncio.run(main())
           
           PY
-          chmod 0600 "$CHECK"
+          chmod 0644 "$CHECK"
           cd /opt/qiaolian_v3/current
           export PYTHONPATH=/opt/qiaolian_v3/current
-          /opt/qiaolian_v3/.venv/bin/python "$CHECK"
+          runuser -u qiaolianbot -- bash -lc "set -a; source /opt/qiaolian_v3/runtime.env; set +a; export PYTHONPATH=/opt/qiaolian_v3/current; cd /opt/qiaolian_v3/current; exec /opt/qiaolian_v3/.venv/bin/python '$CHECK'"
           REMOTE
       - name: Remove temporary SSH material
         if: always()
