@@ -6,7 +6,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: qiaolian-channel-cover-preview
+  group: qiaolian-publisher-readonly-diagnostics
   cancel-in-progress: false
 jobs:
   verify:
@@ -38,43 +38,17 @@ jobs:
           CHECK=$(mktemp /var/tmp/qiaolian-live-vision.XXXXXX.py)
           trap 'rm -f "$CHECK"' EXIT
           cat > "$CHECK" <<'PY'
-          import asyncio, json, sqlite3, traceback
+          import json,sqlite3
           from pathlib import Path
-          from telegram import Bot
-          from v3_core.publishing.admin_bot import load_settings
-          from v3_core.publishing.publisher_app import V3PublisherApplication
-          from v3_core.publishing.telegram_adapter import TelegramChannelAdapter
-          from v3_core.publishing.delivery_coordinator import TelegramSendCommand
-          async def main():
-              settings=load_settings()
-              app=V3PublisherApplication(settings)
-              db=sqlite3.connect(settings.db_path); db.row_factory=sqlite3.Row
-              async with Bot(settings.token) as bot:
-                  chat=await bot.get_chat(settings.channel_chat_id)
-                  for kind in ("别墅","公寓"):
-                      candidates=db.execute("SELECT a.*,l.public_listing_id FROM publisher_auto_items_v3 a JOIN listings_v3 l ON l.listing_id=a.listing_id JOIN listing_offers o ON o.offer_id=a.offer_id WHERE a.state='published' AND l.property_type=? AND l.inventory_status='active' AND o.offer_status='active' ORDER BY a.rowid DESC LIMIT 4",(kind,)).fetchall()
-                      done=False
-                      for row in candidates:
-                          try:
-                              package=await asyncio.to_thread(app.workflow.build_package_for_review,review_id=row["review_id"])
-                              package=app.workflow.approve_package(package_id=package.package_id,approved_by="operator:Gym:preview-20261011")
-                              listing=app.workflow.reader.listing(row["listing_id"])
-                              previous=app.workflow.delivery.publications.get_published_for_listing(row["listing_id"],platform="telegram",channel_chat_id=str(settings.channel_chat_id))
-                              if not previous: raise RuntimeError("published_instance_missing")
-                              command=TelegramSendCommand(attempt_id="",package_id=package.package_id,channel_chat_id=str(settings.channel_chat_id),cover_path=package.cover_path,caption=package.post_text,actions=dict(package.actions),inventory_status=listing["inventory_status"],area_key=str(listing.get("public_location_key") or ""))
-                              receipt=await TelegramChannelAdapter(bot).edit(command,message_id=previous.channel_message_id)
-                              if receipt.get("edit_mode")=="text": raise RuntimeError("cover_edit_fell_back_to_text")
-                              instance=app.workflow.delivery.publications.record_telegram_publication(package_id=package.package_id,listing_id=package.listing_id,offer_id=package.offer_id,channel_chat_id=str(settings.channel_chat_id),telegram_result=receipt)
-                              app.workflow.packages.mark_published(package.package_id)
-                              app.workflow.delivery.publications.mark_status(previous.instance_id,"superseded")
-                              app.auto_repository.set_item(row["offer_id"],state="published",package_id=package.package_id,channel_message_id=str(instance.channel_message_id))
-                              link=("https://t.me/"+chat.username+"/" if chat.username else "https://t.me/c/"+str(chat.id).removeprefix("-100")+"/")+str(instance.channel_message_id)
-                              print("POST_UPDATED",json.dumps({"kind":kind,"listing":row["listing_id"],"public_id":row["public_listing_id"],"link":link,"cover":package.cover_path,"package":package.package_id,"caption":package.post_text},ensure_ascii=False))
-                              done=True; break
-                          except Exception as e:
-                              print("POST_FAILURE",json.dumps({"listing":row["listing_id"],"error":str(e),"trace":traceback.format_exc(limit=3)},ensure_ascii=False))
-                      assert done,"no_usable_"+kind
-          asyncio.run(main())
+          from v3_core.publishing.admin_bot import load_settings,build_workflow
+          settings=load_settings(); workflow=build_workflow(settings)
+          db=sqlite3.connect(settings.db_path); db.row_factory=sqlite3.Row
+          for row in db.execute("SELECT e.listing_id,c.source_post_id,c.facts_json FROM publisher_review_exceptions_v3 e JOIN review_items r ON r.review_id=e.review_id JOIN canonical_records c ON c.canonical_record_id=r.canonical_record_id WHERE e.resolved=0 AND e.ignored=0"):
+              source=workflow.media.reader.source_post(int(row["source_post_id"]))
+              print("RENT_SOURCE",json.dumps({"listing":row["listing_id"],"facts":json.loads(row["facts_json"] or "{}"),"raw":str(source.get("raw_text") or "")[:1400]},ensure_ascii=False))
+          for row in db.execute("SELECT a.listing_id,c.source_post_id FROM publisher_auto_items_v3 a JOIN review_items r ON r.review_id=a.review_id JOIN canonical_records c ON c.canonical_record_id=r.canonical_record_id WHERE a.state='exception' AND a.reason_code IN ('unreadable_media','insufficient_media') AND a.ignored=0"):
+              paths=workflow.media.reader.source_image_paths(row["source_post_id"])
+              print("RAW_MEDIA",json.dumps({"listing":row["listing_id"],"total":len(paths),"exists":sum(Path(p).is_file() for p in paths),"paths":paths[:2]},ensure_ascii=False))
           
           PY
           chmod 0644 "$CHECK"
