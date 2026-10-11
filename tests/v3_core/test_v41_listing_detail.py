@@ -196,8 +196,8 @@ async def test_channel_details_deeplink_end_to_end_opens_detail_with_photos(tmp_
         "🏠 <b>富力城｜2房1厅</b>\n<b>$800</b> /月\n📍 钻石岛 · 公寓 · 18楼\n🟢 当前可预约"
     )
     labels = _buttons(detail["reply_markup"])
-    assert labels[0] == ["📸 查看全部 6 张实拍"]
-    assert ["📅 预约看房", "💬 咨询这套"] in labels
+    assert labels[0] == ["📸 下一组实拍"]  # first 4 shown above; continues at photo 5
+    assert ["📅 预约看房", "💬 中文顾问"] in labels
     assert PUBLIC_ID not in _all_text(bot)
     state = context.user_data[PHOTOS_ALBUM_KEY][f"1001::{PUBLIC_ID}"]
     assert state["page"] == DETAILS_ALBUM_PAGE and len(state["message_ids"]) == 5
@@ -241,13 +241,13 @@ def test_detail_curates_only_real_listing_photos(tmp_path):
     assert str(cover) not in shown and str(tmp_path / "gone.jpg") not in shown
     assert set(shown) <= set(real)
     assert response.photo_total == 5
-    assert response.action_rows[0][0].label == "📸 查看全部 5 张实拍"
+    assert response.action_rows[0][0].label == "📸 下一组实拍"
 
 
 def test_not_bookable_detail_hides_booking():
     response = build_details_response(_view(status="rented"))
     labels = [a.label for row in response.action_rows for a in row]
-    assert "📅 预约看房" not in labels and "💬 咨询这套" in labels
+    assert "📅 预约看房" not in labels and "💬 中文顾问" in labels
 
 
 @pytest.mark.asyncio

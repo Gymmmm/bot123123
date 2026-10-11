@@ -1,0 +1,457 @@
+{
+ "_fixture": "FIXTURE — recorded by careful manual visual inspection on 2026-10-11, NOT a model output. Used by tests and local evidence only (V3_VISION_PROVIDER=fixture).",
+ "listing_source_post": 7117,
+ "prompt_version": "cover_vision_v1_20261011",
+ "photos": [
+  {
+   "photo": "01_scrubbed.jpg",
+   "perceptual_key": "b833b833363b861bc76371898c5fa66b97c387c386cb87439a33987398679806",
+   "perceptual_keys": [
+    "b833b833363b861bc76371898c5fa66b97c387c386cb87439a33987398679806",
+    "b833b833363b861bc66373898cdfa66b97c387c386c3874b9253983398679806",
+    "b833b833363b861b8e6b73899ccba67b96c387c386c3864b83439a3398639846",
+    "9833b833363b963b8e7be3899ccba67f964387c386c3864b87439a3398639867",
+    "9833b833343b961b8e3be38918cb867fb64397c386c386cb87439a3398339867",
+    "9833b833343b961b8e1be70939c98e5fb64397c387c386c3874b82539a339863",
+    "9833b833b43b963b8e1be70939898e5fa66b97c387c386c3864b83439a339863",
+    "9833b833b43b961b8e1bc72131898c4fa67b96c387c386c386cb87439a339833",
+    "9833b833bc3bb61b8e1bc76371899ccba63f964397c387c386c3870b92539833",
+    "9833b833bc3b361b8e1bc66373899ccb867fb64397c387c396c3864b83439a33",
+    "9833b833bc3b161b861bce2be38918cb865fb66397c387c386c386cb83439a53",
+    "9833b833bc3b363b861b8e4be309398b8e5fa63b964387c386c386c3870b8243",
+    "9833b833bc3b161b863b8e1be70939898c4fa63bb64397c387c396c3864b8343",
+    "9833b833bc3b163b861b8e1be76171899ccb863fb6c397c387c396c386cb8303",
+    "9833b833b83b163b863b8e1bc76373891ccb865fa6e3974387c387c386c3864b",
+    "9833b833b83b163bb61b8e1bc65bf309389b8e4fa63b964397c387c396c3864b"
+   ],
+   "vision": {
+    "room_type": "客厅",
+    "property_type_hint": "公寓",
+    "objects": [
+     "沙发",
+     "茶几",
+     "餐桌",
+     "橱柜"
+    ],
+    "view": false,
+    "quality": {
+     "sharpness": 0.9,
+     "brightness": 0.9,
+     "composition": 0.9,
+     "completeness": 0.9
+    },
+    "hero_score": 0.92,
+    "obstruction_score": 0.05,
+    "distortion_score": 0.2,
+    "duplicate_group": "客厅-入口全景",
+    "confidence": 0.95,
+    "reason": "L 形沙发+茶几+圆餐桌，客餐厅全景，左侧可见开放厨房但主体是客厅",
+    "provider": "fixture:manual_visual_inspection"
+   }
+  },
+  {
+   "photo": "02_scrubbed.jpg",
+   "perceptual_key": "dafdde7fd8f898e341ce91399ce68b0e9b4e9b4e9b4e9b0caf1c394c6c7e666e",
+   "perceptual_keys": [
+    "dafdde7fd8f898e341ce91399ce68b0e9b4e9b4e9b4e9b0caf1c394c6c7e666e",
+    "dafdde7fdcf898e349ce91399ce28b4e8b6e9b4e9b4e9b4c871c294c69766e6e",
+    "dafdde7fdcf898e149cf913998e38f4e8b2e9b4e9bce9b4c870cad0c79766c7e",
+    "dcfdde7fdcfc98f1c8c7b13898e39f4e8b2e9b4e9bce9b4c9b0caf1c397c6e7e",
+    "dcfdde7fdcfc98f1c8c7a19898a39f4e8b3e9b4e9b4e9b4c9b0caf1c294c6b7e",
+    "dcfdde7fdcfc98f1d8c7219c98339e4e8b1e9b4e9b4e9b4e9b4c870cad4c7976",
+    "dcfdda7fdcfc98f198c7219c98319ec68b4e9b6c9b4e9b4e9b4c8f0cad1c3966",
+    "dcfdde7fdcfc98f198c7219c99319ce28b4e8b2e9b4e9bce9b4c9b0caf1c394c",
+    "dcfdde7ddcfc98f898c3658c91319ce29f4e8b3e9b4e9b4e9b4c9b4c8f0cad5c",
+    "dcfdde7ddcfc98f898e3458e933998e39f4e8b0e9b4e9b4e9b4e934c8f0caf1c",
+    "dcfddefddcfc90f898e34dceb33898e39e4e8b0e9b6c9b4e9b4e9b4c9b0caf0c",
+    "dcfddcfddcfe98f898f3c8ce331898639e4e8b4e8b2e9b4e9b4e9b4c934c8f0c",
+    "dcfddcfdd8fed8f898f3c8c7239899319ca28f4e8b3e9b4e9b4e9b4e9b4c9f0c",
+    "dcfddcfddcfed8fc98f188c7219c99319ca39f4e8b0e9b4c9b4e9b4e9b4c934c",
+    "dcfddcfddc7fd8fc98f198c7659c933198e39f4e8b4e8b2e9b4e9b4e9b4c9b4c",
+    "dcfddcfdd87fdcfc98f198e7658cb33998e39e0e8b4e8b2e9b4e9b4e9b4e9b4c"
+   ],
+   "vision": {
+    "room_type": "客厅",
+    "property_type_hint": "公寓",
+    "objects": [
+     "沙发",
+     "电视",
+     "茶几"
+    ],
+    "view": false,
+    "quality": {
+     "sharpness": 0.88,
+     "brightness": 0.85,
+     "composition": 0.75,
+     "completeness": 0.7
+    },
+    "hero_score": 0.75,
+    "obstruction_score": 0.15,
+    "distortion_score": 0.3,
+    "duplicate_group": "客厅-沙发侧看电视墙",
+    "confidence": 0.93,
+    "reason": "沙发、电视墙、茶几，前景沙发切边",
+    "provider": "fixture:manual_visual_inspection"
+   }
+  },
+  {
+   "photo": "03_scrubbed.jpg",
+   "perceptual_key": "7a541c19c717b18f8c78c361cdc9ccd9ecdb64db63db4a4b98cab39134d938c8",
+   "perceptual_keys": [
+    "7a541c19c717b18f8c78c361cdc9ccd9ecdb64db63db4a4b98cab39134d938c8",
+    "7a541c19c713b18f8cf8c361cdcbccd9ecd96cdb61db6acb98ca93c0369134d8",
+    "72561c19c713b18f8cf8c361cdcbccc9ecd96cdb61db6acbd8cb91c0339134d8",
+    "72561c19c613b18f8cdcc361c9cbccc9ecd96cdb40db62dbca4b99c2b39136d9",
+    "72561c19c613f38f9cdc8671c1c3ccc9eed9ecdb40db63db4a4b98ca93c13699",
+    "72561c19c613f38f989c8670c1c3ccc9ced9ecdb64db61db6acbd8ca91c03791",
+    "76561c19c613e38f989c8670c1e3cdc9ccd9ecdb6cdb41db62cbca4b91c2b391",
+    "76561c1dc61be307989e8678c3e3cdc9ccd9ecd96cdb41db62db4a4b98ca93c0",
+    "76561c1dce1be307999e8678c361cdcaccc9eed96cdb40db63db6acb98ca91c0",
+    "76561c1c8e1be307998e84788361c9cbccc9eec9ec9b66db61db6acbca4b9dca",
+    "76561c1c8e1be307b98f8cf88361c1c3ccc9cec9ecdb6cdb41db62db4a4b9cca",
+    "76561c1c8e1be317b18f8cfc8771c1c3cdc9ccc9ecd96cdb40db63db6acbda4b",
+    "76561c140e1be717b18f9c9c8670c3e3cdc9ccc9eed9ec9b62db61db62cbca4b",
+    "76561a140e1bc717b1cf9c9c8678c3e3cdc8ccc9cec9ec9b6edb41db62db4acb",
+    "74561a140c1bc617f38f989c86788361c1caccc9cec9ecdb6cdb40db61db6acb",
+    "74563a140c19c617f30f989e8678a361c1c3cdc9ccc9ecd9ec9b62db41db62db"
+   ],
+   "vision": {
+    "room_type": "客厅",
+    "property_type_hint": "公寓",
+    "objects": [
+     "沙发",
+     "茶几",
+     "餐桌",
+     "窗景"
+    ],
+    "view": false,
+    "quality": {
+     "sharpness": 0.88,
+     "brightness": 0.88,
+     "composition": 0.8,
+     "completeness": 0.8
+    },
+    "hero_score": 0.8,
+    "obstruction_score": 0.08,
+    "distortion_score": 0.25,
+    "duplicate_group": "客厅-餐桌侧看沙发",
+    "confidence": 0.93,
+    "reason": "L 形沙发+茶几，可见走廊，主体完整",
+    "provider": "fixture:manual_visual_inspection"
+   }
+  },
+  {
+   "photo": "04_scrubbed.jpg",
+   "perceptual_key": "39c53d8d1e0f1e1f063f063f06cf05c74de701e7066d10853be536271dc33631",
+   "perceptual_keys": [
+    "39c53d8d1e0f1e1f063f063f06cf05c74de701e7066d10853be536271dc33631",
+    "39c53d8d1e0f1e1f063f063f06ef05c74de741e3046d128d39c733661d873231",
+    "38c13d8d1e0f1e1f063f063f066f05c70de741e7046d128d1983336435871a63",
+    "30c13d8d1e0f1e1f063f063f066f06c705e741e704fd026d19833be536271947",
+    "70c13d8d1e0f1e1f063f063f066f06c705c74de700f7066d108539e536263d87",
+    "70c13d8d1e0f1e1f0e3f067f066f06cf05c74de701e7066d128d39c33364358f",
+    "70c13d8d1e0d1e1f0e3f067f063f06cf05c74de741e3047d128d19833b653627",
+    "70c13d8d1e0d1e1f0e1f067f063f06ef05c70de741e704fd026d118739e53226",
+    "70c13d8d1e0d1e1f0e1f067f063f066f07c705e745e700f7066d128539c73364",
+    "70c13d8d1e0d1e1f0e1f063f063f066f06c705e70de701e3046d128d19833b65",
+    "70c13d8d1e0d1e1f0e1f063f063f066f06cf05c70de741e7047d026d118739c5",
+    "70c139851f0d1e1f1e1f063f067f063f06cf05c70de741e700f7066d12851983",
+    "70c139851f0d1e1f1e1f063f067f063f06ef05c705674dc701e3046d12cd1183",
+    "70c139851f0d1e1f1e1f0e3f067f063f066f06c705e74dc741e7047d224d1287",
+    "70c139851d0d1e0f1e1f0e3f063f063f066f06cf05c70de741e700f7066d12c5",
+    "70c139851d0d1e0f1e1f0e1f063f067f062f06cf05c705674dc701e7047d224d"
+   ],
+   "vision": {
+    "room_type": "厨房",
+    "property_type_hint": "公寓",
+    "objects": [
+     "橱柜",
+     "水槽",
+     "灶台"
+    ],
+    "view": false,
+    "quality": {
+     "sharpness": 0.85,
+     "brightness": 0.85,
+     "composition": 0.7,
+     "completeness": 0.75
+    },
+    "hero_score": 0.3,
+    "obstruction_score": 0.05,
+    "distortion_score": 0.2,
+    "duplicate_group": "厨房",
+    "confidence": 0.96,
+    "reason": "L 形橱柜、水槽、嵌入式灶台",
+    "provider": "fixture:manual_visual_inspection"
+   }
+  },
+  {
+   "photo": "05_scrubbed.jpg",
+   "perceptual_key": "31c3f80d3e39b3699ac99ec99ad18a4f8a599e89d1e1dff0dbf2fba8dd5cccd4",
+   "perceptual_keys": [
+    "31c3f80d3e39b3699ac99ec99ad18a4f8a599e89d1e1dff0dbf2fba8dd5cccd4",
+    "31c3f80d3c39a3699ac98ec99ad99a4f8a799e8999c1dfe1dbf2fbb8d16cddd4",
+    "31c3f88d3c39a269bac99ec99ad99a4f8a7d9e1999c1cfe1dbf0fbf2f3e8dd54",
+    "31c3f88d7c39a669b8c98ec99ad99a478a7d9e199cc1c3e1dff0dbf2f3e8dd5c",
+    "31c3f88578198e69b8c99ec99ad99a478a7f8a199e81d3e1dff0dbd2fbb8d16c",
+    "31c3f88578198e69b8e99ec99ad99a439a7f8a599e89d1c1dfe1dbf2fbf2f3e8",
+    "31cbf885781d8e69b8e99ec99ad99a419a5f8a799e8999c1cfe1dbf0dbf2fbe8",
+    "31cbf885781d8e29b2e99ec99ed99ad19a5f8a6d9e199dc1c3e1dff0dbd2fbb8",
+    "31cbf885781d8e39b2699ec99ec99ad19a4f8a758a199e81d3e1dfe1dbd2fbf2",
+    "31cbd885701d9e39b2699ec98ec99ad99a478a7d8a599e8999c1cfe1dbf0dbf2",
+    "31cbd887701d9c39a26998c98ec99ad99a479a7d8a699e1999c1c7e1dff0dbd2",
+    "71cbd897741d9c39a269b8c98ec99ad99a439a7d8a678a199cc1c3e1dfe1dbf2",
+    "71cbd897f40d9c39a669b8c98ec99ad99ac19a7f8a478a199e8991c1cfe1fbf0",
+    "71cbd897f40d1839a669b8c98ec99ad99ad19a4f8a5d8a699e8999c1c3e1dff0",
+    "71cdd897f40d38398669b2e99ec99ec99ad99a479a7d8a458a199cc1d3c1cfe1",
+    "71cdd893e40d38198e69b2e99ec99ec99ad99a479a7d8a478a199e8999c1c7e1"
+   ],
+   "vision": {
+    "room_type": "卧室",
+    "property_type_hint": "公寓",
+    "objects": [
+     "床",
+     "窗景"
+    ],
+    "view": false,
+    "quality": {
+     "sharpness": 0.88,
+     "brightness": 0.85,
+     "composition": 0.85,
+     "completeness": 0.85
+    },
+    "hero_score": 0.62,
+    "obstruction_score": 0.05,
+    "distortion_score": 0.2,
+    "duplicate_group": "主卧-床尾",
+    "confidence": 0.95,
+    "reason": "双人床+飘窗+挂画，像主卧，构图完整",
+    "provider": "fixture:manual_visual_inspection"
+   }
+  },
+  {
+   "photo": "06_scrubbed.jpg",
+   "perceptual_key": "3c638c42a61ca3f427c227c4258c01ac25ac99ac93849a78d800bc18fb08fcc0",
+   "perceptual_keys": [
+    "3c638c42a61ca3f427c227c4258c01ac25ac99ac93849a78d800bc18fb08fcc0",
+    "3c639c42a69c23f427c227c4258c05ac25ac99bc9984b378d804b818fa18fd80",
+    "3c639c42a69c33f425c22784058c05ac25ac8dbc9984b36cda04b800be18f988",
+    "3c639c42a69ca3f42de22786058405ac21aca5bc998c93cc9a20f800bc18fb18",
+    "3c639c42a69cb3f42de02782078405ac01ac25ac99ac9384ba78d804bc18fa18",
+    "3c639c42a69cb3f429e0278227c425ac81ac25ac99ac9184b378da04b810be18",
+    "3c639c42a6ccb3f429e0278227c4258c05ac25ac9dbc9984936cda04f800bc18",
+    "3c639c42a6ccb37c29e0278227c4258c05bc21acadbc998c93cc9a38d804bc18",
+    "3c639c42aeccb73c29e4278227c4058c05ac21aca5ac99ac9384bb78d804b810",
+    "3c639c62aecca73c29e427c22784058405ac01ac25ac99bc91849368da04f800",
+    "3c639c62aecca73cabe427c2278607c405ac05aca5ac8dbc998c93ccba38d800",
+    "3c639c62ae4ca73cabf425c0278227c4258c05ac21aca5bc99ac9384bb78da04",
+    "3c639c628ecea7bc23f425c0278227e4258c05bc21ac25ac99bc91849b68ba04",
+    "3c639c628e46a79c23f42de0278227e4058c05bc05ac25ac8dbc998c93c4ba38",
+    "3e639c628e46a69cb3742de027822784058405ac05ac21aca5bc99ac93849b78",
+    "3c639c628e46a69cb27429e427c2278407c4258c05ac21ac25ac99bc918c9be4"
+   ],
+   "vision": {
+    "room_type": "卧室",
+    "property_type_hint": "公寓",
+    "objects": [
+     "床"
+    ],
+    "view": false,
+    "quality": {
+     "sharpness": 0.85,
+     "brightness": 0.8,
+     "composition": 0.65,
+     "completeness": 0.7
+    },
+    "hero_score": 0.4,
+    "obstruction_score": 0.05,
+    "distortion_score": 0.35,
+    "duplicate_group": "次卧A",
+    "confidence": 0.94,
+    "reason": "床+软包墙，广角偏斜",
+    "provider": "fixture:manual_visual_inspection"
+   }
+  },
+  {
+   "photo": "07_scrubbed.jpg",
+   "perceptual_key": "be1fb99f999ddda3be873b090b3932d132c13ac33b0f32c3b3c133e9e678c85c",
+   "perceptual_keys": [
+    "be1fb99f999ddda3be873b090b3932d132c13ac33b0f32c3b3c133e9e678c85c",
+    "be1fb99fd99dd9a3b6873a0d1b3932f932c13ac13b1f32c7b3c133e9f779cc1c",
+    "be1fb99fd99dd9b3b4873a0d1b3933f932d13ac13b3f328f32c1b3e973f1ce38",
+    "be1fb91f999dd9b3fc833e0f1b392bf932d13ac13b1f328f32c1b3c133e9e679",
+    "be1fb81f999dd991fc83be071b192b7932d13ac13a9f3b1f32c7b3c133e97779",
+    "be1fb81fd99dd991fd83be071b192b7932d132c13ac13b1f32c7b3c1b3e973f1",
+    "be1fbc1fb99dd991fd83be071b190b7932d132c13ac13b3f328f32c1b3c933e9",
+    "be0fbc1f999dd999ed83be073b091b3932f932d13ac13b1f329f32c3b3c133e9",
+    "be0fbc1f999dd999dd83b6073a0d1b392bf932d13ac13a9f3b1f32c7b3c1b389",
+    "be0fbc1fd99fd999dd83ba073e0d1b392bf932d13ac13ac13b3f328f32c1b3c9",
+    "be0fbc1fb99fd999dda3fa073e071b192b7932d132c13ac13b1f329f32c3b3c1",
+    "be0fbc1f999fd999dda3fe073e871b190b7932d932d13ac13a1f3a1f32c732c1",
+    "be0fbc1f999fd999dd93fc87be871b091b3923f932d13ac13a993b3f328f32c3",
+    "be0fbc1fb99fd999dd93fc87b6871b0d1b392bf932d132c13ac13b1f321f32c7",
+    "be1fbc1fb99fd99dd993fd83b6073e0d1b192b7932d932c13ac13a1f3a1f328f",
+    "be1fbc1f999fd99dd991dd83ba073e871b191b7922d932d13ac13ad13b1f321f"
+   ],
+   "vision": {
+    "room_type": "卧室",
+    "property_type_hint": "公寓",
+    "objects": [
+     "床",
+     "衣柜",
+     "书桌"
+    ],
+    "view": false,
+    "quality": {
+     "sharpness": 0.85,
+     "brightness": 0.85,
+     "composition": 0.7,
+     "completeness": 0.75
+    },
+    "hero_score": 0.45,
+    "obstruction_score": 0.05,
+    "distortion_score": 0.3,
+    "duplicate_group": "次卧B",
+    "confidence": 0.94,
+    "reason": "床+衣柜+书桌",
+    "provider": "fixture:manual_visual_inspection"
+   }
+  },
+  {
+   "photo": "08_scrubbed.jpg",
+   "perceptual_key": "be63fe437c864e1c477131e33883349714b741975eb75a9758077032f21ae913",
+   "perceptual_keys": [
+    "be63fe437c864e1c477131e33883349714b741975eb75a9758077032f21ae913",
+    "be63fe437c864e1e477131e338c3309714b741974e975a9758077863f21af113",
+    "be63fe437c865e1e477131e330c3309734b741b747971e9758877863723af012",
+    "be63fe437c865e1e477131eb30c3389734b745b747975eb77a975807703af212",
+    "be63fe437c065c1e4f7133eb31e3388734b715b741975eb77a9758077823f21a",
+    "be63fe437e065c9e4e3933eb31e33887349714b741974e971a9758877863723a",
+    "be63fe437e065c0e4e3937e931e33887349714b741b747975eb7588758477132",
+    "be63fe437e075c8e4e3857e131e33883309734b749b747975eb77a9758077833",
+    "be63fe437e035c8e4e38477131f338c3389734b755b741975e971a9758877863",
+    "be63fe437e435c0e4e38477131fb30e33a8734b715b741974f975eb77a875847",
+    "be63fe437e435c8e4e1c477131fb31e33887349714b749b707975eb77a975807",
+    "be63fe437e435c864e1c4f7133eb31e33887309734b74db741975e975a977a87",
+    "be63fe437e437d064e1c4f3137e931e338c7389734b715b741974f975e977a17",
+    "be63fe43fe437c864c1c4f3137e531f338c33a9734b714b749b707975e975a97",
+    "be63fe43fe437c064c0e4639476531fb30e33a8734b714b749b741970e975a97",
+    "be63fe63fe437c065c0e4639476133fb31e33887309734b755b7419747975e97"
+   ],
+   "vision": {
+    "room_type": "卧室",
+    "property_type_hint": "公寓",
+    "objects": [
+     "床",
+     "窗景"
+    ],
+    "view": false,
+    "quality": {
+     "sharpness": 0.85,
+     "brightness": 0.75,
+     "composition": 0.7,
+     "completeness": 0.7
+    },
+    "hero_score": 0.42,
+    "obstruction_score": 0.05,
+    "distortion_score": 0.25,
+    "duplicate_group": "次卧C",
+    "confidence": 0.94,
+    "reason": "黑色床头双人床+落地窗",
+    "provider": "fixture:manual_visual_inspection"
+   }
+  },
+  {
+   "photo": "09_scrubbed.jpg",
+   "perceptual_key": "1e1f1e798331836193079f1c9f398f298b698a79887d88358e26ee2bcf65ee67",
+   "perceptual_keys": [
+    "1e1f1e798331836193079f1c9f398f298b698a79887d88358e26ee2bcf65ee67",
+    "1e1f1e799331836193079f1c9e398f298b698a798e7d897d8c36ee2ecf21ee67",
+    "1e1f1e799331836193079f1e9e399f298b698a798e7d887d8c36ae26ce29ee67",
+    "1e1f1e7d9331836193039b1e9e399f298b698a798e7d887d8c378e26ee2bef65",
+    "1e1f1e7d9331836193039b1e9e399f298b298a698a79887d88358e26ee2fcf29",
+    "1e1f1e7d93318321b3419b0e9e3d9f398f298a698a798e7d897dcc36ee26ee29",
+    "1e1f1c7d93318321b34193069f1d9f398f298b698a798e7d897d8c378e26ee2b",
+    "1e1f1c7d93318321a36193079f1c9f399f298b698a798e7d887d8c358e26ee2f",
+    "1e1f1c6d1b798321a36193079f1c9e399f298b698a698a798c7d893d8c36ce26",
+    "1e1f1c6d1b798331a36593079f1c9e399f298b298a698a798e7c897d8c378e26",
+    "3e1f1c7d1b798331a36593839b1e9e399f398f298b698a798e7d887d8c358e36",
+    "3e1f1c3d1a798331836593839b0e9e3d9f398f298b698a798a7d8c7d893dcc36",
+    "3e1f1c3d1a7983318365b3819b069e1d9f399f298b698a698a798e7c897d8c37",
+    "3e1f1e3d1e7993318365b34193069f1c9eb99f2d8b298a698a798e7d887d8837",
+    "3e1f1e3d1e7993318365b34193079f1c9eb99f398f298b698a798a798e7c897d",
+    "3e1f1e3d1e7993318321a36193039b1e9e399f398f298b698a698a798e7d887d"
+   ],
+   "vision": {
+    "room_type": "卫生间",
+    "property_type_hint": "公寓",
+    "objects": [
+     "马桶",
+     "淋浴",
+     "洗手台",
+     "镜柜"
+    ],
+    "view": false,
+    "quality": {
+     "sharpness": 0.85,
+     "brightness": 0.85,
+     "composition": 0.7,
+     "completeness": 0.75
+    },
+    "hero_score": 0.15,
+    "obstruction_score": 0.05,
+    "distortion_score": 0.3,
+    "duplicate_group": "卫生间",
+    "confidence": 0.97,
+    "reason": "马桶、淋浴、洗手台、热水器",
+    "provider": "fixture:manual_visual_inspection"
+   }
+  },
+  {
+   "photo": "10_scrubbed.jpg",
+   "perceptual_key": "b3419ad16cc12583e7c6e6c4668536c7366536a676a5e68436a677b237b935ac",
+   "perceptual_keys": [
+    "b3419ad16cc12583e7c6e6c4668536c7366536a676a5e68436a677b237b935ac",
+    "b3419ad16cc125c3e7c6e6c466853687366536a736a5668536e637b237b935ac",
+    "b3419ad168c125e3e7c6e6c466843687366536a536a4668596e636a677b137a9",
+    "b3419ad168c12de3e7c6e7c4668436873665366736a47685c6c636a677b137b9",
+    "a3419ad168c12de1e5c2e7c464c436873665366536a476a5e68536e677b237b9",
+    "a3419ad168c1ade1e5c2e7c664c436873667366536a536a5668596e636a677b1",
+    "a3419ad148c12de1e5c2e7c6e4c4768536c7366536a736a4668586e636a677b0",
+    "a3419ad148c16de1e5c2e7c7e4c4668536873665366536a476a5e68436a677b2",
+    "a34192d148c16de1e5c2e7c7e6c4668536873665366536a436a5668516e636a6",
+    "a34192d148c16de1e5c3e7c7e6c4668436873665366536a736a4668586e636a6",
+    "a34192d1c8c16de1a5c3e7c7e7c664c436873667366536a536a47685e68436e6",
+    "a34192d1cac16de1a5c3e7c6e7c664c4368736c73665366536a436a5668596e6",
+    "a34192d1cac16de1a5e3e5c6e7c764c4668536873665366536a536a46685c684",
+    "a34192d1cad16dc1a5e3e5c2e787e4c4668536873665366536a536a476a5e685",
+    "a36192d1cad16cc1ade3e5c2e787e6c46684368736473665366536a436a56685",
+    "a36192d1dad16cc1ade1e5c2e787e6c664c4368736c73665366736a536a436a5"
+   ],
+   "vision": {
+    "room_type": "阳台",
+    "property_type_hint": "公寓",
+    "objects": [
+     "洗衣机",
+     "栏杆",
+     "窗景",
+     "高楼景观"
+    ],
+    "view": true,
+    "quality": {
+     "sharpness": 0.8,
+     "brightness": 0.75,
+     "composition": 0.55,
+     "completeness": 0.6
+    },
+    "hero_score": 0.3,
+    "obstruction_score": 0.2,
+    "distortion_score": 0.55,
+    "duplicate_group": "生活阳台",
+    "confidence": 0.9,
+    "reason": "封闭阳台+洗衣机，窗外城市高空景观，广角变形明显",
+    "provider": "fixture:manual_visual_inspection"
+   }
+  }
+ ]
+}

@@ -16,7 +16,7 @@ from .public_ids import normalize_public_id
 
 CHANNEL_ACTION_ORDER = ("details", "photos", "book", "consult")
 CHANNEL_CTA_LABELS = {
-    "details": "📷 房源详情",
+    "details": "🏠 房源详情",
     "photos": "📸 全部实拍",  # kept for package/compat; not shown on channel keyboard
     "book": "📅 预约看房",
     "consult": "💬 中文顾问",

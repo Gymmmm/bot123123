@@ -169,7 +169,7 @@ def test_rented_book_is_blocked_before_appointment_flow_is_created():
         actions = [action for row in result.details.action_rows for action in row]
         labels = [action.label for action in actions]
         assert "📅 预约看房" not in labels
-        assert "💬 咨询这套" in labels
+        assert "💬 中文顾问" in labels
         # NOTE: details keyboard has no photos button (photos is a separate deep link)
         assert "📷 更多实拍" not in labels
 

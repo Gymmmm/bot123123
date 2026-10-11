@@ -212,7 +212,7 @@ class TestRentedListingDetailsKeyboard:
         
         labels = [action.label for row in response.action_rows for action in row]
         assert "📅 预约看房" not in labels
-        assert "💬 咨询这套" in labels
+        assert "💬 中文顾问" in labels
         assert "🔍 找相似" in labels
 
     def test_offline_listing_no_book_button(self):

@@ -67,9 +67,13 @@ def test_media_preparation_scrubs_to_derived_files_before_selection(tmp_path):
     assert prepared.source_post_id == source_id
     assert prepared.cover_source_path not in prepared.gallery_paths
     assert prepared.cover_source_path not in prepared.cover_gallery_paths
-    assert len(prepared.cover_gallery_paths) == len(prepared.gallery_paths)
+    # Bot album = hero (branded copy) + the same photos the cover uses, so one more than the thumbs list.
+    assert len(prepared.cover_gallery_paths) == len(prepared.gallery_paths) - 1
     assert len(prepared.cover_gallery_labels) == len(prepared.cover_gallery_paths)
-    assert all(label in {"客厅", "卧室", "厨房", "外观", "卫浴", "实拍"} for label in prepared.cover_gallery_labels)
+    # Offline heuristic provider is never confident: labels stay hidden ("").
+    assert all(label == "" for label in prepared.cover_gallery_labels)
+    assert prepared.cover_template in {"apartment_3x2", "grid_2x2", "single"}
+    assert prepared.source_identity["cover_plan"]["first_batch"][0] == prepared.cover_source_path
     assert all(Path(path).parent.name != "gallery" for path in prepared.cover_gallery_paths)
     assert len(prepared.gallery_paths) >= 1
     assert prepared.source_identity["source_post_db_id"] == source_id
@@ -207,14 +211,16 @@ def test_prepare_classic_blue_uses_style_keyed_gallery_filenames(tmp_path):
     assert all("classic_blue_" in Path(path).name for path in prepared.gallery_paths)
 
 
-def test_branded_gallery_excludes_cover_source(tmp_path):
-    """Flipper is cover render + other shots — never the same room as logo-only #2."""
+def test_branded_gallery_starts_with_the_cover_hero(tmp_path):
+    """Bot detail first batch = hero, thumb 1, thumb 2, thumb 3 (Gym spec §八)."""
     db, source_id, paths = _source(tmp_path, "nodup")
     prepared_dir = tmp_path / "prepared-nodup"
     service = MediaPreparationService(SourceReader(str(db)), prepared_dir=prepared_dir)
     prepared = service.prepare(source_post_id=source_id, cover_style="premium_photo")
-    cover = Path(prepared.cover_source_path).resolve()
     gallery = [Path(p).resolve() for p in prepared.gallery_paths]
-    assert cover not in gallery
-    # Still keep other framed shots when multiple sources exist.
-    assert len(prepared.gallery_paths) == len(paths) - 1
+    # Branded copies only (never the clean cover source itself), one per usable photo.
+    assert Path(prepared.cover_source_path).resolve() not in gallery
+    assert len(prepared.gallery_paths) == len(paths)
+    plan = prepared.source_identity["cover_plan"]
+    assert plan["first_batch"] == [plan["hero"], *plan["thumbs"]][:4]
+    assert plan["bot_first_batch"] == list(prepared.gallery_paths[:4])

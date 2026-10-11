@@ -12,13 +12,30 @@ from typing import Callable
 
 from v3_core.publishing.formatting import display_floor, display_layout, display_property_type
 from v3_core.storage.inventory_reader import InventoryReader
-from .cover_renderer import CoverRenderData, render_cover
+from .cover_renderer import CoverRenderData, _is_apartment, render_cover
+from .straighten import straighten_file
 from .cover_styles import (
     is_video_cover_style,
     recommended_cover_style,
     resolve_cover_style_for_source,
 )
 from .service import PreparedSourceMedia
+
+_EMPTY_TERMS = {"", "none", "null", "未知", "待确认", "-", "无"}
+
+
+def cover_terms(offer: dict) -> str:
+    """'押2付1 · 1年' from the offer's real fields (payment/deposit + contract); missing parts omitted."""
+    if str(offer.get("offer_type") or "rent").strip().lower() != "rent":
+        return ""
+    def clean(value: object) -> str:
+        text = " ".join(str(value or "").split())
+        return "" if text.lower() in _EMPTY_TERMS else text[:16]
+    deposit = clean(offer.get("payment_terms")) or clean(offer.get("deposit_terms"))
+    contract = clean(offer.get("contract_term"))
+    for prefix in ("租期", "合同"):
+        contract = contract.removeprefix(prefix).lstrip(":： ")
+    return " · ".join(part for part in (deposit, contract) if part)
 
 
 @dataclass(frozen=True)
@@ -118,6 +135,7 @@ class CoverRenderService:
             highlight_1="",
             highlight_2="",
             highlight_3="",
+            terms=cover_terms(offer),
         )
         target = (
             Path(output_path).expanduser().resolve()
@@ -136,6 +154,20 @@ class CoverRenderService:
                 media.cover_gallery_paths or media.gallery_paths
             )
             render_kwargs["source_labels"] = media.cover_gallery_labels
+            template = str(getattr(media, "cover_template", "") or "")
+            if template:
+                render_kwargs["layout"] = template
+            planned = str(getattr(media, "cover_render_source", "") or "")
+            if planned and Path(planned).is_file():
+                # Bounded correction already ran in media preparation (shared with the bot album).
+                render_kwargs["source_image"] = planned
+            elif not template and not _is_apartment(data):
+                # Legacy media without a plan: level the villa walls; failure keeps the original.
+                straight = straighten_file(
+                    cover_source, target.parent / f"{public_id}_hero_straight.jpg"
+                )
+                if straight:
+                    render_kwargs["source_image"] = straight["path"]
         rendered = self.renderer(**render_kwargs)
         rendered_path = Path(rendered).expanduser().resolve()
         if not rendered_path.is_file():

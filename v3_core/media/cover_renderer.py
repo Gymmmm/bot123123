@@ -1,59 +1,80 @@
-"""DB-free Pillow renderer for Telegram property covers.
+"""DB-free Pillow renderer for Telegram property covers (Gym 2026-10-11).
 
-Layout follows Gym's 2026-10-10 reference PDF (measured at 1080px wide):
+Templates (chosen upstream by ``cover_plan``; ``auto`` follows the property type):
 
-* villa / house / unrecognised types: 1080x1350 (4:5). Tall hero with a small
-  brand pill top-left, pin + title + subtitle on a bottom gradient, price card
-  bottom-right; three rounded thumbnails on light grey; light footer.
-* apartment / 服务式 / condo / studio: 1080x810 (4:3). Shorter hero with a
-  type tag top-left, location pill top-right, price card bottom-right; three
-  rounded thumbnails; same footer.
+* ``apartment_3x2``: 1200x800 landscape. Hero on the left (798x738) and a
+  right column of three stacked thumbnails (396 wide), 6px white separators,
+  62px dark brand footer. Same proportions as the approved 1080x720 sample.
+* ``villa_black_gold`` (default villa template, ``V3_VILLA_COVER_TEMPLATE``): Gym's
+  1080x1388 reference — hero 700, black-gold info bar 700–868 (📍 title, gold rule,
+  类型 | N房 | 押付·租期, gold price card), three rounded 346x384 thumbs, white footer
+  with the 侨联地产 lockup and 出租房源 pill. See ``villa_card``.
+* ``villa_4x5``: 1080x1350 portrait. Hero 1080x878 (good exterior,
+  straightened upstream), three 356x402 thumbnails below, 64px footer.
+* ``landscape_3x2``: villa without a good exterior — apartment geometry.
+* ``grid_2x2``: 1200x800, four equal photos (no standout hero).
+* ``single``: one photo fills the photo area (no padding with repeats).
 
-Brand artwork is always our gold house lockup (侨联地产 / QIAO LIAN PROPERTY).
+Shared treatment: 📍 title (小区/区域) + gold 户型 · 类型 pill top-left, price
+card bottom-right of the hero as the biggest text, thin top/bottom shades
+only, thumbnails labelled by room, footer = house icon + 侨联地产. No internal
+listing id, no 出租房源 pill, no white frame around the image.
 """
 from __future__ import annotations
 from dataclasses import dataclass
+import os
 from pathlib import Path
 from typing import Any, Iterable
-from PIL import Image, ImageDraw, ImageFont, ImageOps
+from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
+
+from .hero_layout import frame_offset, text_slot
 
 
 @dataclass(frozen=True)
 class CoverLayout:
+    kind: str                 # "apartment" (side column) or "tall" (row below)
     canvas: tuple[int, int]
-    hero_height: int
+    hero: tuple[int, int]     # hero width, height
+    thumb_extent: int         # apartment: column width; tall: row height
+    separator: int
+    footer_height: int
     margin: int
-    gallery_top: int
-    gallery_height: int
-    gallery_gap: int
-    gallery_radius: int
-    footer_top: int
+    title_size: int
+    price_size: int
+
+    @property
+    def footer_top(self) -> int:
+        return self.canvas[1] - self.footer_height
 
 
-# Use the entire canvas for photography. The brand, title and price sit on the
-# hero so the final row can remain a compact, edge-to-edge photo strip.
-TALL_LAYOUT = CoverLayout(
-    canvas=(1080, 1350), hero_height=930, margin=0,
-    gallery_top=938, gallery_height=412, gallery_gap=8, gallery_radius=0,
-    footer_top=1350,
-)
+SEPARATOR = 6
 APARTMENT_LAYOUT = CoverLayout(
-    canvas=(1080, 810), hero_height=500, margin=0,
-    gallery_top=508, gallery_height=302, gallery_gap=8, gallery_radius=0,
-    footer_top=810,
+    kind="apartment", canvas=(1200, 800), hero=(798, 738), thumb_extent=396,
+    separator=SEPARATOR, footer_height=62, margin=36, title_size=49, price_size=71,
+)
+GRID_LAYOUT = CoverLayout(
+    kind="grid", canvas=(1200, 800), hero=(597, 366), thumb_extent=366,
+    separator=SEPARATOR, footer_height=62, margin=30, title_size=42, price_size=60,
+)
+TALL_LAYOUT = CoverLayout(
+    kind="tall", canvas=(1080, 1350), hero=(1080, 878), thumb_extent=402,
+    separator=SEPARATOR, footer_height=64, margin=32, title_size=52, price_size=80,
+)
+# V-B (Gym 2026-10-11 villa feedback): shorter hero, taller detail row.
+TALL_COMPACT_LAYOUT = CoverLayout(
+    kind="tall", canvas=(1080, 1200), hero=(1080, 700), thumb_extent=430,
+    separator=SEPARATOR, footer_height=64, margin=32, title_size=50, price_size=76,
 )
 TALL_CANVAS = TALL_LAYOUT.canvas
 APARTMENT_CANVAS = APARTMENT_LAYOUT.canvas
-TALL_HERO_HEIGHT = TALL_LAYOUT.hero_height
-APARTMENT_HERO_HEIGHT = APARTMENT_LAYOUT.hero_height
+TALL_HERO_HEIGHT = TALL_LAYOUT.hero[1]
+APARTMENT_HERO_HEIGHT = APARTMENT_LAYOUT.hero[1]
 
-PAGE_BG = (238, 240, 243)
-DIVIDER = (220, 221, 223)
+PAGE_BG = (255, 255, 255)      # only visible as the thin separators
+FOOTER_BG = (22, 26, 30)
+SHADE = (12, 14, 17)
 GOLD = (226, 190, 105)
 GOLD_LIGHT = (249, 226, 164)
-GOLD_DEEP = (168, 128, 52)  # gold that still reads on the light footer
-INK = (38, 48, 57)
-MUTED = (122, 130, 138)
 SUBTLE_WHITE = (214, 219, 223)
 CHIP_DARK = (40, 48, 55)
 FONT_CANDIDATES = (
@@ -81,6 +102,7 @@ class CoverRenderData:
     highlight_1: str = ""
     highlight_2: str = ""
     highlight_3: str = ""
+    terms: str = ""              # 押付·租期 from the offer (deposit/payment + contract); empty = omitted
 
     def price_line(self) -> str:
         raw = str(self.price or "").strip()
@@ -148,33 +170,6 @@ def _fit(image: Image.Image, size: tuple[int, int]) -> Image.Image:
 
 
 
-def _rounded_mask(size: tuple[int, int], radius: int, scale: int = 4) -> Image.Image:
-    w, h = size
-    mask = Image.new("L", (w * scale, h * scale), 0)
-    ImageDraw.Draw(mask).rounded_rectangle((0, 0, w * scale - 1, h * scale - 1), radius=radius * scale, fill=255)
-    return mask.resize((w, h), Image.Resampling.LANCZOS)
-
-
-def _paste_gallery(canvas: Image.Image, images: list[Image.Image], geo: CoverLayout) -> list[tuple[int, int]]:
-    """Hero full-bleed, then up to three rounded thumbnails. Returns thumb (x, width)."""
-    canvas.paste(_fit(images[0], (canvas.width, geo.hero_height)), (0, 0))
-    secondary = images[1:4]
-    if not secondary:
-        return []
-    count = len(secondary)
-    inner = canvas.width - 2 * geo.margin - geo.gallery_gap * (count - 1)
-    widths = [inner // count] * count
-    widths[-1] += inner - sum(widths)
-    cells: list[tuple[int, int]] = []
-    x = geo.margin
-    for image, width in zip(secondary, widths):
-        tile = _fit(image, (width, geo.gallery_height))
-        canvas.paste(tile, (x, geo.gallery_top), _rounded_mask(tile.size, geo.gallery_radius))
-        cells.append((x, width))
-        x += width + geo.gallery_gap
-    return cells
-
-
 def _brand_lockup() -> Image.Image | None:
     path = Path(__file__).resolve().parents[2] / "media_pipeline" / "assets" / "qiaolian_logo_black_gold_lockup.png"
     try:
@@ -184,27 +179,6 @@ def _brand_lockup() -> Image.Image | None:
         return image.crop(bbox) if bbox else None
     except (OSError, ValueError):
         return None
-
-
-def _footer_lockup(lockup: Image.Image) -> Image.Image:
-    """Same lockup for the light footer: house in deeper gold, wordmark inked dark."""
-    house_right = round(lockup.width * 0.27)
-    cn_bottom = round(lockup.height * 0.70)
-    alpha = lockup.getchannel("A")
-    out = lockup.copy()
-    ink = Image.new("RGBA", lockup.size, (*INK, 255))
-    muted = Image.new("RGBA", lockup.size, (*MUTED, 255))
-    cn_mask = Image.new("L", lockup.size, 0)
-    cn_mask.paste(alpha.crop((house_right, 0, lockup.width, cn_bottom)), (house_right, 0))
-    en_mask = Image.new("L", lockup.size, 0)
-    en_mask.paste(alpha.crop((house_right, cn_bottom, lockup.width, lockup.height)), (house_right, cn_bottom))
-    house_mask = Image.new("L", lockup.size, 0)
-    house_mask.paste(alpha.crop((0, 0, house_right, lockup.height)), (0, 0))
-    out.paste(Image.new("RGBA", lockup.size, (*GOLD_DEEP, 255)), (0, 0), house_mask)
-    out.paste(ink, (0, 0), cn_mask)
-    out.paste(muted, (0, 0), en_mask)
-    out.putalpha(alpha)
-    return out
 
 
 def _scaled(image: Image.Image, height: int) -> Image.Image:
@@ -248,10 +222,6 @@ def _cover_subtitle(data: CoverRenderData) -> str:
 
 def _cover_title(data: CoverRenderData) -> str:
     return str(data.project or data.project_alias or data.area or data.property_type or "精选房源").strip()
-
-
-def _type_tag(data: CoverRenderData) -> str:
-    return str(data.layout or data.property_type or "").strip()
 
 
 def _pin_icon(size: int, color: tuple[int, int, int]) -> Image.Image:
@@ -330,110 +300,143 @@ def _draw_price_card(
     return left
 
 
-def _gallery_labels(layer: Image.Image, labels: list[str], cells: list[tuple[int, int]], geo: CoverLayout) -> None:
+
+
+def _hero_tag(data: CoverRenderData) -> str:
+    """户型 · 类型 in one pill, without repeating the same taxonomy."""
+    kind = str(data.property_type or "").strip()
+    layout = str(data.layout or "").strip()
+    if not layout:
+        return kind
+    if not kind or kind in layout or layout in kind:
+        return layout
+    return f"{layout} · {kind}"
+
+
+def _shade(layer: Image.Image, box: tuple[int, int, int, int], *, top_alpha: int, bottom_alpha: int,
+           top_span: int = 210, bottom_span: int = 280) -> None:
+    """Dark only in a top band (title) and a bottom band (price); the middle stays untouched."""
+    x0, y0, x1, y1 = box
     draw = ImageDraw.Draw(layer)
-    small = geo.gallery_height < 200
-    size, h, inset = (16, 28, 10) if small else (18, 32, 12)
-    for index, (x, width) in enumerate(cells):
-        label = labels[index] if index < len(labels) and labels[index] else "实拍"
-        label, font = _fit_line(draw, label, max_width=width - 2 * inset - 24, start_size=size, min_size=12)
-        text_w = int(draw.textlength(label, font=font))
-        box = (x + inset, geo.gallery_top + inset, x + inset + text_w + 24, geo.gallery_top + inset + h)
-        _pill(layer, box, fill=(20, 22, 25, 150))
-        _center_text(draw, box, label, font, (255, 255, 255, 245))
+    for y in range(y0, y1):
+        alpha = 0.0
+        if y < y0 + top_span:
+            alpha = max(alpha, top_alpha * (1 - (y - y0) / top_span) ** 1.5)
+        if y > y1 - bottom_span:
+            alpha = max(alpha, bottom_alpha * ((y - (y1 - bottom_span)) / bottom_span) ** 1.4)
+        if alpha > 0:
+            draw.line((x0, y, x1 - 1, y), fill=(*SHADE, int(alpha)))
 
 
-def _hero_gradient(layer: Image.Image, *, top: int, bottom: int, max_alpha: int) -> None:
-    draw = ImageDraw.Draw(layer)
-    span = max(1, bottom - top)
-    for y in range(top, bottom):
-        t = (y - top) / span
-        draw.line((0, y, layer.width, y), fill=(22, 26, 30, int(max_alpha * (t ** 1.4))))
-
-
-def _draw_villa_hero(layer: Image.Image, data: CoverRenderData, geo: CoverLayout, lockup: Image.Image | None) -> None:
-    draw = ImageDraw.Draw(layer)
-    m, hero_h, W = geo.margin, geo.hero_height, layer.width
-    # Small brand pill top-left (our gold house lockup).
-    if lockup is not None:
-        logo = _scaled(lockup, 38)
-        box = (m, m, m + logo.width + 32, m + 56)
-        _pill(layer, box, fill=(18, 20, 23, 135))
-        layer.alpha_composite(logo, (m + 16, m + 9))
-    else:
-        box = (m, m, m + 150, m + 46)
-        _pill(layer, box, fill=(18, 20, 23, 135))
-        _center_text(draw, box, "侨联地产", _font(20, bold=True), (255, 255, 255, 255))
-    # Bottom gradient + facts.
-    _hero_gradient(layer, top=hero_h - 300, bottom=hero_h, max_alpha=215)
-    price_left = _draw_price_card(draw, data, right=W - m, bottom=hero_h - 37, height=78,
-                                  amount_size=40, suffix_size=19, min_width=200, max_width=340)
-    text_right = (price_left if price_left is not None else W - m) - 24
-    pin = _pin_icon(22, GOLD)
-    title_x = m + pin.width + 10
-    title, title_font = _fit_line(draw, _cover_title(data), max_width=text_right - title_x, start_size=42, min_size=28)
-    title_baseline = hero_h - 80
-    layer.alpha_composite(pin, (m, title_baseline - 30))
-    draw.text((title_x, title_baseline), title, font=title_font, fill=(255, 255, 255, 255), anchor="ls")
-    subtitle = _cover_subtitle(data)
-    if subtitle:
-        subtitle, sub_font = _fit_line(draw, subtitle, max_width=text_right - m, start_size=23, min_size=18, bold=False)
-        draw.text((m + 2, hero_h - 41), subtitle, font=sub_font, fill=(*SUBTLE_WHITE, 255), anchor="ls")
-
-
-def _draw_apartment_hero(layer: Image.Image, data: CoverRenderData, geo: CoverLayout) -> None:
-    draw = ImageDraw.Draw(layer)
-    m, hero_h, W = 28, geo.hero_height, layer.width
-    # Gentle top shade so both chips read on bright ceilings.
-    for y in range(0, 120):
-        draw.line((0, y, W, y), fill=(18, 20, 23, int(70 * (1 - y / 120))))
-    # Location pill top-right (project name).
-    pin = _pin_icon(18, (255, 255, 255))
-    loc, loc_font = _fit_line(draw, _cover_title(data), max_width=480, start_size=19, min_size=14)
-    loc_w = int(draw.textlength(loc, font=loc_font))
-    pill_w = 18 + pin.width + 8 + loc_w + 20
-    loc_box = (W - m - pill_w, m, W - m, m + 38)
-    _pill(layer, loc_box, fill=(*CHIP_DARK, 230))
-    layer.alpha_composite(pin, (loc_box[0] + 18, m + 10))
-    _center_text(draw, (loc_box[0] + 18 + pin.width + 8, m, loc_box[0] + 18 + pin.width + 8 + loc_w, m + 38),
-                 loc, loc_font, (255, 255, 255, 255))
-    # Type tag top-left (layout, fallback property type); never collides with the location pill.
-    tag = _type_tag(data)
+def _title_parts(draw: ImageDraw.ImageDraw, data: CoverRenderData, *, max_width: int, size: int):
+    pin = _pin_icon(int(size * 0.62), GOLD)
+    title, title_font = _fit_line(draw, _cover_title(data), max_width=max_width - pin.width - 10,
+                                  start_size=size, min_size=26)
+    title_w = pin.width + 10 + int(draw.textlength(title, font=title_font))
+    tag = _hero_tag(data)
+    tag_font, tag_w = None, 0
     if tag:
-        max_tag = max(80, loc_box[0] - 2 * m - 16 - 36)
-        tag, tag_font = _fit_line(draw, tag, max_width=min(360, max_tag), start_size=19, min_size=14)
-        tag_w = int(draw.textlength(tag, font=tag_font))
-        tag_box = (m, m, m + tag_w + 36, m + 40)
-        _pill(layer, tag_box, fill=(*CHIP_DARK, 230), outline=(*GOLD, 255), width=2)
-        _center_text(draw, tag_box, tag, tag_font, (*GOLD_LIGHT, 255))
-    _draw_price_card(draw, data, right=W - 29, bottom=hero_h - 30, height=63,
-                     amount_size=32, suffix_size=16, min_width=150, max_width=320)
+        tag, tag_font = _fit_line(draw, tag, max_width=max_width - 36, start_size=int(size * 0.5), min_size=18)
+        tag_w = int(draw.textlength(tag, font=tag_font)) + 36
+    height = size + (16 + int(size * 0.5) + 20 if tag else 0) + 8
+    return title, title_font, tag, tag_font, max(title_w, tag_w), height
 
 
-def _draw_footer(layer: Image.Image, data: CoverRenderData, geo: CoverLayout, lockup: Image.Image | None) -> None:
+def _title_block_size(data: CoverRenderData, *, max_width: int, size: int) -> tuple[int, int]:
+    probe = ImageDraw.Draw(Image.new("RGBA", (8, 8)))
+    *_, width, height = _title_parts(probe, data, max_width=max_width, size=size)
+    return width, height
+
+
+def _draw_title_block(layer: Image.Image, data: CoverRenderData, *, x: int, y: int, max_width: int, size: int,
+                      align: str = "left", dark: bool = False) -> None:
+    """📍 title + 户型·类型 pill. ``align`` centres both lines on the block; ``dark`` ink for bright sky."""
+    draw = ImageDraw.Draw(layer)
+    title, title_font, tag, tag_font, block_w, _ = _title_parts(draw, data, max_width=max_width, size=size)
+    pin = _pin_icon(int(size * 0.62), DARK_GOLD if dark else GOLD)
+    line_w = pin.width + 10 + int(draw.textlength(title, font=title_font))
+    tx = x + (block_w - line_w) // 2 if align == "center" else (x + block_w - line_w if align == "right" else x)
+    baseline = y + size
+    layer.alpha_composite(pin, (tx, baseline - int(size * 0.78)))
+    ink = (*DARK_INK, 255) if dark else (255, 255, 255, 255)
+    draw.text((tx + pin.width + 10, baseline), title, font=title_font, fill=ink, anchor="ls")
+    if not tag:
+        return
+    tag_w = int(draw.textlength(tag, font=tag_font))
+    px = x + (block_w - tag_w - 36) // 2 if align == "center" else (x + block_w - tag_w - 36 if align == "right" else x)
+    box = (px, baseline + 16, px + tag_w + 36, baseline + 16 + int(size * 0.5) + 20)
+    _pill(layer, box, fill=(20, 24, 28, 200), outline=(*GOLD, 255), width=2)
+    _center_text(draw, box, tag, tag_font, (*GOLD_LIGHT, 255))
+
+
+def _soft_scrim(layer: Image.Image, box: tuple[int, int, int, int], alpha: int) -> None:
+    """Blurred dark plate behind white ink on a mid-tone sky (no hard band across the photo)."""
+    pad = 36
+    x0, y0, x1, y1 = box
+    plate = Image.new("L", (x1 - x0 + 2 * pad, y1 - y0 + 2 * pad), 0)
+    ImageDraw.Draw(plate).rounded_rectangle((pad, pad, plate.width - pad, plate.height - pad), radius=28, fill=alpha)
+    plate = plate.filter(ImageFilter.GaussianBlur(pad / 2))
+    tint = Image.new("RGBA", plate.size, (*SHADE, 0))
+    tint.putalpha(plate)
+    layer.alpha_composite(tint, (x0 - pad, y0 - pad))
+
+
+def _draw_price(layer: Image.Image, data: CoverRenderData, *, right: int, bottom: int, size: int,
+                max_width: int) -> int | None:
+    """Gold-bordered dark card; ``$amount`` (biggest text on the cover) + ``/月`` centred on their ink."""
+    price = data.price_line()
+    if not price:
+        return None
+    draw = ImageDraw.Draw(layer)
+    suffix = "/月" if price.endswith("/月") else ""
+    amount = price[:-2] if suffix else price
+    for amount_size in range(size, max(24, size // 2) - 1, -2):
+        amount_font = _font(amount_size, bold=True)
+        suffix_font = _font(int(amount_size * 0.4), bold=True)
+        pad, gap, height = int(amount_size * 0.4), 8, int(amount_size * 1.5)
+        a_box = draw.textbbox((0, 0), amount, font=amount_font, anchor="ls")
+        s_box = draw.textbbox((0, 0), suffix, font=suffix_font, anchor="ls") if suffix else (0, 0, 0, 0)
+        width = (a_box[2] - a_box[0]) + ((gap + s_box[2] - s_box[0]) if suffix else 0) + 2 * pad
+        if width <= max_width:
+            break
+    left, top = right - width, bottom - height
+    draw.rounded_rectangle((left, top, right, bottom), radius=14, fill=(20, 24, 28, 215),
+                           outline=(*GOLD, 255), width=3)
+    ink_top = min(a_box[1], s_box[1]) if suffix else a_box[1]
+    ink_bottom = max(a_box[3], s_box[3]) if suffix else a_box[3]
+    baseline = top + (height - (ink_bottom - ink_top)) // 2 - ink_top
+    x = left + pad - a_box[0]
+    draw.text((x, baseline), amount, font=amount_font, fill=(*GOLD_LIGHT, 255), anchor="ls")
+    if suffix:
+        draw.text((x + a_box[2] + gap - s_box[0], baseline), suffix, font=suffix_font,
+                  fill=(255, 255, 255, 255), anchor="ls")
+    return left
+
+
+def _thumb_label(layer: Image.Image, x: int, y: int, width: int, text: str) -> None:
+    draw = ImageDraw.Draw(layer)
+    text, font = _fit_line(draw, text or "实拍", max_width=max(40, width - 44), start_size=18, min_size=12)
+    text_w = int(draw.textlength(text, font=font))
+    box = (x + 10, y + 10, x + 10 + text_w + 24, y + 42)
+    _pill(layer, box, fill=(20, 22, 25, 150))
+    _center_text(draw, box, text, font, (255, 255, 255, 245))
+
+
+def _draw_footer(layer: Image.Image, geo: CoverLayout, lockup: Image.Image | None) -> None:
     draw = ImageDraw.Draw(layer)
     W, H = layer.size
-    top = geo.footer_top
-    if top >= H:
-        return
-    draw.rectangle((0, top, W, H), fill=(*PAGE_BG, 255))
-    draw.line((0, top - 1, W, top - 1), fill=(*DIVIDER, 255))
-    mid = top + (H - top) // 2
-    tall = geo is TALL_LAYOUT or geo.canvas == TALL_CANVAS
-    m = geo.margin
+    top, height = geo.footer_top, geo.footer_height
+    draw.rectangle((0, top, W, H), fill=(*FOOTER_BG, 255))
+    mid = top + height // 2
+    x = geo.margin + 8
     if lockup is not None:
-        logo = _scaled(_footer_lockup(lockup), 44 if tall else 40)
-        layer.alpha_composite(logo, (m, mid - logo.height // 2))
-    else:
-        draw.text((m, mid), "侨联地产", font=_font(24, bold=True), fill=(*INK, 255), anchor="lm")
-    label = "出租房源" if str(data.deal_type or "rent").lower() == "rent" else "出售房源"
-    font = _font(20 if tall else 18, bold=True)
-    label_w = int(draw.textlength(label, font=font))
-    pill_h = 46 if tall else 40
-    right = W - m
-    box = (right - label_w - 44, mid - pill_h // 2, right, mid - pill_h // 2 + pill_h)
-    _pill(layer, box, fill=(*PAGE_BG, 255), outline=(*GOLD_DEEP, 255), width=2)
-    _center_text(draw, box, label, font, (*GOLD_DEEP, 255))
+        house = lockup.crop((0, 0, round(lockup.width * 0.27), lockup.height))
+        bbox = house.getchannel("A").getbbox()
+        if bbox:
+            icon = _scaled(house.crop(bbox), int(height * 0.48))
+            layer.alpha_composite(icon, (x, mid - icon.height // 2))
+            x += icon.width + 10
+    draw.text((x, mid), "侨联地产", font=_font(int(height * 0.4), bold=True), fill=(*GOLD_LIGHT, 255), anchor="lm")
 
 
 def _is_apartment(data: CoverRenderData) -> bool:
@@ -441,38 +444,172 @@ def _is_apartment(data: CoverRenderData) -> bool:
     return any(token in value for token in ("公寓", "服务式", "apartment", "condo", "studio"))
 
 
-def _layout(data: CoverRenderData) -> CoverLayout:
-    return APARTMENT_LAYOUT if _is_apartment(data) else TALL_LAYOUT
+TEMPLATES = ("apartment_3x2", "villa_black_gold", "villa_4x5", "villa_compact", "landscape_3x2", "grid_2x2", "single")
+VILLA_TEMPLATES = ("villa_black_gold", "villa_4x5", "villa_compact")
+DEFAULT_VILLA_TEMPLATE = "villa_black_gold"
+SKY_TEXT_TEMPLATES = {"villa_4x5", "villa_compact"}
+DARK_INK = (24, 30, 36)
+DARK_GOLD = (170, 122, 30)
+BRIGHT_SKY_LUMINANCE = 168
 
 
-def _layout_geometry(data: CoverRenderData) -> tuple[tuple[int, int], int, int, int, int]:
-    """Return canvas, hero height, gallery top/height and footer top."""
-    geo = _layout(data)
-    return geo.canvas, geo.hero_height, geo.gallery_top, geo.gallery_height, geo.footer_top
+def _resolve_template(data: CoverRenderData, template: str | None) -> str:
+    value = str(template or "").strip().lower()
+    if value in TEMPLATES:
+        return value
+    return "apartment_3x2" if _is_apartment(data) else villa_template_from_env()
+
+
+def villa_template_from_env() -> str:
+    """``V3_VILLA_COVER_TEMPLATE``: villa_black_gold (default, Gym's 1080x1388 reference layout),
+    villa_4x5 (V-A 1080x1350, title in the sky) or villa_compact (V-B 1080x1200)."""
+    value = (os.environ.get("V3_VILLA_COVER_TEMPLATE") or "").strip().lower()
+    return value if value in VILLA_TEMPLATES else DEFAULT_VILLA_TEMPLATE
+
+
+def _layout(data: CoverRenderData, template: str | None = None) -> CoverLayout:
+    value = _resolve_template(data, template)
+    if value == "grid_2x2":
+        return GRID_LAYOUT
+    if value in ("villa_4x5", "villa_black_gold"):
+        return TALL_LAYOUT
+    if value == "villa_compact":
+        return TALL_COMPACT_LAYOUT
+    if value == "single":
+        return APARTMENT_LAYOUT if _is_apartment(data) else TALL_LAYOUT
+    return APARTMENT_LAYOUT
+
+
+def _thumb_boxes(geo: CoverLayout, count: int) -> list[tuple[int, int, int, int]]:
+    """(x, y, w, h) for up to three thumbnails filling the non-hero area edge to edge."""
+    if count <= 0:
+        return []
+    sep = geo.separator
+    if geo.kind == "grid":
+        w = (geo.canvas[0] - sep) // 2
+        h = (geo.footer_top - sep) // 2
+        cells = [(0, 0, w, h), (w + sep, 0, geo.canvas[0] - w - sep, h),
+                 (0, h + sep, w, geo.footer_top - h - sep), (w + sep, h + sep, geo.canvas[0] - w - sep, geo.footer_top - h - sep)]
+        return cells[1:1 + count]
+    if geo.kind == "apartment":
+        x, total = geo.hero[0] + sep, geo.hero[1] - sep * (count - 1)
+        heights = [total // count] * count
+        heights[-1] += total - sum(heights)
+        boxes, y = [], 0
+        for h in heights:
+            boxes.append((x, y, geo.thumb_extent, h))
+            y += h + sep
+        return boxes
+    y, total = geo.hero[1] + sep, geo.canvas[0] - sep * (count - 1)
+    widths = [total // count] * count
+    widths[-1] += total - sum(widths)
+    boxes, x = [], 0
+    for w in widths:
+        boxes.append((x, y, w, geo.thumb_extent))
+        x += w + sep
+    return boxes
+
+
+def _layout_geometry(data: CoverRenderData, template: str | None = None) -> dict[str, Any]:
+    if _resolve_template(data, template) == "villa_black_gold":
+        from .villa_card import GEOMETRY as g, thumb_columns
+
+        return {"canvas": g.canvas, "hero": (g.canvas[0], g.hero_height),
+                "thumbs": [(x, g.thumb_top, w, g.thumb_bottom - g.thumb_top) for x, w in thumb_columns(3)],
+                "footer_top": g.footer_top, "footer_height": g.canvas[1] - g.footer_top,
+                "bar": (g.hero_height, g.bar_bottom), "price_card": g.price_card, "template": "villa_black_gold"}
+    geo = _layout(data, template)
+    hero = geo.hero
+    if _resolve_template(data, template) == "single":
+        hero = (geo.canvas[0], geo.footer_top)
+    return {"canvas": geo.canvas, "hero": hero, "thumbs": [] if _resolve_template(data, template) == "single"
+            else _thumb_boxes(geo, 3), "footer_top": geo.footer_top, "footer_height": geo.footer_height,
+            "template": _resolve_template(data, template)}
 
 
 def render_cover(*, style: str, source_image: str, output_path: str, data: CoverRenderData,
                  source_images: Iterable[str] | None = None, source_labels: Iterable[str] | None = None,
-                 layout: str = "hero_three") -> str:
-    """Render every property type with one hero image above three detail images."""
-    # All style aliases intentionally converge on the same channel-first layout.
-    del style, layout
+                 layout: str = "auto") -> str:
+    """Render the hero plus up to three photos in the planned template.
+
+    ``layout`` is a template name from ``TEMPLATES`` (``auto``/unknown → by
+    property type). Empty labels are not drawn: an uncertain room is shown as a
+    plain photo, never with a guessed name.
+    """
+    del style
+    template = _resolve_template(data, layout)
     candidates = [source_image]
-    candidates.extend(list(source_images or ()))
+    if template != "single":
+        candidates.extend(list(source_images or ()))
     images = _usable_images(candidates)
     if not images:
         raise ValueError("cover_no_usable_images")
-    geo = _layout(data)
+    if template == "villa_black_gold":
+        if len(images) > 1:
+            from .villa_card import render_villa_card
+
+            return str(render_villa_card(data=data, images=images, labels=source_labels or (),
+                                         output=Path(output_path).expanduser().resolve()))
+        template = "villa_4x5"              # no detail photos: the full-height hero template
+    geo = _layout(data, template)
+    W, H = geo.canvas
     canvas = Image.new("RGB", geo.canvas, PAGE_BG)
-    cells = _paste_gallery(canvas, images, geo)
-    layer = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
-    lockup = _brand_lockup()
-    if geo is APARTMENT_LAYOUT:
-        _draw_apartment_hero(layer, data, geo)
+    hero_w, hero_h = geo.hero
+    thumbs = images[1:4]
+    if template == "grid_2x2" and len(thumbs) < 3:
+        template, geo = "apartment_3x2", APARTMENT_LAYOUT
+        W, H = geo.canvas
+        canvas = Image.new("RGB", geo.canvas, PAGE_BG)
+        hero_w, hero_h = geo.hero
+    if not thumbs:
+        # No detail photos: the hero takes the whole photo area (no empty band).
+        hero_w, hero_h = W, geo.footer_top
+    sky_text = template in SKY_TEXT_TEMPLATES and bool(thumbs)
+    m = geo.margin
+    block = _title_block_size(data, max_width=hero_w - 2 * m - 16, size=geo.title_size)
+    if sky_text:
+        centering = frame_offset(images[0], (hero_w, hero_h), text_room=block[1] + 2 * m)
+        hero = ImageOps.fit(images[0], (hero_w, hero_h), method=Image.Resampling.LANCZOS, centering=centering)
     else:
-        _draw_villa_hero(layer, data, geo, lockup)
-    _gallery_labels(layer, list(source_labels or ()), cells, geo)
-    _draw_footer(layer, data, geo, lockup)
+        hero = _fit(images[0], (hero_w, hero_h))
+    canvas.paste(hero, (0, 0))
+    slot = text_slot(hero, block, margin=m + 8) if sky_text else None
+    layer = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+    labels = list(source_labels or ())
+    boxes = _thumb_boxes(geo, len(thumbs))
+    for index, (image, (x, y, w, h)) in enumerate(zip(thumbs, boxes)):
+        canvas.paste(_fit(image, (w, h)), (x, y))
+        label = labels[index] if index < len(labels) else ""
+        if label:
+            _thumb_label(layer, x, y, w, label)
+    if geo.kind == "grid":
+        _shade(layer, (0, 0, hero_w, hero_h), top_alpha=170, bottom_alpha=0, top_span=200, bottom_span=1)
+        last = boxes[-1] if boxes else (0, 0, hero_w, hero_h)
+        _shade(layer, (last[0], last[1], last[0] + last[2], last[1] + last[3]), top_alpha=0, bottom_alpha=200,
+               top_span=1, bottom_span=200)
+        _draw_price(layer, data, right=last[0] + last[2] - m, bottom=last[1] + last[3] - m,
+                    size=geo.price_size, max_width=last[2] - 2 * m)
+        _draw_title_block(layer, data, x=m, y=m - 6, max_width=hero_w - 2 * m, size=geo.title_size)
+    else:
+        tall = geo.kind == "tall"
+        if slot is not None:
+            # Title sits in the open sky: no top band; bottom shade only for the price card.
+            _shade(layer, (0, 0, hero_w, hero_h), top_alpha=0, bottom_alpha=210, top_span=1)
+            dark = slot.luminance >= BRIGHT_SKY_LUMINANCE
+            if not dark:
+                _soft_scrim(layer, (slot.x, slot.y, slot.x + slot.width, slot.y + slot.height), 120)
+        else:
+            _shade(layer, (0, 0, hero_w, hero_h), top_alpha=170, bottom_alpha=210 if tall else 200)
+        _draw_price(layer, data, right=hero_w - m - (8 if tall else 0),
+                    bottom=hero_h - m - (4 if tall else 0),
+                    size=geo.price_size, max_width=hero_w - 2 * m)
+        if slot is not None:
+            _draw_title_block(layer, data, x=slot.x, y=slot.y, max_width=hero_w - 2 * m - 16,
+                              size=geo.title_size, align=slot.align, dark=slot.luminance >= BRIGHT_SKY_LUMINANCE)
+        else:
+            _draw_title_block(layer, data, x=m + (8 if tall else 0), y=m - (0 if tall else 6),
+                              max_width=640 if tall else (hero_w - 2 * m), size=geo.title_size)
+    _draw_footer(layer, geo, _brand_lockup())
     canvas.paste(layer, (0, 0), layer)
     output = Path(output_path).expanduser().resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -482,4 +619,5 @@ def render_cover(*, style: str, source_image: str, output_path: str, data: Cover
         canvas.save(output, format="PNG", optimize=True)
     return str(output)
 
-__all__ = ["CoverRenderData", "render_cover"]
+
+__all__ = ["CoverRenderData", "DEFAULT_VILLA_TEMPLATE", "TEMPLATES", "VILLA_TEMPLATES", "render_cover", "villa_template_from_env"]

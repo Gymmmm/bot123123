@@ -221,7 +221,7 @@ async def test_photos_send_frozen_media_then_action_message(tmp_path):
                 action_rows=(
                     (
                         SemanticAction(
-                            "📷 房源详情",
+                            "🏠 房源详情",
                             "details",
                             target_public_listing_id="QL-RF-A2B3",
                         ),
@@ -396,7 +396,7 @@ async def test_expired_listing_or_card_action_shows_visible_alert():
 
 
 def test_details_from_album_edits_caption_or_text(tmp_path):
-    """Opening 📷 房源详情 edits the current message to text details."""
+    """Opening 🏠 房源详情 edits the current message to text details."""
     import asyncio
 
     result = CallbackDispatchResult(

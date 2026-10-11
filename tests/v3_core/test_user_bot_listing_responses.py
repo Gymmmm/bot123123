@@ -132,7 +132,7 @@ def test_detail_text_omits_missing_bullets_and_adviser_without_copy():
     assert "🟢 当前可预约" in text
     # V4.1: no real photo files in this fixture → the photos button is hidden.
     assert _actions(response.action_rows) == [["book", "consult"]]
-    assert _labels(response.action_rows) == [["📅 预约看房", "💬 咨询这套"]]
+    assert _labels(response.action_rows) == [["📅 预约看房", "💬 中文顾问"]]
 
 
 def test_details_response_uses_live_rented_state_but_keeps_frozen_public_facts():
@@ -143,7 +143,7 @@ def test_details_response_uses_live_rented_state_but_keeps_frozen_public_facts()
     assert "🔴 已租出" in response.text
     assert _actions(response.action_rows) == [["consult", "similar"]]
     assert _labels(response.action_rows) == [
-        ["💬 咨询这套", "🔍 找相似"],
+        ["💬 中文顾问", "🔍 找相似"],
     ]
 
 

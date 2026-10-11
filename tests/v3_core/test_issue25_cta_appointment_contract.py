@@ -101,7 +101,7 @@ def test_channel_ctas_and_sync_contract_share_one_real_listing():
     )
     rows = official_channel_button_spec(urls, inventory_status="active")
     assert CHANNEL_CTA_LABELS == {
-        "details": "📷 房源详情",
+        "details": "🏠 房源详情",
         "photos": "📸 全部实拍",
         "book": "📅 预约看房",
         "consult": "💬 中文顾问",
@@ -110,7 +110,7 @@ def test_channel_ctas_and_sync_contract_share_one_real_listing():
         "similar": "🔎 更多房源",
     }
     assert [[label for label, _ in row] for row in rows] == [
-        ["📷 房源详情", "📅 预约看房"], ["💬 中文顾问"],
+        ["🏠 房源详情", "📅 预约看房"], ["💬 中文顾问"],
     ]
     assert urls["details"] == f"https://t.me/QiaoLianBot?start=property_{PUBLIC_ID}_details"
     assert urls["photos"] == f"https://t.me/QiaoLianBot?start=property_{PUBLIC_ID}_photos"
@@ -153,7 +153,7 @@ def test_details_and_photos_contract_has_real_fields_three_entries_and_no_intern
     labels = _labels(details.action_rows)
     # V4.1: fixture has no real photo files → no photo button (never a fake count).
     assert not any("实拍" in label for label in labels)
-    assert "📅 预约看房" in labels and "💬 咨询这套" in labels
+    assert "📅 预约看房" in labels and "💬 中文顾问" in labels
     assert "富力城" in details.text
     # NOTE: public_id is NOT exposed in user-visible details text (privacy)
     assert "🪧" not in details.text
