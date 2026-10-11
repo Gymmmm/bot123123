@@ -38,19 +38,22 @@ jobs:
           CHECK=$(mktemp /var/tmp/qiaolian-live-vision.XXXXXX.py)
           trap 'rm -f "$CHECK"' EXIT
           cat > "$CHECK" <<'PY'
-          import os,signal
+          import json,os,pwd,sqlite3
           from pathlib import Path
-          for proc in Path("/proc").iterdir():
-              if not proc.name.isdigit(): continue
-              try:
-                  args=(proc/"cmdline").read_bytes().split(b"\0")
-                  candidates=[Path(x.decode()) for x in args if x.startswith(b"/var/tmp/qiaolian-live-vision.") and x.endswith(b".py")]
-                  for script in candidates:
-                      text=script.read_text()
-                      if 'print("MEDIA_CHECK"' in text and 'print("POST_UPDATED"' in text:
-                          os.kill(int(proc.name),signal.SIGINT)
-                          print("STOPPED_OWN_BULK_MEDIA_PROBE",proc.name)
-              except (PermissionError,FileNotFoundError,ProcessLookupError): pass
+          from PIL import Image
+          account=pwd.getpwnam("qiaolianbot")
+          db=sqlite3.connect("file:/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db?mode=ro",uri=True); db.row_factory=sqlite3.Row
+          rows=db.execute("SELECT a.listing_id,c.source_post_id FROM publisher_auto_items_v3 a JOIN review_items r ON r.review_id=a.review_id JOIN canonical_records c ON c.canonical_record_id=r.canonical_record_id WHERE a.state='exception' AND a.reason_code IN ('unreadable_media','insufficient_media') AND a.ignored=0").fetchall()
+          for row in rows:
+              root=Path("/opt/qiaolian_dual_bots/media/prepared_v3")/str(int(row["source_post_id"]))
+              fixed=0
+              if root.exists():
+                  for path in [root,*root.rglob("*")]:
+                      if path.is_symlink(): continue
+                      if path.stat().st_uid==0:
+                          os.chown(path,account.pw_uid,account.pw_gid); fixed+=1
+                  print("MEDIA_PERMISSION",json.dumps({"listing":row["listing_id"],"fixed":fixed}))
+          print("PERMISSION_REPAIR_DONE")
           
           PY
           chmod 0600 "$CHECK"
