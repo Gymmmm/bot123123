@@ -134,20 +134,26 @@ def test_6735_villa_regression(photos_copy):
     rooms = {_name(p): i.room_type for p, i in items.items()}
     assert rooms["01"] == rooms["02"] == "外观"          # 外观 ≠ 卧室
     assert rooms["07"] == "卧室"                          # bed + toilet through a door → 卧室, not 卫生间
-    # Multiple exteriors: the complete, less obstructed one wins.
+    # Multiple exteriors (Gym 2026-10-11): the sunny side-front view 02 (blue sky, facade + roof
+    # clear, shrine/tree only in front) beats the flat grey frontal 01.
     assert plan.template == "villa_4x5"
-    assert _name(plan.hero) == "01"
-    assert items[plan.hero].obstruction < [i for p, i in items.items() if _name(p) == "02"][0].obstruction
+    assert _name(plan.hero) == "02"
+    one, two = ([i for p, i in items.items() if _name(p) == n][0] for n in ("01", "02"))
+    assert two.exterior_rank > one.exterior_rank
+    assert two.aesthetic > one.aesthetic + 0.4 and two.blue_sky > 0.3 and one.blue_sky < 0.05
+    assert cp.effective_obstruction(two) < two.obstruction                     # greenery/decor = framing
+    assert cp.effective_obstruction(one) == one.obstruction                    # grey sky: no relief
+    assert plan.hero_correction.get("method") == "gentle" and plan.hero_correction.get("hero_ok") is True
     assert plan.hero_correction.get("status") == "corrected"
     assert plan.labels[0] == "客厅" and "卧室" in plan.labels and "外观" not in plan.labels
 
 
 def test_6735_bad_exterior_switches_hero_and_template(photos_copy):
-    photos = [p for p in photos_copy("6735") if p.stem != "01"]  # only the tree-blocked side view left
+    photos = [p for p in photos_copy("6735") if p.stem not in {"01", "02"}]  # no exterior left
     plan, items = _plan("6735", "独栋别墅", photos=photos)
     assert plan.template == "landscape_3x2"
     assert items[plan.hero].room_type == "客厅"
-    assert "外观不合格" in plan.hero_reason
+    assert "没有可信外观" in plan.hero_reason
 
 
 def test_villa_perspective_correction_does_not_stretch_the_building(photos_copy, tmp_path):
@@ -450,3 +456,46 @@ def test_service_keeps_black_gold_for_living_room_fallback(tmp_path, photos_copy
     assert media.cover_template == "villa_black_gold"
     assert "用客厅做主图" in plan["hero_reason"]
     assert modes[-1] == "interior"                            # the living room is never keystoned as a facade
+
+
+def _item(**kw):
+    base = dict(path="x.jpg", room_type="外观", model_room_type="外观", confidence=0.9, show_label=True,
+                quality=0.7, sharpness=0.8, exposure=0.8, composition=0.8, completeness=0.85, obstruction=0.3,
+                distortion=0.2, text_overlay=0.0, objects=("立面", "屋顶", "树木"), blue_sky=0.4)
+    base.update(kw)
+    return cp.PhotoAssessment(**base)
+
+
+def test_soft_foreground_relief_needs_building_sky_and_greenery_only():
+    assert cp.effective_obstruction(_item()) == pytest.approx(0.15)
+    assert cp.effective_obstruction(_item(blue_sky=0.02)) == pytest.approx(0.3)          # grey / no sky
+    assert cp.effective_obstruction(_item(objects=("立面", "树木"))) == pytest.approx(0.3)  # roof not visible
+    assert cp.effective_obstruction(_item(objects=("立面", "屋顶", "树木", "车辆"))) == pytest.approx(0.3)  # a car blocks
+
+
+def test_garden_shot_with_facade_and_roof_is_an_exterior_candidate():
+    garden = _item(room_type="庭院", model_room_type="庭院", show_label=False)
+    assert cp._exterior_candidate(garden)
+    assert not cp._exterior_candidate(_item(room_type="庭院", model_room_type="庭院", show_label=False,
+                                            objects=("草坪", "树木")))
+    balcony = _item(room_type="阳台", model_room_type="阳台", objects=("洗衣机", "立面", "屋顶"))
+    assert not cp._exterior_candidate(balcony)                                              # 6675 balcony stays out
+
+
+def test_aesthetics_prefer_sunny_colourful_over_flat_grey(tmp_path):
+    sunny = Image.new("RGB", (400, 300), (70, 140, 230))
+    sunny.paste(Image.new("RGB", (400, 180), (230, 230, 225)), (0, 120))
+    sunny.paste(Image.new("RGB", (120, 140), (40, 150, 60)), (20, 160))
+    grey = Image.new("RGB", (400, 300), (200, 200, 200))
+    grey.paste(Image.new("RGB", (400, 180), (150, 150, 150)), (0, 120))
+    sunny.save(tmp_path / "s.jpg"); grey.save(tmp_path / "g.jpg")
+    s, g = cp.image_aesthetics(str(tmp_path / "s.jpg")), cp.image_aesthetics(str(tmp_path / "g.jpg"))
+    assert s["blue_sky"] > 0.9 and g["blue_sky"] == 0.0
+    assert s["score"] > g["score"] + 0.4
+    assert cp.image_aesthetics(str(tmp_path / "missing.jpg"))["score"] == 0.5
+
+
+def test_exterior_rank_uses_aesthetics_and_model_score():
+    flat = _item(aesthetic=0.28, model_hero=0.7, blue_sky=0.0, obstruction=0.2, completeness=0.8)
+    sunny = _item(aesthetic=0.96, model_hero=0.8, blue_sky=0.47, obstruction=0.2, completeness=0.85)
+    assert cp._exterior_rank(sunny) > cp._exterior_rank(flat) + 0.15

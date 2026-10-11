@@ -32,6 +32,9 @@ from pathlib import Path
 from statistics import median
 from typing import Any, Callable, Iterable, Mapping
 
+import numpy as np
+from PIL import Image
+
 from .ranker import _dhash, _hamming
 from .vision import PhotoVision
 
@@ -106,6 +109,10 @@ class PhotoAssessment:
     distortion: float
     text_overlay: float
     hero_score: float = 0.0
+    model_hero: float = 0.0
+    aesthetic: float = 0.5
+    blue_sky: float = 0.0
+    exterior_rank: float = 0.0
     cluster: int = 0
     cluster_best: bool = True
     foreign_suspect: bool = False
@@ -249,21 +256,81 @@ def _hero_score(item: PhotoAssessment, kind: str, model_hero: float) -> float:
     text_fit = 1.0 - min(1.0, item.text_overlay * 1.5)
     return (
         0.18 * item.quality + 0.12 * item.sharpness + 0.08 * item.exposure + 0.12 * item.completeness
-        + 0.1 * (1 - item.obstruction) + 0.08 * item.composition + 0.16 * room_fit
+        + 0.1 * (1 - effective_obstruction(item)) + 0.08 * item.composition + 0.16 * room_fit
         + 0.06 * (1 - item.distortion) + 0.04 * text_fit + 0.06 * model_hero
     )
 
 
 def _exterior_ok(item: PhotoAssessment) -> bool:
     return (
-        item.show_label and item.room_type in {"外观", "入口"} and not item.foreign_suspect
-        and item.completeness >= 0.6 and item.obstruction <= 0.4 and item.quality >= 0.5
+        _exterior_candidate(item) and not item.foreign_suspect
+        and item.completeness >= 0.6 and effective_obstruction(item) <= 0.4 and item.quality >= 0.5
         and item.distortion <= 0.6
     )
 
 
+EXTERIOR_ROOMS = {"外观", "入口"}
+BUILDING_OBJECTS = {"立面", "屋顶"}           # facade AND roof clearly in frame
+SOFT_FOREGROUND = {"树木", "草坪", "栏杆", "院墙"}  # greenery / decor, not a car or a person
+HARD_FOREGROUND = {"车辆"}
+BLUE_SKY_VISIBLE = 0.12                     # ≥ 12 % of the top 40 % is blue sky
+SOFT_OBSTRUCTION_FACTOR = 0.5
+
+
+def image_aesthetics(path: str) -> dict[str, float]:
+    """Cheap pixel aesthetics (no API): blue sky in the top 40 %, colourfulness
+    (Hasler–Süsstrunk), lighting (mid-tone mean) and contrast → ``score`` 0..1.
+    A flat grey-sky frontal shot scores low; a sunny, colourful one high."""
+    try:
+        with Image.open(path) as raw:
+            im = raw.convert("RGB")
+        im.thumbnail((320, 320))
+    except (OSError, ValueError):
+        return {"score": 0.5, "blue_sky": 0.0, "colourful": 0.0, "lighting": 0.5, "contrast": 0.5}
+    rgb = np.asarray(im).astype(float)
+    hsv = np.asarray(im.convert("HSV")).astype(float) / 255.0
+    top = slice(0, max(1, int(rgb.shape[0] * 0.4)))
+    hue, sat, val = hsv[top, :, 0] * 360.0, hsv[top, :, 1], hsv[top, :, 2]
+    blue_sky = float(((hue > 185) & (hue < 250) & (sat > 0.18) & (val > 0.45)).mean())
+    R, G, B = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+    rg, yb = R - G, 0.5 * (R + G) - B
+    colourful = float(np.hypot(rg.std(), yb.std()) + 0.3 * np.hypot(rg.mean(), yb.mean()))
+    luma = 0.299 * R + 0.587 * G + 0.114 * B
+    lighting = max(0.0, 1.0 - abs(float(luma.mean()) - 135.0) / 135.0)
+    contrast = min(1.0, float(luma.std()) / 64.0)
+    score = (0.45 * min(1.0, blue_sky / 0.35) + 0.35 * min(1.0, colourful / 50.0)
+             + 0.2 * (0.5 * lighting + 0.5 * contrast))
+    return {"score": round(score, 3), "blue_sky": round(blue_sky, 3), "colourful": round(colourful, 1),
+            "lighting": round(lighting, 3), "contrast": round(contrast, 3)}
+
+
+def _shows_building(item: PhotoAssessment) -> bool:
+    return BUILDING_OBJECTS <= set(item.objects)
+
+
+def _exterior_candidate(item: PhotoAssessment) -> bool:
+    """A labelled exterior, or a garden/entrance shot whose facade AND roof are clearly in frame
+    (e.g. a side-front view with a shrine and a tree in front) — the label may stay hidden."""
+    if item.show_label and item.room_type in EXTERIOR_ROOMS:
+        return True
+    rooms = {item.room_type, item.model_room_type}
+    return bool(rooms & (EXTERIOR_ROOMS | {"庭院"})) and _shows_building(item) and item.confidence >= 0.6
+
+
+def effective_obstruction(item: PhotoAssessment) -> float:
+    """Partial greenery/decor in front of a clearly visible facade + roof + blue sky is
+    framing, not blocking: its obstruction counts half. Cars/people count fully."""
+    objects = set(item.objects)
+    soft = (_shows_building(item) and item.blue_sky >= BLUE_SKY_VISIBLE
+            and bool(objects & SOFT_FOREGROUND) and not (objects & HARD_FOREGROUND))
+    return item.obstruction * (SOFT_OBSTRUCTION_FACTOR if soft else 1.0)
+
+
 def _exterior_rank(item: PhotoAssessment) -> float:
-    return 0.35 * item.completeness + 0.35 * (1 - item.obstruction) + 0.2 * item.quality + 0.1 * (1 - item.distortion)
+    """Which exterior is the hero: completeness / obstruction / quality as before, plus the
+    model's own cover score and pixel aesthetics (sky, colour, lighting)."""
+    return (0.25 * item.completeness + 0.20 * (1 - effective_obstruction(item)) + 0.15 * item.quality
+            + 0.05 * (1 - item.distortion) + 0.15 * item.model_hero + 0.20 * item.aesthetic)
 
 
 def _clusters(paths: list[str], vision: Mapping[str, PhotoVision]) -> dict[str, int]:
@@ -317,7 +384,12 @@ def plan_cover(
     clusters = _clusters(paths, vis)
     for item in items:
         item.cluster = clusters[item.path]
-        item.hero_score = _hero_score(item, kind, float(vis[item.path].hero_score))
+        item.model_hero = float(vis[item.path].hero_score)
+        if kind == "villa":
+            looks = image_aesthetics(item.path)
+            item.aesthetic, item.blue_sky = looks["score"], looks["blue_sky"]
+        item.hero_score = _hero_score(item, kind, item.model_hero)
+        item.exterior_rank = round(_exterior_rank(item), 4) if _exterior_candidate(item) else 0.0
     for cid in set(clusters.values()):
         members = sorted((i for i in items if i.cluster == cid), key=lambda i: -i.hero_score)
         for index, member in enumerate(members):
@@ -388,9 +460,11 @@ def _auto_hero(eligible: list[PhotoAssessment], kind: str, probe) -> tuple[Photo
                     f"外观{why}（残余 {report.get('residual_after_deg')}°，边缘 {report.get('edge_lean_before_deg')}°），不做主图")
                 rejected_tilt.append(candidate)
                 break   # Gym 2026-10-11: best exterior unusable → best living room (not a weaker side view)
-            return (candidate, f"外观完整度 {candidate.completeness:.2f}、遮挡 {candidate.obstruction:.2f}，"
-                               f"在 {len(exteriors)} 张合格外观中最佳", TEMPLATE_VILLA, report)
-        rejected = [i for i in eligible if i.room_type in {"外观", "入口"} and i.show_label and not _exterior_ok(i)]
+            return (candidate, f"外观综合 {candidate.exterior_rank:.2f}（完整度 {candidate.completeness:.2f}、"
+                               f"遮挡 {effective_obstruction(candidate):.2f}、观感 {candidate.aesthetic:.2f}、"
+                               f"模型 {candidate.model_hero:.2f}），在 {len(exteriors)} 张合格外观中最佳",
+                    TEMPLATE_VILLA, report)
+        rejected = [i for i in eligible if _exterior_candidate(i) and not _exterior_ok(i)]
         why = "外观不合格（" + "；".join(
             f"完整度{i.completeness:.2f}/遮挡{i.obstruction:.2f}" for i in rejected) + "）" if rejected else "没有可信外观"
         if rejected_tilt:

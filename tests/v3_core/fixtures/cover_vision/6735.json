@@ -84,15 +84,15 @@
     "quality": {
      "sharpness": 0.85,
      "brightness": 0.9,
-     "composition": 0.55,
-     "completeness": 0.5
+     "composition": 0.8,
+     "completeness": 0.85
     },
-    "hero_score": 0.6,
-    "obstruction_score": 0.55,
+    "hero_score": 0.8,
+    "obstruction_score": 0.2,
     "distortion_score": 0.3,
     "duplicate_group": "侧面庭院",
     "confidence": 0.9,
-    "reason": "侧面角度，前景大树和神龛挡住近一半立面，建筑不完整",
+    "reason": "侧前方角度：立面、屋顶和蓝天都清楚，前景神龛和树木只挡住左侧一部分（Gym 2026-10-11 复核：比 01 更好看）",
     "provider": "fixture:manual_visual_inspection"
    }
   },
@@ -402,5 +402,6 @@
     "provider": "fixture:manual_visual_inspection"
    }
   }
- ]
+ ],
+ "_fixture_review": "02 re-judged on 2026-10-11 after Gym's review (values aligned with the cached Gemini output: completeness 0.85, obstruction 0.2, hero 0.8)."
 }
