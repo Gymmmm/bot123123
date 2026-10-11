@@ -23,29 +23,28 @@ jobs:
           printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
           printf '%s\n' '50.114.74.120 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMvdBaAbAt9/4NCEC4RmiAukQ5KK5S6OF4YEml2iLw+6' > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
-      - name: Sample missing-rent source evidence
+      - name: Confirm fix markers and source text location
         run: |
           set -Eeuo pipefail
           ssh -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 root@50.114.74.120 'bash -s' <<'REMOTE'
           set -Eeuo pipefail
+          echo "FIX_MARKERS"
+          grep -c "Bare currency after the number" /opt/qiaolian_v3/current/qiaolian_dual/canonical_facts.py || echo 0
+          grep -c "longest non-empty caption" /opt/qiaolian_v3/current/v3_core/ingest/telegram_collector.py || echo 0
           DB=/opt/qiaolian_v3/data/qiaolian_dual_bot.db
           sqlite3 -header -column "$DB" <<'SQL'
-          SELECT
-            CASE WHEN length(trim(COALESCE(s.raw_text,'')))=0 THEN 'empty' ELSE 'has_text' END AS text_state,
-            COUNT(*) AS n
-          FROM publisher_review_exceptions_v3 e
-          JOIN review_items r ON r.review_id=e.review_id
-          JOIN canonical_records c ON c.canonical_record_id=r.canonical_record_id
-          LEFT JOIN source_posts s ON s.source_post_id=c.source_post_id
-          WHERE e.resolved=0 AND e.ignored=0 AND e.reason_code='missing_rent'
-          GROUP BY 1;
+          SELECT 'source_posts' AS t, COUNT(*) AS n FROM source_posts;
+          SELECT 'source_posts_empty' AS t, COUNT(*) AS n FROM source_posts WHERE length(trim(COALESCE(raw_text,'')))=0;
+          SELECT 'canonical_with_source_text' AS t, COUNT(*) AS n
+            FROM publisher_review_exceptions_v3 e
+            JOIN review_items r ON r.review_id=e.review_id
+            JOIN canonical_records c ON c.canonical_record_id=r.canonical_record_id
+            JOIN source_posts s ON s.id=c.source_post_id OR s.source_post_id=c.source_post_id
+            WHERE e.resolved=0 AND e.ignored=0 AND e.reason_code='missing_rent'
+              AND length(trim(COALESCE(s.raw_text,'')))>0;
           SQL
-          echo "--- parser revision in release ---"
-          grep -n "PARSER_REVISION" /opt/qiaolian_v3/current/qiaolian_dual/canonical_facts.py | head -3
-          echo "--- trailing currency pattern present? ---"
-          grep -c "Bare currency after the number" /opt/qiaolian_v3/current/qiaolian_dual/canonical_facts.py || echo 0
-          echo "--- album harvest present? ---"
-          grep -c "harvest the longest" /opt/qiaolian_v3/current/v3_core/ingest/telegram_collector.py || echo 0
+          echo "SAMPLE_IDS"
+          sqlite3 "$DB" "SELECT e.review_id, c.source_post_id, length(COALESCE(s.raw_text,'')) FROM publisher_review_exceptions_v3 e JOIN review_items r ON r.review_id=e.review_id JOIN canonical_records c ON c.canonical_record_id=r.canonical_record_id LEFT JOIN source_posts s ON s.source_post_id=c.source_post_id WHERE e.resolved=0 AND e.reason_code='missing_rent' LIMIT 5;"
           REMOTE
       - name: Remove temporary SSH material
         if: always()
