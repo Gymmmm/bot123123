@@ -158,13 +158,14 @@ def test_villa_perspective_correction_does_not_stretch_the_building(photos_copy,
     assert report["edge_aspect_change"] <= 0.25
     assert report["crop_kept"] >= 0.7
     assert report["lean_after_deg"] < report["lean_before_deg"]
+    assert report["residual_after_deg"] <= 1.0          # verticals within 1 degree
 
 
 def test_correction_reverts_or_refuses_outside_bounds(tmp_path, monkeypatch):
     from v3_core.media import straighten
 
-    monkeypatch.setattr(straighten, "MAX_ASPECT_CHANGE", 0.001)
-    monkeypatch.setattr(straighten, "MAX_EDGE_ASPECT_CHANGE", 0.001)
+    monkeypatch.setattr(straighten, "EXTERIOR_MAX_ASPECT_CHANGE", 0.001)
+    monkeypatch.setattr(straighten, "EXTERIOR_MAX_EDGE_ASPECT_CHANGE", 0.001)
     src = FIXTURES / "photos" / "6735" / "01.jpg"
     report = straighten.correct_file(src, tmp_path / "x.jpg", mode="exterior")
     assert report["status"] == "reverted:aspect_change" and "path" not in report

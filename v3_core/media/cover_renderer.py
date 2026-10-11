@@ -20,7 +20,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
-from PIL import Image, ImageDraw, ImageFont, ImageOps
+from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
+
+from .hero_layout import frame_offset, text_slot
 
 
 @dataclass(frozen=True)
@@ -52,6 +54,11 @@ GRID_LAYOUT = CoverLayout(
 TALL_LAYOUT = CoverLayout(
     kind="tall", canvas=(1080, 1350), hero=(1080, 878), thumb_extent=402,
     separator=SEPARATOR, footer_height=64, margin=32, title_size=52, price_size=80,
+)
+# V-B (Gym 2026-10-11 villa feedback): shorter hero, taller detail row.
+TALL_COMPACT_LAYOUT = CoverLayout(
+    kind="tall", canvas=(1080, 1200), hero=(1080, 700), thumb_extent=430,
+    separator=SEPARATOR, footer_height=64, margin=32, title_size=50, price_size=76,
 )
 TALL_CANVAS = TALL_LAYOUT.canvas
 APARTMENT_CANVAS = APARTMENT_LAYOUT.canvas
@@ -315,22 +322,57 @@ def _shade(layer: Image.Image, box: tuple[int, int, int, int], *, top_alpha: int
             draw.line((x0, y, x1 - 1, y), fill=(*SHADE, int(alpha)))
 
 
-def _draw_title_block(layer: Image.Image, data: CoverRenderData, *, x: int, y: int, max_width: int, size: int) -> None:
-    draw = ImageDraw.Draw(layer)
+def _title_parts(draw: ImageDraw.ImageDraw, data: CoverRenderData, *, max_width: int, size: int):
     pin = _pin_icon(int(size * 0.62), GOLD)
     title, title_font = _fit_line(draw, _cover_title(data), max_width=max_width - pin.width - 10,
                                   start_size=size, min_size=26)
-    baseline = y + size
-    layer.alpha_composite(pin, (x, baseline - int(size * 0.78)))
-    draw.text((x + pin.width + 10, baseline), title, font=title_font, fill=(255, 255, 255, 255), anchor="ls")
+    title_w = pin.width + 10 + int(draw.textlength(title, font=title_font))
     tag = _hero_tag(data)
+    tag_font, tag_w = None, 0
+    if tag:
+        tag, tag_font = _fit_line(draw, tag, max_width=max_width - 36, start_size=int(size * 0.5), min_size=18)
+        tag_w = int(draw.textlength(tag, font=tag_font)) + 36
+    height = size + (16 + int(size * 0.5) + 20 if tag else 0) + 8
+    return title, title_font, tag, tag_font, max(title_w, tag_w), height
+
+
+def _title_block_size(data: CoverRenderData, *, max_width: int, size: int) -> tuple[int, int]:
+    probe = ImageDraw.Draw(Image.new("RGBA", (8, 8)))
+    *_, width, height = _title_parts(probe, data, max_width=max_width, size=size)
+    return width, height
+
+
+def _draw_title_block(layer: Image.Image, data: CoverRenderData, *, x: int, y: int, max_width: int, size: int,
+                      align: str = "left", dark: bool = False) -> None:
+    """📍 title + 户型·类型 pill. ``align`` centres both lines on the block; ``dark`` ink for bright sky."""
+    draw = ImageDraw.Draw(layer)
+    title, title_font, tag, tag_font, block_w, _ = _title_parts(draw, data, max_width=max_width, size=size)
+    pin = _pin_icon(int(size * 0.62), DARK_GOLD if dark else GOLD)
+    line_w = pin.width + 10 + int(draw.textlength(title, font=title_font))
+    tx = x + (block_w - line_w) // 2 if align == "center" else (x + block_w - line_w if align == "right" else x)
+    baseline = y + size
+    layer.alpha_composite(pin, (tx, baseline - int(size * 0.78)))
+    ink = (*DARK_INK, 255) if dark else (255, 255, 255, 255)
+    draw.text((tx + pin.width + 10, baseline), title, font=title_font, fill=ink, anchor="ls")
     if not tag:
         return
-    tag, tag_font = _fit_line(draw, tag, max_width=max_width - 36, start_size=int(size * 0.5), min_size=18)
     tag_w = int(draw.textlength(tag, font=tag_font))
-    box = (x, baseline + 16, x + tag_w + 36, baseline + 16 + int(size * 0.5) + 20)
+    px = x + (block_w - tag_w - 36) // 2 if align == "center" else (x + block_w - tag_w - 36 if align == "right" else x)
+    box = (px, baseline + 16, px + tag_w + 36, baseline + 16 + int(size * 0.5) + 20)
     _pill(layer, box, fill=(20, 24, 28, 200), outline=(*GOLD, 255), width=2)
     _center_text(draw, box, tag, tag_font, (*GOLD_LIGHT, 255))
+
+
+def _soft_scrim(layer: Image.Image, box: tuple[int, int, int, int], alpha: int) -> None:
+    """Blurred dark plate behind white ink on a mid-tone sky (no hard band across the photo)."""
+    pad = 36
+    x0, y0, x1, y1 = box
+    plate = Image.new("L", (x1 - x0 + 2 * pad, y1 - y0 + 2 * pad), 0)
+    ImageDraw.Draw(plate).rounded_rectangle((pad, pad, plate.width - pad, plate.height - pad), radius=28, fill=alpha)
+    plate = plate.filter(ImageFilter.GaussianBlur(pad / 2))
+    tint = Image.new("RGBA", plate.size, (*SHADE, 0))
+    tint.putalpha(plate)
+    layer.alpha_composite(tint, (x0 - pad, y0 - pad))
 
 
 def _draw_price(layer: Image.Image, data: CoverRenderData, *, right: int, bottom: int, size: int,
@@ -396,7 +438,11 @@ def _is_apartment(data: CoverRenderData) -> bool:
     return any(token in value for token in ("公寓", "服务式", "apartment", "condo", "studio"))
 
 
-TEMPLATES = ("apartment_3x2", "villa_4x5", "landscape_3x2", "grid_2x2", "single")
+TEMPLATES = ("apartment_3x2", "villa_4x5", "villa_compact", "landscape_3x2", "grid_2x2", "single")
+SKY_TEXT_TEMPLATES = {"villa_4x5", "villa_compact"}
+DARK_INK = (24, 30, 36)
+DARK_GOLD = (170, 122, 30)
+BRIGHT_SKY_LUMINANCE = 168
 
 
 def _resolve_template(data: CoverRenderData, template: str | None) -> str:
@@ -412,6 +458,8 @@ def _layout(data: CoverRenderData, template: str | None = None) -> CoverLayout:
         return GRID_LAYOUT
     if value == "villa_4x5":
         return TALL_LAYOUT
+    if value == "villa_compact":
+        return TALL_COMPACT_LAYOUT
     if value == "single":
         return APARTMENT_LAYOUT if _is_apartment(data) else TALL_LAYOUT
     return APARTMENT_LAYOUT
@@ -487,7 +535,16 @@ def render_cover(*, style: str, source_image: str, output_path: str, data: Cover
     if not thumbs:
         # No detail photos: the hero takes the whole photo area (no empty band).
         hero_w, hero_h = W, geo.footer_top
-    canvas.paste(_fit(images[0], (hero_w, hero_h)), (0, 0))
+    sky_text = template in SKY_TEXT_TEMPLATES and bool(thumbs)
+    m = geo.margin
+    block = _title_block_size(data, max_width=hero_w - 2 * m - 16, size=geo.title_size)
+    if sky_text:
+        centering = frame_offset(images[0], (hero_w, hero_h), text_room=block[1] + 2 * m)
+        hero = ImageOps.fit(images[0], (hero_w, hero_h), method=Image.Resampling.LANCZOS, centering=centering)
+    else:
+        hero = _fit(images[0], (hero_w, hero_h))
+    canvas.paste(hero, (0, 0))
+    slot = text_slot(hero, block, margin=m + 8) if sky_text else None
     layer = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
     labels = list(source_labels or ())
     boxes = _thumb_boxes(geo, len(thumbs))
@@ -496,7 +553,6 @@ def render_cover(*, style: str, source_image: str, output_path: str, data: Cover
         label = labels[index] if index < len(labels) else ""
         if label:
             _thumb_label(layer, x, y, w, label)
-    m = geo.margin
     if geo.kind == "grid":
         _shade(layer, (0, 0, hero_w, hero_h), top_alpha=170, bottom_alpha=0, top_span=200, bottom_span=1)
         last = boxes[-1] if boxes else (0, 0, hero_w, hero_h)
@@ -507,12 +563,23 @@ def render_cover(*, style: str, source_image: str, output_path: str, data: Cover
         _draw_title_block(layer, data, x=m, y=m - 6, max_width=hero_w - 2 * m, size=geo.title_size)
     else:
         tall = geo.kind == "tall"
-        _shade(layer, (0, 0, hero_w, hero_h), top_alpha=170, bottom_alpha=210 if tall else 200)
+        if slot is not None:
+            # Title sits in the open sky: no top band; bottom shade only for the price card.
+            _shade(layer, (0, 0, hero_w, hero_h), top_alpha=0, bottom_alpha=210, top_span=1)
+            dark = slot.luminance >= BRIGHT_SKY_LUMINANCE
+            if not dark:
+                _soft_scrim(layer, (slot.x, slot.y, slot.x + slot.width, slot.y + slot.height), 120)
+        else:
+            _shade(layer, (0, 0, hero_w, hero_h), top_alpha=170, bottom_alpha=210 if tall else 200)
         _draw_price(layer, data, right=hero_w - m - (8 if tall else 0),
                     bottom=hero_h - m - (4 if tall else 0),
                     size=geo.price_size, max_width=hero_w - 2 * m)
-        _draw_title_block(layer, data, x=m + (8 if tall else 0), y=m - (0 if tall else 6),
-                          max_width=640 if tall else (hero_w - 2 * m), size=geo.title_size)
+        if slot is not None:
+            _draw_title_block(layer, data, x=slot.x, y=slot.y, max_width=hero_w - 2 * m - 16,
+                              size=geo.title_size, align=slot.align, dark=slot.luminance >= BRIGHT_SKY_LUMINANCE)
+        else:
+            _draw_title_block(layer, data, x=m + (8 if tall else 0), y=m - (0 if tall else 6),
+                              max_width=640 if tall else (hero_w - 2 * m), size=geo.title_size)
     _draw_footer(layer, geo, _brand_lockup())
     canvas.paste(layer, (0, 0), layer)
     output = Path(output_path).expanduser().resolve()
