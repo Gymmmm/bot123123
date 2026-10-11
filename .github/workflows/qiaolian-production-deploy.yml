@@ -161,6 +161,65 @@ jobs:
           set -Eeuo pipefail
           scp -P "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 "$RELEASE_BUNDLE" "$PROD_SSH_USER@$PROD_HOST:$REMOTE_BUNDLE"
 
+      - name: Provision vision runtime config (key from secret, never logged)
+        env:
+          V3_VISION_API_KEY: '${{ secrets.V3_VISION_API_KEY }}'
+          REMOTE_SCRIPT: '/var/tmp/qiaolian-provision-vision-${{ github.run_id }}.py'
+        run: |
+          set -Eeuo pipefail
+          test -n "$V3_VISION_API_KEY" || { echo 'DEPLOY_BLOCKED missing_vision_secret'; exit 1; }
+          cat > "$RUNNER_TEMP/provision_vision.py" <<'PY'
+          import os, re, shutil, sys, time
+          PATH = "/opt/qiaolian_v3/runtime.env"
+          BACKUP_DIR = "/opt/qiaolian_backups"
+          key = sys.stdin.read().strip()
+          if not re.fullmatch(r"[A-Za-z0-9_-]{20,200}", key):
+              raise SystemExit("VISION_CONFIG_BLOCKED invalid_key_format")
+          want = {
+              "V3_VISION_PROVIDER": "gemini",
+              "V3_VISION_API_KEY": key,
+              "V3_VISION_MODEL": "gemini-3.5-flash-lite",
+              "V3_VISION_THINKING": "minimal",
+              "V3_VISION_RPM": "14",
+          }
+          st = os.stat(PATH)
+          with open(PATH, encoding="utf-8") as fh:
+              original = fh.read()
+          pattern = re.compile(r"^\s*(?:export\s+)?(?:" + "|".join(want) + r")\s*=")
+          kept = [line for line in original.splitlines() if not pattern.match(line)]
+          while kept and not kept[-1].strip():
+              kept.pop()
+          updated = "\n".join(kept + [""] + [f"{k}={v}" for k, v in want.items()]) + "\n"
+          # 600 when the service user owns the file; a root-owned file keeps group read for the service group (never world).
+          mode = 0o600 if st.st_uid != 0 else (st.st_mode & 0o640)
+          backup = "-"
+          changed = updated != original
+          if changed:
+              os.makedirs(BACKUP_DIR, exist_ok=True)
+              backup = f"{BACKUP_DIR}/runtime.env.before_vision_{time.strftime('%Y%m%d_%H%M%S', time.gmtime())}"
+              shutil.copy2(PATH, backup)
+              os.chown(backup, 0, 0)
+              os.chmod(backup, 0o600)
+              tmp = PATH + ".vision.tmp"
+              fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+              with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                  fh.write(updated)
+                  fh.flush()
+                  os.fsync(fh.fileno())
+              os.chown(tmp, st.st_uid, st.st_gid)
+              os.chmod(tmp, mode)
+              os.replace(tmp, PATH)
+          else:
+              os.chmod(PATH, mode)
+          kept_count = len([l for l in kept if l.strip() and not l.lstrip().startswith("#")])
+          print(f"VISION_CONFIG provider=gemini model=gemini-3.5-flash-lite thinking=minimal rpm=14 key_present=yes "
+                f"changed={'yes' if changed else 'no'} other_settings_kept={kept_count} mode={oct(mode)} "
+                f"owner={st.st_uid}:{st.st_gid} env_backup={backup}")
+          PY
+          scp -P "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 "$RUNNER_TEMP/provision_vision.py" "$PROD_SSH_USER@$PROD_HOST:$REMOTE_SCRIPT"
+          rm -f "$RUNNER_TEMP/provision_vision.py"
+          printf '%s' "$V3_VISION_API_KEY" | ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 "$PROD_SSH_USER@$PROD_HOST" "PY=/opt/qiaolian_v3/.venv/bin/python; [ -x \"\$PY\" ] || PY=python3; \"\$PY\" '$REMOTE_SCRIPT'; rc=\$?; rm -f '$REMOTE_SCRIPT'; exit \$rc"
+
       - name: Deploy and verify four V3 components
         env:
           REMOTE_BUNDLE: '/var/tmp/qiaolian-v3-${{ github.run_id }}-${{ github.sha }}.bundle'
@@ -245,6 +304,27 @@ jobs:
           PY
           printf '%s\n' "$EXPECTED_SHA" > "$ROOT/.deployed_sha"; chmod 0644 "$ROOT/.deployed_sha"; trap - ERR
           echo "V3_DEPLOYMENT_OK sha=$EXPECTED_SHA backup=$BACKUP_PATH"
+          REMOTE
+
+      - name: Verify vision provider is configured (no key output, no API call)
+        run: |
+          set -Eeuo pipefail
+          ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 "$PROD_SSH_USER@$PROD_HOST" "bash -s" <<'REMOTE'
+          set -Eeuo pipefail
+          CHECK=$(mktemp /var/tmp/qiaolian-vision-check.XXXXXX.py)
+          trap 'rm -f "$CHECK"' EXIT
+          cat > "$CHECK" <<'PY'
+          from v3_core.media.vision import vision_client_from_env
+          c = vision_client_from_env()
+          interval = getattr(c, "_min_interval", 0) or 0
+          rpm = round(60 / interval) if interval else 0
+          print(f"VISION_PROVIDER_CONFIGURED client={c.name} model={','.join(getattr(c, 'models', []))} thinking={getattr(c, 'thinking', '')} rpm={rpm} key_present={bool(getattr(c, '_api_key', ''))}")
+          assert c.name == "gemini", c.name
+          PY
+          chmod 0644 "$CHECK"
+          runuser -u qiaolianbot -- bash -lc "set -a; source /opt/qiaolian_v3/runtime.env; set +a; cd /opt/qiaolian_v3/current; exec /opt/qiaolian_v3/.venv/bin/python '$CHECK'"
+          stat -c 'RUNTIME_ENV mode=%a owner=%U:%G' /opt/qiaolian_v3/runtime.env
+          readlink -f /opt/qiaolian_v3/current
           REMOTE
 
       - name: Verify two real Publisher deliveries
