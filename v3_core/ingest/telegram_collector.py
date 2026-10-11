@@ -264,6 +264,16 @@ class TelegramCollectorApp:
             if getattr(message, "media", None):
                 await self.append_supported_media(event.client, message, raw_images)
         raw_text = str((event.text or event.raw_text or "").strip())
+        if not raw_text:
+            # Album caption may live on a non-anchor message; collect any non-empty text.
+            texts = []
+            for message in messages:
+                msg_text = str(getattr(message, "message", None) or getattr(message, "text", None) or "").strip()
+                if msg_text:
+                    texts.append(msg_text)
+            if texts:
+                # Prefer the longest non-empty caption; avoid joining unrelated fragments.
+                raw_text = max(texts, key=len)
         if not raw_images and not raw_text and not has_video:
             return None
         grouped_id = getattr(anchor, "grouped_id", None)
