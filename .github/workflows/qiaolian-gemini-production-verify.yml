@@ -11,7 +11,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 18
     steps:
       - name: Configure pinned production SSH
         env:
@@ -38,26 +38,61 @@ jobs:
           CHECK=$(mktemp /var/tmp/qiaolian-live-vision.XXXXXX.py)
           trap 'rm -f "$CHECK"' EXIT
           cat > "$CHECK" <<'PY'
-          import json, sqlite3
-          db=sqlite3.connect("file:/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db?mode=ro",uri=True)
-          db.row_factory=sqlite3.Row
-          for table in ("publisher_auto_items_v3","publisher_review_exceptions_v3","listings_v3","offers_v3","canonical_facts_v3","publication_records_v3"):
-              cols=[r[1] for r in db.execute(f"PRAGMA table_info({table})")]
-              print("SCHEMA",table,json.dumps(cols))
-              if table=="publisher_auto_items_v3" and cols:
-                  print("AUTO_COUNTS",json.dumps([dict(r) for r in db.execute("SELECT state,reason_code,ignored,COUNT(*) n FROM publisher_auto_items_v3 GROUP BY state,reason_code,ignored")],ensure_ascii=False))
-                  print("AUTO_SAMPLES",json.dumps([dict(r) for r in db.execute("SELECT * FROM publisher_auto_items_v3 WHERE state IN ('exception','queued','held') AND ignored=0 ORDER BY updated_at DESC LIMIT 12")],ensure_ascii=False))
-              if table=="publisher_review_exceptions_v3" and cols:
-                  print("REVIEW_COUNTS",json.dumps([dict(r) for r in db.execute("SELECT reason_code,resolved,ignored,COUNT(*) n FROM publisher_review_exceptions_v3 GROUP BY reason_code,resolved,ignored")],ensure_ascii=False))
-              if table=="listings_v3" and cols:
-                  wanted=[c for c in ("listing_id","title","property_type","layout","bedrooms","status","location","district") if c in cols]
-                  print("LISTING_SAMPLES",json.dumps([dict(r) for r in db.execute(f"SELECT {','.join(wanted)} FROM listings_v3 ORDER BY rowid DESC LIMIT 15")],ensure_ascii=False))
+          import asyncio, json, sqlite3, traceback
+          from pathlib import Path
+          from telegram import Bot
+          from v3_core.publishing.admin_bot import load_settings
+          from v3_core.publishing.publisher_app import V3PublisherApplication
+          from v3_core.publishing.telegram_adapter import TelegramChannelAdapter
+          from v3_core.publishing.delivery_coordinator import TelegramSendCommand
+          async def main():
+              settings=load_settings()
+              app=V3PublisherApplication(settings)
+              db=sqlite3.connect(settings.db_path); db.row_factory=sqlite3.Row
+              rows=db.execute("SELECT a.offer_id,a.listing_id,a.review_id,a.reason_code FROM publisher_auto_items_v3 a WHERE a.state='exception' AND a.ignored=0 ORDER BY a.listing_id").fetchall()
+              for row in rows:
+                  if row["reason_code"] not in ("unreadable_media","insufficient_media"): continue
+                  try:
+                      media=await asyncio.to_thread(app.workflow.review_media,review_id=row["review_id"])
+                      print("MEDIA_CHECK",json.dumps({"listing":row["listing_id"],"reason":row["reason_code"],"cover":str(media.cover_source_path),"gallery_count":len(media.gallery_paths),"cover_exists":Path(media.cover_source_path).is_file()},ensure_ascii=False))
+                  except Exception as e:
+                      print("MEDIA_FAILURE",json.dumps({"listing":row["listing_id"],"error_type":type(e).__name__,"error":str(e),"trace":traceback.format_exc(limit=5)},ensure_ascii=False))
+              for row in db.execute("SELECT e.listing_id,r.review_id FROM publisher_review_exceptions_v3 e JOIN review_items r ON r.review_id=e.review_id WHERE e.resolved=0 AND e.ignored=0 LIMIT 10"):
+                  detail=app.workflow.review_detail(row["review_id"])
+                  source=app.simple.source_reader.source_post(int(detail.canonical["source_post_id"]))
+                  print("RENT_SOURCE",json.dumps({"listing":row["listing_id"],"facts":detail.canonical.get("facts"),"raw":str(source.get("raw_text") or "")[:1800]},ensure_ascii=False))
+              async with Bot(settings.token) as bot:
+                  chat=await bot.get_chat(settings.channel_chat_id)
+                  for kind in ("别墅","公寓"):
+                      candidates=db.execute("SELECT a.*,l.public_listing_id FROM publisher_auto_items_v3 a JOIN listings_v3 l ON l.listing_id=a.listing_id JOIN listing_offers o ON o.offer_id=a.offer_id WHERE a.state='published' AND l.property_type=? AND l.inventory_status='active' AND o.offer_status='active' ORDER BY a.rowid DESC LIMIT 4",(kind,)).fetchall()
+                      done=False
+                      for row in candidates:
+                          try:
+                              package=await asyncio.to_thread(app.workflow.build_package_for_review,review_id=row["review_id"])
+                              package=app.workflow.approve_package(package_id=package.package_id,approved_by="operator:Gym:preview-20261011")
+                              listing=app.workflow.reader.listing(row["listing_id"])
+                              previous=app.workflow.delivery.publications.get_published_for_listing(row["listing_id"],platform="telegram",channel_chat_id=str(settings.channel_chat_id))
+                              if not previous: raise RuntimeError("published_instance_missing")
+                              command=TelegramSendCommand(attempt_id="",package_id=package.package_id,channel_chat_id=str(settings.channel_chat_id),cover_path=package.cover_path,caption=package.post_text,actions=dict(package.actions),inventory_status=listing["inventory_status"],area_key=str(listing.get("public_location_key") or ""))
+                              receipt=await TelegramChannelAdapter(bot).edit(command,message_id=previous.channel_message_id)
+                              if receipt.get("edit_mode")=="text": raise RuntimeError("cover_edit_fell_back_to_text")
+                              instance=app.workflow.delivery.publications.record_telegram_publication(package_id=package.package_id,listing_id=package.listing_id,offer_id=package.offer_id,channel_chat_id=str(settings.channel_chat_id),telegram_result=receipt)
+                              app.workflow.packages.mark_published(package.package_id)
+                              app.workflow.delivery.publications.mark_status(previous.instance_id,"superseded")
+                              app.auto_repository.set_item(row["offer_id"],state="published",package_id=package.package_id,channel_message_id=str(instance.channel_message_id))
+                              link=("https://t.me/"+chat.username+"/" if chat.username else "https://t.me/c/"+str(chat.id).removeprefix("-100")+"/")+str(instance.channel_message_id)
+                              print("POST_UPDATED",json.dumps({"kind":kind,"listing":row["listing_id"],"public_id":row["public_listing_id"],"link":link,"cover":package.cover_path,"package":package.package_id,"caption":package.post_text},ensure_ascii=False))
+                              done=True; break
+                          except Exception as e:
+                              print("POST_FAILURE",json.dumps({"listing":row["listing_id"],"error":str(e),"trace":traceback.format_exc(limit=3)},ensure_ascii=False))
+                      assert done,"no_usable_"+kind
+          asyncio.run(main())
           
           PY
-          chmod 0600 "$CHECK"
+          chmod 0644 "$CHECK"
           cd /opt/qiaolian_v3/current
           export PYTHONPATH=/opt/qiaolian_v3/current
-          /opt/qiaolian_v3/.venv/bin/python "$CHECK"
+          runuser -u qiaolianbot -- bash -lc "set -a; source /opt/qiaolian_v3/runtime.env; set +a; export PYTHONPATH=/opt/qiaolian_v3/current; cd /opt/qiaolian_v3/current; exec /opt/qiaolian_v3/.venv/bin/python '$CHECK'"
           REMOTE
       - name: Remove temporary SSH material
         if: always()
