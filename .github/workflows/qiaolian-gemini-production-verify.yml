@@ -11,7 +11,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 18
+    timeout-minutes: 10
     steps:
       - name: Configure pinned production SSH
         env:
@@ -23,107 +23,26 @@ jobs:
           printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_production"
           printf '%s\n' '50.114.74.120 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMvdBaAbAt9/4NCEC4RmiAukQ5KK5S6OF4YEml2iLw+6' > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/qiaolian_production" "$HOME/.ssh/known_hosts"
-      - name: Targeted reparse and media recheck through existing state machine
+      - name: Sample remaining missing-rent text
         run: |
           set -Eeuo pipefail
           ssh -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 root@50.114.74.120 'bash -s' <<'REMOTE'
           set -Eeuo pipefail
-          CHECK=$(mktemp /var/tmp/qiaolian-exception-recheck.XXXXXX.py)
-          trap 'rm -f "$CHECK"' EXIT
-          cat > "$CHECK" <<'PY'
-          import json, os, sqlite3
-          from pathlib import Path
-          from v3_core.parser.worker import CanonicalWorker
-          from v3_core.publishing.autopilot_anomalies import FinalAutoPublishRepository
-          from v3_core.ingest.source_reader import SourceReader
-          from v3_core.media.service import MediaPreparationService
-
-          db = os.environ["DB_PATH"]
-          conn = sqlite3.connect(db)
-          conn.row_factory = sqlite3.Row
-
-          def counts():
-              auto = conn.execute("SELECT reason_code, COUNT(*) n FROM publisher_auto_items_v3 WHERE state='exception' AND ignored=0 GROUP BY reason_code").fetchall()
-              review = conn.execute("SELECT reason_code, COUNT(*) n FROM publisher_review_exceptions_v3 WHERE resolved=0 AND ignored=0 GROUP BY reason_code").fetchall()
-              return {
-                  "auto": {r["reason_code"]: r["n"] for r in auto},
-                  "review": {r["reason_code"]: r["n"] for r in review},
-                  "auto_total": sum(r["n"] for r in auto),
-                  "review_total": sum(r["n"] for r in review),
-              }
-
-          before = counts()
-          print("BEFORE", json.dumps(before, ensure_ascii=False), flush=True)
-
-          rent_rows = conn.execute("""
-              SELECT DISTINCT s.id AS source_pk, length(trim(COALESCE(s.raw_text,''))) AS text_len
-              FROM publisher_review_exceptions_v3 e
-              JOIN review_items r ON r.review_id=e.review_id
-              JOIN canonical_records c ON c.canonical_record_id=r.canonical_record_id
-              JOIN source_posts s ON CAST(s.id AS TEXT)=CAST(c.source_post_id AS TEXT)
-              WHERE e.resolved=0 AND e.ignored=0 AND e.reason_code='missing_rent'
-          """).fetchall()
-          to_parse = [int(r["source_pk"]) for r in rent_rows if int(r["text_len"] or 0) > 0]
-          skipped_empty = [int(r["source_pk"]) for r in rent_rows if int(r["text_len"] or 0) == 0]
-          print("RENT_TARGETS", json.dumps({"with_text": len(to_parse), "empty": len(skipped_empty)}, ensure_ascii=False), flush=True)
-
-          worker = CanonicalWorker(db)
-          parsed = failed = 0
-          for pk in to_parse:
-              result = worker.process_one(pk)
-              print("PARSED", json.dumps({"pk": pk, "status": result.status, "listing": result.listing_id, "error": result.error}, ensure_ascii=False), flush=True)
-              if result.status == "materialized":
-                  parsed += 1
-              else:
-                  failed += 1
-
-          repo = FinalAutoPublishRepository(db)
-          synced_candidates = repo.sync_candidates()
-          synced_reviews = repo.sync_review_exceptions()
-          print("SYNC", json.dumps({"candidates": synced_candidates, "reviews": synced_reviews}, ensure_ascii=False), flush=True)
-
-          media_rows = conn.execute("""
-              SELECT a.offer_id, a.reason_code, c.source_post_id
-              FROM publisher_auto_items_v3 a
-              JOIN review_items r ON r.review_id=a.review_id
-              JOIN canonical_records c ON c.canonical_record_id=r.canonical_record_id
-              WHERE a.state='exception' AND a.ignored=0
-                AND a.reason_code IN ('unreadable_media','insufficient_media')
-          """).fetchall()
-          reader = SourceReader(db)
-          media = MediaPreparationService(reader)
-          requeued = still_bad = 0
-          for row in media_rows:
-              source_pk = int(row["source_post_id"])
-              try:
-                  prepared = media.prepare(source_post_id=source_pk)
-                  cover = Path(str(prepared.cover_source_path or ""))
-                  gallery = [Path(p) for p in (prepared.gallery_paths or ())]
-                  readable = cover.is_file() and os.access(cover, os.R_OK)
-                  photo_count = (1 if readable else 0) + sum(1 for p in gallery if p.is_file() and os.access(p, os.R_OK))
-                  if readable and photo_count >= 4:
-                      repo.requeue(str(row["offer_id"]))
-                      requeued += 1
-                      print("MEDIA_REQUEUE", json.dumps({"offer": row["offer_id"], "photos": photo_count}, ensure_ascii=False), flush=True)
-                  else:
-                      still_bad += 1
-                      print("MEDIA_STILL", json.dumps({"offer": row["offer_id"], "readable": readable, "photos": photo_count}, ensure_ascii=False), flush=True)
-              except Exception as exc:
-                  still_bad += 1
-                  print("MEDIA_ERROR", json.dumps({"offer": row["offer_id"], "error": f"{type(exc).__name__}:{exc}"[:300]}, ensure_ascii=False), flush=True)
-
-          after = counts()
-          print("AFTER", json.dumps(after, ensure_ascii=False), flush=True)
-          print("SUMMARY", json.dumps({
-              "parsed": parsed, "parse_failed": failed, "skipped_empty": len(skipped_empty),
-              "media_requeued": requeued, "media_still": still_bad,
-              "before_total": before["auto_total"] + before["review_total"],
-              "after_total": after["auto_total"] + after["review_total"],
-          }, ensure_ascii=False), flush=True)
-          PY
-          chmod 0644 "$CHECK"
-          cd /opt/qiaolian_v3/current
-          runuser -u qiaolianbot -- bash -lc "set -a; source /opt/qiaolian_v3/runtime.env; set +a; export PYTHONPATH=/opt/qiaolian_v3/current; export DB_PATH=/opt/qiaolian_v3/data/qiaolian_dual_bot.db; cd /opt/qiaolian_v3/current; exec /opt/qiaolian_v3/.venv/bin/python '$CHECK'"
+          DB=/opt/qiaolian_v3/data/qiaolian_dual_bot.db
+          sqlite3 "$DB" <<'SQL'
+          .mode list
+          .separator ' | '
+          SELECT s.id, substr(replace(replace(s.raw_text, char(10), ' '), char(13), ' '), 1, 180)
+          FROM publisher_review_exceptions_v3 e
+          JOIN review_items r ON r.review_id=e.review_id
+          JOIN canonical_records c ON c.canonical_record_id=r.canonical_record_id
+          JOIN source_posts s ON CAST(s.id AS TEXT)=CAST(c.source_post_id AS TEXT)
+          WHERE e.resolved=0 AND e.ignored=0 AND e.reason_code='missing_rent'
+            AND length(trim(COALESCE(s.raw_text,'')))>0
+          LIMIT 8;
+          SQL
+          echo "COUNTS"
+          sqlite3 "$DB" "SELECT 'auto', COUNT(*) FROM publisher_auto_items_v3 WHERE state='exception' AND ignored=0; SELECT 'review', COUNT(*) FROM publisher_review_exceptions_v3 WHERE resolved=0 AND ignored=0;"
           REMOTE
       - name: Remove temporary SSH material
         if: always()
