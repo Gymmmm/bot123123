@@ -322,7 +322,7 @@ jobs:
           assert c.name == "gemini", c.name
           PY
           chmod 0644 "$CHECK"
-          runuser -u qiaolianbot -- bash -lc "set -a; source /opt/qiaolian_v3/runtime.env; set +a; cd /opt/qiaolian_v3/current; exec /opt/qiaolian_v3/.venv/bin/python '$CHECK'"
+          runuser -u qiaolianbot -- bash -lc "set -a; source /opt/qiaolian_v3/runtime.env; set +a; cd /opt/qiaolian_v3/current; export PYTHONPATH=/opt/qiaolian_v3/current; exec /opt/qiaolian_v3/.venv/bin/python '$CHECK'"
           stat -c 'RUNTIME_ENV mode=%a owner=%U:%G' /opt/qiaolian_v3/runtime.env
           readlink -f /opt/qiaolian_v3/current
           REMOTE
