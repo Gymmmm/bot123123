@@ -1,5 +1,5 @@
 {
   "confirm": "DEPLOY",
-  "deploy_sha": "0704b823d7e1510ba181ffaeb0d8c0bea6065aea",
-  "request_id": "fix-rent-album-exceptions-20261011"
+  "deploy_sha": "8d514f9902004b9e142fac3619f9a5f665d2a97d",
+  "request_id": "remove-obsolete-workflows-20261012"
 }
