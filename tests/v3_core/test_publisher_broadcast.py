@@ -124,13 +124,14 @@ def test_marketing_runtime_button_rows_and_urls_match_locked_v1(tmp_path, monkey
         "thu": [["💬 中文顾问", "🔍 开始找房"]],
         "fri": [["💬 中文顾问", "🔍 开始找房"]],
         "sat": [["🔍 开始找房", "🛎️ 侨联服务"], ["💬 中文顾问"]],
-        "sun": [["🛎️ 侨联服务", "💬 中文顾问"]],
+        "sun": [["🏠 查看出售房源"], ["💬 中文顾问"]],
     }
     expected_urls = {
         "🔍 开始找房": "https://t.me/qiaolian_rent_bot?start=find",
         "💬 中文顾问": "https://t.me/qiaolian_rent_bot?start=advisor",
         "🛎️ 侨联服务": "https://t.me/qiaolian_rent_bot?start=service",
         "📢 最新房源": "https://t.me/qiaolian_channel",
+        "🏠 查看出售房源": "https://qiaolian-jinbian-sale.vercel.app/?utm_source=telegram&utm_medium=marketing&utm_campaign=weekly_sale",
     }
 
     for template in MARKETING_TEMPLATES:
