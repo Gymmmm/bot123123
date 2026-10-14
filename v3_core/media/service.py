@@ -28,7 +28,7 @@ from .cover_renderer import VILLA_TEMPLATES, villa_template_from_env  # noqa: E4
 
 MAX_SCRUB_COVERAGE = 0.08
 SCRUB_REVISION = "source_scrub_v3_center_watermark_20260925"
-GALLERY_BRAND_REVISION = "qiaolian_gallery_v11_no_cover_dup_20260925"
+GALLERY_BRAND_REVISION = "qiaolian_gallery_v12_natural_ratio_20261014"
 
 
 @dataclass(frozen=True)
@@ -164,7 +164,7 @@ class MediaPreparationService:
         target_dir = self.prepared_dir / str(int(source_post_id)) / "gallery"
         target_dir.mkdir(parents=True, exist_ok=True)
         style_key = self._gallery_style_key(cover_style)
-        gallery_orientation = self._gallery_orientation_for_cover(cover_source_path)
+        gallery_orientation = "source"
         branded: list[str] = []
         for raw in paths:
             source = Path(str(raw)).expanduser().resolve()
@@ -185,7 +185,7 @@ class MediaPreparationService:
                     add_logo=True,
                     enhance=True,
                     cover_style=cover_style,
-                    force_orientation=gallery_orientation,
+                    force_orientation=None,
                 )
             branded.append(str(target.resolve()))
         return branded
