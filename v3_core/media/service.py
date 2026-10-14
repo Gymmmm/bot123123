@@ -123,7 +123,7 @@ class MediaPreparationService:
     ) -> str:
         digest = hashlib.sha256()
         style_key = cls._gallery_style_key(cover_style)
-        orient_key = gallery_canvas_key(gallery_orientation)
+        orient_key = "natural" if gallery_orientation == "source" else gallery_canvas_key(gallery_orientation)
         digest.update(
             (GALLERY_BRAND_REVISION + "\0" + style_key + "\0" + orient_key + "\0").encode("utf-8")
         )
@@ -158,8 +158,7 @@ class MediaPreparationService:
         Cover rendering intentionally keeps using the clean selected source.  The
         returned files are only for the public ``更多实拍`` gallery, preventing a
         second brand mark from appearing underneath the cover template.
-        All frames share the cover's landscape/portrait canvas so flips stay
-        size-stable, with a thin white frame + brighten polish.
+        Each frame follows its own orientation to avoid forcing portrait photos\n        into a landscape canvas.
         """
         target_dir = self.prepared_dir / str(int(source_post_id)) / "gallery"
         target_dir.mkdir(parents=True, exist_ok=True)
@@ -321,7 +320,7 @@ class MediaPreparationService:
         )
         rejected = [str(path) for path in scrub_rejected]
         rejected.extend(str(path) for path in selected["rejected_paths"])
-        gallery_orientation = self._gallery_orientation_for_cover(cover_resolved)
+        gallery_orientation = "source"
         plan_summary = plan.summary()
         plan_summary["bot_first_batch"] = list(branded_gallery[:4])
         return PreparedSourceMedia(
