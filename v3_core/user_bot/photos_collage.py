@@ -1,8 +1,4 @@
-"""Left-hero + right-3 stacked rental collage for photos first screen.
-
-Matches the product mock: one large living-room frame, three stacked room
-shots, white footer with 侨联地产 / 出租房源. Pure Pillow — no Chromium.
-"""
+"""Mobile-first four-photo collage: large hero above three readable thumbnails."""
 from __future__ import annotations
 
 import hashlib
@@ -12,8 +8,8 @@ from PIL import Image, ImageDraw, ImageFont
 
 
 # Canvas roughly matching the mock aspect (wide listing card).
-CANVAS_W = 1280
-CANVAS_H = 860
+CANVAS_W = 1080
+CANVAS_H = 1350
 GAP = 14
 RADIUS = 22
 FOOTER_H = 96
@@ -92,7 +88,7 @@ def render_side_stack_collage(
     public_listing_id: str = "",
     out_path: str | Path | None = None,
 ) -> str:
-    """Render left-large + right-3 collage. Returns absolute file path.
+    """Render one large hero above three thumbnails. Returns absolute file path.
 
     Production lock: collector only keeps listings with ≥4 usable photos, so
     this renderer requires 4 readable frames (hero + 3 distinct thumbs). No
@@ -111,7 +107,7 @@ def render_side_stack_collage(
                 str(public_listing_id or ""),
                 str(hero.resolve()),
                 *[str(p.resolve()) for p in thumbs],
-                f"{CANVAS_W}x{CANVAS_H}",
+                f"{CANVAS_W}x{CANVAS_H}:bottom-row-v2",
             ]
         ).encode("utf-8")
     ).hexdigest()[:16]
@@ -128,19 +124,18 @@ def render_side_stack_collage(
     grid_right = CANVAS_W - PAD
     grid_w = grid_right - grid_left
 
-    # ~68% width for hero, rest for stacked thumbs.
-    thumb_col_w = int(grid_w * 0.30)
-    hero_w = grid_w - GAP - thumb_col_w
-    thumb_h = (grid_h - GAP * 2) // 3
-
-    hero_img = _rounded(_cover_fit(hero, hero_w, grid_h), RADIUS)
+    # Full-width hero, then three equal-width photos. Avoid narrow stacked crops.
+    thumb_h = int(grid_h * 0.28)
+    hero_h = grid_h - GAP - thumb_h
+    thumb_w = (grid_w - 2 * GAP) // 3
+    hero_img = _rounded(_cover_fit(hero, grid_w, hero_h), RADIUS)
     canvas.paste(hero_img, (grid_left, grid_top))
 
-    tx = grid_left + hero_w + GAP
-    for index, path in enumerate(thumbs[:3]):
-        ty = grid_top + index * (thumb_h + GAP)
-        this_h = thumb_h if index < 2 else (grid_bottom - ty)
-        thumb = _rounded(_cover_fit(path, thumb_col_w, max(this_h, 1)), RADIUS)
+    ty = grid_top + hero_h + GAP
+    for index, path in enumerate(thumbs):
+        tx = grid_left + index * (thumb_w + GAP)
+        this_w = thumb_w if index < 2 else grid_right - tx
+        thumb = _rounded(_cover_fit(path, this_w, thumb_h), RADIUS)
         canvas.paste(thumb, (tx, ty))
 
     draw = ImageDraw.Draw(canvas)
