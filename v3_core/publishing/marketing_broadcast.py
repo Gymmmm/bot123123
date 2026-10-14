@@ -17,6 +17,8 @@ from zoneinfo import ZoneInfo
 from .broadcast import BUTTON_KEYS, BroadcastButton, parse_hhmm
 from .channel_contract import channel_general_action_url
 
+SALE_SITE_URL = "https://qiaolian-jinbian-sale.vercel.app/?utm_source=telegram&utm_medium=marketing&utm_campaign=weekly_sale"
+
 KEY_ENABLED = "marketing_broadcast_enabled"
 KEY_TIME = "marketing_broadcast_time"
 KEY_LAST_ATTEMPT = "marketing_broadcast_last_attempt_date"
@@ -64,8 +66,8 @@ TEMPLATES = (
         (("🔍 开始找房", "find"), ("🛎️ 侨联服务", "service"), ("💬 中文顾问", "advisor")),
     ),
     MarketingTemplate(
-        "sun", "📝 年租签约清单",
-        "📝 <b>准备在金边住一年，签约前把这些写清楚</b>\n\n租期、押付、水电、物业、网络、维修责任、提前退租、家具家电清单和退房条件，都以合同实际约定为准。",
+        "sun", "🏠 金边出售房源精选",
+        "🏠 <b>侨联地产｜金边出售房源</b>\n\n想在金边买房？可在出售网站按区域、总价和户型查看房源与实拍。\n\n<i>房源价格与状态以实时核实为准。</i>",
         (("🛎️ 侨联服务", "service"), ("💬 中文顾问", "advisor")),
     ),
 )
@@ -254,7 +256,7 @@ class MarketingBroadcastService:
         index = self.local_now().weekday() if weekday is None else int(weekday)
         base = TEMPLATES[index % 7]
         custom = self._get_optional(f"marketing_body_{base.key}").strip()
-        body = custom or self._data_body(base.key, base.body)
+        body = custom or (base.body if base.key == "sun" else self._data_body(base.key, base.body))
         return MarketingTemplate(base.key, base.title, body, base.buttons)
 
     def set_custom_body(self, weekday: int, body: str) -> None:
@@ -311,6 +313,8 @@ class MarketingBroadcastService:
             "sun": ((service, advisor),),
         }
         if selected == "default":
+            if template.key == "sun":
+                return ((BroadcastButton("🏠 查看出售房源", SALE_SITE_URL),), (advisor,))
             return locked[template.key]
         generic = {"find": BroadcastButton("🔍 帮我找房", find.url), "contact": BroadcastButton("💬 联系中文顾问", advisor.url)}
         if latest is not None:
