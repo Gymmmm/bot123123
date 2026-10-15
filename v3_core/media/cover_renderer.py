@@ -21,7 +21,7 @@ only, thumbnails labelled by room, footer = house icon + 侨联地产. No intern
 listing id, no 出租房源 pill, no white frame around the image.
 """
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import os
 from pathlib import Path
 from typing import Any, Iterable
@@ -68,6 +68,10 @@ TALL_COMPACT_LAYOUT = CoverLayout(
 MOBILE_LAYOUT = CoverLayout(
     kind="tall", canvas=(1080, 1350), hero=(1080, 765), thumb_extent=510,
     separator=6, footer_height=69, margin=32, title_size=52, price_size=78,
+)
+MOBILE_SINGLE_LAYOUT = CoverLayout(
+    kind="apartment", canvas=(1200, 900), hero=(1200, 838), thumb_extent=0,
+    separator=0, footer_height=62, margin=42, title_size=58, price_size=82,
 )
 TALL_CANVAS = TALL_LAYOUT.canvas
 APARTMENT_CANVAS = APARTMENT_LAYOUT.canvas
@@ -448,7 +452,7 @@ def _is_apartment(data: CoverRenderData) -> bool:
     return any(token in value for token in ("公寓", "服务式", "apartment", "condo", "studio"))
 
 
-TEMPLATES = ("apartment_3x2", "villa_black_gold", "villa_4x5", "villa_compact", "landscape_3x2", "grid_2x2", "single", "mobile_4x5", "mobile_3x2")
+TEMPLATES = ("apartment_3x2", "villa_black_gold", "villa_4x5", "villa_compact", "landscape_3x2", "grid_2x2", "single", "mobile_4x5", "mobile_3x2", "mobile_single_4x3")
 VILLA_TEMPLATES = ("villa_black_gold", "villa_4x5", "villa_compact")
 DEFAULT_VILLA_TEMPLATE = "villa_black_gold"
 SKY_TEXT_TEMPLATES = {"villa_4x5", "villa_compact"}
@@ -473,6 +477,8 @@ def villa_template_from_env() -> str:
 
 def _layout(data: CoverRenderData, template: str | None = None) -> CoverLayout:
     value = _resolve_template(data, template)
+    if value == "mobile_single_4x3":
+        return MOBILE_SINGLE_LAYOUT
     if value == "mobile_3x2":
         # Telegram displays landscape covers at the full message width. Reuse
         # the proven 3:2 left-hero/right-details geometry for every property
@@ -531,9 +537,9 @@ def _layout_geometry(data: CoverRenderData, template: str | None = None) -> dict
                 "bar": (g.hero_height, g.bar_bottom), "price_card": g.price_card, "template": "villa_black_gold"}
     geo = _layout(data, template)
     hero = geo.hero
-    if _resolve_template(data, template) == "single":
+    if _resolve_template(data, template) in {"single", "mobile_single_4x3"}:
         hero = (geo.canvas[0], geo.footer_top)
-    return {"canvas": geo.canvas, "hero": hero, "thumbs": [] if _resolve_template(data, template) == "single"
+    return {"canvas": geo.canvas, "hero": hero, "thumbs": [] if _resolve_template(data, template) in {"single", "mobile_single_4x3"}
             else _thumb_boxes(geo, 3), "footer_top": geo.footer_top, "footer_height": geo.footer_height,
             "template": _resolve_template(data, template)}
 
@@ -549,8 +555,12 @@ def render_cover(*, style: str, source_image: str, output_path: str, data: Cover
     """
     del style
     template = _resolve_template(data, layout)
+    if template == "mobile_single_4x3":
+        # The channel caption already carries type/layout. Keep the cover to
+        # two instant-scan facts: location/title and price.
+        data = replace(data, property_type="", layout="")
     candidates = [source_image]
-    if template != "single":
+    if template not in {"single", "mobile_single_4x3"}:
         candidates.extend(list(source_images or ()))
     images = _usable_images(candidates)
     if not images:

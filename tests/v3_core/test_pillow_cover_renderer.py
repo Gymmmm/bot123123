@@ -251,3 +251,17 @@ def test_mobile_3x2_uses_full_width_landscape_with_large_right_details(tmp_path,
     assert len(boxes) == count - 1
     assert all(x == 804 and width == 396 for x, _, width, _ in boxes)
     assert sum(height for _, _, _, height in boxes) + 6 * (count - 2) == 738
+
+
+def test_mobile_single_4x3_is_one_large_photo_without_mini_collage(tmp_path):
+    paths = [make(tmp_path / f"mobile-single-{i}.jpg", value=70 + i * 25) for i in range(4)]
+    output = tmp_path / "mobile-single.png"
+    render_cover(
+        style="premium_photo", source_image=paths[0], source_images=paths[1:],
+        output_path=str(output), layout="mobile_single_4x3",
+        data=CoverRenderData(public_listing_id="QL-TEST", property_type="别墅", price="1500"),
+    )
+    with Image.open(output) as cover:
+        assert cover.size == (1200, 900)
+        # The selected hero owns the entire photo area; no right/bottom cells.
+        assert cover.convert("RGB").getpixel((1100, 400))[0] == 70

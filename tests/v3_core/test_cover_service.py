@@ -199,8 +199,8 @@ def test_production_cover_uses_clean_composite_sources_not_branded_gallery(tmp_p
         media=media,
     )
     with Image.open(result.output_path).convert("RGB") as rendered:
-        assert rendered.size == (1200, 800)
-        top_red, top_green, top_blue = rendered.getpixel((1000, 150))
-        bottom_red, bottom_green, bottom_blue = rendered.getpixel((1000, 560))
-    assert top_green > top_red and top_green > top_blue
-    assert bottom_red > bottom_blue and bottom_green > bottom_blue
+        assert rendered.size == (1200, 900)
+        # The approved cover source fills the card. Secondary and rejected
+        # photos remain in the detail flow instead of becoming tiny cells.
+        red, green, blue = rendered.getpixel((1000, 400))
+    assert red > green and red > blue
