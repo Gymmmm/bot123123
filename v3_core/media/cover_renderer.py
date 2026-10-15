@@ -570,11 +570,13 @@ def render_cover(*, style: str, source_image: str, output_path: str, data: Cover
     if template == "mobile_collage_4x5" and len(images) >= 3:
         # Three photos: one full-width hero plus two equal large frames.
         # Four photos: an even 2x2 editorial grid. No thumbnail rail.
-        W, H, gap = 1080, 1350, 6
+        # A square card occupies less vertical space in Telegram and preserves
+        # useful room proportions better than the previous 4:5 poster.
+        W, H, gap = 1080, 1080, 6
         canvas = Image.new("RGB", (W, H), PAGE_BG)
         chosen = images[:4]
         if len(chosen) == 3:
-            hero_h = 735
+            hero_h = 590
             lower_y = hero_h + gap
             lower_h = H - lower_y
             half_w = (W - gap) // 2
