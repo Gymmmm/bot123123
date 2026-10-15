@@ -568,20 +568,23 @@ def render_cover(*, style: str, source_image: str, output_path: str, data: Cover
     if not images:
         raise ValueError("cover_no_usable_images")
     if template == "mobile_collage_4x5" and len(images) >= 3:
-        # A phone-feed 16:9 triptych: one dominant photo plus two substantial
-        # supporting photos. Never a 2x2 grid and never the old 1+3 thumbnail rail.
+        # Phone-feed 16:9: one dominant photo plus two or three supporting
+        # photos, selected according to how many approved images are available.
         W, H, gap = 1280, 720, 6
         canvas = Image.new("RGB", (W, H), PAGE_BG)
-        chosen = images[:3]
-        hero_w = 850
+        chosen = images[:4]
+        hero_w = 800
         side_x = hero_w + gap
         side_w = W - side_x
-        side_h = (H - gap) // 2
-        boxes = [
-            (0, 0, hero_w, H),
-            (side_x, 0, side_w, side_h),
-            (side_x, side_h + gap, side_w, H - side_h - gap),
-        ]
+        side_count = len(chosen) - 1
+        usable_height = H - gap * (side_count - 1)
+        heights = [usable_height // side_count] * side_count
+        heights[-1] += usable_height - sum(heights)
+        boxes = [(0, 0, hero_w, H)]
+        y = 0
+        for height in heights:
+            boxes.append((side_x, y, side_w, height))
+            y += height + gap
         for image, (x, y, w, h) in zip(chosen, boxes):
             canvas.paste(_fit(image, (w, h)), (x, y))
 
