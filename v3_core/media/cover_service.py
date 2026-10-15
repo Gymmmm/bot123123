@@ -164,9 +164,12 @@ class CoverRenderService:
                 render_kwargs["source_images"] = approved_thumbs
             elif media.cover_plan:
                 render_kwargs["source_images"] = ()
-            # Channel cover uses two full-width photos. This keeps both images
-            # legible on a phone without returning to miniature thumbnail rails.
-            if template != "single" and tuple(render_kwargs.get("source_images") or ()):
+            # Channel cover uses three or four substantial photo cells. It
+            # never returns to the old hero-plus-miniature-thumbnail rail.
+            if template != "single" and len(tuple(render_kwargs.get("source_images") or ())) >= 2:
+                render_kwargs["layout"] = "mobile_collage_4x5"
+                render_kwargs["source_images"] = tuple(render_kwargs["source_images"])[:3]
+            elif template != "single" and tuple(render_kwargs.get("source_images") or ()):
                 render_kwargs["layout"] = "mobile_duo_4x5"
                 render_kwargs["source_images"] = tuple(render_kwargs["source_images"])[:1]
             elif template != "single":

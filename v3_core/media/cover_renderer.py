@@ -452,7 +452,7 @@ def _is_apartment(data: CoverRenderData) -> bool:
     return any(token in value for token in ("公寓", "服务式", "apartment", "condo", "studio"))
 
 
-TEMPLATES = ("apartment_3x2", "villa_black_gold", "villa_4x5", "villa_compact", "landscape_3x2", "grid_2x2", "single", "mobile_4x5", "mobile_3x2", "mobile_single_4x3", "mobile_duo_4x5")
+TEMPLATES = ("apartment_3x2", "villa_black_gold", "villa_4x5", "villa_compact", "landscape_3x2", "grid_2x2", "single", "mobile_4x5", "mobile_3x2", "mobile_single_4x3", "mobile_duo_4x5", "mobile_collage_4x5")
 VILLA_TEMPLATES = ("villa_black_gold", "villa_4x5", "villa_compact")
 DEFAULT_VILLA_TEMPLATE = "villa_black_gold"
 SKY_TEXT_TEMPLATES = {"villa_4x5", "villa_compact"}
@@ -477,7 +477,7 @@ def villa_template_from_env() -> str:
 
 def _layout(data: CoverRenderData, template: str | None = None) -> CoverLayout:
     value = _resolve_template(data, template)
-    if value == "mobile_duo_4x5":
+    if value in {"mobile_duo_4x5", "mobile_collage_4x5"}:
         return MOBILE_LAYOUT
     if value == "mobile_single_4x3":
         return MOBILE_SINGLE_LAYOUT
@@ -567,6 +567,64 @@ def render_cover(*, style: str, source_image: str, output_path: str, data: Cover
     images = _usable_images(candidates)
     if not images:
         raise ValueError("cover_no_usable_images")
+    if template == "mobile_collage_4x5" and len(images) >= 3:
+        # Three photos: one full-width hero plus two equal large frames.
+        # Four photos: an even 2x2 editorial grid. No thumbnail rail.
+        W, H, gap = 1080, 1350, 6
+        canvas = Image.new("RGB", (W, H), PAGE_BG)
+        chosen = images[:4]
+        if len(chosen) == 3:
+            hero_h = 735
+            lower_y = hero_h + gap
+            lower_h = H - lower_y
+            half_w = (W - gap) // 2
+            boxes = [
+                (0, 0, W, hero_h),
+                (0, lower_y, half_w, lower_h),
+                (half_w + gap, lower_y, W - half_w - gap, lower_h),
+            ]
+        else:
+            half_w = (W - gap) // 2
+            half_h = (H - gap) // 2
+            boxes = [
+                (0, 0, half_w, half_h),
+                (half_w + gap, 0, W - half_w - gap, half_h),
+                (0, half_h + gap, half_w, H - half_h - gap),
+                (half_w + gap, half_h + gap, W - half_w - gap, H - half_h - gap),
+            ]
+        for image, (x, y, w, h) in zip(chosen, boxes):
+            canvas.paste(_fit(image, (w, h)), (x, y))
+
+        layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(layer)
+        title = _cover_title(data)
+        detail = _cover_subtitle(data)
+        title, title_font = _fit_line(
+            draw, title, max_width=560, start_size=48, min_size=34, bold=True
+        )
+        detail, detail_font = _fit_line(
+            draw, detail, max_width=560, start_size=29, min_size=23, bold=False
+        )
+        title_w = max(draw.textlength(title, font=title_font), draw.textlength(detail, font=detail_font))
+        draw.rounded_rectangle((26, 26, int(70 + title_w), 150), radius=24, fill=(8, 11, 14, 210))
+        draw.text((48, 42), title, font=title_font, fill=(255, 255, 255, 255))
+        if detail:
+            draw.text((50, 102), detail, font=detail_font, fill=(*SUBTLE_WHITE, 255))
+
+        price = data.price_line()
+        if price:
+            price, price_font = _fit_line(
+                draw, price, max_width=340, start_size=58, min_size=40, bold=True
+            )
+            price_w = draw.textlength(price, font=price_font)
+            left = int(W - price_w - 84)
+            draw.rounded_rectangle((left, 26, W - 26, 126), radius=24, fill=(8, 11, 14, 210), outline=(*GOLD, 230), width=2)
+            draw.text((W - 52, 48), price, font=price_font, fill=(*GOLD_LIGHT, 255), anchor="ra")
+        canvas.paste(layer, (0, 0), layer)
+        output = Path(output_path).expanduser().resolve()
+        output.parent.mkdir(parents=True, exist_ok=True)
+        canvas.save(output, format="JPEG" if output.suffix.lower() in {".jpg", ".jpeg"} else "PNG", quality=94, optimize=True)
+        return str(output)
     if template == "mobile_duo_4x5" and len(images) > 1:
         # Phone-first editorial cover: two genuinely large photos, no miniature
         # thumbnail rail.  A single compact glass band carries the only facts
