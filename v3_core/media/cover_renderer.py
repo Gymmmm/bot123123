@@ -568,20 +568,19 @@ def render_cover(*, style: str, source_image: str, output_path: str, data: Cover
     if not images:
         raise ValueError("cover_no_usable_images")
     if template == "mobile_collage_4x5" and len(images) >= 3:
-        # Three photos: one full-width hero plus two equal large frames.
-        # Four photos: an even 2x2 editorial grid. No thumbnail rail.
-        # 4:3 is the native shape of most property photos. In a 2x2 collage,
-        # every cell remains 4:3 as well, avoiding the destructive square crop.
-        W, H, gap = 1200, 900, 6
+        # A phone-feed 16:9 triptych: one dominant photo plus two substantial
+        # supporting photos. Never a 2x2 grid and never the old 1+3 thumbnail rail.
+        W, H, gap = 1280, 720, 6
         canvas = Image.new("RGB", (W, H), PAGE_BG)
-        chosen = images[:4]
-        half_w = (W - gap) // 2
-        half_h = (H - gap) // 2
+        chosen = images[:3]
+        hero_w = 850
+        side_x = hero_w + gap
+        side_w = W - side_x
+        side_h = (H - gap) // 2
         boxes = [
-            (0, 0, half_w, half_h),
-            (half_w + gap, 0, W - half_w - gap, half_h),
-            (0, half_h + gap, half_w, H - half_h - gap),
-            (half_w + gap, half_h + gap, W - half_w - gap, H - half_h - gap),
+            (0, 0, hero_w, H),
+            (side_x, 0, side_w, side_h),
+            (side_x, side_h + gap, side_w, H - side_h - gap),
         ]
         for image, (x, y, w, h) in zip(chosen, boxes):
             canvas.paste(_fit(image, (w, h)), (x, y))
@@ -591,53 +590,22 @@ def render_cover(*, style: str, source_image: str, output_path: str, data: Cover
         title = _cover_title(data)
         detail = _cover_subtitle(data)
         price = data.price_line()
-        if len(chosen) == 3:
-            # The fourth 4:3 cell is an intentional information card, not a
-            # stretched duplicate or empty placeholder.
-            x, y, w, h = boxes[3]
-            draw.rectangle((x, y, x + w, y + h), fill=(17, 21, 25, 255))
-            draw.rectangle((x, y, x + 7, y + h), fill=(*GOLD, 255))
-            title, title_font = _fit_line(
-                draw, title, max_width=w - 76, start_size=52, min_size=34, bold=True
-            )
-            detail, detail_font = _fit_line(
-                draw, detail, max_width=w - 76, start_size=31, min_size=23, bold=False
-            )
-            draw.text((x + 42, y + 54), title, font=title_font, fill=(255, 255, 255, 255))
-            if detail:
-                draw.text((x + 44, y + 130), detail, font=detail_font, fill=(*SUBTLE_WHITE, 255))
-            if price:
-                price, price_font = _fit_line(
-                    draw, price, max_width=w - 76, start_size=70, min_size=46, bold=True
-                )
-                draw.text((x + 42, y + 230), price, font=price_font, fill=(*GOLD_LIGHT, 255))
-            draw.text((x + 44, y + h - 56), "侨联地产", font=_font(28, bold=True), fill=(*GOLD, 230))
-            canvas.paste(layer, (0, 0), layer)
-            output = Path(output_path).expanduser().resolve()
-            output.parent.mkdir(parents=True, exist_ok=True)
-            canvas.save(output, format="JPEG" if output.suffix.lower() in {".jpg", ".jpeg"} else "PNG", quality=94, optimize=True)
-            return str(output)
-
         title, title_font = _fit_line(
-            draw, title, max_width=510, start_size=42, min_size=30, bold=True
+            draw, title, max_width=470, start_size=46, min_size=32, bold=True
         )
         detail, detail_font = _fit_line(
-            draw, detail, max_width=510, start_size=27, min_size=21, bold=False
+            draw, detail, max_width=470, start_size=28, min_size=22, bold=False
         )
-        title_w = max(draw.textlength(title, font=title_font), draw.textlength(detail, font=detail_font))
-        draw.rounded_rectangle((24, 24, int(64 + title_w), 138), radius=22, fill=(8, 11, 14, 210))
-        draw.text((44, 38), title, font=title_font, fill=(255, 255, 255, 255))
+        draw.rounded_rectangle((24, H - 174, hero_w - 24, H - 24), radius=22, fill=(8, 11, 14, 218), outline=(*GOLD, 210), width=2)
+        draw.text((48, H - 151), title, font=title_font, fill=(255, 255, 255, 255))
         if detail:
-            draw.text((46, 91), detail, font=detail_font, fill=(*SUBTLE_WHITE, 255))
+            draw.text((50, H - 92), detail, font=detail_font, fill=(*SUBTLE_WHITE, 255))
 
         if price:
             price, price_font = _fit_line(
-                draw, price, max_width=340, start_size=52, min_size=38, bold=True
+                draw, price, max_width=280, start_size=58, min_size=40, bold=True
             )
-            price_w = draw.textlength(price, font=price_font)
-            left = int(W - price_w - 76)
-            draw.rounded_rectangle((left, 24, W - 24, 116), radius=22, fill=(8, 11, 14, 210), outline=(*GOLD, 230), width=2)
-            draw.text((W - 46, 43), price, font=price_font, fill=(*GOLD_LIGHT, 255), anchor="ra")
+            draw.text((hero_w - 54, H - 125), price, font=price_font, fill=(*GOLD_LIGHT, 255), anchor="ra")
         canvas.paste(layer, (0, 0), layer)
         output = Path(output_path).expanduser().resolve()
         output.parent.mkdir(parents=True, exist_ok=True)

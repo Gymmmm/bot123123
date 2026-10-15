@@ -199,14 +199,12 @@ def test_production_cover_uses_clean_composite_sources_not_branded_gallery(tmp_p
         media=media,
     )
     with Image.open(result.output_path).convert("RGB") as rendered:
-        assert rendered.size == (1200, 900)
-        # The hero and approved clean secondaries become three substantial
-        # cells. Branded/rejected gallery files never enter the cover.
-        top_left = rendered.getpixel((250, 300))
-        top_right = rendered.getpixel((900, 300))
-        bottom_left = rendered.getpixel((250, 700))
-        info_cell = rendered.getpixel((900, 700))
-    assert top_left[0] > top_left[1] and top_left[0] > top_left[2]
-    assert top_right[1] > top_right[0] and top_right[1] > top_right[2]
-    assert bottom_left[0] > bottom_left[2] and bottom_left[1] > bottom_left[2]
-    assert max(info_cell) < 80
+        assert rendered.size == (1280, 720)
+        # One large hero and two supporting cells use only approved clean
+        # sources. The rejected blue branded gallery file never enters it.
+        hero = rendered.getpixel((300, 250))
+        upper_right = rendered.getpixel((1050, 180))
+        lower_right = rendered.getpixel((1050, 560))
+    assert hero[0] > hero[1] and hero[0] > hero[2]
+    assert upper_right[1] > upper_right[0] and upper_right[1] > upper_right[2]
+    assert lower_right[0] > lower_right[2] and lower_right[1] > lower_right[2]
