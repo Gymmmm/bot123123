@@ -79,6 +79,31 @@ def test_all_bad_images_follow_business_failure_not_worker_crash(tmp_path):
         render_cover(style="x", source_image=str(bad), output_path=str(tmp_path/"x.png"), data=CoverRenderData(public_listing_id="QL"))
 
 
+def test_mobile_top_collage_uses_large_hero_and_two_supporting_photos(tmp_path):
+    hero = tmp_path / "hero.png"
+    left = tmp_path / "left.png"
+    right = tmp_path / "right.png"
+    Image.new("RGB", (1200, 800), (210, 30, 30)).save(hero)
+    Image.new("RGB", (1200, 800), (30, 210, 30)).save(left)
+    Image.new("RGB", (1200, 800), (30, 30, 210)).save(right)
+    out = tmp_path / "top.png"
+
+    render_cover(
+        style="x",
+        source_image=str(hero),
+        source_images=(str(left), str(right)),
+        output_path=str(out),
+        data=CoverRenderData(public_listing_id="QL"),
+        layout="mobile_collage_top_3x2",
+    )
+
+    with Image.open(out).convert("RGB") as rendered:
+        assert rendered.size == (1200, 800)
+        assert rendered.getpixel((600, 300))[0] > 180
+        assert rendered.getpixel((250, 700))[1] > 180
+        assert rendered.getpixel((950, 700))[2] > 180
+
+
 @pytest.mark.parametrize(
     "property_type,expected_size,hero",
     [

@@ -452,7 +452,7 @@ def _is_apartment(data: CoverRenderData) -> bool:
     return any(token in value for token in ("公寓", "服务式", "apartment", "condo", "studio"))
 
 
-TEMPLATES = ("apartment_3x2", "villa_black_gold", "villa_4x5", "villa_compact", "landscape_3x2", "grid_2x2", "single", "mobile_4x5", "mobile_3x2", "mobile_single_4x3", "mobile_duo_4x5", "mobile_collage_4x5")
+TEMPLATES = ("apartment_3x2", "villa_black_gold", "villa_4x5", "villa_compact", "landscape_3x2", "grid_2x2", "single", "mobile_4x5", "mobile_3x2", "mobile_single_4x3", "mobile_duo_4x5", "mobile_collage_4x5", "mobile_collage_top_3x2")
 VILLA_TEMPLATES = ("villa_black_gold", "villa_4x5", "villa_compact")
 DEFAULT_VILLA_TEMPLATE = "villa_black_gold"
 SKY_TEXT_TEMPLATES = {"villa_4x5", "villa_compact"}
@@ -477,7 +477,7 @@ def villa_template_from_env() -> str:
 
 def _layout(data: CoverRenderData, template: str | None = None) -> CoverLayout:
     value = _resolve_template(data, template)
-    if value in {"mobile_duo_4x5", "mobile_collage_4x5"}:
+    if value in {"mobile_duo_4x5", "mobile_collage_4x5", "mobile_collage_top_3x2"}:
         return MOBILE_LAYOUT
     if value == "mobile_single_4x3":
         return MOBILE_SINGLE_LAYOUT
@@ -567,25 +567,42 @@ def render_cover(*, style: str, source_image: str, output_path: str, data: Cover
     images = _usable_images(candidates)
     if not images:
         raise ValueError("cover_no_usable_images")
-    if template == "mobile_collage_4x5" and len(images) >= 3:
+    if template in {"mobile_collage_4x5", "mobile_collage_top_3x2"} and len(images) >= 3:
         # Phone-feed 3:2: one dominant photo plus two or three supporting
         # photos. Geometry is tuned separately so supporting rooms remain clear.
         W, H, gap = 1200, 800, 6
         canvas = Image.new("RGB", (W, H), PAGE_BG)
         chosen = images[:4]
         side_count = len(chosen) - 1
-        hero_w = round(W * (0.58 if side_count == 2 else 0.62))
-        side_x = hero_w + gap
-        side_w = W - side_x
-        usable_height = H - gap * (side_count - 1)
-        ratios = (0.56, 0.44) if side_count == 2 else (0.36, 0.34, 0.30)
-        heights = [round(usable_height * ratio) for ratio in ratios[:-1]]
-        heights.append(usable_height - sum(heights))
-        boxes = [(0, 0, hero_w, H)]
-        y = 0
-        for height in heights:
-            boxes.append((side_x, y, side_w, height))
-            y += height + gap
+        if template == "mobile_collage_top_3x2":
+            hero_h = round(H * (0.62 if side_count == 2 else 0.60))
+            supporting_y = hero_h + gap
+            supporting_h = H - supporting_y
+            usable_width = W - gap * (side_count - 1)
+            ratios = (0.56, 0.44) if side_count == 2 else (0.36, 0.34, 0.30)
+            widths = [round(usable_width * ratio) for ratio in ratios[:-1]]
+            widths.append(usable_width - sum(widths))
+            boxes = [(0, 0, W, hero_h)]
+            x = 0
+            for width in widths:
+                boxes.append((x, supporting_y, width, supporting_h))
+                x += width + gap
+            hero_w = W
+            brand_bottom = hero_h
+        else:
+            hero_w = round(W * (0.58 if side_count == 2 else 0.62))
+            side_x = hero_w + gap
+            side_w = W - side_x
+            usable_height = H - gap * (side_count - 1)
+            ratios = (0.56, 0.44) if side_count == 2 else (0.36, 0.34, 0.30)
+            heights = [round(usable_height * ratio) for ratio in ratios[:-1]]
+            heights.append(usable_height - sum(heights))
+            boxes = [(0, 0, hero_w, H)]
+            y = 0
+            for height in heights:
+                boxes.append((side_x, y, side_w, height))
+                y += height + gap
+            brand_bottom = H
         for image, (x, y, w, h) in zip(chosen, boxes):
             canvas.paste(_fit(image, (w, h)), (x, y))
 
@@ -612,7 +629,7 @@ def render_cover(*, style: str, source_image: str, output_path: str, data: Cover
         brand_font = _font(24, bold=True)
         brand = "侨联地产"
         brand_w = draw.textlength(brand, font=brand_font)
-        brand_pos = (hero_w - 28 - brand_w, H - 42)
+        brand_pos = (hero_w - 28 - brand_w, brand_bottom - 42)
         draw.text((brand_pos[0] + 2, brand_pos[1] + 2), brand, font=brand_font, fill=(0, 0, 0, 80))
         draw.text(brand_pos, brand, font=brand_font, fill=(255, 255, 255, 155))
         canvas.paste(layer, (0, 0), layer)
