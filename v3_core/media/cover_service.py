@@ -157,11 +157,15 @@ class CoverRenderService:
             template = str(getattr(media, "cover_template", "") or "")
             if template:
                 render_kwargs["layout"] = template
-            # Default mobile channel cover for three or more distinct photos.
-            # Keep the original media plan and frozen source evidence intact.
-            cover_gallery = media.cover_gallery_paths or media.gallery_paths
-            distinct_paths = {str(cover_source), *(str(path) for path in cover_gallery)}
-            if len(distinct_paths) >= 3 and template != "single":
+            # Use only the cover planner's approved photos. Do not promote
+            # rejected gallery images just to fill a four-photo collage.
+            approved_thumbs = tuple(media.cover_gallery_paths)
+            if approved_thumbs:
+                render_kwargs["source_images"] = approved_thumbs
+            elif media.cover_plan:
+                render_kwargs["source_images"] = ()
+            approved_count = 1 + len({str(path) for path in approved_thumbs if str(path) != str(cover_source)})
+            if approved_count >= 3 and template != "single":
                 render_kwargs["layout"] = "mobile_4x5"
             planned = str(getattr(media, "cover_render_source", "") or "")
             if planned and Path(planned).is_file():
