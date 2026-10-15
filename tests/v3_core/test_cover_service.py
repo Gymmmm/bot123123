@@ -174,9 +174,11 @@ def test_production_cover_uses_clean_composite_sources_not_branded_gallery(tmp_p
 
     cover = tmp_path / "cover-source.jpg"
     clean = tmp_path / "clean-secondary.jpg"
+    clean_third = tmp_path / "clean-third.jpg"
     branded = tmp_path / "branded-secondary.jpg"
     Image.new("RGB", (1200, 900), (200, 20, 20)).save(cover)
     Image.new("RGB", (1200, 900), (20, 200, 20)).save(clean)
+    Image.new("RGB", (1200, 900), (200, 180, 20)).save(clean_third)
     Image.new("RGB", (1200, 900), (20, 20, 200)).save(branded)
     media = PreparedSourceMedia(
         source_post_id=1,
@@ -186,8 +188,8 @@ def test_production_cover_uses_clean_composite_sources_not_branded_gallery(tmp_p
         duplicates=(),
         rejected_paths=(),
         ranking=(),
-        cover_gallery_paths=(str(clean),),
-        cover_gallery_labels=("客厅",),
+        cover_gallery_paths=(str(clean), str(clean_third)),
+        cover_gallery_labels=("客厅", "卧室"),
     )
     result = CoverRenderService(
         reader=InventoryReader(str(db)), output_dir=tmp_path / "covers"
@@ -197,5 +199,8 @@ def test_production_cover_uses_clean_composite_sources_not_branded_gallery(tmp_p
         media=media,
     )
     with Image.open(result.output_path).convert("RGB") as rendered:
-        red, green, blue = rendered.getpixel((540, 1100))
-    assert green > red and green > blue
+        assert rendered.size == (1200, 800)
+        top_red, top_green, top_blue = rendered.getpixel((1000, 150))
+        bottom_red, bottom_green, bottom_blue = rendered.getpixel((1000, 560))
+    assert top_green > top_red and top_green > top_blue
+    assert bottom_red > bottom_blue and bottom_green > bottom_blue

@@ -166,7 +166,10 @@ class CoverRenderService:
                 render_kwargs["source_images"] = ()
             approved_count = 1 + len({str(path) for path in approved_thumbs if str(path) != str(cover_source)})
             if approved_count >= 3 and template != "single":
-                render_kwargs["layout"] = "mobile_4x5"
+                # Portrait covers are rendered narrower in Telegram channels,
+                # making the price and detail photos hard to read. A 3:2 cover
+                # uses the full message width: large hero left, 2–3 details right.
+                render_kwargs["layout"] = "mobile_3x2"
             planned = str(getattr(media, "cover_render_source", "") or "")
             if planned and Path(planned).is_file():
                 # Bounded correction already ran in media preparation (shared with the bot album).

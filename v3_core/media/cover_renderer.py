@@ -448,7 +448,7 @@ def _is_apartment(data: CoverRenderData) -> bool:
     return any(token in value for token in ("公寓", "服务式", "apartment", "condo", "studio"))
 
 
-TEMPLATES = ("apartment_3x2", "villa_black_gold", "villa_4x5", "villa_compact", "landscape_3x2", "grid_2x2", "single", "mobile_4x5")
+TEMPLATES = ("apartment_3x2", "villa_black_gold", "villa_4x5", "villa_compact", "landscape_3x2", "grid_2x2", "single", "mobile_4x5", "mobile_3x2")
 VILLA_TEMPLATES = ("villa_black_gold", "villa_4x5", "villa_compact")
 DEFAULT_VILLA_TEMPLATE = "villa_black_gold"
 SKY_TEXT_TEMPLATES = {"villa_4x5", "villa_compact"}
@@ -473,6 +473,11 @@ def villa_template_from_env() -> str:
 
 def _layout(data: CoverRenderData, template: str | None = None) -> CoverLayout:
     value = _resolve_template(data, template)
+    if value == "mobile_3x2":
+        # Telegram displays landscape covers at the full message width. Reuse
+        # the proven 3:2 left-hero/right-details geometry for every property
+        # type so room photos and price text remain legible on a phone.
+        return APARTMENT_LAYOUT
     if value == "mobile_4x5":
         return MOBILE_LAYOUT
     if value == "grid_2x2":

@@ -232,3 +232,22 @@ def test_mobile_4x5_uses_large_detail_row_for_three_or_four_photos(tmp_path, cou
     assert len(boxes) == count - 1
     assert all(height == 510 for _, _, _, height in boxes)
     assert sum(width for _, _, width, _ in boxes) + 6 * (count - 2) == 1080
+
+
+@pytest.mark.parametrize("count", [3, 4])
+def test_mobile_3x2_uses_full_width_landscape_with_large_right_details(tmp_path, count):
+    from v3_core.media.cover_renderer import APARTMENT_LAYOUT, _thumb_boxes
+
+    paths = [make(tmp_path / f"mobile-landscape-{i}.jpg", value=70 + i * 25) for i in range(count)]
+    output = tmp_path / "mobile-landscape.png"
+    render_cover(
+        style="premium_photo", source_image=paths[0], source_images=paths[1:],
+        output_path=str(output), layout="mobile_3x2",
+        data=CoverRenderData(public_listing_id="QL-TEST", property_type="别墅", price="1500"),
+    )
+    with Image.open(output) as cover:
+        assert cover.size == (1200, 800)
+    boxes = _thumb_boxes(APARTMENT_LAYOUT, count - 1)
+    assert len(boxes) == count - 1
+    assert all(x == 804 and width == 396 for x, _, width, _ in boxes)
+    assert sum(height for _, _, _, height in boxes) + 6 * (count - 2) == 738
