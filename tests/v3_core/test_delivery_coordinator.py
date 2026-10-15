@@ -123,7 +123,7 @@ def _receipt(message_id=777):
     }
 
 
-def test_prepare_send_returns_only_frozen_single_cover_command(tmp_path):
+def test_prepare_send_returns_frozen_cover_and_gallery_command(tmp_path):
     package, coordinator, _, _, _ = _setup(tmp_path)
 
     command = coordinator.prepare_send(
@@ -132,6 +132,7 @@ def test_prepare_send_returns_only_frozen_single_cover_command(tmp_path):
     )
 
     assert command.cover_path == package.cover_path
+    assert command.gallery_paths == package.gallery
     assert command.caption == package.post_text
     assert command.actions == package.actions
     assert tuple(command.actions) == ("details", "photos", "book", "consult")

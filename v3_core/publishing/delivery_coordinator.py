@@ -33,6 +33,7 @@ class TelegramSendCommand:
     caption: str
     actions: dict[str, str]
     inventory_status: str
+    gallery_paths: tuple[str, ...] = ()
     area_key: str = ""
 
 
@@ -138,6 +139,7 @@ class PublicationDeliveryCoordinator:
             caption=package.post_text,
             actions=dict(package.actions),
             inventory_status=effective_status,
+            gallery_paths=tuple(package.gallery),
             area_key=str(listing.get("public_location_key") or listing.get("canonical_area_key") or "").strip(),
         )
 

@@ -255,8 +255,9 @@ def test_sale_review_is_stored_and_approvable_but_never_builds_rental_package(tm
 
 
 class _AutoPublishMessage:
-    def __init__(self, message_id: int = 9001):
+    def __init__(self, message_id: int = 9001, media_group_id: str = ""):
         self.message_id = message_id
+        self.media_group_id = media_group_id
 
 
 class _AutoPublishBot:
@@ -265,10 +266,25 @@ class _AutoPublishBot:
         self.calls: list[dict] = []
 
     async def send_photo(self, **kwargs):
-        self.calls.append(kwargs)
+        self.calls.append({"kind": "photo", **kwargs})
         if self.error is not None:
             raise self.error
         return _AutoPublishMessage()
+
+    async def send_media_group(self, **kwargs):
+        self.calls.append({"kind": "album", **kwargs})
+        if self.error is not None:
+            raise self.error
+        return [
+            _AutoPublishMessage(9001 + index, media_group_id="album-9001")
+            for index, _ in enumerate(kwargs["media"])
+        ]
+
+    async def send_message(self, **kwargs):
+        self.calls.append({"kind": "buttons", **kwargs})
+        if self.error is not None:
+            raise self.error
+        return _AutoPublishMessage(9010)
 
 
 def _pending_autopublish(tmp_path: Path):
@@ -297,8 +313,9 @@ def test_pending_autopublish_success_commits_publication_then_activates_and_is_b
     assert package.status == "published"
     assert "🟢 当前可预约" in package.post_text
     assert package.snapshot["listing"]["inventory_status"] == "active"
-    assert len(bot.calls) == 1
-    labels = [button.text for row in bot.calls[0]["reply_markup"].inline_keyboard for button in row]
+    assert [call["kind"] for call in bot.calls] == ["album", "buttons"]
+    assert len(bot.calls[0]["media"]) == 4
+    labels = [button.text for row in bot.calls[1]["reply_markup"].inline_keyboard for button in row]
     assert "📅 预约看房" in labels
     with sqlite3.connect(reader.db_path) as conn:
         assert conn.execute(
@@ -309,7 +326,7 @@ def test_pending_autopublish_success_commits_publication_then_activates_and_is_b
 
     replay = __import__("asyncio").run(service.process_one(bot=bot, force_offer_id=offer_id))
     assert replay.status == "already_published"
-    assert len(bot.calls) == 1
+    assert len(bot.calls) == 2
     with sqlite3.connect(reader.db_path) as conn:
         assert conn.execute(
             "SELECT COUNT(*) FROM publication_instances WHERE listing_id=? AND publish_status='published'",
