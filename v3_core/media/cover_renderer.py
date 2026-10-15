@@ -65,6 +65,10 @@ TALL_COMPACT_LAYOUT = CoverLayout(
     kind="tall", canvas=(1080, 1200), hero=(1080, 700), thumb_extent=430,
     separator=SEPARATOR, footer_height=64, margin=32, title_size=50, price_size=76,
 )
+MOBILE_LAYOUT = CoverLayout(
+    kind="tall", canvas=(1080, 1350), hero=(1080, 765), thumb_extent=510,
+    separator=6, footer_height=69, margin=32, title_size=52, price_size=78,
+)
 TALL_CANVAS = TALL_LAYOUT.canvas
 APARTMENT_CANVAS = APARTMENT_LAYOUT.canvas
 TALL_HERO_HEIGHT = TALL_LAYOUT.hero[1]
@@ -444,7 +448,7 @@ def _is_apartment(data: CoverRenderData) -> bool:
     return any(token in value for token in ("公寓", "服务式", "apartment", "condo", "studio"))
 
 
-TEMPLATES = ("apartment_3x2", "villa_black_gold", "villa_4x5", "villa_compact", "landscape_3x2", "grid_2x2", "single")
+TEMPLATES = ("apartment_3x2", "villa_black_gold", "villa_4x5", "villa_compact", "landscape_3x2", "grid_2x2", "single", "mobile_4x5")
 VILLA_TEMPLATES = ("villa_black_gold", "villa_4x5", "villa_compact")
 DEFAULT_VILLA_TEMPLATE = "villa_black_gold"
 SKY_TEXT_TEMPLATES = {"villa_4x5", "villa_compact"}
@@ -469,6 +473,8 @@ def villa_template_from_env() -> str:
 
 def _layout(data: CoverRenderData, template: str | None = None) -> CoverLayout:
     value = _resolve_template(data, template)
+    if value == "mobile_4x5":
+        return MOBILE_LAYOUT
     if value == "grid_2x2":
         return GRID_LAYOUT
     if value in ("villa_4x5", "villa_black_gold"):

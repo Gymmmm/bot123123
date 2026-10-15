@@ -157,6 +157,12 @@ class CoverRenderService:
             template = str(getattr(media, "cover_template", "") or "")
             if template:
                 render_kwargs["layout"] = template
+            # Default mobile channel cover for three or more distinct photos.
+            # Keep the original media plan and frozen source evidence intact.
+            cover_gallery = media.cover_gallery_paths or media.gallery_paths
+            distinct_paths = {str(cover_source), *(str(path) for path in cover_gallery)}
+            if len(distinct_paths) >= 3 and template != "single":
+                render_kwargs["layout"] = "mobile_4x5"
             planned = str(getattr(media, "cover_render_source", "") or "")
             if planned and Path(planned).is_file():
                 # Bounded correction already ran in media preparation (shared with the bot album).
