@@ -61,33 +61,13 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
 
     def home_keyboard(self) -> InlineKeyboardMarkup:
         pending_n = int(self._pending_count() or 0)
-        exception_n = self._open_exception_count()
-        recovery_n = self._recovery_unknown_count()
         rows: list[list[InlineKeyboardButton]] = [
             [
                 InlineKeyboardButton("➕ 发布房源", callback_data="v3smp|new"),
                 InlineKeyboardButton("📢 广播中心", callback_data="v3bc"),
             ],
-            [
-                InlineKeyboardButton(
-                    f"🔵 房态工作台 {pending_n}",
-                    callback_data="v3smp|listings",
-                ),
-                InlineKeyboardButton(
-                    f"⚠️ 异常房源 {exception_n}",
-                    callback_data="v3smp|exceptions|all",
-                ),
-            ],
+            [InlineKeyboardButton(f"🔵 房态工作台 {pending_n}", callback_data="v3smp|listings"), InlineKeyboardButton("📡 采集状态", callback_data="v3smp|sources")],
         ]
-        if recovery_n > 0:
-            rows.append(
-                [
-                    InlineKeyboardButton(
-                        f"⚠️ 发布恢复 {recovery_n}",
-                        callback_data="v3err",
-                    ),
-                ]
-            )
         rows.append(
             [
                 InlineKeyboardButton("🕘 最近发布", callback_data="v3smp|inv_rows|recent"),
@@ -98,23 +78,15 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
 
     async def show_home(self, message: Any) -> None:
         pending_n = int(self._pending_count() or 0)
-        exception_n = self._open_exception_count()
-        recovery_n = self._recovery_unknown_count()
+        queued_n = self._queued_count()
         lines = [
             "<b>📣 侨联发布助手</b>",
             "",
-            "优先处理待确认、异常和发布恢复。",
+            "新房源自动采集、自动发布。需要手动发布或修改房态时，点下方按钮。",
             "",
-            f"🔵 待确认 <b>{pending_n}</b>　⚠️ 异常 <b>{exception_n}</b>",
-            f"↩️ 发布恢复 <b>{recovery_n}</b>",
+            f"🔵 待确认房态 <b>{pending_n}</b>　🚀 自动待发 <b>{queued_n}</b>",
+            "技术异常由系统自动处理，不需要逐条操作。",
         ]
-        if recovery_n > 0:
-            lines.extend(
-                [
-                    "",
-                    "有发布结果待确认，请进入「发布恢复」处理。",
-                ]
-            )
         await message.reply_text(
             "\n".join(lines),
             parse_mode=ParseMode.HTML,

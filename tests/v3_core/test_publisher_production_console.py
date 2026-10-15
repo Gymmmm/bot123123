@@ -73,7 +73,7 @@ def test_active_operator_home_shows_only_attention_entries():
     # New compact layout: high-attention entries only, no orphan zero badges.
     assert rows[0] == ["➕ 发布房源", "📢 广播中心"]
     assert rows[1][0].startswith("🔵 房态工作台")
-    assert rows[1][1].startswith("⚠️ 异常房源")
+    assert rows[1][1] == "📡 采集状态"
     last = rows[-1]
     assert last[0] == "🕘 最近发布"
     assert last[1] == "⚙️ 发布设置"
@@ -81,7 +81,8 @@ def test_active_operator_home_shows_only_attention_entries():
     assert "v3smp|new" in callbacks
     assert "v3bc" in callbacks
     assert any(cb.startswith("v3smp|listings") for cb in callbacks)
-    assert any(cb.startswith("v3smp|exceptions|") for cb in callbacks)
+    assert "v3smp|sources" in callbacks
+    assert not any(cb.startswith("v3smp|exceptions|") for cb in callbacks)
     assert "v3smp|inv_rows|recent" in callbacks
     assert "v3smp|settings" in callbacks
     # Low-frequency entries must NOT appear on the home screen anymore.
@@ -124,7 +125,6 @@ def test_low_frequency_entries_live_behind_settings_page():
         "v3smp|auto_queue",
         "v3smp|held_queue",
         "v3smp|preview_ready",
-        "v3smp|sources",
         "v3smp|runtime",
         "v3smp|windows",
         "v3smp|stats",
@@ -145,7 +145,6 @@ def test_settings_page_keyboard_lists_every_moved_entry():
         "v3smp|auto_queue",
         "v3smp|held_queue",
         "v3smp|preview_ready",
-        "v3smp|sources",
         "v3smp|runtime",
         "v3smp|windows",
         "v3smp|stats",

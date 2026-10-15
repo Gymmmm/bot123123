@@ -922,6 +922,18 @@ class SimplePublisherAdminController:
         elif action == "source_toggle" and len(parts) >= 4:
             enabled = parts[2] == "1"
             source_name = "|".join(parts[3:])
+            await query.message.reply_text(
+                f"确认{'启用' if enabled else '暂停'}采集源「{escape(source_name)}」？\n"
+                "这会改变后续自动采集。只查看状态请点取消。",
+                parse_mode=ParseMode.HTML,
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("确认修改", callback_data=f"v3smp|source_apply|{parts[2]}|{source_name}")],
+                    [InlineKeyboardButton("取消，返回采集状态", callback_data="v3smp|sources")],
+                ]),
+            )
+        elif action == "source_apply" and len(parts) >= 4:
+            enabled = parts[2] == "1"
+            source_name = "|".join(parts[3:])
             self.runtime.set_source_enabled(source_name, enabled)
             await self.show_sources(query.message)
         elif action == "manual_cover" and len(parts) == 4:

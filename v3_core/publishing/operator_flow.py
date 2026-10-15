@@ -119,13 +119,16 @@ class OperatorPublisherAdminController(ProductionSimplePublisherAdminController)
     async def show_sources(self, message: Any) -> None:
         configured = self._source_registry().rows()
         runtime = {str(row.get("source_name") or ""): row for row in self.runtime.source_rows()}
-        lines = ["<b>📡 采集源</b>", "", "这里只管理采集来源；后台采集、过滤、去重和发布条件保持不变。", ""]
+        lines = ["<b>📡 采集状态</b>", "", "显示各来源的实际采集情况。修改来源需要确认。", ""]
         buttons: list[list[InlineKeyboardButton]] = []
         for row in configured:
             name = str(row.get("source_name") or "")
             state = runtime.get(name, {})
             enabled = bool(int(state.get("enabled", 1) or 0))
-            lines.append(f"{'✅' if enabled else '⏸'} {escape(name)}")
+            last_collected = str(state.get("last_collected_at") or "尚无采集记录")
+            today_count = int(state.get("today_count") or 0)
+            lines.append(f"{'✅' if enabled else '⏸'} <b>{escape(name)}</b>｜今日 {today_count} 条")
+            lines.append(f"最近采集：{escape(last_collected)}")
             buttons.append(
                 [
                     InlineKeyboardButton(
