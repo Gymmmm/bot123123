@@ -568,18 +568,19 @@ def render_cover(*, style: str, source_image: str, output_path: str, data: Cover
     if not images:
         raise ValueError("cover_no_usable_images")
     if template == "mobile_collage_4x5" and len(images) >= 3:
-        # Phone-feed 16:9: one dominant photo plus two or three supporting
-        # photos, selected according to how many approved images are available.
-        W, H, gap = 1280, 720, 6
+        # Phone-feed 3:2: one dominant photo plus two or three supporting
+        # photos. Geometry is tuned separately so supporting rooms remain clear.
+        W, H, gap = 1200, 800, 6
         canvas = Image.new("RGB", (W, H), PAGE_BG)
         chosen = images[:4]
-        hero_w = 800
+        side_count = len(chosen) - 1
+        hero_w = round(W * (0.58 if side_count == 2 else 0.62))
         side_x = hero_w + gap
         side_w = W - side_x
-        side_count = len(chosen) - 1
         usable_height = H - gap * (side_count - 1)
-        heights = [usable_height // side_count] * side_count
-        heights[-1] += usable_height - sum(heights)
+        ratios = (0.56, 0.44) if side_count == 2 else (0.36, 0.34, 0.30)
+        heights = [round(usable_height * ratio) for ratio in ratios[:-1]]
+        heights.append(usable_height - sum(heights))
         boxes = [(0, 0, hero_w, H)]
         y = 0
         for height in heights:
@@ -593,22 +594,27 @@ def render_cover(*, style: str, source_image: str, output_path: str, data: Cover
         title = _cover_title(data)
         detail = _cover_subtitle(data)
         price = data.price_line()
-        title, title_font = _fit_line(
-            draw, title, max_width=470, start_size=46, min_size=32, bold=True
-        )
-        detail, detail_font = _fit_line(
-            draw, detail, max_width=470, start_size=28, min_size=22, bold=False
-        )
-        draw.rounded_rectangle((24, H - 174, hero_w - 24, H - 24), radius=22, fill=(8, 11, 14, 218), outline=(*GOLD, 210), width=2)
-        draw.text((48, H - 151), title, font=title_font, fill=(255, 255, 255, 255))
-        if detail:
-            draw.text((50, H - 92), detail, font=detail_font, fill=(*SUBTLE_WHITE, 255))
-
+        # Float a compact information lockup over the quiet upper-left wall.
+        # A soft offset shadow supplies contrast without an ad-like panel.
         if price:
             price, price_font = _fit_line(
-                draw, price, max_width=280, start_size=58, min_size=40, bold=True
+                draw, price, max_width=hero_w - 80, start_size=62, min_size=42, bold=True
             )
-            draw.text((hero_w - 54, H - 125), price, font=price_font, fill=(*GOLD_LIGHT, 255), anchor="ra")
+            draw.text((45, 40), price, font=price_font, fill=(0, 0, 0, 120))
+            draw.text((42, 36), price, font=price_font, fill=(255, 255, 255, 255))
+        meta = " · ".join(part for part in (title, detail.replace(" | ", " ")) if part)
+        if meta:
+            meta, meta_font = _fit_line(
+                draw, meta, max_width=hero_w - 80, start_size=28, min_size=21, bold=False
+            )
+            draw.text((46, 115), meta, font=meta_font, fill=(0, 0, 0, 115))
+            draw.text((44, 112), meta, font=meta_font, fill=(255, 255, 255, 245))
+        brand_font = _font(24, bold=True)
+        brand = "侨联地产"
+        brand_w = draw.textlength(brand, font=brand_font)
+        brand_pos = (hero_w - 28 - brand_w, H - 42)
+        draw.text((brand_pos[0] + 2, brand_pos[1] + 2), brand, font=brand_font, fill=(0, 0, 0, 80))
+        draw.text(brand_pos, brand, font=brand_font, fill=(255, 255, 255, 155))
         canvas.paste(layer, (0, 0), layer)
         output = Path(output_path).expanduser().resolve()
         output.parent.mkdir(parents=True, exist_ok=True)
