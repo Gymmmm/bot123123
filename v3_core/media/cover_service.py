@@ -164,10 +164,12 @@ class CoverRenderService:
                 render_kwargs["source_images"] = approved_thumbs
             elif media.cover_plan:
                 render_kwargs["source_images"] = ()
-            # Channel cover is one strong photo, not a miniature collage. On a
-            # phone the small detail cells and repeated facts are hard to read;
-            # the remaining approved photos stay available in the detail flow.
-            if template != "single":
+            # Channel cover uses two full-width photos. This keeps both images
+            # legible on a phone without returning to miniature thumbnail rails.
+            if template != "single" and tuple(render_kwargs.get("source_images") or ()):
+                render_kwargs["layout"] = "mobile_duo_4x5"
+                render_kwargs["source_images"] = tuple(render_kwargs["source_images"])[:1]
+            elif template != "single":
                 render_kwargs["layout"] = "mobile_single_4x3"
                 render_kwargs["source_images"] = ()
             planned = str(getattr(media, "cover_render_source", "") or "")

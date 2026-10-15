@@ -452,7 +452,7 @@ def _is_apartment(data: CoverRenderData) -> bool:
     return any(token in value for token in ("公寓", "服务式", "apartment", "condo", "studio"))
 
 
-TEMPLATES = ("apartment_3x2", "villa_black_gold", "villa_4x5", "villa_compact", "landscape_3x2", "grid_2x2", "single", "mobile_4x5", "mobile_3x2", "mobile_single_4x3")
+TEMPLATES = ("apartment_3x2", "villa_black_gold", "villa_4x5", "villa_compact", "landscape_3x2", "grid_2x2", "single", "mobile_4x5", "mobile_3x2", "mobile_single_4x3", "mobile_duo_4x5")
 VILLA_TEMPLATES = ("villa_black_gold", "villa_4x5", "villa_compact")
 DEFAULT_VILLA_TEMPLATE = "villa_black_gold"
 SKY_TEXT_TEMPLATES = {"villa_4x5", "villa_compact"}
@@ -477,6 +477,8 @@ def villa_template_from_env() -> str:
 
 def _layout(data: CoverRenderData, template: str | None = None) -> CoverLayout:
     value = _resolve_template(data, template)
+    if value == "mobile_duo_4x5":
+        return MOBILE_LAYOUT
     if value == "mobile_single_4x3":
         return MOBILE_SINGLE_LAYOUT
     if value == "mobile_3x2":
@@ -565,6 +567,51 @@ def render_cover(*, style: str, source_image: str, output_path: str, data: Cover
     images = _usable_images(candidates)
     if not images:
         raise ValueError("cover_no_usable_images")
+    if template == "mobile_duo_4x5" and len(images) > 1:
+        # Phone-first editorial cover: two genuinely large photos, no miniature
+        # thumbnail rail.  A single compact glass band carries the only facts
+        # needed before the reader opens the full caption.
+        W, H = 1080, 1350
+        seam = 675
+        canvas = Image.new("RGB", (W, H), PAGE_BG)
+        canvas.paste(_fit(images[0], (W, seam)), (0, 0))
+        canvas.paste(_fit(images[1], (W, H - seam)), (0, seam))
+        layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(layer)
+        band_top, band_bottom = 560, 790
+        draw.rectangle((0, band_top, W, band_bottom), fill=(10, 13, 16, 218))
+        draw.rectangle((0, band_top, W, band_top + 5), fill=(*GOLD, 255))
+
+        title = _cover_title(data)
+        title, title_font = _fit_line(
+            draw, title, max_width=620, start_size=58, min_size=38, bold=True
+        )
+        draw.text((44, 596), title, font=title_font, fill=(255, 255, 255, 255))
+        detail = _cover_subtitle(data)
+        if detail:
+            detail, detail_font = _fit_line(
+                draw, detail, max_width=620, start_size=34, min_size=25, bold=False
+            )
+            draw.text((46, 684), detail, font=detail_font, fill=(*SUBTLE_WHITE, 255))
+
+        price = data.price_line()
+        if price:
+            suffix = "/月" if price.endswith("/月") else ""
+            amount = price[:-2] if suffix else price
+            amount, amount_font = _fit_line(
+                draw, amount, max_width=330, start_size=72, min_size=48, bold=True
+            )
+            amount_width = draw.textlength(amount, font=amount_font)
+            draw.text((W - 44 - amount_width, 604), amount, font=amount_font, fill=(*GOLD_LIGHT, 255))
+            if suffix:
+                draw.text((W - 47, 696), suffix, font=_font(27, bold=True), fill=(255, 255, 255, 230), anchor="ra")
+
+        draw.text((44, 34), "侨联地产", font=_font(34, bold=True), fill=(255, 255, 255, 235), stroke_width=2, stroke_fill=(0, 0, 0, 130))
+        canvas.paste(layer, (0, 0), layer)
+        output = Path(output_path).expanduser().resolve()
+        output.parent.mkdir(parents=True, exist_ok=True)
+        canvas.save(output, format="JPEG" if output.suffix.lower() in {".jpg", ".jpeg"} else "PNG", quality=94, optimize=True)
+        return str(output)
     if template == "villa_black_gold":
         if len(images) > 1:
             from .villa_card import render_villa_card
