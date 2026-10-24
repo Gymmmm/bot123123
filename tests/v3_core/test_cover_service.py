@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from PIL import Image, ImageDraw
+import pytest
 
 from v3_core.media.cover_service import CoverRenderService
 from v3_core.media.service import PreparedSourceMedia
@@ -199,7 +200,7 @@ def test_production_cover_uses_clean_composite_sources_not_branded_gallery(tmp_p
         media=media,
     )
     with Image.open(result.output_path).convert("RGB") as rendered:
-        assert rendered.size == (1200, 800)
+        assert rendered.size == (1200, 850)
         # One large hero and two supporting cells use only approved clean
         # sources. The rejected blue branded gallery file never enters it.
         hero = rendered.getpixel((300, 250))
@@ -208,3 +209,40 @@ def test_production_cover_uses_clean_composite_sources_not_branded_gallery(tmp_p
     assert hero[0] > hero[1] and hero[0] > hero[2]
     assert upper_right[1] > upper_right[0] and upper_right[1] > upper_right[2]
     assert lower_right[0] > lower_right[2] and lower_right[1] > lower_right[2]
+
+
+def test_production_cover_rejects_fewer_than_three_approved_photos(tmp_path):
+    db = tmp_path / "cover-too-few.sqlite3"
+    initialize_v3_storage(db)
+    repo = InventoryRepository(str(db))
+    facts = _facts()
+    canonical = repo.store_canonical(source_post_id="source-few", facts=facts)
+    repo.upsert_listing(
+        listing_id="l_few",
+        public_listing_id="QL-RF-F123",
+        canonical_record_id=str(canonical["canonical_record_id"]),
+        facts=facts,
+    )
+    offer = repo.sync_offers(listing_id="l_few", facts=facts)[0]
+    cover = _source_image(tmp_path / "cover.jpg")
+    only_one_support = _source_image(tmp_path / "support.jpg")
+    media = PreparedSourceMedia(
+        source_post_id=1,
+        cover_source_path=cover,
+        gallery_paths=(only_one_support,),
+        source_identity={},
+        duplicates=(),
+        rejected_paths=(),
+        ranking=(),
+        cover_gallery_paths=(only_one_support,),
+        cover_gallery_labels=("客厅",),
+    )
+
+    with pytest.raises(ValueError, match="cover_requires_3_approved_photos"):
+        CoverRenderService(
+            reader=InventoryReader(str(db)), output_dir=tmp_path / "covers"
+        ).render(
+            listing_id="l_few",
+            offer_id=str(offer["offer_id"]),
+            media=media,
+        )

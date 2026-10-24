@@ -164,17 +164,17 @@ class CoverRenderService:
                 render_kwargs["source_images"] = approved_thumbs
             elif media.cover_plan:
                 render_kwargs["source_images"] = ()
-            # Channel cover uses three or four substantial photo cells. It
-            # never returns to the old hero-plus-miniature-thumbnail rail.
+            # Approved C-style cover: three or four substantial photo cells.
+            # Tall villa/exterior plans use the side hero so the building keeps
+            # its height; landscape apartment/living-room plans use a top hero.
             if template != "single" and len(tuple(render_kwargs.get("source_images") or ())) >= 2:
-                render_kwargs["layout"] = "mobile_collage_4x5"
+                vertical = template in {
+                    "villa_4x5", "villa_black_gold", "villa_compact", "mobile_collage_4x5"
+                } or (not template and not _is_apartment(data))
+                render_kwargs["layout"] = "ql_editorial_side" if vertical else "ql_editorial_top"
                 render_kwargs["source_images"] = tuple(render_kwargs["source_images"])[:3]
-            elif template != "single" and tuple(render_kwargs.get("source_images") or ()):
-                render_kwargs["layout"] = "mobile_duo_4x5"
-                render_kwargs["source_images"] = tuple(render_kwargs["source_images"])[:1]
             elif template != "single":
-                render_kwargs["layout"] = "mobile_single_4x3"
-                render_kwargs["source_images"] = ()
+                raise ValueError("cover_requires_3_approved_photos")
             planned = str(getattr(media, "cover_render_source", "") or "")
             if planned and Path(planned).is_file():
                 # Bounded correction already ran in media preparation (shared with the bot album).

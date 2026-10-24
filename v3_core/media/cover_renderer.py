@@ -452,7 +452,7 @@ def _is_apartment(data: CoverRenderData) -> bool:
     return any(token in value for token in ("公寓", "服务式", "apartment", "condo", "studio"))
 
 
-TEMPLATES = ("apartment_3x2", "villa_black_gold", "villa_4x5", "villa_compact", "landscape_3x2", "grid_2x2", "single", "mobile_4x5", "mobile_3x2", "mobile_single_4x3", "mobile_duo_4x5", "mobile_collage_4x5", "mobile_collage_top_3x2")
+TEMPLATES = ("apartment_3x2", "villa_black_gold", "villa_4x5", "villa_compact", "landscape_3x2", "grid_2x2", "single", "mobile_4x5", "mobile_3x2", "mobile_single_4x3", "mobile_duo_4x5", "mobile_collage_4x5", "mobile_collage_top_3x2", "ql_editorial_side", "ql_editorial_top")
 VILLA_TEMPLATES = ("villa_black_gold", "villa_4x5", "villa_compact")
 DEFAULT_VILLA_TEMPLATE = "villa_black_gold"
 SKY_TEXT_TEMPLATES = {"villa_4x5", "villa_compact"}
@@ -567,6 +567,16 @@ def render_cover(*, style: str, source_image: str, output_path: str, data: Cover
     images = _usable_images(candidates)
     if not images:
         raise ValueError("cover_no_usable_images")
+    if template in {"ql_editorial_side", "ql_editorial_top"}:
+        from .editorial_cover import render_editorial_cover
+
+        return render_editorial_cover(
+            images=images[:4],
+            data=data,
+            output_path=output_path,
+            layout=template,
+            logo=_brand_lockup(),
+        )
     if template in {"mobile_collage_4x5", "mobile_collage_top_3x2"} and len(images) >= 3:
         # Telegram editorial cover: photos own most of a 3:2 canvas while a
         # compact black fact strip and the official lockup stay outside the

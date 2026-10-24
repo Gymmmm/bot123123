@@ -133,6 +133,46 @@ def test_mobile_four_photo_collage_uses_top_hero_and_three_details(tmp_path):
         assert last[0] > 180 and last[1] > 180
 
 
+@pytest.mark.parametrize("layout", ["ql_editorial_side", "ql_editorial_top"])
+@pytest.mark.parametrize("count", [3, 4])
+def test_approved_editorial_cover_renders_three_or_four_distinct_photos(tmp_path, layout, count):
+    paths = []
+    for index, colour in enumerate(((210, 30, 30), (30, 210, 30), (30, 30, 210), (210, 210, 30))[:count]):
+        path = tmp_path / f"editorial-{index}.png"
+        Image.new("RGB", (900, 1200) if index == 0 else (1200, 800), colour).save(path)
+        paths.append(path)
+    out = tmp_path / f"{layout}-{count}.png"
+
+    render_cover(
+        style="x",
+        source_image=str(paths[0]),
+        source_images=tuple(str(path) for path in paths[1:]),
+        output_path=str(out),
+        data=CoverRenderData(
+            public_listing_id="QL", project="一号路炳发", property_type="别墅", layout="5房6卫", price="4500"
+        ),
+        layout=layout,
+    )
+
+    with Image.open(out).convert("RGB") as rendered:
+        assert rendered.size == (1200, 850)
+        assert max(rendered.getpixel((10, 800))) < 50
+
+
+def test_editorial_cover_rejects_too_few_or_duplicate_photos(tmp_path):
+    first = make(tmp_path / "first.jpg")
+    second = make(tmp_path / "second.jpg", value=180)
+    data = CoverRenderData(public_listing_id="QL", project="一号路")
+    with pytest.raises(ValueError, match="editorial_cover_requires_3_or_4_photos"):
+        render_cover(style="x", source_image=first, source_images=(second,), output_path=str(tmp_path / "few.png"),
+                     data=data, layout="ql_editorial_top")
+    duplicate = tmp_path / "duplicate.jpg"
+    duplicate.write_bytes(Path(first).read_bytes())
+    with pytest.raises(ValueError, match="cover_duplicate_photos"):
+        render_cover(style="x", source_image=first, source_images=(str(duplicate), second),
+                     output_path=str(tmp_path / "duplicate.png"), data=data, layout="ql_editorial_top")
+
+
 @pytest.mark.parametrize(
     "property_type,expected_size,hero",
     [
