@@ -9,6 +9,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 W, H, GAP, FOOTER = 1200, 850, 7, 106
 GOLD = (231, 190, 116)
 BLACK = (20, 23, 25)
+CREAM = (244, 239, 229)
 
 
 def _font(size: int, bold: bool = False) -> ImageFont.ImageFont:
@@ -40,6 +41,45 @@ def _clip(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont, width
     while text and draw.textlength(text.rstrip() + suffix, font=font) > width:
         text = text[:-1]
     return text.rstrip() + suffix if text else ""
+
+
+def _scaled_logo(logo: Image.Image, *, max_width: int, max_height: int) -> Image.Image:
+    factor = min(max_width / logo.width, max_height / logo.height)
+    return logo.resize(
+        (max(1, round(logo.width * factor)), max(1, round(logo.height * factor))),
+        Image.Resampling.LANCZOS,
+    )
+
+
+def _watermark(logo: Image.Image, *, max_width: int) -> Image.Image:
+    """Turn the official lockup into the restrained ivory photo watermark."""
+    mark = _scaled_logo(logo, max_width=max_width, max_height=72)
+    alpha = mark.getchannel("A").point(lambda value: round(value * 0.78))
+    ink = Image.new("RGBA", mark.size, (255, 248, 224, 0))
+    ink.putalpha(alpha)
+    return ink
+
+
+def _paste_rounded(canvas: Image.Image, image: Image.Image, box: tuple[int, int, int, int], radius: int = 12) -> None:
+    x, y, width, height = box
+    mask = Image.new("L", (width, height), 0)
+    ImageDraw.Draw(mask).rounded_rectangle((0, 0, width, height), radius=radius, fill=255)
+    canvas.paste(image, (x, y), mask)
+
+
+def _pin(size: int = 31) -> Image.Image:
+    scale = 4
+    icon = Image.new("RGBA", (size * scale, size * scale), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(icon)
+    cx, cy, radius = icon.width // 2, round(icon.height * 0.38), round(icon.width * 0.27)
+    draw.polygon(
+        ((cx - radius, cy + radius // 2), (cx + radius, cy + radius // 2), (cx, icon.height - 4)),
+        fill=(*GOLD, 255),
+    )
+    draw.ellipse((cx - radius, cy - radius, cx + radius, cy + radius), fill=(*GOLD, 255))
+    hole = round(radius * 0.35)
+    draw.ellipse((cx - hole, cy - hole, cx + hole, cy + hole), fill=(*BLACK, 255))
+    return icon.resize((size, size), Image.Resampling.LANCZOS)
 
 
 def render_editorial_cover(*, images: list[Image.Image], data, output_path: str, layout: str,
@@ -76,16 +116,23 @@ def render_editorial_cover(*, images: list[Image.Image], data, output_path: str,
             rectangles.append((x, y, width, photo_bottom - y))
             x += width + GAP
 
-    canvas = Image.new("RGB", (W, H), "white")
+    canvas = Image.new("RGB", (W, H), CREAM)
     for index, (image, (x, y, width, height)) in enumerate(zip(images, rectangles)):
         fitted = _fit(
             image,
             (width, height),
             preserve_tall_exterior=index == 0 and layout == "ql_editorial_side",
         )
-        canvas.paste(fitted, (x, y))
+        _paste_rounded(canvas, fitted, (x, y, width, height))
+
+        if logo is not None:
+            mark = _watermark(logo, max_width=185 if index == 0 else 128)
+            photo_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+            photo_layer.alpha_composite(mark, (x + 18, y + 16))
+            canvas.paste(photo_layer, (0, 0), photo_layer)
 
     draw = ImageDraw.Draw(canvas)
+    draw.rounded_rectangle((0, photo_bottom - 12, W, H), radius=14, fill=BLACK)
     draw.rectangle((0, photo_bottom, W, H), fill=BLACK)
     draw.rectangle((0, photo_bottom, W, photo_bottom + 3), fill=GOLD)
     title = str(data.project or data.project_alias or data.area or "精选房源").strip()
@@ -95,25 +142,30 @@ def render_editorial_cover(*, images: list[Image.Image], data, output_path: str,
             str(data.layout or "").strip(),
         ) if value
     )
-    title_font = _font(40, True)
-    subtitle_font = _font(23)
-    price_font = _font(49, True)
-    draw.text((32, photo_bottom + 18), _clip(draw, title, title_font, 405), font=title_font, fill="white")
-    draw.text((34, photo_bottom + 67), _clip(draw, subtitle, subtitle_font, 385),
+    title_font = _font(36, True)
+    subtitle_font = _font(22)
+    price_label_font = _font(16)
+    price_font = _font(45, True)
+    pin = _pin(31)
+    canvas.paste(pin, (29, photo_bottom + 22), pin)
+    draw.text((70, photo_bottom + 15), _clip(draw, title, title_font, 350), font=title_font, fill="white")
+    draw.text((70, photo_bottom + 62), _clip(draw, subtitle.replace(" · ", "  |  "), subtitle_font, 350),
               font=subtitle_font, fill=(225, 225, 225))
+    draw.line((452, photo_bottom + 18, 452, H - 18), fill=(166, 143, 102), width=2)
     price = _clip(draw, data.price_line(), price_font, 395)
-    draw.text((475, photo_bottom + 24), price, font=price_font, fill=GOLD)
+    draw.text((493, photo_bottom + 14), "月租金" if price.endswith("/月") else "售价", font=price_label_font,
+              fill=(226, 217, 200))
+    draw.text((493, photo_bottom + 36), price, font=price_font, fill=GOLD)
 
     if logo is not None:
-        max_width, max_height = 258, 73
-        factor = min(max_width / logo.width, max_height / logo.height)
-        mark = logo.resize(
-            (max(1, int(logo.width * factor)), max(1, int(logo.height * factor))),
-            Image.Resampling.LANCZOS,
-        )
-        backing = Image.new("RGBA", (mark.width + 16, mark.height + 12), (255, 255, 255, 245))
-        backing.alpha_composite(mark, (8, 6))
-        canvas.paste(backing.convert("RGB"), (W - backing.width - 24, photo_bottom + 13))
+        mark = _scaled_logo(logo, max_width=270, max_height=72)
+        canvas.paste(mark, (W - mark.width - 28, photo_bottom + (FOOTER - mark.height) // 2), mark)
+
+    rounded = Image.new("RGB", (W, H), CREAM)
+    outer_mask = Image.new("L", (W, H), 0)
+    ImageDraw.Draw(outer_mask).rounded_rectangle((0, 0, W - 1, H - 1), radius=18, fill=255)
+    rounded.paste(canvas, (0, 0), outer_mask)
+    canvas = rounded
 
     target = Path(output_path).expanduser().resolve()
     target.parent.mkdir(parents=True, exist_ok=True)
