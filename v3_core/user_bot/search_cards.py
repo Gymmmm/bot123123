@@ -43,11 +43,11 @@ def _card_actions(views: tuple[PublishedListingView, ...], *, index: int, bookab
     rows=[]
     first=[]
     if _has_photos(current):
-        first.append(SemanticAction("📸 看实拍","photos",target))
-    first.append(SemanticAction("🏠 房源详情","details",target))
+        first.append(SemanticAction("📸 查看实拍","photos",target))
+    first.append(SemanticAction("📋 房源详情","details",target))
     rows.append(tuple(first))
     if bookable:
-        rows.append((SemanticAction("📅 预约看房","book",target),SemanticAction("💬 咨询这套","consult",target)))
+        rows.append((SemanticAction("📅 在线预约","book",target),SemanticAction("💬 咨询这套","consult",target)))
     else:
         rows.append((SemanticAction("💬 咨询这套","consult",target),))
     total=len(views)
@@ -58,7 +58,7 @@ def _card_actions(views: tuple[PublishedListingView, ...], *, index: int, bookab
             SemanticAction("⬅️ 上一套","previous",views[prev_i].public_listing_id,prev_i),
             SemanticAction("下一套 ➡️","next",views[next_i].public_listing_id,next_i),
         ))
-    rows.append((SemanticAction("🔄 调整条件","change_search"),))
+    rows.append((SemanticAction("✏️ 调整条件","change_search"),))
     return tuple(rows)
 
 

@@ -28,14 +28,14 @@ def build_appointment_success_view(draft: PublicAppointmentDraft, inventory: Pub
     mode="视频带看" if draft.mode=="video" else "实地看房"
     mode_icon="🎥" if draft.mode=="video" else "🚶"
     lines=[
-        "✅ <b>预约已提交</b>",
+        "✅ <b>预约请求已提交</b>",
         "",
         f"🏠 {he(subject)}",
         f"{mode_icon} {he(mode)}",
         f"🗓️ {he(_date_display(draft.date))} · {he(_time_display(draft.time))}",
         "",
-        "接下来，中文顾问会联系你确认具体安排。",
-        "请留意 Telegram 消息。<b>预约目前尚未确认。</b>",
+        "状态：🟡 待顾问确认",
+        "顾问会核实房态和时间，确认后通过 Telegram 联系你。",
     ]
     return TransitionView(
         kind="appointment_success",

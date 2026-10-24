@@ -207,16 +207,16 @@ def test_overview_raw_button_enters_page_zero_then_next_page(tmp_path):
     assert parsed is not None and parsed.page_index == 0
 
     page0 = service.resolve_action("QL-RF-A2B3", "photos", photo_page=0)
-    assert _flatten(page0.photos.media_groups) == gallery[0:10]
+    assert _flatten(page0.photos.media_groups) == gallery[0:4]
     next_btn = next(a for a in _actions(page0.photos) if a.label == "下一页 ➡️")
     parsed_next = parse_callback(encode_semantic_action(next_btn))
     assert parsed_next is not None and parsed_next.page_index == 1
 
 
 @pytest.mark.parametrize("count", [4, 9, 10, 11, 23])
-def test_start_property_photos_dl_paging_split_by_ten(tmp_path, count):
-    """Pages are ``PHOTOS_PAGE_SIZE`` (10) chunks; every frame is a real photo."""
-    assert PHOTOS_PAGE_SIZE == 10
+def test_start_property_photos_dl_paging_split_by_four(tmp_path, count):
+    """Pages are ``PHOTOS_PAGE_SIZE`` (4) chunks; every frame is a real photo."""
+    assert PHOTOS_PAGE_SIZE == 4
     cover = tmp_path / "cover.jpg"
     cover.write_bytes(b"cover")
     gallery = _write_photos(tmp_path, count)
@@ -242,12 +242,12 @@ def test_start_property_photos_dl_paging_split_by_ten(tmp_path, count):
         assert has_pager == (expected_pages > 1)
 
     if count == 23:
-        assert [len(s) for s in expected_slices] == [10, 10, 3]
+        assert [len(s) for s in expected_slices] == [4, 4, 4, 4, 4, 3]
 
 
 def test_start_property_photos_dl_keyboard_pager_rows(tmp_path):
     """First: 下一页 › only. Middle: ‹ 上一页 + 下一页 ›. Last: ‹ 上一页 only."""
-    gallery = _write_photos(tmp_path, 23)
+    gallery = _write_photos(tmp_path, 11)
     service = _service(_view(gallery=gallery))
     pages = [
         service.resolve_action("QL-RF-A2B3", "photos", source="listing_callback", photo_page=n)
@@ -260,7 +260,7 @@ def test_start_property_photos_dl_keyboard_pager_rows(tmp_path):
     ]
     for page in pages:
         rows = [[a.label for a in row] for row in page.photos.action_rows]
-        assert rows[1:] == [["📅 预约看房", "💬 咨询这套"], ["⬅️ 返回房源"]]
+        assert rows[1:] == [["📅 在线预约", "💬 咨询这套"], ["⬅️ 返回房源"]]
 
 
 def test_start_property_photos_dl_idempotent_on_repeated_callback(tmp_path):
@@ -287,7 +287,7 @@ def test_start_property_photos_dl_out_of_range_page_clamps_to_last(tmp_path):
         "QL-RF-A2B3", "photos", source="listing_callback", photo_page=99
     )
     explicit = service.resolve_action(
-        "QL-RF-A2B3", "photos", source="listing_callback", photo_page=2
+        "QL-RF-A2B3", "photos", source="listing_callback", photo_page=5
     )
     assert last.ok and explicit.ok
     assert last.photos.media_groups == explicit.photos.media_groups

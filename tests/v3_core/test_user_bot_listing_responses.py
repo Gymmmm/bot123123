@@ -132,7 +132,7 @@ def test_detail_text_omits_missing_bullets_and_adviser_without_copy():
     assert "🟢 当前可预约" in text
     # V4.1: no real photo files in this fixture → the photos button is hidden.
     assert _actions(response.action_rows) == [["book", "consult"]]
-    assert _labels(response.action_rows) == [["📅 预约看房", "💬 中文顾问"]]
+    assert _labels(response.action_rows) == [["📅 在线预约", "💬 咨询这套"]]
 
 
 def test_details_response_uses_live_rented_state_but_keeps_frozen_public_facts():
@@ -143,7 +143,7 @@ def test_details_response_uses_live_rented_state_but_keeps_frozen_public_facts()
     assert "🔴 已租出" in response.text
     assert _actions(response.action_rows) == [["consult", "similar"]]
     assert _labels(response.action_rows) == [
-        ["💬 中文顾问", "🔍 找相似"],
+        ["💬 咨询这套", "🔍 找相似"],
     ]
 
 
@@ -221,7 +221,7 @@ def test_photos_response_first_batch_album_with_expand(tmp_path):
     assert "⬅️ 上一张" not in str(_labels(first.action_rows))
     assert _actions(first.action_rows) == [["photos", "book"], ["consult"]]
     assert _labels(first.action_rows) == [
-        ["📸 看全部实拍", "📅 预约看房"],
+        ["📸 看全部实拍", "📅 在线预约"],
         ["💬 咨询这套"],
     ]
     expand_btn = first.action_rows[0][0]
@@ -265,7 +265,7 @@ def test_photos_response_single_photo_uses_details_not_expand(tmp_path):
     assert response.media_groups == ((str(one),),)
     assert response.photo_total == 1
     assert _labels(response.action_rows) == [
-        ["🏠 房源详情", "📅 预约看房"],
+        ["📋 房源详情", "📅 在线预约"],
         ["💬 咨询这套"],
     ]
 
@@ -523,11 +523,11 @@ def test_paged_album_handles_zero_one_three_four_photos(tmp_path):
 
 
 def test_paged_album_buttons_include_prev_page_next_only_when_multi_page(tmp_path):
-    body = _fake_jpegs(tmp_path, 23)
-    for count in (3, 4, 10):
+    body = _fake_jpegs(tmp_path, 11)
+    for count in (3, 4):
         single = build_photos_page_response(_view_with_files(body[:count]), page=0)
         rows = [[a.label for a in row] for row in single.action_rows]
-        assert rows == [["📅 预约看房", "💬 咨询这套"], ["⬅️ 返回房源"]]
+        assert rows == [["📅 在线预约", "💬 咨询这套"], ["⬅️ 返回房源"]]
         assert not any("/" in label for row in rows for label in row)
 
     multi = _view_with_files(body)
@@ -539,7 +539,7 @@ def test_paged_album_buttons_include_prev_page_next_only_when_multi_page(tmp_pat
     assert single_inline_row(last) == ["⬅️ 上一页", "3/3"]
     for page in (first, mid, last):
         rows = [[a.label for a in row] for row in page.action_rows]
-        assert rows[1:] == [["📅 预约看房", "💬 咨询这套"], ["⬅️ 返回房源"]]
+        assert rows[1:] == [["📅 在线预约", "💬 咨询这套"], ["⬅️ 返回房源"]]
 
 def test_paged_album_is_idempotent_on_same_page(tmp_path):
     body = _fake_jpegs(tmp_path, 8)
@@ -578,8 +578,8 @@ def test_paged_album_uses_only_raw_photos_excludes_cover(tmp_path):
     page0 = build_photos_page_response(view, page=0)
     page1 = build_photos_page_response(view, page=1)
     assert page0.photo_total == 12
-    assert list(page0.media_groups[0]) == [str(p) for p in body[:10]]
-    assert list(page1.media_groups[0]) == [str(p) for p in body[10:12]]
+    assert list(page0.media_groups[0]) == [str(p) for p in body[:4]]
+    assert list(page1.media_groups[0]) == [str(p) for p in body[4:8]]
     for page in (page0, page1):
         for group in page.media_groups:
             assert str(cover_path) not in group

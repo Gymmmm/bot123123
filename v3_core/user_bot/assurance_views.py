@@ -23,7 +23,7 @@ class AssuranceView:
 
 
 ASSURANCE_HOME_TEXT = (
-    "🏠 <b>安心租房</b>\n\n"
+    "🏠 <b>看房与交接</b>\n\n"
     "从看房到入住，重要信息尽量提前确认并留档。\n\n"
     "入住交接、费用确认和住房问题，都可以继续找侨联。"
 )
@@ -81,14 +81,14 @@ def build_handover_view() -> AssuranceView:
         text=HANDOVER_TEXT,
         rows=(
             (AssuranceChoice("查看入住交接清单", callback_data="v3u:assure:handover_download"),),
-            (AssuranceChoice("⬅️ 返回安心租房", callback_data="v3u:home:rental"),),
+            (AssuranceChoice("⬅️ 返回看房与交接", callback_data="v3u:home:rental"),),
         ),
     )
 
 
 def build_deposit_view(
     *,
-    back_label: str = "⬅️ 返回安心租房",
+    back_label: str = "⬅️ 返回看房与交接",
     back_callback: str = "v3u:home:rental",
 ) -> AssuranceView:
     return AssuranceView(

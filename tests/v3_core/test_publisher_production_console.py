@@ -70,27 +70,20 @@ def test_active_operator_home_shows_only_attention_entries():
     controller._pending_count = lambda: 0  # type: ignore[assignment]
     keyboard = controller.home_keyboard()
     rows = [[button.text for button in row] for row in keyboard.inline_keyboard]
-    # New compact layout: high-attention entries only, no orphan zero badges.
-    assert rows[0] == ["➕ 发布房源", "📢 广播中心"]
-    assert rows[1][0].startswith("🔵 房态工作台")
-    assert rows[1][1] == "📡 采集状态"
-    last = rows[-1]
-    assert last[0] == "🕘 最近发布"
-    assert last[1] == "⚙️ 发布设置"
+    assert rows == [["🏠 发布房源", "🟢 房态更改"], ["📢 营销内容", "📡 采集源"]]
     callbacks = _callbacks(keyboard)
     assert "v3smp|new" in callbacks
     assert "v3bc" in callbacks
     assert any(cb.startswith("v3smp|listings") for cb in callbacks)
     assert "v3smp|sources" in callbacks
     assert not any(cb.startswith("v3smp|exceptions|") for cb in callbacks)
-    assert "v3smp|inv_rows|recent" in callbacks
-    assert "v3smp|settings" in callbacks
+    assert "v3smp|inv_rows|recent" not in callbacks
+    assert "v3smp|settings" not in callbacks
     # Low-frequency entries must NOT appear on the home screen anymore.
     forbidden_home_labels = {
         "🚀 自动待发",
         "📦 旧库存",
         "📤 待发预览",
-        "📡 采集源",
         "🟢 运行状态",
         "🕒 发帖时段",
         "📊 今日统计",
