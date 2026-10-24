@@ -31,24 +31,12 @@ class ProductionSimplePublisherAdminController(SimplePublisherAdminController):
 
     @staticmethod
     def home_keyboard() -> InlineKeyboardMarkup:
-        """Compact operator home: daily work first, settings last."""
-        return InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton("➕ 发布房源", callback_data="v3smp|new"),
-                    InlineKeyboardButton("🔵 房态工作台", callback_data="v3smp|listings"),
-                ],
-                [
-                    InlineKeyboardButton("📢 广播中心", callback_data="v3bc"),
-                    InlineKeyboardButton("📡 采集源", callback_data="v3smp|sources"),
-                ],
-                [
-                    InlineKeyboardButton("🧪 查看发布效果", callback_data="v3smp|preview"),
-                    InlineKeyboardButton("📚 发布记录", callback_data="v3smp|logs"),
-                ],
-                [InlineKeyboardButton("⚙️ 发布设置", callback_data="v3smp|settings")],
-            ]
-        )
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton("🏠 发布房源", callback_data="v3smp|new"),
+             InlineKeyboardButton("🟢 房态更改", callback_data="v3smp|listings")],
+            [InlineKeyboardButton("📢 营销内容", callback_data="v3bc"),
+             InlineKeyboardButton("📡 采集源", callback_data="v3smp|sources")],
+        ])
 
     async def show_home(self, message: Any) -> None:
         cfg = self.repository.config()

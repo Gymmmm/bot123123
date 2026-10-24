@@ -44,60 +44,15 @@ def _callbacks(markup):
     return [button.callback_data for row in markup.inline_keyboard for button in row if button.callback_data]
 
 
-def test_active_operator_home_shows_only_attention_entries():
-    """The active operator home is built from PublisherInventoryAdminController.
-
-    V3PublisherApplication delegates ``show_home`` to ``self.simple`` which is
-    a PublisherAdviserAdminController.  We assert against the actually
-    rendered keyboard so the test pins down what operators see.
-    """
+def test_active_operator_home_shows_four_business_entries():
     controller = object.__new__(PublisherInventoryAdminController)
-    controller.db_path = ":memory:"
-    controller.repository = type(
-        "_StubRepo",
-        (),
-        {
-            "exception_count": lambda self: 0,
-            "queue_count": lambda self: 0,
-            "held_count": lambda self: 0,
-        },
-    )()
-    controller.workflow = type(
-        "_StubWorkflow",
-        (),
-        {"queue_counts": lambda self: type("_C", (), {"unknown": 0})()},
-    )()
     controller._pending_count = lambda: 0  # type: ignore[assignment]
-    keyboard = controller.home_keyboard()
-    rows = [[button.text for button in row] for row in keyboard.inline_keyboard]
-    # New compact layout: high-attention entries only, no orphan zero badges.
-    assert rows[0] == ["➕ 发布房源", "📢 广播中心"]
-    assert rows[1][0].startswith("🔵 房态工作台")
-    assert rows[1][1] == "📡 采集状态"
-    last = rows[-1]
-    assert last[0] == "🕘 最近发布"
-    assert last[1] == "⚙️ 发布设置"
-    callbacks = _callbacks(keyboard)
-    assert "v3smp|new" in callbacks
-    assert "v3bc" in callbacks
-    assert any(cb.startswith("v3smp|listings") for cb in callbacks)
-    assert "v3smp|sources" in callbacks
-    assert not any(cb.startswith("v3smp|exceptions|") for cb in callbacks)
-    assert "v3smp|inv_rows|recent" in callbacks
-    assert "v3smp|settings" in callbacks
-    # Low-frequency entries must NOT appear on the home screen anymore.
-    forbidden_home_labels = {
-        "🚀 自动待发",
-        "📦 旧库存",
-        "📤 待发预览",
-        "📡 采集源",
-        "🟢 运行状态",
-        "🕒 发帖时段",
-        "📊 今日统计",
-    }
-    flat = [label for row in rows for label in row]
-    for forbidden in forbidden_home_labels:
-        assert forbidden not in flat, f"{forbidden} should not be on home"
+    rows = [[button.text for button in row] for row in controller.home_keyboard().inline_keyboard]
+    assert rows == [["🏠 发布房源", "🟢 房态更改"], ["📢 营销内容", "📡 采集源"]]
+    assert _callbacks(controller.home_keyboard()) == [
+        "v3smp|new", "v3smp|listings", "v3bc", "v3smp|sources"
+    ]
+    assert _callbacks(ProductionSimplePublisherAdminController.home_keyboard()) == _callbacks(controller.home_keyboard())
 
 
 def test_low_frequency_entries_live_behind_settings_page():

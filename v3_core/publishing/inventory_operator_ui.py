@@ -60,21 +60,13 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
         return int(getattr(counts, "unknown", 0) or 0)
 
     def home_keyboard(self) -> InlineKeyboardMarkup:
-        pending_n = int(self._pending_count() or 0)
-        rows: list[list[InlineKeyboardButton]] = [
-            [
-                InlineKeyboardButton("➕ 发布房源", callback_data="v3smp|new"),
-                InlineKeyboardButton("📢 广播中心", callback_data="v3bc"),
-            ],
-            [InlineKeyboardButton(f"🔵 房态工作台 {pending_n}", callback_data="v3smp|listings"), InlineKeyboardButton("📡 采集状态", callback_data="v3smp|sources")],
-        ]
-        rows.append(
-            [
-                InlineKeyboardButton("🕘 最近发布", callback_data="v3smp|inv_rows|recent"),
-                InlineKeyboardButton("⚙️ 发布设置", callback_data="v3smp|settings"),
-            ]
-        )
-        return InlineKeyboardMarkup(rows)
+        """Four operational actions; existing settings stay in secondary flows."""
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton("🏠 发布房源", callback_data="v3smp|new"),
+             InlineKeyboardButton("🟢 房态更改", callback_data="v3smp|listings")],
+            [InlineKeyboardButton("📢 营销内容", callback_data="v3bc"),
+             InlineKeyboardButton("📡 采集源", callback_data="v3smp|sources")],
+        ])
 
     async def show_home(self, message: Any) -> None:
         pending_n = int(self._pending_count() or 0)
@@ -82,10 +74,10 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
         lines = [
             "<b>📣 侨联发布助手</b>",
             "",
-            "新房源自动采集、自动发布。需要手动发布或修改房态时，点下方按钮。",
+            "新房源由后台自动采集、自动发布；也可在这里手动发布。",
             "",
             f"🔵 待确认房态 <b>{pending_n}</b>　🚀 自动待发 <b>{queued_n}</b>",
-            "技术异常由系统自动处理，不需要逐条操作。",
+            "房态、营销内容和采集源可在下方管理。",
         ]
         await message.reply_text(
             "\n".join(lines),

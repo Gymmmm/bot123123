@@ -28,8 +28,8 @@ def test_home_uses_compact_four_action_surface_when_channel_exists():
     assert labels == ["🔍 开始找房", "💬 中文顾问", "📢 最新房源", "🛎️ 侨联服务"]
     assert _callbacks(markup) == ["v3u:home:search", "v3u:home:contact", "v3u:home:service"]
     assert markup.inline_keyboard[1][0].url == "https://t.me/qiaolian"
-    assert "Gym" in view.text
-    assert "晚上好" in view.text
+    assert "侨联地产｜金边中文选房" in view.text
+    assert "提交看房预约" in view.text
 
 
 def test_home_without_channel_keeps_three_core_actions():

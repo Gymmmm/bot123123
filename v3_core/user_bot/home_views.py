@@ -34,12 +34,10 @@ def phnom_penh_greeting() -> str:
 
 def welcome_text(*, first_name: str, greeting: str) -> str:
     return (
-        f"👋 {he(str(first_name))}，{he(str(greeting))}，欢迎来侨联！\n\n"
-        "🏠 <b>侨联地产｜金边中文租房</b>\n\n"
-        "找房、看实拍、预约看房，手机上就能搞定。\n"
-        "🎥 不方便到场？可以视频带看。\n"
-        "🤝 从看房到入住，有问题都能找中文顾问。\n\n"
-        "想先做什么？"
+        "<b>侨联地产｜金边中文选房</b>\n\n"
+        "输入区域、预算和户型，查找合适房源；也可以先看最新发布。\n"
+        "看中房源后，可查看实拍、提交看房预约或咨询中文顾问。\n\n"
+        "请选择下方功能。"
     )
 
 
