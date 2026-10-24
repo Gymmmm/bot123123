@@ -453,8 +453,7 @@ def _auto_hero(eligible: list[PhotoAssessment], kind: str, probe) -> tuple[Photo
                 candidate.adjustments.append(f"外观矫正被拒（{status}），换下一张")
                 continue
             if report.get("hero_ok") is False:
-                # Gentle correction left it leaning (> HERO_MAX_RESIDUAL_DEG) or it is a close
-                # upward shot: never straighten harder (it stretches) — just don't use it as hero.
+                # Adaptive correction could not produce a safe upright facade.
                 why = "近距离仰拍" if report.get("severe_upshot") else "矫正后仍倾斜"
                 candidate.adjustments.append(
                     f"外观{why}（残余 {report.get('residual_after_deg')}°，边缘 {report.get('edge_lean_before_deg')}°），不做主图")

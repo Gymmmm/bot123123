@@ -4,14 +4,14 @@ Detect near-vertical building edges (OpenCV LSD), fit their lean as a linear
 function of x (lean = p + q*x), then warp so walls stand vertical:
 
 * roll (p) is corrected fully, clamped to ±8°;
-* vertical keystone (q) is corrected at 85% — a full correction stretches the
-  top of the frame and looks unnatural;
+* vertical keystone (q) starts at 85%; exterior heroes that remain visibly
+  tilted get an adaptive high-correction pass, capped at 110%;
 * the result is cropped inward so no empty (black) corners remain.
 
-Exterior heroes use exactly this gentle algorithm (the look Gym approved; a 100 %
-keystone stretched close upward shots). Distortion is only measured as a guard, and
-``hero_ok`` is False when the residual tilt stays > 3.5° or the shot is a close upward
-shot (frame-edge verticals > 20°): the planner then uses the best living room instead.
+Exterior heroes keep the gentle result whenever it is already straight. A close
+upward shot is retried at 100% and 110% strength and the safest result with the
+lowest residual lean wins. Distortion, retained crop and residual lean remain hard
+guards; only a still-unusable facade falls back to the best living room.
 
 Bounds (Gym spec §四): interior shots get a light roll-only fix (±3°, no
 keystone); photos that are already level are left untouched; low resolution,
@@ -37,6 +37,7 @@ except Exception:  # pragma: no cover
 
 MAX_ROLL_DEG = 8.0
 KEYSTONE_STRENGTH = 0.85
+EXTERIOR_HIGH_STRENGTHS = (1.0, 1.1)
 MAX_LEAN_DEG = 20.0
 MIN_SEGMENTS = 6
 MIN_CROP_KEPT = 0.7
@@ -49,9 +50,9 @@ MAX_EDGE_ASPECT_CHANGE = 0.25 # same, over the whole kept crop (corners)
 KEYSTONE_STEPS = (KEYSTONE_STRENGTH, 0.7, 0.55, 0.4)  # interior / legacy back-off
 
 # Exterior heroes (Gym 2026-10-11, second feedback): the gentle 03:41 algorithm is the
-# approved look (full tilt ±8°, 85 % keystone, crop to no black corners). A strong
-# 100 % keystone stretched close upward shots, so a photo that stays tilted is not
-# straightened harder; it is simply not used as the hero.
+# approved look (full tilt ±8°, 85 % keystone, crop to no black corners). Keep that
+# as the default, but retry a facade at 100/110 % when the gentle pass still leans.
+# The same crop and anisotropy guards prevent an obviously stretched building.
 GENTLE_MIN_SEGMENTS = 4
 EXTERIOR_SEGMENT_MAX_LEAN_DEG = 35.0   # residual measurement only: converging columns count as evidence
 GUARD_ASPECT_CHANGE = 0.25             # guard against clearly broken warps (centre of the building)
@@ -248,12 +249,10 @@ def _gentle_warp(img: "np.ndarray", p: float, qk: float):
 
 
 def _correct_exterior(img: "np.ndarray") -> tuple[str, "np.ndarray | None", dict[str, Any]]:
-    """Gentle exterior straightening (the look Gym approved, /workspace/cover_type 03:41):
-    full roll fix clamped to ±8°, 85 % of the vertical keystone, crop to no black corners.
+    """Adaptive exterior correction with a gentle-first, strong-when-needed policy.
 
-    Distortion (local aspect change) is measured only as a guard against broken warps.
-    ``hero_ok`` tells the planner whether the photo may be the cover hero: a residual tilt
-    above ``HERO_MAX_RESIDUAL_DEG`` or a severe close upward shot is not used as hero.
+    The 85 % pass remains the default. If it still exceeds the hero residual limit,
+    try 100 % and 110 % and retain the safe candidate with the lowest residual lean.
     """
     H, W = img.shape[:2]
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -278,33 +277,57 @@ def _correct_exterior(img: "np.ndarray") -> tuple[str, "np.ndarray | None", dict
     roll = math.degrees(math.atan(p))
     if abs(roll) > MAX_ROLL_DEG:
         p = math.tan(math.radians(math.copysign(MAX_ROLL_DEG, roll)))
-    qk = q * KEYSTONE_STRENGTH
-    result = _gentle_warp(img, p, qk)
-    if result is None:
-        metrics["hero_ok"] = False
-        return "refused:would_crop_subject", None, metrics
-    out, M, (left, top, right, bottom), kept = result
-    width, height = right - left, bottom - top
-    centre = (left + int(0.2 * width), top + int(0.2 * height), left + int(0.8 * width), top + int(0.8 * height))
-    metrics.update({
-        "roll_deg": round(math.degrees(math.atan(p)), 2), "keystone_q": round(q, 4), "keystone": round(qk, 4),
-        "keystone_strength": KEYSTONE_STRENGTH, "crop_kept": round(kept, 3), "output_size": [width, height],
-        "aspect_change": round(_aspect_change(M, centre, H, W), 4),
-        "edge_aspect_change": round(_aspect_change(M, (left, top, right, bottom), H, W), 4),
-    })
-    after = residual_lean_deg(out)
-    lean_after = mean_abs_lean_deg(cv2.cvtColor(out, cv2.COLOR_BGR2GRAY))
-    metrics["residual_after_deg"] = None if after is None else round(after, 2)
-    metrics["lean_after_deg"] = None if lean_after is None else round(lean_after, 2)
-    residual = after if after is not None else before
-    metrics["hero_ok"] = not severe and (residual is None or residual <= HERO_MAX_RESIDUAL_DEG)
-    # Guards only (never a different correction): clearly broken warp → original photo.
-    if kept < MIN_CROP_KEPT:
-        return "reverted:crop", None, metrics
-    if metrics["aspect_change"] > GUARD_ASPECT_CHANGE or metrics["edge_aspect_change"] > GUARD_EDGE_ASPECT_CHANGE:
-        return "reverted:aspect_change", None, metrics
-    if lean_after is not None and lean_after > metrics["lean_before_deg"] - 0.2:
-        return "reverted:no_improvement", None, metrics
+    strengths = (KEYSTONE_STRENGTH, *EXTERIOR_HIGH_STRENGTHS)
+    candidates: list[tuple[float, "np.ndarray", dict[str, Any]]] = []
+    last_metrics = dict(metrics)
+    rejected_crop = rejected_aspect = rejected_improvement = False
+    for strength in strengths:
+        qk = q * strength
+        result = _gentle_warp(img, p, qk)
+        if result is None:
+            continue
+        out, M, (left, top, right, bottom), kept = result
+        width, height = right - left, bottom - top
+        centre = (left + int(0.2 * width), top + int(0.2 * height),
+                  left + int(0.8 * width), top + int(0.8 * height))
+        after = residual_lean_deg(out)
+        lean_after = mean_abs_lean_deg(cv2.cvtColor(out, cv2.COLOR_BGR2GRAY))
+        trial = {
+            **metrics,
+            "roll_deg": round(math.degrees(math.atan(p)), 2), "keystone_q": round(q, 4),
+            "keystone": round(qk, 4), "keystone_strength": strength,
+            "correction_level": "gentle" if strength == KEYSTONE_STRENGTH else "high",
+            "crop_kept": round(kept, 3), "output_size": [width, height],
+            "aspect_change": round(_aspect_change(M, centre, H, W), 4),
+            "edge_aspect_change": round(_aspect_change(M, (left, top, right, bottom), H, W), 4),
+            "residual_after_deg": None if after is None else round(after, 2),
+            "lean_after_deg": None if lean_after is None else round(lean_after, 2),
+        }
+        last_metrics = trial
+        rejected_crop |= kept < MIN_CROP_KEPT
+        rejected_aspect |= (trial["aspect_change"] > GUARD_ASPECT_CHANGE
+                            or trial["edge_aspect_change"] > GUARD_EDGE_ASPECT_CHANGE)
+        rejected_improvement |= lean_after is not None and lean_after > metrics["lean_before_deg"] - 0.2
+        safe = (kept >= MIN_CROP_KEPT
+                and trial["aspect_change"] <= GUARD_ASPECT_CHANGE
+                and trial["edge_aspect_change"] <= GUARD_EDGE_ASPECT_CHANGE
+                and (lean_after is None or lean_after <= metrics["lean_before_deg"] - 0.2))
+        if safe:
+            residual = after if after is not None else before
+            candidates.append((float("inf") if residual is None else residual, out, trial))
+            if strength == KEYSTONE_STRENGTH and (residual is None or residual <= HERO_MAX_RESIDUAL_DEG) and not severe:
+                break
+    if not candidates:
+        last_metrics["hero_ok"] = False
+        if rejected_aspect:
+            return "reverted:aspect_change", None, last_metrics
+        if rejected_crop:
+            return "reverted:crop", None, last_metrics
+        if rejected_improvement:
+            return "reverted:no_improvement", None, last_metrics
+        return "refused:would_crop_subject", None, last_metrics
+    residual, out, metrics = min(candidates, key=lambda item: item[0])
+    metrics["hero_ok"] = residual <= HERO_MAX_RESIDUAL_DEG
     return "corrected", out, metrics
 
 

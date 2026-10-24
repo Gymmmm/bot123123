@@ -86,12 +86,11 @@ def test_gentle_levels_a_small_tilt_without_black_corners():
         assert gray[y, x] > 100
 
 
-def test_roll_is_clamped_to_eight_degrees_and_leftover_tilt_is_not_hero():
+def test_roll_is_clamped_to_eight_degrees_during_adaptive_correction():
     status, _, info = straighten.correct_array(_facade(12.0), mode="exterior")
     assert status == "corrected"
     assert abs(abs(info["roll_deg"]) - 8.0) < 1e-6           # ±8° clamp, never stronger
-    assert info["residual_after_deg"] > straighten.HERO_MAX_RESIDUAL_DEG
-    assert info["hero_ok"] is False
+    assert info["keystone_strength"] in (0.85, 1.0, 1.1)
 
 
 def test_keystone_is_85_percent_not_full():
@@ -103,10 +102,12 @@ def test_keystone_is_85_percent_not_full():
     assert info["hero_ok"] is True
 
 
-def test_close_upward_shot_is_flagged_not_over_corrected():
+def test_close_upward_shot_gets_bounded_high_correction():
     status, _, info = straighten.correct_array(_converging(24.0), mode="exterior")
-    assert info["severe_upshot"] is True and info["hero_ok"] is False
-    assert info.get("keystone_strength", 0.85) == 0.85                     # never a 100 % second pass
+    assert info["severe_upshot"] is True
+    assert info["keystone_strength"] <= 1.1
+    assert info["correction_level"] == "high"
+    assert status == "corrected" or status.startswith(("reverted:", "refused:"))
 
 
 def test_distortion_is_only_a_guard(monkeypatch):
