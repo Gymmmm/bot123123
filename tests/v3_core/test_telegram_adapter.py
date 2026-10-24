@@ -126,7 +126,7 @@ async def test_adapter_sends_only_one_cover_and_returns_durable_receipt(tmp_path
 
 
 @pytest.mark.asyncio
-async def test_adapter_sends_four_independent_images_then_linked_action_bar(tmp_path):
+async def test_adapter_sends_four_independent_images_then_button_only_action_bar(tmp_path):
     bot = FakeBot()
     adapter = TelegramChannelAdapter(bot)
     receipt = await adapter.send(_command(tmp_path, gallery_count=5))
@@ -137,8 +137,8 @@ async def test_adapter_sends_four_independent_images_then_linked_action_bar(tmp_
     assert len(album_call["media"]) == 4
     assert album_call["media"][0].caption.startswith("🏠")
     assert all(item.caption is None for item in album_call["media"][1:])
-    assert button_call["text"] == "👇 选择房源服务"
-    assert button_call["reply_to_message_id"] == 700
+    assert button_call["text"] == "\u2063"
+    assert "reply_to_message_id" not in button_call
     assert len(button_call["reply_markup"].inline_keyboard) == 2
     assert receipt["media_message_ids"] == ["700", "701", "702", "703"]
     assert receipt["caption_message_id"] == "700"

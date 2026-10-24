@@ -94,9 +94,9 @@ class TelegramChannelAdapter:
 
     async def send(self, command: TelegramSendCommand) -> dict[str, Any]:
         cover, gallery, keyboard = self._validated(command)
-        # Telegram albums need at least two items and cannot carry an inline
-        # keyboard.  Keep the complete frozen caption on the first image, then
-        # send one compact action bar immediately after the album.
+        # Telegram albums cannot carry an inline keyboard. Keep the complete
+        # frozen caption on the first image, then send an effectively textless
+        # action bar. Do not render a reply bubble or visible instruction text.
         if gallery:
             paths = (cover, *gallery[:3])
             with ExitStack() as stack:
@@ -120,9 +120,8 @@ class TelegramChannelAdapter:
                 raise RuntimeError("telegram_album_returned_incomplete_message_ids")
             button_message = await self.bot.send_message(
                 chat_id=command.channel_chat_id,
-                text="👇 选择房源服务",
+                text="\u2063",
                 reply_markup=keyboard,
-                reply_to_message_id=int(message_ids[0]),
             )
             button_message_id = str(
                 getattr(button_message, "message_id", "") or ""
