@@ -63,7 +63,7 @@ def test_rental_service_home_is_public_content_center_with_final_labels():
         "💬 中文顾问",
         "⬅️ 返回侨联服务",
     ]
-    assert "安心租房" in view.text
+    assert "看房与交接" in view.text
     assert "重要信息尽量提前确认并留档" in view.text
     assert "入住交接、费用确认和住房问题" in view.text
 

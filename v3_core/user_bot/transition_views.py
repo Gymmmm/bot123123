@@ -169,7 +169,7 @@ def _appointment_date_view(draft: PublicAppointmentDraft, inventory: PublicInven
             "🕐 <b>选择看房时间</b>\n\n"
             f"{he(subject)}\n"
             f"已选：{he('视频带看' if draft.mode == 'video' else '实地带看')}\n\n"
-            "常用时段可直接选；没有合适时间再自己输入。"
+            "选定时段后将提交预约请求，具体安排待顾问确认。没有合适时间可自己输入。"
         ),
         rows=tuple(rows),
     )
@@ -185,7 +185,7 @@ def _appointment_time_view(draft: PublicAppointmentDraft, inventory: PublicInven
             "🕐 <b>选择时间</b>\n\n"
             f"{he(booking_subject(details))}\n"
             f"日期：{he(_date_display(draft.date))}\n\n"
-            "请选择方便的时间："
+            "请选择方便的时间，选定后将提交预约请求，具体安排待顾问确认："
         ),
         rows=(
             (TransitionChoice("上午 09:00–12:00", "appointment_time", "am"),),

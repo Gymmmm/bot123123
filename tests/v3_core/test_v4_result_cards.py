@@ -1,4 +1,4 @@
-"""V4.0 result card: header i/N, 📸 看实拍 straight to album, verified differences."""
+"""V4.0 result card: header i/N, 📸 查看实拍 straight to album, verified differences."""
 from __future__ import annotations
 
 import json
@@ -51,10 +51,10 @@ def test_card_header_and_photos_button_go_straight_to_album():
     card = build_search_card(items, 0)
     assert card.text.startswith("🏠 <b>找到这些房源</b> · 1/2")
     assert _labels(card) == [
-        ["📸 看实拍", "🏠 房源详情"],
-        ["📅 预约看房", "💬 咨询这套"],
+        ["📸 查看实拍", "📋 房源详情"],
+        ["📅 在线预约", "💬 咨询这套"],
         ["⬅️ 上一套", "下一套 ➡️"],
-        ["🔄 调整条件"],
+        ["✏️ 调整条件"],
     ]
     photos = card.action_rows[0][0]
     raw = encode_semantic_action(photos)

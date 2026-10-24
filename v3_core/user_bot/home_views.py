@@ -34,10 +34,9 @@ def phnom_penh_greeting() -> str:
 
 def welcome_text(*, first_name: str, greeting: str) -> str:
     return (
-        "<b>侨联地产｜金边中文选房</b>\n\n"
-        "输入区域、预算和户型，查找合适房源；也可以先看最新发布。\n"
-        "看中房源后，可查看实拍、提交看房预约或咨询中文顾问。\n\n"
-        "请选择下方功能。"
+        "🏠 <b>侨联地产｜金边中文选房</b>\n\n"
+        "告诉我区域、预算和几房，先帮你缩小范围。\n"
+        "也可以查看最新房源，或直接联系中文顾问。"
     )
 
 
@@ -57,7 +56,7 @@ CONTACT_TEXT = (
     "找房可以说：区域、预算、几房、什么时候入住。"
 )
 BOOK_TEXT = (
-    "📅 <b>预约看房</b>\n\n"
+    "📅 <b>在线预约</b>\n\n"
     "请从具体房源进入预约，选择看房方式、日期和时间后提交。\n\n"
     "提交后表示预约信息已记录，不代表时间已经确认。"
 )
@@ -69,22 +68,11 @@ def build_home_view(
     first_name: str = "您",
     greeting: str | None = None,
 ) -> HomeView:
-    rows: list[tuple[HomeChoice, ...]] = [
-        (
-            HomeChoice("🔍 开始找房", "search"),
-            HomeChoice("💬 中文顾问", "contact"),
-        ),
-    ]
+    rows: list[tuple[HomeChoice, ...]] = [(HomeChoice("🔍 开始找房", "search"),)]
     clean_channel = str(channel_url or "").strip()
-    if clean_channel:
-        rows.append(
-            (
-                HomeChoice("📢 最新房源", "root", url=clean_channel),
-                HomeChoice("🛎️ 侨联服务", "service"),
-            )
-        )
-    else:
-        rows.append((HomeChoice("🛎️ 侨联服务", "service"),))
+    contact = HomeChoice("💬 中文顾问", "contact")
+    rows.append((HomeChoice("📢 最新房源", "root", url=clean_channel), contact) if clean_channel else (contact,))
+    rows.append((HomeChoice("📋 我的预约", "appointments"), HomeChoice("🛎️ 侨联服务", "service")))
     resolved_greeting = str(greeting or "").strip() or phnom_penh_greeting()
     return HomeView(
         "home",

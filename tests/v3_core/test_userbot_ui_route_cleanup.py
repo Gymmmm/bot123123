@@ -127,7 +127,7 @@ def test_search_card_order_and_public_identity(monkeypatch):
     monkeypatch.setattr(mod, "build_public_listing_details", lambda view: D())
     card = build_search_card((V(),), 0)
     labels = [choice.label for row in card.action_rows for choice in row]
-    assert labels == ["🏠 房源详情", "📅 预约看房", "💬 咨询这套", "🔄 调整条件"]
+    assert labels == ["📋 房源详情", "📅 在线预约", "💬 咨询这套", "✏️ 调整条件"]
     assert "l_" not in repr(card).lower()
 
 
@@ -218,6 +218,6 @@ def test_legacy_contact_and_aftercare_destinations_render_new_names():
     assert "中文顾问" in contact.text
     assert "联系顾问" not in _labels(contact)
     rental = build_assurance_home_view()
-    assert "安心租房" in rental.text
+    assert "看房与交接" in rental.text
     assert "入住交接、费用确认和住房问题" in rental.text
     assert "关于侨联" not in rental.text

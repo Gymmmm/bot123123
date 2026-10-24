@@ -25,11 +25,11 @@ def test_home_uses_compact_four_action_surface_when_channel_exists():
     )
     markup = build_home_keyboard(view)
     labels = [b.text for row in markup.inline_keyboard for b in row]
-    assert labels == ["🔍 开始找房", "💬 中文顾问", "📢 最新房源", "🛎️ 侨联服务"]
-    assert _callbacks(markup) == ["v3u:home:search", "v3u:home:contact", "v3u:home:service"]
+    assert labels == ["🔍 开始找房", "📢 最新房源", "💬 中文顾问", "📋 我的预约", "🛎️ 侨联服务"]
+    assert _callbacks(markup) == ["v3u:home:search", "v3u:home:contact", "v3u:home:appointments", "v3u:home:service"]
     assert markup.inline_keyboard[1][0].url == "https://t.me/qiaolian"
-    assert "侨联地产｜金边中文选房" in view.text
-    assert "提交看房预约" in view.text
+    assert "金边中文选房" in view.text
+    assert len(markup.inline_keyboard[0]) == 1
 
 
 def test_home_without_channel_keeps_three_core_actions():
@@ -37,8 +37,8 @@ def test_home_without_channel_keeps_three_core_actions():
         build_home_view(channel_url="", first_name="Gym", greeting="上午好")
     )
     labels = [b.text for row in markup.inline_keyboard for b in row]
-    assert labels == ["🔍 开始找房", "💬 中文顾问", "🛎️ 侨联服务"]
-    assert _callbacks(markup) == ["v3u:home:search", "v3u:home:contact", "v3u:home:service"]
+    assert labels == ["🔍 开始找房", "💬 中文顾问", "📋 我的预约", "🛎️ 侨联服务"]
+    assert _callbacks(markup) == ["v3u:home:search", "v3u:home:contact", "v3u:home:appointments", "v3u:home:service"]
 
 
 def test_contact_handoff_and_appointment_history_navigation_are_plain_text():

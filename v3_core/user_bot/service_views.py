@@ -119,7 +119,7 @@ VIDEO_SERVICE_TEXT = (
     "🎥 <b>视频带看</b>\n\n"
     "人不在金边、或者没空过去，都可以视频看房。\n"
     "顾问到房子里开视频，带你实时看房间和周边。\n\n"
-    "先挑好想看的房子，在房源里点「📅 预约看房」，再选「🎥 视频带看」就行。"
+    "先挑好想看的房子，在房源里点「📅 在线预约」，再选「🎥 视频带看」就行。"
 )
 
 
@@ -147,14 +147,14 @@ def aftercare_home_view() -> ServiceView:
         kind="aftercare_home",
         text=AFTERCARE_TEXT,
         rows=(
-            (ServiceChoice("🔧 房屋报修", "v3u:service:repair"), ServiceChoice("🏢 物业问题", "v3u:service:coordination")),
-            (ServiceChoice("💡 账单疑问", "v3u:service:utilities"), ServiceChoice("❓ 其他住房问题", "v3u:service:general")),
+            (ServiceChoice("🔧 房屋报修", "v3u:service:repair"), ServiceChoice("🏢 物业协调", "v3u:service:coordination")),
+            (ServiceChoice("💡 账单协助", "v3u:service:utilities"), ServiceChoice("❓ 其他住房问题", "v3u:service:general")),
             (ServiceChoice("⬅️ 返回侨联服务", "v3u:home:service"),),
         ),
     )
 
 
-# Section 7 — 看房与交接 (locked rename from 安心租房 / 侨联安心租 / 侨联保障).
+# Section 7 — 看房与交接 (locked rename from 看房与交接 / 看房与交接 / 侨联保障).
 RENTAL_SERVICE_TEXT = (
     "🛡️ <b>看房与交接</b>\n\n"
     "入住前后把房屋情况留清楚，交接时更有依据。\n\n"
@@ -450,7 +450,7 @@ def property_exit_view() -> ServiceView:
 
 def utility_stub_view(kind: str) -> ServiceView:
     labels = {
-        "utilities": ("💡 账单疑问", "水电、物业费或者其他住房费用看不明白？把账单内容或照片发给中文顾问就行。"),
+        "utilities": ("💡 账单协助", "水电、物业费或者其他住房费用看不明白？把账单内容或照片发给中文顾问就行。"),
         "moving": ("🚚 搬家服务", "请说明搬家日期、出发地、目的地，以及大概物品情况。"),
         "cleaning": ("🧹 保洁服务", "请说明需要哪种保洁，以及希望安排的日期：\n\n日常保洁 / 入住保洁 / 退租保洁 / 深度保洁"),
         "network_help": ("🌐 网络办理", "请说明需要处理的问题：\n\n新装 / 续费 / 故障 / 其他"),

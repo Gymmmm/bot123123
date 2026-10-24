@@ -180,9 +180,8 @@ def test_base_simple_home_keyboard_has_seven_inheritance_entries():
         for button in row
     ]
     assert not forbidden.intersection(rendered_labels)
-    # No orphan zero badges — only the high-attention rows.
-    assert "🕘 最近发布" in rendered_labels
-    assert "⚙️ 发布设置" in rendered_labels
+    # Operational homepage contains only the four requested entry points.
+    assert rendered_labels == ["🏠 发布房源", "🟢 房态更改", "📢 营销内容", "📡 采集源"]
 
 
 def test_default_cover_style_policy():

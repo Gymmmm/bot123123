@@ -125,7 +125,7 @@ def test_7117_first_four_bot_photos_match_the_cover(tmp_path, photos_copy):
     details = build_details_response(view)
     assert list(details.media_groups[0]) == expected
     labels = [a.label for row in details.action_rows for a in row]
-    assert labels == ["📸 下一组实拍", "📅 预约看房", "💬 中文顾问"]
+    assert labels == ["📸 下一组实拍", "📅 在线预约", "💬 咨询这套"]
 
 
 # ---------------------------------------------------------------- 6735 villa

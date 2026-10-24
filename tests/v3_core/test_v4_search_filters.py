@@ -130,7 +130,7 @@ def test_booking_success_says_not_yet_confirmed():
 
     draft = PublicAppointmentDraft(public_listing_id="QL-RF-A2B3", mode="video", date="10-15", time="pm", source="user_bot")
     view = build_appointment_success_view(draft, _Inv())
-    assert "预约已提交" in view.text
-    assert "预约目前尚未确认" in view.text
+    assert "预约请求已提交" in view.text
+    assert "待顾问确认" in view.text
     assert "🎥 视频带看" in view.text
     assert _labels(view)[:3] == ["📋 我的预约", "💬 中文顾问", "🔍 继续找房"]

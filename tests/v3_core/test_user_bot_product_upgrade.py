@@ -25,15 +25,14 @@ def test_v3_home_uses_final_conversion_navigation():
     view = build_home_view(channel_url="https://t.me/qiaolian")
     labels = _labels(view)
     assert labels == [
-        "🔍 开始找房", "💬 中文顾问",
-        "📢 最新房源", "🛎️ 侨联服务",
+        "🔍 开始找房", "📢 最新房源", "💬 中文顾问", "📋 我的预约", "🛎️ 侨联服务",
     ]
 
 
 def test_home_without_channel_keeps_core_conversion_actions():
     labels = _labels(build_home_view())
     assert labels == [
-        "🔍 开始找房", "💬 中文顾问", "🛎️ 侨联服务",
+        "🔍 开始找房", "💬 中文顾问", "📋 我的预约", "🛎️ 侨联服务",
     ]
 
 
@@ -44,7 +43,7 @@ def test_about_and_booking_are_compatible_secondary_home_actions():
     assert "侨联地产｜金边中文租房" in about
     assert "真实房源" in about
     assert "看房、费用确认、入住交接留档" in about
-    assert "预约看房" in build_booking_view().text
+    assert "在线预约" in build_booking_view().text
     assert "换房" not in build_about_view().text
 
 
@@ -60,7 +59,7 @@ def test_service_hub_is_public_and_does_not_require_binding():
 def test_rental_service_is_public_parent_content_center():
     view = build_assurance_home_view()
     assert view.text == (
-        "🏠 <b>安心租房</b>\n\n"
+        "🏠 <b>看房与交接</b>\n\n"
         "从看房到入住，重要信息尽量提前确认并留档。\n\n"
         "入住交接、费用确认和住房问题，都可以继续找侨联。"
     )

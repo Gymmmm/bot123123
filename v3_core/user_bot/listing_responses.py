@@ -127,7 +127,7 @@ def _details_actions(
 
     The detail opens with the same 4 photos as the channel cover (hero, thumb
     1–3) followed by the full listing text. Below: 「📸 下一组实拍」(only when
-    more than the first 4 exist; continues from photo 5), 「📅 预约看房」 when
+    more than the first 4 exist; continues from photo 5), 「📅 在线预约」 when
     bookable, and 「💬 中文顾问」. Not bookable → 中文顾问 + 找相似.
     """
     target = str(public_listing_id or "").strip()
@@ -139,12 +139,12 @@ def _details_actions(
         ),))
     if bookable:
         rows.append((
-            SemanticAction("📅 预约看房", "book", target),
-            SemanticAction("💬 中文顾问", "consult", target),
+            SemanticAction("📅 在线预约", "book", target),
+            SemanticAction("💬 咨询这套", "consult", target),
         ))
     else:
         rows.append((
-            SemanticAction("💬 中文顾问", "consult", target),
+            SemanticAction("💬 咨询这套", "consult", target),
             SemanticAction("🔍 找相似", "similar", target),
         ))
     return tuple(rows)
@@ -177,13 +177,13 @@ def _photo_actions(
                 "photos",
                 target
             )
-        return SemanticAction("🏠 房源详情", "details", target)
+        return SemanticAction("📋 房源详情", "details", target)
 
     if bookable or status in {"active", "reserved"}:
         # Book button only when unified bookable is true.
         first: list[SemanticAction] = [_more_or_details()]
         if bookable:
-            first.append(SemanticAction("📅 预约看房", "book", target))
+            first.append(SemanticAction("📅 在线预约", "book", target))
         return (
             tuple(first),
             (SemanticAction("💬 咨询这套", "consult", target),),
@@ -873,7 +873,7 @@ NO_PHOTOS_TEXT = (
 )
 
 # Telegram allows at most 10 frames per sendMediaGroup.
-PHOTOS_PAGE_SIZE = 10
+PHOTOS_PAGE_SIZE = 4
 PHOTOS_ALBUM_MAX_TOTAL = 30
 
 
@@ -964,7 +964,7 @@ def build_photos_overview_response(view: PublishedListingView) -> PublicPhotosRe
     lines.extend(["", f"📸 共 {total} 张实拍 · 先看 {min(total, MAX_PREVIEW)} 张"])
     actions = [(SemanticAction("🖼️ 查看全部原图", "photos", target, target_index=0),)]
     if details.bookable:
-        actions.append((SemanticAction("📅 预约看房", "book", target), SemanticAction("💬 咨询这套", "consult", target)))
+        actions.append((SemanticAction("📅 在线预约", "book", target), SemanticAction("💬 咨询这套", "consult", target)))
     else:
         actions.append((SemanticAction("💬 咨询这套", "consult", target), SemanticAction("🔍 找相似", "similar", target)))
     actions.append((SemanticAction("⬅️ 返回房源", "details", target),))
@@ -1087,7 +1087,7 @@ def _photo_page_actions(
 
     if bookable:
         rows.append((
-            SemanticAction("📅 预约看房", "book", target),
+            SemanticAction("📅 在线预约", "book", target),
             SemanticAction("💬 咨询这套", "consult", target),
         ))
     else:

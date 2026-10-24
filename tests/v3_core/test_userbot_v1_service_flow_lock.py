@@ -41,8 +41,8 @@ def test_p16_aftercare_only_exposes_real_workflows():
         "房屋报修、物业沟通、账单看不明白，都可以告诉中文顾问。"
     )
     assert _rows(view) == [
-        ["🔧 房屋报修", "🏢 物业问题"],
-        ["💡 账单疑问", "❓ 其他住房问题"],
+        ["🔧 房屋报修", "🏢 物业协调"],
+        ["💡 账单协助", "❓ 其他住房问题"],
         ["⬅️ 返回侨联服务"],
     ]
     callbacks = _callbacks(view)
@@ -133,7 +133,7 @@ def test_p19_bound_lease_copy_buttons_and_callbacks_locked():
 def test_p24_assurance_copy_buttons_and_callbacks_locked():
     view = build_assurance_home_view()
     assert view.text == (
-        "🏠 <b>安心租房</b>\n\n"
+        "🏠 <b>看房与交接</b>\n\n"
         "从看房到入住，重要信息尽量提前确认并留档。\n\n"
         "入住交接、费用确认和住房问题，都可以继续找侨联。"
     )

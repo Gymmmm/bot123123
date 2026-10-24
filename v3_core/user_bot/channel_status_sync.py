@@ -53,12 +53,12 @@ def appointment_status_label(status: str, active_count: int = 0) -> str:
         "active": "🟢 当前可预约",
         "reserved": "🟡 已有预约，仍可预约",
         "high_demand": "🟠 预约较多",
-        "pending": "🔵 房态确认中",
+        "pending": "🔵 房态待确认",
         "rented": "🔴 已租出",
         "inactive": "⚫ 已下架",
         "offline": "⚫ 已下架",
         "withdrawn": "⚫ 已下架",
-    }.get(clean, "🔵 房态确认中")
+    }.get(clean, "🔵 房态待确认")
 
 
 def caption_with_appointment_status(

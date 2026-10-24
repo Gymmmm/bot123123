@@ -127,19 +127,19 @@ def test_deeplink_photos_page_one_returns_raw_slice_ten_to_twenty(tmp_path):
         "QL-RF-A2B3", "photos", source="listing_callback", photo_page=1
     )
     assert page1.ok and page1.photos is not None
-    assert _flatten(page1.photos.media_groups) == gallery[10:20]
-    assert [a.label for a in page1.photos.action_rows[0]] == ["⬅️ 上一页", "2/3", "下一页 ➡️"]
-    assert page1.photos.media_caption.endswith("共 23 张 · 第 2/3 页")
+    assert _flatten(page1.photos.media_groups) == gallery[4:8]
+    assert [a.label for a in page1.photos.action_rows[0]] == ["⬅️ 上一页", "2/6", "下一页 ➡️"]
+    assert page1.photos.media_caption.endswith("共 23 张 · 第 2/6 页")
 
 
 def test_deeplink_photos_last_page_returns_tail_with_prev_only(tmp_path):
     gallery = _write_photos(tmp_path, 23)
     page2 = _service(_view(gallery=gallery)).resolve_action(
-        "QL-RF-A2B3", "photos", source="listing_callback", photo_page=2
+        "QL-RF-A2B3", "photos", source="listing_callback", photo_page=5
     )
     assert page2.ok and page2.photos is not None
     assert _flatten(page2.photos.media_groups) == gallery[20:23]
-    assert [a.label for a in page2.photos.action_rows[0]] == ["⬅️ 上一页", "3/3"]
+    assert [a.label for a in page2.photos.action_rows[0]] == ["⬅️ 上一页", "6/6"]
 
 
 def test_deeplink_photos_overview_excludes_cover_named_asset(tmp_path):
@@ -304,14 +304,14 @@ async def test_entry_integration_pagination_through_callback_router_10_10_3(tmp_
     assert p1.status == "ok" and p1.action == "photos"
     photos_p1 = p1.listing.photos
     assert photos_p1.photo_total == 23
-    assert [str(p) for p in photos_p1.media_groups[0]] == gallery[10:20]
-    assert [a.label for a in photos_p1.action_rows[0]] == ["⬅️ 上一页", "2/3", "下一页 ➡️"]
+    assert [str(p) for p in photos_p1.media_groups[0]] == gallery[4:8]
+    assert [a.label for a in photos_p1.action_rows[0]] == ["⬅️ 上一页", "2/6", "下一页 ➡️"]
 
     p2 = router.dispatch("v3u:listing:photos:QL-RF-A2B3:pg:2", source="listing_callback")
     photos_p2 = p2.listing.photos
-    assert [str(p) for p in photos_p2.media_groups[0]] == gallery[20:23]
+    assert [str(p) for p in photos_p2.media_groups[0]] == gallery[8:12]
     rows = [[a.label for a in row] for row in photos_p2.action_rows]
-    assert rows == [["⬅️ 上一页", "3/3"], ["📅 预约看房", "💬 咨询这套"], ["⬅️ 返回房源"]]
+    assert rows == [["⬅️ 上一页", "3/6", "下一页 ➡️"], ["📅 在线预约", "💬 咨询这套"], ["⬅️ 返回房源"]]
 
     for group in (photos_p1.media_groups[0], photos_p2.media_groups[0]):
         assert str(cover) not in {str(p) for p in group}
