@@ -568,18 +568,23 @@ def render_cover(*, style: str, source_image: str, output_path: str, data: Cover
     if not images:
         raise ValueError("cover_no_usable_images")
     if template in {"mobile_collage_4x5", "mobile_collage_top_3x2"} and len(images) >= 3:
-        # Phone-feed 3:2: one dominant photo plus two or three supporting
-        # photos. Geometry is tuned separately so supporting rooms remain clear.
+        # Telegram editorial cover: photos own most of a 3:2 canvas while a
+        # compact black fact strip and the official lockup stay outside the
+        # photography. Three photos use a large left hero with two readable
+        # supporting rooms; four photos use a wide hero over three details.
+        # Never repeat media to fill a cell.
         W, H, gap = 1200, 800, 6
+        info_h, footer_h = 104, 74
+        photo_h = H - info_h - footer_h
         canvas = Image.new("RGB", (W, H), PAGE_BG)
         chosen = images[:4]
         side_count = len(chosen) - 1
-        if template == "mobile_collage_top_3x2":
-            hero_h = round(H * (0.62 if side_count == 2 else 0.60))
+        if side_count == 3:
+            hero_h = round(photo_h * 0.67)
             supporting_y = hero_h + gap
-            supporting_h = H - supporting_y
+            supporting_h = photo_h - supporting_y
             usable_width = W - gap * (side_count - 1)
-            ratios = (0.56, 0.44) if side_count == 2 else (0.36, 0.34, 0.30)
+            ratios = (0.38, 0.33, 0.29)
             widths = [round(usable_width * ratio) for ratio in ratios[:-1]]
             widths.append(usable_width - sum(widths))
             boxes = [(0, 0, W, hero_h)]
@@ -588,50 +593,60 @@ def render_cover(*, style: str, source_image: str, output_path: str, data: Cover
                 boxes.append((x, supporting_y, width, supporting_h))
                 x += width + gap
             hero_w = W
-            brand_bottom = hero_h
         else:
-            hero_w = round(W * (0.58 if side_count == 2 else 0.62))
+            hero_w = round(W * 0.65)
             side_x = hero_w + gap
             side_w = W - side_x
-            usable_height = H - gap * (side_count - 1)
-            ratios = (0.56, 0.44) if side_count == 2 else (0.36, 0.34, 0.30)
+            usable_height = photo_h - gap * (side_count - 1)
+            ratios = (0.56, 0.44)
             heights = [round(usable_height * ratio) for ratio in ratios[:-1]]
             heights.append(usable_height - sum(heights))
-            boxes = [(0, 0, hero_w, H)]
+            boxes = [(0, 0, hero_w, photo_h)]
             y = 0
             for height in heights:
                 boxes.append((side_x, y, side_w, height))
                 y += height + gap
-            brand_bottom = H
         for image, (x, y, w, h) in zip(chosen, boxes):
             canvas.paste(_fit(image, (w, h)), (x, y))
 
         layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
         draw = ImageDraw.Draw(layer)
+        info_top = photo_h
+        footer_top = H - footer_h
+        draw.rectangle((0, info_top, W, footer_top), fill=(*FOOTER_BG, 255))
+        draw.rectangle((0, info_top, W, info_top + 4), fill=(*GOLD, 255))
+        draw.rectangle((0, footer_top, W, H), fill=(255, 255, 255, 255))
+        draw.line((0, footer_top, W, footer_top), fill=(*GOLD_LIGHT, 180), width=1)
+
         title = _cover_title(data)
         detail = _cover_subtitle(data)
         price = data.price_line()
-        # Float a compact information lockup over the quiet upper-left wall.
-        # A soft offset shadow supplies contrast without an ad-like panel.
+        title, title_font = _fit_line(
+            draw, title, max_width=710, start_size=42, min_size=30, bold=True
+        )
+        draw.text((34, info_top + 17), title, font=title_font, fill=(255, 255, 255, 255))
+        if detail:
+            detail = detail.replace(" | ", " · ")
+            detail, detail_font = _fit_line(
+                draw, detail, max_width=710, start_size=25, min_size=20, bold=False
+            )
+            draw.text((36, info_top + 67), detail, font=detail_font, fill=(*SUBTLE_WHITE, 255))
         if price:
             price, price_font = _fit_line(
-                draw, price, max_width=hero_w - 80, start_size=62, min_size=42, bold=True
+                draw, price, max_width=390, start_size=52, min_size=36, bold=True
             )
-            draw.text((45, 40), price, font=price_font, fill=(0, 0, 0, 120))
-            draw.text((42, 36), price, font=price_font, fill=(255, 255, 255, 255))
-        meta = " · ".join(part for part in (title, detail.replace(" | ", " ")) if part)
-        if meta:
-            meta, meta_font = _fit_line(
-                draw, meta, max_width=hero_w - 80, start_size=28, min_size=21, bold=False
-            )
-            draw.text((46, 115), meta, font=meta_font, fill=(0, 0, 0, 115))
-            draw.text((44, 112), meta, font=meta_font, fill=(255, 255, 255, 245))
-        brand_font = _font(24, bold=True)
-        brand = "侨联地产"
-        brand_w = draw.textlength(brand, font=brand_font)
-        brand_pos = (hero_w - 28 - brand_w, brand_bottom - 42)
-        draw.text((brand_pos[0] + 2, brand_pos[1] + 2), brand, font=brand_font, fill=(0, 0, 0, 80))
-        draw.text(brand_pos, brand, font=brand_font, fill=(255, 255, 255, 155))
+            price_width = draw.textlength(price, font=price_font)
+            draw.text((W - 34 - price_width, info_top + 27), price, font=price_font, fill=(*GOLD_LIGHT, 255))
+
+        lockup = _brand_lockup()
+        if lockup is not None:
+            logo = _scaled(lockup, 58)
+            if logo.width > 280:
+                logo = logo.resize((280, max(1, round(logo.height * 280 / logo.width))), Image.Resampling.LANCZOS)
+            layer.alpha_composite(logo, (30, footer_top + (footer_h - logo.height) // 2))
+        else:
+            draw.text((34, footer_top + footer_h // 2), "侨联地产", font=_font(25, bold=True),
+                      fill=(*DARK_GOLD, 255), anchor="lm")
         canvas.paste(layer, (0, 0), layer)
         output = Path(output_path).expanduser().resolve()
         output.parent.mkdir(parents=True, exist_ok=True)

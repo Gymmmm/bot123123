@@ -79,7 +79,7 @@ def test_all_bad_images_follow_business_failure_not_worker_crash(tmp_path):
         render_cover(style="x", source_image=str(bad), output_path=str(tmp_path/"x.png"), data=CoverRenderData(public_listing_id="QL"))
 
 
-def test_mobile_top_collage_uses_large_hero_and_two_supporting_photos(tmp_path):
+def test_mobile_collage_uses_left_hero_and_two_supporting_photos(tmp_path):
     hero = tmp_path / "hero.png"
     left = tmp_path / "left.png"
     right = tmp_path / "right.png"
@@ -94,14 +94,43 @@ def test_mobile_top_collage_uses_large_hero_and_two_supporting_photos(tmp_path):
         source_images=(str(left), str(right)),
         output_path=str(out),
         data=CoverRenderData(public_listing_id="QL"),
-        layout="mobile_collage_top_3x2",
+        layout="mobile_collage_4x5",
     )
 
     with Image.open(out).convert("RGB") as rendered:
         assert rendered.size == (1200, 800)
         assert rendered.getpixel((600, 300))[0] > 180
-        assert rendered.getpixel((250, 700))[1] > 180
-        assert rendered.getpixel((950, 700))[2] > 180
+        assert rendered.getpixel((950, 150))[1] > 180
+        assert rendered.getpixel((950, 500))[2] > 180
+        assert max(rendered.getpixel((600, 680))) < 60  # compact fact strip
+        assert min(rendered.getpixel((600, 775))) > 230  # white logo footer
+
+
+def test_mobile_four_photo_collage_uses_top_hero_and_three_details(tmp_path):
+    paths = []
+    colours = ((210, 30, 30), (30, 210, 30), (30, 30, 210), (210, 210, 30))
+    for index, colour in enumerate(colours):
+        path = tmp_path / f"photo-{index}.png"
+        Image.new("RGB", (1200, 800), colour).save(path)
+        paths.append(path)
+    out = tmp_path / "four.png"
+
+    render_cover(
+        style="x",
+        source_image=str(paths[0]),
+        source_images=tuple(str(path) for path in paths[1:]),
+        output_path=str(out),
+        data=CoverRenderData(public_listing_id="QL"),
+        layout="mobile_collage_4x5",
+    )
+
+    with Image.open(out).convert("RGB") as rendered:
+        assert rendered.size == (1200, 800)
+        assert rendered.getpixel((600, 200))[0] > 180
+        assert rendered.getpixel((150, 550))[1] > 180
+        assert rendered.getpixel((650, 550))[2] > 180
+        last = rendered.getpixel((1080, 550))
+        assert last[0] > 180 and last[1] > 180
 
 
 @pytest.mark.parametrize(
