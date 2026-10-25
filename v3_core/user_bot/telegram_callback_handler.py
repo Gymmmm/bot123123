@@ -268,32 +268,51 @@ def _single_detail_keyboard(
 
 
 def _detail_grid(paths: tuple[str, ...], page: int) -> bytes:
-    """Photo-first responsive collage: large hero plus proportionate supporting shots.
+    """Compose clean originals using the approved three/four-photo layouts.
 
-    Keep pictures free from logos and text; adapt the lower row to the count.
-    Avoid four equal squares, which reduce legibility on Telegram phones.
+    Villa/exterior hero: left tall main image with 2/3 stacked photos at right.
+    Wide living-room hero: top wide main image with 2/3 photos underneath.
+    Brand bars, logos and captions belong to the channel cover, not Bot photos.
     """
     selected = paths[page * 4: page * 4 + 4]
     if not selected:
         raise ValueError("detail_grid_has_no_photos")
-
     width, gutter = 1200, 6
-    if len(selected) == 1:
-        layout = ((0, 0, 1200, 800),)
-        height = 800
-    elif len(selected) == 2:
-        layout = ((0, 0, 1200, 660), (0, 666, 1200, 540))
-        height = 1206
-    else:
-        hero_height, row_height = 715, 348
-        count = len(selected) - 1
-        cell_width = (width - gutter * (count - 1)) // count
+    with Image.open(selected[0]) as source:
+        first = ImageOps.exif_transpose(source)
+        hero_ratio = first.width / max(first.height, 1)
+    horizontal_hero = hero_ratio >= 1.30
+    count = len(selected)
+    if count == 1:
+        layout = [(0, 0, 1200, 800 if horizontal_hero else 1350)]
+        height = layout[0][3]
+    elif count == 2:
+        if horizontal_hero:
+            layout = [(0, 0, 1200, 680), (0, 686, 1200, 540)]
+            height = 1226
+        else:
+            layout = [(0, 0, 760, 1050), (766, 0, 434, 1050)]
+            height = 1050
+    elif horizontal_hero:
+        hero_height, row_height = 680, 360
+        n = count - 1
+        unit = (width - gutter * (n - 1)) // n
         layout = [(0, 0, width, hero_height)]
-        for i in range(count):
-            x = i * (cell_width + gutter)
-            cell = width - x if i == count - 1 else cell_width
-            layout.append((x, hero_height + gutter, cell, row_height))
+        for i in range(n):
+            x = i * (unit + gutter)
+            w = width - x if i == n - 1 else unit
+            layout.append((x, hero_height + gutter, w, row_height))
         height = hero_height + gutter + row_height
+    else:
+        height, hero_width = 1050, 760
+        secondary_width = width - hero_width - gutter
+        n = count - 1
+        unit = (height - gutter * (n - 1)) // n
+        layout = [(0, 0, hero_width, height)]
+        for i in range(n):
+            y = i * (unit + gutter)
+            h = height - y if i == n - 1 else unit
+            layout.append((hero_width + gutter, y, secondary_width, h))
 
     canvas = Image.new("RGB", (width, height), "white")
     for source, (x, y, w, h) in zip(selected, layout):
