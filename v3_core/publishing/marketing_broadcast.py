@@ -35,43 +35,14 @@ class MarketingTemplate:
 
 
 TEMPLATES = (
-    MarketingTemplate(
-        "mon", "📊 本周年租库存",
-        "📊 <b>金边本周年租房源</b>\n\n侨联频道以金边长期居住的年租房源为主，租金统一按月展示。当前公开库存不足时，直接进入最新房源看实时房态。",
-        (("🔍 开始找房", "find"), ("💬 中文顾问", "advisor"), ("📢 最新房源", "latest")),
-    ),
-    MarketingTemplate(
-        "tue", "💰 年租预算怎么选",
-        "💰 <b>在金边长期住，这个预算能选什么？</b>\n\n按侨联当前公开年租库存统计；租金按月展示，库存不足时不生成市场均价。",
-        (("💬 中文顾问", "advisor"), ("🛎️ 侨联服务", "service"), ("🔍 开始找房", "find")),
-    ),
-    MarketingTemplate(
-        "wed", "📍 长住先选区域",
-        "📍 <b>中国人在金边长住，先按日常路线选区域</b>\n\n通勤、吃饭买菜、接送孩子和常去地点，比“网红区域”更重要。下面只按侨联当前公开年租库存统计。",
-        (("🔍 开始找房", "find"), ("💬 中文顾问", "advisor")),
-    ),
-    MarketingTemplate(
-        "thu", "🆕 近7天年租上新",
-        "🆕 <b>近7天金边年租房源更新</b>\n\n只统计已经在 Telegram 公开、当前仍有效的年租房源；租金按月展示。",
-        (("💬 中文顾问", "advisor"), ("🔍 开始找房", "find")),
-    ),
-    MarketingTemplate(
-        "fri", "📋 年租看房重点",
-        "📋 <b>中国人在金边年租，看房别只看装修</b>\n\n先确认通勤、空调和热水、家具家电、水电计费、网络、停车/宠物，再谈押付和入住时间。",
-        (("💬 中文顾问", "advisor"), ("🔍 开始找房", "find")),
-    ),
-    MarketingTemplate(
-        "sat", "🏠 周末年租看房",
-        "🏠 <b>周末集中看金边年租房</b>\n\n先按区域 + 月预算 + 户型 + 入住时间筛选，再确认实时房态，把同一路线的房源尽量排在一起。",
-        (("🔍 开始找房", "find"), ("🛎️ 侨联服务", "service"), ("💬 中文顾问", "advisor")),
-    ),
-    MarketingTemplate(
-        "sun", "🏠 金边出售房源精选",
-        "🏠 <b>侨联地产｜金边出售房源</b>\n\n想在金边买房？可在出售网站按区域、总价和户型查看房源与实拍。\n\n<i>房源价格与状态以实时核实为准。</i>",
-        (("🛎️ 侨联服务", "service"), ("💬 中文顾问", "advisor")),
-    ),
+    MarketingTemplate('mon', '🏠 本周找房', '🏠 <b>这周在金边找房，先缩小范围</b>\n\n告诉我：区域或常去地点、月租预算、几房、入住时间。\n先看符合条件的实拍，合适再约看。', (('🔍 开始找房', 'find'), ('💬 中文顾问', 'advisor'))),
+    MarketingTemplate('tue', '💰 预算怎么选', '💰 <b>月租预算定了，还要问清这些费用</b>\n\n除了房租，还要确认水电、物业、网络和停车费。押金与付款周期，也要提前算进去。\n\n发来你的月租上限和需要几房，先找预算内的选择。', (('🔍 开始找房', 'find'), ('💬 中文顾问', 'advisor'))),
+    MarketingTemplate('wed', '📍 按通勤选区域', '📍 <b>房子合适，也要每天住得方便</b>\n\n把上班、上学或常去的地点告诉我们，再结合预算选区域。\n看房时一起确认实际路线、停车和周边生活配套。', (('🔍 开始找房', 'find'), ('💬 中文顾问', 'advisor'))),
+    MarketingTemplate('thu', '🆕 本周房源更新', '🆕 <b>最近在找房？看看这周更新</b>\n\n点「最新房源」查看近期实拍和租金。\n看中哪套，直接从房源进入详情或咨询，不用重新说明编号。\n\n房态会变化，看房前再确认。', (('📢 最新房源', 'latest'), ('💬 中文顾问', 'advisor'))),
+    MarketingTemplate('fri', '📋 看房前问清楚', '📋 <b>看房别只看装修</b>\n\n• 空调、热水和家具家电能否正常使用\n• 采光、窗外噪音和实际通勤\n• 水电物业、押付和最低租期\n• 维修责任、提前退租与押金条件\n\n看中一套后，点「咨询这套」，把最在意的问题告诉顾问。', (('🔍 开始找房', 'find'), ('💬 中文顾问', 'advisor'))),
+    MarketingTemplate('sat', '🎥 周末看房安排', '🎥 <b>没空到场，也能先了解房子</b>\n\n选择具体房源，点击「在线预约」，再选实地看房或视频带看。\n顾问会核实房态和时间，再与你确认安排。\n\n视频带看是现场实时连线，可以提出想重点看的位置。', (('🔍 开始找房', 'find'), ('💬 中文顾问', 'advisor'))),
+    MarketingTemplate('sun', '🏠 金边出售房源', '🏠 <b>准备在金边买房，先把需求说清楚</b>\n\n自住还是投资？意向区域、总预算、户型分别是什么？\n先看具体房源和实拍，再逐项核对产权、费用及交易条件。\n\n点击「查看出售房源」浏览，或联系中文顾问。', (('🛎️ 侨联服务', 'service'), ('💬 中文顾问', 'advisor'))),
 )
-
 
 @dataclass(frozen=True)
 class InventoryMarketingSnapshot:
@@ -218,37 +189,14 @@ class MarketingBroadcastService:
         s = self._inventory_snapshot()
         if s.total <= 0:
             return fallback
-        area_lines = "\n".join(f"• {escape(area)}：{count} 套" for area, count in s.top_areas) or "• 区域信息待补全"
-        rent_range = f"{self._money(s.min_rent)}–{self._money(s.max_rent)}/月" if s.min_rent and s.max_rent else "价格信息待补全"
+        area_lines = "\n".join(f"• {escape(area)}：{count} 套" for area, count in s.top_areas) or "可直接告诉顾问你常去的地点。"
         bodies = {
-            "mon": "📊 <b>金边本周年租库存</b>\n\n"
-                   f"当前公开有效：<b>{s.total} 套</b>\n可租：{s.active} 套｜已预留：{s.reserved} 套\n"
-                   f"年租房源月租展示：{rent_range}\n\n<b>当前房源较多的区域</b>\n{area_lines}\n\n"
-                   "<i>侨联频道以金边年租房源为主；价格按月展示。房态会变化，以咨询时实时确认为准。</i>",
-            "tue": "💰 <b>在金边长期住，这个预算能选什么？</b>\n\n"
-                   f"$500 以下：{s.budget_under_500} 套\n$500–700：{s.budget_500_700} 套\n"
-                   f"$701–1,000：{s.budget_701_1000} 套\n$1,000 以上：{s.budget_over_1000} 套\n\n"
-                   f"当前公开年租库存共 {s.total} 套。\n"
-                   "<i>租金按月展示；这是侨联当前公开库存，不代表全金边市场均价或成交价。</i>",
-            "wed": "📍 <b>中国人在金边长住，区域先按日常路线选</b>\n\n"
-                   f"{area_lines}\n\n当前公开年租：{s.total} 套\n"
-                   "通勤、吃饭买菜、接送孩子和常去地点，比只看区域名更实用。\n"
-                   "<i>以上按侨联当前公开库存数量排序，不使用“最热门”等无法验证的市场结论。</i>",
-            "thu": "🆕 <b>近7天金边年租房源更新</b>\n\n"
-                   f"近7天新公开 / 重新发布且当前有效：<b>{s.new_7d} 套</b>\n"
-                   f"当前公开年租：{s.total} 套\n月租展示范围：{rent_range}\n\n"
-                   "直接发区域 + 月预算 + 户型 + 入住时间，我们按当前 Telegram 库存筛。",
-            "fri": "📋 <b>中国人在金边年租，看房别只看装修</b>\n\n"
-                   "先看：通勤路线、空调和热水、家具家电、水电计费、网络、停车 / 宠物。\n"
-                   "再确认：租期、押付、维修责任和预计入住时间。\n\n"
-                   f"侨联当前公开年租：{s.total} 套。先筛再排看房，减少来回跑。",
-            "sat": "🏠 <b>周末集中看金边年租房</b>\n\n"
-                   f"当前可租：<b>{s.active} 套</b>\n已预留：{s.reserved} 套\n月租展示范围：{rent_range}\n\n"
-                   f"{area_lines}\n\n给区域 + 月预算 + 户型 + 入住时间，先确认房态，再把同一路线的房源尽量一起看。",
-            "sun": "📝 <b>准备在金边住一年，签约前把这些写清楚</b>\n\n"
-                   "租期｜押付方式｜水电计费｜物业 / 网络｜维修责任｜提前退租｜家具家电清单｜退房条件\n\n"
-                   f"当前公开年租：{s.total} 套｜近7天更新：{s.new_7d} 套\n"
-                   "<i>具体租期和合同条件以每套房实际约定为准；不把挂牌库存包装成成交量或市场热度。</i>",
+            "mon": fallback + f"\n\n当前可咨询房源：<b>{s.total} 套</b>。房态与费用以顾问核实为准。",
+            "tue": fallback + f"\n\n<b>按月租看现有选择</b>\n低于$500：{s.budget_under_500} 套\n$500–700：{s.budget_500_700} 套\n高于$700、不超过$1,000：{s.budget_701_1000} 套\n高于$1,000：{s.budget_over_1000} 套\n以上仅为侨联当前可咨询房源。",
+            "wed": fallback + f"\n\n<b>当前可参考的区域</b>\n{area_lines}",
+            "thu": fallback + f"\n\n近7天新公开或重新发布、目前仍可咨询：<b>{s.new_7d} 套</b>。",
+            "fri": fallback,
+            "sat": fallback,
         }
         return bodies.get(key, fallback)
 
@@ -301,17 +249,11 @@ class MarketingBroadcastService:
         advisor = BroadcastButton("💬 中文顾问", channel_general_action_url(self.user_bot_username, "advisor"))
         service = BroadcastButton("🛎️ 侨联服务", channel_general_action_url(self.user_bot_username, "service"))
         latest = BroadcastButton("📢 最新房源", f"https://t.me/{channel_username}") if channel_username else None
-        if template.key == "mon" and latest is None:
-            raise ValueError("marketing_channel_username_required")
         locked = {
-            "mon": ((find, advisor), (latest,)),
-            "tue": ((advisor, service), (find,)),
-            "wed": ((find, advisor),),
-            "thu": ((advisor, find),),
-            "fri": ((advisor, find),),
-            "sat": ((find, service), (advisor,)),
-            "sun": ((service, advisor),),
+            key: ((find,), (advisor,)) for key in ("mon", "tue", "wed", "fri", "sat")
         }
+        locked["thu"] = ((latest or find,), (advisor,))
+        locked["sun"] = ((service,), (advisor,))
         if selected == "default":
             if template.key == "sun":
                 return ((BroadcastButton("🏠 查看出售房源", SALE_SITE_URL),), (advisor,))

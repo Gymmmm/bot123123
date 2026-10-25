@@ -24,7 +24,7 @@ def build_search_no_match_view(intent: SearchSubmitIntent) -> TransitionView:
         text=(
             "🔍 <b>还没找到完全符合的房子</b>"
             f"{summary_block}\n\n"
-            "可以放宽一点条件再看看，或者让中文顾问继续帮你找。"
+            "可以只调整一项，其他条件保留；也可以让中文顾问继续帮你找。"
         ),
         rows=(
             (

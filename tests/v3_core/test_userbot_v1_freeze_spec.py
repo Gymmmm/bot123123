@@ -19,7 +19,7 @@ def test_home_matches_final_service_surface():
 def test_search_entry_is_direct_filter_panel():
     view = TransitionViewService.search_entry()
     assert "想找什么样的房子" in view.text
-    assert "BKK1，两房，预算 $800" in view.text
+    assert "BKK1，两房，$800以内，下个月入住" in view.text
     assert _labels(view) == [
         "📍 选区域", "💰 选预算", "🏠 选户型",
         "💬 帮我找房", "⬅️ 返回首页",

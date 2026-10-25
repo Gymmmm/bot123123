@@ -49,15 +49,9 @@ def test_parse_hhmm_is_strict():
 
 
 def test_marketing_template_button_metadata_matches_locked_v1_ctas():
-    expected = {
-        "mon": (("🔍 开始找房", "find"), ("💬 中文顾问", "advisor"), ("📢 最新房源", "latest")),
-        "tue": (("💬 中文顾问", "advisor"), ("🛎️ 侨联服务", "service"), ("🔍 开始找房", "find")),
-        "wed": (("🔍 开始找房", "find"), ("💬 中文顾问", "advisor")),
-        "thu": (("💬 中文顾问", "advisor"), ("🔍 开始找房", "find")),
-        "fri": (("💬 中文顾问", "advisor"), ("🔍 开始找房", "find")),
-        "sat": (("🔍 开始找房", "find"), ("🛎️ 侨联服务", "service"), ("💬 中文顾问", "advisor")),
-        "sun": (("🛎️ 侨联服务", "service"), ("💬 中文顾问", "advisor")),
-    }
+    expected = {key: (("🔍 开始找房", "find"), ("💬 中文顾问", "advisor")) for key in ("mon", "tue", "wed", "fri", "sat")}
+    expected["thu"] = (("📢 最新房源", "latest"), ("💬 中文顾问", "advisor"))
+    expected["sun"] = (("🛎️ 侨联服务", "service"), ("💬 中文顾问", "advisor"))
     assert {template.key: template.buttons for template in MARKETING_TEMPLATES} == expected
 
 
@@ -70,10 +64,10 @@ def test_weekly_marketing_copy_is_safe_when_public_inventory_is_empty(tmp_path):
     assert "六年，这个承诺没破过" not in joined
     assert "我们赚服务费" not in joined
     assert "顾问实地核实" not in joined
-    assert "公开" in joined
-    assert "年租" in joined
+    assert "房态会变化" in joined
+    assert "月租" in joined
     assert "金边" in joined
-    assert "中国人在金边" in joined
+    assert "押金" in joined
     assert "短租" not in joined
     assert "日租" not in joined
 
@@ -103,12 +97,10 @@ def test_marketing_uses_only_durably_published_rent_inventory(tmp_path):
     service = MarketingBroadcastService(db, user_bot_username="qiaolian_rent_bot")
     monday = service.template(0).body
     tuesday = service.template(1).body
-    assert "当前公开有效：<b>1 套</b>" in monday
-    assert "BKK1：1 套" in monday
-    assert "年租房源月租展示：$650–$650/月" in monday
+    assert "当前可咨询房源：<b>1 套</b>" in monday
     assert "$500–700：1 套" in tuesday
-    assert "当前公开年租库存共 1 套" in tuesday
-    assert "全金边市场均价" in tuesday
+    assert "侨联当前可咨询房源" in tuesday
+    assert "已预留" not in monday
 
 
 def test_marketing_runtime_button_rows_and_urls_match_locked_v1(tmp_path, monkeypatch):
@@ -117,15 +109,9 @@ def test_marketing_runtime_button_rows_and_urls_match_locked_v1(tmp_path, monkey
     monkeypatch.setenv("CHANNEL_USERNAME", "qiaolian_channel")
     service = MarketingBroadcastService(db, user_bot_username="qiaolian_rent_bot")
 
-    expected_labels = {
-        "mon": [["🔍 开始找房", "💬 中文顾问"], ["📢 最新房源"]],
-        "tue": [["💬 中文顾问", "🛎️ 侨联服务"], ["🔍 开始找房"]],
-        "wed": [["🔍 开始找房", "💬 中文顾问"]],
-        "thu": [["💬 中文顾问", "🔍 开始找房"]],
-        "fri": [["💬 中文顾问", "🔍 开始找房"]],
-        "sat": [["🔍 开始找房", "🛎️ 侨联服务"], ["💬 中文顾问"]],
-        "sun": [["🏠 查看出售房源"], ["💬 中文顾问"]],
-    }
+    expected_labels = {key: [["🔍 开始找房"], ["💬 中文顾问"]] for key in ("mon", "tue", "wed", "fri", "sat")}
+    expected_labels["thu"] = [["📢 最新房源"], ["💬 中文顾问"]]
+    expected_labels["sun"] = [["🏠 查看出售房源"], ["💬 中文顾问"]]
     expected_urls = {
         "🔍 开始找房": "https://t.me/qiaolian_rent_bot?start=find",
         "💬 中文顾问": "https://t.me/qiaolian_rent_bot?start=advisor",
@@ -263,3 +249,14 @@ def test_publisher_dashboard_exposes_broadcast_center(tmp_path):
     assert broadcast.callback_data == "v3bc"
     # v3bc still routes into the broadcast center (marketing, weather, FX, ...).
     assert "v3bc" in {button.callback_data for button in buttons}
+
+
+def test_marketing_latest_falls_back_to_find_when_channel_is_not_configured(tmp_path, monkeypatch):
+    for key in ('CHANNEL_USERNAME', 'CHANNEL_URL', 'CHANNEL_ID'):
+        monkeypatch.delenv(key, raising=False)
+    db = tmp_path / 'no-channel.db'
+    initialize_v3_storage(db)
+    service = MarketingBroadcastService(db, user_bot_username='qiaolian_rent_bot')
+    rows = service.footer_rows(service.template(3))
+    assert rows[0][0].url == 'https://t.me/qiaolian_rent_bot?start=find'
+    assert rows[0][0].label == '🔍 开始找房'
