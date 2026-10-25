@@ -302,6 +302,42 @@ async def test_details_callback_sends_photos_once_and_replaces_search_card(tmp_p
     assert "原始实拍 3/4" in later.calls[-1][2]["media"].caption
 
 
+@pytest.mark.asyncio
+async def test_detail_to_search_card_and_back_stays_on_one_message(tmp_path):
+    from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+    from v3_core.user_bot.telegram_callback_response import TelegramCallbackResponse
+    from v3_core.user_bot.telegram_callback_handler import render_search_card_response
+
+    raw = _photos(tmp_path, 3)
+    view = _view(gallery=raw)
+    payload = channel_start_payload(PUBLIC_ID, "details")
+    _, _, ctx = await _start(payload, view)
+    state = ctx.user_data[PHOTOS_ALBUM_KEY][f"1001::{PUBLIC_ID}"]
+    msg_id = int(state["message_ids"][0])
+    query = FakeQuery("v3u:card:0:" + PUBLIC_ID,
+                      FakeMessage(message_id=msg_id, photo=[object()]))
+    card = TelegramCallbackResponse(
+        kind="card", status="ok", text="🏠 富力城",
+        photo_path=raw[0],
+        keyboard=InlineKeyboardMarkup([[InlineKeyboardButton(
+            "📋 房源详情", callback_data=f"v3u:listing:details:{PUBLIC_ID}"
+        )]]),
+    )
+    await render_search_card_response(_cb_update(query), ctx, card, query=query)
+    assert state.get("message_ids") is None
+    assert state.get("page") is None
+
+    listings, views = _flow(view)
+    router = CallbackRouter(listings=listings, search_sessions=SimpleNamespace(
+        navigate=lambda *_a, **_k: SimpleNamespace(status="ok", card=None)))
+    ctx.bot.calls.clear()
+    back = FakeQuery(f"v3u:listing:details:{PUBLIC_ID}",
+                     FakeMessage(message_id=msg_id, photo=[object()]))
+    await handle_v3_callback(_cb_update(back), ctx, router=router, transition_views=views)
+    assert _kinds(ctx.bot) == ["edit_message_media"]
+    assert ctx.bot.calls[0][1]["message_id"] == msg_id
+
+
 # ---- Fix 3: internal listing IDs never reach user-visible text ----
 
 def test_internal_ids_hidden_on_album_detail_consult_and_booking(tmp_path):

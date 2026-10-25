@@ -396,8 +396,10 @@ async def _handle_detail_photo(
         return True
     # No dependency on in-memory album state: older live buttons still work
     # after a Bot restart, because the listing is re-resolved from storage.
-    if (current_id in _album_message_ids(state)
-            and int(state.get("detail_index", -1)) == index):
+    shown_caption = str(getattr(query.message, "caption", "") or "")
+    if (shown_caption.startswith(f"📷 原始实拍 {index + 1}/{len(paths)}")
+            or (current_id in _album_message_ids(state)
+                and int(state.get("detail_index", -1)) == index)):
         await query.answer()
         return True
     from .telegram_ui import build_action_keyboard
@@ -502,6 +504,21 @@ async def render_search_card_response(update: Any, context: Any, response: Teleg
             sent = await context.bot.send_photo(chat_id=_chat_id(update), photo=handle, caption=response.text, parse_mode=ParseMode.HTML, reply_markup=response.keyboard)
     else:
         sent = await context.bot.send_message(chat_id=_chat_id(update), text=response.text, parse_mode=ParseMode.HTML, reply_markup=response.keyboard)
+
+    # A search card may replace the detail photo in place. Invalidate the
+    # old detail state or the next '房源详情' tap can be incorrectly no-op'd.
+    if message is not None and has_photo and sent is None:
+        current_id = str(getattr(message, "message_id", "") or "")
+        albums = getattr(context, "user_data", {})
+        albums = albums.get(PHOTOS_ALBUM_KEY) if isinstance(albums, dict) else None
+        if isinstance(albums, dict):
+            for state in albums.values():
+                if (isinstance(state, dict)
+                        and state.get("page") == DETAILS_ALBUM_PAGE
+                        and current_id in _album_message_ids(state)):
+                    state.pop("page", None)
+                    state.pop("message_ids", None)
+                    state.pop("detail_index", None)
 
     user_data = getattr(context, "user_data", None)
     if isinstance(user_data, dict):
