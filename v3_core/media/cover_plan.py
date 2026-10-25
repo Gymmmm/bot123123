@@ -490,9 +490,16 @@ def _auto_hero(eligible: list[PhotoAssessment], kind: str, probe) -> tuple[Photo
 def _pick_thumbs(hero: PhotoAssessment, eligible: list[PhotoAssessment], items: list[PhotoAssessment],
                  kind: str, *, limit: int) -> list[str]:
     pool = [i for i in eligible if i.path != hero.path and i.cluster != hero.cluster]
-    if len(pool) < limit:  # small listings: allow same-cluster / suspect shots rather than nothing
-        extra = [i for i in items if i.path != hero.path and i not in pool and not i.foreign_suspect]
-        pool += sorted(extra, key=lambda i: -i.quality)
+    # Do not reintroduce an angle/cluster already shown in the hero or pool.
+    # Two distinct supporting rooms are better than three repetitive frames.
+    distinct = []
+    clusters = {hero.cluster}
+    for candidate in sorted(pool, key=lambda i: -i.quality):
+        if candidate.cluster in clusters:
+            continue
+        clusters.add(candidate.cluster)
+        distinct.append(candidate)
+    pool = distinct
 
     def thumb_score(item: PhotoAssessment) -> float:
         harmony = 1.0 - min(1.0, abs(item.exposure - hero.exposure) * 2)
