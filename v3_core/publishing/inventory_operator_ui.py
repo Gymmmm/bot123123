@@ -351,8 +351,8 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
                         InlineKeyboardButton("⚫ 下架", callback_data=f"v3smp|status|offline|{listing_id}"),
                     ],
                 ])
-        buttons.append([InlineKeyboardButton("☑️ 批量更新", callback_data="v3smp|inv_batch")])
-        buttons.append([InlineKeyboardButton("⬅️ 房态工作台", callback_data="v3smp|listings")])
+        buttons.append([InlineKeyboardButton("🔍 重新搜索", callback_data="v3smp|inv_search")])
+        buttons.append([InlineKeyboardButton("⬅️ 房态更改", callback_data="v3smp|listings")])
         await message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(buttons))
 
     async def show_inventory_rows(self, message: Any, category: str) -> None:
@@ -540,16 +540,22 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
         if isinstance(state, dict) and str(state.get("kind") or "") == "inventory_search":
             text = str(getattr(update.effective_message, "text", "") or "").strip()
             context.user_data.pop(SIMPLE_EDIT_STATE_KEY, None)
+            if not text:
+                await update.effective_message.reply_text("请输入房源编号、楼盘名称或关键词。")
+                context.user_data[SIMPLE_EDIT_STATE_KEY] = {"kind": "inventory_search"}
+                return True
             rows: list[dict[str, Any]] = []
             for category in ("pending", "active", "reserved", "rented", "offline"):
-                rows.extend(self._inventory_rows(category, limit=20, query=text))
+                rows.extend(self._inventory_rows(category, limit=30, query=text))
             unique: dict[str, dict[str, Any]] = {str(row["listing_id"]): row for row in rows}
-            await self._render_inventory_rows(
-                update.effective_message,
-                list(unique.values())[:30],
-                title=f"🔍 搜索：{text}",
-                quick_status=True,
-            )
+            matches = list(unique.values())
+            if len(matches) == 1:
+                await self.show_listing(update.effective_message, str(matches[0]["listing_id"]))
+            else:
+                await self._render_inventory_rows(
+                    update.effective_message, matches[:8],
+                    title=f"🔍 搜索：{text}" + (f"（前8套 / 共{len(matches)}套）" if len(matches) > 8 else ""),
+                )
             return True
         return await super().handle_text(update, context)
 
