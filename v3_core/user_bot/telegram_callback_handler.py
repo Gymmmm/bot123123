@@ -5,6 +5,8 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from html import escape as html_escape, unescape as html_unescape
 import re
+from io import BytesIO
+from PIL import Image, ImageOps
 from typing import Any
 
 from telegram import InputMediaPhoto, InlineKeyboardButton, InlineKeyboardMarkup
@@ -220,7 +222,9 @@ async def _render_photos(
 
 def _single_detail_caption(text: str, index: int, total: int) -> str:
     """Keep the complete useful detail in the same Telegram photo message."""
-    heading = f"📷 原始实拍 {index + 1}/{total}\n\n"
+    begin = index * 4 + 1
+    end = min(begin + 3, total)
+    heading = f"📷 实拍 {begin}–{end}/{total} · 点击查看大图\n\n"
     content = str(text or "").strip()
     if len(heading + content) <= 1024:
         return heading + content
@@ -234,20 +238,25 @@ def _single_detail_keyboard(
 ) -> InlineKeyboardMarkup:
     """Photo controls and listing actions live on one persistent message."""
     rows: list[list[InlineKeyboardButton]] = []
-    if total > 1:
+    pages = (total + 3) // 4
+    if pages > 1:
         photo_row = []
         if index > 0:
             photo_row.append(InlineKeyboardButton(
-                "⬅️ 上一张", callback_data=f"v3u:detailphoto:{public_id}:{index - 1}"
+                "⬅️ 上一组", callback_data=f"v3u:detailphoto:{public_id}:{index - 1}"
             ))
         photo_row.append(InlineKeyboardButton(
-            f"{index + 1}/{total}", callback_data=f"v3u:detailphoto:{public_id}:{index}"
+            f"{index + 1}/{pages}", callback_data=f"v3u:detailphoto:{public_id}:{index}"
         ))
-        if index + 1 < total:
+        if index + 1 < pages:
             photo_row.append(InlineKeyboardButton(
-                "下一张 ➡️", callback_data=f"v3u:detailphoto:{public_id}:{index + 1}"
+                "下一组 ➡️", callback_data=f"v3u:detailphoto:{public_id}:{index + 1}"
             ))
         rows.append(photo_row)
+    if total > 1:
+        rows.append([InlineKeyboardButton(
+            "🔎 查看高清原图", callback_data=f"v3u:listing:photos:{public_id}:pg:{index}"
+        )])
     for row in (getattr(markup, "inline_keyboard", None) or ()):
         clean = [
             button for button in row
@@ -256,6 +265,21 @@ def _single_detail_keyboard(
         if clean:
             rows.append(clean)
     return InlineKeyboardMarkup(rows)
+
+
+def _detail_grid(paths: tuple[str, ...], page: int) -> bytes:
+    """Clean four-photo contact sheet; never uses the branded channel cover."""
+    selected = paths[page * 4: page * 4 + 4]
+    canvas = Image.new("RGB", (1000, 1000), "white")
+    slots = ((0, 0), (504, 0), (0, 504), (504, 504))
+    for source, (x, y) in zip(selected, slots):
+        with Image.open(source) as original:
+            photo = ImageOps.fit(original.convert("RGB"), (496, 496),
+                                 method=Image.Resampling.LANCZOS)
+            canvas.paste(photo, (x, y))
+    output = BytesIO()
+    canvas.save(output, format="JPEG", quality=87, optimize=True)
+    return output.getvalue()
 
 
 async def send_listing_details(
@@ -300,7 +324,7 @@ async def send_listing_details(
         caption = _single_detail_caption(text, 0, len(paths))
         keyboard = _single_detail_keyboard(reply_markup, public_id, 0, len(paths))
         media = InputMediaPhoto(
-            media=Path(paths[0]).read_bytes(),
+            media=_detail_grid(paths, 0),
             caption=caption,
             parse_mode=ParseMode.HTML,
         )
@@ -320,14 +344,13 @@ async def send_listing_details(
                     # In that case send one new message and retire the old.
                     pass
         if not ids:
-            with Path(paths[0]).open("rb") as handle:
-                sent = await bot.send_photo(
-                    chat_id=chat_id_value,
-                    photo=handle,
-                    caption=caption,
-                    parse_mode=ParseMode.HTML,
-                    reply_markup=keyboard,
-                )
+            sent = await bot.send_photo(
+                chat_id=chat_id_value,
+                photo=_detail_grid(paths, 0),
+                caption=caption,
+                parse_mode=ParseMode.HTML,
+                reply_markup=keyboard,
+            )
             ids = [str(getattr(sent, "message_id"))]
     else:
         if replace_id and not getattr(replace_message, "photo", None):
@@ -386,7 +409,7 @@ async def _handle_detail_photo(
         return True
     paths = tuple(path for path in details.photo_paths if Path(path).is_file())
     index = int(matched.group(2))
-    if not paths or index >= len(paths):
+    if not paths or index >= (len(paths) + 3) // 4:
         await query.answer("这张实拍暂时无法打开", show_alert=True)
         return True
     state = _album_state(update, context, public_id)
@@ -397,7 +420,7 @@ async def _handle_detail_photo(
     # No dependency on in-memory album state: older live buttons still work
     # after a Bot restart, because the listing is re-resolved from storage.
     shown_caption = str(getattr(query.message, "caption", "") or "")
-    if (shown_caption.startswith(f"📷 原始实拍 {index + 1}/{len(paths)}")
+    if (shown_caption.startswith(f"📷 实拍 {index * 4 + 1}–{min(index * 4 + 4, len(paths))}/{len(paths)}")
             or (current_id in _album_message_ids(state)
                 and int(state.get("detail_index", -1)) == index)):
         await query.answer()
@@ -413,7 +436,7 @@ async def _handle_detail_photo(
     await query.answer()
     await query.edit_message_media(
         media=InputMediaPhoto(
-            media=Path(paths[index]).read_bytes(),
+            media=_detail_grid(paths, index),
             caption=caption,
             parse_mode=ParseMode.HTML,
         ),

@@ -193,11 +193,11 @@ async def test_channel_details_deeplink_end_to_end_opens_detail_with_photos(tmp_
     bot = context.bot
     assert _kinds(bot) == ["send_photo"]
     detail = bot.calls[0][1]
-    assert detail["caption"].startswith("📷 原始实拍 1/6")
+    assert detail["caption"].startswith("📷 实拍 1–4/6")
     assert "富力城" in detail["caption"]
     assert len(detail["caption"]) <= 1024
     labels = _buttons(detail["reply_markup"])
-    assert labels[0] == ["1/6", "下一张 ➡️"]
+    assert labels[0] == ["1/2", "下一组 ➡️"]
     assert ["📅 在线预约", "💬 咨询这套"] in labels
     assert PUBLIC_ID not in _all_text(bot)
     state = context.user_data[PHOTOS_ALBUM_KEY][f"1001::{PUBLIC_ID}"]
@@ -253,7 +253,7 @@ def test_not_bookable_detail_hides_booking():
 
 @pytest.mark.asyncio
 async def test_details_callback_sends_photos_once_and_replaces_search_card(tmp_path):
-    view = _view(gallery=_photos(tmp_path, 4))
+    view = _view(gallery=_photos(tmp_path, 9))
     listings, views = _flow(view)
     router = CallbackRouter(listings=listings, search_sessions=SimpleNamespace(
         navigate=lambda *_a, **_k: SimpleNamespace(status="ok", card=None)))
@@ -285,7 +285,7 @@ async def test_details_callback_sends_photos_once_and_replaces_search_card(tmp_p
     await handle_v3_callback(_cb_update(next_query), context, router=router, transition_views=views)
     assert [call[0] for call in next_query.calls] == ["answer", "edit_media"]
     media = next_query.calls[-1][2]["media"]
-    assert "原始实拍 2/4" in media.caption
+    assert "实拍 5–8/9" in media.caption
     assert "富力城" in media.caption
     assert context.bot.calls == []  # no send, delete, or extra message
     state = context.user_data[PHOTOS_ALBUM_KEY][f"1001::{PUBLIC_ID}"]
@@ -299,7 +299,7 @@ async def test_details_callback_sends_photos_once_and_replaces_search_card(tmp_p
     )
     await handle_v3_callback(_cb_update(later), restarted, router=router, transition_views=views)
     assert [call[0] for call in later.calls] == ["answer", "edit_media"]
-    assert "原始实拍 3/4" in later.calls[-1][2]["media"].caption
+    assert "实拍 9–9/9" in later.calls[-1][2]["media"].caption
 
 
 @pytest.mark.asyncio
