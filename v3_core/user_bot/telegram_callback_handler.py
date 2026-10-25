@@ -268,49 +268,52 @@ def _single_detail_keyboard(
 
 
 def _detail_grid(paths: tuple[str, ...], page: int) -> bytes:
-    """Compose clean originals using the approved three/four-photo layouts.
+    """Phone-first real-photo preview: one large hero plus up to three rooms.
 
-    Villa/exterior hero: left tall main image with 2/3 stacked photos at right.
-    Wide living-room hero: top wide main image with 2/3 photos underneath.
-    Brand bars, logos and captions belong to the channel cover, not Bot photos.
+    Do not place logos or marketing words over the originals. Portrait villa
+    exteriors are contained over a softly blurred fill so their roofs survive.
     """
+    from PIL import ImageFilter
+
     selected = paths[page * 4: page * 4 + 4]
     if not selected:
         raise ValueError("detail_grid_has_no_photos")
-    width, gutter = 1200, 6
-    with Image.open(selected[0]) as source:
-        first = ImageOps.exif_transpose(source)
-        hero_ratio = first.width / max(first.height, 1)
-    horizontal_hero = hero_ratio >= 1.30
+    width, height, gutter = 1080, 1350, 9
     count = len(selected)
-    # Balanced mobile preview: four frames have equal visual weight,
-    # and a partial final page retains the same two-column rhythm.
     if count == 1:
-        layout = [(0, 0, 1200, 1100)]
-        height = 1100
-    elif count == 2:
-        layout = [(0, 0, 597, 1100), (603, 0, 597, 1100)]
-        height = 1100
-    elif count == 3:
-        layout = [(0, 0, 597, 1100), (603, 0, 597, 547),
-                  (603, 553, 597, 547)]
-        height = 1100
+        boxes = [(0, 0, width, height)]
     else:
-        layout = [(0, 0, 597, 547), (603, 0, 597, 547),
-                  (0, 553, 597, 547), (603, 553, 597, 547)]
-        height = 1100
+        hero_height = 836
+        thumb_top = hero_height + gutter
+        thumb_height = height - thumb_top
+        thumb_width = (width - gutter * (count - 2)) // (count - 1)
+        boxes = [(0, 0, width, hero_height)]
+        left = 0
+        for index in range(count - 1):
+            cell_width = thumb_width if index < count - 2 else width - left
+            boxes.append((left, thumb_top, cell_width, thumb_height))
+            left += cell_width + gutter
 
     canvas = Image.new("RGB", (width, height), "white")
-    for source, (x, y, w, h) in zip(selected, layout):
+    for index, (source, (x, y, w, h)) in enumerate(zip(selected, boxes)):
         with Image.open(source) as original:
             corrected = ImageOps.exif_transpose(original).convert("RGB")
+        if index == 0 and corrected.height > corrected.width * 1.18:
+            photo = ImageOps.fit(
+                corrected, (w, h), method=Image.Resampling.LANCZOS
+            ).filter(ImageFilter.GaussianBlur(24))
+            visible = ImageOps.contain(
+                corrected, (w, h), method=Image.Resampling.LANCZOS
+            )
+            photo.paste(visible, ((w - visible.width) // 2, (h - visible.height) // 2))
+        else:
             photo = ImageOps.fit(
                 corrected, (w, h), method=Image.Resampling.LANCZOS,
-                centering=(0.5, 0.40 if y == 0 else 0.5),
+                centering=(0.5, 0.45 if index == 0 else 0.5),
             )
-            canvas.paste(photo, (x, y))
+        canvas.paste(photo, (x, y))
     output = BytesIO()
-    canvas.save(output, format="JPEG", quality=89, optimize=True)
+    canvas.save(output, format="JPEG", quality=91, optimize=True)
     return output.getvalue()
 
 
