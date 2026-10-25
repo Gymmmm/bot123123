@@ -353,11 +353,11 @@ async def test_dashboard_pending_uses_existing_eligible_ten_at_a_time_queue(tmp_
     labels = _labels(message.calls[-1]["reply_markup"])
     callbacks = _callbacks(message.calls[-1]["reply_markup"])
     pending_label = next(label for label in labels if label.startswith("🔵 待确认 "))
-    assert pending_label == "🔵 待确认 11｜10套一组"
+    assert pending_label == "🔵 待确认 11"
     assert "🔵 待确认 17" not in labels
-    assert any(label.startswith("⚠️ 待处理异常") for label in labels)
-    assert "v3smp|exceptions|all" in callbacks
-    assert callbacks[0] == "v3smp|pbat|0"
+    assert not any(label.startswith("⚠️ 待处理异常") for label in labels)
+    assert "v3smp|inv_search" in callbacks
+    assert "v3smp|pbat|0" in callbacks
 
     first = controller._pending_batch_rows(0)
     second = controller._pending_batch_rows(1)
