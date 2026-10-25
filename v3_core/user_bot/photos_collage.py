@@ -4,7 +4,7 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageOps
 
 
 # Canvas roughly matching the mock aspect (wide listing card).
@@ -51,6 +51,18 @@ def _cover_fit(path: Path, width: int, height: int) -> Image.Image:
     left = max(0, (new_w - width) // 2)
     top = max(0, (new_h - height) // 2)
     return resized.crop((left, top, left + width, top + height))
+
+
+def _hero_fit(path: Path, width: int, height: int) -> Image.Image:
+    """Keep tall exterior buildings visible instead of cropping their roofs."""
+    with Image.open(path) as source:
+        image = ImageOps.exif_transpose(source).convert("RGB")
+    if image.height <= image.width:
+        return _cover_fit(path, width, height)
+    background = _cover_fit(path, width, height).filter(ImageFilter.GaussianBlur(26))
+    foreground = ImageOps.contain(image, (width, height), Image.Resampling.LANCZOS)
+    background.paste(foreground, ((width - foreground.width) // 2, (height - foreground.height) // 2))
+    return background
 
 
 def _rounded(img: Image.Image, radius: int) -> Image.Image:
@@ -107,7 +119,7 @@ def render_side_stack_collage(
                 str(public_listing_id or ""),
                 str(hero.resolve()),
                 *[str(p.resolve()) for p in thumbs],
-                f"{CANVAS_W}x{CANVAS_H}:bottom-row-v2",
+                f"{CANVAS_W}x{CANVAS_H}:bottom-row-v3:{len(thumbs)}",
             ]
         ).encode("utf-8")
     ).hexdigest()[:16]
@@ -134,7 +146,7 @@ def render_side_stack_collage(
     ty = grid_top + hero_h + GAP
     for index, path in enumerate(thumbs):
         tx = grid_left + index * (thumb_w + GAP)
-        this_w = thumb_w if index < 2 else grid_right - tx
+        this_w = thumb_w if index < len(thumbs) - 1 else grid_right - tx
         thumb = _rounded(_cover_fit(path, this_w, thumb_h), RADIUS)
         canvas.paste(thumb, (tx, ty))
 
