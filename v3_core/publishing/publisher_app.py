@@ -74,7 +74,7 @@ class V3PublisherApplication(PublisherAdminBot):
             await query.answer()
             try:
                 handled=await self.simple.handle_callback(update,context); parts=raw.split("|")
-                if handled and len(parts)==4 and parts[1]=="status":
+                if handled and len(parts)==4 and parts[1] in {"status", "status_apply"}:
                     status,listing_id=parts[2],parts[3]; result=await self.manual_status_sync.sync(context.bot,listing_id=listing_id,status=status)
                     if result.attempted and not result.synced: await query.message.reply_text("⚠️ 频道房态正在自动重试，无需重复操作。",reply_markup=InlineKeyboardMarkup([self._home_button()]))
                 if handled:

@@ -343,12 +343,12 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
             if quick_status:
                 buttons.extend([
                     [
-                        InlineKeyboardButton("🟢 可预约", callback_data=f"v3smp|status|active|{listing_id}"),
-                        InlineKeyboardButton("🟡 已预约", callback_data=f"v3smp|status|reserved|{listing_id}"),
+                        InlineKeyboardButton("🟢 可预约", callback_data=f"v3smp|status_review|active|{listing_id}"),
+                        InlineKeyboardButton("🟡 已预约", callback_data=f"v3smp|status_review|reserved|{listing_id}"),
                     ],
                     [
-                        InlineKeyboardButton("🔴 已租", callback_data=f"v3smp|status|rented|{listing_id}"),
-                        InlineKeyboardButton("⚫ 下架", callback_data=f"v3smp|status|offline|{listing_id}"),
+                        InlineKeyboardButton("🔴 已租", callback_data=f"v3smp|status_review|rented|{listing_id}"),
+                        InlineKeyboardButton("⚫ 下架", callback_data=f"v3smp|status_review|offline|{listing_id}"),
                     ],
                 ])
         buttons.append([InlineKeyboardButton("🔍 重新搜索", callback_data="v3smp|inv_search")])
@@ -415,12 +415,12 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
         ]
         rows: list[list[InlineKeyboardButton]] = [
             [
-                InlineKeyboardButton("🟢 可预约", callback_data=f"v3smp|status|active|{listing_id}"),
-                InlineKeyboardButton("🟡 已有预约", callback_data=f"v3smp|status|reserved|{listing_id}"),
+                InlineKeyboardButton("🟢 可预约", callback_data=f"v3smp|status_review|active|{listing_id}"),
+                InlineKeyboardButton("🟡 已有预约", callback_data=f"v3smp|status_review|reserved|{listing_id}"),
             ],
             [
-                InlineKeyboardButton("🔴 已租出", callback_data=f"v3smp|status|rented|{listing_id}"),
-                InlineKeyboardButton("⚫ 下架", callback_data=f"v3smp|status|offline|{listing_id}"),
+                InlineKeyboardButton("🔴 已租出", callback_data=f"v3smp|status_review|rented|{listing_id}"),
+                InlineKeyboardButton("⚫ 下架", callback_data=f"v3smp|status_review|offline|{listing_id}"),
             ],
         ]
         if public_id:
@@ -535,6 +535,38 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
         context.user_data.pop(INVENTORY_BATCH_STATE_KEY, None)
         return updated, skipped
 
+    def _search_inventory(self, text: str) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        for category in ("pending", "active", "reserved", "rented", "offline"):
+            rows.extend(self._inventory_rows(category, limit=200, query=text))
+        return list({str(row["listing_id"]): row for row in rows}.values())
+
+    async def _show_search_page(self, message: Any, rows: list[dict[str, Any]], text: str, page: int) -> None:
+        total = len(rows)
+        page = max(0, min(page, max(0, (total - 1) // 8)))
+        shown = rows[page * 8:(page + 1) * 8]
+        lines = [f"<b>🔍 {escape(text)} · 找到 {total} 套</b>", "点击一套房源查看资料、修改房态。", ""]
+        buttons = []
+        for index, row in enumerate(shown, start=page * 8 + 1):
+            status = {"active": "🟢", "reserved": "🟡", "rented": "🔴", "offline": "⚫", "inactive": "⚫", "pending": "🔵"}.get(str(row.get("inventory_status")), "🏠")
+            name = self._primary_name(row)
+            if name == "未命名房源":
+                name = str(row.get("public_location_display") or row.get("display_title") or "位置待确认")
+            label = f"{status} {row.get('public_listing_id') or ''}｜{name}｜{self._price(row)}"
+            buttons.append([InlineKeyboardButton(label[:58], callback_data=f"v3smp|listing|{row['listing_id']}")])
+        if not shown:
+            lines.append("没有找到相关房源，可更换楼盘名或编号搜索。")
+        nav = []
+        if page:
+            nav.append(InlineKeyboardButton("⬅️ 上一页", callback_data=f"v3smp|inv_page|{page-1}"))
+        if (page + 1) * 8 < total:
+            nav.append(InlineKeyboardButton("下一页 ➡️", callback_data=f"v3smp|inv_page|{page+1}"))
+        if nav:
+            buttons.append(nav)
+        buttons.append([InlineKeyboardButton("🔍 重新搜索", callback_data="v3smp|inv_search")])
+        buttons.append(self.home_row())
+        await message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(buttons))
+
     async def handle_text(self, update: Any, context: Any) -> bool:
         state = context.user_data.get(SIMPLE_EDIT_STATE_KEY)
         if isinstance(state, dict) and str(state.get("kind") or "") == "inventory_search":
@@ -544,18 +576,16 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
                 await update.effective_message.reply_text("请输入房源编号、楼盘名称或关键词。")
                 context.user_data[SIMPLE_EDIT_STATE_KEY] = {"kind": "inventory_search"}
                 return True
-            rows: list[dict[str, Any]] = []
-            for category in ("pending", "active", "reserved", "rented", "offline"):
-                rows.extend(self._inventory_rows(category, limit=30, query=text))
-            unique: dict[str, dict[str, Any]] = {str(row["listing_id"]): row for row in rows}
-            matches = list(unique.values())
+            if not text:
+                context.user_data[SIMPLE_EDIT_STATE_KEY] = {"kind": "inventory_search"}
+                await update.effective_message.reply_text("请输入房源编号、楼盘名称或关键词。")
+                return True
+            context.user_data["v3_inventory_search_query"] = text
+            matches = self._search_inventory(text)
             if len(matches) == 1:
                 await self.show_listing(update.effective_message, str(matches[0]["listing_id"]))
             else:
-                await self._render_inventory_rows(
-                    update.effective_message, matches[:8],
-                    title=f"🔍 搜索：{text}" + (f"（前8套 / 共{len(matches)}套）" if len(matches) > 8 else ""),
-                )
+                await self._show_search_page(update.effective_message, matches, text, 0)
             return True
         return await super().handle_text(update, context)
 
@@ -622,9 +652,16 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
             else:
                 await self.show_inventory_rows(query.message, parts[2])
             return True
+        if action == "inv_page" and len(parts) == 3:
+            text = str(context.user_data.get("v3_inventory_search_query") or "").strip()
+            if not text:
+                await query.message.reply_text("搜索已过期，请重新输入关键词。")
+                return True
+            await self._show_search_page(query.message, self._search_inventory(text), text, int(parts[2]))
+            return True
         if action == "inv_search":
             context.user_data[SIMPLE_EDIT_STATE_KEY] = {"kind": "inventory_search"}
-            await query.message.reply_text("发送项目名、QL编号、户型或关键词：")
+            await query.message.reply_text("发送房源编号、楼盘名、位置或户型关键词：")
             return True
         if action == "inv_batch":
             context.user_data.pop(INVENTORY_BATCH_STATE_KEY, None)

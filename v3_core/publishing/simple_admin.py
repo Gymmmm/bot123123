@@ -895,6 +895,31 @@ class SimplePublisherAdminController:
         elif action == "recheck" and len(parts) == 3:
             result = await self.autopilot.process_one(bot=context.bot, force_offer_id=parts[2])
             await self._reply_recheck_result(query.message, result)
+        elif action == "status_review" and len(parts) == 4:
+            status, listing_id = parts[2], parts[3]
+            if status not in {"active", "reserved", "rented", "offline"}:
+                await query.message.reply_text("不支持的房态。")
+                return True
+            row = self._listing_detail(listing_id)
+            labels = {"active": "🟢 可预约", "reserved": "🟡 已预约", "rented": "🔴 已租出", "offline": "⚫ 已下架"}
+            await query.message.reply_text(
+                f"确认修改房态？\n\n房源：{escape(str(row.get('public_listing_id') or listing_id))}\n"
+                f"楼盘：{escape(str(row.get('project_name') or row.get('display_title') or '未命名房源'))}\n"
+                f"当前：{escape(labels.get(str(row.get('inventory_status') or ''), '待确认'))}\n"
+                f"修改为：{labels[status]}\n\n确认后将同步频道原帖。",
+                parse_mode=ParseMode.HTML,
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("✅ 确认修改", callback_data=f"v3smp|status_apply|{status}|{listing_id}")],
+                    [InlineKeyboardButton("❌ 取消", callback_data=f"v3smp|listing|{listing_id}")],
+                ]),
+            )
+        elif action == "status_apply" and len(parts) == 4:
+            status, listing_id = parts[2], parts[3]
+            if status not in {"active", "reserved", "rented", "offline"}:
+                await query.message.reply_text("不支持的房态。")
+                return True
+            self.repository.set_listing_status(listing_id, status)
+            await self.show_listing(query.message, listing_id)
         elif action == "status" and len(parts) == 4:
             status, listing_id = parts[2], parts[3]
             self.repository.set_listing_status(listing_id, status)
