@@ -27,8 +27,8 @@ class PublisherInventoryDashboardController(PublisherInventoryAdminController):
         c = self._inventory_counts()
         await message.reply_text(
             "<b>🟢 房态更改</b>\n\n"
-            "选择房源状态，找到房源后修改。\n"
-            "也可以按编号搜索，或处理待确认房源。",
+            "最常用：按编号或楼盘名搜索，再选择新房态。\n"
+            "房态更新后会同步频道原帖。",
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("🔍 搜索房源", callback_data="v3smp|inv_search")],
