@@ -246,25 +246,31 @@ class OperatorPublisherAdminController(ProductionSimplePublisherAdminController)
         if not text and photo is None and video is None:
             return False
 
-        media_group_id = str(getattr(message, "media_group_id", None) or "")
-        if media_group_id:
+        # Keep accumulating all batches until the operator explicitly finishes.
+        if str(state.get("mode") or "") != "collecting":
+            state["mode"] = "collecting"
+            state.pop("package_id", None)
+        if str(getattr(message, "media_group_id", None) or ""):
+            # Telegram albums arrive as separate updates; delay only the prompt.
             previous = state.get("_album_task")
             if previous and not previous.done():
                 previous.cancel()
             state["_album_task"] = asyncio.create_task(
                 self._flush_album_after_delay(
-                    message=message,
-                    context=context,
+                    message=message, context=context,
                     user_id=int(update.effective_user.id),
                     session_id=str(state.get("session_id") or ""),
                 )
             )
             return True
-
         await message.reply_text(
-            f"已收到：图片 {len(state.get('images') or [])} 张 · 视频 {len(state.get('videos') or [])} 条。\n正在整理房源资料…"
+            f"已收到：图片 {len(state.get('images') or [])} 张 · 视频 {len(state.get('videos') or [])} 条。\n"
+            "可继续发送素材，全部发完后再点击「✅ 素材发完了」。",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("✅ 素材发完了", callback_data="v3smp|manual_finish")],
+                [InlineKeyboardButton("❌ 取消发布", callback_data="v3smp|manual_cancel")],
+            ]),
         )
-        await self._materialize_manual(message, context, user_id=int(update.effective_user.id))
         return True
 
     async def _flush_album_after_delay(self, *, message: Any, context: Any, user_id: int, session_id: str) -> None:
@@ -276,9 +282,13 @@ class OperatorPublisherAdminController(ProductionSimplePublisherAdminController)
         if not isinstance(state, dict) or str(state.get("session_id") or "") != session_id:
             return
         await message.reply_text(
-            f"相册已收齐：图片 {len(state.get('images') or [])} 张。\n正在整理房源资料…"
+            f"已收到相册：图片 {len(state.get('images') or [])} 张 · 视频 {len(state.get('videos') or [])} 条。\n"
+            "可继续发送素材，全部发完后再点击「✅ 素材发完了」。",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("✅ 素材发完了", callback_data="v3smp|manual_finish")],
+                [InlineKeyboardButton("❌ 取消发布", callback_data="v3smp|manual_cancel")],
+            ]),
         )
-        await self._materialize_manual(message, context, user_id=user_id)
 
     async def _materialize_manual(self, message: Any, context: Any, *, user_id: int) -> None:
         state = context.user_data.get(NEW_LISTING_STATE_KEY)
@@ -591,6 +601,24 @@ class OperatorPublisherAdminController(ProductionSimplePublisherAdminController)
             return False
         parts = raw.split("|")
         action = parts[1] if len(parts) > 1 else ""
+        if action == "manual_finish":
+            state = context.user_data.get(NEW_LISTING_STATE_KEY)
+            if not isinstance(state, dict):
+                await query.message.reply_text("当前没有待整理的房源素材。")
+                return True
+            if not (state.get("images") or state.get("videos") or str(state.get("text") or "").strip()):
+                await query.message.reply_text("请先发送房源素材和介绍文字。")
+                return True
+            if state.get("mode") == "processing":
+                await query.message.reply_text("素材正在整理，请勿重复提交。")
+                return True
+            pending = state.pop("_album_task", None)
+            if pending and not pending.done():
+                pending.cancel()
+            state["mode"] = "processing"
+            await query.message.reply_text("正在统一整理已收到的素材…")
+            await self._materialize_manual(query.message, context, user_id=int(update.effective_user.id))
+            return True
         if action == "manual_supplement":
             await self.show_supplement(query.message, context)
             return True
