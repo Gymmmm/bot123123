@@ -243,19 +243,19 @@ def _single_detail_keyboard(
         photo_row = []
         if index > 0:
             photo_row.append(InlineKeyboardButton(
-                "⬅️ 上一组", callback_data=f"v3u:detailphoto:{public_id}:{index - 1}"
+                "⬅️ 上组", callback_data=f"v3u:detailphoto:{public_id}:{index - 1}"
             ))
         photo_row.append(InlineKeyboardButton(
             f"{index + 1}/{pages}", callback_data=f"v3u:detailphoto:{public_id}:{index}"
         ))
         if index + 1 < pages:
             photo_row.append(InlineKeyboardButton(
-                "下一组 ➡️", callback_data=f"v3u:detailphoto:{public_id}:{index + 1}"
+                "下组 ➡️", callback_data=f"v3u:detailphoto:{public_id}:{index + 1}"
             ))
         rows.append(photo_row)
     if total > 1:
         rows.append([InlineKeyboardButton(
-            "🔎 查看高清原图", callback_data=f"v3u:listing:photos:{public_id}:pg:{index}"
+            "🔍 高清原图", callback_data=f"v3u:listing:photos:{public_id}:pg:{index}"
         )])
     for row in (getattr(markup, "inline_keyboard", None) or ()):
         clean = [
@@ -283,36 +283,22 @@ def _detail_grid(paths: tuple[str, ...], page: int) -> bytes:
         hero_ratio = first.width / max(first.height, 1)
     horizontal_hero = hero_ratio >= 1.30
     count = len(selected)
+    # Balanced mobile preview: four frames have equal visual weight,
+    # and a partial final page retains the same two-column rhythm.
     if count == 1:
-        layout = [(0, 0, 1200, 800 if horizontal_hero else 1350)]
-        height = layout[0][3]
+        layout = [(0, 0, 1200, 1100)]
+        height = 1100
     elif count == 2:
-        if horizontal_hero:
-            layout = [(0, 0, 1200, 680), (0, 686, 1200, 540)]
-            height = 1226
-        else:
-            layout = [(0, 0, 760, 1050), (766, 0, 434, 1050)]
-            height = 1050
-    elif horizontal_hero:
-        hero_height, row_height = 680, 360
-        n = count - 1
-        unit = (width - gutter * (n - 1)) // n
-        layout = [(0, 0, width, hero_height)]
-        for i in range(n):
-            x = i * (unit + gutter)
-            w = width - x if i == n - 1 else unit
-            layout.append((x, hero_height + gutter, w, row_height))
-        height = hero_height + gutter + row_height
+        layout = [(0, 0, 597, 1100), (603, 0, 597, 1100)]
+        height = 1100
+    elif count == 3:
+        layout = [(0, 0, 597, 1100), (603, 0, 597, 547),
+                  (603, 553, 597, 547)]
+        height = 1100
     else:
-        height, hero_width = 1050, 760
-        secondary_width = width - hero_width - gutter
-        n = count - 1
-        unit = (height - gutter * (n - 1)) // n
-        layout = [(0, 0, hero_width, height)]
-        for i in range(n):
-            y = i * (unit + gutter)
-            h = height - y if i == n - 1 else unit
-            layout.append((hero_width + gutter, y, secondary_width, h))
+        layout = [(0, 0, 597, 547), (603, 0, 597, 547),
+                  (0, 553, 597, 547), (603, 553, 597, 547)]
+        height = 1100
 
     canvas = Image.new("RGB", (width, height), "white")
     for source, (x, y, w, h) in zip(selected, layout):
