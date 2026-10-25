@@ -590,3 +590,22 @@ async def test_first_photos_entry_without_pg_suffix_is_remembered_for_next_page(
         if call[0] == "delete_message"
     ]
     assert deleted == prior_ids
+
+
+@pytest.mark.parametrize("count", [3, 4])
+def test_mobile_detail_grid_emphasizes_hero_and_preserves_portrait(tmp_path, count):
+    from io import BytesIO
+    from PIL import Image
+    from v3_core.user_bot.telegram_callback_handler import _detail_grid
+
+    paths = []
+    for index in range(count):
+        path = tmp_path / f"photo-{index}.jpg"
+        size = (720, 1280) if index == 0 else (1100, 750)
+        Image.new("RGB", size, (220, 20, 20) if index == 0 else (20, 200, 20)).save(path)
+        paths.append(str(path))
+    payload = _detail_grid(tuple(paths), 0)
+    with Image.open(BytesIO(payload)) as preview:
+        assert preview.size == (1080, 1350)
+        assert preview.getpixel((540, 300))[0] > 140
+        assert preview.getpixel((160, 1150))[1] > 140
