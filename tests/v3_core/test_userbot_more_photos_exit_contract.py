@@ -630,7 +630,7 @@ async def test_exit_change_search_keeps_action_bar_clears_state(tmp_path):
 
 @pytest.mark.asyncio
 async def test_paging_still_deletes_full_5_and_sends_new_5(tmp_path):
-    """翻页: 先删旧 5 条, 再发新 5 条。"""
+    """翻页先发送新相册，成功后再清理旧消息，避免闪屏。"""
     ctx, prior_ids = await _enter_paged_album_page0(tmp_path)
 
     # Move to page 1.
@@ -646,6 +646,9 @@ async def test_paging_still_deletes_full_5_and_sends_new_5(tmp_path):
     # All 5 prior ids deleted.
     deleted = [c[1]["message_id"] for c in ctx.bot.calls if c[0] == "delete_message"]
     assert deleted == prior_ids, deleted
+    operations = [name for name, _ in ctx.bot.calls]
+    first_delete = operations.index("delete_message")
+    assert any(name.startswith("send_") for name in operations[:first_delete])
 
     # 4 new photos + 1 new action bar sent.
     new_ids = list(ctx.bot.returned_ids)

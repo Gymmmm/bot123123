@@ -185,9 +185,10 @@ async def _render_photos(
         if int(page) == last_page and _album_message_ids(state):
             # Idempotent: same page, album already up-to-date.
             return
-        await _delete_album_photos(
-            bot, chat_id_value, state, keep_action_bar=False
-        )
+        # Keep the existing page visible until the replacement has actually
+        # been sent. Deleting it first makes Telegram jump to an empty screen,
+        # and a transient send failure otherwise leaves the customer stranded.
+        stale_ids = _album_message_ids(state)
 
     sent_ids = await send_listing_photos_album(
         bot,
@@ -202,7 +203,16 @@ async def _render_photos(
 
     if public_listing_id and bot is not None:
         state = _album_state(update, context, public_listing_id)
+        if not sent_ids:
+            return
         _remember_album_sent(state, message_ids=[int(s) for s in sent_ids], page=int(page))
+        for old_id in stale_ids:
+            if str(old_id) in {str(new_id) for new_id in sent_ids}:
+                continue
+            try:
+                await bot.delete_message(chat_id=chat_id_value, message_id=int(old_id))
+            except Exception:
+                continue
 
 
 async def send_listing_details(
