@@ -181,3 +181,11 @@ def test_listing_detail_has_direct_reserved_transition():
     assert "v3smp|status|rented|l_1" in callbacks
     assert "v3smp|status|offline|l_1" in callbacks
     assert "v3smp|recheck|OFF_1" in callbacks
+
+
+def test_production_publisher_does_not_run_hardcoded_cover_acceptance():
+    from pathlib import Path
+    source = (Path(__file__).resolve().parents[2] / "v3_core/publishing/publisher_app.py").read_text()
+    assert "pillow_cover_acceptance_once" not in source
+    assert "production_acceptance" not in source
+    assert "force_offer_id" not in source
