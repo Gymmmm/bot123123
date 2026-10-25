@@ -3,13 +3,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from pathlib import Path
+from html import escape as html_escape, unescape as html_unescape
+import re
 from typing import Any
 
-from telegram import InputMediaPhoto
+from telegram import InputMediaPhoto, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 
 from .callback_router import CallbackRouter
 from .callbacks import PREFIX, encode_card_callback
+from v3_core.publishing.public_ids import normalize_public_id
 from .telegram_callback_response import TelegramCallbackResponse, adapt_callback_response
 from .telegram_navigation import polish_listing_keyboard
 from .telegram_transition_ui import build_transition_keyboard
@@ -215,6 +218,46 @@ async def _render_photos(
                 continue
 
 
+def _single_detail_caption(text: str, index: int, total: int) -> str:
+    """Keep the complete useful detail in the same Telegram photo message."""
+    heading = f"📷 原始实拍 {index + 1}/{total}\n\n"
+    content = str(text or "").strip()
+    if len(heading + content) <= 1024:
+        return heading + content
+    # No truncated HTML entities/tags: Telegram rejects malformed HTML.
+    plain = html_unescape(re.sub(r"<[^>]*>", "", content))
+    return heading + html_escape(plain[: 970 - len(heading)])
+
+
+def _single_detail_keyboard(
+    markup: Any, public_id: str, index: int, total: int,
+) -> InlineKeyboardMarkup:
+    """Photo controls and listing actions live on one persistent message."""
+    rows: list[list[InlineKeyboardButton]] = []
+    if total > 1:
+        photo_row = []
+        if index > 0:
+            photo_row.append(InlineKeyboardButton(
+                "⬅️ 上一张", callback_data=f"v3u:detailphoto:{public_id}:{index - 1}"
+            ))
+        photo_row.append(InlineKeyboardButton(
+            f"{index + 1}/{total}", callback_data=f"v3u:detailphoto:{public_id}:{index}"
+        ))
+        if index + 1 < total:
+            photo_row.append(InlineKeyboardButton(
+                "下一张 ➡️", callback_data=f"v3u:detailphoto:{public_id}:{index + 1}"
+            ))
+        rows.append(photo_row)
+    for row in (getattr(markup, "inline_keyboard", None) or ()):
+        clean = [
+            button for button in row
+            if str(getattr(button, "text", "") or "") != "📸 下一组实拍"
+        ]
+        if clean:
+            rows.append(clean)
+    return InlineKeyboardMarkup(rows)
+
+
 async def send_listing_details(
     update: Any,
     context: Any,
@@ -224,24 +267,16 @@ async def send_listing_details(
     media_caption: str,
     text: str,
     reply_markup: Any,
+    photo_paths: tuple[str, ...] = (),
     replace_message: Any = None,
     force: bool = False,
 ) -> bool:
-    """V4.1 detail surface: 3–4 real photos (short caption) + detail text with buttons.
+    """One editable Telegram photo+caption+keyboard; never a second detail bubble.
 
-    Telegram media groups cannot carry inline buttons, so the structured detail
-    text and its keyboard go in the message sent right after the album. The
-    sent ids are recorded under the album state (``page=DETAILS_ALBUM_PAGE``):
-    re-opening the same detail is a no-op, and any previous album/detail
-    messages for this listing (plus ``replace_message``, e.g. the search card
-    or the album action bar the user clicked) are removed after the new
-    detail is in place, so repeated clicks never stack duplicates.
-    Returns ``False`` when nothing was sent (detail already on screen).
-    ``force=True`` (a fresh /start deep link) always re-sends and removes the
-    previous copy, because the user's new /start message pushed it up.
+    A channel deep link sends one message. Callbacks from an existing photo card
+    edit that same message whenever Telegram permits. Photo navigation then only
+    edits that message's media, keeping its ID and scroll position stable.
     """
-    from .telegram_photos_render import send_listing_photos_album
-
     bot = getattr(context, "bot", None)
     if bot is None:
         raise ValueError("telegram_bot_missing_for_listing_details")
@@ -250,32 +285,140 @@ async def send_listing_details(
     state = _album_state(update, context, public_id) if public_id else {}
     previous = _album_message_ids(state)
     replace_id = str(getattr(replace_message, "message_id", "") or "").strip()
-    if (
-        not force
-        and previous
-        and state.get("page") == DETAILS_ALBUM_PAGE
-        and (not replace_id or replace_id in previous)
-    ):
+    if (replace_id and replace_id in previous
+            and state.get("page") == DETAILS_ALBUM_PAGE
+            and state.get("detail_index") == 0 and not force):
         return False
-    sent_ids = await send_listing_photos_album(
-        bot,
-        chat_id=chat_id_value,
-        media_groups=media_groups,
-        media_caption=media_caption,
-        text=text,
-        reply_markup=reply_markup,
-        separate_details=True,
+    candidates = photo_paths or tuple(
+        path for group in media_groups or () for path in group
     )
+    paths = tuple(dict.fromkeys(
+        str(path) for path in candidates if Path(str(path)).is_file()
+    ))
+    ids: list[str] = []
+    if paths:
+        caption = _single_detail_caption(text, 0, len(paths))
+        keyboard = _single_detail_keyboard(reply_markup, public_id, 0, len(paths))
+        media = InputMediaPhoto(
+            media=Path(paths[0]).read_bytes(),
+            caption=caption,
+            parse_mode=ParseMode.HTML,
+        )
+        if replace_id and bool(getattr(replace_message, "photo", None)):
+            edit = getattr(bot, "edit_message_media", None)
+            if callable(edit):
+                try:
+                    await edit(
+                        chat_id=chat_id_value,
+                        message_id=int(replace_id),
+                        media=media,
+                        reply_markup=keyboard,
+                    )
+                    ids = [replace_id]
+                except Exception:
+                    # An album member cannot always become a standalone photo.
+                    # In that case send one new message and retire the old.
+                    pass
+        if not ids:
+            with Path(paths[0]).open("rb") as handle:
+                sent = await bot.send_photo(
+                    chat_id=chat_id_value,
+                    photo=handle,
+                    caption=caption,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=keyboard,
+                )
+            ids = [str(getattr(sent, "message_id"))]
+    else:
+        if replace_id and not getattr(replace_message, "photo", None):
+            try:
+                await bot.edit_message_text(
+                    chat_id=chat_id_value,
+                    message_id=int(replace_id),
+                    text=text,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=reply_markup,
+                )
+                ids = [replace_id]
+            except Exception:
+                pass
+        if not ids:
+            sent = await bot.send_message(
+                chat_id=chat_id_value, text=text, parse_mode=ParseMode.HTML,
+                reply_markup=reply_markup,
+            )
+            ids = [str(getattr(sent, "message_id"))]
+
     stale = list(previous)
     if replace_id and replace_id not in stale:
         stale.append(replace_id)
-    for raw in stale:
+    for old_id in stale:
+        if old_id in ids:
+            continue
         try:
-            await bot.delete_message(chat_id=chat_id_value, message_id=int(raw))
+            await bot.delete_message(chat_id=chat_id_value, message_id=int(old_id))
         except Exception:
             continue
     if public_id:
-        _remember_album_sent(state, message_ids=[str(i) for i in sent_ids], page=DETAILS_ALBUM_PAGE)
+        _remember_album_sent(state, message_ids=ids, page=DETAILS_ALBUM_PAGE)
+        state["detail_index"] = 0
+    return True
+
+
+async def _handle_detail_photo(
+    update: Any, context: Any, router: CallbackRouter, raw: str,
+    *, advisor_url: str = "", channel_url: str = "",
+) -> bool:
+    matched = re.fullmatch(r"v3u:detailphoto:(QL-[A-Z0-9-]+):(\d+)", raw)
+    if matched is None:
+        return False
+    query = update.callback_query
+    public_id = normalize_public_id(matched.group(1))
+    if public_id is None:
+        await query.answer("房源入口无效", show_alert=True)
+        return True
+    # Re-resolve the published listing, so status/booking rules stay current.
+    listings = getattr(router, "listings", None)
+    result = listings.resolve_action(public_id, "details") if listings else None
+    details = getattr(result, "details", None) if getattr(result, "ok", False) else None
+    if details is None:
+        await query.answer("房源已更新，请重新进入", show_alert=True)
+        return True
+    paths = tuple(path for path in details.photo_paths if Path(path).is_file())
+    index = int(matched.group(2))
+    if not paths or index >= len(paths):
+        await query.answer("这张实拍暂时无法打开", show_alert=True)
+        return True
+    state = _album_state(update, context, public_id)
+    current_id = str(getattr(getattr(query, "message", None), "message_id", "") or "")
+    if not current_id or not getattr(query.message, "photo", None):
+        await query.answer("请重新进入房源详情", show_alert=True)
+        return True
+    # No dependency on in-memory album state: older live buttons still work
+    # after a Bot restart, because the listing is re-resolved from storage.
+    if (current_id in _album_message_ids(state)
+            and int(state.get("detail_index", -1)) == index):
+        await query.answer()
+        return True
+    from .telegram_ui import build_action_keyboard
+    base = polish_listing_keyboard(
+        build_action_keyboard(details.action_rows),
+        advisor_url=advisor_url, channel_url=channel_url, add_home=True,
+        listing_summary=details.listing_summary,
+    )
+    keyboard = _single_detail_keyboard(base, public_id, index, len(paths))
+    caption = _single_detail_caption(details.text, index, len(paths))
+    await query.answer()
+    await query.edit_message_media(
+        media=InputMediaPhoto(
+            media=Path(paths[index]).read_bytes(),
+            caption=caption,
+            parse_mode=ParseMode.HTML,
+        ),
+        reply_markup=keyboard,
+    )
+    _remember_album_sent(state, message_ids=[current_id], page=DETAILS_ALBUM_PAGE)
+    state["detail_index"] = index
     return True
 
 
@@ -522,6 +665,13 @@ async def handle_v3_callback(
         return TelegramCallbackHandlerOutcome(handled=False)
     if parse_transition_callback(raw) is not None:
         return TelegramCallbackHandlerOutcome(handled=False)
+    if raw.startswith("v3u:detailphoto:"):
+        handled = await _handle_detail_photo(
+            update, context, router, raw,
+            advisor_url=advisor_url, channel_url=channel_url,
+        )
+        if handled:
+            return TelegramCallbackHandlerOutcome(handled=True)
 
     session_ids = _session_ids(context)
     dispatched = _dispatch(router, raw, context)
@@ -569,6 +719,7 @@ async def handle_v3_callback(
                 context,
                 public_listing_id=public_id_for_exit,
                 media_groups=response.media_groups,
+                photo_paths=response.photo_paths,
                 media_caption=response.media_caption,
                 text=response.text,
                 reply_markup=response.keyboard,
@@ -637,7 +788,7 @@ async def handle_v3_callback(
             update,
             context,
             public_id_for_exit,
-            keep_action_bar=False,
+            keep_action_bar=True,
         )
     elif response.kind == "transition" and response.transition in {"book", "similar", "change_search"} and transition_views is not None:
         # Book / similar / change_search from the paged album: drop only the

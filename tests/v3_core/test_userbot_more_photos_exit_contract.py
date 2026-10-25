@@ -512,9 +512,8 @@ async def test_exit_book_keeps_action_bar_so_edit_message_does_not_target_delete
 
 
 @pytest.mark.asyncio
-async def test_exit_consult_drops_full_5_message_group_without_rendering_transition_view(tmp_path):
-    """💬 咨询这套 from the paged album: drop ALL 5 messages (no in-place
-    edit, no transition view) AND clear the album state."""
+async def test_exit_consult_keeps_action_message_for_inplace_handoff(tmp_path):
+    """Consult removes photo frames but preserves the message the handoff edits."""
     ctx, prior_ids = await _enter_paged_album_page0(tmp_path)
     # Snapshot calls so we can inspect only what happens after the consult click.
     ctx.bot.calls.clear()
@@ -525,11 +524,11 @@ async def test_exit_consult_drops_full_5_message_group_without_rendering_transit
         router=RouterStub(_consult_dispatch()),
     )
 
-    # 1) All 5 messages deleted.
+    # 1) The action message remains editable; only album frames are deleted.
     deleted = [c[1]["message_id"] for c in ctx.bot.calls if c[0] == "delete_message"]
-    assert deleted == prior_ids, deleted
+    assert deleted == prior_ids[:-1], deleted
 
-    # 2) NO in-place edit (consult is a pure intent).
+    # 2) NO in-place edit at this layer (consult is an intent).
     edit_calls = [c for c in ctx.bot.calls if c[0] in {"edit_text", "edit_caption"}]
     assert not edit_calls, edit_calls
 

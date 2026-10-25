@@ -160,17 +160,13 @@ async def test_channel_deeplink_start_handler_keeps_listing_context(tmp_path, pa
 
     # Verify deep link behavior per action type
     if expected_kind == "details":
-        # V4.1: channel details deep link opens the detail directly (no home):
-        # the listing's real photo(s) first, then detail text + buttons.
+        # Single persistent detail message: original photo, facts, and actions.
         assert message.calls == []
-        assert [call[0] for call in bot.calls] == ["send_photo", "send_message"]
+        assert [call[0] for call in bot.calls] == ["send_photo"]
         caption = bot.calls[0][2].get("caption") or ""
         assert len(caption) <= 1024 and PUBLIC_ID not in caption
-        rendered = bot.calls[1][2]["text"]
-        assert "富力城" in rendered
-        assert PUBLIC_ID not in rendered
-        keyboard_data = repr(bot.calls[1][2]["reply_markup"])
-        # One photo is already shown above the detail: no 「下一组实拍」.
+        assert "富力城" in caption
+        keyboard_data = repr(bot.calls[0][2]["reply_markup"])
         assert "下一组实拍" not in keyboard_data
         assert "book" in keyboard_data or "consult" in keyboard_data
     elif expected_kind == "photos":

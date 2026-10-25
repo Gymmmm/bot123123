@@ -38,6 +38,7 @@ class TelegramCallbackResponse:
     text: str = ""
     photo_path: str = ""
     media_groups: tuple[tuple[str, ...], ...] = ()
+    photo_paths: tuple[str, ...] = ()
     media_caption: str = ""
     detail_text: str = ""
     expand_only: bool = False
@@ -123,6 +124,7 @@ def adapt_callback_response(
                 status="ok",
                 text=listing.details.text,
                 media_groups=tuple(getattr(listing.details, "media_groups", ()) or ()),
+                photo_paths=tuple(getattr(listing.details, "photo_paths", ()) or ()),
                 media_caption=str(getattr(listing.details, "media_caption", "") or ""),
                 keyboard=build_action_keyboard(listing.details.action_rows),
                 listing_summary=str(getattr(listing.details, "listing_summary", "") or ""),

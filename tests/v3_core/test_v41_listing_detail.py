@@ -95,6 +95,10 @@ class FakeBot:
         self.calls.append(("send_message", kw, [msg.message_id]))
         return msg
 
+    async def edit_message_media(self, **kw):
+        self.calls.append(("edit_message_media", kw, [kw["message_id"]]))
+        return SimpleNamespace(message_id=kw["message_id"], chat_id=kw["chat_id"])
+
     async def delete_message(self, **kw):
         self.calls.append(("delete_message", kw, [kw["message_id"]]))
 
@@ -124,6 +128,9 @@ class FakeQuery:
 
     async def edit_message_caption(self, *a, **k):
         self.calls.append(("edit_caption", a, k))
+
+    async def edit_message_media(self, *a, **k):
+        self.calls.append(("edit_media", a, k))
 
 
 def _start_update(message):
@@ -184,23 +191,17 @@ async def test_channel_details_deeplink_end_to_end_opens_detail_with_photos(tmp_
     assert outcome.kind == "details"
     assert message.calls == []  # never the home screen
     bot = context.bot
-    assert _kinds(bot) == ["send_media_group", "send_message"]
-    media = bot.calls[0][1]["media"]
-    assert len(media) == 4
-    caption = media[0].caption
-    assert caption and len(caption) <= 1024 and "\n" in caption and caption.count("\n") <= 2
-    assert all(not getattr(m, "caption", None) for m in media[1:])
-
-    detail = bot.calls[1][1]
-    assert detail["text"].startswith(
-        "🏠 <b>富力城｜2房1厅</b>\n<b>$800</b> /月\n📍 钻石岛 · 公寓 · 18楼\n🟢 当前可预约"
-    )
+    assert _kinds(bot) == ["send_photo"]
+    detail = bot.calls[0][1]
+    assert detail["caption"].startswith("📷 原始实拍 1/6")
+    assert "富力城" in detail["caption"]
+    assert len(detail["caption"]) <= 1024
     labels = _buttons(detail["reply_markup"])
-    assert labels[0] == ["📸 下一组实拍"]  # first 4 shown above; continues at photo 5
+    assert labels[0] == ["1/6", "下一张 ➡️"]
     assert ["📅 在线预约", "💬 咨询这套"] in labels
     assert PUBLIC_ID not in _all_text(bot)
     state = context.user_data[PHOTOS_ALBUM_KEY][f"1001::{PUBLIC_ID}"]
-    assert state["page"] == DETAILS_ALBUM_PAGE and len(state["message_ids"]) == 5
+    assert state["page"] == DETAILS_ALBUM_PAGE and len(state["message_ids"]) == 1
 
 
 @pytest.mark.asyncio
@@ -213,7 +214,7 @@ async def test_retapping_channel_button_replaces_previous_detail(tmp_path):
 
     await _start(payload, view, context=context)
     kinds = _kinds(context.bot)
-    assert kinds.count("send_media_group") == 1 and kinds.count("send_message") == 1
+    assert kinds.count("send_photo") == 1
     deleted = [str(c[1]["message_id"]) for c in context.bot.calls if c[0] == "delete_message"]
     assert deleted == first_ids
 
@@ -262,16 +263,43 @@ async def test_details_callback_sends_photos_once_and_replaces_search_card(tmp_p
     await handle_v3_callback(_cb_update(query), context, router=router, transition_views=views)
 
     kinds = _kinds(context.bot)
-    assert kinds == ["send_media_group", "send_message", "delete_message"]
-    assert context.bot.calls[-1][1]["message_id"] == 42  # the search card it replaced
+    assert kinds == ["edit_message_media"]
+    assert context.bot.calls[0][1]["message_id"] == 42
     assert not [c for c in query.calls if c[0] in {"edit_text", "edit_caption"}]
 
-    # A stale 「房源详情」tap while the same detail is on screen does not resend.
+    # Re-entering the same detail does not re-send or edit an unchanged photo.
     context.bot.calls.clear()
-    detail_text_id = context.user_data[PHOTOS_ALBUM_KEY][f"1001::{PUBLIC_ID}"]["message_ids"][-1]
-    again = FakeQuery(f"v3u:listing:details:{PUBLIC_ID}", FakeMessage(message_id=int(detail_text_id)))
+    detail_id = context.user_data[PHOTOS_ALBUM_KEY][f"1001::{PUBLIC_ID}"]["message_ids"][-1]
+    again = FakeQuery(
+        f"v3u:listing:details:{PUBLIC_ID}",
+        FakeMessage(message_id=int(detail_id), photo=[object()]),
+    )
     await handle_v3_callback(_cb_update(again), context, router=router, transition_views=views)
     assert context.bot.calls == []
+
+    # Actual next-photo control edits the same message in place.
+    next_query = FakeQuery(
+        f"v3u:detailphoto:{PUBLIC_ID}:1",
+        FakeMessage(message_id=int(detail_id), photo=[object()]),
+    )
+    await handle_v3_callback(_cb_update(next_query), context, router=router, transition_views=views)
+    assert [call[0] for call in next_query.calls] == ["answer", "edit_media"]
+    media = next_query.calls[-1][2]["media"]
+    assert "原始实拍 2/4" in media.caption
+    assert "富力城" in media.caption
+    assert context.bot.calls == []  # no send, delete, or extra message
+    state = context.user_data[PHOTOS_ALBUM_KEY][f"1001::{PUBLIC_ID}"]
+    assert state["message_ids"] == [str(detail_id)] and state["detail_index"] == 1
+
+    # After an app restart, button callbacks still resolve from the database.
+    restarted = SimpleNamespace(user_data={}, bot=context.bot)
+    later = FakeQuery(
+        f"v3u:detailphoto:{PUBLIC_ID}:2",
+        FakeMessage(message_id=int(detail_id), photo=[object()]),
+    )
+    await handle_v3_callback(_cb_update(later), restarted, router=router, transition_views=views)
+    assert [call[0] for call in later.calls] == ["answer", "edit_media"]
+    assert "原始实拍 3/4" in later.calls[-1][2]["media"].caption
 
 
 # ---- Fix 3: internal listing IDs never reach user-visible text ----

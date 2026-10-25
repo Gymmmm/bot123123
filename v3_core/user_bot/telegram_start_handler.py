@@ -251,6 +251,7 @@ async def _render_details(
             context,
             public_listing_id=str(getattr(result, "public_listing_id", "") or ""),
             media_groups=media_groups,
+            photo_paths=tuple(getattr(result.details, "photo_paths", ()) or ()),
             media_caption=str(getattr(result.details, "media_caption", "") or ""),
             text=result.details.text,
             reply_markup=keyboard,

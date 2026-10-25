@@ -55,6 +55,7 @@ class PublicDetailsResponse:
     media_groups: tuple[tuple[str, ...], ...] = ()
     media_caption: str = ""
     photo_total: int = 0
+    photo_paths: tuple[str, ...] = ()
 
     @property
     def has_media(self) -> bool:
@@ -392,6 +393,7 @@ def build_details_response(view: PublishedListingView) -> PublicDetailsResponse:
         media_groups=(tuple(photos),) if photos else (),
         media_caption=_detail_media_caption(details, shown=len(photos), total=photo_total) if photos else "",
         photo_total=photo_total,
+        photo_paths=_album_photo_paths(view),
         listing_summary=listing_summary_bits(
             project_name=details.project_name,
             layout=details.layout,
