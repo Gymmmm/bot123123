@@ -6,7 +6,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
-W, H, GAP, FOOTER = 1200, 850, 7, 106
+W, H, GAP, FOOTER = 1080, 1350, 9, 176
 GOLD = (231, 190, 116)
 BLACK = (20, 23, 25)
 CREAM = (244, 239, 229)
@@ -93,28 +93,18 @@ def render_editorial_cover(*, images: list[Image.Image], data, output_path: str,
 
     photo_bottom = H - FOOTER
     count = len(images)
-    if layout == "ql_editorial_side":
-        hero_width = 752
-        rectangles = [(0, 0, hero_width, photo_bottom)]
-        x = hero_width + GAP
-        available_height = photo_bottom - GAP * (count - 2)
-        heights = [available_height // (count - 1)] * (count - 1)
-        heights[-1] += available_height - sum(heights)
-        y = 0
-        for height in heights:
-            rectangles.append((x, y, W - x, height))
-            y += height + GAP
-    else:
-        hero_height = round(photo_bottom * 0.665)
-        rectangles = [(0, 0, W, hero_height)]
-        y = hero_height + GAP
-        available_width = W - GAP * (count - 2)
-        widths = [available_width // (count - 1)] * (count - 1)
-        widths[-1] += available_width - sum(widths)
-        x = 0
-        for width in widths:
-            rectangles.append((x, y, width, photo_bottom - y))
-            x += width + GAP
+    # One mobile-first composition for both villa and apartment covers:
+    # a substantial hero with two or three legible supporting rooms.
+    hero_height = 826
+    rectangles = [(0, 0, W, hero_height)]
+    y = hero_height + GAP
+    available_width = W - GAP * (count - 2)
+    widths = [available_width // (count - 1)] * (count - 1)
+    widths[-1] += available_width - sum(widths)
+    x = 0
+    for width in widths:
+        rectangles.append((x, y, width, photo_bottom - y))
+        x += width + GAP
 
     canvas = Image.new("RGB", (W, H), CREAM)
     for index, (image, (x, y, width, height)) in enumerate(zip(images, rectangles)):
@@ -142,23 +132,23 @@ def render_editorial_cover(*, images: list[Image.Image], data, output_path: str,
             str(data.layout or "").strip(),
         ) if value
     )
-    title_font = _font(36, True)
-    subtitle_font = _font(22)
-    price_label_font = _font(16)
-    price_font = _font(45, True)
+    title_font = _font(38, True)
+    subtitle_font = _font(25)
+    price_label_font = _font(22)
+    price_font = _font(50, True)
     pin = _pin(31)
-    canvas.paste(pin, (29, photo_bottom + 22), pin)
-    draw.text((70, photo_bottom + 15), _clip(draw, title, title_font, 350), font=title_font, fill="white")
-    draw.text((70, photo_bottom + 62), _clip(draw, subtitle.replace(" · ", "  |  "), subtitle_font, 350),
+    canvas.paste(pin, (28, photo_bottom + 38), pin)
+    draw.text((70, photo_bottom + 28), _clip(draw, title, title_font, 348), font=title_font, fill="white")
+    draw.text((70, photo_bottom + 97), _clip(draw, subtitle.replace(" · ", "  |  "), subtitle_font, 350),
               font=subtitle_font, fill=(225, 225, 225))
-    draw.line((452, photo_bottom + 18, 452, H - 18), fill=(166, 143, 102), width=2)
-    price = _clip(draw, data.price_line(), price_font, 395)
-    draw.text((493, photo_bottom + 14), "月租金" if price.endswith("/月") else "售价", font=price_label_font,
+    draw.line((445, photo_bottom + 32, 445, H - 32), fill=(166, 143, 102), width=2)
+    price = _clip(draw, data.price_line(), price_font, 330)
+    draw.text((477, photo_bottom + 38), "月租金" if price.endswith("/月") else "售价", font=price_label_font,
               fill=(226, 217, 200))
-    draw.text((493, photo_bottom + 36), price, font=price_font, fill=GOLD)
+    draw.text((477, photo_bottom + 76), price, font=price_font, fill=GOLD)
 
     if logo is not None:
-        mark = _scaled_logo(logo, max_width=270, max_height=72)
+        mark = _scaled_logo(logo, max_width=205, max_height=90)
         canvas.paste(mark, (W - mark.width - 28, photo_bottom + (FOOTER - mark.height) // 2), mark)
 
     rounded = Image.new("RGB", (W, H), CREAM)
