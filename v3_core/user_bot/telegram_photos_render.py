@@ -33,6 +33,7 @@ async def send_listing_photos_album(
     text: str = "",
     reply_markup: Any = None,
     expand_only: bool = False,
+    separate_details: bool = False,
 ) -> list[int]:
     """Send album frames, then optional action message.
 
@@ -59,7 +60,7 @@ async def send_listing_photos_album(
         # One collage/photo is one Telegram message with details and controls.
         body = str(text or "").strip()
         combined = body or caption
-        inline = not expand_only and len(combined) <= 1024
+        inline = not expand_only and not separate_details and len(combined) <= 1024
         with Path(paths[0]).open("rb") as handle:
             sent = await bot.send_photo(
                 chat_id=chat_id,

@@ -125,8 +125,8 @@ def _details_actions(
 ) -> tuple[tuple[SemanticAction, ...], ...]:
     """Details page actions (Gym spec 2026-10-11 §八).
 
-    The detail opens with the same 4 photos as the channel cover (hero, thumb
-    1–3) followed by the full listing text. Below: 「📸 下一组实拍」(only when
+    The detail opens with up to four original photos, not the branded
+    channel collage, followed by the full listing text. Below: 「📸 下一组实拍」(only when
     more than the first 4 exist; continues from photo 5), 「📅 在线预约」 when
     bookable, and 「💬 中文顾问」. Not bookable → 中文顾问 + 找相似.
     """
@@ -135,7 +135,7 @@ def _details_actions(
     total = max(0, int(photo_total or 0))
     if total > DETAIL_PHOTO_COUNT:
         rows.append((SemanticAction(
-            "📸 下一组实拍", "photos", target, target_index=DETAIL_CONTINUE_OFFSET_BASE + DETAIL_PHOTO_COUNT,
+             "📸 下一组实拍", "photos", target, target_index=1,
         ),))
     if bookable:
         rows.append((

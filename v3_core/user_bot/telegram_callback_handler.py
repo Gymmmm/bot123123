@@ -254,6 +254,7 @@ async def send_listing_details(
         media_caption=media_caption,
         text=text,
         reply_markup=reply_markup,
+        separate_details=True,
     )
     stale = list(previous)
     if replace_id and replace_id not in stale:

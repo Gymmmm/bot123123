@@ -374,9 +374,11 @@ def test_next_batch_continues_after_the_first_four(tmp_path):
     action = details.action_rows[0][0]
     assert action.label == "📸 下一组实拍"
     callback = parse_callback(encode_semantic_action(action))
-    assert callback.action == "photos" and callback.page_index is None
-    more = build_photos_response(view, offset=int(callback.target_index))
+    assert callback.action == "photos" and callback.page_index == 1
+    from v3_core.user_bot.listing_responses import build_photos_page_response
+    more = build_photos_page_response(view, page=callback.page_index)
     assert list(more.media_groups[0]) == gallery[4:]
+    assert more.action_rows[0][0].label == "⬅️ 上一页"
 
 
 def test_real_provider_results_are_cached_per_photo(tmp_path):
