@@ -155,7 +155,7 @@ def test_approved_editorial_cover_renders_three_or_four_distinct_photos(tmp_path
     )
 
     with Image.open(out).convert("RGB") as rendered:
-        assert rendered.size == (1200, 850)
+        assert rendered.size == (1080, 1350)
         assert max(rendered.getpixel((10, 800))) < 50
 
 
