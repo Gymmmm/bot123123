@@ -71,10 +71,10 @@ class OperatorPublisherAdminController(ProductionSimplePublisherAdminController)
             [
                 [
                     InlineKeyboardButton("➕ 发布房源", callback_data="v3smp|new"),
-                    InlineKeyboardButton("📢 广播中心", callback_data="v3bc"),
+                    InlineKeyboardButton("📢 营销内容", callback_data="v3bc"),
                 ],
                 [
-                    InlineKeyboardButton("🔵 房态工作台", callback_data="v3smp|listings"),
+                    InlineKeyboardButton("🔵 房态管理", callback_data="v3smp|listings"),
                     InlineKeyboardButton("📡 采集源", callback_data="v3smp|sources"),
                 ],
                 [
@@ -87,7 +87,7 @@ class OperatorPublisherAdminController(ProductionSimplePublisherAdminController)
     async def show_home(self, message: Any) -> None:
         await message.reply_text(
             "<b>📣 侨联发布助手</b>\n\n"
-            "发送房源素材、发布广播、修改房态和管理采集源。",
+            "中介发布自有房源、修改房态；营销内容和采集源也在这里管理。",
             parse_mode=ParseMode.HTML,
             reply_markup=self.home_keyboard(),
         )
@@ -167,7 +167,7 @@ class OperatorPublisherAdminController(ProductionSimplePublisherAdminController)
             "• 单张图片 + 文字\n"
             "• 多张图片相册 + 文字\n"
             "• 单条视频 + 文字\n\n"
-            "系统会自动解析并整理房源资料，再让你确认。",
+            "素材可以分批发送；全部发完后点击「✅ 素材发完了」，再统一整理和预览。",
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(
                 [[InlineKeyboardButton("❌ 取消发布", callback_data="v3smp|manual_cancel")], self.home_row()]
