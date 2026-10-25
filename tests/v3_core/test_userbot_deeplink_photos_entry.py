@@ -274,10 +274,10 @@ async def test_entry_integration_nine_photos_opens_overview_via_start(tmp_path):
     )
     assert outcome.handled and outcome.kind == "photos"
     assert outcome.result is not None and outcome.result.source == "channel_listing"
-    assert [c[0] for c in bot.calls] == ["send_photo", "send_message"]
+    assert [c[0] for c in bot.calls] == ["send_photo"]
     assert message.calls == []
-    card = bot.calls[1][2]
-    assert "共 9 张实拍 · 先看 8 张" in card["text"]
+    card = bot.calls[0][2]
+    assert "共 9 张实拍 · 先看 8 张" in card["caption"]
     labels = [[b.text for b in row] for row in card["reply_markup"].inline_keyboard]
     assert labels[0] == ["🖼️ 查看全部原图"]
     assert labels[-1] == ["⬅️ 返回房源"]

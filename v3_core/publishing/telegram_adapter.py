@@ -94,53 +94,9 @@ class TelegramChannelAdapter:
 
     async def send(self, command: TelegramSendCommand) -> dict[str, Any]:
         cover, gallery, keyboard = self._validated(command)
-        # Telegram albums cannot carry an inline keyboard. Keep the complete
-        # frozen caption on the first image, then send an effectively textless
-        # action bar. Do not render a reply bubble or visible instruction text.
-        if gallery:
-            paths = (cover, *gallery[:3])
-            with ExitStack() as stack:
-                handles = [stack.enter_context(path.open("rb")) for path in paths]
-                media = [
-                    InputMediaPhoto(
-                        media=handle,
-                        caption=command.caption if index == 0 else None,
-                        parse_mode=ParseMode.HTML if index == 0 else None,
-                    )
-                    for index, handle in enumerate(handles)
-                ]
-                messages = await self.bot.send_media_group(
-                    chat_id=command.channel_chat_id,
-                    media=media,
-                )
-            message_ids = [
-                str(getattr(message, "message_id", "") or "") for message in messages
-            ]
-            if len(message_ids) != len(paths) or any(not value for value in message_ids):
-                raise RuntimeError("telegram_album_returned_incomplete_message_ids")
-            button_message = await self.bot.send_message(
-                chat_id=command.channel_chat_id,
-                text="\u2063",
-                reply_markup=keyboard,
-            )
-            button_message_id = str(
-                getattr(button_message, "message_id", "") or ""
-            )
-            if not button_message_id:
-                raise RuntimeError("telegram_button_send_returned_no_message_id")
-            media_group_id = str(
-                getattr(messages[0], "media_group_id", "") or ""
-            )
-            return {
-                "media_message_ids": message_ids,
-                "caption_message_id": message_ids[0],
-                "button_message_id": button_message_id,
-                "media_group_id": media_group_id,
-                "caption": command.caption,
-                "single_cover": False,
-                "discussion_published": False,
-            }
-
+        # The cover is already a 3/4-photo collage. Publishing gallery
+        # frames again duplicates images and forces a separate blank action bar.
+        # A single photo supports both a caption and inline buttons.
         with cover.open("rb") as handle:
             message = await self.bot.send_photo(
                 chat_id=command.channel_chat_id,

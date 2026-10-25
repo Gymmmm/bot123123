@@ -56,16 +56,23 @@ async def send_listing_photos_album(
     sent_media_ids: list[int] = []
 
     if len(paths) == 1:
+        # One collage/photo is one Telegram message with details and controls.
+        body = str(text or "").strip()
+        combined = body or caption
+        inline = not expand_only and len(combined) <= 1024
         with Path(paths[0]).open("rb") as handle:
             sent = await bot.send_photo(
                 chat_id=chat_id,
                 photo=handle,
-                caption=caption or None,
-                parse_mode=ParseMode.HTML if caption else None,
+                caption=(combined if inline else caption) or None,
+                parse_mode=ParseMode.HTML if (combined if inline else caption) else None,
+                reply_markup=reply_markup if inline else None,
             )
         media_id = getattr(sent, "message_id", None)
         if media_id is not None:
             sent_media_ids.append(int(media_id))
+        if inline:
+            return sent_media_ids
     elif len(paths) >= 2:
         media: list[InputMediaPhoto] = []
         for index, raw in enumerate(paths[:10]):

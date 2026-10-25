@@ -126,25 +126,16 @@ async def test_adapter_sends_only_one_cover_and_returns_durable_receipt(tmp_path
 
 
 @pytest.mark.asyncio
-async def test_adapter_sends_four_independent_images_then_button_only_action_bar(tmp_path):
+async def test_adapter_sends_single_collage_with_caption_and_buttons_even_with_gallery(tmp_path):
     bot = FakeBot()
-    adapter = TelegramChannelAdapter(bot)
-    receipt = await adapter.send(_command(tmp_path, gallery_count=5))
-
-    assert len(bot.calls) == 2
-    album_call, button_call = bot.calls
-    assert album_call["chat_id"] == "-100123"
-    assert len(album_call["media"]) == 4
-    assert album_call["media"][0].caption.startswith("🏠")
-    assert all(item.caption is None for item in album_call["media"][1:])
-    assert button_call["text"] == "\u2063"
-    assert "reply_to_message_id" not in button_call
-    assert len(button_call["reply_markup"].inline_keyboard) == 2
-    assert receipt["media_message_ids"] == ["700", "701", "702", "703"]
-    assert receipt["caption_message_id"] == "700"
-    assert receipt["button_message_id"] == "799"
-    assert receipt["media_group_id"] == "album-1"
-    assert receipt["single_cover"] is False
+    receipt = await TelegramChannelAdapter(bot).send(_command(tmp_path, gallery_count=5))
+    assert len(bot.calls) == 1
+    call = bot.calls[0]
+    assert call["caption"].startswith("🏠")
+    assert len(call["reply_markup"].inline_keyboard) == 2
+    assert receipt["media_message_ids"] == ["777"]
+    assert receipt["caption_message_id"] == receipt["button_message_id"] == "777"
+    assert receipt["single_cover"] is True
 
 
 @pytest.mark.asyncio
@@ -169,12 +160,12 @@ async def test_exception_after_sending_boundary_is_marked_unknown(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_button_timeout_after_album_is_unknown_and_never_auto_retried(tmp_path):
+async def test_single_cover_timeout_is_unknown_and_never_auto_retried(tmp_path):
     command = _command(tmp_path, gallery_count=3)
     coordinator = FakeCoordinator(command)
-    adapter = TelegramChannelAdapter(ButtonTimeoutBot())
+    adapter = TelegramChannelAdapter(FakeBot(error=TimeoutError("photo response timeout")))
 
-    with pytest.raises(TimeoutError, match="button response timeout"):
+    with pytest.raises(TimeoutError, match="photo response timeout"):
         await deliver_approved_package(
             coordinator=coordinator,
             adapter=adapter,

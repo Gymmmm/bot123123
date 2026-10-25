@@ -313,9 +313,8 @@ def test_pending_autopublish_success_commits_publication_then_activates_and_is_b
     assert package.status == "published"
     assert "🟢 当前可预约" in package.post_text
     assert package.snapshot["listing"]["inventory_status"] == "active"
-    assert [call["kind"] for call in bot.calls] == ["album", "buttons"]
-    assert len(bot.calls[0]["media"]) == 4
-    labels = [button.text for row in bot.calls[1]["reply_markup"].inline_keyboard for button in row]
+    assert [call["kind"] for call in bot.calls] == ["photo"]
+    labels = [button.text for row in bot.calls[0]["reply_markup"].inline_keyboard for button in row]
     assert "📅 在线预约" in labels
     with sqlite3.connect(reader.db_path) as conn:
         assert conn.execute(
@@ -326,7 +325,7 @@ def test_pending_autopublish_success_commits_publication_then_activates_and_is_b
 
     replay = __import__("asyncio").run(service.process_one(bot=bot, force_offer_id=offer_id))
     assert replay.status == "already_published"
-    assert len(bot.calls) == 2
+    assert len(bot.calls) == 1
     with sqlite3.connect(reader.db_path) as conn:
         assert conn.execute(
             "SELECT COUNT(*) FROM publication_instances WHERE listing_id=? AND publish_status='published'",
