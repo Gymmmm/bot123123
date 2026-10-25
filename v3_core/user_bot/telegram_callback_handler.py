@@ -268,17 +268,44 @@ def _single_detail_keyboard(
 
 
 def _detail_grid(paths: tuple[str, ...], page: int) -> bytes:
-    """Clean four-photo contact sheet; never uses the branded channel cover."""
+    """Photo-first responsive collage: large hero plus proportionate supporting shots.
+
+    Keep pictures free from logos and text; adapt the lower row to the count.
+    Avoid four equal squares, which reduce legibility on Telegram phones.
+    """
     selected = paths[page * 4: page * 4 + 4]
-    canvas = Image.new("RGB", (1000, 1000), "white")
-    slots = ((0, 0), (504, 0), (0, 504), (504, 504))
-    for source, (x, y) in zip(selected, slots):
+    if not selected:
+        raise ValueError("detail_grid_has_no_photos")
+
+    width, gutter = 1200, 6
+    if len(selected) == 1:
+        layout = ((0, 0, 1200, 800),)
+        height = 800
+    elif len(selected) == 2:
+        layout = ((0, 0, 1200, 660), (0, 666, 1200, 540))
+        height = 1206
+    else:
+        hero_height, row_height = 715, 348
+        count = len(selected) - 1
+        cell_width = (width - gutter * (count - 1)) // count
+        layout = [(0, 0, width, hero_height)]
+        for i in range(count):
+            x = i * (cell_width + gutter)
+            cell = width - x if i == count - 1 else cell_width
+            layout.append((x, hero_height + gutter, cell, row_height))
+        height = hero_height + gutter + row_height
+
+    canvas = Image.new("RGB", (width, height), "white")
+    for source, (x, y, w, h) in zip(selected, layout):
         with Image.open(source) as original:
-            photo = ImageOps.fit(original.convert("RGB"), (496, 496),
-                                 method=Image.Resampling.LANCZOS)
+            corrected = ImageOps.exif_transpose(original).convert("RGB")
+            photo = ImageOps.fit(
+                corrected, (w, h), method=Image.Resampling.LANCZOS,
+                centering=(0.5, 0.40 if y == 0 else 0.5),
+            )
             canvas.paste(photo, (x, y))
     output = BytesIO()
-    canvas.save(output, format="JPEG", quality=87, optimize=True)
+    canvas.save(output, format="JPEG", quality=89, optimize=True)
     return output.getvalue()
 
 
