@@ -897,11 +897,27 @@ class SimplePublisherAdminController:
             await self._reply_recheck_result(query.message, result)
         elif action == "status" and len(parts) == 4:
             status, listing_id = parts[2], parts[3]
+            if status in {"rented", "offline"}:
+                label = "已租出" if status == "rented" else "已下架"
+                await query.message.reply_text(
+                    f"确认将这套房设为「{label}」？\n保存后会同步频道房态，客户将无法继续预约。",
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton(f"✅ 确认{label}", callback_data=f"v3smp|status_apply|{status}|{listing_id}")],
+                        [InlineKeyboardButton("⬅️ 返回房源", callback_data=f"v3smp|listing|{listing_id}")],
+                    ]),
+                )
+                return True
             self.repository.set_listing_status(listing_id, status)
             row = self._listing_detail(listing_id)
             # Inventory recovery is a status change, not a new publication.
             # The publisher app synchronizes the existing Telegram post after
             # this callback; never requeue an already-published offer here.
+            await self.show_listing(query.message, listing_id)
+        elif action == "status_apply" and len(parts) == 4:
+            status, listing_id = parts[2], parts[3]
+            if status not in {"rented", "offline"}:
+                raise ValueError("invalid_status_confirmation")
+            self.repository.set_listing_status(listing_id, status)
             await self.show_listing(query.message, listing_id)
         elif action == "windows":
             await self.show_windows(query.message)
