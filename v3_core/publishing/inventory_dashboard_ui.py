@@ -23,62 +23,23 @@ class PublisherInventoryDashboardController(PublisherInventoryAdminController):
     """Daily workbench over the existing inventory management actions."""
 
     async def show_listing_categories(self, message: Any) -> None:
+        """Keep room-state actions focused on agents' daily changes."""
         c = self._inventory_counts()
-        repo = getattr(self, "repository", None)
-        exception_count = int(repo.exception_count() or 0) if repo is not None else 0
-        queued_n = int(repo.queue_count() or 0) if repo is not None else 0
-        held_n = int(repo.held_count() or 0) if repo is not None and hasattr(repo, "held_count") else 0
-        lines = [
-            "<b>🔵 房态工作台</b>",
-            "",
-            "<b>今天先处理</b>",
-            f"🔵 待确认 {c['pending']}｜10套一组　　⏰ 超3天 {c['overdue']}",
-            f"🟡 已有预约 {c['reserved']}　　🆕 今日发布 {c['today']}",
-            f"⚠️ 待处理异常 {exception_count}",
-            "",
-            "<b>自动投递</b>",
-            f"🚀 自动待发 {queued_n}　　📦 旧库存暂停 {held_n}",
-            "",
-            "<b>当前库存</b>",
-            f"🟢 可预约 {c['active']}　　🔴 已租出 {c['rented']}　　⚫ 已下架 {c['offline']}",
-            "",
-            "待确认可以直接批量处理，不需要逐套打开。",
-        ]
         await message.reply_text(
-            "\n".join(lines),
+            "<b>🟢 房态更改</b>\n\n"
+            "选择房源状态，找到房源后修改。\n"
+            "也可以按编号搜索，或处理待确认房源。",
             parse_mode=ParseMode.HTML,
-            reply_markup=InlineKeyboardMarkup(
-                [
-                    [
-                        InlineKeyboardButton(f"🔵 待确认 {c['pending']}｜10套一组", callback_data="v3smp|pbat|0"),
-                        InlineKeyboardButton(f"⏰ 超时 {c['overdue']}", callback_data="v3smp|inv_rows|overdue"),
-                    ],
-                    [
-                        InlineKeyboardButton(
-                            f"⚠️ 待处理异常 ({exception_count})",
-                            callback_data="v3smp|exceptions|all",
-                        )
-                    ],
-                    [
-                        InlineKeyboardButton(f"🚀 自动待发 {queued_n}", callback_data="v3smp|auto_queue"),
-                        InlineKeyboardButton(f"📦 旧库存 {held_n}", callback_data="v3smp|held_queue"),
-                    ],
-                    [
-                        InlineKeyboardButton(f"🟡 已有预约 {c['reserved']}", callback_data="v3smp|inv_rows|reserved"),
-                        InlineKeyboardButton(f"🆕 今日发布 {c['today']}", callback_data="v3smp|inv_rows|today"),
-                    ],
-                    [
-                        InlineKeyboardButton("🕘 最近发布", callback_data="v3smp|inv_rows|recent"),
-                        InlineKeyboardButton("🔍 搜索房源", callback_data="v3smp|inv_search"),
-                    ],
-                    [
-                        InlineKeyboardButton(f"🟢 可预约 {c['active']}", callback_data="v3smp|inv_rows|active"),
-                        InlineKeyboardButton(f"🔴 已租出 {c['rented']}", callback_data="v3smp|inv_rows|rented"),
-                    ],
-                    [InlineKeyboardButton(f"⚫ 已下架 {c['offline']}", callback_data="v3smp|inv_rows|offline")],
-                    self.home_row(),
-                ]
-            ),
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔍 搜索房源", callback_data="v3smp|inv_search")],
+                [InlineKeyboardButton(f"🟢 可预约 {c['active']}", callback_data="v3smp|inv_rows|active"),
+                 InlineKeyboardButton(f"🟡 已预约 {c['reserved']}", callback_data="v3smp|inv_rows|reserved")],
+                [InlineKeyboardButton(f"🔴 已租出 {c['rented']}", callback_data="v3smp|inv_rows|rented"),
+                 InlineKeyboardButton(f"⚫ 已下架 {c['offline']}", callback_data="v3smp|inv_rows|offline")],
+                [InlineKeyboardButton("🕘 最近发布", callback_data="v3smp|inv_rows|recent"),
+                 InlineKeyboardButton(f"🔵 待确认 {c['pending']}", callback_data="v3smp|pbat|0")],
+                self.home_row(),
+            ]),
         )
 
     async def show_batch_menu(self, message: Any) -> None:
