@@ -552,7 +552,11 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
                     await query.message.reply_text(
                         "发布失败：\n" + escape(type(exc).__name__ + ": " + str(exc)),
                         parse_mode=ParseMode.HTML,
-                        reply_markup=InlineKeyboardMarkup([self.home_row()]),
+                        reply_markup=InlineKeyboardMarkup([
+                            [InlineKeyboardButton("📤 待确认发布", callback_data="v3smp|preview_ready")],
+                            [InlineKeyboardButton("👀 重新生成预览", callback_data="v3smp|manual_preview")],
+                            self.home_row(),
+                        ]),
                     )
                 return True
             return True
