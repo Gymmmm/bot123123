@@ -99,6 +99,11 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
         except Exception:
             blockers = ["unreadable_media"]
         optional_missing = [name for name in OPTIONAL_FIELDS if values.get(name) in (None, "")]
+        video_count = len(state.get("videos") or [])
+        original_photo_count = sum(
+            1 for image in (state.get("images") or [])
+            if isinstance(image, dict) and not image.get("from_video_thumbnail")
+        )
 
         lines = ["<b>🏠 房源资料已整理</b>", ""]
         for name, label in DISPLAY_FIELDS:
@@ -116,13 +121,19 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
         else:
             lines.extend(["", "✅ 房源资料已满足发布条件。"])
 
+        if video_count:
+            lines.extend(["", "🎬 <b>视频发布说明</b>",
+                          "当前频道发布只发送图片封面，不会自动附带视频文件。"])
+            if not original_photo_count:
+                lines.append("⚠️ 当前只有视频缩略图，没有独立实拍照片；请补充照片。")
         buttons: list[list[InlineKeyboardButton]] = []
         if blockers or optional_missing:
             buttons.append([InlineKeyboardButton("➕ 补充资料", callback_data="v3smp|manual_supplement"), InlineKeyboardButton("✏️ 修改资料", callback_data="v3smp|manual_edit")])
         else:
             buttons.append([InlineKeyboardButton("✏️ 修改资料", callback_data="v3smp|manual_edit")])
         buttons.append([InlineKeyboardButton("💬 调整侨联说", callback_data="v3smp|manual_adviser")])
-        buttons.append([InlineKeyboardButton("📤 检查并发布" if blockers else "👀 生成预览", callback_data="v3smp|manual_preview")])
+        if not (video_count and not original_photo_count):
+            buttons.append([InlineKeyboardButton("📤 检查并发布" if blockers else "👀 生成预览", callback_data="v3smp|manual_preview")])
         buttons.append([InlineKeyboardButton("❌ 取消", callback_data="v3smp|manual_cancel")])
         await message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(buttons))
 
@@ -190,6 +201,18 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
         detail = self.workflow.review_detail(review_id)
         detail = self._repair_manual_layout_if_needed(detail, state)
         blockers, media = await self._manual_blockers(detail)
+        # A video thumbnail is not an independent listing photo. Never
+        # silently publish a thumbnail while the submitted video is omitted.
+        originals = [
+            image for image in (state.get("images") or [])
+            if isinstance(image, dict) and not image.get("from_video_thumbnail")
+        ]
+        if state.get("videos") and not originals:
+            await message.reply_text(
+                "⚠️ 当前只有视频，频道发布暂不支持附带视频原文件。请先补充至少一张房源实拍照片，避免只发布视频截图。"
+            )
+            await self.show_manual_confirmation(message, context)
+            return
         if blockers:
             await self.show_manual_confirmation(message, context)
             return
