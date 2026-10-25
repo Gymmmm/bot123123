@@ -308,9 +308,18 @@ class OperatorPublisherAdminController(ProductionSimplePublisherAdminController)
         result = await asyncio.to_thread(self.intake.persist, source)
         state["source_post_pk"] = result.source_post_pk
         if result.source_post_pk is None:
+            state["mode"] = "collecting"
+            await message.reply_text(
+                "素材保存未成功，请补充后重试。",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("✅ 重新整理", callback_data="v3smp|manual_finish")],
+                    [InlineKeyboardButton("❌ 取消发布", callback_data="v3smp|manual_cancel")],
+                ]),
+            )
             return
         worker_result = await asyncio.to_thread(self.worker.process_one, int(result.source_post_pk))
         if worker_result.status != "materialized":
+            state["mode"] = "collecting"
             await message.reply_text(
                 "暂时没能整理出完整房源资料。可以继续发送文字或素材补充。",
                 reply_markup=InlineKeyboardMarkup(
@@ -327,7 +336,14 @@ class OperatorPublisherAdminController(ProductionSimplePublisherAdminController)
                 (worker_result.listing_id,),
             ).fetchone()
         if row is None:
-            await message.reply_text("暂时没能识别出可发布的租赁信息，可以继续补充文字。")
+            state["mode"] = "collecting"
+            await message.reply_text(
+                "暂时没能识别出可发布的租赁信息，请补充房源位置、户型和租金后重新整理。",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("✅ 重新整理", callback_data="v3smp|manual_finish")],
+                    [InlineKeyboardButton("❌ 取消发布", callback_data="v3smp|manual_cancel")],
+                ]),
+            )
             return
         state["offer_id"] = str(row["offer_id"])
         state["review_id"] = str(row["review_id"])

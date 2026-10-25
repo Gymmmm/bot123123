@@ -353,7 +353,11 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
         await message.reply_text(
             f"✅ 已发布到频道。频道消息：{escape(str(result.publication.channel_message_id))}",
             parse_mode=ParseMode.HTML,
-            reply_markup=InlineKeyboardMarkup([self.home_row()]),
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔵 管理这套房态", callback_data=f"v3smp|listing|{listing_id}")] if listing_id else self.home_row(),
+                [InlineKeyboardButton("➕ 继续发布房源", callback_data="v3smp|new")],
+                self.home_row(),
+            ]),
         )
 
     async def handle_text(self, update: Any, context: Any) -> bool:
