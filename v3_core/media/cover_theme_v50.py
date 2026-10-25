@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 PALETTES = {
     "minimal_white": ("#FFFFFF", "#242c34", "#A17B4B"),
     "business_blue": ("#E9F4FD", "#113A67", "#275F99"),
-    "cream_beige": ("#FAF3EA", "#62492F", "#997347"),
+    "cream_beige": ("#FBF9F5", "#322D29", "#876333"),
     "nature_green": ("#F1F8EE", "#33583B", "#467B51"),
 }
 ALIASES = {"white": "minimal_white", "blue": "business_blue",
@@ -33,6 +33,9 @@ class CoverSettings:
     footer_ratio: float = .105
     gap: int = 6
     max_photos: int = 4
+    card_radius: int = 22
+    logo_max_height: int = 42
+    price_font_size: int = 42
     logo_path: str = ""
     font_regular: str = ""
     font_bold: str = ""
@@ -131,34 +134,31 @@ def render_branded_cover(*, data: Any, images: Iterable[Image.Image],
         if bw<=0 or bh<=0:raise ValueError("cover_layout_too_small")
         canvas.paste(_fit(im,(bw,bh),main=index==0,kind=kind),(x,y))
     d=ImageDraw.Draw(canvas)
-    # Header-free image area + information-only footer, no promotional fillers.
     ftop=area_h
-    d.line((0,ftop,w,ftop),fill=color[2],width=3)
+    # A small restrained footer; the photography must remain the focus.
     title=str(getattr(data,"project","") or getattr(data,"project_alias","") or getattr(data,"area","") or "").strip()
-    area=str(getattr(data,"area","") or "").strip()
     typ=str(getattr(data,"property_type","") or "").strip()
     rooms=str(getattr(data,"layout","") or "").strip()
     summary=" · ".join(x for x in (typ,rooms) if x)
     price=data.price_line() if callable(getattr(data,"price_line",None)) else str(getattr(data,"price","") or "")
-    # left 42% / center 29% / right 29%
-    x1=int(w*.42);x2=int(w*.71)
-    d.line((x1,ftop+26,x1,h-26),fill=color[2],width=2)
-    d.line((x2,ftop+26,x2,h-26),fill=color[2],width=2)
-    line1,ft=_compact(d,title or area, x1-68,47,25,st,True)
-    d.text((28,ftop+25),line1,fill=color[1],font=ft)
-    line2,sm=_compact(d,summary,x1-68,30,18,st)
-    d.text((28,ftop+78),line2,fill=color[1],font=sm)
-    d.text((x1+27,ftop+23),"月租金" if str(getattr(data,"deal_type","rent")).lower()=="rent" else "售价",
-           fill=color[1],font=_font(22,False,st))
-    price,fp=_compact(d,str(price),x2-x1-42,49,22,st,True)
-    d.text((x1+24,ftop+57),price,fill=color[2],font=fp)
+    label, title_font=_compact(d,title,640,44,25,st,True)
+    d.text((30,ftop+23),label,fill=color[1],font=title_font)
+    summary, summary_font=_compact(d,summary,580,27,18,st)
+    d.text((30,ftop+85),summary,fill=color[1],font=summary_font)
+    price_text, price_font=_compact(d,str(price),345,st.price_font_size,28,st,True)
+    d.text((625,ftop+43),price_text,fill=color[2],font=price_font)
     logo=_logo(st)
     if logo:
-        logo.thumbnail((w-x2-40,footer_h-50),Image.Resampling.LANCZOS)
-        canvas.paste(logo,(x2+(w-x2-logo.width)//2,ftop+(footer_h-logo.height)//2),logo)
+        logo.thumbnail((170,st.logo_max_height),Image.Resampling.LANCZOS)
+        # A neutral, clearly visible wordmark with no faded watermark effect.
+        if logo.mode == "RGBA":
+            alpha=logo.getchannel("A")
+            dark=Image.new("RGBA",logo.size,(62,49,38,255))
+            dark.putalpha(alpha)
+            logo=dark
+        canvas.paste(logo,(w-30-logo.width,ftop+56),logo)
     else:
-        label,lf=_compact(d,"侨联地产",w-x2-40,38,22,st,True)
-        d.text((x2+22,ftop+49),label,font=lf,fill=color[1])
+        d.text((w-190,ftop+61),"侨联地产",font=_font(28,True,st),fill=color[1])
     dest=Path(output_path)
     dest.parent.mkdir(parents=True,exist_ok=True)
     if dest.suffix.lower() not in (".png",".jpg",".jpeg"):
@@ -177,6 +177,7 @@ ROLE_WORDS = {
     "kitchen": ("厨房", "kitchen"),
     "dining": ("餐厅", "dining"),
     "bathroom": ("卫生间", "浴室", "bathroom"),
+    "balcony": ("阳台", "露台", "balcony", "terrace"),
 }
 
 def detect_role(label: str, path: str = "") -> str:
@@ -193,7 +194,7 @@ def select_cover_roles(entries, kind, limit=4):
     entries: [(path, role), ...].
     """
     priority = ("exterior", "living", "bedroom", "kitchen", "dining", "bathroom") if kind == "villa" else (
-        "living", "bedroom", "kitchen", "dining", "bathroom", "exterior"
+        "living", "bedroom", "kitchen", "dining", "balcony", "bathroom", "exterior"
     )
     picked = []
     seen_paths = set()
