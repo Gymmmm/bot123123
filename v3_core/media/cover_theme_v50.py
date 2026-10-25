@@ -30,7 +30,7 @@ class CoverSettings:
     villa_hero_3: float = .63
     villa_hero_4: float = .60
     apartment_hero: float = .65
-    footer_ratio: float = .105
+    footer_ratio: float = 128 / 1500
     gap: int = 6
     max_photos: int = 4
     card_radius: int = 22
@@ -120,7 +120,7 @@ def render_branded_cover(*, data: Any, images: Iterable[Image.Image],
     st=settings or CoverSettings()
     if not (500<=st.width<=3500 and 500<=st.height<=3500):raise ValueError("invalid_cover_size")
     if st.gap < 0 or st.max_photos not in (1,2,3,4):raise ValueError("invalid_layout_settings")
-    if not (.1<=st.footer_ratio<=.25):raise ValueError("invalid_footer_ratio")
+    if not (.08<=st.footer_ratio<=.25):raise ValueError("invalid_footer_ratio")
     color=PALETTES[ALIASES.get(st.theme,st.theme)]
     pictures=[im.convert("RGB") for im in images][:st.max_photos]
     if not pictures:raise ValueError("cover_no_usable_images")
@@ -132,7 +132,13 @@ def render_branded_cover(*, data: Any, images: Iterable[Image.Image],
     boxes=_regions(kind,len(pictures),w,area_h,st.gap,st)
     for index,(im,(x,y,bw,bh)) in enumerate(zip(pictures,boxes)):
         if bw<=0 or bh<=0:raise ValueError("cover_layout_too_small")
-        canvas.paste(_fit(im,(bw,bh),main=index==0,kind=kind),(x,y))
+        fitted=_fit(im,(bw,bh),main=index==0,kind=kind)
+        if st.card_radius:
+            mask=Image.new("L",(bw,bh),0)
+            ImageDraw.Draw(mask).rounded_rectangle((0,0,bw-1,bh-1),radius=st.card_radius,fill=255)
+            canvas.paste(fitted,(x,y),mask)
+        else:
+            canvas.paste(fitted,(x,y))
     d=ImageDraw.Draw(canvas)
     ftop=area_h
     # A small restrained footer; the photography must remain the focus.
