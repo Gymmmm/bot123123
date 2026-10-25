@@ -117,12 +117,15 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
             lines.extend(["", "✅ 房源资料已满足发布条件。"])
 
         buttons: list[list[InlineKeyboardButton]] = []
+        if not blockers:
+            buttons.append([InlineKeyboardButton("📤 下一步：预览并发布", callback_data="v3smp|manual_preview")])
         if blockers or optional_missing:
             buttons.append([InlineKeyboardButton("➕ 补充资料", callback_data="v3smp|manual_supplement"), InlineKeyboardButton("✏️ 修改资料", callback_data="v3smp|manual_edit")])
         else:
             buttons.append([InlineKeyboardButton("✏️ 修改资料", callback_data="v3smp|manual_edit")])
         buttons.append([InlineKeyboardButton("💬 调整侨联说", callback_data="v3smp|manual_adviser")])
-        buttons.append([InlineKeyboardButton("📤 检查并发布" if blockers else "👀 生成预览", callback_data="v3smp|manual_preview")])
+        if blockers:
+            buttons.append([InlineKeyboardButton("🔍 检查缺少的资料", callback_data="v3smp|manual_preview")])
         buttons.append([InlineKeyboardButton("❌ 取消", callback_data="v3smp|manual_cancel")])
         await message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(buttons))
 
@@ -402,6 +405,19 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
         query = getattr(update, "callback_query", None)
         raw = str(getattr(query, "data", "") or "") if query is not None else ""
         parts = raw.split("|")
+        if raw == "v3smp|manual_preview":
+            state = context.user_data.get(NEW_LISTING_STATE_KEY)
+            if not isinstance(state, dict) or not state.get("review_id") or not state.get("offer_id"):
+                await query.message.reply_text(
+                    "当前房源会话已过期，请重新进入发布房源。",
+                    reply_markup=InlineKeyboardMarkup([self.home_row()]),
+                )
+                return True
+            await self.prepare_manual_preview(
+                query.message, context,
+                review_id=str(state["review_id"]), offer_id=str(state["offer_id"]),
+            )
+            return True
         if raw == "v3smp|manual_adviser":
             await self.show_adviser_editor(query.message, context)
             return True
