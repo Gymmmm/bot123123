@@ -452,7 +452,7 @@ def _is_apartment(data: CoverRenderData) -> bool:
     return any(token in value for token in ("公寓", "服务式", "apartment", "condo", "studio"))
 
 
-TEMPLATES = ("apartment_3x2", "villa_black_gold", "villa_4x5", "villa_compact", "landscape_3x2", "grid_2x2", "single", "mobile_4x5", "mobile_3x2", "mobile_single_4x3", "mobile_duo_4x5", "mobile_collage_4x5", "mobile_collage_top_3x2", "ql_editorial_side", "ql_editorial_top")
+TEMPLATES = ("apartment_3x2", "villa_black_gold", "villa_4x5", "villa_compact", "landscape_3x2", "grid_2x2", "single", "mobile_4x5", "mobile_3x2", "mobile_single_4x3", "mobile_duo_4x5", "mobile_collage_4x5", "mobile_collage_top_3x2", "ql_editorial_side", "ql_editorial_top", "ql_optimized_villa", "ql_optimized_apartment", "ql_optimized_premium")
 VILLA_TEMPLATES = ("villa_black_gold", "villa_4x5", "villa_compact")
 DEFAULT_VILLA_TEMPLATE = "villa_black_gold"
 SKY_TEXT_TEMPLATES = {"villa_4x5", "villa_compact"}
@@ -583,7 +583,7 @@ def render_cover(*, style: str, source_image: str, output_path: str, data: Cover
     images = _usable_images(candidates)
     if not images:
         raise ValueError("cover_no_usable_images")
-    if template in {"ql_editorial_side", "ql_editorial_top"}:
+    if template in {"ql_editorial_side", "ql_editorial_top", "ql_optimized_premium", "ql_optimized_villa"}:
         from .editorial_cover import render_editorial_cover
 
         return render_editorial_cover(
@@ -592,6 +592,7 @@ def render_cover(*, style: str, source_image: str, output_path: str, data: Cover
             output_path=output_path,
             layout=template,
             logo=_brand_lockup(),
+            polished=template in {"ql_optimized_premium", "ql_optimized_villa"},
         )
     if template in {"mobile_collage_4x5", "mobile_collage_top_3x2"} and len(images) >= 3:
         # Telegram editorial cover: photos own most of a 3:2 canvas while a
@@ -678,6 +679,10 @@ def render_cover(*, style: str, source_image: str, output_path: str, data: Cover
         output.parent.mkdir(parents=True, exist_ok=True)
         canvas.save(output, format="JPEG" if output.suffix.lower() in {".jpg", ".jpeg"} else "PNG", quality=94, optimize=True)
         return str(output)
+    if template == "ql_optimized_apartment" and len(images) >= 3:
+        from .editorial_cover import render_wide_polished_cover
+        return render_wide_polished_cover(images=images[:4], data=data,
+            output_path=output_path, logo=_brand_lockup())
     if template == "mobile_duo_4x5" and len(images) > 1:
         # Phone-first editorial cover: two genuinely large photos, no miniature
         # thumbnail rail.  A single compact glass band carries the only facts

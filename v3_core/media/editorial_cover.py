@@ -83,7 +83,7 @@ def _pin(size: int = 31) -> Image.Image:
 
 
 def render_editorial_cover(*, images: list[Image.Image], data, output_path: str, layout: str,
-                           logo: Image.Image | None = None) -> str:
+                           logo: Image.Image | None = None, polished: bool = False) -> str:
     """Render exactly three or four distinct approved photos."""
     if len(images) not in {3, 4}:
         raise ValueError("editorial_cover_requires_3_or_4_photos")
@@ -91,37 +91,67 @@ def render_editorial_cover(*, images: list[Image.Image], data, output_path: str,
     if len(set(signatures)) != len(signatures):
         raise ValueError("cover_duplicate_photos")
 
-    photo_bottom = H - FOOTER
+    footer_height = 132 if polished else FOOTER
+    photo_bottom = H - footer_height
     count = len(images)
-    # One mobile-first composition for both villa and apartment covers:
-    # a substantial hero with two or three legible supporting rooms.
-    hero_height = 826
-    rectangles = [(0, 0, W, hero_height)]
-    y = hero_height + GAP
-    available_width = W - GAP * (count - 2)
-    widths = [available_width // (count - 1)] * (count - 1)
-    widths[-1] += available_width - sum(widths)
-    x = 0
-    for width in widths:
-        rectangles.append((x, y, width, photo_bottom - y))
-        x += width + GAP
+    # For villas, a generous vertical exterior is the left hero.
+    # Premium apartments keep a wide top hero and large detail cells beneath.
+    if polished and layout == "ql_optimized_villa":
+        left = round(W * .60)
+        side_w = W - left - GAP
+        each_h = (photo_bottom - (count - 2) * GAP) // (count - 1)
+        rectangles = [(0, 0, left, photo_bottom)]
+        y = 0
+        for i in range(count - 1):
+            height = each_h if i < count - 2 else photo_bottom - y
+            rectangles.append((left + GAP, y, side_w, height))
+            y += height + GAP
+    else:
+        hero_height = 870 if polished else 826
+        rectangles = [(0, 0, W, hero_height)]
+        y = hero_height + GAP
+        available_width = W - GAP * (count - 2)
+        widths = [available_width // (count - 1)] * (count - 1)
+        widths[-1] += available_width - sum(widths)
+        x = 0
+        for width in widths:
+            rectangles.append((x, y, width, photo_bottom - y))
+            x += width + GAP
 
     canvas = Image.new("RGB", (W, H), CREAM)
     for index, (image, (x, y, width, height)) in enumerate(zip(images, rectangles)):
         fitted = _fit(
             image,
             (width, height),
-            preserve_tall_exterior=index == 0 and layout == "ql_editorial_side",
+            preserve_tall_exterior=index == 0 and layout in {"ql_editorial_side", "ql_optimized_villa"},
         )
         _paste_rounded(canvas, fitted, (x, y, width, height))
 
-        if logo is not None:
+        if logo is not None and not polished:
             mark = _watermark(logo, max_width=185 if index == 0 else 128)
             photo_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
             photo_layer.alpha_composite(mark, (x + 18, y + 16))
             canvas.paste(photo_layer, (0, 0), photo_layer)
 
     draw = ImageDraw.Draw(canvas)
+    if polished:
+        # Keep the photo area quiet and the footer secondary to the property.
+        draw.rectangle((0, photo_bottom, W, H), fill=(250, 248, 245))
+        title = str(data.project or data.project_alias or data.area or "精选房源").strip()
+        subtitle = " · ".join(str(v).strip() for v in (data.property_type, data.layout) if v)
+        draw.text((28, photo_bottom + 18), _clip(draw, title, _font(38, True), 455),
+                  font=_font(38, True), fill=(42, 42, 39))
+        draw.text((30, photo_bottom + 77), _clip(draw, subtitle, _font(24), 450),
+                  font=_font(24), fill=(87, 84, 77))
+        draw.text((528, photo_bottom + 51), _clip(draw, data.price_line(), _font(48, True), 330),
+                  font=_font(48, True), fill=(133, 92, 46))
+        if logo is not None:
+            mark = _scaled_logo(logo, max_width=160, max_height=43)
+            canvas.paste(mark, (W - mark.width - 24, photo_bottom + 53), mark)
+        target = Path(output_path).expanduser().resolve()
+        target.parent.mkdir(parents=True, exist_ok=True)
+        canvas.save(target, format="JPEG" if target.suffix.lower() in {".jpg", ".jpeg"} else "PNG", quality=94)
+        return str(target)
     draw.rounded_rectangle((0, photo_bottom - 12, W, H), radius=14, fill=BLACK)
     draw.rectangle((0, photo_bottom, W, H), fill=BLACK)
     draw.rectangle((0, photo_bottom, W, photo_bottom + 3), fill=GOLD)
@@ -166,4 +196,39 @@ def render_editorial_cover(*, images: list[Image.Image], data, output_path: str,
     return str(target)
 
 
-__all__ = ["render_editorial_cover"]
+def render_wide_polished_cover(*, images: list[Image.Image], data, output_path: str,
+                               logo: Image.Image | None = None) -> str:
+    """3:2 apartment cover: 64% living-room hero, right supporting rooms."""
+    if len(images) not in (3, 4):
+        raise ValueError("wide_cover_requires_3_or_4_photos")
+    if len({hashlib.sha256(im.tobytes()).digest() for im in images}) != len(images):
+        raise ValueError("cover_duplicate_photos")
+    width, height, gap, footer = 1200, 800, 6, 95
+    photo_h = height - footer
+    hero_w = round(width * .64)
+    canvas = Image.new("RGB", (width, height), (250, 248, 245))
+    boxes = [(0, 0, hero_w, photo_h)]
+    y = 0
+    thumb_h = (photo_h - gap * (len(images) - 2)) // (len(images) - 1)
+    for index in range(len(images)-1):
+        h = thumb_h if index < len(images)-2 else photo_h-y
+        boxes.append((hero_w+gap, y, width-hero_w-gap, h))
+        y += h+gap
+    for photo, (x,y,w,h) in zip(images, boxes):
+        _paste_rounded(canvas, _fit(photo,(w,h)), (x,y,w,h), radius=9)
+    draw = ImageDraw.Draw(canvas)
+    title = str(data.project or data.project_alias or data.area or "精选房源").strip()
+    subtitle = " · ".join(str(v).strip() for v in (data.property_type,data.layout) if v)
+    draw.text((24,photo_h+12),_clip(draw,title,_font(32,True),410),font=_font(32,True),fill=(37,40,41))
+    draw.text((25,photo_h+57),_clip(draw,subtitle,_font(20),420),font=_font(20),fill=(84,84,80))
+    draw.text((550,photo_h+28),_clip(draw,data.price_line(),_font(40,True),400),font=_font(40,True),fill=(133,92,46))
+    if logo is not None:
+        mark=_scaled_logo(logo,max_width=145,max_height=35)
+        canvas.paste(mark,(width-mark.width-24,photo_h+33),mark)
+    target=Path(output_path).expanduser().resolve()
+    target.parent.mkdir(parents=True,exist_ok=True)
+    canvas.save(target,format="JPEG" if target.suffix.lower() in {".jpg",".jpeg"} else "PNG",quality=94)
+    return str(target)
+
+
+__all__ = ["render_editorial_cover", "render_wide_polished_cover"]
