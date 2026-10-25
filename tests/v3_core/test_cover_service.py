@@ -200,7 +200,7 @@ def test_production_cover_uses_clean_composite_sources_not_branded_gallery(tmp_p
         media=media,
     )
     with Image.open(result.output_path).convert("RGB") as rendered:
-        assert rendered.size == (1200, 850)
+        assert rendered.size == (1080, 1350)
         # One large hero and two supporting cells use only approved clean
         # sources. The rejected blue branded gallery file never enters it.
         hero = rendered.getpixel((300, 250))
