@@ -6,10 +6,10 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 SIZE = (1080, 1350)
 STYLES = {
-    'ql_frame_blue': {'bg': '#EAF2F8', 'mat': '#DDE8F0', 'ink': '#173B63', 'muted': '#536B80', 'layout': 'side'},
-    'ql_frame_cream': {'bg': '#F8F1E8', 'mat': '#EEE4D8', 'ink': '#644833', 'muted': '#8B7561', 'layout': 'top'},
-    'ql_frame_green': {'bg': '#F0F5EB', 'mat': '#DFE9D8', 'ink': '#315B37', 'muted': '#66826B', 'layout': 'side'},
-    'ql_frame_white': {'bg': '#FAFAF8', 'mat': '#EDEEEB', 'ink': '#282D33', 'muted': '#7A7E82', 'layout': 'top'},
+    'ql_frame_blue': {'bg': '#EAF2F8', 'mat': '#DDE8F0', 'ink': '#173B63', 'muted': '#536B80'},
+    'ql_frame_cream': {'bg': '#F8F1E8', 'mat': '#EEE4D8', 'ink': '#644833', 'muted': '#8B7561'},
+    'ql_frame_green': {'bg': '#F0F5EB', 'mat': '#DFE9D8', 'ink': '#315B37', 'muted': '#66826B'},
+    'ql_frame_white': {'bg': '#FAFAF8', 'mat': '#EDEEEB', 'ink': '#282D33', 'muted': '#7A7E82'},
 }
 
 
@@ -47,6 +47,39 @@ def _frame(canvas, photo, box, mat, inset=7):
     canvas.paste(scaled, (x + (width - scaled.width) // 2, y + (height - scaled.height) // 2))
 
 
+
+def _photo_boxes(count: int, *, photo_top: int = 139, photo_bottom: int = 1115,
+                 gap: int = 10) -> list[tuple[int, int, int, int]]:
+    """One unified geometry for every palette: 4 side, 3 top, 2 stacked, 1 full.
+
+    Photo ordering comes from the existing cover planner: hero first.
+    """
+    if not 1 <= count <= 4:
+        raise ValueError('photo_count_must_be_1_to_4')
+    height = photo_bottom - photo_top
+    if count == 1:
+        return [(24, photo_top, 1032, height)]
+    if count == 2:
+        first = (height - gap) // 2
+        return [(24, photo_top, 1032, first),
+                (24, photo_top + first + gap, 1032, height - first - gap)]
+    if count == 3:
+        hero_h = 635
+        bottom_h = height - hero_h - gap
+        left_w = (1032 - gap) // 2
+        return [(24, photo_top, 1032, hero_h),
+                (24, photo_top + hero_h + gap, left_w, bottom_h),
+                (24 + left_w + gap, photo_top + hero_h + gap, 1032 - left_w - gap, bottom_h)]
+    hero_w = 652
+    right_x = 24 + hero_w + gap
+    right_w = 1032 - hero_w - gap
+    each = (height - 2 * gap) // 3
+    return [(24, photo_top, hero_w, height),
+            (right_x, photo_top, right_w, each),
+            (right_x, photo_top + each + gap, right_w, each),
+            (right_x, photo_top + 2 * (each + gap), right_w, height - 2 * (each + gap))]
+
+
 def render_contain_cover(*, images, data, output_path: str, layout: str, logo=None):
     if layout not in STYLES:
         raise ValueError('unknown_contain_layout')
@@ -62,36 +95,7 @@ def render_contain_cover(*, images, data, output_path: str, layout: str, logo=No
     draw.line((32, 119, 1048, 119), fill=spec['mat'], width=3)
     photo_top, photo_bottom, gap = 139, 1115, 10
     count = min(len(images), 4)
-    photo_h = photo_bottom - photo_top
-    boxes = []
-    if count == 1:
-        boxes = [(24, photo_top, 1032, photo_h)]
-    elif count == 2:
-        if spec['layout'] == 'side':
-            boxes = [(24, photo_top, 632, photo_h), (666, photo_top, 390, photo_h)]
-        else:
-            h = (photo_h - gap) // 2
-            boxes = [(24, photo_top, 1032, h), (24, photo_top + h + gap, 1032, photo_h - h - gap)]
-    elif spec['layout'] == 'side':
-        hero_w = 652
-        side_x, side_w = 24 + hero_w + gap, 1032 - hero_w - gap
-        side_count = count - 1
-        each = (photo_h - gap * (side_count - 1)) // side_count
-        boxes = [(24, photo_top, hero_w, photo_h)]
-        for i in range(side_count):
-            y = photo_top + i * (each + gap)
-            h = each if i < side_count - 1 else photo_bottom - y
-            boxes.append((side_x, y, side_w, h))
-    else:
-        hero_h = 625 if count == 4 else 670
-        remaining = photo_h - hero_h - gap
-        side_count = count - 1
-        cell_w = (1032 - gap * (side_count - 1)) // side_count
-        boxes = [(24, photo_top, 1032, hero_h)]
-        for i in range(side_count):
-            x = 24 + i * (cell_w + gap)
-            w = cell_w if i < side_count - 1 else 1056 - x
-            boxes.append((x, photo_top + hero_h + gap, w, remaining))
+    boxes = _photo_boxes(count, photo_top=photo_top, photo_bottom=photo_bottom, gap=gap)
     for photo, box in zip(images[:count], boxes):
         _frame(canvas, photo, box, spec['mat'])
 

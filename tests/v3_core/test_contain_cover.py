@@ -1,6 +1,6 @@
 from PIL import Image
 import pytest
-from v3_core.media.contain_cover import _frame
+from v3_core.media.contain_cover import _frame, _photo_boxes
 from v3_core.media.cover_renderer import CoverRenderData, render_cover
 
 
@@ -29,3 +29,24 @@ def test_frame_preserves_source_edges():
     _frame(canvas, photo, (0, 0, 700, 700), '#EDEEEB')
     assert (255, 0, 0) in canvas.get_flattened_data()
     assert (0, 0, 255) in canvas.get_flattened_data()
+
+
+@pytest.mark.parametrize('count,expected', [(1, 'single'), (2, 'stacked'), (3, 'top-two'), (4, 'side-three')])
+def test_unified_geometry(count, expected):
+    boxes = _photo_boxes(count)
+    assert len(boxes) == count
+    for x, y, w, h in boxes:
+        assert x >= 24 and y >= 139
+        assert w > 0 and h > 0
+        assert x + w <= 1056 and y + h <= 1115
+    for i, (x, y, w, h) in enumerate(boxes):
+        for xx, yy, ww, hh in boxes[i + 1:]:
+            assert x + w <= xx or xx + ww <= x or y + h <= yy or yy + hh <= y
+    if expected == 'single':
+        assert boxes[0][2] == 1032
+    elif expected == 'stacked':
+        assert boxes[0][2] == boxes[1][2] == 1032
+    elif expected == 'top-two':
+        assert boxes[0][2] == 1032 and boxes[1][1] == boxes[2][1]
+    else:
+        assert boxes[0][3] > boxes[1][3] and boxes[1][0] == boxes[2][0] == boxes[3][0]
