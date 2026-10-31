@@ -23,7 +23,7 @@
         <span class="brand-mark">侨</span>
         <span><strong>侨联地产</strong><small>金边房产 · 出售精选</small></span>
       </button>
-      <a class="header-contact" href="https://t.me/pengqingw" target="_blank" rel="noopener">联系顾问</a>
+      <div class="header-links"><a class="rental-link" href="https://t.me/UPzufang" target="_blank" rel="noopener">找租房？前往出租频道 ↗</a><a class="header-contact" href="https://t.me/pengqingw" target="_blank" rel="noopener">联系顾问</a></div>
     </div>
     <div class="filter-shell">
       <div class="qualifications"><span class="filter-heading">购买资格</span><div class="qualifier-chips"><span class="qualification-chip" title="目前没有可核验的产权数据，暂不能按资格筛选">外国人可持有 · 待核验</span><span class="qualification-chip" title="需核对产权文件后才能按分层产权筛选">分层产权 · 待核验</span></div></div>
@@ -43,16 +43,17 @@
       <div class="hero-copy">
         <span class="eyebrow">PHNOM PENH · PROPERTIES FOR SALE</span>
         <h1 id="hero-title">金边出售房源<br><em>信息透明，按条件查找</em></h1>
-        <p>按区域、价格和房型筛选。产权文件、外国人购买资格及交易费用，由中文顾问协助核验。</p><div class="hero-metrics"><div><small>当前展示</small><strong id="heroTotal">—</strong></div><div><small>覆盖区域</small><strong id="heroAreas">—</strong></div><div><small>产权及税费</small><strong>待核验</strong></div></div>
+        <p>按区域、价格和房型筛选。产权文件、外国人购买资格及交易费用，由中文顾问协助核验。</p><div class="hero-metrics hero-decisions"><div><small>购买资格</small><strong>产权待核验</strong><span>暂无法按资格筛选</span></div><button type="button" id="showRegions"><small>覆盖区域</small><strong id="heroAreas">正在统计</strong><span>查看区域挂牌单价 ↓</span></button><button type="button" id="openCalculator"><small>成本试算</small><strong>计算总预算</strong><span>税率、费用可调整 →</span></button></div>
 
         <a class="hero-cta" href="#catalog">查看出售房源 <span aria-hidden="true">↓</span></a>
       </div>
 
     </section>
 
+    <section id="regionBenchmarks" class="region-benchmarks" aria-label="区域挂牌单价参照"><div class="region-title"><strong>区域挂牌单价参考</strong><span>仅按本站有总价和面积的在售房源计算，不代表市场成交价</span></div><div id="regionStrip" class="region-strip"><span class="region-loading">正在整理区域房源…</span></div></section>
     <section id="catalog" class="catalog" aria-labelledby="catalog-title">
-      <div class="catalog-heading"><div><span class="eyebrow">PROPERTY LISTINGS</span><h2 id="catalog-title">在售房源</h2></div><span id="count" class="count">读取中</span></div>
-      <section id="grid" class="listing-grid" aria-live="polite"></section>
+      <div class="catalog-heading"><div><span class="eyebrow">PROPERTY LISTINGS</span><h2 id="catalog-title">在售房源</h2></div><span id="count" class="count" aria-live="polite">正在载入房源</span></div>
+      <section id="grid" class="listing-grid" aria-live="polite"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></section>
     <div id="pager" class="pager" hidden><button id="prev" type="button">上一页</button><span id="pageno"></span><button id="next" type="button">下一页</button></div>
   </main>
 
@@ -70,6 +71,7 @@
       <div class="detail-footer"><div id="consultContext" class="consult-context"></div><a id="consultButton" class="consult" target="_blank" rel="noopener">索取产权与配额确认文件</a></div>
     </section>
   </div>
+  <div id="calcOverlay" class="calc-overlay" hidden><section class="calc-dialog" role="dialog" aria-modal="true" aria-labelledby="calcTitle"><div class="calc-heading"><h2 id="calcTitle">购房成本试算</h2><button id="closeCalculator" type="button" aria-label="关闭">×</button></div><p>仅为预算工具。税率和固定费用按实际产权、买卖双方约定及主管部门要求核实。</p><label>挂牌价（USD）<input id="calcPrice" type="number" min="0" step="1000" value="120000"></label><label>假设转让税率（%）<input id="calcTax" type="number" min="0" max="100" step="0.1" value="4"></label><label>其他费用估计（USD）<input id="calcFees" type="number" min="0" step="50" value="0"></label><div class="calc-result"><span>假设总预算</span><strong id="calcTotal">—</strong></div><small>4% 仅作可调整的示例税率；0 美元费用不代表实际无需支付。</small></section></div>
   <script src="./app.js" defer></script>
 </body>
 </html>
