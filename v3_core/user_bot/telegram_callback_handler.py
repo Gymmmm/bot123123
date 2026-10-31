@@ -6,6 +6,7 @@ from pathlib import Path
 from html import escape as html_escape, unescape as html_unescape
 import re
 from io import BytesIO
+from time import monotonic
 from telegram import InputFile
 from PIL import Image, ImageOps
 from typing import Any
@@ -921,7 +922,33 @@ async def handle_v3_callback(
             await _render_details(query, response)
         _set_listing_touchpoint(context, "listing_details")
     elif response.kind == "photos":
-        # A photo collage is one editable image, not a native multi-message album.
+        # V6: the search-result collage stays in place; photos open as a native
+        # Telegram album with a single compact action bar underneath.
+        callback_obj = dispatched.callback
+        public_id = str(getattr(callback_obj, "public_listing_id", "") or "").strip() if callback_obj else ""
+        listings = getattr(router, "listings", None)
+        resolved = listings.resolve_action(public_id, "details") if listings and public_id else None
+        details = getattr(resolved, "details", None) if getattr(resolved, "ok", False) else None
+        full_paths = tuple(p for p in getattr(details, "photo_paths", ()) if Path(p).is_file())
+        if public_id and full_paths and not response.expand_only and ":pg:" not in raw:
+            from .telegram_photos_render import send_listing_photos_album
+            state = _album_state(update, context, public_id)
+            now = monotonic()
+            if now - float(state.get("native_album_at", -10000)) < 300:
+                return TelegramCallbackHandlerOutcome(handled=True, response=response)
+            if full_paths:
+                # A native MediaGroup accepts at most ten frames per request.
+                groups = tuple(tuple(full_paths[n:n + 10]) for n in range(0, len(full_paths), 10))
+                await send_listing_photos_album(
+                    context.bot, chat_id=_chat_id(update), media_groups=groups,
+                    media_caption=f"📸 {public_id}｜共 {len(full_paths)} 张实拍",
+                    text=f"📸 {public_id}｜共 {len(full_paths)} 张实拍\n预约看房或咨询，请选择：",
+                    reply_markup=response.keyboard,
+                )
+                state["native_album_at"] = now
+                _set_listing_touchpoint(context, "listing_photos")
+                return TelegramCallbackHandlerOutcome(handled=True, response=response)
+        # Fallback: preserve the existing editable collage for other sources.
         # Search-result cards therefore remain in place when entering photos.
         callback_obj = dispatched.callback
         public_id_for_detail = str(getattr(callback_obj, "public_listing_id", "") or "").strip() if callback_obj else ""
