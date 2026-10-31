@@ -632,3 +632,23 @@ def test_detail_grid_keeps_source_edges_and_pale_matte(tmp_path, count):
         # Horizontal source photos use a shorter canvas rather than
         # placing large gray blocks inside a forced tall 4:5 layout.
         assert result.height < 850
+
+
+
+def test_four_landscape_photos_have_one_large_hero(tmp_path):
+    from io import BytesIO
+    from PIL import Image
+    from v3_core.user_bot.telegram_callback_handler import _detail_grid
+
+    photos = []
+    colors = [(220, 20, 20), (20, 220, 20), (20, 20, 220), (220, 180, 20)]
+    for index, color in enumerate(colors):
+        path = tmp_path / f"landscape-{index}.png"
+        Image.new("RGB", (1200, 800), color).save(path)
+        photos.append(str(path))
+    with Image.open(BytesIO(_detail_grid(tuple(photos), 0))) as out:
+        assert out.width == 1080
+        assert 900 <= out.height <= 1350
+        assert out.getpixel((540, 350))[0] > 180  # full-width hero
+        for x, channel in [(150, 1), (540, 2), (910, 0)]:
+            assert out.getpixel((x, out.height - 115))[channel] > 140

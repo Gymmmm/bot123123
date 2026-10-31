@@ -303,17 +303,19 @@ def _detail_grid(paths: tuple[str, ...], page: int) -> bytes:
         boxes = [(0, 0, width, hero_h),
                  (0, hero_h + gap, bottom_w, bottom_h),
                  (bottom_w + gap, hero_h + gap, width - bottom_w - gap, bottom_h)]
-    elif all(ratio >= 1.15 for ratio in ratios):
-        # Four landscape rooms: 2x2 instead of one narrow tall strip with
-        # three tiny photos and an enormous amount of unused grey background.
-        cell_w = (width - gap) // 2
-        top_h = max(round(cell_w / ratios[0]), round(cell_w / ratios[1]))
-        bottom_h = max(round(cell_w / ratios[2]), round(cell_w / ratios[3]))
-        height = top_h + gap + bottom_h
-        boxes = [(0, 0, cell_w, top_h),
-                 (cell_w + gap, 0, width - cell_w - gap, top_h),
-                 (0, top_h + gap, cell_w, bottom_h),
-                 (cell_w + gap, top_h + gap, width - cell_w - gap, bottom_h)]
+    elif ratios[0] >= 1.15:
+        # Four landscape-focused photos: one prominent full-width photo,
+        # three smaller photos in a single row. Avoid the equal 2x2 grid.
+        hero_h = min(900, round(width / ratios[0]))
+        cell_w = (width - 2 * gap) // 3
+        support_h = max(round(cell_w / ratio) for ratio in ratios[1:])
+        support_h = min(support_h, max(180, 1350 - hero_h - gap))
+        height = hero_h + gap + support_h
+        boxes = [(0, 0, width, hero_h)]
+        for index in range(3):
+            left = index * (cell_w + gap)
+            w = cell_w if index < 2 else width - left
+            boxes.append((left, hero_h + gap, w, support_h))
     else:
         # Portrait hero still gets a large left cell. Adjust proportions to
         # the actual photo, rather than forcing an overly narrow fixed column.
