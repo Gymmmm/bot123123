@@ -75,7 +75,7 @@ async def test_search_home_edits_existing_panel_then_sets_session():
     assert outcome.handled and outcome.rendered
     assert [c[0] for c in query.calls]==["answer","edit_text"]
     assert message.calls==[]
-    assert "想找什么样的房子" in query.calls[-1][1][0]
+    assert "开始找房" in query.calls[-1][1][0]
     assert "BKK1，两房，$800以内，下个月入住" in query.calls[-1][1][0]
     callbacks=[b.callback_data for row in query.calls[-1][2]["reply_markup"].inline_keyboard for b in row]
     assert callbacks==[

@@ -298,7 +298,7 @@ def _detail_fact_lines(details) -> list[str]:
     lines: list[str] = [f"🏠 <b>{he(title)}</b>"]
     price = _format_price(details.monthly_rent_usd)
     if price:
-        lines.append(f"<b>{he(price.replace('/月', ''))}</b> /月")
+        lines.append(f"💵 <b>{he(price.replace('/月', ''))}</b>/月")
 
     show_location = bool(location) and not (
         project and location_display_overlaps_project(project, location)
@@ -317,9 +317,9 @@ def _detail_fact_lines(details) -> list[str]:
         lines.append("📍 " + " · ".join(he(part) for part in place))
 
     terms = [he(part) for part in (details.deposit_terms, details.contract_term) if part]
-    if terms:
-        lines.append("🔑 " + "｜".join(terms))
     lines.append(_detail_status_line(details))
+    if terms:
+        lines.extend(["", "<b>租赁条件</b>", "🔑 " + "｜".join(terms)])
     # NOTE: public_id is NOT exposed in user-visible details text (privacy)
     return lines
 
@@ -356,13 +356,16 @@ def build_detail_text(view: PublishedListingView) -> str:
         electric=str(details.electric_rate or "").strip(),
     )
     lines = _detail_fact_lines(details)
+    extras = []
     for label, value in (
         ("物业费", details.management_fee),
         ("水电", utilities),
         ("配套", details.building_amenities),
     ):
         if value:
-            lines.append(f"{label}｜{he(value)}")
+            extras.append(f"{label}：{he(value)}")
+    if extras:
+        lines.extend(["", "<b>费用与配套</b>", *extras])
     lines.extend(_adviser_lines(view, caption=False))
     return chr(10).join(lines).strip()
 

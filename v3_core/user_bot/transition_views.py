@@ -426,10 +426,10 @@ def _similar_view(plan: TransitionPlan) -> TransitionView:
 
 
 _SEARCH_ENTRY_TEXT = (
-    "🔍 <b>想找什么样的房子？</b>\n\n"
-    "直接告诉我你的要求就行。\n"
-    "比如：<code>BKK1，两房，$800以内，下个月入住</code>\n\n"
-    "也可以从下面开始选："
+    "🔍 <b>开始找房</b>\n\n"
+    "直接发送你的要求，例如：\n"
+    "<code>BKK1，两房，$800以内，下个月入住</code>\n\n"
+    "也可以按区域、预算和户型逐项筛选。"
 )
 
 

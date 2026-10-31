@@ -94,11 +94,11 @@ def test_detail_text_shows_public_facts_and_full_publisher_copy():
 
     text = build_detail_text(view)
 
-    assert text.startswith("🏠 <b>富力城｜2房1厅</b>\n<b>$800</b> /月\n📍 BKK1 · 公寓 · 95㎡ · 19楼")
+    assert text.startswith("🏠 <b>富力城｜2房1厅</b>\n💵 <b>$800</b>/月\n📍 BKK1 · 公寓 · 95㎡ · 19楼")
     assert "🔑 押1付1｜1年" in text
-    assert "物业费｜含物业费" in text
-    assert "水电｜水 按表 / 电 0.25$/度" in text
-    assert "配套｜泳池、健身房" in text
+    assert "物业费：含物业费" in text
+    assert "水电：水 按表 / 电 0.25$/度" in text
+    assert "配套：泳池、健身房" in text
     assert "💬 <b>侨联说</b>" in text
     assert "采光面宽，适合长期住。" in text
     assert "楼下配套成熟。" in text
@@ -139,7 +139,7 @@ def test_details_response_uses_live_rented_state_but_keeps_frozen_public_facts()
     view = _view(status="rented", offer_status="inactive")
     response = build_details_response(view)
 
-    assert "<b>$800</b> /月" in response.text
+    assert "💵 <b>$800</b>/月" in response.text
     assert "🔴 已租出" in response.text
     assert _actions(response.action_rows) == [["consult", "similar"]]
     assert _labels(response.action_rows) == [

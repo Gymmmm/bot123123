@@ -108,7 +108,7 @@ async def test_find_home_shortcut_enters_guided_search_without_property_resoluti
     outcome = await handle_v3_start(_update(message), context, listings=listings, transition_views=_views())
     assert outcome.handled and outcome.kind == "broadcast_find_home"
     assert listings.calls == []
-    assert "想找什么样的房子" in message.calls[0][0][0]
+    assert "开始找房" in message.calls[0][0][0]
     assert "BKK1，两房，$800以内，下个月入住" in message.calls[0][0][0]
     assert context.user_data[AWAITING_KEYWORD_SESSION_KEY] == {"source": "daily_broadcast"}
     assert context.user_data[SEARCH_PREF_SESSION_KEY]["source"] == "daily_broadcast"
