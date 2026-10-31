@@ -684,7 +684,7 @@ class SimplePublisherAdminController:
         worker_result = await asyncio.to_thread(self.worker.process_one, int(result.source_post_pk))
         if worker_result.status != "materialized":
             await update.effective_message.reply_text(
-                "解析失败，房源没有发布。可以继续补充资料后再次发送。\n" + escape(worker_result.error[:500]),
+                "这套房暂时未能完成资料整理。请继续补充房源文字或照片，系统会重新检查。",
                 parse_mode=ParseMode.HTML,
             )
             return
@@ -779,10 +779,7 @@ class SimplePublisherAdminController:
                 reply_markup=InlineKeyboardMarkup(
                     [
                         [InlineKeyboardButton("📤 确认发布到频道", callback_data=f"v3smp|manual_send|{package.package_id}|{offer_id}")],
-                        [
-                            InlineKeyboardButton("更换封面图片", callback_data=f"v3smp|manual_cover|{review_id}|{offer_id}"),
-                            InlineKeyboardButton("更换封面模板", callback_data=f"v3smp|manual_templates|{review_id}|{offer_id}"),
-                        ],
+                        [InlineKeyboardButton("🖼️ 更换封面图片", callback_data=f"v3smp|manual_cover|{review_id}|{offer_id}")],
                         self.home_row(),
                     ]
                 ),
