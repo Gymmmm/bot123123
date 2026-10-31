@@ -1,6 +1,7 @@
 """Read-only HTTP surface for the V3 sale catalog."""
 from __future__ import annotations
 
+from hashlib import sha256
 from http import HTTPStatus
 from html import escape
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -171,6 +172,14 @@ def make_handler(repository: SaleCatalogRepository, index_path: str | Path):
                 self._json(HTTPStatus.NOT_FOUND, {"ok": False, "error": "media_not_found"})
                 return
             path, mime_type = resolved
+            scrub_root = os.getenv("V3_SALE_SCRUB_DIR")
+            if scrub_root:
+                # Production-only sale media isolation; original assets are never edited.
+                cleaned = Path(scrub_root) / (sha256(unquote(asset_id).encode("utf-8")).hexdigest() + ".jpg")
+                if not cleaned.is_file():
+                    self._json(HTTPStatus.NOT_FOUND, {"ok": False, "error": "sale_photo_pending_cleanup"})
+                    return
+                path, mime_type = cleaned, "image/jpeg"
             body = path.read_bytes()
             self.send_response(HTTPStatus.OK)
             self.send_header("Content-Type", mime_type)
