@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from hashlib import sha256
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from PIL import Image, ImageFont
+from PIL import Image
 
-from v3_core.media.cover_generator import CoverRenderData, generate_cover
 from v3_core.media.cover_styles import cover_template_path
 from v3_core.publishing.publisher_adviser_ui import PublisherAdviserAdminController
 from v3_core.publishing.simple_admin import NEW_LISTING_STATE_KEY
@@ -73,22 +71,10 @@ def _image(path: Path, value: int):
     Image.new("RGB", (1000, 750), (value, 120, 180)).save(path)
 
 
-def test_cover_styles_map_to_distinct_template_paths_and_render_differently(tmp_path: Path, monkeypatch):
-    paths = [cover_template_path(key, allow_video=False).resolve() for key in ("classic_blue", "right_price", "black_gold", "premium_photo")]
-    assert len(set(paths)) == 4
-    assert all(path.is_file() for path in paths)
-
-    monkeypatch.setattr("v3_core.media.cover_generator._font", lambda size, bold=False: ImageFont.load_default(size=size))
-
-    source = tmp_path / "source.jpg"
-    _image(source, 80)
-    data = CoverRenderData(public_listing_id="QL-TEST", project="富力城", layout="1房1厅", area="金边", price="400")
-    outputs = []
-    for style in ("classic_blue", "right_price", "black_gold", "premium_photo"):
-        output = tmp_path / f"{style}.jpg"
-        generate_cover(style=style, source_image=str(source), output_path=str(output), data=data)
-        outputs.append(output)
-    assert len({sha256(path.read_bytes()).hexdigest() for path in outputs}) == 4
+def test_approved_cover_template_still_exists():
+    # Legacy cover-generator variants are retired; current channel publishing
+    # uses CoverRenderService -> cover_renderer -> editorial_cover (Pillow).
+    assert cover_template_path("premium_photo").is_file()
 
 
 @pytest.mark.asyncio
