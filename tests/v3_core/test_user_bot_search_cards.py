@@ -95,7 +95,7 @@ def test_search_card_uses_locked_copy_and_frozen_cover(tmp_path):
     card = build_search_card((first, second), 0)
 
     # Locked copy per Section 3: title + 价格 + 区域 + 房态
-    assert card.text == "🏠 <b>找到这些房源</b> · 1/2\n\n富力城｜2房1厅\n💵 $800/月\n📍 BKK1\n🟢 当前可预约"
+    assert card.text == "🏠 <b>找到这些房源</b> · 1/2\n\n富力城｜2房1厅\n💵 $800/月\n📍 BKK1\n🏢 19\n🟢 当前可预约"
     assert card.photo_path == str(cover)
     # No gallery on this fixture → no 📸 查看实拍 entry.
     assert _actions(card) == [
@@ -107,7 +107,7 @@ def test_search_card_uses_locked_copy_and_frozen_cover(tmp_path):
     assert _labels(card) == [
         ["📋 房源详情"],
         ["📅 在线预约", "💬 咨询这套"],
-        ["⬅️ 上一套", "下一套 ➡️"],
+        ["⬅️ 1/2", "下一套 ➡️"],
         ["✏️ 调整条件"],
     ]
 

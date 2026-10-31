@@ -253,7 +253,7 @@ def _single_detail_keyboard(
         rows.append(photo_row)
     if total > 1:
         rows.append([InlineKeyboardButton(
-            "🖼 单张原图预览", callback_data=f"v3u:detailfull:{public_id}:{index * 4}"
+            "🖼 预览单张照片", callback_data=f"v3u:detailfull:{public_id}:{index * 4}"
         )])
     for row in (getattr(markup, "inline_keyboard", None) or ()):
         clean = [
@@ -492,7 +492,7 @@ async def _handle_detail_full(
             previous.append(InlineKeyboardButton("下一张 ➡️", callback_data=f"v3u:detailfull:{public_id}:{value + 1}"))
         rows.append(previous)
         rows.append([InlineKeyboardButton("📥 下载当前原图", callback_data=f"v3u:detaildownload:{public_id}:{value}")])
-        rows.append([InlineKeyboardButton("⬅️ 返回拼图", callback_data=f"v3u:detailback:{public_id}:{page}")])
+        rows.append([InlineKeyboardButton("⬅️ 返回实拍", callback_data=f"v3u:detailback:{public_id}:{page}")])
         rows.extend(base.inline_keyboard)
         keyboard = InlineKeyboardMarkup(rows)
     await query.answer()
@@ -921,6 +921,24 @@ async def handle_v3_callback(
             await _render_details(query, response)
         _set_listing_touchpoint(context, "listing_details")
     elif response.kind == "photos":
+        # A photo collage is one editable image, not a native multi-message album.
+        # Search-result cards therefore remain in place when entering photos.
+        callback_obj = dispatched.callback
+        public_id_for_detail = str(getattr(callback_obj, "public_listing_id", "") or "").strip() if callback_obj else ""
+        if response.photo_paths and public_id_for_detail:
+            await send_listing_details(
+                update, context,
+                public_listing_id=public_id_for_detail,
+                media_groups=response.media_groups,
+                photo_paths=response.photo_paths,
+                media_caption=response.media_caption,
+                text=response.text,
+                reply_markup=response.keyboard,
+                replace_message=getattr(query, "message", None),
+                force=True,
+            )
+            _set_listing_touchpoint(context, "listing_photos")
+            return TelegramCallbackHandlerOutcome(handled=True, response=response)
         public_id_for_album = ""
         page_for_album = 0
         callback_obj = dispatched.callback

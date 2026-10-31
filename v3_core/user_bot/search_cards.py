@@ -55,8 +55,8 @@ def _card_actions(views: tuple[PublishedListingView, ...], *, index: int, bookab
         prev_i=(index-1)%total
         next_i=(index+1)%total
         rows.append((
-            SemanticAction("⬅️ 上一套","previous",views[prev_i].public_listing_id,prev_i),
-            SemanticAction("下一套 ➡️","next",views[next_i].public_listing_id,next_i),
+            SemanticAction(f"⬅️ {index + 1}/{total}","previous",views[prev_i].public_listing_id,prev_i),
+            SemanticAction(f"下一套 ➡️","next",views[next_i].public_listing_id,next_i),
         ))
     rows.append((SemanticAction("✏️ 调整条件","change_search"),))
     return tuple(rows)
@@ -94,6 +94,10 @@ def build_search_card(
         lines.append(f"💵 {he(rent)}")
     if project and area and not location_display_overlaps_project(project, area):
         lines.append(f"📍 {he(area)}")
+    if details.floor:
+        lines.append(f"🏢 {he(details.floor)}")
+    if details.deposit_terms:
+        lines.append(f"🔑 {he(details.deposit_terms)}")
     status_line = _status_line_for(details)
     if status_line:
         lines.append(status_line)
