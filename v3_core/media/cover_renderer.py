@@ -555,22 +555,6 @@ def render_cover(*, style: str, source_image: str, output_path: str, data: Cover
     property type). Empty labels are not drawn: an uncertain room is shown as a
     plain photo, never with a guessed name.
     """
-    import os
-    theme = str(os.getenv("QIAOLIAN_COVER_THEME", "")).strip()
-    if theme:
-        from .cover_theme_v50 import CoverSettings, PALETTES, ALIASES, render_from_paths
-        normalized = ALIASES.get(theme, theme)
-        if normalized not in PALETTES:
-            raise ValueError(f"unknown_cover_theme: {theme}")
-        new_layout = os.getenv("QIAOLIAN_COVER_LAYOUT", "auto").strip() or "auto"
-        if new_layout not in ("auto", "villa", "apartment"):
-            raise ValueError(f"unknown_cover_layout: {new_layout}")
-        return render_from_paths(
-            data=data, source_image=source_image,
-            source_images=source_images or (), source_labels=source_labels or (),
-            output_path=output_path,
-            settings=CoverSettings(theme=normalized, layout=new_layout),
-        )
     del style
     template = _resolve_template(data, layout)
     if template == "mobile_single_4x3":
