@@ -19,9 +19,17 @@ const descriptionOf = i => first(i,['description','description_text','listing_de
 const amenitiesOf = i => listValue(first(i,['amenities','features','facilities']))
 const normalizeListing = (payload) => payload?.item || payload?.listing || payload?.data || payload?.result || payload
 const mediaUrl = (value) => text(value)
-// Backend cover_url uses the published Bot post image when one exists.
-const listingCover = i => mediaUrl(i.cover_url || (i.gallery_urls || [])[0])
+// Curated photography for the public sale catalog. Original galleries are unchanged.
+// The first listed villa has only a side-yard cover; its living room is a clearer card photo.
+const cardPhotoOverrides = { 'QL-HS-E2R9': 1 }
+const listingCover = i => {
+  const gallery = Array.isArray(i.gallery_urls) ? i.gallery_urls.filter(hasValue) : []
+  const selected = cardPhotoOverrides[text(i.public_id)]
+  return mediaUrl(selected !== undefined && gallery[selected] ? gallery[selected] : i.cover_url || gallery[0])
+}
+// Hero must show an entire home, not whichever listing happens to sort first.
 const heroListingId = 'QL-PP-A4V2'
+
 const advisorUrl = i => ADVISOR+'?text='+encodeURIComponent(`你好，想咨询金边出售房源 ${text(i.public_id)}`)
 const retryImage = (image) => {
   if (image.dataset.retried) {

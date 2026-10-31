@@ -444,7 +444,13 @@ def plan_cover(
 def _auto_hero(eligible: list[PhotoAssessment], kind: str, probe) -> tuple[PhotoAssessment, str, str, dict[str, Any]]:
     by_score = sorted(eligible, key=lambda i: -i.hero_score)
     if kind == "villa":
-        exteriors = sorted((i for i in eligible if _exterior_ok(i)), key=lambda i: -_exterior_rank(i))
+        # For a rental villa cover, a complete facade AND roof must outrank
+        # a prettier but partial side/entrance view. Do not mistake an
+        # exterior label alone for a recognisable building main photo.
+        exteriors = sorted(
+            (i for i in eligible if _exterior_ok(i)),
+            key=lambda i: (not _shows_building(i), -_exterior_rank(i)),
+        )
         rejected_tilt: list[PhotoAssessment] = []
         for candidate in exteriors:
             report = dict(probe(candidate.path, "exterior")) if probe else {}

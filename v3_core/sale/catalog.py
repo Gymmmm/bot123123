@@ -45,8 +45,7 @@ SELECT
     l.created_at,
     l.updated_at,
     o.sale_price_usd,
-    c.source_post_id,
-    l.listing_id
+    c.source_post_id
 FROM listings_v3 l
 JOIN canonical_records c ON c.canonical_record_id=l.canonical_record_id
 JOIN listing_offers o ON o.offer_id=(
@@ -180,18 +179,7 @@ class SaleCatalogRepository:
         return result
 
     @staticmethod
-    def _published_cover(conn: sqlite3.Connection, listing_id: str) -> str:
-        row = conn.execute(
-            """SELECT cover_path FROM publication_packages_v3
-               WHERE listing_id=? AND status='published'
-               ORDER BY published_at DESC, id DESC LIMIT 1""", (listing_id,)
-        ).fetchone()
-        if row is None or not Path(str(row["cover_path"] or "")).is_file():
-            return ""
-        return f"/api/v3/sale/poster/{quote(listing_id, safe='')}"
-
-    @staticmethod
-    def _public_row(row: sqlite3.Row, media: list[dict[str, str]], poster_url: str = "") -> dict[str, Any]:
+    def _public_row(row: sqlite3.Row, media: list[dict[str, str]]) -> dict[str, Any]:
         location = str(row["public_location_display"] or row["canonical_area_display"] or "").strip()
         project = str(row["project_name"] or "").strip()
         layout = str(row["layout"] or "").strip()
@@ -213,7 +201,7 @@ class SaleCatalogRepository:
             "floor": str(row["floor"] or "").strip(),
             "sale_price_usd": None if row["sale_price_usd"] is None else int(row["sale_price_usd"]),
             "status": _PUBLIC_STATUS.get(str(row["inventory_status"]), "在售"),
-            "cover_url": poster_url or (gallery[0] if gallery else ""),
+            "cover_url": gallery[0] if gallery else "",
             "gallery_urls": gallery,
             "updated_at": str(row["updated_at"] or ""),
         }
@@ -248,7 +236,7 @@ class SaleCatalogRepository:
                 _BASE_SELECT + "\n" + where + f"\nORDER BY {order_sql} LIMIT ? OFFSET ?",
                 tuple(params + [limit, offset]),
             ).fetchall()
-            items = [self._public_row(row, self._media_for_source(conn, row["source_post_id"]), self._published_cover(conn, row["listing_id"])) for row in rows]
+            items = [self._public_row(row, self._media_for_source(conn, row["source_post_id"])) for row in rows]
         return {
             "items": items,
             "total": count,
@@ -314,26 +302,7 @@ class SaleCatalogRepository:
             if row is None:
                 return None
             media = self._media_for_source(conn, row["source_post_id"])
-            return self._public_row(row, media, self._published_cover(conn, row["listing_id"]))
-
-    def published_poster(self, listing_id: str) -> Path | None:
-        """Only expose a published cover tied to a public, active sale listing."""
-        with self._connect() as conn:
-            row = conn.execute(
-                """SELECT p.cover_path FROM publication_packages_v3 p
-                   JOIN listings_v3 l ON l.listing_id=p.listing_id
-                   JOIN listing_offers o ON o.listing_id=l.listing_id
-                   WHERE p.listing_id=? AND p.status='published'
-                     AND o.offer_type='sale' AND o.offer_status='active'
-                     AND o.publication_policy='store_only'
-                     AND l.data_status='current'
-                     AND l.inventory_status IN ('pending','active','reserved')
-                   ORDER BY p.published_at DESC,p.id DESC LIMIT 1""", (listing_id,)
-            ).fetchone()
-        if row is None:
-            return None
-        path = Path(str(row["cover_path"] or ""))
-        return path if path.is_file() and path.suffix.lower() in {'.png', '.jpg', '.jpeg', '.webp'} else None
+            return self._public_row(row, media)
 
     def media_asset(self, asset_id: str) -> tuple[Path, str] | None:
         """Resolve only image media belonging to a currently public sale listing."""

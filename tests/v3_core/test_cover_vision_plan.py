@@ -501,3 +501,17 @@ def test_exterior_rank_uses_aesthetics_and_model_score():
     flat = _item(aesthetic=0.28, model_hero=0.7, blue_sky=0.0, obstruction=0.2, completeness=0.8)
     sunny = _item(aesthetic=0.96, model_hero=0.8, blue_sky=0.47, obstruction=0.2, completeness=0.85)
     assert cp._exterior_rank(sunny) > cp._exterior_rank(flat) + 0.15
+
+
+def test_villa_cover_prefers_complete_facade_over_side_view(photos_copy):
+    from dataclasses import replace
+
+    plan, _ = _plan('6735', '独栋别墅', photos=photos_copy('6735'))
+    exterior = next(i for i in plan.photos if i.path == plan.hero)
+    assert cp._shows_building(exterior)
+    side = replace(exterior, path='side-view.jpg', objects=('大门',),
+                   model_hero=1.0, aesthetic=1.0, hero_score=0.99)
+    assert cp._exterior_ok(side)
+    assert not cp._shows_building(side)
+    selected, _, _, _ = cp._auto_hero([side, exterior], 'villa', None)
+    assert selected.path == exterior.path
