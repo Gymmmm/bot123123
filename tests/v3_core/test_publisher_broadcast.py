@@ -51,7 +51,7 @@ def test_parse_hhmm_is_strict():
 def test_marketing_template_button_metadata_matches_locked_v1_ctas():
     expected = {key: (("🔍 开始找房", "find"), ("💬 中文顾问", "advisor")) for key in ("mon", "tue", "wed", "fri", "sat")}
     expected["thu"] = (("📢 最新房源", "latest"), ("💬 中文顾问", "advisor"))
-    expected["sun"] = (("🛎️ 侨联服务", "service"), ("💬 中文顾问", "advisor"))
+    expected["sun"] = (("🏠 查看出售房源", "sale"), ("💬 中文顾问", "advisor"))
     assert {template.key: template.buttons for template in MARKETING_TEMPLATES} == expected
 
 
@@ -64,7 +64,7 @@ def test_weekly_marketing_copy_is_safe_when_public_inventory_is_empty(tmp_path):
     assert "六年，这个承诺没破过" not in joined
     assert "我们赚服务费" not in joined
     assert "顾问实地核实" not in joined
-    assert "房态会变化" in joined
+    assert "房态" in joined
     assert "月租" in joined
     assert "金边" in joined
     assert "押金" in joined

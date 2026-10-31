@@ -42,7 +42,7 @@ def test_round2_tenant_service_entry_is_public_regardless_of_binding(tmp_path):
     service = TenantService(SQLiteTenantServiceRepository(db))
     missing = tenant_home_view(service, 99)
     missing_labels = [choice.label for row in missing.rows for choice in row]
-    assert missing_labels == ["🎥 视频带看", "🛡️ 看房与交接", "🤝 租后服务", "📋 我的租约", "🏠 查看出售房源", "💬 中文顾问", "⬅️ 返回首页"]
+    assert missing_labels == ["🎥 视频带看", "🛡️ 看房与交接", "🤝 租后服务", "📋 我的租约", "💬 中文顾问", "⬅️ 返回首页"]
     assert "没有显示你的住房信息" not in missing.text
 
     with sqlite3.connect(str(db)) as conn:

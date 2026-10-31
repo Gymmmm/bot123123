@@ -69,11 +69,7 @@ def build_service_keyboard(view: ServiceView, *, advisor_url: str = "") -> Inlin
         [
             InlineKeyboardButton(
                 str(choice.label or ""),
-                **(
-                    {"url": choice.callback_data}
-                    if str(choice.callback_data).startswith("https://")
-                    else {"callback_data": _runtime_service_callback(choice.callback_data)}
-                ),
+                callback_data=_runtime_service_callback(choice.callback_data),
             )
             for choice in row
         ]

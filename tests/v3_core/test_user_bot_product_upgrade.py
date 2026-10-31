@@ -50,9 +50,9 @@ def test_about_and_booking_are_compatible_secondary_home_actions():
 def test_service_hub_is_public_and_does_not_require_binding():
     view = service_home_view()
     labels = _labels(view)
-    assert labels == ["🎥 视频带看", "🛡️ 看房与交接", "🤝 租后服务", "📋 我的租约", "🏠 查看出售房源", "💬 中文顾问", "⬅️ 返回首页"]
+    assert labels == ["🎥 视频带看", "🛡️ 看房与交接", "🤝 租后服务", "📋 我的租约", "💬 中文顾问", "⬅️ 返回首页"]
     callbacks = _callbacks(view)
-    assert callbacks == ["v3u:service:video", "v3u:home:rental", "v3u:service:aftercare", "v3u:service:tenant_lease", "https://qiaolian-jinbian-sale.vercel.app/", "v3u:home:contact", "v3u:t:home"]
+    assert callbacks == ["v3u:service:video", "v3u:home:rental", "v3u:service:aftercare", "v3u:service:tenant_lease", "v3u:home:contact", "v3u:t:home"]
     assert "没有显示你的住房信息" not in view.text
 
 
@@ -94,7 +94,7 @@ def test_public_static_page_callbacks_use_registered_v3_namespaces():
         build_assurance_home_view(), build_moving_view(), repair_home_view(), property_view(),
         local_life_view(), nearby_view(), rfcity_home_view(),
     ]
-    allowed = ("v3u:home:", "v3u:service:", "v3u:assure:", "v3u:t:", "https://qiaolian-jinbian-sale.vercel.app/")
+    allowed = ("v3u:home:", "v3u:service:", "v3u:assure:", "v3u:t:")
     for view in views:
         for callback in _callbacks(view):
             assert callback.startswith(allowed), (view.kind, callback)

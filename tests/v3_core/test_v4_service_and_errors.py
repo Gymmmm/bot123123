@@ -36,7 +36,7 @@ def _encoded(view):
 
 def test_service_hub_has_video_entry_and_v4_copy():
     view = service_home_view()
-    assert "租房、看房、入住及租后问题" in view.text
+    assert "租房不只是找到房子" in view.text
     assert _labels(view)[0] == "🎥 视频带看"
     assert _callbacks(view)[0] == "v3u:service:video"
     assert all(term not in view.text + "".join(_labels(view)) for term in BANNED)

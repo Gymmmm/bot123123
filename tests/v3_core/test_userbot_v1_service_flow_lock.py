@@ -22,16 +22,15 @@ def test_p15_service_hub_copy_buttons_and_callbacks_locked():
     view = service_home_view()
     assert view.text == (
         "🛎️ <b>侨联服务</b>\n\n"
-        "租房、看房、入住及租后问题，都可以从这里处理。\n"
-        "购买房产请进入出售房源网站查看实拍、价格及房源信息。"
+        "租房不只是找到房子。\n"
+        "从看房、签约到入住，有需要都可以继续联系侨联。"
     )
     assert _rows(view) == [
         ["🎥 视频带看", "🛡️ 看房与交接"],
         ["🤝 租后服务", "📋 我的租约"],
-        ["🏠 查看出售房源"],
         ["💬 中文顾问", "⬅️ 返回首页"],
     ]
-    assert _callbacks(view) == ["v3u:service:video", "v3u:home:rental", "v3u:service:aftercare", "v3u:service:tenant_lease", "https://qiaolian-jinbian-sale.vercel.app/", "v3u:home:contact", "v3u:t:home"]
+    assert _callbacks(view) == ["v3u:service:video", "v3u:home:rental", "v3u:service:aftercare", "v3u:service:tenant_lease", "v3u:home:contact", "v3u:t:home"]
 
 
 def test_p16_aftercare_only_exposes_real_workflows():

@@ -94,12 +94,10 @@ def rfcity_category_view(category: str) -> ServiceView:
 # without exposing their old copy/buttons.
 
 # Section 6 — 侨联服务 (locked hub).
-SALE_SITE_URL = "https://qiaolian-jinbian-sale.vercel.app/"
-
 SERVICE_HOME_TEXT = (
     "🛎️ <b>侨联服务</b>\n\n"
-    "租房、看房、入住及租后问题，都可以从这里处理。\n"
-    "购买房产请进入出售房源网站查看实拍、价格及房源信息。"
+    "租房不只是找到房子。\n"
+    "从看房、签约到入住，有需要都可以继续联系侨联。"
 )
 
 
@@ -110,7 +108,6 @@ def service_home_view() -> ServiceView:
         rows=(
             (ServiceChoice("🎥 视频带看", "v3u:service:video"), ServiceChoice("🛡️ 看房与交接", "v3u:home:rental")),
             (ServiceChoice("🤝 租后服务", "v3u:service:aftercare"), ServiceChoice("📋 我的租约", "v3u:service:tenant_lease")),
-            (ServiceChoice("🏠 查看出售房源", SALE_SITE_URL),),
             (ServiceChoice("💬 中文顾问", "v3u:home:contact"), ServiceChoice("⬅️ 返回首页", "v3u:t:home")),
         ),
     )
