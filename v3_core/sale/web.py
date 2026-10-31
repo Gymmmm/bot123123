@@ -234,6 +234,21 @@ def make_handler(repository: SaleCatalogRepository, index_path: str | Path):
                 else:
                     self._json(HTTPStatus.OK, {"ok": True, "item": item})
                 return
+            poster_prefix = "/api/v3/sale/poster/"
+            if path.startswith(poster_prefix):
+                poster = repository.published_poster(unquote(path[len(poster_prefix):]))
+                if poster is None:
+                    self._json(HTTPStatus.NOT_FOUND, {"ok": False, "error": "poster_not_found"})
+                    return
+                body = poster.read_bytes()
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Content-Type", "image/png" if poster.suffix.lower() == ".png" else "image/jpeg")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "public, max-age=3600")
+                self._common_headers()
+                self.end_headers()
+                self.wfile.write(body)
+                return
             media_prefix = "/api/v3/sale/media/"
             if path.startswith(media_prefix):
                 self._media(path[len(media_prefix):])
