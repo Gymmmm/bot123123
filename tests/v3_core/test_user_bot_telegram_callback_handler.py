@@ -608,4 +608,24 @@ def test_mobile_detail_grid_emphasizes_hero_and_preserves_portrait(tmp_path, cou
     with Image.open(BytesIO(payload)) as preview:
         assert preview.size == (1080, 1350)
         assert preview.getpixel((540, 300))[0] > 140
-        assert preview.getpixel((160, 1150))[1] > 140
+        detail_x = 160 if count == 3 else 880
+        assert preview.getpixel((detail_x, 1150))[1] > 140
+
+
+@pytest.mark.parametrize("count", [1, 2, 3, 4])
+def test_detail_grid_keeps_source_edges_and_pale_matte(tmp_path, count):
+    from io import BytesIO
+    from PIL import Image
+    from v3_core.user_bot.telegram_callback_handler import _detail_grid
+
+    photos = []
+    for i in range(count):
+        image = Image.new("RGB", (900, 300), (35 + i * 30, 100, 125))
+        path = tmp_path / f"room-{i}.png"
+        image.save(path)
+        photos.append(str(path))
+    with Image.open(BytesIO(_detail_grid(tuple(photos), 0))) as result:
+        assert result.size == (1080, 1350)
+        # Horizontal sources stay horizontal with the matte exposed; never
+        # stretched vertically or cropped to fill narrow detail cells.
+        assert result.getpixel((5, 5))[0] > 170

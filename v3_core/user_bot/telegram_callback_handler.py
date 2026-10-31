@@ -243,14 +243,14 @@ def _single_detail_keyboard(
         photo_row = []
         if index > 0:
             photo_row.append(InlineKeyboardButton(
-                "⬅️ 上组", callback_data=f"v3u:detailphoto:{public_id}:{index - 1}"
+                "⬅️ 上一组", callback_data=f"v3u:detailphoto:{public_id}:{index - 1}"
             ))
         photo_row.append(InlineKeyboardButton(
             f"{index + 1}/{pages}", callback_data=f"v3u:detailphoto:{public_id}:{index}"
         ))
         if index + 1 < pages:
             photo_row.append(InlineKeyboardButton(
-                "下组 ➡️", callback_data=f"v3u:detailphoto:{public_id}:{index + 1}"
+                "下一组 ➡️", callback_data=f"v3u:detailphoto:{public_id}:{index + 1}"
             ))
         rows.append(photo_row)
     if total > 1:
@@ -268,50 +268,44 @@ def _single_detail_keyboard(
 
 
 def _detail_grid(paths: tuple[str, ...], page: int) -> bytes:
-    """Phone-first real-photo preview: one large hero plus up to three rooms.
+    """Display 1–4 complete original photos in one editable 4:5 Telegram image.
 
-    Do not place logos or marketing words over the originals. Portrait villa
-    exteriors are contained over a softly blurred fill so their roofs survive.
+    4: left hero/right three; 3: top hero/bottom two; 2: stacked;
+    1: full frame. No cropping, stretching or artificial blurred image.
     """
-    from PIL import ImageFilter
-
-    selected = paths[page * 4: page * 4 + 4]
+    selected = paths[page * 4:page * 4 + 4]
     if not selected:
         raise ValueError("detail_grid_has_no_photos")
-    width, height, gutter = 1080, 1350, 9
+    width, height, gutter = 1080, 1350, 10
     count = len(selected)
     if count == 1:
         boxes = [(0, 0, width, height)]
+    elif count == 2:
+        top = (height - gutter) // 2
+        boxes = [(0, 0, width, top),
+                 (0, top + gutter, width, height - top - gutter)]
+    elif count == 3:
+        top = 880
+        left = (width - gutter) // 2
+        boxes = [(0, 0, width, top),
+                 (0, top + gutter, left, height - top - gutter),
+                 (left + gutter, top + gutter, width - left - gutter, height - top - gutter)]
     else:
-        hero_height = 836
-        thumb_top = hero_height + gutter
-        thumb_height = height - thumb_top
-        thumb_width = (width - gutter * (count - 2)) // (count - 1)
-        boxes = [(0, 0, width, hero_height)]
-        left = 0
-        for index in range(count - 1):
-            cell_width = thumb_width if index < count - 2 else width - left
-            boxes.append((left, thumb_top, cell_width, thumb_height))
-            left += cell_width + gutter
+        hero = 688
+        right_x, right_w = hero + gutter, width - hero - gutter
+        cell_h = (height - 2 * gutter) // 3
+        boxes = [(0, 0, hero, height),
+                 (right_x, 0, right_w, cell_h),
+                 (right_x, cell_h + gutter, right_w, cell_h),
+                 (right_x, 2 * (cell_h + gutter), right_w, height - 2 * (cell_h + gutter))]
 
-    canvas = Image.new("RGB", (width, height), "white")
-    for index, (source, (x, y, w, h)) in enumerate(zip(selected, boxes)):
+    canvas = Image.new("RGB", (width, height), "#EDF0ED")
+    for source, (x, y, w, h) in zip(selected, boxes):
         with Image.open(source) as original:
-            corrected = ImageOps.exif_transpose(original).convert("RGB")
-        if index == 0 and corrected.height > corrected.width * 1.18:
-            photo = ImageOps.fit(
-                corrected, (w, h), method=Image.Resampling.LANCZOS
-            ).filter(ImageFilter.GaussianBlur(24))
-            visible = ImageOps.contain(
-                corrected, (w, h), method=Image.Resampling.LANCZOS
-            )
-            photo.paste(visible, ((w - visible.width) // 2, (h - visible.height) // 2))
-        else:
-            photo = ImageOps.fit(
-                corrected, (w, h), method=Image.Resampling.LANCZOS,
-                centering=(0.5, 0.45 if index == 0 else 0.5),
-            )
-        canvas.paste(photo, (x, y))
+            photo = ImageOps.contain(ImageOps.exif_transpose(original).convert("RGB"),
+                                     (w, h), method=Image.Resampling.LANCZOS)
+        canvas.paste(photo, (x + (w - photo.width) // 2,
+                             y + (h - photo.height) // 2))
     output = BytesIO()
     canvas.save(output, format="JPEG", quality=91, optimize=True)
     return output.getvalue()
