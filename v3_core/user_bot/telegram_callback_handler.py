@@ -255,7 +255,7 @@ def _single_detail_keyboard(
         rows.append(photo_row)
     if total > 1:
         rows.append([InlineKeyboardButton(
-            "🔍 高清原图", callback_data=f"v3u:listing:photos:{public_id}:pg:{index}"
+            "🔍 高清原图", callback_data=f"v3u:detailfull:{public_id}:{index * 4}"
         )])
     for row in (getattr(markup, "inline_keyboard", None) or ()):
         clean = [
@@ -441,6 +441,70 @@ async def send_listing_details(
     if public_id:
         _remember_album_sent(state, message_ids=ids, page=DETAILS_ALBUM_PAGE)
         state["detail_index"] = 0
+        state["detail_full"] = False
+    return True
+
+
+async def _handle_detail_full(
+    update: Any, context: Any, router: CallbackRouter, raw: str,
+    *, advisor_url: str = "", channel_url: str = "",
+) -> bool:
+    """Show individual originals in the SAME Telegram message, never send an album."""
+    match = re.fullmatch(r"v3u:detail(full|back):(QL-[A-Z0-9-]+):(\d+)", raw)
+    if match is None:
+        return False
+    query = update.callback_query
+    public_id = normalize_public_id(match.group(2))
+    if public_id is None:
+        await query.answer("房源入口无效", show_alert=True)
+        return True
+    listings = getattr(router, "listings", None)
+    result = listings.resolve_action(public_id, "details") if listings else None
+    details = getattr(result, "details", None) if getattr(result, "ok", False) else None
+    if details is None:
+        await query.answer("房源已更新，请重新进入", show_alert=True)
+        return True
+    paths = tuple(path for path in details.photo_paths if Path(path).is_file())
+    value = int(match.group(3))
+    page = value // 4 if match.group(1) == "full" else value
+    if not paths or (match.group(1) == "full" and value >= len(paths)) or page >= (len(paths) + 3) // 4:
+        await query.answer("这张实拍暂时无法打开", show_alert=True)
+        return True
+    if not getattr(getattr(query, "message", None), "photo", None):
+        await query.answer("请重新进入房源详情", show_alert=True)
+        return True
+    from .telegram_ui import build_action_keyboard
+    base = polish_listing_keyboard(
+        build_action_keyboard(details.action_rows),
+        advisor_url=advisor_url, channel_url=channel_url, add_home=True,
+        listing_summary=details.listing_summary,
+    )
+    if match.group(1) == "back":
+        media = _detail_grid(paths, page)
+        caption = _single_detail_caption(details.text, page, len(paths))
+        keyboard = _single_detail_keyboard(base, public_id, page, len(paths))
+    else:
+        media = Path(paths[value]).read_bytes()
+        caption = _single_detail_caption(details.text, page, len(paths))
+        rows: list[list[InlineKeyboardButton]] = []
+        previous = []
+        if value > 0:
+            previous.append(InlineKeyboardButton("⬅️ 上一张", callback_data=f"v3u:detailfull:{public_id}:{value - 1}"))
+        previous.append(InlineKeyboardButton(f"{value + 1}/{len(paths)}", callback_data=f"v3u:detailfull:{public_id}:{value}"))
+        if value + 1 < len(paths):
+            previous.append(InlineKeyboardButton("下一张 ➡️", callback_data=f"v3u:detailfull:{public_id}:{value + 1}"))
+        rows.append(previous)
+        rows.append([InlineKeyboardButton("⬅️ 返回拼图", callback_data=f"v3u:detailback:{public_id}:{page}")])
+        rows.extend(base.inline_keyboard)
+        keyboard = InlineKeyboardMarkup(rows)
+    await query.answer()
+    await query.edit_message_media(
+        media=InputMediaPhoto(media=media, caption=caption, parse_mode=ParseMode.HTML),
+        reply_markup=keyboard,
+    )
+    state = _album_state(update, context, public_id)
+    state["detail_index"] = page
+    state["detail_full"] = match.group(1) == "full"
     return True
 
 
@@ -478,7 +542,7 @@ async def _handle_detail_photo(
     shown_caption = str(getattr(query.message, "caption", "") or "")
     if (shown_caption.startswith(f"📷 实拍 {index * 4 + 1}–{min(index * 4 + 4, len(paths))}/{len(paths)}")
             or (current_id in _album_message_ids(state)
-                and int(state.get("detail_index", -1)) == index)):
+                and int(state.get("detail_index", -1)) == index and not state.get("detail_full"))):
         await query.answer()
         return True
     from .telegram_ui import build_action_keyboard
@@ -500,6 +564,7 @@ async def _handle_detail_photo(
     )
     _remember_album_sent(state, message_ids=[current_id], page=DETAILS_ALBUM_PAGE)
     state["detail_index"] = index
+    state["detail_full"] = False
     return True
 
 
@@ -761,6 +826,13 @@ async def handle_v3_callback(
         return TelegramCallbackHandlerOutcome(handled=False)
     if parse_transition_callback(raw) is not None:
         return TelegramCallbackHandlerOutcome(handled=False)
+    if raw.startswith(("v3u:detailfull:", "v3u:detailback:")):
+        handled = await _handle_detail_full(
+            update, context, router, raw,
+            advisor_url=advisor_url, channel_url=channel_url,
+        )
+        if handled:
+            return TelegramCallbackHandlerOutcome(handled=True)
     if raw.startswith("v3u:detailphoto:"):
         handled = await _handle_detail_photo(
             update, context, router, raw,

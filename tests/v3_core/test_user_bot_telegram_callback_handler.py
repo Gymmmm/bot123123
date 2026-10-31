@@ -652,3 +652,32 @@ def test_four_landscape_photos_have_one_large_hero(tmp_path):
         assert out.getpixel((540, 350))[0] > 180  # full-width hero
         for x, channel in [(150, 1), (540, 2), (910, 0)]:
             assert out.getpixel((x, out.height - 115))[channel] > 140
+
+@pytest.mark.asyncio
+async def test_high_resolution_edits_current_message_without_new_album(tmp_path):
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+    from PIL import Image
+    from v3_core.user_bot.telegram_callback_handler import _handle_detail_full, _single_detail_keyboard
+
+    public_id = "QL-RF-A2B3"
+    photos = []
+    for i in range(5):
+        path = tmp_path / f"photo{i}.jpg"
+        Image.new("RGB", (800, 600), (40 + i, 80, 120)).save(path)
+        photos.append(str(path))
+    detail = SimpleNamespace(photo_paths=tuple(photos), text="Test listing", action_rows=((__import__("v3_core.user_bot.listing_responses", fromlist=["SemanticAction"]).SemanticAction("查看房源", "details", public_id),),), listing_summary="")
+    listings = SimpleNamespace(resolve_action=lambda *args: SimpleNamespace(ok=True, details=detail))
+    router = SimpleNamespace(listings=listings)
+    query = SimpleNamespace(message=SimpleNamespace(photo=[object()], message_id=55),
+                            answer=AsyncMock(), edit_message_media=AsyncMock())
+    update = SimpleNamespace(callback_query=query, effective_chat=SimpleNamespace(id=123))
+    context = SimpleNamespace(user_data={}, bot=SimpleNamespace(send_media_group=AsyncMock(), send_photo=AsyncMock()))
+    keyboard = _single_detail_keyboard(None, public_id, 0, 5)
+    assert keyboard.inline_keyboard[1][0].callback_data == f"v3u:detailfull:{public_id}:0"
+    assert await _handle_detail_full(update, context, router, f"v3u:detailfull:{public_id}:0")
+    assert await _handle_detail_full(update, context, router, f"v3u:detailfull:{public_id}:1")
+    assert await _handle_detail_full(update, context, router, f"v3u:detailback:{public_id}:0")
+    assert query.edit_message_media.await_count == 3
+    assert context.bot.send_photo.await_count == 0
+    assert context.bot.send_media_group.await_count == 0
