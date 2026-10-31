@@ -22,9 +22,9 @@ def build_search_no_match_view(intent: SearchSubmitIntent) -> TransitionView:
     return TransitionView(
         kind="search_no_match",
         text=(
-            "🔍 <b>还没找到完全符合的房子</b>"
+            "🔍 <b>暂时没有完全符合的房源</b>"
             f"{summary_block}\n\n"
-            "可以只调整一项，其他条件保留；也可以让中文顾问继续帮你找。"
+            "调整一项条件即可继续搜索，其他条件会保留。\n也可以把需求交给中文顾问。"
         ),
         rows=(
             (
@@ -33,7 +33,7 @@ def build_search_no_match_view(intent: SearchSubmitIntent) -> TransitionView:
             ),
             (
                 TransitionChoice("🏠 调整户型", "adjust_layout"),
-                TransitionChoice("💬 帮我找房", "home", value="contact"),
+                TransitionChoice("💬 中文顾问", "home", value="contact"),
             ),
             (TransitionChoice("⬅️ 返回找房", "change_search"),),
         ),

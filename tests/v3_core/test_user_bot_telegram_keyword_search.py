@@ -183,8 +183,8 @@ async def test_keyword_no_match_stays_strict_and_offers_recovery_actions_then_re
         search_executor=FakeSearchExecutor(matched=False), lead_effects=effects,
     )
     assert outcome.presentation is not None and not outcome.presentation.matched
-    assert "还没找到完全符合的房子" in message.calls[-1][1][0]
-    assert "可以只调整一项，其他条件保留" in message.calls[-1][1][0]
+    assert "暂时没有完全符合的房源" in message.calls[-1][1][0]
+    assert "调整一项条件即可继续搜索，其他条件会保留" in message.calls[-1][1][0]
     markup = message.calls[-1][2]["reply_markup"]
     callbacks = [button.callback_data for row in markup.inline_keyboard for button in row]
     assert callbacks == ["v3u:t:adjust_budget", "v3u:t:adjust_area", "v3u:t:adjust_layout", "v3u:home:contact", "v3u:change_search"]

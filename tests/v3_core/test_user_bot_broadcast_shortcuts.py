@@ -141,7 +141,7 @@ async def test_latest_shortcut_uses_published_search_executor_not_property_resol
     assert limit == 5
     assert intent.source == "daily_broadcast_latest"
     assert intent.touch_payload == {"daily_broadcast": True, "latest": True}
-    assert "还没找到完全符合的房子" in message.calls[-1][0][0]
+    assert "暂时没有完全符合的房源" in message.calls[-1][0][0]
 
 
 @pytest.mark.asyncio

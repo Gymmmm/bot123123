@@ -206,10 +206,10 @@ def _lines(item: AppointmentHistoryItem, *, past: bool = False) -> list[str]:
     )
     mode_icon = "🎥" if item.viewing_mode == "video" else "🚶"
     return [
-        f"🏠 {he(item.subject)}",
-        f"🗓️ {he(_date_compact(item.appointment_date))} · {he(_time_compact(item.appointment_time))}",
+        f"🏠 <b>{he(item.subject)}</b>",
         f"{mode_icon} {he(mode)}",
-        f"📌 {status_icon} {he(status_label)}",
+        f"🗓️ {he(_date_compact(item.appointment_date))} · {he(_time_compact(item.appointment_time))}",
+        f"状态：{status_icon} {he(status_label)}",
     ]
 
 
@@ -247,8 +247,8 @@ class AppointmentHistoryService:
         items = tuple(_item(record, self.inventory) for record in upcoming_records[:2])
 
         parts = ["📋 <b>我的看房预约</b>"]
-        for item in items:
-            parts.append("")
+        for index, item in enumerate(items):
+            parts.extend(["", "──────────"] if index else [""])
             parts.extend(_lines(item))
         if len(upcoming_records) > 2:
             parts.extend(["", "更多预约记录请联系中文顾问。"])
