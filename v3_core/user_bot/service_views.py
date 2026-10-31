@@ -94,10 +94,12 @@ def rfcity_category_view(category: str) -> ServiceView:
 # without exposing their old copy/buttons.
 
 # Section 6 — 侨联服务 (locked hub).
+SALE_SITE_URL = "https://qiaolian-jinbian-sale.vercel.app/"
+
 SERVICE_HOME_TEXT = (
     "🛎️ <b>侨联服务</b>\n\n"
-    "租房不只是找到房子。\n"
-    "从看房、签约到入住，有需要都可以继续联系侨联。"
+    "租房、看房、入住及租后问题，都可以从这里处理。\n"
+    "购买房产请进入出售房源网站查看实拍、价格及房源信息。"
 )
 
 
@@ -108,6 +110,7 @@ def service_home_view() -> ServiceView:
         rows=(
             (ServiceChoice("🎥 视频带看", "v3u:service:video"), ServiceChoice("🛡️ 看房与交接", "v3u:home:rental")),
             (ServiceChoice("🤝 租后服务", "v3u:service:aftercare"), ServiceChoice("📋 我的租约", "v3u:service:tenant_lease")),
+            (ServiceChoice("🏠 查看出售房源", SALE_SITE_URL),),
             (ServiceChoice("💬 中文顾问", "v3u:home:contact"), ServiceChoice("⬅️ 返回首页", "v3u:t:home")),
         ),
     )
@@ -139,8 +142,8 @@ def video_service_view() -> ServiceView:
 # Section 9 — 租后服务 (descriptive naming per locked status).
 AFTERCARE_TEXT = (
     "🤝 <b>租后服务</b>\n\n"
-    "住进去以后，有问题也能找我们。\n"
-    "房屋报修、物业沟通、账单看不明白，都可以告诉中文顾问。"
+    "入住后遇到房屋、物业或费用问题，可以在这里提交。\n"
+    "请按问题类型选择；具体处理安排以顾问沟通确认为准。"
 )
 
 
@@ -159,8 +162,8 @@ def aftercare_home_view() -> ServiceView:
 # Section 7 — 看房与交接 (locked rename from 看房与交接 / 看房与交接 / 侨联保障).
 RENTAL_SERVICE_TEXT = (
     "🛡️ <b>看房与交接</b>\n\n"
-    "入住前后把房屋情况留清楚，交接时更有依据。\n\n"
-    "这里可以查看入住留档清单；需要协调交接，直接找中文顾问。"
+    "入住有记录，退租有依据。\n\n"
+    "查看交接核对清单；如需现场交接协助，请联系中文顾问。"
 )
 
 
@@ -195,7 +198,7 @@ def handover_record_view() -> ServiceView:
         kind="rental_handover",
         text=HANDOVER_RECORD_TEXT,
         rows=(
-            (ServiceChoice("📋 查看入住清单", "v3u:rental:handover_download"),),
+            (ServiceChoice("📋 查看交接清单", "v3u:rental:handover_download"),),
             (ServiceChoice("⬅️ 返回看房与交接", "v3u:home:rental"),),
         ),
     )
@@ -209,7 +212,7 @@ def concierge_home_view() -> ServiceView:
 def repair_home_view() -> ServiceView:
     return ServiceView(
         kind="repair_home",
-        text="🔧 <b>房屋报修</b>\n\n请选择需要处理的问题：",
+        text="🔧 <b>房屋报修</b>\n\n请选择故障类型，再简要描述现场情况。\n照片或视频可以稍后补充。",
         rows=(
             (ServiceChoice("❄️ 空调", "v3u:service:issue:repair_ac"), ServiceChoice("🚿 热水 / 漏水", "v3u:service:issue:repair_water")),
             (ServiceChoice("💡 灯具 / 电路", "v3u:service:issue:repair_power"), ServiceChoice("🔐 门锁 / 门禁", "v3u:service:issue:repair_door")),
@@ -248,7 +251,7 @@ def repair_media_view(draft: ServiceRequestDraft, media_count: int = 0) -> Servi
         text=(
             "📷 <b>补充图片或视频</b>\n\n"
             "可以连续发送现场图片或视频。\n\n"
-            "没有附件也可以直接下一步。"
+            "没有附件可以直接跳过。"
             + count_line
         ),
         rows=rows,
@@ -353,7 +356,7 @@ def property_view() -> ServiceView:
     choices = [ServiceChoice(label, f"v3u:service:property_category:{key}") for label, key in _PROPERTY_CATEGORIES]
     return ServiceView(
         kind="property",
-        text="🏢 <b>物业问题</b>\n\n门禁、电梯、公共设施或者跟物业沟通有问题？选一个类型告诉我们：",
+        text="🏢 <b>物业问题</b>\n\n门禁、电梯、停车或公共设施有问题？\n选择类型，再说明需要协助的情况。",
         rows=(
             (choices[0], choices[1]),
             (choices[2], choices[3]),
@@ -375,7 +378,7 @@ def property_description_view(category_label: str) -> ServiceView:
 def property_time_view() -> ServiceView:
     return ServiceView(
         kind="property_time",
-        text="🕐 <b>事情什么时候发生？</b>",
+        text="🕐 <b>问题发生时间</b>\n\n请选择大致时间，便于顾问核对。",
         rows=(
             (ServiceChoice("今天", "v3u:service:property_time:今天"), ServiceChoice("昨天", "v3u:service:property_time:昨天")),
             (ServiceChoice("这几天", "v3u:service:property_time:这几天"), ServiceChoice("其他时间", "v3u:service:property_time:other")),
@@ -387,7 +390,7 @@ def property_time_view() -> ServiceView:
 def property_contacted_view() -> ServiceView:
     return ServiceView(
         kind="property_contacted",
-        text="🏢 <b>是否已经联系过物业？</b>",
+        text="🏢 <b>是否联系过物业？</b>\n\n如已联系，请在提交后向顾问补充处理情况。",
         rows=(
             (ServiceChoice("已经联系过", "v3u:service:property_contacted:yes"), ServiceChoice("还没有联系", "v3u:service:property_contacted:no")),
             (ServiceChoice("⬅️ 返回", "v3u:service:property_modify_time"),),
@@ -452,7 +455,7 @@ def property_exit_view() -> ServiceView:
 
 def utility_stub_view(kind: str) -> ServiceView:
     labels = {
-        "utilities": ("💡 账单协助", "水电、物业费或者其他住房费用看不明白？把账单内容或照片发给中文顾问就行。"),
+        "utilities": ("💡 账单协助", "对水电费、物业费或其他住房费用有疑问？\n请把账单照片和需要核对的项目发送给中文顾问。"),
         "moving": ("🚚 搬家服务", "请说明搬家日期、出发地、目的地，以及大概物品情况。"),
         "cleaning": ("🧹 保洁服务", "请说明需要哪种保洁，以及希望安排的日期：\n\n日常保洁 / 入住保洁 / 退租保洁 / 深度保洁"),
         "network_help": ("🌐 网络办理", "请说明需要处理的问题：\n\n新装 / 续费 / 故障 / 其他"),

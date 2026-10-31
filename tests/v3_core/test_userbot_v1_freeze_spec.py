@@ -18,11 +18,11 @@ def test_home_matches_final_service_surface():
 
 def test_search_entry_is_direct_filter_panel():
     view = TransitionViewService.search_entry()
-    assert "想找什么样的房子" in view.text
+    assert "开始找房" in view.text
     assert "BKK1，两房，$800以内，下个月入住" in view.text
     assert _labels(view) == [
         "📍 选区域", "💰 选预算", "🏠 选户型",
-        "💬 帮我找房", "⬅️ 返回首页",
+        "💬 中文顾问", "⬅️ 返回首页",
     ]
 
 
@@ -34,7 +34,7 @@ def test_listing_surface_source_contains_final_first_layer_actions():
 
 
 def test_service_hubs_match_final_layouts():
-    assert _labels(service_home_view()) == ["🎥 视频带看", "🛡️ 看房与交接", "🤝 租后服务", "📋 我的租约", "💬 中文顾问", "⬅️ 返回首页"]
+    assert _labels(service_home_view()) == ["🎥 视频带看", "🛡️ 看房与交接", "🤝 租后服务", "📋 我的租约", "🏠 查看出售房源", "💬 中文顾问", "⬅️ 返回首页"]
     from v3_core.user_bot.service_views import aftercare_home_view
     assert _labels(aftercare_home_view()) == [
         "🔧 房屋报修", "🏢 物业协调",

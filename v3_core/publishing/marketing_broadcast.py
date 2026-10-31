@@ -254,19 +254,19 @@ class MarketingBroadcastService:
         }
         locked["thu"] = ((latest or find,), (advisor,))
         locked["sun"] = ((service,), (advisor,))
+        sale = BroadcastButton("🏠 查看出售房源", SALE_SITE_URL)
         if selected == "default":
-            if template.key == "sun":
-                return ((BroadcastButton("🏠 查看出售房源", SALE_SITE_URL),), (advisor,))
-            return locked[template.key]
-        generic = {"find": BroadcastButton("🔍 帮我找房", find.url), "contact": BroadcastButton("💬 联系中文顾问", advisor.url)}
+            base = ((advisor,),) if template.key == "sun" else locked[template.key]
+            return ((sale,),) + base if template.key == "sun" else base + ((sale,),)
+        generic = {"find": BroadcastButton("🔍 开始找房", find.url), "contact": advisor}
         if latest is not None:
             generic["latest"] = latest
         if selected == "combo":
             first = tuple(button for button in (find, latest) if button is not None)
-            return (first, (advisor,))
+            return (first, (advisor,), (sale,))
         if selected in generic:
-            return ((generic[selected],),)
-        return locked[template.key]
+            return ((generic[selected],), (sale,))
+        return locked[template.key] + ((sale,),)
 
     def claim_due(self, now: datetime | None = None) -> tuple[bool, str]:
         current = now.astimezone(self.timezone) if now else self.local_now()

@@ -109,8 +109,8 @@ def test_marketing_runtime_button_rows_and_urls_match_locked_v1(tmp_path, monkey
     monkeypatch.setenv("CHANNEL_USERNAME", "qiaolian_channel")
     service = MarketingBroadcastService(db, user_bot_username="qiaolian_rent_bot")
 
-    expected_labels = {key: [["🔍 开始找房"], ["💬 中文顾问"]] for key in ("mon", "tue", "wed", "fri", "sat")}
-    expected_labels["thu"] = [["📢 最新房源"], ["💬 中文顾问"]]
+    expected_labels = {key: [["🔍 开始找房"], ["💬 中文顾问"], ["🏠 查看出售房源"]] for key in ("mon", "tue", "wed", "fri", "sat")}
+    expected_labels["thu"] = [["📢 最新房源"], ["💬 中文顾问"], ["🏠 查看出售房源"]]
     expected_labels["sun"] = [["🏠 查看出售房源"], ["💬 中文顾问"]]
     expected_urls = {
         "🔍 开始找房": "https://t.me/qiaolian_rent_bot?start=find",
