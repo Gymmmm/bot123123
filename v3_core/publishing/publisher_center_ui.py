@@ -85,15 +85,8 @@ class PublisherCenterAdminController(BroadcastAdminController):
         today = self.marketing.template()
         today_state = self._today_delivery_state("marketing_" + today.key)
         lines = [
-            "<b>🗓 本周营销</b>",
-            "",
-            "周一  📊 本周租房库存",
-            "周二  💰 预算能租什么",
-            "周三  📍 当前房源区域",
-            "周四  🆕 近7天上新",
-            "周五  📋 周末看房准备",
-            "周六  🏠 周末可看房源",
-            "周日  📈 本周房源复盘",
+            "<b>🗓 七天营销</b>", "",
+            *(f"周{'一二三四五六日'[i]}  {escape(t.title)}" for i, t in enumerate(TEMPLATES)),
             "",
             f"自动营销：{'🟢 已开启' if self.marketing.enabled else '⏸ 已暂停'}",
             f"发送时间：{escape(self.marketing.send_time)}",

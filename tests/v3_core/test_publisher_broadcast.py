@@ -220,14 +220,14 @@ def test_live_builder_preserves_weather_and_fx_contract(tmp_path):
     assert "2026.09.09" in body
     assert "🌦 今日天气" in body
     assert "小雨 25–32℃｜降雨 45%" in body
-    assert "💱 今日汇率" in body
+    assert "💱 美元兑人民币" in body
     assert "1 USD ≈ 7.00 CNY" in body
     assert "100 USD ≈ 700 CNY" in body
-    assert "📌 今日提醒" in body
+    assert "📌 出行提醒" in body
     assert "今天有阵雨，出门记得带伞。" in body
-    assert "金边年租找房" in body
-    assert "租金按月展示" in body
-    assert "常去地点 / 区域 + 月预算 + 户型 + 入住时间" in body
+    assert "今日找房" in body
+    assert "先看合适的房源实拍" in body
+    assert "常去地点、月租预算、户型和入住时间" in body
 
 
 def test_publisher_dashboard_exposes_broadcast_center(tmp_path):

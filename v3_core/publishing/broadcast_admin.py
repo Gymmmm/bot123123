@@ -156,9 +156,9 @@ class BroadcastAdminController:
         marketing_button = self.marketing.button_key(today_index)
         today_state = self._today_delivery_state("marketing_" + today.key)
         lines = [
-            "<b>🗓 本周营销</b>", "",
-            "周一  🏠 本周找房", "周二  📋 看房准备", "周三  💰 租房预算",
-            "周四  🔍 房源怎么选", "周五  📝 签约提醒", "周六  🏠 周末看房", "周日  🛡 侨联保障", "",
+            "<b>🗓 七天营销</b>", "",
+            *(f"周{'一二三四五六日'[i]}  {escape(t.title)}" for i, t in enumerate(TEMPLATES)),
+            "",
             f"自动营销：{'🟢 已开启' if self.marketing.enabled else '⏸ 已暂停'}",
             f"发送时间：{escape(self.marketing.send_time)}",
             f"今日文案：{'自定义' if today.body != TEMPLATES[today_index].body else '默认'}",
