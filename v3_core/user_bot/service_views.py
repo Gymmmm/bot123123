@@ -176,7 +176,7 @@ def rental_service_home_view() -> ServiceView:
 
 # Section 8 — 入住留档 (重点权益页，保留最多细节).
 HANDOVER_RECORD_TEXT = (
-    "🛡️ <b>入住留档</b>\n\n"
+    "🛡️ <b>入住留档｜PDF 清单</b>\n\n"
     "入住有记录，退租有依据。\n\n"
     "入住当天建议记录：\n"
     "• 水电表\n"
@@ -184,7 +184,8 @@ HANDOVER_RECORD_TEXT = (
     "• 钥匙和门卡\n"
     "• 墙面 / 地板 / 卫浴已有问题\n"
     "• 需要房东或物业处理的事项\n\n"
-    "建议照片和视频一起保存。"
+    "点击下方按钮下载《入住交接清单》PDF，保存到手机。\n"
+    "交接时按清单核对，并拍照或录像留存。"
 )
 
 
@@ -193,7 +194,7 @@ def handover_record_view() -> ServiceView:
         kind="rental_handover",
         text=HANDOVER_RECORD_TEXT,
         rows=(
-            (ServiceChoice("📋 查看入住清单", "v3u:rental:handover_download"),),
+            (ServiceChoice("📄 下载入住交接清单 PDF", "v3u:rental:handover_download"),),
             (ServiceChoice("⬅️ 返回看房与交接", "v3u:home:rental"),),
         ),
     )

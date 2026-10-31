@@ -304,23 +304,27 @@ def _search_budget_view(
 
 
 def _search_area_view(*, summary: str = "", back_kind: str = "change_search") -> TransitionView:
-    choices = tuple(TransitionChoice(label, "area_choice", code) for code, label in AREA_OPTIONS)
+    # Short keyboard labels; selection codes still retain canonical area names.
+    names = {"bkk1": "BKK1", "bkk23": "BKK2 / BKK3", "koh": "钻石岛",
+             "jinjie": "金街", "rf": "富力城", "aeon1": "永旺1",
+             "tk": "堆谷 TK", "russian": "俄罗斯市场", "pp": "炳发城",
+             "chroy": "水净华", "sen": "森速 / 永旺2"}
+    choices = tuple(TransitionChoice(names[code], "area_choice", code) for code, _ in AREA_OPTIONS)
     rows = (
         (choices[0], choices[1]),
         (choices[2], choices[3]),
         (choices[4], choices[5]),
-        (choices[6],),
-        (choices[7],),
+        (choices[6], choices[7]),
         (choices[8], choices[9]),
         (choices[10],),
-        (TransitionChoice("✏️ 输入其他位置", "area_other"),),
+        (TransitionChoice("✏️ 其他区域 / 小区", "area_other"),),
         (_back_choice(back_kind),),
     )
     return TransitionView(
         kind="search_area",
         text=(
             "📍 <b>想住在哪个区域？</b>\n\n"
-            "选一个区域，或者直接告诉我小区名称。"
+            "选择常住区域，或直接输入小区、楼盘名称。"
             f"{_summary_block(summary)}"
         ),
         rows=rows,
