@@ -23,7 +23,7 @@ KEY_ENABLED = "marketing_broadcast_enabled"
 KEY_TIME = "marketing_broadcast_time"
 KEY_LAST_ATTEMPT = "marketing_broadcast_last_attempt_date"
 KEY_LAST_SENT = "marketing_broadcast_last_sent_date"
-DEFAULTS = {KEY_ENABLED: "1", KEY_TIME: "18:30", KEY_LAST_ATTEMPT: "", KEY_LAST_SENT: ""}
+DEFAULTS = {KEY_ENABLED: "1", KEY_TIME: "17:30", KEY_LAST_ATTEMPT: "", KEY_LAST_SENT: ""}
 
 
 @dataclass(frozen=True)
@@ -35,13 +35,13 @@ class MarketingTemplate:
 
 
 TEMPLATES = (
-    MarketingTemplate('mon', '🏠 本周找房', '🏠 <b>侨联地产｜金边找房</b>\n\n准备换房或刚到金边？不用先翻几十套房源。\n\n告诉我们三个信息：\n📍 想住的区域或常去地点\n💵 每月预算\n🛏 户型及预计入住时间\n\n先看匹配的真实照片与租金，再选值得实地看的房子。\n\n<b>找房从明确需求开始。</b>', (('🔍 开始找房', 'find'), ('💬 中文顾问', 'advisor'))),
-    MarketingTemplate('tue', '💰 预算与费用', '💰 <b>侨联地产｜租房费用清单</b>\n\n同样的月租，实际入住成本可能不同。\n\n看中房源时，除了租金，还要确认：\n• 押金、付款周期和最低租期\n• 水电、物业、网络、停车费用\n• 家具配置及维修责任\n\n把预算和户型发给我们，先筛出合适的房源，再逐项核对费用。', (('🔍 开始找房', 'find'), ('💬 中文顾问', 'advisor'))),
-    MarketingTemplate('wed', '📍 住在哪个区域', '📍 <b>侨联地产｜选对居住区域</b>\n\nBKK、钻石岛、堆谷、富力城……位置不同，适合的生活方式也不同。\n\n比起只看楼盘，先确定每天的出行重点：上班、学校、购物或接送孩子。\n\n发来常去地点和月租预算，侨联帮你缩小找房范围。\n\n<b>住得方便，比看起来热闹更重要。</b>', (('🔍 开始找房', 'find'), ('💬 中文顾问', 'advisor'))),
-    MarketingTemplate('thu', '🆕 近期房源', '🆕 <b>侨联地产｜近期房源速览</b>\n\n想看最近发布了哪些房源？\n\n点下方「最新房源」，直接查看照片、户型、区域和租金。\n\n看到合适的一套，可进入房源详情预约看房，或把具体问题交给中文顾问。\n\n房态可能变化，以预约前核实结果为准。', (('📢 最新房源', 'latest'), ('💬 中文顾问', 'advisor'))),
-    MarketingTemplate('fri', '📋 看房核对', '📋 <b>侨联地产｜看房别漏掉这些</b>\n\n照片好看，只是第一步。\n\n到现场重点查看：\n☀️ 采光、通风及噪音\n🚿 水压、热水、空调与家电\n💵 水电物业费、押金和租期\n🔑 门锁、家具状态及交接记录\n\n有看不明白的地方，直接咨询对应房源的中文顾问。', (('🔍 开始找房', 'find'), ('💬 中文顾问', 'advisor'))),
-    MarketingTemplate('sat', '🎥 周末约看房', '🎥 <b>侨联地产｜周末看房预约</b>\n\n这周收藏了房源，周末安排看一看。\n\n🚶 <b>实地看房</b>｜现场了解空间、采光和周边。\n🎥 <b>视频带看</b>｜顾问到房屋现场，实时连线查看细节。\n\n在具体房源里点击「在线预约」，选择方式和希望的时段。\n\n顾问核对房态与时间后再确认安排。', (('🔍 开始找房', 'find'), ('💬 中文顾问', 'advisor'))),
-    MarketingTemplate('sun', '🏠 金边出售房源', '🏠 <b>侨联地产｜金边在售房源</b>\n\n想买公寓、排屋或别墅，先从实际房源开始了解。\n\n点击下方「查看出售房源」，按区域、楼盘和价格浏览房源资料与实拍。\n\n有感兴趣的房源，再联系中文顾问核对实际房态、产权资料、税费及交易条件。\n\n<b>先看清房源，再谈下一步。</b>', (('🏠 查看出售房源', 'sale'), ('💬 中文顾问', 'advisor'))),
+    MarketingTemplate('mon', '🏠 租房费用', '🏠 <b>金边租房，先把费用问清楚</b>\n\n同样是 $800/月，实际入住支出可能不同。\n\n看房前确认：\n• 押金和付款周期\n• 水电、物业及停车费用\n• 合同期限和最早入住时间\n\n侨联先帮你核对条件，再安排合适的房源。\n\n<b>找房需求：区域＋预算＋户型＋入住时间</b>\n\n💎 <b>侨联地产｜您在金边的自己人</b>', (("🏠 我要租房", "find"), ("🏢 我要买房", "sale"), ("💬 中文顾问", "advisor"))),
+    MarketingTemplate('tue', '📌 看房先核对', '📌 <b>一套房值不值得看？</b>\n\n照片只能帮你初筛，真正要核对的是：\n① 目前房态是否可预约\n② 月租以外还有哪些费用\n③ 押金、租期是否符合预期\n④ 位置是否方便日常通勤\n\n先看清房源信息，再决定是否到现场。\n\n💎 <b>侨联地产｜您在金边的自己人</b>', (("🏠 我要租房", "find"), ("🏢 我要买房", "sale"), ("💬 中文顾问", "advisor"))),
+    MarketingTemplate('wed', '🏙 金边选区域', '🏙 <b>BKK1、钻石岛、TK 怎么选？</b>\n\n📍 BKK1：餐饮与商业配套集中，部分路段高峰较拥堵。\n📍 钻石岛：新公寓较多，具体交通及物业配套因项目而异。\n📍 TK（堆谷）：住宅、学校及日常商业分布较多。\n\n区域没有绝对的好坏。把常去地点、预算和户型告诉侨联，先按你的生活路线筛选。\n\n💎 <b>侨联地产｜您在金边的自己人</b>', (("🏠 我要租房", "find"), ("🏢 我要买房", "sale"), ("💬 中文顾问", "advisor"))),
+    MarketingTemplate('thu', '📷 看实拍细节', '📷 <b>看房源照片，别只看客厅</b>\n\n选房时，还要关注：\n• 卧室采光和窗外环境\n• 厨房、卫浴及晾衣空间\n• 家具家电的实际状态\n• 楼层、公区与噪音\n\n先看完整实拍，感兴趣再预约核对现场情况。\n\n💎 <b>侨联地产｜您在金边的自己人</b>', (("🏠 我要租房", "find"), ("🏢 我要买房", "sale"), ("💬 中文顾问", "advisor"))),
+    MarketingTemplate('fri', '🎥 远程视频带看', '🎥 <b>人不在金边，也能先了解房子</b>\n\n可以预约顾问到现场进行 1 对 1 视频带看，重点查看：\n• 卧室、厨房、卫浴和阳台\n• 家具家电及实际采光\n• 电梯、停车及公共区域\n\n在房源详情选择「在线预约」→「视频带看」，提交希望的时段。顾问确认后再安排连线。\n\n💎 <b>侨联地产｜您在金边的自己人</b>', (("🏠 我要租房", "find"), ("🏢 我要买房", "sale"), ("💬 中文顾问", "advisor"))),
+    MarketingTemplate('sat', '⚖️ 比较两套房', '⚖️ <b>两套房怎么选？别只比租金</b>\n\n一套 $750、一套 $850，未必便宜的更合适。\n\n一起比较：\n• 通勤与周边生活便利度\n• 押金、水电和物业费用\n• 家具配置、停车及厨房条件\n• 入住时间和实际房态\n\n把候选房源发给中文顾问，按同一标准逐项比较。\n\n💎 <b>侨联地产｜您在金边的自己人</b>', (("🏠 我要租房", "find"), ("🏢 我要买房", "sale"), ("💬 中文顾问", "advisor"))),
+    MarketingTemplate('sun', '🏠 本周找房需求', '🏠 <b>不知道从哪里开始找房？</b>\n\n只要提供四项信息：\n📍 区域或常去地点\n💰 每月预算\n🏠 需要几房\n🗓 预计入住时间\n\n侨联先按条件筛选现有房源。如果没有完全匹配，也会说明哪些条件可以调整。\n\n<b>先把需求说清楚，再去看房。</b>\n\n💎 <b>侨联地产｜您在金边的自己人</b>', (("🏠 我要租房", "find"), ("🏢 我要买房", "sale"), ("💬 中文顾问", "advisor"))),
 )
 
 @dataclass(frozen=True)
@@ -255,18 +255,12 @@ class MarketingBroadcastService:
         locked["thu"] = ((latest or find,), (advisor,))
         locked["sun"] = ((service,), (advisor,))
         sale = BroadcastButton("🏠 查看出售房源", SALE_SITE_URL)
-        if selected == "default":
-            base = ((advisor,),) if template.key == "sun" else locked[template.key]
-            return ((sale,),) + base if template.key == "sun" else base + ((sale,),)
-        generic = {"find": BroadcastButton("🔍 开始找房", find.url), "contact": advisor}
-        if latest is not None:
-            generic["latest"] = latest
-        if selected == "combo":
-            first = tuple(button for button in (find, latest) if button is not None)
-            return (first, (advisor,), (sale,))
-        if selected in generic:
-            return ((generic[selected],), (sale,))
-        return locked[template.key] + ((sale,),)
+        rent = BroadcastButton("🏠 我要租房", find.url)
+        buy = BroadcastButton("🏢 我要买房", SALE_SITE_URL)
+        # A compact two-row CTA, stable for all seven weekday campaigns.
+        if selected == "none":
+            return ()
+        return ((rent, buy), (advisor,))
 
     def claim_due(self, now: datetime | None = None) -> tuple[bool, str]:
         current = now.astimezone(self.timezone) if now else self.local_now()

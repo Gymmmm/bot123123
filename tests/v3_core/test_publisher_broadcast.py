@@ -49,9 +49,7 @@ def test_parse_hhmm_is_strict():
 
 
 def test_marketing_template_button_metadata_matches_locked_v1_ctas():
-    expected = {key: (("🔍 开始找房", "find"), ("💬 中文顾问", "advisor")) for key in ("mon", "tue", "wed", "fri", "sat")}
-    expected["thu"] = (("📢 最新房源", "latest"), ("💬 中文顾问", "advisor"))
-    expected["sun"] = (("🏠 查看出售房源", "sale"), ("💬 中文顾问", "advisor"))
+    expected = {key: (("🏠 我要租房", "find"), ("🏢 我要买房", "sale"), ("💬 中文顾问", "advisor")) for key in ("mon", "tue", "wed", "thu", "fri", "sat", "sun")}
     assert {template.key: template.buttons for template in MARKETING_TEMPLATES} == expected
 
 
@@ -109,20 +107,16 @@ def test_marketing_runtime_button_rows_and_urls_match_locked_v1(tmp_path, monkey
     monkeypatch.setenv("CHANNEL_USERNAME", "qiaolian_channel")
     service = MarketingBroadcastService(db, user_bot_username="qiaolian_rent_bot")
 
-    expected_labels = {key: [["🔍 开始找房"], ["💬 中文顾问"], ["🏠 查看出售房源"]] for key in ("mon", "tue", "wed", "fri", "sat")}
-    expected_labels["thu"] = [["📢 最新房源"], ["💬 中文顾问"], ["🏠 查看出售房源"]]
-    expected_labels["sun"] = [["🏠 查看出售房源"], ["💬 中文顾问"]]
+    expected_labels = [["🏠 我要租房", "🏢 我要买房"], ["💬 中文顾问"]]
     expected_urls = {
-        "🔍 开始找房": "https://t.me/qiaolian_rent_bot?start=find",
+        "🏠 我要租房": "https://t.me/qiaolian_rent_bot?start=find",
+        "🏢 我要买房": "https://qiaolian-jinbian-sale.vercel.app/?utm_source=telegram&utm_medium=marketing&utm_campaign=weekly_sale",
         "💬 中文顾问": "https://t.me/qiaolian_rent_bot?start=advisor",
-        "🛎️ 侨联服务": "https://t.me/qiaolian_rent_bot?start=service",
-        "📢 最新房源": "https://t.me/qiaolian_channel",
-        "🏠 查看出售房源": "https://qiaolian-jinbian-sale.vercel.app/?utm_source=telegram&utm_medium=marketing&utm_campaign=weekly_sale",
     }
 
     for template in MARKETING_TEMPLATES:
         rows = service.footer_rows(template)
-        assert [[button.label for button in row] for row in rows] == expected_labels[template.key]
+        assert [[button.label for button in row] for row in rows] == expected_labels
         for row in rows:
             for button in row:
                 assert button.url == expected_urls[button.label]
@@ -141,7 +135,7 @@ def test_defaults_are_safe_and_disabled(tmp_path):
     service = _service(tmp_path)
     config = service.config()
     assert config.enabled is False
-    assert config.send_time == "09:30"
+    assert config.send_time == "08:00"
     assert config.template_key == "live"
     assert config.fx_offset == 0.0
     assert config.button_key == "none"
@@ -153,13 +147,13 @@ def test_footer_buttons_use_live_v3_start_shortcuts(tmp_path):
     service.set_button("combo")
     rows = service.footer_rows()
     assert [[button.label for button in row] for row in rows] == [
-        ["🔍 帮我找房", "🏠 最新房源"],
-        ["💬 联系中文顾问"],
+        ["🏠 我要租房", "🏢 我要买房"],
+        ["💬 中文顾问"],
     ]
     urls = [button.url for row in rows for button in row]
     assert urls == [
         "https://t.me/qiaolian_rent_bot?start=find_home",
-        "https://t.me/qiaolian_rent_bot?start=latest",
+        "https://qiaolian-jinbian-sale.vercel.app/?utm_source=telegram&utm_medium=marketing&utm_campaign=weekly_sale",
         "https://t.me/qiaolian_rent_bot?start=advisor",
     ]
 
@@ -216,18 +210,18 @@ def test_live_builder_preserves_weather_and_fx_contract(tmp_path):
         fx_offset=-0.20,
         now=datetime(2026, 9, 9, 8, 0, tzinfo=ZoneInfo("Asia/Phnom_Penh")),
     )
-    assert "侨联地产｜早安金边" in body
+    assert "早安金边｜侨联播报" in body
     assert "2026.09.09" in body
-    assert "🌦 今日天气" in body
+    assert "🌦 小雨" in body
     assert "小雨 25–32℃｜降雨 45%" in body
-    assert "💱 美元兑人民币" in body
+    assert "💱 1 USD" in body
     assert "1 USD ≈ 7.00 CNY" in body
-    assert "100 USD ≈ 700 CNY" in body
-    assert "📌 出行提醒" in body
+    assert "💎" in body
+    assert "📌 今天有阵雨" in body
     assert "今天有阵雨，出门记得带伞。" in body
-    assert "今日找房" in body
-    assert "先看合适的房源实拍" in body
-    assert "常去地点、月租预算、户型和入住时间" in body
+    assert "找房发" in body
+    assert "您在金边的自己人" in body
+    assert "区域＋预算＋户型＋入住时间" in body
 
 
 def test_publisher_dashboard_exposes_broadcast_center(tmp_path):
@@ -259,4 +253,4 @@ def test_marketing_latest_falls_back_to_find_when_channel_is_not_configured(tmp_
     service = MarketingBroadcastService(db, user_bot_username='qiaolian_rent_bot')
     rows = service.footer_rows(service.template(3))
     assert rows[0][0].url == 'https://t.me/qiaolian_rent_bot?start=find'
-    assert rows[0][0].label == '🔍 开始找房'
+    assert rows[0][0].label == '🏠 我要租房'

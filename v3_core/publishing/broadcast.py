@@ -52,7 +52,7 @@ KEY_LAST_SENT_DATE = "daily_broadcast_last_scheduled_sent_date"
 
 DEFAULTS: Mapping[str, str] = {
     KEY_ENABLED: "0",
-    KEY_TIME: "09:30",
+    KEY_TIME: "08:00",
     KEY_TEMPLATE: "live",
     KEY_CUSTOM_HTML: "",
     KEY_FX_OFFSET: "0.00",
@@ -371,25 +371,15 @@ class LiveDailyInfoBuilder:
 
         weather_display = weather_line.replace("🌤 天气：", "")
         fx_display = fx_line.replace("💵 美元/人民币：", "")
-        hundred_line = ""
-        if "1 USD ≈" in fx_display:
-            try:
-                rate = float(fx_display.split("≈", 1)[1].split("CNY", 1)[0].strip())
-                hundred_line = f"\n100 USD ≈ {rate * 100:.0f} CNY"
-            except (ValueError, IndexError):
-                pass
         return (
-            "<b>☀️ 侨联地产｜早安金边</b>\n"
+            "<b>☀️ 早安金边｜侨联播报</b>\n"
             f"📅 {current:%Y.%m.%d}｜星期{weekday}\n\n"
-            "<b>🌦 今日天气</b>\n"
-            f"{weather_display}\n\n"
-            "<b>💱 美元兑人民币</b>\n"
-            f"{fx_display}{hundred_line}\n\n"
-            "<b>📌 出行提醒</b>\n"
-            f"{weather_note}\n\n"
-            "<b>🏠 今日找房</b>\n"
-            "告诉我们常去地点、月租预算、户型和入住时间，先看合适的房源实拍。\n\n"
-            "<i>天气为预报、汇率为参考值；以最新天气及实际交易牌价为准。</i>"
+            f"🌦 {weather_display}\n"
+            f"💱 {fx_display}\n\n"
+            f"📌 {weather_note}\n\n"
+            "🏠 找房发：区域＋预算＋户型＋入住时间\n\n"
+            "💎 <b>侨联地产｜您在金边的自己人</b>\n\n"
+            "<i>天气与汇率仅供参考。</i>"
         )
 
 
@@ -426,7 +416,7 @@ class BroadcastService:
             button = "none"
         send_time = str(values[KEY_TIME]).strip()
         if parse_hhmm(send_time) is None:
-            send_time = "09:30"
+            send_time = "08:00"
         return BroadcastConfig(
             enabled=_truthy(values[KEY_ENABLED]),
             send_time=send_time,
@@ -507,7 +497,8 @@ class BroadcastService:
             "contact": BroadcastButton("💬 联系中文顾问", build_bot_start_url(self.user_bot_username, "advisor")),
         }
         if selected == "combo":
-            return ((buttons["find"], buttons["latest"]), (buttons["contact"],))
+            from .marketing_broadcast import SALE_SITE_URL
+            return ((BroadcastButton("🏠 我要租房", build_bot_start_url(self.user_bot_username, "find_home")), BroadcastButton("🏢 我要买房", SALE_SITE_URL)), (BroadcastButton("💬 中文顾问", build_bot_start_url(self.user_bot_username, "advisor")),))
         return ((buttons[selected],),)
 
     def local_now(self) -> datetime:
