@@ -224,7 +224,7 @@ def _single_detail_caption(text: str, index: int, total: int) -> str:
     """Keep the complete useful detail in the same Telegram photo message."""
     begin = index * 4 + 1
     end = min(begin + 3, total)
-    heading = f"📷 实拍 {begin}–{end}/{total} · 点击查看大图\n\n"
+    heading = f"📸 实拍 {begin}–{end}/{total}\n\n"
     content = str(text or "").strip()
     if len(heading + content) <= 1024:
         return heading + content
@@ -245,9 +245,6 @@ def _single_detail_keyboard(
             photo_row.append(InlineKeyboardButton(
                 "⬅️ 上一组", callback_data=f"v3u:detailphoto:{public_id}:{index - 1}"
             ))
-        photo_row.append(InlineKeyboardButton(
-            f"{index + 1}/{pages}", callback_data=f"v3u:detailphoto:{public_id}:{index}"
-        ))
         if index + 1 < pages:
             photo_row.append(InlineKeyboardButton(
                 "下一组 ➡️", callback_data=f"v3u:detailphoto:{public_id}:{index + 1}"
@@ -255,7 +252,7 @@ def _single_detail_keyboard(
         rows.append(photo_row)
     if total > 1:
         rows.append([InlineKeyboardButton(
-            "🔍 高清原图", callback_data=f"v3u:detailfull:{public_id}:{index * 4}"
+            "🔍 查看原始照片", callback_data=f"v3u:detailfull:{public_id}:{index * 4}"
         )])
     for row in (getattr(markup, "inline_keyboard", None) or ()):
         clean = [
