@@ -25,3 +25,8 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,'Segoe UI'
 /* Taller property photography: avoid compressed panoramic thumbnails. */
 .card-image{aspect-ratio:5/4}
 @media(max-width:580px){.card-image{aspect-ratio:4/3}}
+
+/* Original image proportions: never crop listing photographs. */
+.card-image{aspect-ratio:auto!important;height:auto!important;min-height:0!important;overflow:visible!important;background:#f7f8fa}
+.card-image img{display:block;width:100%;height:auto!important;max-height:none!important;aspect-ratio:auto!important;object-fit:contain!important;object-position:center}
+@media(max-width:580px){.card-image{aspect-ratio:auto!important}}
