@@ -19,7 +19,7 @@ const unitPrice = i => {const p=Number(priceOf(i)),sqm=sizeOf(i);return Number.i
 const descriptionOf = i => first(i,['description','description_text','listing_description','adviser_copy'])
 const amenitiesOf = i => listValue(first(i,['amenities','features','facilities']))
 const normalizeListing = (payload) => payload?.item || payload?.listing || payload?.data || payload?.result || payload
-const mediaUrl = (value) => text(value)
+const mediaUrl = (value) => {const url=text(value);return url.startsWith('/api/v3/sale/media/') ? url+'?clean=1' : url}
 // Curated photography for the public sale catalog. Original galleries are unchanged.
 // The first listed villa has only a side-yard cover; its living room is a clearer card photo.
 const cardPhotoOverrides = { 'QL-HS-E2R9': 1 }
