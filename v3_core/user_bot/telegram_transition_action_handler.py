@@ -52,6 +52,7 @@ from .transition_session import (
     apply_session_mutation,
 )
 from .transition_views import TransitionChoice, TransitionView, TransitionViewService, searching_view
+from .video_focus import FOCUS_SESSION_KEY, focus_summary, valid_focus, video_focus_view
 
 
 _GUIDED_SEARCH_CALLBACKS = frozenset(
@@ -235,6 +236,7 @@ def _appointment_success_cleanup() -> SessionMutationPlan:
             APPOINTMENT_SESSION_KEY,
             APPOINTMENT_AWAITING_DATE_KEY,
             APPOINTMENT_AWAITING_TIME_KEY,
+            FOCUS_SESSION_KEY,
         ),
     )
 
@@ -268,6 +270,7 @@ async def _submit_confirmed_appointment(
     lead_effects: LeadEffectExecutor | None,
     appointment_runtime_effects: AppointmentRuntimeEffectExecutor | None,
 ) -> TelegramTransitionActionOutcome:
+    video_focus = focus_summary(user_data.get(FOCUS_SESSION_KEY)) if draft.mode == "video" else ""
     appointment_user = _telegram_appointment_user(update)
     lead_user = _lead_user(appointment_user)
     try:
@@ -289,11 +292,13 @@ async def _submit_confirmed_appointment(
             user=lead_user,
             execution=execution,
             draft=draft,
+            video_focus=video_focus,
         )
     success_view = build_appointment_success_view(
         draft,
         views.inventory,
         submission_kind=execution.submission.kind,
+        video_focus=video_focus,
     )
     await _edit_view(query, success_view)
     apply_session_mutation(user_data, _appointment_success_cleanup())
@@ -329,6 +334,37 @@ async def handle_v3_transition_action(
     user_data = getattr(context, "user_data", None)
     if not isinstance(user_data, dict):
         raise ValueError("telegram_user_data_missing_for_transition_action")
+
+    if callback.kind.startswith("appointment_focus_"):
+        raw_draft = user_data.get(APPOINTMENT_SESSION_KEY)
+        if not isinstance(raw_draft, Mapping) or str(raw_draft.get("mode") or "") != "video":
+            await query.answer("预约已失效，请重新选择房源。", show_alert=True)
+            return TelegramTransitionActionOutcome(handled=True)
+        try:
+            draft = PublicAppointmentDraft(
+                public_listing_id=str(raw_draft.get("public_listing_id") or ""),
+                mode="video", date=str(raw_draft.get("date") or ""),
+                time=str(raw_draft.get("time") or ""),
+                source=str(raw_draft.get("source") or "user_bot"),
+            )
+        except ValueError:
+            return TelegramTransitionActionOutcome(handled=True)
+        await query.answer()
+        selected = list(valid_focus(user_data.get(FOCUS_SESSION_KEY)))
+        if callback.kind == "appointment_focus_toggle":
+            if callback.value in selected:
+                selected.remove(callback.value)
+            else:
+                selected.append(callback.value)
+            user_data[FOCUS_SESSION_KEY] = list(valid_focus(selected))
+            await _edit_view(query, video_focus_view(user_data[FOCUS_SESSION_KEY]))
+        elif callback.kind == "appointment_focus_back":
+            await _edit_view(query, views.appointment_mode(draft))
+        else:
+            if callback.kind == "appointment_focus_skip":
+                user_data[FOCUS_SESSION_KEY] = []
+            await _edit_view(query, views.appointment_date(draft))
+        return TelegramTransitionActionOutcome(handled=True)
 
     # These two callbacks are the explicit confirmation boundary added by
     # Issue #25. They operate on the same public appointment session and do not
@@ -374,6 +410,13 @@ async def handle_v3_transition_action(
         return TelegramTransitionActionOutcome(handled=True, result=result)
     await query.answer()
 
+    if callback.kind == "appointment_mode" and result.appointment is not None:
+        user_data[FOCUS_SESSION_KEY] = []
+        if result.appointment.mode == "video":
+            await _edit_view(query, video_focus_view())
+            _apply_success_mutation(user_data, result, callback.kind)
+            return TelegramTransitionActionOutcome(handled=True, result=result)
+
     view = _view_for_result(views, result)
     if view is not None:
         await _edit_view(query, view)
@@ -394,7 +437,7 @@ async def handle_v3_transition_action(
         if result.appointment is None:
             raise ValueError("appointment_submit_action_missing_draft")
         _apply_success_mutation(user_data, result, callback.kind)
-        await _edit_view(query, build_appointment_confirmation_view(result.appointment, views.inventory))
+        await _edit_view(query, build_appointment_confirmation_view(result.appointment, views.inventory, video_focus=focus_summary(user_data.get(FOCUS_SESSION_KEY)) if result.appointment.mode == "video" else ""))
         return TelegramTransitionActionOutcome(handled=True, result=result)
 
     if result.next_step == "search_submit" and search_executor is not None:

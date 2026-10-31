@@ -18,7 +18,7 @@ def _time_display(value: object) -> str:
     raw=str(value or "").strip()
     return {"am":"上午 09:00–12:00","pm":"下午 14:00–17:00"}.get(raw,display_time(raw))
 
-def build_appointment_success_view(draft: PublicAppointmentDraft, inventory: PublicInventoryReader, *, submission_kind: str = "created") -> TransitionView:
+def build_appointment_success_view(draft: PublicAppointmentDraft, inventory: PublicInventoryReader, *, submission_kind: str = "created", video_focus: str = "") -> TransitionView:
     published=inventory.resolve(draft.public_listing_id)
     if published is None:
         subject="这套房"
@@ -37,6 +37,8 @@ def build_appointment_success_view(draft: PublicAppointmentDraft, inventory: Pub
         "状态：🟡 待顾问确认",
         "顾问会核实房态和时间，确认后通过 Telegram 联系你。",
     ]
+    if draft.mode == "video" and video_focus:
+        lines.insert(5, f"重点查看：{he(video_focus)}")
     return TransitionView(
         kind="appointment_success",
         text="\n".join(lines),

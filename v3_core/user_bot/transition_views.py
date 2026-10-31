@@ -21,6 +21,10 @@ _CHANNEL_BOOK_SOURCES = frozenset(
 
 TransitionChoiceKind = Literal[
     "appointment_date",
+    "appointment_focus_toggle",
+    "appointment_focus_continue",
+    "appointment_focus_skip",
+    "appointment_focus_back",
     "appointment_quick_slot",
     "appointment_other_date",
     "appointment_mode",
@@ -99,7 +103,7 @@ def _resolve_bookable_details(inventory: PublicInventoryReader, public_listing_i
 
 
 _APPOINTMENT_MODE_TEXT = (
-    "没空到场？选择视频带看，顾问到现场实时带你看。\n\n"
+    "<b>在线预约</b>\n\n没空到场？选择视频带看，顾问到现场与你实时连线。\n\n"
     "请选择看房方式："
 )
 
@@ -117,7 +121,7 @@ def _appointment_mode_view(draft: PublicAppointmentDraft, inventory: PublicInven
         ),
         rows=(
             (
-                TransitionChoice("🚶 实地带看", "appointment_mode", "offline"),
+                TransitionChoice("🚶 实地看房", "appointment_mode", "offline"),
                 TransitionChoice("🎥 视频带看", "appointment_mode", "video"),
             ),
             (TransitionChoice("⬅️ 返回房源", "listing_details", public_listing_id=draft.public_listing_id),),

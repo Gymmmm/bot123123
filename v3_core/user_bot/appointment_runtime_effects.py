@@ -81,6 +81,7 @@ class AppointmentRuntimeEffectExecutor:
         user: LeadUser,
         execution: AppointmentSubmitExecution,
         draft: PublicAppointmentDraft,
+        video_focus: str = "",
     ) -> AppointmentRuntimeEffectResult:
         availability_result = None
         availability_error = ""
@@ -103,6 +104,7 @@ class AppointmentRuntimeEffectExecutor:
                     execution,
                     draft,
                     subject=self._subject(execution.public_listing_id),
+                    video_focus=video_focus,
                     reply_markup=_admin_appointment_keyboard(
                         execution.submission.appointment_id,
                         user.user_id,

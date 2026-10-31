@@ -19,6 +19,7 @@ TRANSITION_PREFIX = f"{PREFIX}:t"
 _VALUE_KINDS = frozenset(
     {
         "appointment_date",
+        "appointment_focus_toggle",
         "appointment_quick_slot",
         "appointment_mode",
         "appointment_time",
@@ -33,6 +34,9 @@ _FLAG_KINDS = frozenset(
         "appointment_other_time",
         "appointment_back_date",
         "appointment_back_mode",
+        "appointment_focus_continue",
+        "appointment_focus_skip",
+        "appointment_focus_back",
         "appointment_exit",
         "appointment_submit",
         "appointment_back_time",
@@ -67,6 +71,11 @@ class TransitionCallback:
 
 def _validate_value(kind: str, value: object) -> str:
     clean = str(value or "").strip()
+    if kind == "appointment_focus_toggle":
+        from .video_focus import FOCUS_LABELS
+        if clean not in FOCUS_LABELS:
+            raise ValueError("invalid_video_focus")
+        return clean
     if kind == "appointment_date":
         if not _DATE_RE.fullmatch(clean):
             raise ValueError("invalid_transition_appointment_date")

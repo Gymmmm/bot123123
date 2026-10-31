@@ -48,21 +48,25 @@ def appointment_notification(
     *,
     subject: str = "",
     reply_markup=None,
+    video_focus: str = "",
 ) -> AdminNotification:
     updated = execution.submission.kind == "updated"
     title = f"📅 {'预约时间已修改' if updated else '新预约'} #{execution.submission.appointment_id}"
     mode_label = APPOINTMENT_MODE_LABELS.get(draft.mode, "实地看房")
     display_subject = str(subject or draft.public_listing_id).strip()
-    return AdminNotification(
-        title=title,
-        lines=(
+    lines = [
             f"🏠 <b>{he(display_subject)}</b>",
             f"🕐 {he(display_date(draft.date))} · {he(display_time(draft.time))}",
             f"📍 {he(mode_label)}",
             f"👤 客户｜{user_mention_html(user)}",
             f"💬 Telegram｜{he(user_contact_text(user))}",
             "<b>当前状态｜🟡 待确认</b>",
-        ),
+    ]
+    if draft.mode == "video" and video_focus:
+        lines.insert(3, f"🎥 重点查看｜{he(video_focus)}")
+    return AdminNotification(
+        title=title,
+        lines=tuple(lines),
         show_bell=False,
         reply_markup=reply_markup,
     )

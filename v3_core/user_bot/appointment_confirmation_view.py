@@ -18,7 +18,7 @@ def _time_display(value: object) -> str:
     raw=str(value or "").strip()
     return {"am":"上午 09:00–12:00","pm":"下午 14:00–17:00"}.get(raw,display_time(raw))
 
-def build_appointment_confirmation_view(draft: PublicAppointmentDraft, inventory: PublicInventoryReader) -> TransitionView:
+def build_appointment_confirmation_view(draft: PublicAppointmentDraft, inventory: PublicInventoryReader, *, video_focus: str = "") -> TransitionView:
     if not draft.ready:
         raise ValueError("appointment_confirmation_requires_ready_draft")
     published=inventory.resolve(draft.public_listing_id)
@@ -40,6 +40,8 @@ def build_appointment_confirmation_view(draft: PublicAppointmentDraft, inventory
         "请确认以上信息。",
         "提交后，中文顾问会联系你确认具体安排。",
     ]
+    if draft.mode == "video" and video_focus:
+        lines.insert(6, f"重点｜{he(video_focus)}")
     return TransitionView(
         kind="appointment_confirmation",
         text="\n".join(lines),

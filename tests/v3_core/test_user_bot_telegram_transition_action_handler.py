@@ -245,3 +245,37 @@ async def test_stale_transition_is_owned_and_shows_expired_feedback_without_muta
     assert query.calls[0][1] == ("这个入口已经更新，请返回重新选择。",)
     assert query.calls[0][2] == {"show_alert": True}
     assert user_data == {}
+
+@pytest.mark.asyncio
+async def test_video_mode_focus_toggle_and_continue_keeps_appointment():
+    data = _appt_user_data()
+    ctx = _context(data)
+    svc = TransitionActionService()
+    mode_query = FakeQuery("v3u:t:appointment_mode:video")
+    await handle_v3_transition_action(_update(mode_query), ctx, actions=svc, views=ViewsStub())
+    assert data[APPOINTMENT_SESSION_KEY]["mode"] == "video"
+    assert "视频带看｜重点查看" in mode_query.calls[-1][1][0]
+
+    toggle_query = FakeQuery("v3u:t:appointment_focus_toggle:sunlight")
+    await handle_v3_transition_action(_update(toggle_query), ctx, actions=svc, views=ViewsStub())
+    assert data["v3_video_focus"] == ["sunlight"]
+    assert "已选：</b>采光朝向" in toggle_query.calls[-1][1][0]
+
+    done_query = FakeQuery("v3u:t:appointment_focus_continue")
+    await handle_v3_transition_action(_update(done_query), ctx, actions=svc, views=ViewsStub())
+    assert "date:video" in done_query.calls[-1][1][0]
+    assert data[APPOINTMENT_SESSION_KEY]["public_listing_id"] == PUBLIC_ID
+    assert data["v3_video_focus"] == ["sunlight"]
+
+
+@pytest.mark.asyncio
+async def test_video_focus_skip_clears_previous_selections():
+    data = _appt_user_data(mode="video")
+    data["v3_video_focus"] = ["water"]
+    q = FakeQuery("v3u:t:appointment_focus_skip")
+    result = await handle_v3_transition_action(
+        _update(q), _context(data), actions=TransitionActionService(), views=ViewsStub(),
+    )
+    assert result.handled
+    assert data["v3_video_focus"] == []
+    assert "date:video" in q.calls[-1][1][0]
