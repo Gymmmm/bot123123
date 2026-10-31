@@ -960,9 +960,6 @@ class SimplePublisherAdminController:
                 reply_markup=InlineKeyboardMarkup(
                     [
                         [InlineKeyboardButton("极简实拍渐变", callback_data=f"v3smp|manual_style|premium_photo|{parts[2]}|{parts[3]}")],
-                        [InlineKeyboardButton("右侧价格牌", callback_data=f"v3smp|manual_style|right_price|{parts[2]}|{parts[3]}")],
-                        [InlineKeyboardButton("黑金模板", callback_data=f"v3smp|manual_style|black_gold|{parts[2]}|{parts[3]}")],
-                        [InlineKeyboardButton("经典蓝卡", callback_data=f"v3smp|manual_style|classic_blue|{parts[2]}|{parts[3]}")],
                         self.home_row(),
                     ]
                 ),

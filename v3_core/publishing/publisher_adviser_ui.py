@@ -532,7 +532,6 @@ class PublisherAdviserAdminController(PublisherInventoryDashboardController):
                     parse_mode=ParseMode.HTML,
                     reply_markup=InlineKeyboardMarkup([
                         [InlineKeyboardButton("极简实拍渐变（默认）", callback_data="v3smp|manual_style|premium_photo")],
-                        [InlineKeyboardButton("右侧价格牌", callback_data="v3smp|manual_style|right_price")],
                         self.home_row(),
                     ]),
                 )

@@ -479,20 +479,10 @@ class PublisherAdminBot:
 
     @staticmethod
     def _style_keyboard(review_id: str) -> InlineKeyboardMarkup:
-        return InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton("极简实拍渐变", callback_data=f"v3b|premium_photo|{review_id}"),
-                    InlineKeyboardButton("经典蓝卡", callback_data=f"v3b|classic_blue|{review_id}"),
-                ],
-                [
-                    InlineKeyboardButton("右侧价格牌", callback_data=f"v3b|right_price|{review_id}"),
-                    InlineKeyboardButton("黑金高级感", callback_data=f"v3b|black_gold|{review_id}"),
-                ],
-                [InlineKeyboardButton("⬅️ 封面 / 实拍", callback_data=f"v3media|{review_id}")],
-            ]
-        )
-
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton("极简实拍渐变", callback_data=f"v3b|premium_photo|{review_id}")],
+            [InlineKeyboardButton("⬅️ 封面 / 实拍", callback_data=f"v3media|{review_id}")],
+        ])
     def _package_keyboard(self, package: FrozenPackage, *, review_id: str = "") -> InlineKeyboardMarkup:
         rows: list[list[InlineKeyboardButton]] = [
             [InlineKeyboardButton("🏠 查看房源", url=package.actions["details"])],

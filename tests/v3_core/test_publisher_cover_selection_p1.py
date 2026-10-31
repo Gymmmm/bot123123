@@ -147,7 +147,9 @@ async def test_manual_cover_next_cycles_real_photos_and_preserves_template(tmp_p
         if getattr(b, "callback_data", None)
     ]
     assert "v3smp|manual_style|premium_photo" in callbacks
-    assert "v3smp|manual_style|right_price" in callbacks
+    assert "v3smp|manual_style|right_price" not in callbacks
+    assert "v3smp|manual_style|black_gold" not in callbacks
+    assert "v3smp|manual_style|classic_blue" not in callbacks
     assert "v3smp|manual_style|black_gold" not in callbacks
     assert "v3smp|manual_style|classic_blue" not in callbacks
 
