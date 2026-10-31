@@ -6,6 +6,7 @@ from pathlib import Path
 from html import escape as html_escape, unescape as html_unescape
 import re
 from io import BytesIO
+from telegram import InputFile
 from PIL import Image, ImageOps
 from typing import Any
 
@@ -224,7 +225,7 @@ def _single_detail_caption(text: str, index: int, total: int) -> str:
     """Keep the complete useful detail in the same Telegram photo message."""
     begin = index * 4 + 1
     end = min(begin + 3, total)
-    heading = f"📷 实拍 {begin}–{end}/{total} · 点击查看大图\n\n"
+    heading = f"📷 实拍 {begin}–{end}/{total} · 拼图预览\n\n"
     content = str(text or "").strip()
     if len(heading + content) <= 1024:
         return heading + content
@@ -245,9 +246,6 @@ def _single_detail_keyboard(
             photo_row.append(InlineKeyboardButton(
                 "⬅️ 上一组", callback_data=f"v3u:detailphoto:{public_id}:{index - 1}"
             ))
-        photo_row.append(InlineKeyboardButton(
-            f"{index + 1}/{pages}", callback_data=f"v3u:detailphoto:{public_id}:{index}"
-        ))
         if index + 1 < pages:
             photo_row.append(InlineKeyboardButton(
                 "下一组 ➡️", callback_data=f"v3u:detailphoto:{public_id}:{index + 1}"
@@ -255,7 +253,7 @@ def _single_detail_keyboard(
         rows.append(photo_row)
     if total > 1:
         rows.append([InlineKeyboardButton(
-            "🔍 高清原图", callback_data=f"v3u:detailfull:{public_id}:{index * 4}"
+            "🖼 单张原图预览", callback_data=f"v3u:detailfull:{public_id}:{index * 4}"
         )])
     for row in (getattr(markup, "inline_keyboard", None) or ()):
         clean = [
@@ -490,10 +488,10 @@ async def _handle_detail_full(
         previous = []
         if value > 0:
             previous.append(InlineKeyboardButton("⬅️ 上一张", callback_data=f"v3u:detailfull:{public_id}:{value - 1}"))
-        previous.append(InlineKeyboardButton(f"{value + 1}/{len(paths)}", callback_data=f"v3u:detailfull:{public_id}:{value}"))
         if value + 1 < len(paths):
             previous.append(InlineKeyboardButton("下一张 ➡️", callback_data=f"v3u:detailfull:{public_id}:{value + 1}"))
         rows.append(previous)
+        rows.append([InlineKeyboardButton("📥 下载当前原图", callback_data=f"v3u:detaildownload:{public_id}:{value}")])
         rows.append([InlineKeyboardButton("⬅️ 返回拼图", callback_data=f"v3u:detailback:{public_id}:{page}")])
         rows.extend(base.inline_keyboard)
         keyboard = InlineKeyboardMarkup(rows)
@@ -826,6 +824,26 @@ async def handle_v3_callback(
         return TelegramCallbackHandlerOutcome(handled=False)
     if parse_transition_callback(raw) is not None:
         return TelegramCallbackHandlerOutcome(handled=False)
+    if raw.startswith("v3u:detaildownload:"):
+        matched = re.fullmatch(r"v3u:detaildownload:(QL-[A-Z0-9-]+):(\d+)", raw)
+        public_id = normalize_public_id(matched.group(1)) if matched else None
+        listings = getattr(router, "listings", None)
+        result = listings.resolve_action(public_id, "details") if listings and public_id else None
+        details = getattr(result, "details", None) if getattr(result, "ok", False) else None
+        paths = tuple(p for p in getattr(details, "photo_paths", ()) if Path(p).is_file())
+        index = int(matched.group(2)) if matched else -1
+        if index < 0 or index >= len(paths):
+            await query.answer("原图暂时无法下载", show_alert=True)
+            return TelegramCallbackHandlerOutcome(handled=True)
+        await query.answer("正在发送原图")
+        source = Path(paths[index])
+        with source.open("rb") as photo:
+            await context.bot.send_document(
+                chat_id=update.effective_chat.id,
+                document=InputFile(photo, filename=f"{public_id}-{index + 1}{source.suffix or '.jpg'}"),
+                caption=f"房源 {public_id} · 原图 {index + 1}/{len(paths)}",
+            )
+        return TelegramCallbackHandlerOutcome(handled=True)
     if raw.startswith(("v3u:detailfull:", "v3u:detailback:")):
         handled = await _handle_detail_full(
             update, context, router, raw,

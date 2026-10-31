@@ -313,10 +313,7 @@ def _search_area_view(*, summary: str = "", back_kind: str = "change_search") ->
     rows = (
         (choices[0], choices[1]),
         (choices[2], choices[3]),
-        (choices[4], choices[5]),
-        (choices[6], choices[7]),
-        (choices[8], choices[9]),
-        (choices[10],),
+        (choices[4], choices[6]),
         (TransitionChoice("✏️ 其他区域 / 小区", "area_other"),),
         (_back_choice(back_kind),),
     )
@@ -324,7 +321,7 @@ def _search_area_view(*, summary: str = "", back_kind: str = "change_search") ->
         kind="search_area",
         text=(
             "📍 <b>想住在哪个区域？</b>\n\n"
-            "选择常住区域，或直接输入小区、楼盘名称。"
+            "先选常用区域，其他区域或楼盘请直接输入。"
             f"{_summary_block(summary)}"
         ),
         rows=rows,
