@@ -5,6 +5,14 @@
   },
   "rewrites": [
     {
+      "source": "/",
+      "destination": "/api/home"
+    },
+    {
+      "source": "/index.html",
+      "destination": "/api/home"
+    },
+    {
       "source": "/property/:id",
       "destination": "/api/seo?id=:id"
     },
@@ -36,5 +44,10 @@
       ]
     }
   ],
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD ."
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD .",
+  "functions": {
+    "api/*.py": {
+      "includeFiles": "home.html"
+    }
+  }
 }

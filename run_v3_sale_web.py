@@ -24,7 +24,7 @@ def run() -> None:
         or os.getenv("SQLITE_PATH")
         or "data/qiaolian_dual_bot.db"
     ).expanduser()
-    index_path = Path(os.getenv("V3_SALE_WEB_INDEX") or root / "web" / "sale" / "index.html")
+    index_path = Path(os.getenv("V3_SALE_WEB_INDEX") or root / "web" / "sale" / "home.html")
     host = os.getenv("V3_SALE_WEB_HOST", "127.0.0.1")
     port = int(os.getenv("V3_SALE_WEB_PORT", "8091"))
     serve(db_path=db_path, index_path=index_path, host=host, port=port)

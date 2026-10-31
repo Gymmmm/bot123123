@@ -363,8 +363,13 @@ async function loadMeta() {
 
 async function loadList(reset = false) {
   if (reset) offset = 0;
-  showSkeletons();
-  setCount('读取中…');
+  // Server-prerendered first page: keep the cards visible until fresh data arrives.
+  const prerendered = $('grid')?.dataset.prerendered === '1' && !reset && !window.location.search;
+  if ($('grid')) delete $('grid').dataset.prerendered;
+  if (!prerendered) {
+    showSkeletons();
+    setCount('读取中…');
+  }
   try {
     await loadMeta();
     if (!initialUrlRestored) {

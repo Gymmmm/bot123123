@@ -34,7 +34,7 @@ class handler(BaseHTTPRequestHandler):
             self.send_error(404)
             return
 
-        source = (Path(__file__).resolve().parents[1] / "index.html").read_text(encoding="utf-8")
+        source = (Path(__file__).resolve().parents[1] / "home.html").read_text(encoding="utf-8")
         project = str(item.get("project") or "").strip()
         location = str(item.get("location") or "").strip()
         layout = str(item.get("layout") or "").strip()
