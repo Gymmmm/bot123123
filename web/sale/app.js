@@ -19,6 +19,17 @@ const descriptionOf = i => first(i,['description','description_text','listing_de
 const amenitiesOf = i => listValue(first(i,['amenities','features','facilities']))
 const normalizeListing = (payload) => payload?.item || payload?.listing || payload?.data || payload?.result || payload
 const mediaUrl = (value) => text(value)
+// Curated photography for the public sale catalog. Original galleries are unchanged.
+// The first listed villa has only a side-yard cover; its living room is a clearer card photo.
+const cardPhotoOverrides = { 'QL-HS-E2R9': 1 }
+const listingCover = i => {
+  const gallery = Array.isArray(i.gallery_urls) ? i.gallery_urls.filter(hasValue) : []
+  const selected = cardPhotoOverrides[text(i.public_id)]
+  return mediaUrl(selected !== undefined && gallery[selected] ? gallery[selected] : i.cover_url || gallery[0])
+}
+// Hero must show an entire home, not whichever listing happens to sort first.
+const heroListingId = 'QL-PP-A4V2'
+
 const advisorUrl = i => ADVISOR+'?text='+encodeURIComponent(`你好，想咨询金边出售房源 ${text(i.public_id)}`)
 const retryImage = (image) => {
   if (image.dataset.retried) {
@@ -42,10 +53,10 @@ function queryParams(){const p=new URLSearchParams({limit:LIMIT,offset}); const 
 async function loadMetadata(){if(metadataLoaded)return; const r=await fetch(META_API,{cache:'no-store'}); if(!r.ok)throw Error('metadata'); const d=await r.json(),areas=d.areas||[],types=d.property_types||[],minPrice=Number(d.min_price_usd),maxPrice=Number(d.max_price_usd); [...areas].filter(hasValue).sort().forEach(v=>$('area').insertAdjacentHTML('beforeend',`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`)); [...types].filter(hasValue).sort().forEach(v=>$('type').insertAdjacentHTML('beforeend',`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`)); const prices=[minPrice,maxPrice].filter(Number.isFinite); if(prices.length===2){$('price').setAttribute('aria-description',`真实出售价格范围 ${formatPrice(Math.min(...prices))} 至 ${formatPrice(Math.max(...prices))}`)} metadataLoaded=true}
 function showSkeletons(){$('grid').innerHTML='<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>'}
 const summary=i=>{const b=bedroomsOf(i),bath=Number(i.bathrooms),s=sizeOf(i);return [locationOf(i),b?`${b}室`:'',Number.isFinite(bath)&&bath>0?`${bath}卫`:'',hasValue(i.layout)?i.layout:'',s?`${s.toLocaleString()}㎡`:''].filter(hasValue).join(' · ')}
-function imageMarkup(i,index=0){return hasValue(i.cover_url)?`<img src="${escapeHtml(mediaUrl(i.cover_url))}" alt="${escapeHtml(text(i.title)||projectOf(i)||'出售房源')}" loading="${index===0?'eager':'lazy'}" fetchpriority="${index===0?'high':'auto'}" onerror="retryImage(this)"><div class="image-fallback" hidden>暂无房源照片</div>`:'<div class="image-fallback">暂无房源照片</div>'}
+function imageMarkup(i,index=0){return hasValue(listingCover(i))?`<img src="${escapeHtml(listingCover(i))}" alt="${escapeHtml(text(i.title)||projectOf(i)||'出售房源')}" loading="${index===0?'eager':'lazy'}" fetchpriority="${index===0?'high':'auto'}" onerror="retryImage(this)"><div class="image-fallback" hidden>暂无房源照片</div>`:'<div class="image-fallback">暂无房源照片</div>'}
 const publicStatus=i=>({active:'在售',pending:'待确认',sold:'已售',offline:'已下架',inactive:'已下架'}[text(i.status).toLowerCase()]||'');
 function card(i){const id=escapeHtml(i.public_id),title=text(i.title)||projectOf(i)||'金边出售房源',price=formatPrice(priceOf(i)),status=publicStatus(i),url='/property/'+encodeURIComponent(i.public_id);return `<article class="card"><a class="card-open property-link" href="${url}" data-id="${id}" aria-label="查看${escapeHtml(title)}"><div class="card-image">${imageMarkup(i)}<div class="card-overlay"></div><div class="card-meta">${status?`<span class="tag">${status}</span>`:''}${hasValue(i.gallery_urls)?'<span class="tag">有照片</span>':''}</div></div><div class="card-body"><p class="card-price">${price?`<strong class="price">${price}</strong>`:'<span class="price-unset">价格面议</span>'}</p><h2 class="card-title">${escapeHtml(title)}</h2>${summary(i)?`<p class="card-summary">${escapeHtml(summary(i))}</p>`:''}</div></a><div class="card-actions"><a href="${url}" data-id="${id}" class="detail-action property-link">查看详情</a><a href="${advisorUrl(i)}" target="_blank" rel="noopener">咨询这套</a></div></article>`}
-function render(items){$('count').textContent=total?`${total} 套在售`:'暂无';$('grid').innerHTML=items.length?items.map(card).join(''):'<div class="empty">当前条件下暂无出售房源</div>';const hero=items.find(i=>hasValue(i.cover_url));const heroImage=$('heroImage');if(hero&&heroImage){heroImage.src=mediaUrl(hero.cover_url);heroImage.alt=text(hero.title)||projectOf(hero)||'金边出售房源';heroImage.onerror=()=>{heroImage.hidden=true}}}
+function render(items){$('count').textContent=total?`${total} 套在售`:'暂无';$('grid').innerHTML=items.length?items.map(card).join(''):'<div class="empty">当前条件下暂无出售房源</div>';const hero=items.find(i=>i.public_id===heroListingId)||items.find(i=>hasValue(listingCover(i)));const heroImage=$('heroImage');if(hero&&heroImage){heroImage.hidden=false;heroImage.src=mediaUrl(hero.cover_url||listingCover(hero));heroImage.alt=text(hero.title)||projectOf(hero)||'金边出售房源';heroImage.onerror=()=>{heroImage.hidden=true}}}
 function updatePager(){const pages=Math.max(1,Math.ceil(total/LIMIT));$('pager').hidden=total<=LIMIT;$('pageno').textContent=`${Math.floor(offset/LIMIT)+1} / ${pages}`;$('prev').disabled=offset===0;$('next').disabled=offset+LIMIT>=total}
 const routeListingId=()=>{const m=location.pathname.match(/^\/property\/([^/]+)\/?$/);return m?decodeURIComponent(m[1]):new URLSearchParams(location.search).get('id')}
 async function load(reset=false){if(reset)offset=0;showSkeletons();$('count').textContent='读取中';try{await loadMetadata();const r=await fetch(API+'?'+queryParams(),{cache:'no-store'});if(!r.ok)throw Error('list');const d=await r.json();const items=Array.isArray(d.items)?d.items:[];total=Number.isFinite(Number(d.total))?Number(d.total):items.length;render(items);updatePager();const id=routeListingId();if(id&&!currentListing)openDetail(id,false)}catch{$('count').textContent='';$('grid').innerHTML='<div class="empty error">出售房源暂时无法读取，请稍后刷新。</div>'}}
