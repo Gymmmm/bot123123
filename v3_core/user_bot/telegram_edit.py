@@ -32,7 +32,7 @@ async def edit_query_caption(query: Any, caption: str, **kwargs: Any) -> bool:
 
 async def edit_query_panel(query: Any, *, text: str, **kwargs: Any) -> bool:
     message = getattr(query, "message", None)
-    if getattr(message, "photo", None):
+    if any(getattr(message, kind, None) for kind in ("photo", "video", "animation", "document", "audio", "voice")):
         return await edit_query_caption(query, text, **kwargs)
     return await edit_query_text(query, text, **kwargs)
 
