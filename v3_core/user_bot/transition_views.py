@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 from .listing_presenter import booking_subject, build_public_listing_details
 from .public_appointment import PublicAppointmentDraft
 from .public_inventory import PublicInventoryReader
-from .search_navigation import AREA_OPTIONS, LAYOUT_OPTIONS
+from .search_navigation import AREA_OPTIONS, LAYOUT_OPTIONS, area_description
 from .transition_plan import TransitionPlan
 
 
@@ -300,9 +300,15 @@ def _search_budget_view(
         (TransitionChoice("✏️ 自己填预算", "budget_custom"),),
         (_back_choice(back_kind),),
     )
+    description = area_description(area_display)
+    description_block = f"\n\n{he(description)}" if description else ""
     return TransitionView(
         kind="search_budget",
-        text=f"💰 <b>每月租金预算多少？</b>{_summary_block(summary)}",
+        text=(
+            f"💰 <b>每月租金预算多少？</b>{_summary_block(summary)}"
+            f"{description_block}\n\n"
+            "预算指每月房租，不含押金、水电和物业等其他费用。"
+        ),
         rows=rows,
     )
 
@@ -435,7 +441,7 @@ def _search_entry_view() -> TransitionView:
         ),
         (
             TransitionChoice("🏠 选户型", "search_layout"),
-            TransitionChoice("💬 帮我找房", "home", "contact"),
+            TransitionChoice("💬 中文顾问", "home", "contact"),
         ),
         (TransitionChoice("⬅️ 返回首页", "home"),),
     )

@@ -32,6 +32,27 @@ LAYOUT_OPTIONS: tuple[tuple[str, str], ...] = (
     ("any", "不限"),
 )
 
+AREA_DESCRIPTIONS = {
+    "bkk1": "商务与餐饮较集中，生活便利；部分路段高峰较拥堵。",
+    "bkk23": "邻近BKK1，住宅与本地商业混合，可比较不同租金。",
+    "koh": "公寓与商业项目集中，部分住宅有河景或社区设施。",
+    "jinjie": "中餐、超市和日常配套较多，适合重视生活便利的租客。",
+    "rf": "大型公寓社区，户型与物业收费因楼栋而异。",
+    "aeon1": "靠近购物中心，餐饮、办公与住宅项目较集中。",
+    "tk": "学校、住宅及商业项目较多，也有排屋与别墅。",
+    "russian": "市场、咖啡馆和日常生活设施丰富，住宅选择多。",
+    "pp": "多个排屋与别墅社区，适合需要较多卧室的家庭。",
+    "chroy": "滨河住宅和新项目较多，部分公寓可选河景。",
+    "sen": "商场、超市与住宅项目较多，房型选择较丰富。",
+}
+
+
+def area_description(label: str) -> str:
+    for code, display in AREA_OPTIONS:
+        if str(label or "").strip() == display:
+            return AREA_DESCRIPTIONS.get(code, "")
+    return ""
+
 _AREA_LABELS = dict(AREA_OPTIONS)
 _LAYOUT_LABELS = dict(LAYOUT_OPTIONS)
 
@@ -73,6 +94,8 @@ def layout_selection(code: object) -> tuple[str, str, str]:
 
 __all__ = [
     "AREA_OPTIONS",
+    "AREA_DESCRIPTIONS",
+    "area_description",
     "LAYOUT_OPTIONS",
     "area_selection",
     "layout_selection",
