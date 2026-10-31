@@ -268,46 +268,71 @@ def _single_detail_keyboard(
 
 
 def _detail_grid(paths: tuple[str, ...], page: int) -> bytes:
-    """Display 1–4 complete original photos in one editable 4:5 Telegram image.
+    """Photo-led detail collage. Keep full images and avoid oversized matte.
 
-    4: left hero/right three; 3: top hero/bottom two; 2: stacked;
-    1: full frame. No cropping, stretching or artificial blurred image.
+    The canvas adapts to landscape and portrait source proportions; listing
+    captions, pagination and Telegram message navigation are unaffected.
     """
     selected = paths[page * 4:page * 4 + 4]
     if not selected:
         raise ValueError("detail_grid_has_no_photos")
-    width, height, gutter = 1080, 1350, 10
-    count = len(selected)
+    photos = []
+    for path in selected:
+        with Image.open(path) as original:
+            photos.append(ImageOps.exif_transpose(original).convert("RGB"))
+    ratios = [photo.width / photo.height for photo in photos]
+    width, gap = 1080, 8
+    count = len(photos)
     if count == 1:
+        height = max(600, min(1350, round(width / ratios[0])))
         boxes = [(0, 0, width, height)]
     elif count == 2:
-        top = (height - gutter) // 2
-        boxes = [(0, 0, width, top),
-                 (0, top + gutter, width, height - top - gutter)]
+        # Give both photos full width; each row follows its source ratio.
+        row_heights = [round(width / ratio) for ratio in ratios]
+        scale = min(1.0, 1342 / sum(row_heights))
+        top = max(200, round(row_heights[0] * scale))
+        bottom = max(200, round(row_heights[1] * scale))
+        height = top + gap + bottom
+        boxes = [(0, 0, width, top), (0, top + gap, width, bottom)]
     elif count == 3:
-        top = 880
-        left = (width - gutter) // 2
-        boxes = [(0, 0, width, top),
-                 (0, top + gutter, left, height - top - gutter),
-                 (left + gutter, top + gutter, width - left - gutter, height - top - gutter)]
+        # Wide hero on top, two readable details beneath it.
+        bottom_w = (width - gap) // 2
+        hero_h = min(780, round(width / ratios[0]))
+        bottom_h = min(650, round(max(bottom_w / ratios[1], bottom_w / ratios[2])))
+        height = hero_h + gap + bottom_h
+        boxes = [(0, 0, width, hero_h),
+                 (0, hero_h + gap, bottom_w, bottom_h),
+                 (bottom_w + gap, hero_h + gap, width - bottom_w - gap, bottom_h)]
+    elif all(ratio >= 1.15 for ratio in ratios):
+        # Four landscape rooms: 2x2 instead of one narrow tall strip with
+        # three tiny photos and an enormous amount of unused grey background.
+        cell_w = (width - gap) // 2
+        top_h = max(round(cell_w / ratios[0]), round(cell_w / ratios[1]))
+        bottom_h = max(round(cell_w / ratios[2]), round(cell_w / ratios[3]))
+        height = top_h + gap + bottom_h
+        boxes = [(0, 0, cell_w, top_h),
+                 (cell_w + gap, 0, width - cell_w - gap, top_h),
+                 (0, top_h + gap, cell_w, bottom_h),
+                 (cell_w + gap, top_h + gap, width - cell_w - gap, bottom_h)]
     else:
-        hero = 688
-        right_x, right_w = hero + gutter, width - hero - gutter
-        cell_h = (height - 2 * gutter) // 3
-        boxes = [(0, 0, hero, height),
-                 (right_x, 0, right_w, cell_h),
-                 (right_x, cell_h + gutter, right_w, cell_h),
-                 (right_x, 2 * (cell_h + gutter), right_w, height - 2 * (cell_h + gutter))]
+        # Portrait hero still gets a large left cell. Adjust proportions to
+        # the actual photo, rather than forcing an overly narrow fixed column.
+        height = 1260
+        hero_w = min(730, max(510, round(height * ratios[0])))
+        right_w = width - hero_w - gap
+        row_h = (height - gap * 2) // 3
+        boxes = [(0, 0, hero_w, height),
+                 (hero_w + gap, 0, right_w, row_h),
+                 (hero_w + gap, row_h + gap, right_w, row_h),
+                 (hero_w + gap, 2 * (row_h + gap), right_w, height - 2 * (row_h + gap))]
 
-    canvas = Image.new("RGB", (width, height), "#EDF0ED")
-    for source, (x, y, w, h) in zip(selected, boxes):
-        with Image.open(source) as original:
-            photo = ImageOps.contain(ImageOps.exif_transpose(original).convert("RGB"),
-                                     (w, h), method=Image.Resampling.LANCZOS)
-        canvas.paste(photo, (x + (w - photo.width) // 2,
-                             y + (h - photo.height) // 2))
+    canvas = Image.new("RGB", (width, height), "#F4F4F1")
+    for photo, (x, y, w, h) in zip(photos, boxes):
+        fitted = ImageOps.contain(photo, (w, h), method=Image.Resampling.LANCZOS)
+        canvas.paste(fitted, (x + (w - fitted.width) // 2,
+                              y + (h - fitted.height) // 2))
     output = BytesIO()
-    canvas.save(output, format="JPEG", quality=91, optimize=True)
+    canvas.save(output, format="JPEG", quality=92, optimize=True)
     return output.getvalue()
 
 

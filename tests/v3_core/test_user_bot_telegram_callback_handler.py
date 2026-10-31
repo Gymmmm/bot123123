@@ -606,10 +606,12 @@ def test_mobile_detail_grid_emphasizes_hero_and_preserves_portrait(tmp_path, cou
         paths.append(str(path))
     payload = _detail_grid(tuple(paths), 0)
     with Image.open(BytesIO(payload)) as preview:
-        assert preview.size == (1080, 1350)
-        assert preview.getpixel((540, 300))[0] > 140
-        detail_x = 160 if count == 3 else 880
-        assert preview.getpixel((detail_x, 1150))[1] > 140
+        assert preview.width == 1080
+        assert 400 <= preview.height <= 1350
+        # Both the portrait hero and landscape details must remain visible.
+        colors = preview.resize((108, max(1, preview.height // 10))).get_flattened_data()
+        assert any(r > 170 and g < 90 for r, g, b in colors)
+        assert any(g > 150 and r < 90 for r, g, b in colors)
 
 
 @pytest.mark.parametrize("count", [1, 2, 3, 4])
@@ -625,7 +627,8 @@ def test_detail_grid_keeps_source_edges_and_pale_matte(tmp_path, count):
         image.save(path)
         photos.append(str(path))
     with Image.open(BytesIO(_detail_grid(tuple(photos), 0))) as result:
-        assert result.size == (1080, 1350)
-        # Horizontal sources stay horizontal with the matte exposed; never
-        # stretched vertically or cropped to fill narrow detail cells.
-        assert result.getpixel((5, 5))[0] > 170
+        assert result.width == 1080
+        assert 300 <= result.height <= 1350
+        # Horizontal source photos use a shorter canvas rather than
+        # placing large gray blocks inside a forced tall 4:5 layout.
+        assert result.height < 850
