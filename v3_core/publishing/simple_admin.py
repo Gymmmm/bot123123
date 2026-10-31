@@ -650,7 +650,9 @@ class SimplePublisherAdminController:
         message = update.effective_message
         text = str(getattr(message, "caption", None) or getattr(message, "text", None) or "").strip()
         if text:
-            state["text"] = text
+            previous = str(state.get("text") or "").strip()
+            if text not in previous.split("\n"):
+                state["text"] = f"{previous}\n{text}".strip() if previous else text
         photo = await self._download_photo(message, context)
         if photo:
             images = state.setdefault("images", [])
@@ -680,6 +682,9 @@ class SimplePublisherAdminController:
         result = await asyncio.to_thread(self.intake.persist, source)
         state["source_post_pk"] = result.source_post_pk
         if result.source_post_pk is None:
+            await update.effective_message.reply_text(
+                "暂时未保存成功。请重发这条素材，之前已收到的内容仍保留在本次发布中。"
+            )
             return
         worker_result = await asyncio.to_thread(self.worker.process_one, int(result.source_post_pk))
         if worker_result.status != "materialized":
@@ -975,6 +980,13 @@ class SimplePublisherAdminController:
                 reply_markup=InlineKeyboardMarkup([self.home_row()]),
             )
         elif action == "manual_send" and len(parts) == 4:
+            state = context.user_data.get(NEW_LISTING_STATE_KEY)
+            if not isinstance(state, dict) or str(state.get("package_id") or "") != parts[2] or str(state.get("offer_id") or "") != parts[3]:
+                await query.message.reply_text(
+                    "这张预览已失效或已处理，请从当前房源预览重新发布。",
+                    reply_markup=InlineKeyboardMarkup([self.home_row()]),
+                )
+                return True
             package = await asyncio.to_thread(
                 self.workflow.approve_package,
                 package_id=parts[2],
