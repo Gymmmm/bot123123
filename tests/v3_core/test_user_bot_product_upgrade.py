@@ -84,7 +84,7 @@ def test_listing_attribution_sources_have_chinese_admin_labels():
 
 def test_repair_page_exposes_every_supported_core_issue():
     callbacks = set(_callbacks(repair_home_view()))
-    for issue in ("repair_ac", "repair_water", "repair_power", "repair_door", "repair_washer", "repair_fridge", "repair_network", "repair_furniture", "repair_other"):
+    for issue in ("repair_other", "aftercare_property", "aftercare_bill", "aftercare_other"):
         assert f"v3u:service:issue:{issue}" in callbacks
 
 
