@@ -292,7 +292,7 @@ def test_sale_http_api_meta_detail_media_and_static_frontend(tmp_path: Path):
 def test_sale_web_is_bundled_and_uses_store_only_policy():
     """Sale UI is bundled in this repo; Sale uses store_only policy, not telegram_publish."""
     root = Path(__file__).resolve().parents[2]
-    assert (root / "web" / "sale" / "index.html").exists(), "sale frontend should be bundled"
+    assert (root / "web" / "sale" / "home.html").exists(), "sale frontend should be bundled"
     catalog = (root / "v3_core" / "sale" / "catalog.py").read_text(encoding="utf-8")
     assert "inventory_status IN ('pending','active','reserved')" in catalog
     assert '"pending": "在售"' in catalog
@@ -366,7 +366,7 @@ def test_sale_catalog_handles_missing_public_fields_and_media(tmp_path: Path):
 
 def test_sale_frontend_has_crawlable_property_urls_and_home_seo():
     root = Path(__file__).resolve().parents[2]
-    index = (root / "web" / "sale" / "index.html").read_text(encoding="utf-8")
+    index = (root / "web" / "sale" / "home.html").read_text(encoding="utf-8")
     app = (root / "web" / "sale" / "app.js").read_text(encoding="utf-8")
     assert "金边买房｜金边房产出售｜侨联地产" in index
     assert 'rel="canonical"' in index
@@ -380,7 +380,7 @@ def test_sale_property_page_has_unique_server_side_seo(tmp_path: Path):
     db = initialize_v3_storage(tmp_path / "seo.sqlite")
     _seed_listing(db, tmp_path, suffix="SEO", public_id="QL-SEO-01", sale_price=188000, location="BKK1", layout="2房2卫")
     root = Path(__file__).resolve().parents[2]
-    server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(SaleCatalogRepository(db), root / "web" / "sale" / "index.html"))
+    server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(SaleCatalogRepository(db), root / "web" / "sale" / "home.html"))
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
