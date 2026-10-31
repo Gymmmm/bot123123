@@ -25,11 +25,15 @@
       </button>
       <a class="header-contact" href="https://t.me/pengqingw" target="_blank" rel="noopener">联系顾问</a>
     </div>
-    <div class="filters" aria-label="房源筛选">
-      <select id="area" aria-label="区域"><option value="">全部区域</option></select>
-      <select id="type" aria-label="物业类型"><option value="">全部类型</option></select>
-      <select id="price" aria-label="总价"><option value="">总价不限</option><option value="0-100000">$10万内</option><option value="100000-200000">$10–20万</option><option value="200000-500000">$20–50万</option><option value="500000-1000000">$50–100万</option><option value="1000000-999999999">$100万以上</option></select>
-      <button id="resetButton" type="button">重置</button>
+    <div class="filter-shell">
+      <div class="qualifications"><span class="filter-heading">购买资格</span><div class="qualifier-chips"><span class="qualification-chip" title="目前没有可核验的产权数据，暂不能按资格筛选">外国人可持有 · 待核验</span><span class="qualification-chip" title="需核对产权文件后才能按分层产权筛选">分层产权 · 待核验</span></div></div>
+      <div class="market-filters"><span class="filter-heading">市场条件</span><div class="filters" aria-label="房源筛选">
+        <select id="area" aria-label="区域"><option value="">全部区域</option></select>
+        <select id="type" aria-label="物业类型"><option value="">全部类型</option></select>
+        <select id="price" aria-label="总价"><option value="">总价不限</option><option value="0-100000">$10万内</option><option value="100000-200000">$10–20万</option><option value="200000-500000">$20–50万</option><option value="500000-1000000">$50–100万</option><option value="1000000-999999999">$100万以上</option></select>
+        <button id="resetButton" type="button">重置</button>
+      </div></div>
+      <div id="activeFilters" class="active-filters" aria-live="polite" hidden></div>
     </div>
   </header>
 
@@ -38,8 +42,8 @@
       <div class="hero-media" aria-hidden="true"><img id="heroImage" alt="" /></div>
       <div class="hero-copy">
         <span class="eyebrow">PHNOM PENH · PROPERTIES FOR SALE</span>
-        <h1 id="hero-title">在金边，找到<br><em>理想的家</em></h1>
-        <p>探索金边公寓、别墅与住宅房源。按区域、价格和房型，找到适合你的选择。</p>
+        <h1 id="hero-title">金边出售房源<br><em>信息透明，按条件查找</em></h1>
+        <p>按区域、价格和房型筛选。产权文件、外国人购买资格及交易费用，由中文顾问协助核验。</p><div class="hero-metrics"><div><small>当前展示</small><strong id="heroTotal">—</strong></div><div><small>覆盖区域</small><strong id="heroAreas">—</strong></div><div><small>产权及税费</small><strong>待核验</strong></div></div>
 
         <a class="hero-cta" href="#catalog">查看出售房源 <span aria-hidden="true">↓</span></a>
       </div>
@@ -59,11 +63,11 @@
       <div class="detail-content">
         <span class="eyebrow">出售总价 USD</span><strong id="detail-price" class="detail-price"></strong><h2 id="detail-title"></h2>
         <div class="ownership-note">产权类型及外资购买资格：尚未核验，请向顾问索取产权材料。</div><div id="detail-unit-price" class="detail-unit-price" hidden></div><div id="detail-fields" class="detail-fields"></div>
-<section id="investmentBlock" class="detail-section detail-reference" hidden><h3>购置参考</h3><p id="investmentText"></p></section>
+<section id="investmentBlock" class="detail-section detail-reference"><h3>购置资格与成本</h3><div class="decision-panel"><div class="decision-row"><span>产权及外资配额</span><strong>未披露 · 待核验</strong></div><div class="decision-row"><span>挂牌总价</span><strong id="decisionPrice">—</strong></div><div class="decision-row"><span>参考单价</span><strong id="decisionUnit">—</strong></div><div class="decision-row"><span>转让税及登记费</span><strong>待核实</strong></div><div class="decision-row"><span>律师／公证费</span><strong>待核实</strong></div><div class="decision-row decision-total"><span>落地总成本</span><strong>待出具核算</strong></div></div><p class="decision-caution">以上仅显示已知挂牌资料，不构成产权确认或费用报价。</p><p id="investmentText" hidden></p></section>
  <section id="descriptionBlock" class="detail-section" hidden><h3>房源介绍</h3><p id="detail-description"></p></section>
  <section id="amenitiesBlock" class="detail-section" hidden><h3>房源特点</h3><div id="detail-amenities" class="amenities"></div></section>
       </div>
-      <div class="detail-footer"><div id="consultContext" class="consult-context"></div><a id="consultButton" class="consult" target="_blank" rel="noopener">咨询这套</a></div>
+      <div class="detail-footer"><div id="consultContext" class="consult-context"></div><a id="consultButton" class="consult" target="_blank" rel="noopener">索取产权与配额确认文件</a></div>
     </section>
   </div>
   <script src="./app.js" defer></script>
