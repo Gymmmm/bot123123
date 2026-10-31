@@ -74,10 +74,13 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
         lines = [
             "<b>📣 侨联发布助手</b>",
             "",
-            "新房源由后台自动采集、自动发布；也可在这里手动发布。",
+            "<b>房源发布与日常管理</b>",
+            "发送房源素材后自动整理，确认预览即可发布。",
             "",
-            f"🔵 待确认房态 <b>{pending_n}</b>　🚀 自动待发 <b>{queued_n}</b>",
-            "房态、营销内容和采集源可在下方管理。",
+            f"🔵 待确认：<b>{pending_n}</b> 套",
+            f"🚀 自动待发：<b>{queued_n}</b> 套",
+            "",
+            "请选择需要处理的事项：",
         ]
         await message.reply_text(
             "\n".join(lines),
@@ -189,13 +192,14 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
         lines = [
             "<b>🔵 房态工作台</b>",
             "",
-            f"🔵 待确认 {c['pending']}｜10套一组",
-            f"🟢 可预约       {c['active']}",
-            f"🟡 已有预约      {c['reserved']}",
-            f"🔴 已租出        {c['rented']}",
-            f"⚫ 已下架        {c['offline']}",
-            f"🆕 今日发布    {c['today']}",
-            f"⏰ 超3天未确认   {c['overdue']}",
+            f"🔵 待确认：<b>{c['pending']}</b> 套",
+            f"🟢 可预约：<b>{c['active']}</b> 套",
+            f"🟡 已有预约：<b>{c['reserved']}</b> 套",
+            f"🔴 已租出：<b>{c['rented']}</b> 套",
+            f"⚫ 已下架：<b>{c['offline']}</b> 套",
+            "",
+            f"🆕 今日发布：{c['today']} 套",
+            f"⏰ 超3天未确认：{c['overdue']} 套",
         ]
         await message.reply_text(
             "\n".join(lines),
@@ -403,15 +407,16 @@ class PublisherInventoryAdminController(PendingBatchOperatorPublisherAdminContro
         lines = [
             f"<b>🏠 {escape(project)}｜{escape(layout)}</b>",
             f"💵 {escape(price)}/月" if price.startswith("$") else f"💵 {escape(price)}",
-            "",
-            escape(public_id),
-            f"发布时间：{escape(published)}",
-            f"来源：{source}",
+            f"📍 {escape(area)}",
             f"当前房态：{status_label}",
             "",
-            f"📍 {escape(area)}",
+            "<b>租赁信息</b>",
             f"🏢 {escape(property_type)} · {escape(floor)}",
-            f"🗝 {escape(payment)} · {escape(contract)}",
+            f"🔑 {escape(payment)} · {escape(contract)}",
+            "",
+            f"房源编号：{escape(public_id)}",
+            f"发布时间：{escape(published)}",
+            f"来源：{source}",
         ]
         rows: list[list[InlineKeyboardButton]] = [
             [

@@ -614,10 +614,14 @@ class SimplePublisherAdminController:
             "cover_index": 0,
         }
         await message.reply_text(
-            "<b>➕ 发布房源</b>\n\n"
-            "直接发送房源文字、图片、带文字的多张图片，或转发房源消息。\n"
-            "系统会自动合并、解析和检查；资料满足发布条件后会直接显示最终预览。\n"
-            "如果资料不完整，可以继续补发，不需要重新开始。",
+            "<b>🏠 发布房源</b>\n\n"
+            "<b>① 发送素材</b>\n"
+            "发送房源文字、照片或转发原房源消息。\n"
+            "支持继续补充，之前已收到的素材会保留。\n\n"
+            "<b>② 检查资料</b>\n"
+            "系统自动整理。缺少资料时按提示补充。\n\n"
+            "<b>③ 预览并发布</b>\n"
+            "确认封面和正文后，点击「📤 确认发布到频道」。",
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(
                 [
@@ -659,7 +663,8 @@ class SimplePublisherAdminController:
             if photo["file_hash"] not in {str(x.get("file_hash") or "") for x in images if isinstance(x, dict)}:
                 images.append(photo)
         await message.reply_text(
-            f"已收到：文字 {'有' if state.get('text') else '无'} · 图片 {len(state.get('images') or [])} 张。\n正在自动检查…"
+            f"<b>素材已收到</b>\n文字：{'已收到' if state.get('text') else '未收到'}\n照片：{len(state.get('images') or [])} 张\n\n正在检查房源资料…",
+            parse_mode=ParseMode.HTML,
         )
         await self._materialize_manual(update, context)
         return True
@@ -742,10 +747,10 @@ class SimplePublisherAdminController:
         blockers = self.autopilot._strict_blockers(item, dict(detail.canonical.get("facts") or {}), media)
         if blockers:
             code = blockers[0]
-            reason = ERROR_LABELS.get(code, code)
+            reason = ERROR_LABELS.get(code) or "房源资料或照片暂未满足发布要求"
             self.repository.set_item(offer_id, state="exception", reason_code=code, reason_text=reason, origin="manual")
             await message.reply_text(
-                f"当前不能发布：<b>{escape(reason)}</b>\n\n请先补充或修改资料，完成后再点“检查并发布”。",
+                f"<b>房源暂不能发布</b>\n\n需要处理：{escape(reason)}\n\n请选择补充或修改资料；发送完成后系统会重新检查并生成预览。",
                 parse_mode=ParseMode.HTML,
                 reply_markup=InlineKeyboardMarkup([
                     [
