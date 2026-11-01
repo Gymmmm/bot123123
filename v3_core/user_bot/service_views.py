@@ -137,8 +137,8 @@ def video_service_view() -> ServiceView:
 # Section 9 — 租后服务 (descriptive naming per locked status).
 AFTERCARE_TEXT = (
     "🤝 <b>租后服务</b>\n\n"
-    "住进去以后，有问题也能找我们。\n"
-    "房屋报修、物业沟通、账单看不明白，都可以告诉中文顾问。"
+    "维修、物业、账单或其他问题，统一在这里提交。\n"
+    "说明情况，按需上传照片，提交后由侨联顾问跟进。"
 )
 
 
@@ -147,8 +147,7 @@ def aftercare_home_view() -> ServiceView:
         kind="aftercare_home",
         text=AFTERCARE_TEXT,
         rows=(
-            (ServiceChoice("🔧 房屋报修", "v3u:service:repair"), ServiceChoice("🏢 物业协调", "v3u:service:coordination")),
-            (ServiceChoice("💡 账单协助", "v3u:service:utilities"), ServiceChoice("❓ 其他住房问题", "v3u:service:general")),
+            (ServiceChoice("📝 提交住房问题", "v3u:service:repair"),),
             (ServiceChoice("⬅️ 返回侨联服务", "v3u:home:service"),),
         ),
     )
@@ -176,7 +175,7 @@ def rental_service_home_view() -> ServiceView:
 
 # Section 8 — 入住留档 (重点权益页，保留最多细节).
 HANDOVER_RECORD_TEXT = (
-    "🛡️ <b>入住留档</b>\n\n"
+    "🛡️ <b>入住留档｜PDF 清单</b>\n\n"
     "入住有记录，退租有依据。\n\n"
     "入住当天建议记录：\n"
     "• 水电表\n"
@@ -184,7 +183,8 @@ HANDOVER_RECORD_TEXT = (
     "• 钥匙和门卡\n"
     "• 墙面 / 地板 / 卫浴已有问题\n"
     "• 需要房东或物业处理的事项\n\n"
-    "建议照片和视频一起保存。"
+    "点击下方按钮下载《入住交接清单》PDF，保存到手机。\n"
+    "交接时按清单核对，并拍照或录像留存。"
 )
 
 
@@ -193,7 +193,7 @@ def handover_record_view() -> ServiceView:
         kind="rental_handover",
         text=HANDOVER_RECORD_TEXT,
         rows=(
-            (ServiceChoice("📋 查看入住清单", "v3u:rental:handover_download"),),
+            (ServiceChoice("📄 下载入住交接清单 PDF", "v3u:rental:handover_download"),),
             (ServiceChoice("⬅️ 返回看房与交接", "v3u:home:rental"),),
         ),
     )
@@ -207,14 +207,11 @@ def concierge_home_view() -> ServiceView:
 def repair_home_view() -> ServiceView:
     return ServiceView(
         kind="repair_home",
-        text="🔧 <b>房屋报修</b>\n\n请选择需要处理的问题：",
+        text="📝 <b>提交住房问题</b>\n\n请选择问题类型，之后填写说明并可上传照片。",
         rows=(
-            (ServiceChoice("❄️ 空调", "v3u:service:issue:repair_ac"), ServiceChoice("🚿 热水 / 漏水", "v3u:service:issue:repair_water")),
-            (ServiceChoice("💡 灯具 / 电路", "v3u:service:issue:repair_power"), ServiceChoice("🔐 门锁 / 门禁", "v3u:service:issue:repair_door")),
-            (ServiceChoice("🧺 洗衣机", "v3u:service:issue:repair_washer"), ServiceChoice("🧊 冰箱", "v3u:service:issue:repair_fridge")),
-            (ServiceChoice("🌐 网络", "v3u:service:issue:repair_network"), ServiceChoice("🪑 家具损坏", "v3u:service:issue:repair_furniture")),
-            (ServiceChoice("❓ 其他问题", "v3u:service:issue:repair_other"),),
-            (ServiceChoice("⬅️ 退出报修", "v3u:service:repair_exit"),),
+            (ServiceChoice("🔧 维修问题", "v3u:service:issue:repair_other"), ServiceChoice("🏢 物业问题", "v3u:service:issue:aftercare_property")),
+            (ServiceChoice("💡 账单问题", "v3u:service:issue:aftercare_bill"), ServiceChoice("❓ 其他问题", "v3u:service:issue:aftercare_other")),
+            (ServiceChoice("⬅️ 返回租后服务", "v3u:service:concierge"),),
         ),
     )
 
@@ -276,7 +273,7 @@ def repair_confirm_view(
     media_count: int = 0,
     property_name: str = "",
 ) -> ServiceView:
-    lines = ["🔧 <b>确认报修</b>", ""]
+    lines = ["📝 <b>确认住房问题</b>", ""]
     if property_name:
         lines.extend([f"🏠 {he(property_name)}", ""])
     lines.extend([
@@ -291,7 +288,7 @@ def repair_confirm_view(
         rows=(
             (ServiceChoice("✅ 确认提交", "v3u:service:repair_confirm"),),
             (ServiceChoice("修改描述", "v3u:service:repair_modify_desc"), ServiceChoice("修改时间", "v3u:service:repair_modify_time")),
-            (ServiceChoice("退出报修", "v3u:service:repair_exit"),),
+            (ServiceChoice("退出提交", "v3u:service:repair_exit"),),
         ),
     )
 
@@ -299,7 +296,7 @@ def repair_confirm_view(
 def repair_result_view(*, outcome: str, issue_label: str = "", property_name: str = "") -> ServiceView:
     clean = str(outcome or "").strip()
     if clean in {"ticket", "handoff"}:
-        lines = ["✅ <b>报修已记录</b>", ""]
+        lines = ["✅ <b>住房问题已记录</b>", ""]
         if property_name:
             lines.extend([f"🏠 {he(property_name)}", ""])
         if issue_label:
@@ -323,7 +320,7 @@ def repair_result_view(*, outcome: str, issue_label: str = "", property_name: st
         rows=(
             (ServiceChoice("重新提交", "v3u:service:repair_confirm"),),
             (ServiceChoice("💬 中文顾问", "v3u:home:contact"),),
-            (ServiceChoice("退出报修", "v3u:service:repair_exit"),),
+            (ServiceChoice("退出提交", "v3u:service:repair_exit"),),
         ),
     )
 

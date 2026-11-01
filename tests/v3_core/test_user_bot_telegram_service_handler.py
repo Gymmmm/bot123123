@@ -116,7 +116,7 @@ async def test_unbound_repair_collects_full_need_then_uses_real_handoff(tmp_path
     outcome=await handle_v3_service_callback(_callback_update(confirm),context,service=service,effects=effects)
     assert outcome.handled and outcome.ticket_id is None
     assert len(leads.calls)==1 and len(admins.calls)==1
-    assert "报修已记录" in confirm.calls[-1][1][0]
+    assert "住房问题已记录" in confirm.calls[-1][1][0]
     assert SERVICE_REQUEST_SESSION_KEY not in context.user_data
     with sqlite3.connect(str(service.repository.db_path)) as conn:
         assert conn.execute("SELECT COUNT(*) FROM repair_tickets_v3").fetchone()[0]==0
@@ -134,7 +134,7 @@ async def test_bound_repair_creates_real_ticket_only_on_confirm(tmp_path):
     confirm=FakeQuery("v3u:service:repair_confirm")
     outcome=await handle_v3_service_callback(_callback_update(confirm),context,service=service)
     assert outcome.ticket_id is not None
-    assert "报修已记录" in confirm.calls[-1][1][0]
+    assert "住房问题已记录" in confirm.calls[-1][1][0]
     with sqlite3.connect(str(service.repository.db_path)) as conn:
         assert conn.execute("SELECT COUNT(*) FROM repair_tickets_v3").fetchone()[0]==1
 
@@ -147,3 +147,22 @@ async def test_general_text_consumed_only_with_explicit_wait_state(tmp_path):
     query=FakeQuery("v3u:service:general")
     await handle_v3_service_callback(_callback_update(query),context,service=service)
     assert context.user_data[SERVICE_GENERAL_WAIT_KEY] is True
+@pytest.mark.asyncio
+@pytest.mark.parametrize("issue", ["aftercare_property", "aftercare_bill", "aftercare_other"])
+async def test_bound_nonrepair_housing_issue_reaches_adviser_without_repair_ticket(tmp_path, issue):
+    service = _service(tmp_path, binding=True)
+    context = _context()
+    leads, admins = CountingLeadService(), CountingAdmins()
+    effects = ServiceEffectExecutor(leads=leads, admins=admins, now=lambda: "2026-09-09 03:14:01")
+    await handle_v3_service_callback(_callback_update(FakeQuery("v3u:service:issue:" + issue)), context, service=service, effects=effects)
+    await handle_v3_service_text(_text_update(FakeMessage("物业账单有疑问，请协助核对。")), context, service=service, effects=effects)
+    for action in ("repair_media_skip", "slot:today"):
+        await handle_v3_service_callback(_callback_update(FakeQuery("v3u:service:" + action)), context, service=service, effects=effects)
+    query = FakeQuery("v3u:service:repair_confirm")
+    outcome = await handle_v3_service_callback(_callback_update(query), context, service=service, effects=effects)
+    assert outcome.handled and outcome.ticket_id is None
+    assert len(leads.calls) == 1 and len(admins.calls) == 1
+    assert "住房问题已记录" in query.calls[-1][1][0]
+    assert SERVICE_REQUEST_SESSION_KEY not in context.user_data
+    with sqlite3.connect(str(service.repository.db_path)) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM repair_tickets_v3").fetchone()[0] == 0

@@ -16,7 +16,10 @@ SERVICE_REQUEST_LABELS = {
     "repair_fridge": "冰箱",
     "repair_network": "网络",
     "repair_furniture": "家具损坏",
-    "repair_other": "其他设备",
+    "repair_other": "其他维修问题",
+    "aftercare_property": "物业问题",
+    "aftercare_bill": "账单问题",
+    "aftercare_other": "其他住房问题",
     "property": "物业协调",
 }
 SERVICE_SLOT_LABELS = {"today": "今天内安排", "tomorrow_am": "明天上午", "tomorrow_pm": "明天下午"}

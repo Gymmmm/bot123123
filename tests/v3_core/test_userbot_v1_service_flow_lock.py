@@ -35,51 +35,24 @@ def test_p15_service_hub_copy_buttons_and_callbacks_locked():
 
 def test_p16_aftercare_only_exposes_real_workflows():
     view = aftercare_home_view()
-    assert view.text == (
-        "🤝 <b>租后服务</b>\n\n"
-        "住进去以后，有问题也能找我们。\n"
-        "房屋报修、物业沟通、账单看不明白，都可以告诉中文顾问。"
-    )
+    assert "统一在这里提交" in view.text
+    assert _callbacks(view) == ["v3u:service:repair", "v3u:home:service"]
+
+
+def test_p20_unified_housing_problem_categories():
+    from v3_core.user_bot.service_flow import SERVICE_REQUEST_LABELS
+    view = repair_home_view()
+    assert "提交住房问题" in view.text
     assert _rows(view) == [
-        ["🔧 房屋报修", "🏢 物业协调"],
-        ["💡 账单协助", "❓ 其他住房问题"],
-        ["⬅️ 返回侨联服务"],
+        ["🔧 维修问题", "🏢 物业问题"],
+        ["💡 账单问题", "❓ 其他问题"],
+        ["⬅️ 返回租后服务"],
     ]
     callbacks = _callbacks(view)
-    assert callbacks == [
-        "v3u:service:repair",
-        "v3u:service:coordination",
-        "v3u:service:utilities",
-        "v3u:service:general",
-        "v3u:home:service",
-    ]
-    for stub in ("billing", "moving", "cleaning", "network_help"):
-        assert not any(stub in callback for callback in callbacks)
-
-
-def test_p20_repair_copy_buttons_and_callbacks_locked():
-    view = repair_home_view()
-    assert view.text == "🔧 <b>房屋报修</b>\n\n请选择需要处理的问题："
-    assert _rows(view) == [
-        ["❄️ 空调", "🚿 热水 / 漏水"],
-        ["💡 灯具 / 电路", "🔐 门锁 / 门禁"],
-        ["🧺 洗衣机", "🧊 冰箱"],
-        ["🌐 网络", "🪑 家具损坏"],
-        ["❓ 其他问题"],
-        ["⬅️ 退出报修"],
-    ]
-    assert _callbacks(view) == [
-        "v3u:service:issue:repair_ac",
-        "v3u:service:issue:repair_water",
-        "v3u:service:issue:repair_power",
-        "v3u:service:issue:repair_door",
-        "v3u:service:issue:repair_washer",
-        "v3u:service:issue:repair_fridge",
-        "v3u:service:issue:repair_network",
-        "v3u:service:issue:repair_furniture",
-        "v3u:service:issue:repair_other",
-        "v3u:service:repair_exit",
-    ]
+    assert callbacks[-1] == "v3u:service:concierge"
+    keys = [value.split("issue:")[1] for value in callbacks[:-1]]
+    assert keys == ["repair_other", "aftercare_property", "aftercare_bill", "aftercare_other"]
+    assert all(key in SERVICE_REQUEST_LABELS for key in keys)
 
 
 def test_p18_unbound_lease_copy_and_buttons_locked():

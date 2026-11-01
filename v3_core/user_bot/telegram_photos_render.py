@@ -11,6 +11,7 @@ from typing import Any
 
 from telegram import InputMediaPhoto
 from telegram.constants import ParseMode
+from telegram.error import BadRequest
 
 
 def _readable_paths(groups: tuple[tuple[str, ...], ...] | list) -> list[str]:
@@ -75,37 +76,37 @@ async def send_listing_photos_album(
         if inline:
             return sent_media_ids
     elif len(paths) >= 2:
-        media: list[InputMediaPhoto] = []
-        for index, raw in enumerate(paths[:10]):
-            data = Path(raw).read_bytes()
-            if index == 0 and caption:
-                media.append(
-                    InputMediaPhoto(
-                        media=data,
-                        caption=caption,
-                        parse_mode=ParseMode.HTML,
-                    )
-                )
-            else:
-                media.append(InputMediaPhoto(media=data))
-        try:
-            sent_group = await bot.send_media_group(chat_id=chat_id, media=media)
+        for start in range(0, len(paths), 10):
+            batch = paths[start:start + 10]
+            media = [InputMediaPhoto(
+                media=Path(raw).read_bytes(),
+                caption=caption if start == 0 and index == 0 else None,
+                parse_mode=ParseMode.HTML if start == 0 and index == 0 and caption else None,
+            ) for index, raw in enumerate(batch)]
+            try:
+                if len(media) == 1:
+                    sent = await bot.send_photo(chat_id=chat_id, photo=media[0].media)
+                    sent_group = [sent]
+                else:
+                    sent_group = await bot.send_media_group(chat_id=chat_id, media=media)
+            except BadRequest:
+                # A definite rejection is safe to resend individually; network
+                # timeouts are ambiguous and must not duplicate delivered photos.
+                sent_group = []
+                for index, raw in enumerate(batch):
+                    with Path(raw).open("rb") as handle:
+                        sent = await bot.send_photo(
+                            chat_id=chat_id, photo=handle,
+                            caption=caption if start == 0 and index == 0 else None,
+                            parse_mode=ParseMode.HTML if start == 0 and index == 0 and caption else None,
+                        )
+                    mid = getattr(sent, "message_id", None)
+                    if mid is not None:
+                        sent_media_ids.append(int(mid))
             for msg in sent_group or []:
                 mid = getattr(msg, "message_id", None)
                 if mid is not None:
                     sent_media_ids.append(int(mid))
-        except Exception:
-            # Do not crash the whole photos flow on a MediaGroup rejection.
-            with Path(paths[0]).open("rb") as handle:
-                sent = await bot.send_photo(
-                    chat_id=chat_id,
-                    photo=handle,
-                    caption=caption or None,
-                    parse_mode=ParseMode.HTML if caption else None,
-                )
-            media_id = getattr(sent, "message_id", None)
-            if media_id is not None:
-                sent_media_ids.append(int(media_id))
 
     if expand_only:
         return sent_media_ids

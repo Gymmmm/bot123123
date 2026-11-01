@@ -442,13 +442,13 @@ async def handle_v3_service_callback(
         binding = service.active_binding(user.user_id)
         prop = str(getattr(binding, "property_name", "") or "") if binding is not None else ""
         detail = (
-            f"报修：{draft.issue_label}\n说明：{draft.detail}\n希望时间：{slot_label}"
+            f"住房问题：{draft.issue_label}\n说明：{draft.detail}\n希望时间：{slot_label}"
             f"\n附件数：{len(state.get('media_file_ids') or ())}"
         )
         ticket_id = None
         effect = None
         outcome = "failed"
-        if binding is not None:
+        if binding is not None and draft.issue_key.startswith("repair_"):
             try:
                 submission = service.submit_repair(user_id=user.user_id, draft=draft, slot=slot)
             except Exception:

@@ -6,6 +6,8 @@ from pathlib import Path
 from html import escape as html_escape, unescape as html_unescape
 import re
 from io import BytesIO
+from time import monotonic
+from telegram import InputFile
 from PIL import Image, ImageOps
 from typing import Any
 
@@ -224,7 +226,7 @@ def _single_detail_caption(text: str, index: int, total: int) -> str:
     """Keep the complete useful detail in the same Telegram photo message."""
     begin = index * 4 + 1
     end = min(begin + 3, total)
-    heading = f"📷 实拍 {begin}–{end}/{total} · 点击查看大图\n\n"
+    heading = f"📷 实拍 {begin}–{end}/{total} · 拼图预览\n\n"
     content = str(text or "").strip()
     if len(heading + content) <= 1024:
         return heading + content
@@ -245,9 +247,6 @@ def _single_detail_keyboard(
             photo_row.append(InlineKeyboardButton(
                 "⬅️ 上一组", callback_data=f"v3u:detailphoto:{public_id}:{index - 1}"
             ))
-        photo_row.append(InlineKeyboardButton(
-            f"{index + 1}/{pages}", callback_data=f"v3u:detailphoto:{public_id}:{index}"
-        ))
         if index + 1 < pages:
             photo_row.append(InlineKeyboardButton(
                 "下一组 ➡️", callback_data=f"v3u:detailphoto:{public_id}:{index + 1}"
@@ -255,7 +254,7 @@ def _single_detail_keyboard(
         rows.append(photo_row)
     if total > 1:
         rows.append([InlineKeyboardButton(
-            "🔍 高清原图", callback_data=f"v3u:detailfull:{public_id}:{index * 4}"
+            "🖼 预览单张照片", callback_data=f"v3u:detailfull:{public_id}:{index * 4}"
         )])
     for row in (getattr(markup, "inline_keyboard", None) or ()):
         clean = [
@@ -485,16 +484,19 @@ async def _handle_detail_full(
         keyboard = _single_detail_keyboard(base, public_id, page, len(paths))
     else:
         media = Path(paths[value]).read_bytes()
-        caption = _single_detail_caption(details.text, page, len(paths))
+        caption = f"📷 单张实拍 {value + 1}/{len(paths)}\n\n" + str(details.text or "")
+        if len(caption) > 1024:
+            caption = f"📷 单张实拍 {value + 1}/{len(paths)}"
         rows: list[list[InlineKeyboardButton]] = []
         previous = []
         if value > 0:
             previous.append(InlineKeyboardButton("⬅️ 上一张", callback_data=f"v3u:detailfull:{public_id}:{value - 1}"))
-        previous.append(InlineKeyboardButton(f"{value + 1}/{len(paths)}", callback_data=f"v3u:detailfull:{public_id}:{value}"))
         if value + 1 < len(paths):
             previous.append(InlineKeyboardButton("下一张 ➡️", callback_data=f"v3u:detailfull:{public_id}:{value + 1}"))
-        rows.append(previous)
-        rows.append([InlineKeyboardButton("⬅️ 返回拼图", callback_data=f"v3u:detailback:{public_id}:{page}")])
+        if previous:
+            rows.append(previous)
+        rows.append([InlineKeyboardButton("📥 下载当前原图", callback_data=f"v3u:detaildownload:{public_id}:{value}")])
+        rows.append([InlineKeyboardButton("⬅️ 返回实拍", callback_data=f"v3u:detailback:{public_id}:{page}")])
         rows.extend(base.inline_keyboard)
         keyboard = InlineKeyboardMarkup(rows)
     await query.answer()
@@ -826,6 +828,26 @@ async def handle_v3_callback(
         return TelegramCallbackHandlerOutcome(handled=False)
     if parse_transition_callback(raw) is not None:
         return TelegramCallbackHandlerOutcome(handled=False)
+    if raw.startswith("v3u:detaildownload:"):
+        matched = re.fullmatch(r"v3u:detaildownload:(QL-[A-Z0-9-]+):(\d+)", raw)
+        public_id = normalize_public_id(matched.group(1)) if matched else None
+        listings = getattr(router, "listings", None)
+        result = listings.resolve_action(public_id, "details") if listings and public_id else None
+        details = getattr(result, "details", None) if getattr(result, "ok", False) else None
+        paths = tuple(p for p in getattr(details, "photo_paths", ()) if Path(p).is_file())
+        index = int(matched.group(2)) if matched else -1
+        if index < 0 or index >= len(paths):
+            await query.answer("原图暂时无法下载", show_alert=True)
+            return TelegramCallbackHandlerOutcome(handled=True)
+        await query.answer("正在发送原图")
+        source = Path(paths[index])
+        with source.open("rb") as photo:
+            await context.bot.send_document(
+                chat_id=update.effective_chat.id,
+                document=InputFile(photo, filename=f"{public_id}-{index + 1}{source.suffix or '.jpg'}"),
+                caption=f"房源 {public_id} · 原图 {index + 1}/{len(paths)}",
+            )
+        return TelegramCallbackHandlerOutcome(handled=True)
     if raw.startswith(("v3u:detailfull:", "v3u:detailback:")):
         handled = await _handle_detail_full(
             update, context, router, raw,
@@ -903,6 +925,51 @@ async def handle_v3_callback(
             await _render_details(query, response)
         _set_listing_touchpoint(context, "listing_details")
     elif response.kind == "photos":
+        # V6: the search-result collage stays in place; photos open as a native
+        # Telegram album with a single compact action bar underneath.
+        callback_obj = dispatched.callback
+        public_id = str(getattr(callback_obj, "public_listing_id", "") or "").strip() if callback_obj else ""
+        listings = getattr(router, "listings", None)
+        resolved = listings.resolve_action(public_id, "details") if listings and public_id else None
+        details = getattr(resolved, "details", None) if getattr(resolved, "ok", False) else None
+        full_paths = tuple(p for p in getattr(details, "photo_paths", ()) if Path(p).is_file())
+        if public_id and full_paths and not response.expand_only and ":pg:" not in raw:
+            from .telegram_photos_render import send_listing_photos_album
+            state = _album_state(update, context, public_id)
+            now = monotonic()
+            if now - float(state.get("native_album_at", -10000)) < 300:
+                await query.answer("实拍已发送，请查看下方相册", show_alert=True)
+                return TelegramCallbackHandlerOutcome(handled=True, response=response)
+            if full_paths:
+                # A native MediaGroup accepts at most ten frames per request.
+                groups = tuple(tuple(full_paths[n:n + 10]) for n in range(0, len(full_paths), 10))
+                await send_listing_photos_album(
+                    context.bot, chat_id=_chat_id(update), media_groups=groups,
+                    media_caption=f"📸 {public_id}｜共 {len(full_paths)} 张实拍",
+                    text=f"📸 {public_id}｜共 {len(full_paths)} 张实拍\n预约看房或咨询，请选择：",
+                    reply_markup=response.keyboard,
+                )
+                state["native_album_at"] = now
+                _set_listing_touchpoint(context, "listing_photos")
+                return TelegramCallbackHandlerOutcome(handled=True, response=response)
+        # Fallback: preserve the existing editable collage for other sources.
+        # Search-result cards therefore remain in place when entering photos.
+        callback_obj = dispatched.callback
+        public_id_for_detail = str(getattr(callback_obj, "public_listing_id", "") or "").strip() if callback_obj else ""
+        if response.photo_paths and public_id_for_detail:
+            await send_listing_details(
+                update, context,
+                public_listing_id=public_id_for_detail,
+                media_groups=response.media_groups,
+                photo_paths=response.photo_paths,
+                media_caption=response.media_caption,
+                text=response.text,
+                reply_markup=response.keyboard,
+                replace_message=getattr(query, "message", None),
+                force=True,
+            )
+            _set_listing_touchpoint(context, "listing_photos")
+            return TelegramCallbackHandlerOutcome(handled=True, response=response)
         public_id_for_album = ""
         page_for_album = 0
         callback_obj = dispatched.callback
