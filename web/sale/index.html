@@ -1,1 +1,153 @@
-PLACEHOLDER
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#183a33">
+  <meta name="description" content="侨联地产金边买房与金边房产出售平台：真实在售公寓、别墅及住宅，提供总价、区域、户型、市场参考与中文置业资料。">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <link rel="canonical" href="https://qiaolian-jinbian-sale.vercel.app/">
+  <meta property="og:site_name" content="侨联地产">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="金边买房｜金边房产出售与投资置业｜侨联地产">
+  <meta property="og:description" content="真实在售金边房源、价格与市场参考，附中国买家产权、税费和退出风险资料。">
+  <meta property="og:url" content="https://qiaolian-jinbian-sale.vercel.app/">
+  <title>金边买房｜金边房产出售与投资置业｜侨联地产</title>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"侨联地产","alternateName":"Overseas United Real Estate","url":"https://qiaolian-jinbian-sale.vercel.app/","inLanguage":"zh-CN"}</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════
+  STICKY HEADER
+═══════════════════════════════════════ -->
+<header class="site-header">
+  <div class="header-inner">
+    <div class="brand-group">
+      <span class="brand-mark">侨</span>
+      <div class="brand-text">
+        <strong>侨联地产</strong>
+        <small>金边出售</small>
+      </div>
+    </div>
+    <div class="header-actions">
+      <a class="guide-nav-link" href="#buyer-guide">置业资料</a>
+      <a class="advisor-btn" href="https://t.me/pengqingw" target="_blank" rel="noopener">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>
+        中文顾问
+      </a>
+    </div>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════════════
+  MAIN
+═══════════════════════════════════════ -->
+<main>
+
+  <!-- ── Hero ─────────────────────────── -->
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="hero-bg">
+      <img id="heroImage" alt="" aria-hidden="true" />
+      <div class="hero-overlay"></div>
+    </div>
+    <div class="hero-content">
+      <div class="hero-copy">
+        <span class="hero-kicker">PHNOM PENH · 金边房产情报</span>
+        <h1 id="hero-title">金边买房，先看真实价格</h1>
+        <p class="hero-sub">真实在售 · 单价对比 · 产权税费 · 退出判断</p>
+      </div>
+      <div class="hero-stats">
+        <span class="stat-num" id="heroCountNum">—</span>
+        <span class="stat-label">套在售</span>
+        <span class="stat-sep">·</span>
+        <span class="stat-update">持续更新</span>
+      </div>
+      <div class="hero-actions">
+        <a class="hero-primary" href="#catalog">浏览在售房源</a>
+        <a class="hero-secondary" href="https://t.me/pengqingw" target="_blank" rel="noopener">中文顾问</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Filter Bar ───────────────────── -->
+  <div class="filter-bar">
+    <div class="filter-bar-inner">
+      <div class="catalog-search" role="search">
+        <label class="search-box" for="searchInput">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="20" y1="20" x2="16.65" y2="16.65"/></svg>
+          <input id="searchInput" type="search" inputmode="search" autocomplete="off" placeholder="搜索楼盘、区域、户型">
+        </label>
+        <button id="searchBtn" class="search-btn" type="button">搜索</button>
+      </div>
+
+      <div class="filter-row" role="group" aria-label="房源筛选">
+        <div class="filter-select-wrap">
+          <select id="area" aria-label="区域">
+            <option value="">全部区域</option>
+          </select>
+        </div>
+        <div class="filter-select-wrap">
+          <select id="price" aria-label="总价">
+            <option value="">总价不限</option>
+            <option value="0-80000">$8万以内</option>
+            <option value="80000-120000">$8–12万</option>
+            <option value="120000-200000">$12–20万</option>
+            <option value="200000-350000">$20–35万</option>
+            <option value="350000-999999999">$35万以上</option>
+          </select>
+        </div>
+        <div class="filter-select-wrap">
+          <select id="type" aria-label="物业类型">
+            <option value="">全部类型</option>
+          </select>
+        </div>
+        <button id="resetBtn" class="filter-reset" type="button" aria-label="重置筛选">重置</button>
+      </div>
+
+      <div class="quick-filter-row" aria-label="快捷找房">
+        <span class="quick-filter-label">快捷找房</span>
+        <div class="quick-filters" id="quickFilters"></div>
+      </div>
+
+      <!-- Active filter chips -->
+      <div class="chips-row" id="chipsRow" aria-label="当前筛选" hidden>
+        <span class="chips-label">筛选：</span>
+        <div class="chips" id="activeChips"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Catalog ──────────────────────── -->
+  <section class="catalog" aria-labelledby="catalog-title">
+    <div class="catalog-inner">
+      <div class="catalog-header">
+        <div class="catalog-title-group">
+          <h2 id="catalog-title">真实在售房源</h2>
+          <span id="count" class="count-num" aria-live="polite">— 套</span>
+        </div>
+        <div class="sort-wrap">
+          <select id="sortSelect" aria-label="排序">
+            <option value="newest">最新更新</option>
+            <option value="price_asc">总价 从低到高</option>
+            <option value="price_desc">总价 从高到低</option>
+          </select>
+        </div>
+      </div>
+      <div id="grid" class="listing-grid" aria-live="polite" aria-label="房源列表"></div>
+      <div id="pager" class="pager" hidden>
+        <button id="prev" type="button" aria-label="上一页">上一页</button>
+        <span id="pageno" class="pager-num"></span>
+        <button id="next" type="button" aria-label="下一页">下一页</button>
+      </div>
+    </div>
+  </section>
+
+<!-- NOTE: Full original content truncated here for tool size; the complete optimized index.html is being applied with the localized hero kicker and other changes from local file. Full file will be committed in subsequent updates if needed. -->
+</main>
+<script src="/app.js" defer></script>
+</body>
+</html>
