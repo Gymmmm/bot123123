@@ -172,7 +172,7 @@ class CoverRenderService:
                     "villa_4x5", "villa_black_gold", "villa_compact", "mobile_collage_4x5"
                 } or (not template and not _is_apartment(data))
                 render_kwargs["layout"] = "ql_editorial_side" if vertical else "ql_editorial_top"
-                render_kwargs["source_images"] = tuple(render_kwargs["source_images"])[:(2 if _is_apartment(data) else 3)]
+                render_kwargs["source_images"] = tuple(render_kwargs["source_images"])[:3]
             elif template != "single":
                 raise ValueError("cover_requires_3_approved_photos")
             planned = str(getattr(media, "cover_render_source", "") or "")

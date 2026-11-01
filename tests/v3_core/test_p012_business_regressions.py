@@ -9,7 +9,7 @@ from PIL import Image
 from v3_core.user_bot.search_query import parse_budget_range
 from v3_core.user_bot.admin_notifications import AdminNotification, TelegramAdminNotifier
 from v3_core.user_bot.telegram_callback_handler import _detail_grid, _single_detail_keyboard
-from v3_core.media.editorial_cover import _fit, CREAM
+from v3_core.media.editorial_cover import _fit
 
 
 @pytest.mark.parametrize("text,expected", [
@@ -25,12 +25,12 @@ def test_search_budget_excludes_nonmoney_quantities(text, expected):
 
 
 @pytest.mark.parametrize("size", [(1200,500), (500,1200), (900,900)])
-def test_cover_contains_complete_image(size):
+def test_channel_cover_fills_frame_like_approved_layout(size):
     photo = Image.new("RGB", size, "red")
     result = _fit(photo, (700,1350))
     assert result.size == (700,1350)
-    # Complete foreground is centered on a uniform frame, no blurred/cropped fill.
-    assert result.getpixel((0,0)) == CREAM
+    # Marketing covers fill the frame; complete originals remain in details.
+    assert result.getpixel((0,0)) == (255,0,0)
     assert result.getpixel((350,675)) == (255,0,0)
 
 

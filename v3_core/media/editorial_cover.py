@@ -22,11 +22,16 @@ def _font(size: int, bold: bool = False) -> ImageFont.ImageFont:
 
 
 def _fit(photo: Image.Image, size: tuple[int, int], *, preserve_tall_exterior: bool = False) -> Image.Image:
-    """Fit every complete photo on the same neutral canvas without cropping."""
-    background = Image.new("RGB", size, CREAM)
-    foreground = ImageOps.contain(photo.convert("RGB"), size, method=Image.Resampling.LANCZOS)
-    background.paste(foreground, ((size[0] - foreground.width) // 2, (size[1] - foreground.height) // 2))
-    return background
+    """Crop normally, but never distort or cut the roof off a tall villa hero."""
+    photo_width, photo_height = photo.size
+    slot_width, slot_height = size
+    if preserve_tall_exterior and photo_height > photo_width * 1.18 and slot_width > slot_height * 0.75:
+        background = ImageOps.fit(photo, size, method=Image.Resampling.LANCZOS)
+        background = background.filter(ImageFilter.GaussianBlur(22))
+        foreground = ImageOps.contain(photo, size, method=Image.Resampling.LANCZOS)
+        background.paste(foreground, ((slot_width - foreground.width) // 2, 0))
+        return background
+    return ImageOps.fit(photo, size, method=Image.Resampling.LANCZOS)
 
 
 def _clip(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont, width: int) -> str:
@@ -91,7 +96,7 @@ def render_editorial_cover(*, images: list[Image.Image], data, output_path: str,
     count = len(images)
     # For villas, a generous vertical exterior is the left hero.
     # Premium apartments keep a wide top hero and large detail cells beneath.
-    if layout in {"ql_editorial_side", "ql_optimized_villa"}:
+    if polished and layout == "ql_optimized_villa":
         left = round(W * .60)
         side_w = W - left - GAP
         each_h = (photo_bottom - (count - 2) * GAP) // (count - 1)
