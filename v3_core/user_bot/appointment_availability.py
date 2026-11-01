@@ -1,9 +1,5 @@
-"""Explicit listing availability recomputation from appointment state.
-
-This mirrors locked production's appointment lock rule: bookable inventory is
-``active`` with no open appointments, ``reserved`` with 1-4, and ``pending`` at
-5 or more. Manual/terminal ``pending``/``rented``/``inactive``/``offline`` states
-are never relaxed automatically.
+"""Recompute active/reserved from viewing requests without inventing unavailability.
+Manual pending and terminal states remain protected.
 """
 from __future__ import annotations
 
@@ -91,9 +87,9 @@ class AppointmentAvailabilityService:
                 protected_status=True,
             )
 
-        if active_count >= APPOINTMENT_LOCK_COUNT:
-            next_status = "pending"
-        elif active_count >= 1:
+        # Viewing requests do not mean the property is unavailable.
+        # Keep manual pending protected; system counts only toggle active/reserved.
+        if active_count >= 1:
             next_status = "reserved"
         else:
             next_status = "active"

@@ -37,15 +37,12 @@ def test_active_listing_becomes_reserved_with_one_to_four_open_appointments():
     assert set(repo.count_calls[0][1]) == {"pending", "assigned", "contacted", "confirmed"}
 
 
-def test_fifth_open_appointment_locks_listing_to_pending():
-    repo = MemoryAvailability(status="reserved", active_count=5)
-    result = AppointmentAvailabilityService(repository=repo).recompute("LST_1")
-
-    assert result.previous_status == "reserved"
-    assert result.next_status == "pending"
-    assert result.active_appointment_count == 5
-    assert result.changed
-    assert repo.updates == [("LST_1", "pending")]
+def test_fifth_request_remains_reserved_and_cancellation_reopens():
+    repo = MemoryAvailability(status="active", active_count=5)
+    service = AppointmentAvailabilityService(repository=repo)
+    assert service.recompute("LST_1").next_status == "reserved"
+    repo.active_count = 0
+    assert service.recompute("LST_1").next_status == "active"
 
 
 def test_reserved_listing_returns_active_after_last_open_appointment_is_gone():

@@ -81,14 +81,14 @@ class V3PublisherApplication(PublisherAdminBot):
                     await self._sync_batch_statuses(context, query.message)
             except Exception as exc:
                 context.user_data.pop(BATCH_STATUS_SYNC_KEY, None)
-                await query.message.reply_text("操作失败，房源没有被强行发布：\n"+escape(type(exc).__name__+": "+str(exc)),parse_mode=ParseMode.HTML,reply_markup=InlineKeyboardMarkup([self._home_button()]))
+                await query.message.reply_text("这次操作未完成。请返回房源检查资料后重试；发布状态请以发布记录为准。",parse_mode=ParseMode.HTML,reply_markup=InlineKeyboardMarkup([self._home_button()]))
             return
         if raw=="v3bc" or raw.startswith("v3bc|"):
             if query is None: return
             if not await self._require_admin(update): await query.answer(); return
             await query.answer()
             try: await self.broadcast.handle_callback(update,context)
-            except Exception as exc: await query.message.reply_text("发布操作失败：\n"+escape(type(exc).__name__+": "+str(exc)),parse_mode=ParseMode.HTML,reply_markup=InlineKeyboardMarkup([self._home_button()]))
+            except Exception as exc: await query.message.reply_text("发布操作未完成，请先查看发布记录，避免重复发送。",parse_mode=ParseMode.HTML,reply_markup=InlineKeyboardMarkup([self._home_button()]))
             return
         await super().on_callback(update,context)
 
@@ -99,7 +99,7 @@ class V3PublisherApplication(PublisherAdminBot):
             if isinstance(context.user_data.get(NEW_LISTING_STATE_KEY),dict) and await self.simple.consume_new_listing_message(update,context): return
             if isinstance(context.user_data.get(BROADCAST_EDIT_STATE_KEY),dict) and await self.broadcast.handle_text(update,context): return
         except Exception as exc:
-            await update.effective_message.reply_text("处理失败，未发布到频道：\n"+escape(type(exc).__name__+": "+str(exc)),parse_mode=ParseMode.HTML,reply_markup=InlineKeyboardMarkup([self._home_button()])); return
+            await update.effective_message.reply_text("资料暂未整理完成。请继续补充位置、户型、租金和图片，然后重新整理。",parse_mode=ParseMode.HTML,reply_markup=InlineKeyboardMarkup([self._home_button()])); return
         await super().on_text(update,context)
 
     async def on_media(self, update, context: ContextTypes.DEFAULT_TYPE):
@@ -107,7 +107,7 @@ class V3PublisherApplication(PublisherAdminBot):
         if not isinstance(context.user_data.get(NEW_LISTING_STATE_KEY),dict):
             await update.effective_message.reply_text("请先从首页点击“➕ 发布房源”，再发送图片、相册或视频。",reply_markup=InlineKeyboardMarkup([self._home_button()])); return
         try: await self.simple.consume_new_listing_message(update,context)
-        except Exception as exc: await update.effective_message.reply_text("素材处理失败，未发布到频道：\n"+escape(type(exc).__name__+": "+str(exc)),parse_mode=ParseMode.HTML,reply_markup=InlineKeyboardMarkup([self._home_button()]))
+        except Exception as exc: await update.effective_message.reply_text("素材暂未处理完成。已接收的内容会保留，请补发未成功的图片或视频后重试。",parse_mode=ParseMode.HTML,reply_markup=InlineKeyboardMarkup([self._home_button()]))
 
     async def cancel(self, update, context: ContextTypes.DEFAULT_TYPE):
         if not await self._require_admin(update): return
@@ -118,22 +118,10 @@ class V3PublisherApplication(PublisherAdminBot):
         context.user_data.pop("v3_publisher_edit",None); context.user_data.pop(BROADCAST_EDIT_STATE_KEY,None); context.user_data.pop(SIMPLE_EDIT_STATE_KEY,None); context.user_data.pop(BATCH_STATUS_SYNC_KEY,None); context.user_data.pop("v3_inventory_batch_selection",None)
         await update.effective_message.reply_text("已取消当前操作。",reply_markup=InlineKeyboardMarkup([self._home_button()]))
 
-    async def _pillow_acceptance_once(self, context: ContextTypes.DEFAULT_TYPE):
-        for offer_id in (
-            "OFF_3ddae62e8b7a45fb9643fc5565d6ebb9",
-            "OFF_480dd91f8efa41ba8c4fc844ba1a1fd5",
-        ):
-            await self.autopilot.process_one(
-                bot=context.bot,
-                force_offer_id=offer_id,
-                origin="production_acceptance",
-            )
-
     def build_application(self):
         app=super().build_application(); app.add_handler(CommandHandler("daily",self.daily),group=0); app.add_handler(MessageHandler(filters.PHOTO|filters.VIDEO,self.on_media),group=0)
         if app.job_queue is None: raise RuntimeError("python-telegram-bot JobQueue support is required for V3 Publisher")
         app.job_queue.run_repeating(self.autopilot.scheduled_tick,interval=20,first=3,name="v3_auto_publish_tick")
-        app.job_queue.run_once(self._pillow_acceptance_once,when=9,name="pillow_cover_acceptance_once")
         app.job_queue.run_repeating(self.broadcast.scheduled_tick,interval=20,first=5,name="v3_broadcast_tick")
         app.job_queue.run_repeating(self.manual_status_sync.scheduled_tick,interval=20,first=7,name="v3_status_sync_tick",job_kwargs={"max_instances": 1})
         return app

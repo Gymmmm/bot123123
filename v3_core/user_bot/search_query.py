@@ -33,7 +33,16 @@ _PROPERTY_TYPES = (
 
 def parse_budget_range(text: str) -> tuple[int | None, int | None]:
     raw = str(text or "")
-    values = [int(value) for value in re.findall(r"\d{2,5}", raw)]
+    # Remove non-price quantities before looking for explicit budget evidence.
+    raw = re.sub(r"\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}(?=\s*(?:入住|搬入|号|日))", " ", raw)
+    raw = re.sub(r"\d+(?:\.\d+)?\s*(?:月|日|号|年|平方米|平米|平|㎡|m2|m²|楼|层|房|室|厅|卫|br\b|bed\b)", " ", raw, flags=re.I)
+    # A stated budget outranks unrelated remaining numbers.
+    explicit = re.search(r"(?:预算|租金|月租|budget|rent)\s*[:：为是约]?\s*([$¥￥]?\s*\d[\d,]*(?:\.\d+)?(?:\s*(?:-|—|–|~|至|到)\s*[$¥￥]?\s*\d[\d,]*(?:\.\d+)?)?\s*(?:美元|美金|USD|刀|以内|以下|不超过|最多|以上|起|至少)?)", raw, re.I)
+    if explicit:
+        raw = explicit.group(1)
+    raw = raw.replace(",", "")
+    values = [int(float(value)) for value in re.findall(r"(?<!\d)\d{2,5}(?:\.\d+)?(?!\d)", raw)]
+
     if not values:
         return (None, None)
     if len(values) == 1:
