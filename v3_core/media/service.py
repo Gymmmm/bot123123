@@ -1,16 +1,12 @@
-"""Prepare immutable derived media for V3 publication packaging.
-
-Raw source evidence is never modified. Publication media first goes through the
-source-mark scrubber (crop bottom contact/slogan bands off, then light corner
-inpaint; abandon only unsafe inpaint-only results), then dedupe / quality
-ranking / cover selection runs on derived files. Gallery derivatives get a mild
-enhance + cover-style corner mark. Cover rendering remains owned by
-``CoverRenderService``.
+"""Prepare immutable V3 media after read-only source overlay verification.
+Contact/brand-bearing sources are rejected, never cropped or repainted.
+Accepted sources retain their complete scene before ranking and cover layout.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 import hashlib
+import json
 from pathlib import Path
 import shutil
 from typing import Any, Iterable
@@ -20,15 +16,14 @@ from .cover_plan import plan_cover
 from .media_selection import select_publication_media
 from .straighten import correct_file
 from .vision import VisionClient, analyze_photos, vision_client_from_env
-from .photo_formatter import format_gallery_photo, gallery_canvas_key, resolve_gallery_logo_path
-from .source_scrub import scrub_file
+from .photo_formatter import gallery_canvas_key
+from .source_overlay import detect_source_overlay
 
 from .cover_renderer import VILLA_TEMPLATES, villa_template_from_env  # noqa: E402  (single source)
 
 
-MAX_SCRUB_COVERAGE = 0.08
-SCRUB_REVISION = "source_scrub_v3_center_watermark_20260925"
-GALLERY_BRAND_REVISION = "qiaolian_gallery_v11_no_cover_dup_20260925"
+SCRUB_REVISION = "source_scrub_v4_nocrop_reject_20261101"
+GALLERY_BRAND_REVISION = "qiaolian_gallery_v12_original_frames_20261101"
 
 
 @dataclass(frozen=True)
@@ -153,14 +148,7 @@ class MediaPreparationService:
         cover_style: str | None = None,
         cover_source_path: str | Path | None = None,
     ) -> list[str]:
-        """Create deterministic logo-bearing gallery copies without touching evidence.
-
-        Cover rendering intentionally keeps using the clean selected source.  The
-        returned files are only for the public ``更多实拍`` gallery, preventing a
-        second brand mark from appearing underneath the cover template.
-        All frames share the cover's landscape/portrait canvas so flips stay
-        size-stable, with a thin white frame + brighten polish.
-        """
+        """Cache complete original gallery frames, separately from marketing covers."""
         target_dir = self.prepared_dir / str(int(source_post_id)) / "gallery"
         target_dir.mkdir(parents=True, exist_ok=True)
         style_key = self._gallery_style_key(cover_style)
@@ -177,16 +165,10 @@ class MediaPreparationService:
             )
             target = target_dir / f"{style_key}_{gallery_orientation}_{digest[:16]}_gallery.jpg"
             if not target.is_file():
-                format_gallery_photo(
-                    source,
-                    target,
-                    logo_path=resolve_gallery_logo_path(cover_style),
-                    logo_position="top_left",
-                    add_logo=True,
-                    enhance=True,
-                    cover_style=cover_style,
-                    force_orientation=gallery_orientation,
-                )
+                # Gallery is factual evidence: keep original dimensions and
+                # pixels, no watermark, forced canvas, enhancement or crop.
+                shutil.copy2(source, target)
+
             branded.append(str(target.resolve()))
         return branded
 
@@ -211,30 +193,25 @@ class MediaPreparationService:
             dst = target_dir / f"{digest[:24]}_clean.jpg"
             chosen: Path | None = None
             try:
-                if dst.is_file():
-                    chosen = dst
+                decision_path = target_dir / f"{digest[:24]}_overlay.json"
+                if decision_path.is_file():
+                    decision = json.loads(decision_path.read_text(encoding="utf-8"))
                 else:
-                    info = scrub_file(src, dst, prefer_crop=True)
-                    methods = [str(item) for item in (info.get("methods") or [])]
-                    cropped = any(item.startswith("crop_bottom") for item in methods)
-                    inpaint_cov = float(info.get("inpaint_coverage") or 0.0)
-                    detect_cov = float(info.get("coverage") or 0.0)
-                    # Bottom contact/slogan crop must stick — never fall back to the
-                    # watermarked original after the strip was already cut off.
-                    if cropped:
-                        chosen = dst
-                    elif max(inpaint_cov, detect_cov if "inpaint_telea" in methods else 0.0) <= MAX_SCRUB_COVERAGE:
-                        chosen = dst
-                    else:
-                        dst.unlink(missing_ok=True)
-                        chosen = self._original_derivative(src, target_dir, digest)
-            except Exception:
-                dst.unlink(missing_ok=True)
-                # Scrubbing is an enhancement stage, not permission to corrupt
-                # or drop otherwise valid source evidence. Fail safely to an
-                # immutable derived copy and let production quality gates decide.
+                    decision = detect_source_overlay(src)
+                    decision_path.write_text(json.dumps(decision), encoding="utf-8")
+                if decision.get("blocked"):
+                    rejected.append(str(src))
+                    continue
                 chosen = self._original_derivative(src, target_dir, digest)
 
+            except Exception:
+                dst.unlink(missing_ok=True)
+                # Failed/uncertain verification must never publish the original.
+                chosen = None
+
+            if chosen is None:
+                rejected.append(str(src))
+                continue
             clean = str(chosen.resolve())
             accepted.append(clean)
             raw_to_clean[str(src)] = clean
@@ -310,7 +287,7 @@ class MediaPreparationService:
         # One ordered list for both surfaces: channel cover = hero + thumbs 1–3;
         # bot detail first 4 standalone photos = the same 4, same order.
         gallery_sources = list(plan.gallery_order)
-        bot_sources = [render_source if path == cover_resolved else path for path in gallery_sources]
+        bot_sources = list(gallery_sources)
         cover_thumbs = list(plan.thumbs) + [p for p in gallery_sources if p != cover_resolved and p not in plan.thumbs]
         thumb_labels = list(plan.labels) + [""] * (len(cover_thumbs) - len(plan.labels))
         branded_gallery = self._branded_gallery(

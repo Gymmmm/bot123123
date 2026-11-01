@@ -106,7 +106,7 @@ def test_7117_first_four_bot_photos_match_the_cover(tmp_path, photos_copy):
     assert list(media.cover_gallery_labels[:3]) == ["卧室", "厨房", "卫生间"]
     # Bot gallery = same 4 photos, same order (hero lightly corrected, small logo, uncropped).
     expected = service._branded_gallery(
-        source_post_id=7117, paths=[media.cover_render_source, *media.cover_gallery_paths[:3]],
+        source_post_id=7117, paths=[media.cover_source_path, *media.cover_gallery_paths[:3]],
         cover_source_path=media.cover_source_path,
     )
     assert list(media.gallery_paths[:4]) == expected == plan["bot_first_batch"]
@@ -148,12 +148,11 @@ def test_6735_villa_regression(photos_copy):
     assert plan.labels[0] == "客厅" and "卧室" in plan.labels and "外观" not in plan.labels
 
 
-def test_6735_bad_exterior_switches_hero_and_template(photos_copy):
-    photos = [p for p in photos_copy("6735") if p.stem not in {"01", "02"}]  # no exterior left
-    plan, items = _plan("6735", "独栋别墅", photos=photos)
-    assert plan.template == "landscape_3x2"
-    assert items[plan.hero].room_type == "客厅"
-    assert "没有可信外观" in plan.hero_reason
+def test_6735_bad_exterior_requires_review(photos_copy):
+    photos = [p for p in photos_copy("6735") if p.stem not in {"01", "02"}]
+    with pytest.raises(ValueError, match="villa_exterior_review_required"):
+        _plan("6735", "独栋别墅", photos=photos)
+
 
 
 def test_villa_perspective_correction_does_not_stretch_the_building(photos_copy, tmp_path):
@@ -408,22 +407,14 @@ def _tilted_exterior_probe(path, mode):
     return {"status": "level", "mode": mode}
 
 
-def test_exterior_still_tilted_after_gentle_fix_falls_back_to_living_room(photos_copy):
+def test_exterior_still_tilted_after_gentle_fix_requires_review(photos_copy):
     paths = photos_copy("6735")
     selected = select_publication_media(paths, cover_preference="exterior")
-    vision = analyze_photos(selected["gallery_paths"], FixtureVisionClient(FIXTURES), ranking=selected["ranking"],
-                            use_cache=False)
-    probed = []
-    def probe(p, m):
-        probed.append(m)
-        return _tilted_exterior_probe(p, m)
-    plan = plan_cover(gallery=selected["gallery_paths"], ranking=selected["ranking"], vision=vision,
-                      property_type="独栋别墅", correction_probe=probe)
-    items = {i.path: i for i in plan.photos}
-    assert items[plan.hero].room_type == "客厅"
-    assert "近距离仰拍" in plan.hero_reason and "用客厅做主图" in plan.hero_reason
-    assert probed.count("exterior") == 1                       # no weaker side exterior tried after it
-    assert any("不做主图" in a for i in plan.photos for a in i.adjustments)
+    vision = analyze_photos(selected["gallery_paths"], FixtureVisionClient(FIXTURES), ranking=selected["ranking"], use_cache=False)
+    with pytest.raises(ValueError, match="villa_exterior_review_required"):
+        plan_cover(gallery=selected["gallery_paths"], ranking=selected["ranking"], vision=vision,
+                   property_type="独栋别墅", correction_probe=_tilted_exterior_probe)
+
 
 
 def test_gentle_ok_exterior_stays_hero(photos_copy):
@@ -432,32 +423,19 @@ def test_gentle_ok_exterior_stays_hero(photos_copy):
     assert plan.hero_correction.get("hero_ok") is True and plan.hero_correction.get("method") == "gentle"
 
 
-def test_service_keeps_black_gold_for_living_room_fallback(tmp_path, photos_copy, monkeypatch):
+def test_service_refuses_villa_without_safe_exterior(tmp_path, photos_copy, monkeypatch):
     import v3_core.media.service as svc
-
-    monkeypatch.delenv("V3_VILLA_COVER_TEMPLATE", raising=False)
     paths = [str(p) for p in photos_copy("6735")]
-    modes = []
     real = svc.correct_file
-    def fake(src, dst, *, mode="exterior"):
-        modes.append(mode)
-        return _tilted_exterior_probe(src, mode) if mode == "exterior" else real(src, dst, mode=mode)
-    monkeypatch.setattr(svc, "correct_file", fake)
-
+    monkeypatch.setattr(svc, "correct_file", lambda src,dst,mode="exterior": _tilted_exterior_probe(src,mode) if mode=="exterior" else real(src,dst,mode=mode))
     class Reader:
         db_path = str(tmp_path / "db" / "x.db")
-        def source_image_paths(self, _pid):
-            return paths
-        def source_identity(self, pid):
-            return {"source_post_id": int(pid)}
+        def source_image_paths(self, _): return paths
+        def source_identity(self, _): return {"source_post_id": 6735}
+    with pytest.raises(ValueError, match="villa_exterior_review_required"):
+        svc.MediaPreparationService(Reader(), prepared_dir=tmp_path/"prepared",
+            vision_client=FixtureVisionClient(FIXTURES)).prepare(source_post_id=6735, property_hints=("独栋别墅",))
 
-    media = svc.MediaPreparationService(Reader(), prepared_dir=tmp_path / "prepared",
-                                        vision_client=FixtureVisionClient(FIXTURES)).prepare(
-        source_post_id=6735, property_hints=("独栋别墅",))
-    plan = media.source_identity["cover_plan"]
-    assert media.cover_template == "villa_black_gold"
-    assert "用客厅做主图" in plan["hero_reason"]
-    assert modes[-1] == "interior"                            # the living room is never keystoned as a facade
 
 
 def _item(**kw):

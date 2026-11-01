@@ -82,7 +82,7 @@ def test_media_preparation_scrubs_to_derived_files_before_selection(tmp_path):
     assert all(prepared_dir in Path(path).parents for path in prepared.gallery_paths)
     assert all(Path(path).parent.name == "gallery" for path in prepared.gallery_paths)
     assert all(Path(path).name.endswith("_gallery.jpg") for path in prepared.gallery_paths)
-    assert prepared.source_identity["gallery_brand_revision"] == "qiaolian_gallery_v11_no_cover_dup_20260925"
+    assert prepared.source_identity["gallery_brand_revision"] == "qiaolian_gallery_v12_original_frames_20261101"
     assert all(str(Path(path).resolve()) not in prepared.gallery_paths for path in paths)
     assert [_sha(path) for path in paths] == before
 
@@ -103,45 +103,26 @@ def test_manual_raw_cover_maps_to_its_derived_media(tmp_path):
     assert prepared.cover_source_path == expected[str(Path(paths[2]).resolve())]
 
 
-def test_scrub_over_eight_percent_falls_back_to_untouched_derived_copy(tmp_path, monkeypatch):
-    db, source_id, paths = _source(tmp_path, "reject")
+def test_verified_clean_sources_keep_their_original_pixels(tmp_path, monkeypatch):
+    db, source_id, paths = _source(tmp_path, "clean")
     before = [_sha(path) for path in paths]
-
-    def fake_scrub(src, dst, *, prefer_crop=False):
-        Path(dst).write_bytes(Path(src).read_bytes())
-        return {"coverage": 0.081, "methods": ["inpaint_telea"], "inpaint_coverage": 0.081}
-
-    monkeypatch.setattr("v3_core.media.service.scrub_file", fake_scrub)
-    prepared_dir = tmp_path / "risky"
-    prepared = MediaPreparationService(
-        SourceReader(str(db)), prepared_dir=prepared_dir
-    ).prepare(source_post_id=source_id)
-
-    assert prepared.gallery_paths
-    assert all(Path(path).name.endswith("_gallery.jpg") for path in prepared.gallery_paths)
-    assert all(prepared_dir in Path(path).parents for path in prepared.gallery_paths)
+    monkeypatch.setattr("v3_core.media.service.detect_source_overlay", lambda path: {"blocked":False})
+    service = MediaPreparationService(SourceReader(str(db)), prepared_dir=tmp_path/"verified")
+    cleaned, mapping, rejected = service._scrubbed_paths(source_post_id=source_id, paths=paths)
+    assert not rejected and len(cleaned) == len(paths)
+    assert [_sha(path) for path in cleaned] == before
     assert [_sha(path) for path in paths] == before
 
 
-def test_bottom_contact_crop_is_kept_even_when_residual_inpaint_is_large(tmp_path, monkeypatch):
-    db, source_id, paths = _source(tmp_path, "cropkeep")
 
-    def fake_scrub(src, dst, *, prefer_crop=False):
-        Path(dst).write_bytes(b"cropped-clean")
-        return {
-            "coverage": 0.20,
-            "methods": ["crop_bottom_0.12", "inpaint_telea"],
-            "inpaint_coverage": 0.20,
-            "crop_frac": 0.12,
-        }
+def test_contact_sources_are_rejected_instead_of_cropped_or_leaked(tmp_path, monkeypatch):
+    db, source_id, paths = _source(tmp_path, "contact")
+    monkeypatch.setattr("v3_core.media.service.detect_source_overlay", lambda path: {"blocked":True})
+    service = MediaPreparationService(SourceReader(str(db)), prepared_dir=tmp_path/"blocked")
+    cleaned, mapping, rejected = service._scrubbed_paths(source_post_id=source_id, paths=paths)
+    assert not cleaned and not mapping
+    assert len(rejected) == len(paths)
 
-    monkeypatch.setattr("v3_core.media.service.scrub_file", fake_scrub)
-    prepared_dir = tmp_path / "crop-keep"
-    service = MediaPreparationService(SourceReader(str(db)), prepared_dir=prepared_dir)
-    cleaned, mapping, _ = service._scrubbed_paths(source_post_id=source_id, paths=paths)
-    assert cleaned
-    assert all(Path(path).read_bytes() == b"cropped-clean" for path in cleaned)
-    assert all(Path(path).name.endswith("_clean.jpg") for path in cleaned)
 
 
 def test_source_scrub_crops_bottom_contact_banner(tmp_path):
@@ -220,7 +201,7 @@ def test_branded_gallery_starts_with_the_cover_hero(tmp_path):
     gallery = [Path(p).resolve() for p in prepared.gallery_paths]
     # Branded copies only (never the clean cover source itself), one per usable photo.
     assert Path(prepared.cover_source_path).resolve() not in gallery
-    assert len(prepared.gallery_paths) == len(paths)
+    assert len(prepared.gallery_paths) + len(prepared.duplicates) + len(prepared.rejected_paths) == len(paths)
     plan = prepared.source_identity["cover_plan"]
     assert plan["first_batch"] == [plan["hero"], *plan["thumbs"]][:4]
     assert plan["bot_first_batch"] == list(prepared.gallery_paths[:4])

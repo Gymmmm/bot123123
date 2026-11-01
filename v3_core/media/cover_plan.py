@@ -21,9 +21,9 @@ Pipeline
    hero's cluster, brightness harmony with the hero, important rooms first.
 4. Template: property type comes from the database; photos only verify.
 5. Degrade: uncertain labels hidden; uncertain hero room → highest quality
-   complete shot; no good exterior → interior/courtyard hero on 3:2; no
+   complete shot; no trusted exterior → operator review; no
    standout hero → 2×2 grid; one photo → single image; all low quality →
-   still render, flagged 「图片质量较低」. Nothing is ever invented.
+   marked low quality; villa exterior verification remains mandatory.
 """
 from __future__ import annotations
 
@@ -421,6 +421,9 @@ def plan_cover(
             template = TEMPLATE_VILLA if _exterior_ok(hero) else TEMPLATE_LANDSCAPE
         else:
             template = TEMPLATE_APARTMENT
+    if kind == "villa" and not (manual and manual in by_path):
+        if not _exterior_ok(hero):
+            raise ValueError("villa_exterior_review_required")
     manual = manual if manual_override else ""
     if len(paths) == 1:
         template = TEMPLATE_SINGLE

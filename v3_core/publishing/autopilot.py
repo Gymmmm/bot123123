@@ -89,6 +89,7 @@ ERROR_LABELS = {
     "missing_location": "缺少项目或位置",
     "missing_listing_info": "房源信息不完整",
     "insufficient_media": "实拍图片不足",
+    "villa_exterior_review_required": "请补充干净完整的别墅外观图，或手动确认封面",
     "unreadable_media": "图片无法读取",
     "duplicate_listing": "疑似重复房源",
     "already_published": "房源已经发布",
@@ -887,8 +888,9 @@ class AutoPublishService:
         facts = dict(detail.canonical.get("facts") or {})
         try:
             media = await asyncio.to_thread(self.workflow.review_media, review_id=str(item["review_id"]))
-        except Exception:
-            return self._mark_exception(offer_id, "unreadable_media")
+        except Exception as exc:
+            reason = "villa_exterior_review_required" if "villa_exterior_review_required" in str(exc) else "unreadable_media"
+            return self._mark_exception(offer_id, reason)
         blockers = self._strict_blockers(item, facts, media, allow_pending=True)
         if blockers:
             return self._mark_exception(offer_id, blockers[0])

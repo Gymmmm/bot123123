@@ -174,7 +174,10 @@ def _usable_images(paths: Iterable[str | Path]) -> list[Image.Image]:
     return result
 
 def _fit(image: Image.Image, size: tuple[int, int]) -> Image.Image:
-    return ImageOps.fit(image, size, method=Image.Resampling.LANCZOS, centering=(0.5, 0.5))
+    frame = Image.new("RGB", size, (244, 239, 229))
+    fitted = ImageOps.contain(image.convert("RGB"), size, method=Image.Resampling.LANCZOS)
+    frame.paste(fitted, ((size[0] - fitted.width) // 2, (size[1] - fitted.height) // 2))
+    return frame
 
 
 

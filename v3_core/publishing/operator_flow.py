@@ -59,6 +59,7 @@ BLOCKER_LABELS = {
     "missing_location": "项目或区域",
     "missing_listing_info": "户型",
     "unreadable_media": "可用封面图片",
+    "villa_exterior_review_required": "干净完整的别墅外观照片",
     "listing_not_publishable": "房态",
     "canonical_error": "关键房源资料",
 }
@@ -370,7 +371,12 @@ class OperatorPublisherAdminController(ProductionSimplePublisherAdminController)
         return values
 
     async def _manual_blockers(self, detail: Any) -> tuple[list[str], Any]:
-        media = await asyncio.to_thread(self.workflow.review_media, review_id=str(detail.review["review_id"]))
+        try:
+            media = await asyncio.to_thread(self.workflow.review_media, review_id=str(detail.review["review_id"]))
+        except ValueError as exc:
+            if "villa_exterior_review_required" in str(exc):
+                return ["villa_exterior_review_required"], None
+            raise
         item = {
             "offer_type": detail.offer.get("offer_type"),
             "monthly_rent_usd": detail.offer.get("monthly_rent_usd"),

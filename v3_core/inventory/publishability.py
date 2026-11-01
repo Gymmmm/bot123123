@@ -41,7 +41,7 @@ def evaluate_publishability(facts: dict[str, Any], *, media_count: int = 0, cove
         blocking.append('missing_rent')
     if not str(facts.get('canonical_facts_hash') or '').strip():
         blocking.append('missing_canonical_hash')
-    if int(media_count or 0) < 4:
+    if int(media_count or 0) < 1:
         blocking.append('insufficient_media')
     if not cover_exists:
         blocking.append('missing_cover')
