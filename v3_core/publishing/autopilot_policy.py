@@ -380,11 +380,12 @@ class ProductionAutoPublishService(AutoPublishService):
             media = await asyncio.to_thread(
                 self.workflow.review_media, review_id=str(item["review_id"])
             )
-        except Exception:
+        except Exception as exc:
+            reason = "villa_exterior_review_required" if "villa_exterior_review_required" in str(exc) else "unreadable_media"
             self.repository.set_offer_readiness(
-                offer_id, publishable=False, block_reason="unreadable_media"
+                offer_id, publishable=False, block_reason=reason
             )
-            return self._mark_exception(offer_id, "unreadable_media")
+            return self._mark_exception(offer_id, reason)
         blockers = self._strict_blockers(item, facts, media, allow_pending=True)
         if blockers:
             reason = blockers[0]
