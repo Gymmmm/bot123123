@@ -288,7 +288,7 @@ def _unbound_service(tmp_path):
 @pytest.mark.parametrize(
     ("callback", "expected"),
     [
-        ("v3u:service:repair", "房屋报修"),
+        ("v3u:service:repair", "提交住房问题"),
         ("v3u:service:property", "物业问题"),
         ("v3u:service:local", "周边生活"),
     ],
@@ -384,7 +384,7 @@ async def test_unbound_repair_flow_reuses_general_service_effect_without_fake_bi
     assert submitted.ticket_id is None
     assert len(effects.general_calls) == 1
     details = effects.general_calls[0]["details"]
-    assert "报修：空调" in details
+    assert "住房问题：空调" in details
     assert "空调可以启动，但一直不制冷。" in details
     assert "希望时间：今天内" in details
     assert SERVICE_REQUEST_SESSION_KEY not in context.user_data

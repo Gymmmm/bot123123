@@ -631,7 +631,7 @@ def test_detail_grid_keeps_source_edges_and_pale_matte(tmp_path, count):
         assert 300 <= result.height <= 1350
         # Horizontal source photos use a shorter canvas rather than
         # placing large gray blocks inside a forced tall 4:5 layout.
-        assert result.height < 850
+        assert result.height == 1350
 
 
 
@@ -649,9 +649,9 @@ def test_four_landscape_photos_have_one_large_hero(tmp_path):
     with Image.open(BytesIO(_detail_grid(tuple(photos), 0))) as out:
         assert out.width == 1080
         assert 900 <= out.height <= 1350
-        assert out.getpixel((540, 350))[0] > 180  # full-width hero
-        for x, channel in [(150, 1), (540, 2), (910, 0)]:
-            assert out.getpixel((x, out.height - 115))[channel] > 140
+        assert out.getpixel((350, 675))[0] > 180  # full-width hero
+        for y, channel in [(220, 1), (675, 2), (1130, 0)]:
+            assert out.getpixel((894, y))[channel] > 140
 
 @pytest.mark.asyncio
 async def test_high_resolution_edits_current_message_without_new_album(tmp_path):
@@ -674,7 +674,7 @@ async def test_high_resolution_edits_current_message_without_new_album(tmp_path)
     update = SimpleNamespace(callback_query=query, effective_chat=SimpleNamespace(id=123))
     context = SimpleNamespace(user_data={}, bot=SimpleNamespace(send_media_group=AsyncMock(), send_photo=AsyncMock()))
     keyboard = _single_detail_keyboard(None, public_id, 0, 5)
-    assert keyboard.inline_keyboard[1][0].callback_data == f"v3u:detailfull:{public_id}:0"
+    assert keyboard.inline_keyboard[1][0].callback_data == f"v3u:listing:photos:{public_id}"
     assert await _handle_detail_full(update, context, router, f"v3u:detailfull:{public_id}:0")
     assert await _handle_detail_full(update, context, router, f"v3u:detailfull:{public_id}:1")
     assert await _handle_detail_full(update, context, router, f"v3u:detailback:{public_id}:0")

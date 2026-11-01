@@ -67,12 +67,13 @@ def build_home_view(
     advisor_url: str = "",
     first_name: str = "您",
     greeting: str | None = None,
+    show_appointments: bool = False,
 ) -> HomeView:
     rows: list[tuple[HomeChoice, ...]] = [(HomeChoice("🔍 开始找房", "search"),)]
     clean_channel = str(channel_url or "").strip()
     contact = HomeChoice("💬 中文顾问", "contact")
     rows.append((HomeChoice("📢 最新房源", "root", url=clean_channel), contact) if clean_channel else (contact,))
-    rows.append((HomeChoice("📋 我的预约", "appointments"), HomeChoice("🛎️ 侨联服务", "service")))
+    rows.append((HomeChoice("📋 我的预约", "appointments"), HomeChoice("🛎️ 侨联服务", "service")) if show_appointments else (HomeChoice("🛎️ 侨联服务", "service"),))
     resolved_greeting = str(greeting or "").strip() or phnom_penh_greeting()
     return HomeView(
         "home",

@@ -35,7 +35,7 @@ def repair_success_view(*, urgent: bool) -> ServiceView:
     return ServiceView(
         kind="repair_success",
         text="✅ <b>报修已提交</b>\n\n顾问会根据您提交的问题和时间安排后续处理。" + urgent_note,
-        rows=((ServiceChoice("💬 中文顾问", "v3u:home:contact"),), (ServiceChoice("⬅️ 返回入住服务", "v3u:home:service"),)),
+        rows=((ServiceChoice("💬 中文顾问", "v3u:home:contact"),), (ServiceChoice("⬅️ 返回租后服务", "v3u:home:service"),)),
     )
 
 
@@ -49,13 +49,13 @@ def general_prompt_view(*, nearby: bool = False) -> ServiceView:
     return ServiceView(
         kind="general_prompt",
         text="💬 <b>其他需求</b>\n\n直接发送需要处理的事情，顾问会按您这条内容继续跟进。",
-        rows=((ServiceChoice("💬 中文顾问", "v3u:home:contact"),), (ServiceChoice("⬅️ 返回入住服务", "v3u:home:service"),)),
+        rows=((ServiceChoice("💬 中文顾问", "v3u:home:contact"),), (ServiceChoice("⬅️ 返回租后服务", "v3u:home:service"),)),
     )
 
 
 def general_success_view(*, nearby: bool = False) -> ServiceView:
     text = "✅ <b>周边需求已收到</b>\n\n顾问会根据您提交的区域和需求回复。" if nearby else "✅ <b>需求已收到</b>\n\n顾问会根据您刚才提交的内容继续跟进。"
-    return ServiceView(kind="general_success", text=text, rows=((ServiceChoice("⬅️ 返回入住服务", "v3u:home:service"),),))
+    return ServiceView(kind="general_success", text=text, rows=((ServiceChoice("⬅️ 返回租后服务", "v3u:home:service"),),))
 
 
 
@@ -147,7 +147,8 @@ def aftercare_home_view() -> ServiceView:
         kind="aftercare_home",
         text=AFTERCARE_TEXT,
         rows=(
-            (ServiceChoice("📝 提交住房问题", "v3u:service:repair"),),
+            (ServiceChoice("🔧 维修问题", "v3u:service:issue:repair_other"), ServiceChoice("🏢 物业问题", "v3u:service:issue:aftercare_property")),
+            (ServiceChoice("💡 账单问题", "v3u:service:issue:aftercare_bill"), ServiceChoice("❓ 其他问题", "v3u:service:issue:aftercare_other")),
             (ServiceChoice("⬅️ 返回侨联服务", "v3u:home:service"),),
         ),
     )
@@ -217,13 +218,14 @@ def repair_home_view() -> ServiceView:
 
 
 def issue_prompt_view(draft: ServiceRequestDraft) -> ServiceView:
+    example = {"aftercare_bill": "这个月电费比上个月高很多，请帮我核对账单。", "aftercare_property": "物业还没有处理门卡问题，请帮忙沟通。", "aftercare_other": "我有一个住房问题，需要中文顾问协助。"}.get(draft.issue_key, "空调可以启动，但一直不制冷。")
     return ServiceView(
         kind="repair_issue",
         text=(
             f"🔧 <b>{he(draft.issue_label)}</b>\n\n"
             "请简单说明发生了什么。\n\n"
             "例如：\n"
-            "<code>空调可以启动，但一直不制冷。</code>"
+            f"<code>{he(example)}</code>"
         ),
         rows=((ServiceChoice("⬅️ 返回", "v3u:service:repair"),),),
     )
@@ -280,14 +282,14 @@ def repair_confirm_view(
         f"问题｜{he(draft.issue_label)}",
         f"说明｜{he(draft.detail)}",
         f"附件｜{int(media_count)} 个" if media_count else "附件｜未添加",
-        f"时间｜{he(slot_label)}",
+        *([f"时间｜{he(slot_label)}"] if slot_label else []),
     ])
     return ServiceView(
         kind="repair_confirm",
         text="\n".join(lines),
         rows=(
             (ServiceChoice("✅ 确认提交", "v3u:service:repair_confirm"),),
-            (ServiceChoice("修改描述", "v3u:service:repair_modify_desc"), ServiceChoice("修改时间", "v3u:service:repair_modify_time")),
+            ((ServiceChoice("修改描述", "v3u:service:repair_modify_desc"), ServiceChoice("修改时间", "v3u:service:repair_modify_time")) if draft.issue_key.startswith("repair_") else (ServiceChoice("修改描述", "v3u:service:repair_modify_desc"),)),
             (ServiceChoice("退出提交", "v3u:service:repair_exit"),),
         ),
     )
@@ -307,7 +309,7 @@ def repair_result_view(*, outcome: str, issue_label: str = "", property_name: st
             text="\n".join(lines),
             rows=(
                 (ServiceChoice("💬 中文顾问", "v3u:home:contact"),),
-                (ServiceChoice("⬅️ 返回入住服务", "v3u:service:concierge"),),
+                (ServiceChoice("⬅️ 返回租后服务", "v3u:service:concierge"),),
             ),
         )
     return ServiceView(
@@ -328,8 +330,8 @@ def repair_result_view(*, outcome: str, issue_label: str = "", property_name: st
 def repair_exit_view() -> ServiceView:
     return ServiceView(
         kind="repair_exit",
-        text="<b>已退出本次报修</b>\n\n本次信息未提交。",
-        rows=((ServiceChoice("⬅️ 返回入住服务", "v3u:service:concierge"),),),
+        text="<b>已退出本次提交</b>\n\n本次信息未提交。",
+        rows=((ServiceChoice("⬅️ 返回租后服务", "v3u:service:concierge"),),),
     )
 
 
@@ -419,7 +421,7 @@ def property_result_view(*, success: bool) -> ServiceView:
             text="✅ <b>情况已记录</b>\n\n中文顾问会根据你提交的信息继续跟进。",
             rows=(
                 (ServiceChoice("💬 中文顾问", "v3u:home:contact"),),
-                (ServiceChoice("⬅️ 返回入住服务", "v3u:service:concierge"),),
+                (ServiceChoice("⬅️ 返回租后服务", "v3u:service:concierge"),),
             ),
         )
     return ServiceView(
@@ -441,7 +443,7 @@ def property_exit_view() -> ServiceView:
     return ServiceView(
         kind="property_exit",
         text="<b>已退出本次物业协调</b>\n\n本次信息未提交。",
-        rows=((ServiceChoice("⬅️ 返回入住服务", "v3u:service:concierge"),),),
+        rows=((ServiceChoice("⬅️ 返回租后服务", "v3u:service:concierge"),),),
     )
 
 

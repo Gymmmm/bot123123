@@ -713,7 +713,8 @@ async def handle_v3_start(
     if isinstance(album_messages, dict) and album_messages:
         user_data[PHOTOS_ALBUM_KEY] = album_messages
     if not args:
-        home = build_home_view(channel_url=channel_url, advisor_url=advisor_url)
+        history = appointment_history.build(_lead_user(update).user_id) if appointment_history is not None else None
+        home = build_home_view(channel_url=channel_url, advisor_url=advisor_url, show_appointments=bool(getattr(history, "items", ())))
         await message.reply_text(home.text, parse_mode=ParseMode.HTML, reply_markup=build_home_keyboard(home))
         return TelegramStartOutcome(handled=True, kind="home")
 

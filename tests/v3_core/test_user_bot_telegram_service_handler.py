@@ -166,3 +166,40 @@ async def test_bound_nonrepair_housing_issue_reaches_adviser_without_repair_tick
     assert SERVICE_REQUEST_SESSION_KEY not in context.user_data
     with sqlite3.connect(str(service.repository.db_path)) as conn:
         assert conn.execute("SELECT COUNT(*) FROM repair_tickets_v3").fetchone()[0] == 0
+
+@pytest.mark.asyncio
+async def test_bill_question_skips_schedule_and_preserves_attachment_for_adviser(tmp_path):
+    from v3_core.user_bot.telegram_service_handler import handle_v3_service_media
+    service = _service(tmp_path, binding=False)
+    context = _context()
+    leads, admins = CountingLeadService(), CountingAdmins()
+    effects = ServiceEffectExecutor(leads=leads, admins=admins, now=lambda: "2026-11-01 00:00:00")
+    await handle_v3_service_callback(_callback_update(FakeQuery("v3u:service:issue:aftercare_bill")), context, service=service, effects=effects)
+    await handle_v3_service_text(_text_update(FakeMessage("请核对这个月的电费。")), context, service=service, effects=effects)
+    image = FakeMessage()
+    image.photo = [SimpleNamespace(file_id="BILL_PHOTO")]
+    await handle_v3_service_media(_text_update(image), context, service=service, effects=effects)
+    query = FakeQuery("v3u:service:repair_media_next")
+    await handle_v3_service_callback(_callback_update(query), context, service=service, effects=effects)
+    assert context.user_data[SERVICE_REQUEST_SESSION_KEY]["stage"] == "confirm"
+    assert "方便什么时候" not in query.calls[-1][1][0]
+    outcome = await handle_v3_service_callback(_callback_update(FakeQuery("v3u:service:repair_confirm")), context, service=service, effects=effects)
+    assert outcome.handled
+    note = admins.calls[0][1]
+    assert note.media == (("photo", "BILL_PHOTO"),)
+    assert leads.calls[0][1].payload["media"] == [("photo", "BILL_PHOTO")]
+    assert SERVICE_REQUEST_SESSION_KEY not in context.user_data
+
+@pytest.mark.asyncio
+async def test_service_retry_after_confirmation_render_failure_does_not_duplicate_handoff(tmp_path):
+    service = _service(tmp_path, binding=False)
+    context = _context()
+    leads, admins = CountingLeadService(), CountingAdmins()
+    effects = ServiceEffectExecutor(leads=leads, admins=admins, now=lambda: "2026-11-01 00:00:00")
+    await handle_v3_service_callback(_callback_update(FakeQuery("v3u:service:issue:aftercare_bill")), context, service=service, effects=effects)
+    await handle_v3_service_text(_text_update(FakeMessage("账单有问题，请核对。")), context, service=service, effects=effects)
+    await handle_v3_service_callback(_callback_update(FakeQuery("v3u:service:repair_media_skip")), context, service=service, effects=effects)
+    with pytest.raises(RuntimeError, match="telegram_edit_failed"):
+        await handle_v3_service_callback(_callback_update(FakeQuery("v3u:service:repair_confirm", fail_edit=True)), context, service=service, effects=effects)
+    await handle_v3_service_callback(_callback_update(FakeQuery("v3u:service:repair_confirm")), context, service=service, effects=effects)
+    assert len(leads.calls) == len(admins.calls) == 1

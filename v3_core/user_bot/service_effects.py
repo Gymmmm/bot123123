@@ -40,7 +40,7 @@ class ServiceEffectExecutor:
             return LeadEffectResult(status="failed", error=str(exc))
         return LeadEffectResult(status="recorded", record=record)
 
-    async def repair(self, *, bot: Any, user: LeadUser, submission: RepairSubmission) -> ServiceEffectResult:
+    async def repair(self, *, bot: Any, user: LeadUser, submission: RepairSubmission, media: tuple[tuple[str, str], ...] = ()) -> ServiceEffectResult:
         if not submission.created:
             return ServiceEffectResult(
                 lead=LeadEffectResult(status="skipped"),
@@ -61,6 +61,7 @@ class ServiceEffectExecutor:
                     "time_slot": ticket.time_slot,
                     "detail": ticket.description,
                     "binding_id": ticket.binding_id,
+                    "media": list(media),
                 },
             ),
         )
@@ -68,6 +69,7 @@ class ServiceEffectExecutor:
             bot,
             AdminNotification(
                 title="新报修请求",
+                media=media,
                 lines=(
                     f"客户：{user_mention_html(user)}",
                     f"联系方式：{he(user_contact_text(user))}",
@@ -132,19 +134,20 @@ class ServiceEffectExecutor:
         )
         return ServiceEffectResult(lead=lead, admin=admin)
 
-    async def general(self, *, bot: Any, user: LeadUser, details: str, nearby: bool = False) -> ServiceEffectResult:
+    async def general(self, *, bot: Any, user: LeadUser, details: str, nearby: bool = False, media: tuple[tuple[str, str], ...] = ()) -> ServiceEffectResult:
         kind = "周边需求" if nearby else "通用服务咨询"
         action = "nearby_request" if nearby else "service_general"
         source = "nearby_service" if nearby else "service_hub"
         clean = str(details or "").strip()[:800]
         lead = self._record(
             user=user,
-            request=LeadRequest(action=action, source=source, payload={"kind": kind, "details": clean}),
+            request=LeadRequest(action=action, source=source, payload={"kind": kind, "details": clean, "media": list(media)}),
         )
         admin = await self.admins.send(
             bot,
             AdminNotification(
                 title=kind,
+                media=media,
                 lines=(
                     f"用户：{user_mention_html(user)}",
                     f"联系方式：{he(user_contact_text(user))}",

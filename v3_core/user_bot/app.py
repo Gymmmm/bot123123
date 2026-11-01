@@ -163,7 +163,7 @@ class V3UserBotDependencies:
 def build_v3_user_bot_dependencies(config: V3UserBotConfig) -> V3UserBotDependencies:
     read = build_read_runtime(config.db_path)
     transition = build_transition_runtime(config.db_path)
-    admins = TelegramAdminNotifier(config.admin_ids)
+    admins = TelegramAdminNotifier(config.admin_ids, outbox_dir=Path(config.db_path).parent / "admin_notification_outbox")
     contact_effects = ContactEffectExecutor(leads=transition.lead_effects, admins=admins)
     listing_contact_effects = ListingContactEffectExecutor(
         leads=transition.lead_effects,
@@ -203,7 +203,7 @@ def build_takeover_user_bot_dependencies(
     """Use V3 UX with the live 3858 appointment/lead/tenant data boundaries."""
     read = build_read_runtime(config.db_path)
     transition = build_takeover_transition_runtime(config.db_path)
-    admins = TelegramAdminNotifier(config.admin_ids)
+    admins = TelegramAdminNotifier(config.admin_ids, outbox_dir=Path(config.db_path).parent / "admin_notification_outbox")
     contact_effects = ContactEffectExecutor(leads=transition.lead_effects, admins=admins)
     listing_contact_effects = ListingContactEffectExecutor(
         leads=transition.lead_effects,
@@ -240,10 +240,11 @@ def build_takeover_user_bot_dependencies(
     )
 
 
-async def _render_home_callback(update: Any, config: V3UserBotConfig) -> None:
+async def _render_home_callback(update: Any, config: V3UserBotConfig, appointment_history=None) -> None:
     query = update.callback_query
     await query.answer()
-    home = build_home_view(channel_url=config.channel_url, advisor_url=config.advisor_url)
+    history = appointment_history.build(int(update.effective_user.id)) if appointment_history is not None else None
+    home = build_home_view(channel_url=config.channel_url, advisor_url=config.advisor_url, show_appointments=bool(getattr(history, "items", ())))
     await edit_query_panel(
         query,
         text=home.text,
@@ -437,7 +438,7 @@ def build_v3_user_bot_application(
         if action is None:
             return False
         if action == "home":
-            await _render_home_callback(update, config)
+            await _render_home_callback(update, config, deps.transition.appointment_history)
             return True
         await handle_v3_home_callback(
             update,
@@ -461,7 +462,7 @@ def build_v3_user_bot_application(
         if await _legacy_callback(update, context, raw):
             return
         if raw == "v3u:t:home":
-            await _render_home_callback(update, config)
+            await _render_home_callback(update, config, deps.transition.appointment_history)
             return
         if raw.startswith("v3u:t:"):
             await handle_v3_transition_action(
@@ -584,6 +585,7 @@ def build_v3_user_bot_application(
 
     async def heartbeat(context):
         runtime_state.heartbeat("user", state="running")
+        await deps.admins.retry_pending(context.bot)
 
     async def errors(update, context):
         error = context.error

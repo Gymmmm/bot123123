@@ -36,7 +36,7 @@ def test_p15_service_hub_copy_buttons_and_callbacks_locked():
 def test_p16_aftercare_only_exposes_real_workflows():
     view = aftercare_home_view()
     assert "统一在这里提交" in view.text
-    assert _callbacks(view) == ["v3u:service:repair", "v3u:home:service"]
+    assert _callbacks(view) == ["v3u:service:issue:repair_other", "v3u:service:issue:aftercare_property", "v3u:service:issue:aftercare_bill", "v3u:service:issue:aftercare_other", "v3u:home:service"]
 
 
 def test_p20_unified_housing_problem_categories():

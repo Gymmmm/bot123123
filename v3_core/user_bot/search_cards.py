@@ -95,9 +95,9 @@ def build_search_card(
     if project and area and not location_display_overlaps_project(project, area):
         lines.append(f"📍 {he(area)}")
     if details.floor:
-        lines.append(f"🏢 {he(details.floor)}")
+        lines.append(f"🏢 楼层：{he(str(details.floor))}" + ("层" if str(details.floor).isdigit() else ""))
     if details.deposit_terms:
-        lines.append(f"🔑 {he(details.deposit_terms)}")
+        lines.append(f"🔑 押付：{he(details.deposit_terms)}")
     status_line = _status_line_for(details)
     if status_line:
         lines.append(status_line)

@@ -6,7 +6,6 @@ from pathlib import Path
 from html import escape as html_escape, unescape as html_unescape
 import re
 from io import BytesIO
-from time import monotonic
 from telegram import InputFile
 from PIL import Image, ImageOps
 from typing import Any
@@ -254,12 +253,13 @@ def _single_detail_keyboard(
         rows.append(photo_row)
     if total > 1:
         rows.append([InlineKeyboardButton(
-            "🖼 预览单张照片", callback_data=f"v3u:detailfull:{public_id}:{index * 4}"
+            "📸 全部实拍", callback_data=f"v3u:listing:photos:{public_id}"
         )])
     for row in (getattr(markup, "inline_keyboard", None) or ()):
         clean = [
             button for button in row
             if str(getattr(button, "text", "") or "") != "📸 下一组实拍"
+            and not str(getattr(button, "callback_data", "") or "").startswith("v3u:listing:photos:")
         ]
         if clean:
             rows.append(clean)
@@ -267,11 +267,7 @@ def _single_detail_keyboard(
 
 
 def _detail_grid(paths: tuple[str, ...], page: int) -> bytes:
-    """Photo-led detail collage. Keep full images and avoid oversized matte.
-
-    The canvas adapts to landscape and portrait source proportions; listing
-    captions, pagination and Telegram message navigation are unaffected.
-    """
+    """Fixed 4:5 detail canvas with complete, undistorted photo cells."""
     selected = paths[page * 4:page * 4 + 4]
     if not selected:
         raise ValueError("detail_grid_has_no_photos")
@@ -279,47 +275,21 @@ def _detail_grid(paths: tuple[str, ...], page: int) -> bytes:
     for path in selected:
         with Image.open(path) as original:
             photos.append(ImageOps.exif_transpose(original).convert("RGB"))
-    ratios = [photo.width / photo.height for photo in photos]
-    width, gap = 1080, 8
+    width, height, gap = 1080, 1350, 8
     count = len(photos)
     if count == 1:
-        height = max(600, min(1350, round(width / ratios[0])))
         boxes = [(0, 0, width, height)]
     elif count == 2:
-        # Give both photos full width; each row follows its source ratio.
-        row_heights = [round(width / ratio) for ratio in ratios]
-        scale = min(1.0, 1342 / sum(row_heights))
-        top = max(200, round(row_heights[0] * scale))
-        bottom = max(200, round(row_heights[1] * scale))
-        height = top + gap + bottom
-        boxes = [(0, 0, width, top), (0, top + gap, width, bottom)]
+        top = (height - gap) // 2
+        boxes = [(0, 0, width, top), (0, top + gap, width, height - top - gap)]
     elif count == 3:
-        # Wide hero on top, two readable details beneath it.
+        hero_h = 810
         bottom_w = (width - gap) // 2
-        hero_h = min(780, round(width / ratios[0]))
-        bottom_h = min(650, round(max(bottom_w / ratios[1], bottom_w / ratios[2])))
-        height = hero_h + gap + bottom_h
-        boxes = [(0, 0, width, hero_h),
-                 (0, hero_h + gap, bottom_w, bottom_h),
+        bottom_h = height - hero_h - gap
+        boxes = [(0, 0, width, hero_h), (0, hero_h + gap, bottom_w, bottom_h),
                  (bottom_w + gap, hero_h + gap, width - bottom_w - gap, bottom_h)]
-    elif ratios[0] >= 1.15:
-        # Four landscape-focused photos: one prominent full-width photo,
-        # three smaller photos in a single row. Avoid the equal 2x2 grid.
-        hero_h = min(900, round(width / ratios[0]))
-        cell_w = (width - 2 * gap) // 3
-        support_h = max(round(cell_w / ratio) for ratio in ratios[1:])
-        support_h = min(support_h, max(180, 1350 - hero_h - gap))
-        height = hero_h + gap + support_h
-        boxes = [(0, 0, width, hero_h)]
-        for index in range(3):
-            left = index * (cell_w + gap)
-            w = cell_w if index < 2 else width - left
-            boxes.append((left, hero_h + gap, w, support_h))
     else:
-        # Portrait hero still gets a large left cell. Adjust proportions to
-        # the actual photo, rather than forcing an overly narrow fixed column.
-        height = 1260
-        hero_w = min(730, max(510, round(height * ratios[0])))
+        hero_w = 700
         right_w = width - hero_w - gap
         row_h = (height - gap * 2) // 3
         boxes = [(0, 0, hero_w, height),
@@ -936,22 +906,23 @@ async def handle_v3_callback(
         if public_id and full_paths and not response.expand_only and ":pg:" not in raw:
             from .telegram_photos_render import send_listing_photos_album
             state = _album_state(update, context, public_id)
-            now = monotonic()
-            if now - float(state.get("native_album_at", -10000)) < 300:
-                await query.answer("实拍已发送，请查看下方相册", show_alert=True)
-                return TelegramCallbackHandlerOutcome(handled=True, response=response)
-            if full_paths:
-                # A native MediaGroup accepts at most ten frames per request.
-                groups = tuple(tuple(full_paths[n:n + 10]) for n in range(0, len(full_paths), 10))
-                await send_listing_photos_album(
-                    context.bot, chat_id=_chat_id(update), media_groups=groups,
-                    media_caption=f"📸 {public_id}｜共 {len(full_paths)} 张实拍",
-                    text=f"📸 {public_id}｜共 {len(full_paths)} 张实拍\n预约看房或咨询，请选择：",
-                    reply_markup=response.keyboard,
-                )
-                state["native_album_at"] = now
-                _set_listing_touchpoint(context, "listing_photos")
-                return TelegramCallbackHandlerOutcome(handled=True, response=response)
+            # Keep actions on the original card; an album needs no second
+            # action bubble. Replace only albums we previously sent ourselves.
+            groups = tuple(tuple(full_paths[n:n + 10]) for n in range(0, len(full_paths), 10))
+            sent_ids = await send_listing_photos_album(
+                context.bot, chat_id=_chat_id(update), media_groups=groups,
+                media_caption=f"📸 {public_id}｜共 {len(full_paths)} 张实拍",
+                expand_only=True,
+            )
+            old_ids = tuple(state.get("native_album_ids") or ())
+            state["native_album_ids"] = sent_ids
+            for old_id in old_ids:
+                try:
+                    await context.bot.delete_message(chat_id=_chat_id(update), message_id=int(old_id))
+                except Exception:
+                    pass
+            _set_listing_touchpoint(context, "listing_photos")
+            return TelegramCallbackHandlerOutcome(handled=True, response=response)
         # Fallback: preserve the existing editable collage for other sources.
         # Search-result cards therefore remain in place when entering photos.
         callback_obj = dispatched.callback

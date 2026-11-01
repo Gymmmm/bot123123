@@ -237,6 +237,7 @@ def _store_draft(user_data: dict[str, Any], draft: ServiceRequestDraft, **extra:
         "detail": draft.detail,
         "request_token": draft.request_token,
         "media_file_ids": list(existing.get("media_file_ids") or ()),
+        "media_types": dict(existing.get("media_types") or {}),
         "slot": str(existing.get("slot") or ""),
         "stage": str(existing.get("stage") or ""),
     }
@@ -394,6 +395,10 @@ async def handle_v3_service_callback(
         draft = _draft_from_session(user_data.get(SERVICE_REQUEST_SESSION_KEY))
         if draft is None or not draft.detail:
             return TelegramServiceOutcome(True, action, False)
+        if not draft.issue_key.startswith("repair_"):
+            _store_draft(user_data, draft, stage="confirm", slot="not_required")
+            await render_service_view(query, repair_confirm_view(draft, slot_label="", media_count=len((_repair_state(user_data) or {}).get("media_file_ids") or ())), advisor_url=advisor_url)
+            return TelegramServiceOutcome(True, action, True)
         _store_draft(user_data, draft, stage="time")
         await render_service_view(query, slot_view(draft), advisor_url=advisor_url)
         return TelegramServiceOutcome(True, action, True)
@@ -435,8 +440,15 @@ async def handle_v3_service_callback(
         state = _repair_state(user_data)
         if draft is None or state is None:
             return TelegramServiceOutcome(True, action, False)
+        if state.get("submitted_outcome"):
+            ticket_id = state.get("submitted_ticket_id")
+            view = repair_result_view(outcome=state["submitted_outcome"], issue_label=draft.issue_label)
+            await render_service_view(query, view, advisor_url=advisor_url)
+            user_data.pop(SERVICE_REQUEST_SESSION_KEY, None)
+            user_data.pop(SERVICE_REQUEST_ANCHOR_KEY, None)
+            return TelegramServiceOutcome(True, action, True, ticket_id=ticket_id)
         slot = str(state.get("slot") or "")
-        slot_label = SERVICE_SLOT_LABELS.get(slot)
+        slot_label = "无需安排上门" if slot == "not_required" and not draft.issue_key.startswith("repair_") else SERVICE_SLOT_LABELS.get(slot)
         if not slot_label:
             return TelegramServiceOutcome(True, action, False)
         binding = service.active_binding(user.user_id)
@@ -445,6 +457,7 @@ async def handle_v3_service_callback(
             f"住房问题：{draft.issue_label}\n说明：{draft.detail}\n希望时间：{slot_label}"
             f"\n附件数：{len(state.get('media_file_ids') or ())}"
         )
+        media = tuple((str((state.get("media_types") or {}).get(fid, "photo")), fid) for fid in state.get("media_file_ids") or ())
         ticket_id = None
         effect = None
         outcome = "failed"
@@ -457,15 +470,18 @@ async def handle_v3_service_callback(
                 ticket_id = submission.ticket.id
                 outcome = "ticket"
                 if effects is not None:
-                    effect = await effects.repair(bot=getattr(context, "bot", None), user=user, submission=submission)
+                    effect = await effects.repair(bot=getattr(context, "bot", None), user=user, submission=submission, media=media)
             elif effects is not None:
-                effect = await effects.general(bot=getattr(context, "bot", None), user=user, details=detail)
+                effect = await effects.general(bot=getattr(context, "bot", None), user=user, details=detail, media=media)
                 if _effect_success(effect):
                     outcome = "handoff"
         elif effects is not None:
-            effect = await effects.general(bot=getattr(context, "bot", None), user=user, details=detail)
+            effect = await effects.general(bot=getattr(context, "bot", None), user=user, details=detail, media=media)
             if _effect_success(effect):
                 outcome = "handoff"
+        if outcome != "failed":
+            state["submitted_outcome"] = outcome
+            state["submitted_ticket_id"] = ticket_id
         result_view = repair_result_view(
             outcome=outcome,
             issue_label=draft.issue_label,
@@ -693,7 +709,9 @@ async def handle_v3_service_media(
     ids = list(state.get("media_file_ids") or ())
     if file_id not in ids:
         ids.append(file_id)
-    _store_draft(user_data, draft, stage="media", media_file_ids=ids)
+    types = dict(state.get("media_types") or {})
+    types[file_id] = "photo" if photos else "video"
+    _store_draft(user_data, draft, stage="media", media_file_ids=ids, media_types=types)
     await _edit_anchor(context, user_data, SERVICE_REQUEST_ANCHOR_KEY, repair_media_view(draft, len(ids)), advisor_url=advisor_url, fallback_message=message)
     return TelegramServiceOutcome(True, "repair_media", True)
 
