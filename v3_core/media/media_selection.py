@@ -122,7 +122,7 @@ def _pick_auto_cover_with_reason(
     def _most_level(items: list[dict[str, Any]]) -> dict[str, Any]:
         if len(items) == 1:
             return items[0]
-        return min(items, key=lambda item: (round(_vertical_lean_deg(_path(item)) / 2.0), -score(item)))
+        return min(items, key=lambda item: (0 if float(item.get("ratio") or 0) >= 1.0 else 1, round(_vertical_lean_deg(_path(item)) / 2.0), -score(item)))
 
     strict = [item for item in usable if _passes_villa_exterior_gate(item)]
     if strict:
