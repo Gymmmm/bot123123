@@ -1,4 +1,4 @@
-name: qiaolian-final-readonly-audit-v3
+name: qiaolian-final-readonly-audit-v4
 on:
   push:
     branches: [ops/final-readonly-audit-20261106]
@@ -33,6 +33,16 @@ jobs:
           print('LISTING_STATUS',stat("select inventory_status,count(*) from listings_v3 group by inventory_status"))
           print('LISTING_FIELDS',stat("select count(*) total, sum(case when monthly_rent is null then 1 else 0 end) no_rent, sum(case when bedrooms is null then 1 else 0 end) no_rooms, sum(case when area is null or area='' then 1 else 0 end) no_area, sum(case when description is null or description='' then 1 else 0 end) no_desc from listings_v3"))
           print('DELIVERY',stat("select state,count(*) from publication_delivery_attempts_v3 group by state"))
+          print('UNKNOWN_AGE',stat("select substr(updated_at,1,10),count(*) from publication_delivery_attempts_v3 where state='unknown' group by 1 order by 1 desc"))
+          print('QUEUE_AGE',stat("select state,reason_code,min(updated_at),max(updated_at),count(*) from publisher_auto_items_v3 where state in ('queued','exception') group by state,reason_code"))
+          print('ALL_LISTINGS',stat("select count(*),sum(case when inventory_status='active' then 1 else 0 end),sum(case when inventory_status='reserved' then 1 else 0 end),sum(case when inventory_status='pending' then 1 else 0 end),sum(case when inventory_status='rented' then 1 else 0 end),sum(case when inventory_status in ('offline','inactive') then 1 else 0 end) from listings_v3"))
+          print('BOOKINGS',stat("select status,count(*) from appointments_v3 group by status"))
+          print('ACTIVE_TABLES',stat("select name from sqlite_master where type='table'"))
+          print('RECENT_TELETHON',stat("select count(*),max(created_at) from source_posts"))
+          print('SOURCES',stat("select source_channel,last_seen_at from collect_sources where external_channel_id is not null"))
+          print('REPAIRS',stat("select category,status,count(*) from repair_tickets_v3 group by category,status"))
+          print('COLLECTOR_48H',stat("select count(*) from source_posts where created_at >= datetime('now','-48 hour')"))
+          print('COVER_JOBS',stat("select status,count(*) from cover_render_jobs group by status"))
           print('APPOINTMENTS',stat("select status,count(*) from appointments group by status"))
           print('SERVICE_REQUESTS',stat("select category,status,count(*) from housing_service_requests group by category,status"))
           for svc in ['publisher','user','canonical','collector']:
