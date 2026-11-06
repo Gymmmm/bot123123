@@ -51,13 +51,28 @@ jobs:
           for key in ('V3_VISION_PROVIDER', 'V3_VISION_MODEL', 'V3_VILLA_COVER_TEMPLATE', 'V3_APARTMENT_COVER_TEMPLATE'):
               print(f'{key}={env.get(key, "<unset>")}')
           print('V3_VISION_API_KEY=present' if env.get('V3_VISION_API_KEY') else 'V3_VISION_API_KEY=absent')
+          unit = 'qiaolian-v3@publisher.service'
+          pid = subprocess.check_output(['systemctl', 'show', unit, '-p', 'MainPID', '--value'], text=True).strip()
+          if pid and pid != '0':
+              cmdline = Path(f'/proc/{pid}/cmdline').read_bytes().replace(b'\0', b' ').decode()
+              print(f'PUBLISHER_CMD={cmdline}')
+              current = subprocess.check_output(['sudo', '-u', 'qiaolianbot', 'tr', '\\0', '\\n'], input=Path(f'/proc/{pid}/environ').read_bytes().decode('latin1'), text=True)
+              loaded = dict(line.split('=', 1) for line in current.splitlines() if '=' in line)
+              for key in ('V3_VISION_PROVIDER', 'V3_VISION_MODEL'):
+                  print(f'PROCESS_{key}={loaded.get(key, "<unset>")}')
+          output = subprocess.check_output(['journalctl', '-u', unit, '--since', '-24 hours', '--no-pager'], text=True)
+          lines = output.splitlines()
+          for i, line in enumerate(lines):
+              if 'Traceback (most recent call last)' in line:
+                  print('PUBLISHER_ERROR_BLOCK_START')
+                  print('\n'.join(lines[i:min(i+15, len(lines))]))
           for name in ('collector', 'canonical', 'publisher', 'user'):
               unit = f'qiaolian-v3@{name}.service'
               def prop(k):
                   return subprocess.check_output(['systemctl', 'show', unit, '-p', k, '--value'], text=True).strip()
               print(f'SERVICE={name} STATE={os.popen("systemctl is-active " + unit).read().strip()} PID={prop("MainPID")} RESTARTS={prop("NRestarts")} STARTED={prop("ActiveEnterTimestamp")}')
           PY
-          journalctl -u 'qiaolian-v3@collector.service' -u 'qiaolian-v3@canonical.service' -u 'qiaolian-v3@publisher.service' -u 'qiaolian-v3@user.service' --since '-24 hours' --no-pager | grep -E 'Traceback|ModuleNotFoundError|Main process exited|Failed with result|database is locked|409 [Cc]onflict' | tail -15 || true
+          
           REMOTE
       - name: Remove temporary SSH material
         if: always()
