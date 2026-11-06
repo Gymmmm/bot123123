@@ -1,81 +1,48 @@
-name: qiaolian-final-readonly-audit
+name: qiaolian-final-readonly-audit-v3
 on:
-  workflow_dispatch:
   push:
     branches: [ops/final-readonly-audit-20261106]
-permissions:
-  contents: read
 jobs:
   audit:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 3
     steps:
-      - run: |
+      - env:
+          PROD_SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+        run: |
           set -Eeuo pipefail
-          printf '%s\n' '50.114.74.120 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMvdBaAbAt9/4NCEC4RmiAukQ5KK5S6OF4YEml2iLw+6' > "$RUNNER_TEMP/host_seen"
-          test "$(ssh-keygen -lf "$RUNNER_TEMP/host_seen" | awk '{print $2;}')" = 'SHA256:fuufBlFaqRpQhlkio0vuLsuv8w8x3zUb3VFQsnUny/o'
-          ssh-keyscan -T 10 -t ed25519 50.114.74.120 2>/dev/null | grep -v '^#' > "$RUNNER_TEMP/host_live"
-          ssh-keygen -lf "$RUNNER_TEMP/host_live" | grep -F 'SHA256:fuufBlFaqRpQhlkio0vuLsuv8w8x3zUb3VFQsnUny/o'
           install -d -m 700 "$HOME/.ssh"
           printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/key"
           chmod 600 "$HOME/.ssh/key"
-          cp "$RUNNER_TEMP/host_live" "$HOME/.ssh/known_hosts"
+          ssh-keyscan -T 10 -t ed25519 50.114.74.120 2>/dev/null | grep -v '^#' > "$HOME/.ssh/known_hosts"
+          ssh-keygen -lf "$HOME/.ssh/known_hosts" | grep -F 'SHA256:fuufBlFaqRpQhlkio0vuLsuv8w8x3zUb3VFQsnUny/o'
           ssh -i "$HOME/.ssh/key" -o BatchMode=yes -o IdentitiesOnly=yes root@50.114.74.120 'bash -s' <<'REMOTE'
           set -Eeuo pipefail
+          echo RELEASE=$(readlink -f /opt/qiaolian_v3/current)
           python3 - <<'PY'
-          from pathlib import Path
-          import os, sqlite3, subprocess, datetime
-          DB = '/opt/qiaolian_v3/data/qiaolian_dual_bot.db'
-          print('LIVE_RELEASE=' + subprocess.check_output(['sudo', '-u', 'qiaolianbot', 'readlink', '-f', '/opt/qiaolian_v3/current'], text=True).strip().split('/')[-1])
-          db=sqlite3.connect(f'file:{DB}?mode=ro',uri=True)
+          import sqlite3, subprocess
+          db=sqlite3.connect('file:/opt/qiaolian_v3/data/qiaolian_dual_bot.db?mode=ro',uri=True)
           db.row_factory=sqlite3.Row
           tables=[r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")]
-          def cols(t): return {r[1] for r in db.execute(f'PRAGMA table_info({t})')}
-          def query(sql, args=()):
-              try: return db.execute(sql,args).fetchall()
-              except Exception as e: return [('QUERY_FAILED', str(e))]
-          for t in ['listings','source_posts','publisher_auto_items_v3','review_groups','review_items','publications','delivery_attempts','appointments','consult_sessions','housing_service_requests','users','search_sessions','leads','marketing_broadcast_runs','marketing_deliveries','service_leads','user_leads']:
-              if t in tables:
-                  print(f'TABLE_COUNT {t}={db.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]} COLS={sorted(cols(t))}')
-          if 'listings' in tables:
-              c=cols('listings')
-              for field in ['monthly_rent','rent','lease_term','lease_months','bedrooms','bathrooms','area','title','project_name','display_title','description','status','inventory_status','public_listing_id']:
-                  if field in c:
-                  null_count=db.execute("SELECT COUNT(*) FROM listings WHERE " + field + " IS NULL OR trim(cast(" + field + " as text))=''").fetchone()[0]
-                  print(f'LISTING_DATA {field} NULL={null_count}')
-              for f in ['status','inventory_status','source','source_channel']:
-                  if f in c:
-                      for r in query(f"SELECT cast({f} as text),COUNT(*) FROM listings GROUP BY {f} ORDER BY COUNT(*) DESC LIMIT 14"): print('LISTING_FIELD ' + f + ' ' + repr(r))
-          for t in ['publisher_auto_items_v3','appointments','source_posts']:
-              if t in tables:
-                  fields=['state','reason_code','parse_status','status','workflow_status']
-                  for f in set(fields)&cols(t):
-                      for r in query(f"SELECT cast({f} as text),COUNT(*) FROM {t} GROUP BY {f} ORDER BY COUNT(*) DESC LIMIT 14"): print('ENTITY_FIELD '+t+'.'+f+' '+repr(r))
-          for t in ['appointments','consult_sessions','housing_service_requests','service_leads','user_leads','users']:
-              if t in tables:
-                  for f in ['created_at','updated_at','received_at']:
-                      if f in cols(t):
-                          for r in query(f"SELECT min({f}),max({f}),count(*) FROM {t}"):print('ENTITY_TIME '+t+' '+repr(r))
-          if 'appointments' in tables:
-              for f in ['time_preference','preferred_time','scheduled_at','start_at','listing_id','source_message_id','time_slot','user_id']:
-                  if f in cols('appointments'):
-                      pass
-              print('APPOINTMENT_SAMPLE_FIELDS '+repr([{k:r[k] for k in r.keys() if k in ['id','listing_id','status','time_preference','preferred_time','scheduled_at','start_at','time_slot','created_at'] } for r in query('SELECT * FROM appointments ORDER BY rowid DESC LIMIT 10')]))
-          for service in ['publisher','user','canonical','collector']:
-              cmd=['journalctl','-u',f'qiaolian-v3@{service}.service','--since','-24 hours','--no-pager']
-              out=subprocess.check_output(cmd,text=True).splitlines()
-              mess=[l.split(': ',1)[-1] for l in out]
-              print('RECENT_ERRORS '+service)
-              for line in out:
-                  if any(w in line for w in ['Error:', 'Error during callback', 'CRITICAL','PermissionError','OperationalError','DatabaseError','SecretNotFound','v3-profile']):print(line[-300:])
-          print('MARKETING_ENV')
-          env_text=subprocess.check_output(['sudo','-u','qiaolianbot','cat','/opt/qiaolian_v3/runtime.env'],text=True)
-          for l in env_text.splitlines():
-              if any(x in l.upper() for x in ['MARKETING','BROADCAST','SCHEDULER','CRON','ADVISOR','PREFLIGHT']):
-                  if any(x in l.upper() for x in ['KEY','TOKEN','SECRET','PASSWORD']):continue
-                  print(l)
+          print('TABLES',','.join(sorted(tables)))
+          def stat(sql):
+              try: return [tuple(r) for r in db.execute(sql).fetchall()]
+              except Exception as e: return [('QUERY_FAILED',str(e))]
+          print('QUEUE',stat("select state, reason_code, count(*) from publisher_auto_items_v3 group by state,reason_code"))
+          print('REVIEWS',stat("select review_status,count(*) from review_items group by review_status"))
+          print('LISTING_STATUS',stat("select inventory_status,count(*) from listings_v3 group by inventory_status"))
+          print('LISTING_FIELDS',stat("select count(*) total, sum(case when monthly_rent is null then 1 else 0 end) no_rent, sum(case when bedrooms is null then 1 else 0 end) no_rooms, sum(case when area is null or area='' then 1 else 0 end) no_area, sum(case when description is null or description='' then 1 else 0 end) no_desc from listings_v3"))
+          print('DELIVERY',stat("select state,count(*) from publication_delivery_attempts_v3 group by state"))
+          print('APPOINTMENTS',stat("select status,count(*) from appointments group by status"))
+          print('SERVICE_REQUESTS',stat("select category,status,count(*) from housing_service_requests group by category,status"))
+          for svc in ['publisher','user','canonical','collector']:
+              lines=subprocess.run(['journalctl','-u','qiaolian-v3@'+svc+'.service','--since','-48 hours','--no-pager'],capture_output=True,text=True).stdout.splitlines()
+              matches=[l[-500:] for l in lines if any(w in l for w in ['Error during callback','NetworkError','PermissionError','OperationalError','DatabaseError','CRITICAL','Traceback','v3-profile'])]
+              print('LOG',svc,'LINES',len(lines),'MATCHES',len(matches))
+              for l in matches[-10:]: print('LOG_DETAIL',svc,l)
+          print('SCHEDULER',stat("select state, count(*) from publisher_auto_items_v3 where state in ('pending','exception') group by state"))
+          print('BROADCAST_TABLES',[t for t in tables if 'broadcast' in t or 'marketing' in t])
+          OUT=subprocess.run(['systemctl','is-active','qiaolian-v3@publisher','qiaolian-v3@user','qiaolian-v3@canonical','qiaolian-v3@collector'],text=True,capture_output=True)
+          print('SERVICES',OUT.stdout.replace('\n',','),'ERR',OUT.stderr)
           PY
           REMOTE
-          rm -f "$HOME/.ssh/key"
-        env:
-          PROD_SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
