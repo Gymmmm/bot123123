@@ -320,97 +320,104 @@ async def send_listing_details(
     replace_message: Any = None,
     force: bool = False,
 ) -> bool:
-    """One editable Telegram photo+caption+keyboard; never a second detail bubble.
+    """Open listing details with ALL real photos in native Telegram albums.
 
-    A channel deep link sends one message. Callbacks from an existing photo card
-    edit that same message whenever Telegram permits. Photo navigation then only
-    edits that message's media, keeping its ID and scroll position stable.
+    Preserve the original card as the sole text/action surface when possible.
+    Telegram media groups have a 10-photo limit, so large listings use
+    consecutive groups; there is no photo-page navigation.
     """
+    from .telegram_photos_render import send_listing_photos_album
+
     bot = getattr(context, "bot", None)
     if bot is None:
         raise ValueError("telegram_bot_missing_for_listing_details")
     chat_id_value = _chat_id(update)
     public_id = str(public_listing_id or "").strip()
     state = _album_state(update, context, public_id) if public_id else {}
-    previous = _album_message_ids(state)
-    replace_id = str(getattr(replace_message, "message_id", "") or "").strip()
-    if (replace_id and replace_id in previous
-            and state.get("page") == DETAILS_ALBUM_PAGE
-            and state.get("detail_index") == 0 and not force):
-        return False
-    candidates = photo_paths or tuple(
-        path for group in media_groups or () for path in group
-    )
     paths = tuple(dict.fromkeys(
-        str(path) for path in candidates if Path(str(path)).is_file()
+        str(path) for path in (photo_paths or tuple(
+            p for group in media_groups or () for p in group
+        )) if Path(str(path)).is_file()
     ))
-    ids: list[str] = []
-    if paths:
-        caption = _single_detail_caption(text, 0, len(paths))
-        keyboard = _single_detail_keyboard(reply_markup, public_id, 0, len(paths))
-        media = InputMediaPhoto(
-            media=_detail_grid(paths, 0),
-            caption=caption,
-            parse_mode=ParseMode.HTML,
-        )
-        if replace_id and bool(getattr(replace_message, "photo", None)):
-            edit = getattr(bot, "edit_message_media", None)
-            if callable(edit):
-                try:
-                    await edit(
-                        chat_id=chat_id_value,
-                        message_id=int(replace_id),
-                        media=media,
-                        reply_markup=keyboard,
-                    )
-                    ids = [replace_id]
-                except Exception:
-                    # An album member cannot always become a standalone photo.
-                    # In that case send one new message and retire the old.
-                    pass
-        if not ids:
-            sent = await bot.send_photo(
-                chat_id=chat_id_value,
-                photo=_detail_grid(paths, 0),
-                caption=caption,
-                parse_mode=ParseMode.HTML,
-                reply_markup=keyboard,
-            )
-            ids = [str(getattr(sent, "message_id"))]
-    else:
-        if replace_id and not getattr(replace_message, "photo", None):
+    if not paths:
+        # Preserve the existing no-photo fallback.
+        if replace_message is not None:
             try:
-                await bot.edit_message_text(
-                    chat_id=chat_id_value,
-                    message_id=int(replace_id),
-                    text=text,
-                    parse_mode=ParseMode.HTML,
-                    reply_markup=reply_markup,
-                )
-                ids = [replace_id]
+                if getattr(replace_message, "photo", None):
+                    await bot.edit_message_caption(
+                        chat_id=chat_id_value, message_id=replace_message.message_id,
+                        caption=text, parse_mode=ParseMode.HTML,
+                        reply_markup=reply_markup,
+                    )
+                else:
+                    await bot.edit_message_text(
+                        chat_id=chat_id_value, message_id=replace_message.message_id,
+                        text=text, parse_mode=ParseMode.HTML,
+                        reply_markup=reply_markup,
+                    )
+                return True
             except Exception:
                 pass
-        if not ids:
-            sent = await bot.send_message(
-                chat_id=chat_id_value, text=text, parse_mode=ParseMode.HTML,
-                reply_markup=reply_markup,
-            )
-            ids = [str(getattr(sent, "message_id"))]
+        await bot.send_message(
+            chat_id=chat_id_value, text=text, parse_mode=ParseMode.HTML,
+            reply_markup=reply_markup,
+        )
+        return True
 
-    stale = list(previous)
-    if replace_id and replace_id not in stale:
-        stale.append(replace_id)
-    for old_id in stale:
-        if old_id in ids:
+    # Repeated taps on the same detail do not resend the entire gallery.
+    existing = _album_message_ids(state)
+    if existing and state.get("page") == DETAILS_ALBUM_PAGE and not force:
+        return False
+
+    groups = tuple(tuple(paths[i:i + 10]) for i in range(0, len(paths), 10))
+    sent_ids = await send_listing_photos_album(
+        bot, chat_id=chat_id_value, media_groups=groups,
+        media_caption=f"📸 {public_id}｜全部实拍（共{len(paths)}张）",
+        expand_only=True,
+    )
+    if not sent_ids:
+        return False
+
+    # One detail/action message, not a second action bar under the album.
+    action_id = None
+    if replace_message is not None:
+        try:
+            if getattr(replace_message, "photo", None):
+                await bot.edit_message_caption(
+                    chat_id=chat_id_value, message_id=replace_message.message_id,
+                    caption=text, parse_mode=ParseMode.HTML,
+                    reply_markup=reply_markup,
+                )
+            else:
+                await bot.edit_message_text(
+                    chat_id=chat_id_value, message_id=replace_message.message_id,
+                    text=text, parse_mode=ParseMode.HTML,
+                    reply_markup=reply_markup,
+                )
+            action_id = int(replace_message.message_id)
+        except Exception:
+            pass
+    if action_id is None:
+        action = await bot.send_message(
+            chat_id=chat_id_value, text=text, parse_mode=ParseMode.HTML,
+            reply_markup=reply_markup,
+        )
+        action_id = int(action.message_id)
+
+    # Only remove old gallery frames, never the reused detail/action message.
+    for old_id in existing:
+        if str(old_id) == str(action_id):
             continue
         try:
             await bot.delete_message(chat_id=chat_id_value, message_id=int(old_id))
         except Exception:
             continue
     if public_id:
-        _remember_album_sent(state, message_ids=ids, page=DETAILS_ALBUM_PAGE)
-        state["detail_index"] = 0
-        state["detail_full"] = False
+        _remember_album_sent(
+            state, message_ids=[str(mid) for mid in sent_ids] + [str(action_id)],
+            page=DETAILS_ALBUM_PAGE,
+        )
+        state["detail_full"] = True
     return True
 
 
