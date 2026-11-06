@@ -62,10 +62,10 @@ jobs:
                   print(f'PROCESS_{key}={loaded.get(key, "<unset>")}')
           output = subprocess.check_output(['journalctl', '-u', unit, '--since', '-24 hours', '--no-pager'], text=True)
           lines = output.splitlines()
-          for i, line in enumerate(lines):
+          for i, line in enumerate(lines[-180:]):
               if 'Traceback (most recent call last)' in line:
                   print('PUBLISHER_ERROR_BLOCK_START')
-                  print('\n'.join(lines[i:min(i+15, len(lines))]))
+                  print('\n'.join(lines[max(0, len(lines)-180+i):min(len(lines)-180+i+70, len(lines))]))
           for name in ('collector', 'canonical', 'publisher', 'user'):
               unit = f'qiaolian-v3@{name}.service'
               def prop(k):
