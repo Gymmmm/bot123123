@@ -40,7 +40,9 @@ jobs:
           if 'listings' in tables:
               c=cols('listings')
               for field in ['monthly_rent','rent','lease_term','lease_months','bedrooms','bathrooms','area','title','project_name','display_title','description','status','inventory_status','public_listing_id']:
-                  if field in c: print(f'LISTING_DATA {field} NULL={db.execute(f"SELECT COUNT(*) FROM listings WHERE {field} IS NULL OR trim(cast({field} as text))=\'\'").fetchone()[0]}')
+                  if field in c:
+                  null_count=db.execute("SELECT COUNT(*) FROM listings WHERE " + field + " IS NULL OR trim(cast(" + field + " as text))=''").fetchone()[0]
+                  print(f'LISTING_DATA {field} NULL={null_count}')
               for f in ['status','inventory_status','source','source_channel']:
                   if f in c:
                       for r in query(f"SELECT cast({f} as text),COUNT(*) FROM listings GROUP BY {f} ORDER BY COUNT(*) DESC LIMIT 14"): print('LISTING_FIELD ' + f + ' ' + repr(r))
