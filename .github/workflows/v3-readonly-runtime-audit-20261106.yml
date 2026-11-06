@@ -33,8 +33,8 @@ jobs:
           set -Eeuo pipefail
           CURRENT=$(readlink -f /opt/qiaolian_v3/current)
           echo "LIVE_RELEASE=$(basename "$CURRENT")"
-          git -c safe.directory="$CURRENT" -C "$CURRENT" rev-parse HEAD
-          git -c safe.directory="$CURRENT" -C "$CURRENT" status --short
+          git -c safe.directory=* -C "$CURRENT" rev-parse HEAD
+          git -c safe.directory=* -C "$CURRENT" status --short
           echo "APPLIED_AT=$(stat -c '%y' /opt/qiaolian_v3/current)"
           python3 - <<'PY'
           from pathlib import Path
@@ -53,7 +53,7 @@ jobs:
                   return subprocess.check_output(['systemctl', 'show', unit, '-p', k, '--value'], text=True).strip()
               print(f'SERVICE={name} STATE={os.popen("systemctl is-active " + unit).read().strip()} PID={prop("MainPID")} RESTARTS={prop("NRestarts")} STARTED={prop("ActiveEnterTimestamp")}')
           PY
-          journalctl -u 'qiaolian-v3@*' --since '-24 hours' --no-pager | grep -E 'Traceback|ModuleNotFoundError|Main process exited|Failed with result|database is locked|409 [Cc]onflict' | tail -15 || true
+          journalctl -u 'qiaolian-v3@collector.service' -u 'qiaolian-v3@canonical.service' -u 'qiaolian-v3@publisher.service' -u 'qiaolian-v3@user.service' --since '-24 hours' --no-pager | grep -E 'Traceback|ModuleNotFoundError|Main process exited|Failed with result|database is locked|409 [Cc]onflict' | tail -15 || true
           REMOTE
       - name: Remove temporary SSH material
         if: always()
