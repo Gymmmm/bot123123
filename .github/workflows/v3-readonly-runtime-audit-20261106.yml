@@ -1,0 +1,60 @@
+name: v3-readonly-runtime-audit
+on:
+  workflow_dispatch:
+  push:
+    branches: [ops/read-only-runtime-audit-20261106]
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      PROD_HOST: 50.114.74.120
+      PROD_SSH_KNOWN_HOSTS: '50.114.74.120 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMvdBaAbAt9/4NCEC4RmiAukQ5KK5S6OF4YEml2iLw+6'
+      PROD_SSH_HOST_FINGERPRINT: 'SHA256:fuufBlFaqRpQhlkio0vuLsuv8w8x3zUb3VFQsnUny/o'
+    steps:
+      - name: Check production host identity
+        run: |
+          set -Eeuo pipefail
+          ssh-keyscan -T 10 -t ed25519 "$PROD_HOST" 2>/dev/null | grep -v '^#' > "$RUNNER_TEMP/host_seen"
+          ssh-keygen -lf "$RUNNER_TEMP/host_seen" | grep -F "$PROD_SSH_HOST_FINGERPRINT"
+      - name: Read current release health and redacted vision settings
+        env:
+          PROD_SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+        run: |
+          set -Eeuo pipefail
+          test -n "$PROD_SSH_PRIVATE_KEY"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/prod_ro_key"
+          printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/prod_ro_key" "$HOME/.ssh/known_hosts"
+          ssh -i "$HOME/.ssh/prod_ro_key" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 root@50.114.74.120 'bash -s' <<'REMOTE'
+          set -Eeuo pipefail
+          CURRENT=$(readlink -f /opt/qiaolian_v3/current)
+          echo "LIVE_RELEASE=$(basename "$CURRENT")"
+          git -c safe.directory="$CURRENT" -C "$CURRENT" rev-parse HEAD
+          git -c safe.directory="$CURRENT" -C "$CURRENT" status --short
+          echo "APPLIED_AT=$(stat -c '%y' /opt/qiaolian_v3/current)"
+          python3 - <<'PY'
+          from pathlib import Path
+          import os, subprocess
+          env = {}
+          for line in Path('/opt/qiaolian_v3/runtime.env').read_text().splitlines():
+              if '=' in line and not line.lstrip().startswith('#'):
+                  k, v = line.split('=', 1)
+                  env[k] = v.strip().strip('"').strip("'")
+          for key in ('V3_VISION_PROVIDER', 'V3_VISION_MODEL', 'V3_VILLA_COVER_TEMPLATE', 'V3_APARTMENT_COVER_TEMPLATE'):
+              print(f'{key}={env.get(key, "<unset>")}')
+          print('V3_VISION_API_KEY=present' if env.get('V3_VISION_API_KEY') else 'V3_VISION_API_KEY=absent')
+          for name in ('collector', 'canonical', 'publisher', 'user'):
+              unit = f'qiaolian-v3@{name}.service'
+              def prop(k):
+                  return subprocess.check_output(['systemctl', 'show', unit, '-p', k, '--value'], text=True).strip()
+              print(f'SERVICE={name} STATE={os.popen("systemctl is-active " + unit).read().strip()} PID={prop("MainPID")} RESTARTS={prop("NRestarts")} STARTED={prop("ActiveEnterTimestamp")}')
+          PY
+          journalctl -u 'qiaolian-v3@*' --since '-24 hours' --no-pager | grep -E 'Traceback|ModuleNotFoundError|Main process exited|Failed with result|database is locked|409 [Cc]onflict' | tail -15 || true
+          REMOTE
+      - name: Remove temporary SSH material
+        if: always()
+        run: rm -f "$HOME/.ssh/prod_ro_key"
