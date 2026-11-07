@@ -343,6 +343,8 @@ class PendingBatchOperatorPublisherAdminController(OperatorPublisherAdminControl
         return updated, skipped
 
     def _apply_pending_batch(self, status: str, page: int = 0) -> tuple[list[str], list[str]]:
+        # Private legacy helper used by isolated regression fixtures. Telegram
+        # callbacks must use _confirm_pending_batch -> _apply_pending_ids.
         clean_status = str(status or "").strip().lower()
         if clean_status not in {"active", "offline"}:
             raise ValueError("unsupported pending batch status")
