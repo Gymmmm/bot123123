@@ -11,10 +11,13 @@ import json
 import logging
 from pathlib import Path
 import re
+import secrets
+import time
 import sqlite3
 from typing import Any, Callable
 
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.error import BadRequest
 
 from v3_core.publishing.channel_contract import (
     assert_channel_identity,
@@ -153,6 +156,69 @@ class V3AppointmentChannelSynchronizer:
         conn.execute("PRAGMA busy_timeout=30000")
         return conn
 
+    def _queue_retry(self, listing_id: str, error: str) -> None:
+        """Persist an appointment-origin retry in the Publisher's existing outbox.
+
+        Publisher's periodic sync re-reads *current* inventory_status, verifies
+        the frozen message identity, and edits the bound post idempotently.
+        Never persist a Telegram caption, a stale status, or a send operation.
+        """
+        with self._connect() as conn:
+            self._queue_retry_in_transaction(conn, listing_id, error)
+            conn.commit()
+
+    @staticmethod
+    def _queue_retry_in_transaction(conn: sqlite3.Connection, listing_id: str, error: str) -> None:
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS publisher_status_sync_outbox_v3 (
+                listing_id TEXT PRIMARY KEY,
+                revision INTEGER NOT NULL DEFAULT 1,
+                attempts INTEGER NOT NULL DEFAULT 0,
+                next_attempt REAL NOT NULL DEFAULT 0,
+                last_error TEXT NOT NULL DEFAULT ''
+            )"""
+        )
+        conn.execute(
+            """INSERT INTO publisher_status_sync_outbox_v3
+                   (listing_id,revision,attempts,next_attempt,last_error)
+               VALUES (?,1,0,0,?)
+               ON CONFLICT(listing_id) DO UPDATE SET
+                   revision=revision+1,attempts=0,next_attempt=0,
+                   last_error=excluded.last_error""",
+            (str(listing_id), str(error or "channel_sync_failed")[:240]),
+        )
+
+    def _begin_edit(self, listing_id: str) -> tuple[str, int]:
+        """Keep a durable intent until bounded Telegram I/O has completed."""
+        operation_id = secrets.token_hex(16)
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            self._queue_retry_in_transaction(conn, listing_id, "channel_edit_in_flight")
+            conn.execute(
+                """CREATE TABLE IF NOT EXISTS channel_status_edits_inflight_v3 (
+                    operation_id TEXT PRIMARY KEY, listing_id TEXT NOT NULL,
+                    expires_at REAL NOT NULL
+                )"""
+            )
+            conn.execute(
+                "INSERT INTO channel_status_edits_inflight_v3 VALUES (?,?,?)",
+                (operation_id, listing_id, time.time() + 300),
+            )
+            revision = int(conn.execute(
+                "SELECT revision FROM publisher_status_sync_outbox_v3 WHERE listing_id=?",
+                (listing_id,),
+            ).fetchone()[0])
+            conn.commit()
+        return operation_id, revision
+
+    def _failed(self, listing_id: str, error: str, *, attempted: bool) -> ChannelStatusSyncResult:
+        try:
+            self._queue_retry(listing_id, error)
+        except Exception:
+            logger.exception("V3 appointment channel sync retry could not be persisted: %s", listing_id)
+            error = f"{error};retry_queue_failed"
+        return ChannelStatusSyncResult(listing_id, attempted=attempted, synced=False, error=error)
+
     def _snapshot(self, listing_id: str) -> tuple[dict[str, Any] | None, int]:
         statuses = tuple(sorted(ACTIVE_APPOINTMENT_STATUSES))
         placeholders = ",".join("?" for _ in statuses)
@@ -184,11 +250,11 @@ class V3AppointmentChannelSynchronizer:
         if not clean:
             return ChannelStatusSyncResult(clean, attempted=False, synced=False, error="listing_id_required")
         if not self.publisher_bot_token or not self.user_bot_username or not self.advisor_url:
-            return ChannelStatusSyncResult(clean, attempted=False, synced=False, error="channel_sync_not_configured")
+            return self._failed(clean, "channel_sync_not_configured", attempted=False)
         try:
             row, active_count = self._snapshot(clean)
             if row is None:
-                return ChannelStatusSyncResult(clean, attempted=False, synced=False, error="published_instance_not_found")
+                return self._failed(clean, "published_instance_not_found", attempted=False)
             previous = str(row.get("inventory_status") or "").strip().lower()
             snapshot = json.loads(str(row.get("snapshot_json") or "{}"))
             public_id = str(snapshot.get("public_listing_id") or "").strip()
@@ -228,24 +294,69 @@ class V3AppointmentChannelSynchronizer:
                 area=str(row.get("public_location_key") or ""),
             )
             bot = self.bot_factory(self.publisher_bot_token)
-            await bot.edit_message_caption(
-                chat_id=chat_id,
-                message_id=message_id,
-                caption=caption,
-                parse_mode="HTML",
-                reply_markup=keyboard,
-            )
+            operation_id, sent_revision = self._begin_edit(clean)
+            try:
+                await bot.edit_message_caption(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    caption=caption,
+                    parse_mode="HTML",
+                    reply_markup=keyboard,
+                    connect_timeout=10, pool_timeout=10,
+                    read_timeout=30, write_timeout=30,
+                )
+            except BadRequest as exc:
+                if "message is not modified" not in str(exc).lower():
+                    raise
+                # Telegram confirms the remote post already has this projection.
+                # Do not enqueue a retry or raise an appointment alert.
+
             with self._connect() as conn:
                 conn.execute("BEGIN IMMEDIATE")
-                conn.execute(
-                    "UPDATE publication_instances SET post_text=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
-                    (caption, int(row["publication_row_id"])),
+                current = conn.execute(
+                    "SELECT inventory_status FROM listings_v3 WHERE listing_id=?", (clean,)
+                ).fetchone()
+                latest = conn.execute(
+                    """SELECT id FROM publication_instances
+                       WHERE listing_id=? AND platform='telegram' AND publish_status='published'
+                         AND CAST(COALESCE(channel_message_id,'0') AS INTEGER)>0
+                       ORDER BY updated_at DESC,id DESC LIMIT 1""", (clean,)
+                ).fetchone()
+                same_post = latest is not None and int(latest[0]) == int(row["publication_row_id"])
+                projection_changed = (
+                    current is None or str(current[0] or "").strip().lower() != target or not same_post
                 )
+                conn.execute(
+                    "DELETE FROM channel_status_edits_inflight_v3 WHERE operation_id=?", (operation_id,)
+                )
+                # An edit can finish after another process has sent newer state
+                # and acknowledged its outbox revision. Recreate a durable job
+                # atomically with this receipt, even if that job was deleted.
+                if projection_changed:
+                    self._queue_retry_in_transaction(conn, clean, "channel_projection_changed_during_edit")
+                else:
+                    conn.execute(
+                        """DELETE FROM publisher_status_sync_outbox_v3
+                           WHERE listing_id=? AND revision=? AND NOT EXISTS (
+                               SELECT 1 FROM channel_status_edits_inflight_v3
+                               WHERE listing_id=? AND expires_at>?
+                           )""", (clean, sent_revision, clean, time.time()),
+                    )
+                if same_post:
+                    conn.execute(
+                        "UPDATE publication_instances SET post_text=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                        (caption, int(row["publication_row_id"])),
+                    )
+                else:
+                    # Do not promote an older publication by touching updated_at.
+                    conn.execute("UPDATE publication_instances SET post_text=? WHERE id=?",
+                                 (caption, int(row["publication_row_id"])))
                 conn.commit()
             return ChannelStatusSyncResult(
                 clean,
                 attempted=True,
-                synced=True,
+                synced=not projection_changed,
+                error="channel_projection_changed_during_edit" if projection_changed else "",
                 previous_status=previous,
                 next_status=target,
                 active_appointment_count=active_count,
@@ -254,7 +365,10 @@ class V3AppointmentChannelSynchronizer:
             )
         except Exception as exc:
             logger.exception("V3 channel appointment status sync failed: listing_id=%s", clean)
-            return ChannelStatusSyncResult(clean, attempted=True, synced=False, error=str(exc))
+            # Keep ambiguous I/O intents until their bounded lease expires;
+            # the Publisher keeps correcting current state throughout that window.
+            return self._failed(clean, str(exc), attempted=True)
+
 
 
 __all__ = [

@@ -120,6 +120,9 @@ def test_aftercare_and_public_resident_buttons_stay_frozen():
 
 def test_search_card_order_and_public_identity(monkeypatch):
     class D:
+        # Match the current public detail contract; product/UI assertions below
+        # remain unchanged.
+        deposit_terms = ""
         public_listing_id = "QL-RF-A2B3"; project_name = "富力城"; location = "富力城"; layout = "2房"; property_type = "公寓"; monthly_rent_usd = 800; size_sqm = None; floor = ""; status_icon = "🟢"; status_label = "可预约"; bookable = True
     class V:
         public_listing_id = "QL-RF-A2B3"; package = {}

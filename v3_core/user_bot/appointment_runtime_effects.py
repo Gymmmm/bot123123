@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from html import escape
+import logging
 from typing import Any
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from .admin_notification_plans import appointment_notification
-from .admin_notifications import AdminNotificationResult, TelegramAdminNotifier
+from .admin_notifications import AdminNotification, AdminNotificationResult, TelegramAdminNotifier
 from .appointment_availability import (
     AppointmentAvailabilityResult,
     AppointmentAvailabilityService,
@@ -18,6 +20,8 @@ from .lead_service import LeadUser
 from .public_appointment import PublicAppointmentDraft
 from .public_inventory import PublicInventoryReader
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
 class AppointmentRuntimeEffectResult:
@@ -25,6 +29,7 @@ class AppointmentRuntimeEffectResult:
     channel: ChannelStatusSyncResult | None
     admin: AdminNotificationResult | None
     availability_error: str = ""
+    channel_alert: AdminNotificationResult | None = None
 
 
 def _admin_appointment_keyboard(appointment_id: int, user_id: int) -> InlineKeyboardMarkup:
@@ -110,11 +115,34 @@ class AppointmentRuntimeEffectExecutor:
                 ),
             )
 
+        # The ordinary appointment notification is not evidence of a channel
+        # update. Surface channel failures independently, using the existing
+        # durable admin notification outbox for transient send failures.
+        channel_alert = None
+        if channel_result is not None and not channel_result.synced:
+            queued = "retry_queue_failed" not in str(channel_result.error or "")
+            try:
+                channel_alert = await self.admins.send(
+                    bot,
+                    AdminNotification(
+                        title="频道房态同步异常",
+                        lines=(
+                            f"房源：{escape(str(execution.public_listing_id))}",
+                            "预约数据已经保存，但频道状态未确认同步。",
+                            "已持久化等待按最新房态重试。" if queued else "重试待办保存失败，需要人工检查。",
+                            "请勿重新发送房源帖；只核对原频道消息。",
+                        ),
+                    ),
+                )
+            except Exception:
+                logger.exception("Unable to notify admins about channel sync failure")
+
         return AppointmentRuntimeEffectResult(
             availability=availability_result,
             channel=channel_result,
             admin=admin_result,
             availability_error=availability_error,
+            channel_alert=channel_alert,
         )
 
 

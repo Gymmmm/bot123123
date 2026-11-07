@@ -133,7 +133,7 @@ async def test_date_choice_renders_time_then_advances_public_session():
     assert outcome.handled and outcome.result is not None
     assert outcome.result.next_step == "appointment_time"
     assert [call[0] for call in query.calls] == ["answer", "edit_caption"]
-    assert user_data[APPOINTMENT_SESSION_KEY]["date"] == "09-10"
+    assert user_data[APPOINTMENT_SESSION_KEY]["date"] == "2026-09-10"
     assert "LST_" not in repr(user_data)
     markup = query.calls[-1][2]["reply_markup"]
     assert markup.inline_keyboard[0][0].callback_data == "v3u:t:appointment_time:pm"

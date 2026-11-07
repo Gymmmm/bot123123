@@ -12,6 +12,8 @@ from html import escape
 import hashlib
 from pathlib import Path
 import sqlite3
+import secrets
+import time
 from typing import Any
 import uuid
 
@@ -506,9 +508,10 @@ class SimplePublisherAdminController:
                 actions.append(
                     [InlineKeyboardButton("补充或修改资料", callback_data=f"v3edit|{review_id}")]
                 )
-            if reason_code in {"unreadable_media", "insufficient_media"}:
+            if reason_code in {"unreadable_media", "insufficient_media", "villa_exterior_review_required"}:
+                label = "补充别墅外观图" if reason_code == "villa_exterior_review_required" else "补充图片"
                 actions.append(
-                    [InlineKeyboardButton("补充图片", callback_data=f"v3smp|addmedia|{offer_id}")]
+                    [InlineKeyboardButton(label, callback_data=f"v3smp|addmedia|{offer_id}")]
                 )
         if reason_code != "sale_store_only":
             actions.append([InlineKeyboardButton("标记忽略", callback_data=f"v3smp|ignore|{offer_id}|{return_to}")])
@@ -820,6 +823,92 @@ class SimplePublisherAdminController:
             return True
         return False
 
+    def _status_token_db(self, conn: sqlite3.Connection) -> None:
+        """Durable revision survives status round-trips, including same-second updates."""
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS publisher_status_revisions_v3 (
+                listing_id TEXT PRIMARY KEY, revision INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE TRIGGER IF NOT EXISTS publisher_status_revision_change_v3
+            AFTER UPDATE OF inventory_status ON listings_v3
+            WHEN OLD.inventory_status IS NOT NEW.inventory_status
+            BEGIN
+                INSERT INTO publisher_status_revisions_v3(listing_id,revision)
+                VALUES(NEW.listing_id,1)
+                ON CONFLICT(listing_id) DO UPDATE SET revision=revision+1;
+            END;
+            CREATE TABLE IF NOT EXISTS publisher_status_confirmations_v3 (
+                token TEXT PRIMARY KEY, admin_id TEXT NOT NULL,
+                listing_id TEXT NOT NULL, target TEXT NOT NULL,
+                expected TEXT NOT NULL, revision INTEGER NOT NULL,
+                expires_at REAL NOT NULL, consumed INTEGER NOT NULL DEFAULT 0
+            );
+        """)
+
+    def revoke_status_confirmations(self, admin_id: str) -> None:
+        """Cancel this operator's pending confirmations without creating schema."""
+        with sqlite3.connect(self.db_path, timeout=30) as conn:
+            exists = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='publisher_status_confirmations_v3'"
+            ).fetchone()
+            if exists:
+                conn.execute(
+                    "UPDATE publisher_status_confirmations_v3 SET consumed=1 WHERE admin_id=? AND consumed=0",
+                    (str(admin_id),),
+                )
+
+    def _issue_status_token(self, admin_id: str, listing_id: str, target: str, expected: str) -> str:
+        token = secrets.token_urlsafe(18)
+        with sqlite3.connect(self.db_path, timeout=30) as conn:
+            self._status_token_db(conn)
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute(
+                "UPDATE publisher_status_confirmations_v3 SET consumed=1 WHERE admin_id=? AND consumed=0",
+                (str(admin_id),),
+            )
+            revision_row = conn.execute(
+                "SELECT revision FROM publisher_status_revisions_v3 WHERE listing_id=?",
+                (listing_id,),
+            ).fetchone()
+            revision = int(revision_row[0]) if revision_row else 0
+            conn.execute(
+                """INSERT INTO publisher_status_confirmations_v3
+                   (token,admin_id,listing_id,target,expected,revision,expires_at)
+                   VALUES (?,?,?,?,?,?,?)""",
+                (token, str(admin_id), listing_id, target, expected, revision, time.time()+300),
+            )
+            conn.commit()
+        return token
+
+    def _apply_confirmed_status(self, token: str, admin_id: str) -> bool:
+        """Consume once and compare durable status revision in the same write transaction."""
+        with sqlite3.connect(self.db_path, timeout=30) as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute(
+                """SELECT admin_id,listing_id,target,expected,revision,expires_at
+                   FROM publisher_status_confirmations_v3
+                   WHERE token=? AND consumed=0""", (token,),
+            ).fetchone()
+            if not row or str(row[0]) != str(admin_id) or row[5] <= time.time():
+                return False
+            listing_id, target, expected, revision = row[1], row[2], row[3], int(row[4])
+            current = conn.execute(
+                """SELECT l.inventory_status,COALESCE(r.revision,0)
+                   FROM listings_v3 l LEFT JOIN publisher_status_revisions_v3 r
+                     ON r.listing_id=l.listing_id WHERE l.listing_id=?""",
+                (listing_id,),
+            ).fetchone()
+            conn.execute("UPDATE publisher_status_confirmations_v3 SET consumed=1 WHERE token=?", (token,))
+            if not current or current[0] != expected or int(current[1]) != revision:
+                conn.commit()
+                return False
+            cur = conn.execute(
+                "UPDATE listings_v3 SET inventory_status=?,updated_at=CURRENT_TIMESTAMP WHERE listing_id=? AND inventory_status=?",
+                (target, listing_id, expected),
+            )
+            conn.commit()
+            return cur.rowcount == 1
+
     async def handle_callback(self, update: Any, context: Any) -> bool:
         query = update.callback_query
         if query is None:
@@ -829,6 +918,10 @@ class SimplePublisherAdminController:
             return False
         parts = raw.split("|")
         action = parts[1] if len(parts) > 1 else ""
+        if action != "status_apply":
+            admin_id = str(getattr(getattr(update, "effective_user", None), "id", ""))
+            if admin_id:
+                self.revoke_status_confirmations(admin_id)
         if action == "new":
             await self.start_new_listing(query.message, context)
         elif action == "runtime":
@@ -894,28 +987,40 @@ class SimplePublisherAdminController:
             await self._reply_recheck_result(query.message, result)
         elif action == "status" and len(parts) == 4:
             status, listing_id = parts[2], parts[3]
-            if status in {"rented", "offline"}:
-                label = "已租出" if status == "rented" else "已下架"
-                await query.message.reply_text(
-                    f"确认将这套房设为「{label}」？\n保存后会同步频道房态，客户将无法继续预约。",
-                    reply_markup=InlineKeyboardMarkup([
-                        [InlineKeyboardButton(f"✅ 确认{label}", callback_data=f"v3smp|status_apply|{status}|{listing_id}")],
-                        [InlineKeyboardButton("⬅️ 返回房源", callback_data=f"v3smp|listing|{listing_id}")],
-                    ]),
-                )
-                return True
-            self.repository.set_listing_status(listing_id, status)
+            labels = {"active": "可预约", "reserved": "已有预约", "rented": "已租出",
+                      "inactive": "停止发布", "offline": "已下架"}
+            if status not in labels:
+                raise ValueError("unsupported listing status")
             row = self._listing_detail(listing_id)
-            # Inventory recovery is a status change, not a new publication.
-            # The publisher app synchronizes the existing Telegram post after
-            # this callback; never requeue an already-published offer here.
-            await self.show_listing(query.message, listing_id)
-        elif action == "status_apply" and len(parts) == 4:
-            status, listing_id = parts[2], parts[3]
-            if status not in {"rented", "offline"}:
-                raise ValueError("invalid_status_confirmation")
-            self.repository.set_listing_status(listing_id, status)
-            await self.show_listing(query.message, listing_id)
+            expected = str(row.get("inventory_status") or "").strip().lower()
+            if not expected:
+                await query.message.reply_text("房态无法核实，本次不修改。")
+                return True
+            token = self._issue_status_token(str(update.effective_user.id), listing_id, status, expected)
+            await query.message.reply_text(
+                f"请确认房源 {escape(str(row.get('public_listing_id') or listing_id))}：\\n"
+                f"当前状态：{escape(expected)}\\n"
+                f"修改为：{escape(labels[status])}\\n\\n"
+                "提交前会重新检查房态，变化后自动跳过；只同步原频道帖，不重新发帖。",
+                parse_mode=ParseMode.HTML,
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton(
+                        f"✅ 确认设为{labels[status]}",
+                        callback_data=f"v3smp|status_apply|{token}",
+                    )],
+                    [InlineKeyboardButton("取消，返回房源", callback_data=f"v3smp|listing|{listing_id}")],
+                ]),
+            )
+            return True
+        elif action == "status_apply" and len(parts) == 3:
+            if not self._apply_confirmed_status(parts[2], str(update.effective_user.id)):
+                await query.message.reply_text("确认已失效或房态版本已变化，请重新核对房源。")
+                return False
+            await query.message.reply_text("✅ 房态已更新。")
+            return True
+        elif action == "status_apply":
+            await query.message.reply_text("旧确认按钮已失效，请重新打开房源。")
+            return False
         elif action == "windows":
             await self.show_windows(query.message)
         elif action == "window_add":

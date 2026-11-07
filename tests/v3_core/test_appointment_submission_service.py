@@ -120,7 +120,7 @@ def test_exact_unfinished_duplicate_is_reused_without_new_lead_or_insert():
         "user_id": 123,
         "listing_id": "LST_1",
         "viewing_mode": "offline",
-        "appointment_date": "09-05",
+        "appointment_date": "2026-09-05",
         "appointment_time": "pm",
         "status": "pending",
     }
@@ -178,7 +178,7 @@ def test_edit_updates_only_own_nonterminal_same_listing_and_resets_pending():
     assert result.lead_action == "appointment_time_update"
     assert result.lead_source == "appointment_edit"
     assert repo.rows[4]["status"] == "pending"
-    assert repo.rows[4]["appointment_date"] == "09-05"
+    assert repo.rows[4]["appointment_date"] == "2026-09-05"
     assert repo.rows[4]["appointment_time"] == "pm"
 
 
@@ -229,3 +229,13 @@ def test_incomplete_or_general_request_is_blocked_before_repository_write():
         )
 
     assert repo.created == []
+
+
+@pytest.fixture(autouse=True)
+def fixed_confirmation_clock(monkeypatch):
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    from v3_core.user_bot import appointment_dates, appointment_service
+    clock = lambda: datetime(2026, 9, 2, 12, tzinfo=ZoneInfo("Asia/Phnom_Penh"))
+    monkeypatch.setattr(appointment_dates, "local_now", clock)
+    monkeypatch.setattr(appointment_service, "local_now", clock)

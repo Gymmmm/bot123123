@@ -55,7 +55,7 @@ def test_date_and_time_steps_are_light_and_supported():
         "⬅️ 返回上一步",
     ]
     assert date_view.rows[0][0].kind == "appointment_quick_slot"
-    assert date_view.rows[0][0].value == "09-19_pm"
+    assert date_view.rows[0][0].value == "2026-09-19_pm"
     timed=draft.with_date("09-19")
     time_view=service.appointment_time(timed)
     assert "富力城｜2房1厅" in time_view.text

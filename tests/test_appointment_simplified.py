@@ -128,6 +128,10 @@ class SimplifiedAppointmentTests(unittest.IsolatedAsyncioTestCase):
             patch.object(user_bot, "_notify_admins", new=AsyncMock()),
             patch("qiaolian_dual.listing.listing_is_available", return_value=(True, "active")),
             patch("qiaolian_dual.channel_status_sync.sync_channel_listing_status", new=AsyncMock()),
+            # Submit now checks the public-inventory adapter too. Supply its
+            # offline fixture rather than relying on an unrelated local DB.
+            patch("qiaolian_dual.adapters.public_inventory.PublicInventoryAdapter.get_listing", return_value={"bookable": True, "internal_listing_id": "l_315"}),
+            patch.object(user_bot.db, "list_appointments", return_value=[]),
         ):
             state = await user_bot.appoint_flow_cb(update, context)
 
@@ -163,11 +167,15 @@ class SimplifiedAppointmentTests(unittest.IsolatedAsyncioTestCase):
             patch("qiaolian_dual.results_admin._notify_admins", new=AsyncMock()),
             patch("qiaolian_dual.listing.listing_is_available", return_value=(True, "active")),
             patch("qiaolian_dual.channel_status_sync.sync_channel_listing_status", new=AsyncMock()),
+            # Submit now checks the public-inventory adapter too. Supply its
+            # offline fixture rather than relying on an unrelated local DB.
+            patch("qiaolian_dual.adapters.public_inventory.PublicInventoryAdapter.get_listing", return_value={"bookable": True, "internal_listing_id": "l_315"}),
+            patch.object(user_bot.db, "list_appointments", return_value=[]),
         ):
             state = await user_bot.handle_appointment_text(update, context)
 
         self.assertEqual(state, user_bot.MAIN)
-        self.assertEqual(create_appt.call_args.args[0]["appointment_time"], "晚上8点")
+        self.assertEqual(create_appt.call_args.args[0]["appointment_time"], "20:00")
         text = message.reply_text.await_args.args[0]
         self.assertIn("预约申请已提交", text)
         self.assertNotIn("确认看房预约", text)
@@ -202,6 +210,10 @@ class SimplifiedAppointmentTests(unittest.IsolatedAsyncioTestCase):
             patch.object(user_bot, "_notify_admins", new=AsyncMock()) as notify,
             patch("qiaolian_dual.listing.listing_is_available", return_value=(True, "active")),
             patch("qiaolian_dual.channel_status_sync.sync_channel_listing_status", new=AsyncMock()),
+            # Submit now checks the public-inventory adapter too. Supply its
+            # offline fixture rather than relying on an unrelated local DB.
+            patch("qiaolian_dual.adapters.public_inventory.PublicInventoryAdapter.get_listing", return_value={"bookable": True, "internal_listing_id": "l_315"}),
+            patch.object(user_bot.db, "list_appointments", return_value=[]),
         ):
             state = await user_bot.appoint_flow_cb(update, context)
 
@@ -209,7 +221,7 @@ class SimplifiedAppointmentTests(unittest.IsolatedAsyncioTestCase):
         saved = create_appt.call_args.args[0]
         self.assertEqual(saved["listing_id"], "l_315")
         self.assertEqual(saved["viewing_mode"], "offline")
-        self.assertEqual(saved["appointment_date"], "08-12")
+        self.assertEqual(saved["appointment_date"], "2026-08-12")
         self.assertEqual(saved["appointment_time"], "pm")
         self.assertEqual(saved["status"], "pending")
         self.assertEqual(saved["note"], "")

@@ -85,3 +85,10 @@ def test_contact_view_prefills_last_search_summary_into_advisor_url():
 def test_home_shows_appointment_shortcut_for_users_with_upcoming_appointments():
     view = build_home_view(channel_url="https://t.me/test", show_appointments=True)
     assert any(choice.kind == "appointments" for row in view.rows for choice in row)
+
+
+def test_default_home_hides_only_the_empty_appointment_shortcut():
+    default = build_home_view(channel_url="https://t.me/test")
+    explicit = build_home_view(channel_url="https://t.me/test", show_appointments=True)
+    assert [c.kind for r in default.rows for c in r] == ["search", "root", "contact", "service"]
+    assert [c.kind for r in explicit.rows for c in r] == ["search", "root", "contact", "appointments", "service"]

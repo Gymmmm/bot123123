@@ -295,16 +295,27 @@ class OperatorPublisherAdminController(ProductionSimplePublisherAdminController)
         state = context.user_data.get(NEW_LISTING_STATE_KEY)
         if not isinstance(state, dict):
             return
+        # The production repair entry point stores the original channel identity.
+        # This is the effective materializer in the final controller MRO: do not
+        # turn that repair into a second admin_manual source/listing.
+        identity = state.get("repair_source_identity")
+        repair = identity if isinstance(identity, dict) else None
+        meta = dict(repair.get("meta") or {}) if repair else {}
+        meta.update({
+            "origin": "publisher_admin_repair" if repair else "publisher_admin",
+            "telegram_user_id": int(user_id),
+        })
         source = SourceIntake(
-            source_type="admin_manual",
-            source_name="publisher_admin",
-            source_post_id=str(state["session_id"]),
-            source_url="",
-            source_author=str(user_id),
+            source_id=(str(repair["source_id"]) if repair and repair.get("source_id") not in (None, "") else None),
+            source_type=str(repair.get("source_type") or "telegram_channel") if repair else "admin_manual",
+            source_name=str(repair.get("source_name") or "") if repair else "publisher_admin",
+            source_post_id=str(repair.get("source_post_id") or "") if repair else str(state["session_id"]),
+            source_url=str(repair.get("source_url") or "") if repair else "",
+            source_author=str(repair.get("source_author") or "channel") if repair else str(user_id),
             raw_text=str(state.get("text") or ""),
             raw_images=list(state.get("images") or []),
             raw_videos=list(state.get("videos") or []),
-            meta={"origin": "publisher_admin", "telegram_user_id": int(user_id)},
+            meta=meta,
         )
         result = await asyncio.to_thread(self.intake.persist, source)
         state["source_post_pk"] = result.source_post_pk

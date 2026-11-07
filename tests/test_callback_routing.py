@@ -398,8 +398,10 @@ class CallbackRoutingTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_find_show_more_empty_set_has_recovery_actions(self):
         query = _Query("find:show_more")
+        reply = AsyncMock()
         update = SimpleNamespace(
             callback_query=query,
+            effective_message=SimpleNamespace(reply_text=reply),
             effective_user=SimpleNamespace(id=1),
             effective_chat=SimpleNamespace(id=100),
         )
@@ -407,8 +409,11 @@ class CallbackRoutingTests(unittest.IsolatedAsyncioTestCase):
         context = SimpleNamespace(user_data={"find_more_listing_ids": []}, bot=bot)
         result = await handle_listing_callback(update, context, query, "find:show_more", update.effective_user)
         self.assertEqual(MAIN, result)
-        self.assertEqual(1, len(bot.messages))
-        self.assertIn("已经看完", bot.messages[0][1])
+        reply.assert_awaited_once()
+        self.assertIn("暂时没有可以安排看房的房源", reply.await_args.args[0])
+        callbacks = [b.callback_data for row in reply.await_args.kwargs["reply_markup"].inline_keyboard for b in row]
+        self.assertIn("findmode:guided", callbacks)
+        self.assertIn("home", callbacks)
 
     async def test_unknown_callback_returns_an_actionable_message(self):
         query = _Query("removed:old_button")

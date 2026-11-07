@@ -42,12 +42,19 @@ def test_active_binding_wins_when_historical_binding_also_exists(tmp_path):
     assert binding.property_name == "当前住房"
 
 
-def test_repair_submission_reuses_same_request_token_and_keeps_binding(tmp_path):
+@pytest.mark.parametrize("issue_key,issue_label", [
+    ("repair_ac", "空调"), ("repair_water", "热水器 / 漏水排水"),
+    ("repair_power", "灯具 / 电路"), ("repair_door", "门锁 / 门禁"),
+    ("repair_washer", "洗衣机"), ("repair_fridge", "冰箱"),
+    ("repair_network", "网络"), ("repair_furniture", "家具损坏"),
+    ("repair_other", "其他维修问题"),
+])
+def test_repair_submission_reuses_same_request_token_and_keeps_binding(tmp_path, issue_key, issue_label):
     db = tmp_path / "v3.db"
     initialize_v3_storage(db)
     _insert_binding(db)
     service = TenantService(SQLiteTenantServiceRepository(db), now=lambda: "2026-09-09 03:14:00")
-    draft = service.begin_request("repair_ac", request_token="req-abc")
+    draft = service.begin_request(issue_key, request_token="req-abc")
     draft = service.with_detail(draft, "空调可以启动，但一直不制冷。")
     first = service.submit_repair(user_id=123, draft=draft, slot="tomorrow_am")
     second = service.submit_repair(user_id=123, draft=draft, slot="tomorrow_am")
@@ -56,8 +63,8 @@ def test_repair_submission_reuses_same_request_token_and_keeps_binding(tmp_path)
     assert second.ticket.id == first.ticket.id
     assert first.ticket.property_name == "富力城 A3-1208"
     assert first.ticket.binding_id is not None
-    assert first.ticket.issue_key == "repair_ac"
-    assert first.ticket.issue_type == "空调"
+    assert first.ticket.issue_key == issue_key
+    assert first.ticket.issue_type == issue_label
     assert first.ticket.time_slot == "tomorrow_am"
     assert "明天上午" in first.ticket.description
     with sqlite3.connect(str(db)) as conn:

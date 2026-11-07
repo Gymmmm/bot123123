@@ -11,7 +11,7 @@ def _labels(view):
 
 
 def test_home_matches_final_service_surface():
-    view = build_home_view(channel_url="https://t.me/example")
+    view = build_home_view(channel_url="https://t.me/example", show_appointments=True)
     assert _labels(view) == ["🔍 开始找房", "📢 最新房源", "💬 中文顾问", "📋 我的预约", "🛎️ 侨联服务"]
     assert "金边中文选房" in view.text
 
@@ -37,8 +37,8 @@ def test_service_hubs_match_final_layouts():
     assert _labels(service_home_view()) == ["🎥 视频带看", "🛡️ 看房与交接", "🤝 租后服务", "📋 我的租约", "💬 中文顾问", "⬅️ 返回首页"]
     from v3_core.user_bot.service_views import aftercare_home_view
     assert _labels(aftercare_home_view()) == [
-        "🔧 房屋报修", "🏢 物业协调",
-        "💡 账单协助", "❓ 其他住房问题", "⬅️ 返回侨联服务",
+        "🔧 维修问题", "🏢 物业问题",
+        "💡 账单问题", "❓ 其他问题", "⬅️ 返回侨联服务",
     ]
 
 

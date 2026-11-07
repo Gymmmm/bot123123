@@ -8,10 +8,11 @@ successful result.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Literal, Protocol
 
 from .appointments import AppointmentDraft, duplicate_identity, editable_status
+from .appointment_dates import booking_date, booking_time, local_now, local_datetime
 
 
 class AppointmentRepository(Protocol):
@@ -99,6 +100,10 @@ class AppointmentSubmissionService:
         if not self.bookability.is_bookable(listing_id):
             raise ValueError("listing_not_bookable")
 
+        confirmed_at = local_datetime(created_at) if created_at else local_now()
+        if confirmed_at is None:
+            raise ValueError("appointment_confirmation_time_invalid")
+        draft = replace(draft, date=booking_date(draft.date, now=confirmed_at), time=booking_time(draft.time))
         edit_id = int(edit_appointment_id or 0)
         if edit_id:
             existing = self.repository.get_for_user(edit_id, int(user.user_id))

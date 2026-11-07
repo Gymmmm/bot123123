@@ -252,3 +252,131 @@ async def test_status_sync_blocks_frozen_identity_mismatch_before_telegram_edit(
     assert not result.synced
     assert "channel_" in result.error
     assert fake.calls == []
+
+
+@pytest.mark.asyncio
+async def test_failed_appointment_channel_edit_queues_durable_latest_status_retry(tmp_path):
+    from types import SimpleNamespace
+    from v3_core.publishing.manual_status_sync import PublisherManualStatusSynchronizer
+
+    db_path = tmp_path / "retry.sqlite3"
+    _seed(db_path, appointment_count=1, inventory_status="reserved")
+
+    class NetworkFailure:
+        async def edit_message_caption(self, **kwargs):
+            raise RuntimeError("test_network_unavailable")
+
+    sync = V3AppointmentChannelSynchronizer(
+        db_path,
+        publisher_bot_token="fake-token",
+        user_bot_username="qiaolian_rent_bot",
+        advisor_url="https://t.me/qiaolian_advisor",
+        bot_factory=lambda _: NetworkFailure(),
+    )
+    result = await sync.sync("l_1")
+    assert not result.synced
+    assert "test_network_unavailable" in result.error
+    with sqlite3.connect(db_path) as conn:
+        queued = conn.execute(
+            "SELECT listing_id,revision,attempts FROM publisher_status_sync_outbox_v3 WHERE listing_id='l_1'"
+        ).fetchone()
+    assert queued is not None
+    assert queued[0] == "l_1"
+    assert queued[2] == 0
+
+    # A status change after the failed attempt must win over all stale state.
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("UPDATE listings_v3 SET inventory_status='rented' WHERE listing_id='l_1'")
+        conn.commit()
+
+    # An ambiguous failed edit retains its lease until the network window closes.
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("UPDATE channel_status_edits_inflight_v3 SET expires_at=0")
+    fake = FakeBot()
+    publisher = PublisherManualStatusSynchronizer(
+        db_path, user_bot_username="qiaolian_rent_bot",
+        advisor_url="https://t.me/qiaolian_advisor",
+    )
+    await publisher.scheduled_tick(SimpleNamespace(bot=fake))
+    assert {call["message_id"] for call in fake.calls} == {222}
+    assert all("已租出" in call["caption"] for call in fake.calls)
+    with sqlite3.connect(db_path) as conn:
+        old_post = conn.execute("SELECT post_text FROM publication_instances WHERE instance_id='PUB_OLD'").fetchone()[0]
+    assert "已有预约" in old_post
+    with sqlite3.connect(db_path) as conn:
+        remaining = conn.execute(
+            "SELECT COUNT(*) FROM publisher_status_sync_outbox_v3 WHERE listing_id='l_1'"
+        ).fetchone()[0]
+    assert remaining == 0
+
+
+@pytest.mark.asyncio
+async def test_retry_queue_deduplicates_failed_edits_by_listing(tmp_path):
+    db_path = tmp_path / "dedupe.sqlite3"
+    _seed(db_path, appointment_count=0, inventory_status="active")
+
+    class NetworkFailure:
+        async def edit_message_caption(self, **kwargs):
+            raise RuntimeError("temporary-network-failure")
+
+    sync = V3AppointmentChannelSynchronizer(
+        db_path,
+        publisher_bot_token="fake-token",
+        user_bot_username="qiaolian_rent_bot",
+        advisor_url="https://t.me/qiaolian_advisor",
+        bot_factory=lambda _: NetworkFailure(),
+    )
+    assert not (await sync.sync("l_1")).synced
+    assert not (await sync.sync("l_1")).synced
+    with sqlite3.connect(db_path) as conn:
+        rows = conn.execute(
+            "SELECT revision FROM publisher_status_sync_outbox_v3 WHERE listing_id='l_1'"
+        ).fetchall()
+    assert len(rows) == 1
+    assert rows[0][0] == 4  # Each attempt persists an intent, then records its failure.
+
+
+@pytest.mark.asyncio
+async def test_unchanged_telegram_caption_is_success_without_retry(tmp_path):
+    from telegram.error import BadRequest
+    db_path = tmp_path / "unchanged.db"
+    _seed(db_path, appointment_count=0)
+    class UnchangedBot(FakeBot):
+        async def edit_message_caption(self, **kwargs):
+            self.calls.append(kwargs)
+            raise BadRequest("Message is not modified: specified new message content and reply markup are exactly the same")
+    bot = UnchangedBot()
+    sync = V3AppointmentChannelSynchronizer(
+        db_path, publisher_bot_token="publisher-token",
+        user_bot_username="qiaolian_rent_bot",
+        advisor_url="https://t.me/qiaolian_advisor",
+        bot_factory=lambda _: bot,
+    )
+    result = await sync.sync("l_1")
+    assert result.synced and result.attempted and not result.error
+    with sqlite3.connect(db_path) as conn:
+        assert conn.execute(
+            "SELECT COUNT(*) FROM publisher_status_sync_outbox_v3"
+        ).fetchone()[0] == 0
+
+
+@pytest.mark.asyncio
+async def test_network_timeout_still_uses_existing_retry_queue(tmp_path):
+    from telegram.error import TimedOut
+    db_path = tmp_path / "timeout.db"
+    _seed(db_path, appointment_count=0)
+    class TimeoutBot(FakeBot):
+        async def edit_message_caption(self, **kwargs):
+            raise TimedOut()
+    sync = V3AppointmentChannelSynchronizer(
+        db_path, publisher_bot_token="publisher-token",
+        user_bot_username="qiaolian_rent_bot",
+        advisor_url="https://t.me/qiaolian_advisor",
+        bot_factory=lambda _: TimeoutBot(),
+    )
+    result = await sync.sync("l_1")
+    assert not result.synced and result.attempted
+    with sqlite3.connect(db_path) as conn:
+        assert conn.execute(
+            "SELECT COUNT(*) FROM publisher_status_sync_outbox_v3 WHERE listing_id='l_1'"
+        ).fetchone()[0] == 1

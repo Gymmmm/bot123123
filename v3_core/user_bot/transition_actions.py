@@ -19,6 +19,8 @@ Fixed-SHA semantics preserved here:
 """
 from __future__ import annotations
 
+from .appointment_dates import booking_date
+
 from dataclasses import dataclass
 from typing import Any, Literal, Mapping
 
@@ -329,7 +331,7 @@ class TransitionActionService:
             if kind == "appointment_quick_slot":
                 date_value, time_value = callback.value.rsplit("_", 1)
                 try:
-                    updated = draft.with_date(date_value).with_time(time_value)
+                    updated = draft.with_date(booking_date(date_value)).with_time(time_value)
                 except ValueError:
                     return TransitionActionResult(
                         status="invalid",
@@ -349,7 +351,10 @@ class TransitionActionService:
                 )
 
             if kind == "appointment_date":
-                updated = draft.with_date(callback.value)
+                try:
+                    updated = draft.with_date(booking_date(callback.value))
+                except ValueError:
+                    return TransitionActionResult(status="invalid", reason="invalid_appointment_date")
                 return TransitionActionResult(
                     status="ok",
                     next_step="appointment_time",
