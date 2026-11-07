@@ -15,6 +15,7 @@ import sqlite3
 from typing import Any, Callable
 
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.error import BadRequest
 
 from v3_core.publishing.channel_contract import (
     assert_channel_identity,
@@ -264,13 +265,20 @@ class V3AppointmentChannelSynchronizer:
                 area=str(row.get("public_location_key") or ""),
             )
             bot = self.bot_factory(self.publisher_bot_token)
-            await bot.edit_message_caption(
-                chat_id=chat_id,
-                message_id=message_id,
-                caption=caption,
-                parse_mode="HTML",
-                reply_markup=keyboard,
-            )
+            try:
+                await bot.edit_message_caption(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    caption=caption,
+                    parse_mode="HTML",
+                    reply_markup=keyboard,
+                )
+            except BadRequest as exc:
+                if "message is not modified" not in str(exc).lower():
+                    raise
+                # Telegram confirms the remote post already has this projection.
+                # Do not enqueue a retry or raise an appointment alert.
+
             with self._connect() as conn:
                 conn.execute("BEGIN IMMEDIATE")
                 conn.execute(
