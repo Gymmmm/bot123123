@@ -148,7 +148,8 @@ def test_pending_batch_screen_has_one_tap_group_actions(tmp_path: Path):
     assert "✅ 这10套全部设为可预约" in labels
     assert "⚫ 这10套全部下架" in labels
     assert "🔎 单独处理本组" in labels
-    assert "v3smp|pbapply|active|0" in callbacks
+    assert "v3smp|pbconfirm|active|0" in callbacks
+    assert "v3smp|pbapply|active|0" not in callbacks
     assert "v3smp|pbat|1" in callbacks
 
 
