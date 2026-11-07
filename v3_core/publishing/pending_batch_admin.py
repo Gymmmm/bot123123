@@ -309,9 +309,9 @@ class PendingBatchOperatorPublisherAdminController(OperatorPublisherAdminControl
         }
         label = "可预约" if status == "active" else "已下架"
         await message.reply_text(
-            f"确认将以下 {len(listing_ids)} 套房源设为「{label}」？\n"
-            + "本次只处理这些房源，列表变化不会替换目标。\n\n"
-            + "\n".join(str(row.get("public_listing_id") or row["listing_id"]) for row in rows),
+            f"确认将以下 {len(listing_ids)} 套房源设为「{label}」？\\n"
+            + "本次只处理这些房源，列表变化不会替换目标。\\n\\n"
+            + "\\n".join(str(row.get("public_listing_id") or row["listing_id"]) for row in rows),
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton(f"✅ 确认处理这 {len(listing_ids)} 套", callback_data=f"v3smp|pbcommit|{token}")],
                 [InlineKeyboardButton("取消，返回本组", callback_data=f"v3smp|pbat|{page}")],
