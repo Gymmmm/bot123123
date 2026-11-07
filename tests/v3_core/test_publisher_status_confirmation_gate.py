@@ -95,3 +95,24 @@ def test_confirmed_status_updates_once_and_replay_is_safe(tmp_path):
     assert _status(path) == "active"
     assert not _callback(controller, message, callback)
     assert _status(path) == "active"
+
+
+def test_villa_exterior_exception_exposes_safe_add_photo_exit():
+    controller = object.__new__(SimplePublisherAdminController)
+    controller._exception_detail = lambda offer_id: {
+        "reason_code": "villa_exterior_review_required",
+        "reason_text": "缺少合格外立面",
+        "review_id": "review_1",
+        "public_listing_id": "QL-0009",
+    }
+    controller._listing_summary = lambda row: "测试别墅"
+    message = _Message()
+    asyncio.run(controller.show_exception(message, "offer_9"))
+    keyboard = message.calls[-1][1]["reply_markup"]
+    actions = {
+        btn.text: btn.callback_data
+        for row in keyboard.inline_keyboard
+        for btn in row if btn.callback_data
+    }
+    assert actions["补充别墅外观图"] == "v3smp|addmedia|offer_9"
+    assert "重新检查并发布" in actions
