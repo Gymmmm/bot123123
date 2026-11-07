@@ -33,7 +33,7 @@ def setup(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_status_change_is_durable_and_syncs_every_bound_post(tmp_path):
+async def test_status_change_is_durable_and_syncs_latest_bound_post(tmp_path):
     db, sync = setup(tmp_path)
     with sqlite3.connect(db) as conn:
         conn.execute("UPDATE listings_v3 SET inventory_status='rented'")
@@ -45,7 +45,7 @@ async def test_status_change_is_durable_and_syncs_every_bound_post(tmp_path):
     restarted = PublisherManualStatusSynchronizer(db, user_bot_username='test_bot')
     bot.edit_message_caption = AsyncMock()
     await restarted.scheduled_tick(SimpleNamespace(bot=bot))
-    assert [c.kwargs['message_id'] for c in bot.edit_message_caption.call_args_list] == [10, 11]
+    assert [c.kwargs['message_id'] for c in bot.edit_message_caption.call_args_list] == [11]
     assert all('房态确认中' in c.kwargs['caption'] for c in bot.edit_message_caption.call_args_list)
     with sqlite3.connect(db) as conn:
         assert conn.execute('SELECT count(*) FROM publisher_status_sync_outbox_v3').fetchone()[0] == 0
