@@ -18,6 +18,11 @@ on:
         description: '输入已通过门禁的完整 40 位生产 commit SHA'
         required: true
         type: string
+      hold_publisher:
+        description: '先保持发布服务停止；不改变三个自动发布开关或队列。false 会恢复正常自动发布'
+        required: true
+        default: true
+        type: boolean
 
 permissions:
   contents: read
@@ -54,11 +59,14 @@ jobs:
           EVENT_NAME: '${{ github.event_name }}'
           MANUAL_CONFIRM: '${{ inputs.confirm }}'
           MANUAL_SHA: '${{ inputs.deploy_sha }}'
+          MANUAL_HOLD: '${{ inputs.hold_publisher }}'
         run: |
           set -Eeuo pipefail
           if [ "$EVENT_NAME" = workflow_dispatch ]; then
             test "$MANUAL_CONFIRM" = DEPLOY || { echo 'DEPLOY_BLOCKED confirm_must_equal_DEPLOY'; exit 1; }
             REQUESTED_SHA="$MANUAL_SHA"
+            HOLD_PUBLISHER="$MANUAL_HOLD"
+            [[ "$HOLD_PUBLISHER" = true || "$HOLD_PUBLISHER" = false ]] || { echo 'DEPLOY_BLOCKED invalid_hold_publisher'; exit 1; }
           elif [ "$EVENT_NAME" = push ]; then
             test "$GITHUB_REF" = refs/heads/deploy-control || { echo 'DEPLOY_BLOCKED invalid_control_branch'; exit 1; }
             mapfile -t CHANGED_FILES < <(git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA")
@@ -88,6 +96,7 @@ jobs:
             )
             test "${REQUEST_FIELDS[0]}" = DEPLOY
             REQUESTED_SHA="${REQUEST_FIELDS[1]}"
+            HOLD_PUBLISHER=true
             echo "DEPLOY_CONTROL_REQUEST_ID=${REQUEST_FIELDS[2]}"
           else
             echo 'DEPLOY_BLOCKED unsupported_event'
@@ -95,6 +104,7 @@ jobs:
           fi
           [[ "$REQUESTED_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo 'DEPLOY_BLOCKED deploy_sha_must_be_full_40_hex_commit'; exit 1; }
           echo "DEPLOY_SHA=$REQUESTED_SHA" >> "$GITHUB_ENV"
+          echo "HOLD_PUBLISHER=$HOLD_PUBLISHER" >> "$GITHUB_ENV"
 
       - name: Checkout requested immutable SHA
         uses: actions/checkout@v4
@@ -172,10 +182,13 @@ jobs:
           REMOTE_BUNDLE: '/var/tmp/qiaolian-v3-${{ github.run_id }}-${{ github.sha }}.bundle'
         run: |
           set -Eeuo pipefail
-          ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 "$PROD_SSH_USER@$PROD_HOST" "bash -s -- '$REMOTE_BUNDLE' '$CANDIDATE_SHA'" <<'REMOTE'
+          ssh -p "$PROD_PORT" -i "$HOME/.ssh/qiaolian_production" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=20 "$PROD_SSH_USER@$PROD_HOST" "bash -s -- '$REMOTE_BUNDLE' '$CANDIDATE_SHA' '$HOLD_PUBLISHER'" <<'REMOTE'
           set -Eeuo pipefail
           BUNDLE_PATH=$1
           EXPECTED_SHA=$2
+          HOLD_PUBLISHER=$3
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          [[ "$HOLD_PUBLISHER" = true || "$HOLD_PUBLISHER" = false ]] || exit 1
           ROOT=/opt/qiaolian_v3
           OLD=/opt/qiaolian_dual_bots
           RELEASE="$ROOT/releases/$EXPECTED_SHA"
@@ -186,19 +199,50 @@ jobs:
           BACKUP_DIR=/opt/qiaolian_backups
           PYTHON_BOOTSTRAP=""
           SERVICES=(qiaolian-v3@collector.service qiaolian-v3@canonical.service qiaolian-v3@publisher.service qiaolian-v3@user.service)
+          OTHER_SERVICES=(qiaolian-v3@collector.service qiaolian-v3@canonical.service qiaolian-v3@user.service)
+          PUBLISHER=qiaolian-v3@publisher.service
+          HOLD_MARKER="$ROOT/.publisher-deploy-held.json"
+          ACTIVE_SERVICES=("${SERVICES[@]}")
+          [ "$HOLD_PUBLISHER" = false ] || ACTIVE_SERVICES=("${OTHER_SERVICES[@]}")
+          PREVIOUSLY_HELD=0
+          PUBLISHER_HELD=0
           SWITCHED=0
           OLD_RELEASE=""
           OLD_SHA=""
           BACKUP_PATH=""
           cleanup() { rm -f -- "$BUNDLE_PATH"; }
+          write_hold_marker() {
+            "$PYTHON_BOOTSTRAP" - "$HOLD_MARKER" "$1" "$DB" <<'PY'
+          import json, os, sqlite3, sys, tempfile
+          target, sha, path=sys.argv[1:]
+          db=sqlite3.connect(f"file:{path}?mode=ro",uri=True); db.execute("PRAGMA query_only=ON")
+          switches={}
+          for table,key,name in (("publisher_autopilot_settings_v3","enabled","property"),("publisher_settings_v3","daily_broadcast_enabled","daily"),("publisher_settings_v3","marketing_broadcast_enabled","marketing")):
+              row=db.execute("SELECT setting_value FROM "+table+" WHERE setting_key=?",(key,)).fetchone()
+              raw=str(row[0]).strip().lower() if row else ""
+              switches[name]={"present":row is not None,"enabled":True if raw in ("1","true","yes","on","enabled") else False if raw in ("0","false","no","off","disabled") else None}
+          db.close()
+          fd,temporary=tempfile.mkstemp(prefix=".publisher-held-",dir=os.path.dirname(target))
+          with os.fdopen(fd,"w") as output:
+              json.dump({"release_sha":sha,"switches_unchanged":switches},output); output.flush(); os.fsync(output.fileno())
+          os.replace(temporary,target)
+          print("PUBLISHER_HOLD sha="+sha+" original_switches="+json.dumps(switches,sort_keys=True))
+          PY
+          }
           rollback_release() {
             rc=$?; trap - ERR
-            if [ "$SWITCHED" -eq 1 ] && [ -n "$OLD_RELEASE" ] && [ -d "$OLD_RELEASE" ]; then
+            if { [ "$SWITCHED" -eq 1 ] || [ "$PUBLISHER_HELD" -eq 1 ]; } && [ -n "$OLD_RELEASE" ] && [ -d "$OLD_RELEASE" ]; then
               echo "ROLLBACK_START release=$OLD_RELEASE"
               ln -sfn "$OLD_RELEASE" "$ROOT/current.rollback"; mv -Tf "$ROOT/current.rollback" "$CURRENT"
-              systemctl restart "${SERVICES[@]}" || true
+              if [ "$HOLD_PUBLISHER" = true ] || [ "$PREVIOUSLY_HELD" -eq 1 ]; then
+                systemctl stop "$PUBLISHER" || true
+                write_hold_marker "$OLD_SHA" || true
+                systemctl restart "${OTHER_SERVICES[@]}" || true
+              else
+                systemctl restart "${SERVICES[@]}" || true
+              fi
               if [ -n "$OLD_SHA" ]; then printf '%s\n' "$OLD_SHA" > "$ROOT/.deployed_sha"; chmod 0644 "$ROOT/.deployed_sha"; fi
-              echo "ROLLBACK_COMPLETE release=$OLD_RELEASE"
+              echo "ROLLBACK_CODE_ONLY_ATTEMPTED release=$OLD_RELEASE verify_with_readonly_audit=true"
             fi
             cleanup; exit "$rc"
           }
@@ -210,7 +254,23 @@ jobs:
           test -d "$OLD/telethon_sessions" || { echo "DEPLOY_BLOCKED missing_telethon_sessions"; exit 1; }
           OLD_RELEASE=$(readlink -f "$CURRENT"); test -d "$OLD_RELEASE" || { echo "DEPLOY_BLOCKED current_release_missing"; exit 1; }
           OLD_SHA=$(basename "$OLD_RELEASE"); echo "CURRENT_PRODUCTION_SHA=$OLD_SHA"
-          for service in "${SERVICES[@]}"; do test "$(systemctl is-active "$service")" = active || { echo "DEPLOY_BLOCKED service_not_active=$service"; exit 1; }; done
+          for service in "${OTHER_SERVICES[@]}"; do test "$(systemctl is-active "$service")" = active || { echo "DEPLOY_BLOCKED service_not_active=$service"; exit 1; }; done
+          PUBLISHER_STATE=$(systemctl is-active "$PUBLISHER" || true)
+          if [ "$PUBLISHER_STATE" != active ]; then
+            test "$PUBLISHER_STATE" = inactive || { echo 'DEPLOY_BLOCKED publisher_unhealthy'; exit 1; }
+            /usr/bin/python3 - "$HOLD_MARKER" "$OLD_SHA" <<'PY'
+          import json,sys
+          from pathlib import Path
+          try:
+              marker=Path(sys.argv[1])
+              assert marker.is_file() and not marker.is_symlink()
+              data=json.loads(marker.read_text())
+              assert isinstance(data,dict) and data.get("release_sha") == sys.argv[2]
+          except (OSError,ValueError,KeyError,AssertionError):
+              raise SystemExit("DEPLOY_BLOCKED inactive_publisher_without_matching_hold")
+          PY
+            PREVIOUSLY_HELD=1
+          fi
           for python_candidate in "$VENV/bin/python" "$OLD/.venv/bin/python" /opt/qiaolian-python-3.12/bin/python3 /usr/local/bin/python3.12 /usr/bin/python3.12; do if [ -x "$python_candidate" ]; then PYTHON_BOOTSTRAP="$python_candidate"; break; fi; done
           test -n "$PYTHON_BOOTSTRAP" || { echo "DEPLOY_BLOCKED missing_python_bootstrap"; exit 1; }
           echo '=== PRE-DEPLOY DB CHECK ==='
@@ -235,19 +295,32 @@ jobs:
           printf '%s\n' "$EXPECTED_SHA" > "$RELEASE/.deployed_sha"; chmod 0644 "$RELEASE/.deployed_sha"; chown -R qiaolianbot:qiaolianbot "$RELEASE"
           runuser -u qiaolianbot -- bash -lc "set -a; source '$RUNTIME_ENV'; set +a; export QIAOLIAN_CODE_ROOT='$RELEASE'; exec '$PYTHON_BOOTSTRAP' '$RELEASE/run_v3_preflight.py' --component all --db '$DB'"
           trap rollback_release ERR
+          if [ "$HOLD_PUBLISHER" = true ]; then
+            # Persist intention before stopping, so an interrupted SSH session is recoverable.
+            write_hold_marker "$OLD_SHA"
+            PUBLISHER_HELD=1
+            systemctl stop "$PUBLISHER"
+            test "$(systemctl is-active "$PUBLISHER" || true)" = inactive
+          fi
           ln -sfn "$RELEASE" "$ROOT/current.next"; mv -Tf "$ROOT/current.next" "$CURRENT"; SWITCHED=1
-          ACTIVATED_AT=$(date -u '+%Y-%m-%d %H:%M:%S UTC'); systemctl restart "${SERVICES[@]}"; sleep 10
+          ACTIVATED_AT=$(date -u '+%Y-%m-%d %H:%M:%S UTC'); systemctl restart "${ACTIVE_SERVICES[@]}"; sleep 10
           HEALTH_FAILED=0
-          for service in "${SERVICES[@]}"; do ACTIVE=$(systemctl is-active "$service" 2>/dev/null||true); PID=$(systemctl show "$service" -p MainPID --value 2>/dev/null||echo 0); RESTARTS=$(systemctl show "$service" -p NRestarts --value 2>/dev/null||echo unknown); echo "SERVICE_HEALTH unit=$service active=$ACTIVE pid=$PID restarts=$RESTARTS"; [ "$ACTIVE" = active ]||HEALTH_FAILED=1; [ "${PID:-0}" -gt 0 ] 2>/dev/null||HEALTH_FAILED=1; [ "$RESTARTS" = 0 ]||HEALTH_FAILED=1; done
-          LOGS=$(journalctl -u qiaolian-v3@collector.service -u qiaolian-v3@canonical.service -u qiaolian-v3@publisher.service -u qiaolian-v3@user.service --since "$ACTIVATED_AT" --no-pager); printf '%s\n' "$LOGS"
+          for service in "${ACTIVE_SERVICES[@]}"; do ACTIVE=$(systemctl is-active "$service" 2>/dev/null||true); PID=$(systemctl show "$service" -p MainPID --value 2>/dev/null||echo 0); RESTARTS=$(systemctl show "$service" -p NRestarts --value 2>/dev/null||echo unknown); echo "SERVICE_HEALTH unit=$service active=$ACTIVE pid=$PID restarts=$RESTARTS"; [ "$ACTIVE" = active ]||HEALTH_FAILED=1; [ "${PID:-0}" -gt 0 ] 2>/dev/null||HEALTH_FAILED=1; [ "$RESTARTS" = 0 ]||HEALTH_FAILED=1; done
+          if [ "$HOLD_PUBLISHER" = true ]; then
+            test "$(systemctl is-active "$PUBLISHER" || true)" = inactive
+            test "$(systemctl show "$PUBLISHER" -p MainPID --value)" = 0
+            write_hold_marker "$EXPECTED_SHA"
+          fi
+          LOGS=$(journalctl -u qiaolian-v3@collector.service -u qiaolian-v3@canonical.service -u qiaolian-v3@publisher.service -u qiaolian-v3@user.service --since "$ACTIVATED_AT" --no-pager -n 1000); echo "SERVICE_LOGS_CHECKED raw_output_suppressed=true"
           if [ "$HEALTH_FAILED" -ne 0 ] || printf '%s\n' "$LOGS" | grep -Eqi 'Traceback|ModuleNotFoundError|Main process exited|Failed with result|database is locked|sqlite.*error|409.*conflict|Conflict: terminated by other getUpdates request|polling error|callback.*exception|publication.*(error|failed)|appointment.*(error|failed)|lead.*(error|failed)'; then echo 'DEPLOY_HEALTH_FAILED'; false; fi
           "$PYTHON_BOOTSTRAP" - "$DB" <<'PY'
           import sqlite3,sys
           db=sqlite3.connect(f"file:{sys.argv[1]}?mode=ro",uri=True); db.execute("PRAGMA query_only=ON"); integrity=db.execute("PRAGMA integrity_check").fetchone()[0]; quick=db.execute("PRAGMA quick_check").fetchone()[0]
           print("post_integrity_check=",integrity); print("post_quick_check=",quick); assert integrity=="ok"; assert quick=="ok"
           PY
+          if [ "$HOLD_PUBLISHER" = false ]; then rm -f -- "$HOLD_MARKER"; fi
           printf '%s\n' "$EXPECTED_SHA" > "$ROOT/.deployed_sha"; chmod 0644 "$ROOT/.deployed_sha"; trap - ERR
-          echo "V3_DEPLOYMENT_OK sha=$EXPECTED_SHA backup=$BACKUP_PATH"
+          echo "V3_DEPLOYMENT_OK sha=$EXPECTED_SHA backup=$BACKUP_PATH publisher_held=$HOLD_PUBLISHER"
           REMOTE
 
       - name: Remove temporary SSH material

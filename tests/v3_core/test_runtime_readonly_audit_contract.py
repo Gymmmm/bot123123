@@ -22,13 +22,11 @@ def _script():
     )
 
 
-def test_audit_does_not_accept_commands_or_read_env_logs_or_mutate_services():
+def test_audit_does_not_accept_commands_or_dump_env_logs_or_mutate_services():
     text = WORKFLOW.read_text()
     for forbidden in (
         "inputs:",
-        "runtime.env",
         "/proc/",
-        "journalctl",
         "systemctl restart",
         "systemctl stop",
         "workflow_run:",
@@ -54,6 +52,12 @@ def test_audit_does_not_accept_commands_or_read_env_logs_or_mutate_services():
     assert "50.114.74.120" in text
     assert "SHA256:fuufBlFaqRpQhlkio0vuLsuv8w8x3zUb3VFQsnUny/o" in text
     assert "secrets.PROD_SSH_PRIVATE_KEY" in text
+    assert script.count('Path("/opt/qiaolian_v3/runtime.env").open') == 1
+    assert "/getChat?" in script and "sendMessage" not in script
+    assert "--initialize" not in script.replace(
+        "# Existing deployed preflight is statically readonly, without --initialize.",
+        "",
+    )
     assert "actions/checkout" not in text  # Do not import or run PR code on production.
 
 
@@ -106,10 +110,40 @@ def test_fixed_audit_executes_only_whitelisted_reads_and_emits_no_row_data(
 
     def run(args, **kwargs):
         calls.append(args)
-        assert kwargs.get("capture_output") and kwargs.get("check")
+        assert kwargs.get("capture_output")
+        if args[0] == "runuser":
+            assert (
+                kwargs["check"] is False and "-B" in args and "--initialize" not in args
+            )
+            assert kwargs["env"]["PYTHONDONTWRITEBYTECODE"] == "1"
+            return SimpleNamespace(
+                returncode=0,
+                stdout=json.dumps(
+                    {
+                        "ok": True,
+                        "checks": [
+                            {
+                                "name": "storage:tables",
+                                "ok": True,
+                                "detail": "PRIVATE_PREFLIGHT_DETAIL",
+                            }
+                        ],
+                    }
+                ),
+            )
+        assert kwargs.get("check")
+        if args == ["tesseract", "--list-langs"]:
+            return SimpleNamespace(stdout="eng\nchi_sim")
         if args[:4] == ["sudo", "-u", "qiaolianbot", "git"]:
             assert args[-2:] == ["rev-parse", "HEAD"]
             return SimpleNamespace(stdout="a" * 40)
+        if args[0] == "journalctl":
+            assert (
+                args[-3:] == ["-n", "500", "--output=cat"] and "10 minutes ago" in args
+            )
+            return SimpleNamespace(
+                stdout="PRIVATE_LISTING_SHOULD_NOT_BE_PRINTED\nTraceback PRIVATE_ERROR"
+            )
         assert args[0:2] == ["systemctl", "show"]
         assert args[2] in {
             "qiaolian-v3@" + n + ".service"
@@ -118,7 +152,11 @@ def test_fixed_audit_executes_only_whitelisted_reads_and_emits_no_row_data(
         assert args[3:] == ["-p", args[4], "--value"] and args[4] in {
             "ActiveState",
             "ExecStart",
+            "MainPID",
+            "NRestarts",
         }
+        if args[4] in {"MainPID", "NRestarts"}:
+            return SimpleNamespace(stdout="123" if args[4] == "MainPID" else "0")
         name = args[2].split("@")[1].split(".")[0]
         return SimpleNamespace(
             stdout=(
@@ -152,5 +190,11 @@ def test_fixed_audit_executes_only_whitelisted_reads_and_emits_no_row_data(
     assert report["switches"]["daily_broadcast"]["enabled"] is False
     assert report["queues"]["unknown_delivery"] == 1
     assert report["queues"]["publisher_status_sync_outbox_v3"] == 1
-    assert "PRIVATE_LISTING" not in output
-    assert len(calls) == 9
+    assert "PRIVATE_LISTING" not in output and "PRIVATE_PREFLIGHT_DETAIL" not in output
+    assert report["live_preflight"]["ok"] and report["ocr"] == {
+        "eng": True,
+        "chi_sim": True,
+    }
+    assert report["database_quick_check_ok"] is True
+    assert report["recent_error_lines"] == 1 and "PRIVATE_ERROR" not in output
+    assert len(calls) == 20

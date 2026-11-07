@@ -61,3 +61,4 @@ tests/v3_core/test_v41_listing_detail.py
 tests/v3_core/test_user_bot_service_flow.py
 tests/v3_core/test_user_bot_home_views.py
 tests/v3_core/test_release_legacy_recovery.py
+tests/v3_core/test_controlled_release_safety.py
