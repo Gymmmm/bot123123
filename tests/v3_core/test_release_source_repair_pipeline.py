@@ -133,10 +133,13 @@ def test_villa_supplement_rechecks_real_media_and_builds_preview_without_publish
     state = context.user_data[NEW_LISTING_STATE_KEY]
     assert state["source_post_pk"] == source_id
     media = app.workflow.review_media(review_id=state["review_id"])
-    assert media.cover_template == "villa_4x5"
-    assert media.cover_plan[
-        "hero"
-    ]  # A real safe exterior was selected after supplement.
+    assert media.cover_template == "villa_black_gold"
+    hero = next(
+        photo
+        for photo in media.cover_plan["photos"]
+        if photo["path"] == media.cover_plan["hero"]
+    )
+    assert hero["room_type"] == "外观"
     asyncio.run(
         app.simple.prepare_manual_preview(
             message, context, review_id=state["review_id"], offer_id=state["offer_id"]
