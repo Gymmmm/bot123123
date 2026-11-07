@@ -80,9 +80,9 @@ def test_legacy_confirmation_does_not_modify_status(tmp_path):
     _db(path)
     controller = _controller(path)
     message = _Message()
-    assert _callback(controller, message, "v3smp|status_apply|active|l_01")
+    assert not _callback(controller, message, "v3smp|status_apply|active|l_01")
     assert _status(path) == "offline"
-    assert "已经更新" in message.calls[-1][0]
+    assert "已失效" in message.calls[-1][0]
 
 
 def test_confirmed_status_updates_once_and_replay_is_safe(tmp_path):
