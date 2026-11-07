@@ -820,6 +820,21 @@ class SimplePublisherAdminController:
             return True
         return False
 
+    def _apply_confirmed_status(self, listing_id: str, target: str, expected: str) -> bool:
+        """Atomic status compare-and-set for a specific reviewed listing."""
+        allowed = {"active", "reserved", "rented", "inactive", "offline"}
+        if target not in allowed or not expected:
+            raise ValueError("invalid_status_confirmation")
+        with sqlite3.connect(self.db_path, timeout=30) as conn:
+            cur = conn.execute(
+                """UPDATE listings_v3
+                      SET inventory_status=?,updated_at=CURRENT_TIMESTAMP
+                    WHERE listing_id=? AND inventory_status=?""",
+                (target, str(listing_id), expected),
+            )
+            conn.commit()
+        return cur.rowcount == 1
+
     async def handle_callback(self, update: Any, context: Any) -> bool:
         query = update.callback_query
         if query is None:
@@ -894,27 +909,49 @@ class SimplePublisherAdminController:
             await self._reply_recheck_result(query.message, result)
         elif action == "status" and len(parts) == 4:
             status, listing_id = parts[2], parts[3]
-            if status in {"rented", "offline"}:
-                label = "已租出" if status == "rented" else "已下架"
+            labels = {"active": "可预约", "reserved": "已有预约", "rented": "已租出",
+                      "inactive": "停止发布", "offline": "已下架"}
+            if status not in labels:
+                raise ValueError("unsupported listing status")
+            row = self._listing_detail(listing_id)
+            expected = str(row.get("inventory_status") or "").strip().lower()
+            if not expected:
+                await query.message.reply_text("房态无法核实，本次不修改。")
+                return True
+            await query.message.reply_text(
+                f"请确认房源 {escape(str(row.get('public_listing_id') or listing_id))}：\\n"
+                f"当前状态：{escape(expected)}\\n"
+                f"修改为：{escape(labels[status])}\\n\\n"
+                "提交前会重新检查房态，变化后自动跳过；只同步原频道帖，不重新发帖。",
+                parse_mode=ParseMode.HTML,
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton(
+                        f"✅ 确认设为{labels[status]}",
+                        callback_data=f"v3smp|status_apply|{status}|{listing_id}|{expected}",
+                    )],
+                    [InlineKeyboardButton("取消，返回房源", callback_data=f"v3smp|listing|{listing_id}")],
+                ]),
+            )
+            return True
+        elif action == "status_apply" and len(parts) == 4:
+            # Pre-confirmation legacy buttons did not bind the source status.
+            await query.message.reply_text(
+                "这个确认按钮已经更新，请重新打开房源核对房态。",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("返回房源", callback_data=f"v3smp|listing|{parts[3]}")]
+                ]),
+            )
+            return True
+        elif action == "status_apply" and len(parts) == 5:
+            status, listing_id, expected = parts[2], parts[3], parts[4]
+            if not self._apply_confirmed_status(listing_id, status, expected):
                 await query.message.reply_text(
-                    f"确认将这套房设为「{label}」？\n保存后会同步频道房态，客户将无法继续预约。",
+                    "房态已变化，本次没有覆盖。请重新核对这套房。",
                     reply_markup=InlineKeyboardMarkup([
-                        [InlineKeyboardButton(f"✅ 确认{label}", callback_data=f"v3smp|status_apply|{status}|{listing_id}")],
-                        [InlineKeyboardButton("⬅️ 返回房源", callback_data=f"v3smp|listing|{listing_id}")],
+                        [InlineKeyboardButton("重新查看房源", callback_data=f"v3smp|listing|{listing_id}")]
                     ]),
                 )
-                return True
-            self.repository.set_listing_status(listing_id, status)
-            row = self._listing_detail(listing_id)
-            # Inventory recovery is a status change, not a new publication.
-            # The publisher app synchronizes the existing Telegram post after
-            # this callback; never requeue an already-published offer here.
-            await self.show_listing(query.message, listing_id)
-        elif action == "status_apply" and len(parts) == 4:
-            status, listing_id = parts[2], parts[3]
-            if status not in {"rented", "offline"}:
-                raise ValueError("invalid_status_confirmation")
-            self.repository.set_listing_status(listing_id, status)
+                return False
             await self.show_listing(query.message, listing_id)
         elif action == "windows":
             await self.show_windows(query.message)
