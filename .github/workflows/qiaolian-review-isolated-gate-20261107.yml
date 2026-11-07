@@ -32,7 +32,7 @@ jobs:
       - name: Syntax
         run: python -m compileall -q v3_core qiaolian_dual tests
       - name: Targeted regression
-        run: python -m pytest -q --disable-socket --allow-unix-socket tests/v3_core/test_pending_batch_admin.py tests/v3_core/test_publisher_status_confirmation_gate.py tests/v3_core/test_user_bot_channel_status_sync.py tests/v3_core/test_appointment_channel_alert_gate.py tests/v3_core/test_status_sync_recovery.py
+        run: python -m pytest -q --disable-socket --allow-unix-socket tests/v3_core/test_pending_batch_admin.py tests/v3_core/test_publisher_status_confirmation_gate.py tests/v3_core/test_user_bot_channel_status_sync.py tests/v3_core/test_appointment_channel_alert_gate.py tests/v3_core/test_status_sync_recovery.py tests/v3_core/test_release_confirmation_and_sync_races.py
       - name: Full regression
         run: python -m pytest -q --disable-socket --allow-unix-socket --allow-hosts=127.0.0.1,localhost --continue-on-collection-errors tests
 

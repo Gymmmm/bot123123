@@ -68,9 +68,14 @@ class V3PublisherApplication(PublisherAdminBot):
 
     async def on_callback(self, update, context: ContextTypes.DEFAULT_TYPE):
         query=getattr(update,"callback_query",None); raw=str(getattr(query,"data","") or "") if query else ""
+        if query is not None:
+            if not await self._require_admin(update):
+                await query.answer()
+                return
+            if not raw.startswith("v3smp|status_apply|"):
+                self.simple.revoke_status_confirmations(str(update.effective_user.id))
         if raw.startswith("v3smp|"):
             if query is None: return
-            if not await self._require_admin(update): await query.answer(); return
             await query.answer()
             try:
                 handled=await self.simple.handle_callback(update,context); parts=raw.split("|")
@@ -91,7 +96,6 @@ class V3PublisherApplication(PublisherAdminBot):
             return
         if raw=="v3bc" or raw.startswith("v3bc|"):
             if query is None: return
-            if not await self._require_admin(update): await query.answer(); return
             await query.answer()
             try: await self.broadcast.handle_callback(update,context)
             except Exception as exc: await query.message.reply_text("发布操作未完成，请先查看发布记录，避免重复发送。",parse_mode=ParseMode.HTML,reply_markup=InlineKeyboardMarkup([self._home_button()]))
@@ -117,6 +121,7 @@ class V3PublisherApplication(PublisherAdminBot):
 
     async def cancel(self, update, context: ContextTypes.DEFAULT_TYPE):
         if not await self._require_admin(update): return
+        self.simple.revoke_status_confirmations(str(update.effective_user.id))
         state=context.user_data.pop(NEW_LISTING_STATE_KEY,None)
         if isinstance(state,dict):
             task=state.get("_album_task")

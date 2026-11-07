@@ -72,7 +72,7 @@ def test_restore_requires_confirmation_and_rechecks_original_status(tmp_path):
         conn.execute("UPDATE listings_v3 SET inventory_status='rented' WHERE listing_id='l_01'")
     assert not _callback(controller, message, confirmation)
     assert _status(path) == "rented"
-    assert "没有覆盖" in message.calls[-1][0]
+    assert "确认已失效或房态版本已变化" in message.calls[-1][0]
 
 
 def test_legacy_confirmation_does_not_modify_status(tmp_path):

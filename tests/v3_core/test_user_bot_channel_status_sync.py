@@ -289,6 +289,9 @@ async def test_failed_appointment_channel_edit_queues_durable_latest_status_retr
         conn.execute("UPDATE listings_v3 SET inventory_status='rented' WHERE listing_id='l_1'")
         conn.commit()
 
+    # An ambiguous failed edit retains its lease until the network window closes.
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("UPDATE channel_status_edits_inflight_v3 SET expires_at=0")
     fake = FakeBot()
     publisher = PublisherManualStatusSynchronizer(
         db_path, user_bot_username="qiaolian_rent_bot",
@@ -330,7 +333,7 @@ async def test_retry_queue_deduplicates_failed_edits_by_listing(tmp_path):
             "SELECT revision FROM publisher_status_sync_outbox_v3 WHERE listing_id='l_1'"
         ).fetchall()
     assert len(rows) == 1
-    assert rows[0][0] == 2
+    assert rows[0][0] == 4  # Each attempt persists an intent, then records its failure.
 
 
 @pytest.mark.asyncio
@@ -353,7 +356,7 @@ async def test_unchanged_telegram_caption_is_success_without_retry(tmp_path):
     assert result.synced and result.attempted and not result.error
     with sqlite3.connect(db_path) as conn:
         assert conn.execute(
-            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='publisher_status_sync_outbox_v3'"
+            "SELECT COUNT(*) FROM publisher_status_sync_outbox_v3"
         ).fetchone()[0] == 0
 
 

@@ -845,10 +845,27 @@ class SimplePublisherAdminController:
             );
         """)
 
+    def revoke_status_confirmations(self, admin_id: str) -> None:
+        """Cancel this operator's pending confirmations without creating schema."""
+        with sqlite3.connect(self.db_path, timeout=30) as conn:
+            exists = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='publisher_status_confirmations_v3'"
+            ).fetchone()
+            if exists:
+                conn.execute(
+                    "UPDATE publisher_status_confirmations_v3 SET consumed=1 WHERE admin_id=? AND consumed=0",
+                    (str(admin_id),),
+                )
+
     def _issue_status_token(self, admin_id: str, listing_id: str, target: str, expected: str) -> str:
         token = secrets.token_urlsafe(18)
         with sqlite3.connect(self.db_path, timeout=30) as conn:
             self._status_token_db(conn)
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute(
+                "UPDATE publisher_status_confirmations_v3 SET consumed=1 WHERE admin_id=? AND consumed=0",
+                (str(admin_id),),
+            )
             revision_row = conn.execute(
                 "SELECT revision FROM publisher_status_revisions_v3 WHERE listing_id=?",
                 (listing_id,),
@@ -901,6 +918,10 @@ class SimplePublisherAdminController:
             return False
         parts = raw.split("|")
         action = parts[1] if len(parts) > 1 else ""
+        if action != "status_apply":
+            admin_id = str(getattr(getattr(update, "effective_user", None), "id", ""))
+            if admin_id:
+                self.revoke_status_confirmations(admin_id)
         if action == "new":
             await self.start_new_listing(query.message, context)
         elif action == "runtime":

@@ -230,7 +230,25 @@ class PublisherManualStatusSynchronizer:
                     break
         if job:
             with self._connect() as conn:
-                if not rows or result.synced:
+                # Another process may still be editing this listing. Keep the
+                # durable retry until it finishes (or its bounded I/O lease
+                # expires after a crash), even if our own edit succeeded.
+                inflight_table = conn.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='channel_status_edits_inflight_v3'"
+                ).fetchone()
+                inflight = False
+                if inflight_table:
+                    conn.execute("DELETE FROM channel_status_edits_inflight_v3 WHERE expires_at<=?", (time.time(),))
+                    inflight = conn.execute(
+                        "SELECT 1 FROM channel_status_edits_inflight_v3 WHERE listing_id=? LIMIT 1", (listing_id,)
+                    ).fetchone() is not None
+                if (not rows or result.synced) and inflight:
+                    conn.execute(
+                        """UPDATE publisher_status_sync_outbox_v3 SET next_attempt=?,last_error=?
+                           WHERE listing_id=? AND revision=?""",
+                        (time.time()+10, "channel_edit_in_flight", listing_id, job["revision"]),
+                    )
+                elif not rows or result.synced:
                     conn.execute("DELETE FROM publisher_status_sync_outbox_v3 WHERE listing_id=? AND revision=?", (listing_id, job["revision"]))
                 else:
                     delay = min(600, 10 * 2 ** min(job["attempts"], 6))
