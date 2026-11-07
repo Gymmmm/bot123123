@@ -32,6 +32,6 @@ jobs:
       - name: Syntax
         run: python -m compileall -q v3_core qiaolian_dual tests
       - name: Targeted regression
-        run: python -m pytest -q --disable-socket tests/v3_core/test_pending_batch_admin.py
+        run: python -m pytest -q --disable-socket --allow-unix-socket tests/v3_core/test_pending_batch_admin.py
       - name: Full regression
-        run: python -m pytest -q --disable-socket tests
+        run: python -m pytest -q --disable-socket --allow-unix-socket tests
