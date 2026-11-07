@@ -25,7 +25,7 @@ def _db(path: Path) -> None:
             );
             INSERT INTO listings_v3
               (listing_id,public_listing_id,display_title,inventory_status)
-              VALUES ('l_01','QL-0001','测试房源','offline');
+              VALUES ('l_01','QL-RF-A2B3','测试房源','offline');
             """
         )
 
