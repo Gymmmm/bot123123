@@ -293,7 +293,7 @@ class PendingBatchOperatorPublisherAdminController(OperatorPublisherAdminControl
             ),
         )
 
-    async def _confirm_pending_batch(self, message: Any, context: Any, status: str, page: int) -> None:
+    async def _confirm_pending_batch(self, message: Any, context: Any, status: str, page: int, admin_id: str = "") -> None:
         if status not in {"active", "offline"}:
             raise ValueError("unsupported pending batch status")
         rows = self._pending_batch_rows(page)
@@ -304,7 +304,7 @@ class PendingBatchOperatorPublisherAdminController(OperatorPublisherAdminControl
         token = secrets.token_hex(12)
         context.user_data[PENDING_BATCH_CONFIRM_KEY] = {
             "token": token,
-            "admin_id": str(getattr(getattr(context, "user_data", None), "get", lambda *_: "")("_admin_id", "")),
+            "admin_id": str(admin_id),
             "expires_at": time.time() + 300,
             "status": status,
             "page": page,
@@ -431,13 +431,13 @@ class PendingBatchOperatorPublisherAdminController(OperatorPublisherAdminControl
             )
             return True
         if action == "pbconfirm" and len(parts) == 4:
-            await self._confirm_pending_batch(query.message, context, parts[2], int(parts[3]))
+            await self._confirm_pending_batch(query.message, context, parts[2], int(parts[3]), str(getattr(getattr(update, "effective_user", None), "id", "")))
             return True
         if action == "pbcommit" and len(parts) == 3:
             saved = context.user_data.get(PENDING_BATCH_CONFIRM_KEY)
             if not isinstance(saved, dict) or not secrets.compare_digest(
                 str(saved.get("token") or ""), parts[2]
-            ) or float(saved.get("expires_at") or 0) <= time.time():
+            ) or float(saved.get("expires_at") or 0) <= time.time() or str(saved.get("admin_id") or "") != str(getattr(getattr(update, "effective_user", None), "id", "")):
                 await query.message.reply_text(
                     "确认已失效，请重新选择房源。",
                     reply_markup=InlineKeyboardMarkup([
