@@ -12,6 +12,8 @@ from html import escape
 import hashlib
 from pathlib import Path
 import sqlite3
+import secrets
+import time
 from typing import Any
 import uuid
 
@@ -821,20 +823,74 @@ class SimplePublisherAdminController:
             return True
         return False
 
-    def _apply_confirmed_status(self, listing_id: str, target: str, expected: str) -> bool:
-        """Atomic status compare-and-set for a specific reviewed listing."""
-        allowed = {"active", "reserved", "rented", "inactive", "offline"}
-        if target not in allowed or not expected:
-            raise ValueError("invalid_status_confirmation")
+    def _status_token_db(self, conn: sqlite3.Connection) -> None:
+        """Durable revision survives status round-trips, including same-second updates."""
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS publisher_status_revisions_v3 (
+                listing_id TEXT PRIMARY KEY, revision INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE TRIGGER IF NOT EXISTS publisher_status_revision_change_v3
+            AFTER UPDATE OF inventory_status ON listings_v3
+            WHEN OLD.inventory_status IS NOT NEW.inventory_status
+            BEGIN
+                INSERT INTO publisher_status_revisions_v3(listing_id,revision)
+                VALUES(NEW.listing_id,1)
+                ON CONFLICT(listing_id) DO UPDATE SET revision=revision+1;
+            END;
+            CREATE TABLE IF NOT EXISTS publisher_status_confirmations_v3 (
+                token TEXT PRIMARY KEY, admin_id TEXT NOT NULL,
+                listing_id TEXT NOT NULL, target TEXT NOT NULL,
+                expected TEXT NOT NULL, revision INTEGER NOT NULL,
+                expires_at REAL NOT NULL, consumed INTEGER NOT NULL DEFAULT 0
+            );
+        """)
+
+    def _issue_status_token(self, admin_id: str, listing_id: str, target: str, expected: str) -> str:
+        token = secrets.token_urlsafe(18)
         with sqlite3.connect(self.db_path, timeout=30) as conn:
-            cur = conn.execute(
-                """UPDATE listings_v3
-                      SET inventory_status=?,updated_at=CURRENT_TIMESTAMP
-                    WHERE listing_id=? AND inventory_status=?""",
-                (target, str(listing_id), expected),
+            self._status_token_db(conn)
+            revision_row = conn.execute(
+                "SELECT revision FROM publisher_status_revisions_v3 WHERE listing_id=?",
+                (listing_id,),
+            ).fetchone()
+            revision = int(revision_row[0]) if revision_row else 0
+            conn.execute(
+                """INSERT INTO publisher_status_confirmations_v3
+                   (token,admin_id,listing_id,target,expected,revision,expires_at)
+                   VALUES (?,?,?,?,?,?,?)""",
+                (token, str(admin_id), listing_id, target, expected, revision, time.time()+300),
             )
             conn.commit()
-        return cur.rowcount == 1
+        return token
+
+    def _apply_confirmed_status(self, token: str, admin_id: str) -> bool:
+        """Consume once and compare durable status revision in the same write transaction."""
+        with sqlite3.connect(self.db_path, timeout=30) as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute(
+                """SELECT admin_id,listing_id,target,expected,revision,expires_at
+                   FROM publisher_status_confirmations_v3
+                   WHERE token=? AND consumed=0""", (token,),
+            ).fetchone()
+            if not row or str(row[0]) != str(admin_id) or row[5] <= time.time():
+                return False
+            listing_id, target, expected, revision = row[1], row[2], row[3], int(row[4])
+            current = conn.execute(
+                """SELECT l.inventory_status,COALESCE(r.revision,0)
+                   FROM listings_v3 l LEFT JOIN publisher_status_revisions_v3 r
+                     ON r.listing_id=l.listing_id WHERE l.listing_id=?""",
+                (listing_id,),
+            ).fetchone()
+            conn.execute("UPDATE publisher_status_confirmations_v3 SET consumed=1 WHERE token=?", (token,))
+            if not current or current[0] != expected or int(current[1]) != revision:
+                conn.commit()
+                return False
+            cur = conn.execute(
+                "UPDATE listings_v3 SET inventory_status=?,updated_at=CURRENT_TIMESTAMP WHERE listing_id=? AND inventory_status=?",
+                (target, listing_id, expected),
+            )
+            conn.commit()
+            return cur.rowcount == 1
 
     async def handle_callback(self, update: Any, context: Any) -> bool:
         query = update.callback_query
@@ -919,6 +975,7 @@ class SimplePublisherAdminController:
             if not expected:
                 await query.message.reply_text("房态无法核实，本次不修改。")
                 return True
+            token = self._issue_status_token(str(update.effective_user.id), listing_id, status, expected)
             await query.message.reply_text(
                 f"请确认房源 {escape(str(row.get('public_listing_id') or listing_id))}：\\n"
                 f"当前状态：{escape(expected)}\\n"
@@ -928,32 +985,21 @@ class SimplePublisherAdminController:
                 reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton(
                         f"✅ 确认设为{labels[status]}",
-                        callback_data=f"v3smp|status_apply|{status}|{listing_id}|{expected}",
+                        callback_data=f"v3smp|status_apply|{token}",
                     )],
                     [InlineKeyboardButton("取消，返回房源", callback_data=f"v3smp|listing|{listing_id}")],
                 ]),
             )
             return True
-        elif action == "status_apply" and len(parts) == 4:
-            # Pre-confirmation legacy buttons did not bind the source status.
-            await query.message.reply_text(
-                "这个确认按钮已经更新，请重新打开房源核对房态。",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("返回房源", callback_data=f"v3smp|listing|{parts[3]}")]
-                ]),
-            )
-            return True
-        elif action == "status_apply" and len(parts) == 5:
-            status, listing_id, expected = parts[2], parts[3], parts[4]
-            if not self._apply_confirmed_status(listing_id, status, expected):
-                await query.message.reply_text(
-                    "房态已变化，本次没有覆盖。请重新核对这套房。",
-                    reply_markup=InlineKeyboardMarkup([
-                        [InlineKeyboardButton("重新查看房源", callback_data=f"v3smp|listing|{listing_id}")]
-                    ]),
-                )
+        elif action == "status_apply" and len(parts) == 3:
+            if not self._apply_confirmed_status(parts[2], str(update.effective_user.id)):
+                await query.message.reply_text("确认已失效或房态版本已变化，请重新核对房源。")
                 return False
-            await self.show_listing(query.message, listing_id)
+            await query.message.reply_text("✅ 房态已更新。")
+            return True
+        elif action == "status_apply":
+            await query.message.reply_text("旧确认按钮已失效，请重新打开房源。")
+            return False
         elif action == "windows":
             await self.show_windows(query.message)
         elif action == "window_add":
