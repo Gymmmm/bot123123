@@ -326,10 +326,16 @@ class PendingBatchOperatorPublisherAdminController(OperatorPublisherAdminControl
         skipped: list[str] = []
         with sqlite3.connect(self.db_path) as conn:
             for listing_id in dict.fromkeys(str(value) for value in listing_ids):
+                eligible = conn.execute(
+                    f"SELECT 1 FROM listings_v3 l WHERE l.listing_id=? AND {_PENDING_ELIGIBLE_WHERE} LIMIT 1",
+                    (listing_id,),
+                ).fetchone()
+                if eligible is None:
+                    skipped.append(listing_id)
+                    continue
                 cur = conn.execute(
-                    f"""UPDATE listings_v3 AS l
-                           SET inventory_status=?,updated_at=CURRENT_TIMESTAMP
-                         WHERE l.listing_id=? AND {_PENDING_ELIGIBLE_WHERE}""",
+                    """UPDATE listings_v3 SET inventory_status=?,updated_at=CURRENT_TIMESTAMP
+                       WHERE listing_id=? AND inventory_status='pending'""",
                     (clean_status, listing_id),
                 )
                 (updated if cur.rowcount == 1 else skipped).append(listing_id)
