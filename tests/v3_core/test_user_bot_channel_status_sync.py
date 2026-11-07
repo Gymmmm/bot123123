@@ -331,3 +331,49 @@ async def test_retry_queue_deduplicates_failed_edits_by_listing(tmp_path):
         ).fetchall()
     assert len(rows) == 1
     assert rows[0][0] == 2
+
+
+@pytest.mark.asyncio
+async def test_unchanged_telegram_caption_is_success_without_retry(tmp_path):
+    from telegram.error import BadRequest
+    db_path = tmp_path / "unchanged.db"
+    _seed(db_path, appointment_count=0)
+    class UnchangedBot(FakeBot):
+        async def edit_message_caption(self, **kwargs):
+            self.calls.append(kwargs)
+            raise BadRequest("Message is not modified: specified new message content and reply markup are exactly the same")
+    bot = UnchangedBot()
+    sync = V3AppointmentChannelSynchronizer(
+        db_path, publisher_bot_token="publisher-token",
+        user_bot_username="qiaolian_rent_bot",
+        advisor_url="https://t.me/qiaolian_advisor",
+        bot_factory=lambda _: bot,
+    )
+    result = await sync.sync("l_1")
+    assert result.synced and result.attempted and not result.error
+    with sqlite3.connect(db_path) as conn:
+        assert conn.execute(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='publisher_status_sync_outbox_v3'"
+        ).fetchone()[0] == 0
+
+
+@pytest.mark.asyncio
+async def test_network_timeout_still_uses_existing_retry_queue(tmp_path):
+    from telegram.error import TimedOut
+    db_path = tmp_path / "timeout.db"
+    _seed(db_path, appointment_count=0)
+    class TimeoutBot(FakeBot):
+        async def edit_message_caption(self, **kwargs):
+            raise TimedOut()
+    sync = V3AppointmentChannelSynchronizer(
+        db_path, publisher_bot_token="publisher-token",
+        user_bot_username="qiaolian_rent_bot",
+        advisor_url="https://t.me/qiaolian_advisor",
+        bot_factory=lambda _: TimeoutBot(),
+    )
+    result = await sync.sync("l_1")
+    assert not result.synced and result.attempted
+    with sqlite3.connect(db_path) as conn:
+        assert conn.execute(
+            "SELECT COUNT(*) FROM publisher_status_sync_outbox_v3 WHERE listing_id='l_1'"
+        ).fetchone()[0] == 1
