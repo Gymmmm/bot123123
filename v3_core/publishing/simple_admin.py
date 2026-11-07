@@ -506,9 +506,10 @@ class SimplePublisherAdminController:
                 actions.append(
                     [InlineKeyboardButton("补充或修改资料", callback_data=f"v3edit|{review_id}")]
                 )
-            if reason_code in {"unreadable_media", "insufficient_media"}:
+            if reason_code in {"unreadable_media", "insufficient_media", "villa_exterior_review_required"}:
+                label = "补充别墅外观图" if reason_code == "villa_exterior_review_required" else "补充图片"
                 actions.append(
-                    [InlineKeyboardButton("补充图片", callback_data=f"v3smp|addmedia|{offer_id}")]
+                    [InlineKeyboardButton(label, callback_data=f"v3smp|addmedia|{offer_id}")]
                 )
         if reason_code != "sale_store_only":
             actions.append([InlineKeyboardButton("标记忽略", callback_data=f"v3smp|ignore|{offer_id}|{return_to}")])
