@@ -58,7 +58,13 @@ def test_public_id_normalization_and_legacy_lookup(tmp_path):
 
 @pytest.mark.asyncio
 async def test_unknown_public_id_shows_not_found(tmp_path, monkeypatch):
-    monkeypatch.setattr(public_listing_id, "DB_PATH", str(tmp_path / "unknown.db"))
+    from v3_core.storage.bootstrap import initialize_v3_storage
+    from qiaolian_dual import listing
+
+    db = tmp_path / "unknown.db"
+    initialize_v3_storage(db)
+    monkeypatch.setattr(public_listing_id, "DB_PATH", str(db))
+    monkeypatch.setattr(listing, "DB_PATH", str(db))
     render = AsyncMock()
     monkeypatch.setattr("qiaolian_dual.texts.render_panel", render)
     update = SimpleNamespace(

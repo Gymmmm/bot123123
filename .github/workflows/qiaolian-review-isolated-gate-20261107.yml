@@ -67,3 +67,32 @@ jobs:
         with:
           name: pr114-baseline-candidate-comparison
           path: /tmp/qiaolian-pr114-comparison/
+
+  deployment-v3-gate:
+    name: Official deployment V3 gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DB_PATH: /tmp/qiaolian-pr114-deployment-gate.db
+      USER_BOT_TOKEN: TEST_OFFLINE
+      PUBLISHER_BOT_TOKEN: TEST_OFFLINE
+      PYTHONPATH: .
+      # Preserve the official command/complete production collection. This only
+      # blocks external network; loopback test servers remain available.
+      PYTEST_ADDOPTS: --disable-socket --allow-unix-socket --allow-hosts=127.0.0.1,localhost
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install deployment requirements and offline test guard
+        run: |
+          python -m pip install --upgrade pip
+          sudo apt-get update -qq
+          sudo apt-get install -y tesseract-ocr tesseract-ocr-eng tesseract-ocr-chi-sim
+          python -m pip install -r requirements.txt pytest pytest-asyncio pytest-socket
+      - name: Complete official deployment test command
+        run: |
+          python -m compileall -q v3_core tests/v3_core run_v3_collector.py run_v3_canonical_worker.py run_v3_publisher_bot.py run_v3_user_bot.py run_v3_preflight.py
+          python -m pytest -q tests/v3_core
+          git diff --check

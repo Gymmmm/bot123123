@@ -108,3 +108,48 @@ The four resolved IDs are the search-card fixture plus three legacy simplified
 appointment tests whose mocks missed the real inventory adapter. All product
 assertions remain. The conservative past-yearless guard added afterward must
 pass its own latest-SHA CI; remaining failures are not waived.
+
+## Deployment-gate contract reconciliation (2026-11-07, Phnom Penh UTC+7)
+
+The six failures were examined against live baseline `1a7c4c44` source and the
+existing P15/P16/P20 locked tests, not waived or removed. Runtime home/service/
+photo implementations are unchanged by this repair:
+
+| Exact node ID (under tests/v3_core/) | Cause and retained coverage |
+| --- | --- |
+| test_user_bot_product_upgrade.py::test_v3_home_uses_final_conversion_navigation | Fixture omitted show_appointments=True; explicit populated history plus default-empty coverage retained. |
+| test_user_bot_product_upgrade.py::test_home_without_channel_keeps_core_conversion_actions | Same missing fixture flag with channel absent; core actions still asserted. |
+| test_userbot_v1_freeze_spec.py::test_home_matches_final_service_surface | Same missing fixture flag; text and all populated-user actions retained. |
+| test_user_bot_product_upgrade.py::test_repair_page_exposes_every_supported_core_issue | Old nine-button menu predates P20 four-category menu; exact current callbacks asserted, all nine legacy issue keys now undergo real SQLite submission and idempotent replay. |
+| test_userbot_v1_freeze_spec.py::test_service_hubs_match_final_layouts | Old service wording conflicts with existing P16/P20 locked spec; exact current labels and callbacks remain covered. |
+| test_v41_listing_detail.py::test_channel_details_deeplink_end_to_end_opens_detail_with_photos | Obsolete inert 1/2 button; range remains in caption. Exact next-page callback/all-photo access asserted; real media replacement/pagination tests retained. |
+
+An independent PR check executes the unchanged official command
+`python -m pytest -q tests/v3_core`. The official production workflow retains
+that same complete collection, compile and whitespace gates; its runner-only
+bootstrap now provisions OCR eng/chi_sim and pytest-socket. Both environments
+block external sockets (loopback servers allowed), use fake tokens and the
+existing conftest isolated DB. No deployment trigger, host operation, release
+switch or production gate was removed/relaxed; no workflow was dispatched.
+The broad full-suite/baseline comparison remains intact and still fails on any
+remaining legacy failures. Passing the separate V3 check is not a false claim
+that all historical tests passed. Missing retired modules are not shimmed.
+
+Two additional legacy tests received safe fixture repairs: an actual empty V3
+schema/path for unknown public IDs, and a complete fake Telegram Update for
+empty-result recovery. The former exposed a genuine product error: reason
+`missing` was rendered as pending. Only the missing-ID copy is corrected to the
+already asserted not-found response; pending/rented/offline copy is unchanged
+and separately regression-tested. No status threshold, pictures or album code
+changed. All old release-manifest files remain; coverage only expands.
+
+Test-channel discovery: repository secret/variable **names only** and environment
+names were queried. No dedicated test/staging bot/channel secret/variable or
+environment was visible; no live-channel credentials were read. Repository
+workflow inventory has offline UI checks and production publish/ops workflows,
+not a demonstrated isolated Telegram staging sender. Do not run a production
+smoke/publish workflow as a substitute. Production runtime.env was not read, so
+this does not assert that no private test configuration exists anywhere. The
+minimal external-acceptance gap is the approved non-production channel and
+dedicated bots' supported configuration entry, followed by approval of the exact
+post draft/target. No channel posts or phone acceptance have been performed.

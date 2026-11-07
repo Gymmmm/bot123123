@@ -55,3 +55,9 @@ tests/v3_core/test_user_bot_transition_views.py
 tests/v3_core/test_userbot_ui_route_cleanup.py
 tests/v3_core/test_v4_search_filters.py
 tests/v3_core/test_runtime_readonly_audit_contract.py
+tests/v3_core/test_user_bot_product_upgrade.py
+tests/v3_core/test_userbot_v1_freeze_spec.py
+tests/v3_core/test_v41_listing_detail.py
+tests/v3_core/test_user_bot_service_flow.py
+tests/v3_core/test_user_bot_home_views.py
+tests/v3_core/test_release_legacy_recovery.py
