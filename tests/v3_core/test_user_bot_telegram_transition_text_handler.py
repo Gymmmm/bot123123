@@ -215,7 +215,7 @@ async def test_custom_date_reply_succeeds_before_waiting_state_advances():
     assert outcome.handled and outcome.result is not None
     assert outcome.result.next_step == "appointment_time"
     assert APPOINTMENT_AWAITING_DATE_KEY not in user_data
-    assert user_data[APPOINTMENT_SESSION_KEY]["date"] == "9月5日"
+    assert user_data[APPOINTMENT_SESSION_KEY]["date"] == "2026-09-05"
     markup = message.calls[-1][2]["reply_markup"]
     assert markup.inline_keyboard[0][0].callback_data == "v3u:t:appointment_time:pm"
 

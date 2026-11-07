@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from v3_core.user_bot.transition_actions import (
     APPOINTMENT_AWAITING_DATE_KEY,
     APPOINTMENT_AWAITING_TIME_KEY,
@@ -53,7 +55,7 @@ def test_appointment_mode_and_date_are_public_only_state_transitions():
     )
     assert picked.ok and picked.next_step == "appointment_time"
     assert picked.appointment is not None
-    assert picked.appointment.date == "09-10"
+    assert picked.appointment.date == "2026-09-10"
     assert picked.appointment.time == ""
 
 
@@ -280,5 +282,15 @@ def test_appointment_quick_slot_skips_separate_date_and_time_steps():
     assert result.ok
     assert result.next_step == "appointment_submit"
     assert result.appointment is not None
-    assert result.appointment.date == "09-10"
+    assert result.appointment.date == "2026-09-10"
     assert result.appointment.time == "pm"
+
+
+@pytest.fixture(autouse=True)
+def fixed_confirmation_clock(monkeypatch):
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    from v3_core.user_bot import appointment_dates, appointment_service
+    clock = lambda: datetime(2026, 9, 2, 12, tzinfo=ZoneInfo("Asia/Phnom_Penh"))
+    monkeypatch.setattr(appointment_dates, "local_now", clock)
+    monkeypatch.setattr(appointment_service, "local_now", clock)

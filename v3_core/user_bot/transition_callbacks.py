@@ -1,6 +1,8 @@
 """Explicit callback codec for side-effect-free V3 transition views."""
 from __future__ import annotations
 
+from datetime import date as calendar_date
+
 from dataclasses import dataclass
 import re
 
@@ -55,8 +57,8 @@ _AREA_CODES = frozenset(code for code, _ in AREA_OPTIONS)
 _LAYOUT_CODES = frozenset(code for code, _ in LAYOUT_OPTIONS)
 _MODES = frozenset({"offline", "video"})
 _TIMES = frozenset({"am", "pm", "evening"})
-_DATE_RE = re.compile(r"^\d{2}-\d{2}$")
-_QUICK_SLOT_RE = re.compile(r"^(\d{2}-\d{2})_(am|pm)$")
+_DATE_RE = re.compile(r"^(?:\d{4}-)?\d{2}-\d{2}$")
+_QUICK_SLOT_RE = re.compile(r"^((?:\d{4}-)?\d{2}-\d{2})_(am|pm)$")
 
 
 @dataclass(frozen=True)
@@ -70,18 +72,26 @@ def _validate_value(kind: str, value: object) -> str:
     if kind == "appointment_date":
         if not _DATE_RE.fullmatch(clean):
             raise ValueError("invalid_transition_appointment_date")
-        month, day = (int(part) for part in clean.split("-", 1))
+        month, day = (int(part) for part in clean.split("-")[-2:])
         if not (1 <= month <= 12 and 1 <= day <= 31):
             raise ValueError("invalid_transition_appointment_date")
+        try:
+            calendar_date.fromisoformat(clean if len(clean) == 10 else "2024-" + clean)
+        except ValueError as exc:
+            raise ValueError("invalid_transition_appointment_date") from exc
         return clean
     if kind == "appointment_quick_slot":
         match = _QUICK_SLOT_RE.fullmatch(clean)
         if match is None:
             raise ValueError("invalid_transition_appointment_quick_slot")
         date_value = match.group(1)
-        month, day = (int(part) for part in date_value.split("-", 1))
+        month, day = (int(part) for part in date_value.split("-")[-2:])
         if not (1 <= month <= 12 and 1 <= day <= 31):
             raise ValueError("invalid_transition_appointment_quick_slot")
+        try:
+            calendar_date.fromisoformat(date_value if len(date_value) == 10 else "2024-" + date_value)
+        except ValueError as exc:
+            raise ValueError("invalid_transition_appointment_quick_slot") from exc
         return clean
     if kind == "appointment_mode":
         if clean not in _MODES:

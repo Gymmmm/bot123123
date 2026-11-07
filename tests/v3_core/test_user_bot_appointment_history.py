@@ -119,9 +119,9 @@ def test_empty_history_matches_fixed_sha_empty_copy(tmp_path):
 def test_history_shows_only_two_upcoming_and_counts_terminal_or_past_rows(tmp_path):
     db, service = _service(tmp_path)
     _insert_appointment(db, appointment_id=1, date="09-10", time="am", created_at="2026-09-08 10:00:00")
-    _insert_appointment(db, appointment_id=2, date="09-11", time="pm", mode="video", created_at="2026-09-08 11:00:00")
-    _insert_appointment(db, appointment_id=3, date="09-12", time="evening", status="confirmed", created_at="2026-09-08 12:00:00")
-    _insert_appointment(db, appointment_id=4, date="09-01", time="pm", created_at="2026-09-08 13:00:00")
+    _insert_appointment(db, appointment_id=2, date="2026-09-11", time="pm", mode="video", created_at="2026-09-08 11:00:00")
+    _insert_appointment(db, appointment_id=3, date="2026-09-12", time="evening", status="confirmed", created_at="2026-09-08 12:00:00")
+    _insert_appointment(db, appointment_id=4, date="2026-09-01", time="pm", created_at="2026-09-08 13:00:00")
     _insert_appointment(db, appointment_id=5, date="09-20", time="pm", status="cancelled", created_at="2026-09-08 14:00:00")
 
     view = service.build(

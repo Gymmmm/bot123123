@@ -98,6 +98,13 @@ async def _submit_appointment(
         await respond('预约信息不完整，请重新选择日期和时间。', InlineKeyboardMarkup([[InlineKeyboardButton('📅 重新预约', callback_data=f'listing:appoint:{lid}')]]))
         return MAIN
 
+    from v3_core.user_bot.appointment_dates import booking_date, booking_time
+    try:
+        appt['date'] = booking_date(appt['date'])
+        appt['time'] = booking_time(appt['time'])
+    except ValueError:
+        await respond('日期或时间不明确，请重新选择后确认。')
+        return APPT_DATE
     user = update.effective_user
     mode = str(appt.get('mode') or 'offline')
     time_value = str(appt.get('time') or '')
@@ -311,7 +318,7 @@ async def appoint_flow_cb(update: Update, context: ContextTypes.DEFAULT_TYPE, *,
 
 async def handle_appointment_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """承接其他日期 / 其他时间输入。"""
-    from .appointment_ui import _normalize_custom_date, _appointment_time_keyboard, _title_layout_label
+    from .appointment_ui import _appointment_time_keyboard, _title_layout_label
     from .listing import listing_context
     from .utils_formatting import _display_layout
 
@@ -319,7 +326,12 @@ async def handle_appointment_text(update: Update, context: ContextTypes.DEFAULT_
     value = str(update.effective_message.text or '').strip()[:40]
 
     if appt.pop('awaiting_custom_date', False):
-        normalized = _normalize_custom_date(value)
+        from v3_core.user_bot.appointment_dates import booking_date
+        from v3_core.user_bot.appointments import display_date
+        try:
+            normalized = booking_date(value)
+        except ValueError:
+            normalized = ""
         if not normalized:
             appt['awaiting_custom_date'] = True
             await update.effective_message.reply_text('日期格式没有识别出来。请试试：<code>0905</code>、<code>9月5日</code> 或 <code>下周三</code>。', parse_mode=ParseMode.HTML)
@@ -329,19 +341,24 @@ async def handle_appointment_text(update: Update, context: ContextTypes.DEFAULT_
         title = str(info.get('project') or info.get('community') or info.get('area') or '这套房')
         layout = _display_layout(info.get('layout') or info.get('property_type'), info.get('property_type'))
         await update.effective_message.reply_text(
-            f'🕐 <b>选择时间</b>\n\n📅 {he(normalized)}\n🏠 {he(_title_layout_label(title, layout, "｜"))}',
+            f'🕐 <b>选择时间</b>\n\n📅 {he(display_date(normalized))}\n🏠 {he(_title_layout_label(title, layout, "｜"))}',
             parse_mode=ParseMode.HTML,
             reply_markup=_appointment_time_keyboard(),
         )
         return APPT_TIME
 
     if appt.pop('awaiting_custom_time', False):
-        valid = bool(re.fullmatch(r'(?:[01]?\d|2[0-3]):[0-5]\d|(?:上午|下午|傍晚|晚上)\s*\d{1,2}(?::[0-5]\d|点)?', value))
+        from v3_core.user_bot.appointment_dates import booking_time
+        try:
+            concrete_time = booking_time(value)
+        except ValueError:
+            concrete_time = ""
+        valid = bool(concrete_time)
         if not valid:
             appt['awaiting_custom_time'] = True
             await update.effective_message.reply_text('时间格式没有识别出来。请试试：<code>20:00</code> 或 <code>晚上8点</code>。', parse_mode=ParseMode.HTML)
             return APPT_TIME
-        appt['time'] = value
+        appt['time'] = concrete_time
         return await _submit_appointment(update, context, appt)
 
     await update.effective_message.reply_text('请点击页面上的日期或时间按钮。')

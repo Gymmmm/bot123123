@@ -10,7 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal, Mapping
 
-from .appointments import normalize_custom_date, valid_custom_time
+from .appointments import valid_custom_time
+from .appointment_dates import booking_date, booking_time
 from .public_appointment import PublicAppointmentDraft
 from .search_query import SearchCriteria, detect_location_keys, detect_property_type, parse_budget_range
 from .transition_actions import (
@@ -153,7 +154,10 @@ class TransitionTextActionService:
                     status="expired",
                     reason="appointment_session_expired",
                 )
-            normalized = normalize_custom_date(value)
+            try:
+                normalized = booking_date(value)
+            except ValueError:
+                normalized = ""
             if not normalized:
                 return TransitionTextActionResult(
                     status="invalid",
@@ -181,7 +185,11 @@ class TransitionTextActionService:
                     status="expired",
                     reason="appointment_session_expired",
                 )
-            if not valid_custom_time(value):
+            try:
+                normalized_time = booking_time(value) if valid_custom_time(value) else ""
+            except ValueError:
+                normalized_time = ""
+            if not normalized_time:
                 return TransitionTextActionResult(
                     status="invalid",
                     reason="appointment_time_unrecognized",
@@ -191,7 +199,7 @@ class TransitionTextActionService:
                     ),
                 )
             try:
-                updated = draft.with_time(value)
+                updated = draft.with_time(normalized_time)
             except ValueError:
                 return TransitionTextActionResult(
                     status="invalid",

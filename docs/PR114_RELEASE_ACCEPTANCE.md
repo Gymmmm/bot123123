@@ -58,19 +58,22 @@ Comparison artifacts contain complete logs, not a historical-failure assumption.
 
 ## Still-blocking evidence gaps / product finding
 
-* Appointment-history boundary probes reveal an inherited product gap:
-  `appointment_history._record_date` cannot parse Chinese month/day values
-  emitted by `normalize_custom_date`; yearless January dates on Dec 31 are also
-  interpreted in the current year. Explicit ISO dates are the passing control.
-  The active takeover history reader feeds this same service. No ambiguous
-  legacy dates were rewritten and no guessed rollover policy was implemented.
-  Resolving the year contract across legacy callbacks/storage/history needs a
-  focused follow-up, not a migration of the production `appointments` table.
-* No authenticated current production audit was run. Public SSH host-key reachability
-  is NOT verification of release SHA, ExecStart, state, DB inode or publish flags.
-  Existing V3 runtime dispatch reads whole runtime/proc environments and raw
-  journals; it was not invoked under the no-sensitive-env boundary. The other
-  prior V3 audit is push-only. Do not add arbitrary remote-exec workflows.
+* Appointment-history calendar gap is now repaired without schema migration or
+  bulk rewrites. New date selection/confirmation stores ISO calendar dates with
+  Phnom Penh date/time interpretation (existing created_at storage stays unchanged); relative input is frozen before midnight
+  can move it. Existing slots retain their fixed time windows; custom times are
+  concrete clock values. Both legacy and V3 repositories reconcile known date/
+  time aliases for duplicate checks. Cancellation and rescheduling stay intact.
+  Legacy yearless dates use the creation context only inside the existing quick
+  picker's 0/1/2-day horizon, including Dec/Jan rollover. Other unknown years,
+  invalid dates and old relative strings remain visible as date-needs-confirmation,
+  never guessed completed. Known ISO past dates retain completed semantics.
+* The existing V3 readonly runtime audit workflow has been narrowed to fixed
+  SHA/service/ExecStart metadata, two fixed DB identities, persisted boolean
+  switches and aggregate queue counts. It has no command inputs, repository code
+  execution, runtime/proc environment reads, raw logs or user/source identifiers.
+  It reuses only its original host pin and original Actions-held SSH secret.
+  Production execution evidence must be checked before claiming today's facts.
 * Last authenticated production fact remains the 2026-11-06 audit. Deployment
   references two DB paths; same-inode/symlink identity must be proved first.
 * Publisher restart schedules autopilot; deployment can publish backlog. The
@@ -79,3 +82,13 @@ Comparison artifacts contain complete logs, not a historical-failure assumption.
 * Test-channel business closure, physical phone and production behavior are not
   accepted by this offline collection. No real messages or production DB writes
   were performed. Overall release gate is **not passed**.
+
+## Subsequent complete CI evidence
+
+Run https://github.com/Gymmmm/bot123123/actions/runs/42359341990 on
+`ec7aaa38cc4acc9a3e732821f17753505582036c` completed: targeted 56 passed;
+release-path collection 317 passed, no skips; full 1657 passed, 113 failed,
+9 collection errors. Same-run base remained 1623 passed / 114 failed / 9 errors.
+One inherited search-card mock failure was fixed, no tests removed. Current date
+and readonly-audit changes must pass their own latest-SHA CI; this is not a waiver
+of remaining legacy/UI failures or a production release approval.

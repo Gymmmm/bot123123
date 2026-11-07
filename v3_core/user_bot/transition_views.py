@@ -137,7 +137,7 @@ def _appointment_date_view(draft: PublicAppointmentDraft, inventory: PublicInven
             TransitionChoice(
                 f"今天下午 · {today.month}月{today.day}日",
                 "appointment_quick_slot",
-                f"{today.strftime('%m-%d')}_pm",
+                f"{today.strftime('%Y-%m-%d')}_pm",
             ),
         ))
     rows.extend((
@@ -145,19 +145,19 @@ def _appointment_date_view(draft: PublicAppointmentDraft, inventory: PublicInven
             TransitionChoice(
                 f"明天上午 · {tomorrow.month}月{tomorrow.day}日",
                 "appointment_quick_slot",
-                f"{tomorrow.strftime('%m-%d')}_am",
+                f"{tomorrow.strftime('%Y-%m-%d')}_am",
             ),
             TransitionChoice(
                 f"明天下午 · {tomorrow.month}月{tomorrow.day}日",
                 "appointment_quick_slot",
-                f"{tomorrow.strftime('%m-%d')}_pm",
+                f"{tomorrow.strftime('%Y-%m-%d')}_pm",
             ),
         ),
         (
             TransitionChoice(
                 f"后天上午 · {after.month}月{after.day}日",
                 "appointment_quick_slot",
-                f"{after.strftime('%m-%d')}_am",
+                f"{after.strftime('%Y-%m-%d')}_am",
             ),
         ),
         (TransitionChoice("其他日期 / 时间", "appointment_other_date"),),

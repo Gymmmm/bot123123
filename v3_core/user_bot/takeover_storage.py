@@ -42,22 +42,23 @@ class ProductionAppointmentRepository:
         statuses = tuple(sorted(UNFINISHED_APPOINTMENT_STATUSES))
         placeholders = ",".join("?" for _ in statuses)
         with self._connect() as conn:
-            row = conn.execute(
+            rows = conn.execute(
                 f"""SELECT * FROM appointments
                     WHERE user_id=? AND listing_id=? AND viewing_mode=?
-                      AND appointment_date=? AND appointment_time=?
                       AND status IN ({placeholders})
-                    ORDER BY id DESC LIMIT 1""",
+                    ORDER BY id DESC""",
                 (
                     int(user_id),
                     str(listing_id or "").strip(),
                     str(mode or "offline").strip(),
-                    str(date or "").strip(),
-                    str(time or "").strip(),
                     *statuses,
                 ),
-            ).fetchone()
-        return dict(row) if row is not None else None
+            ).fetchall()
+        from v3_core.user_bot.appointment_dates import same_confirmed_schedule
+        for row in rows:
+            if same_confirmed_schedule(row, str(date or "").strip(), str(time or "").strip()):
+                return dict(row)
+        return None
 
     def get_for_user(self, appointment_id: int, user_id: int) -> dict[str, Any] | None:
         with self._connect() as conn:

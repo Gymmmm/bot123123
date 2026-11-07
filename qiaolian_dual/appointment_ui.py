@@ -7,9 +7,9 @@ from .common import *
 def _appointment_date_keyboard(*, show_video: bool = True) -> InlineKeyboardMarkup:
     today = datetime.now(ZoneInfo('Asia/Phnom_Penh'))
     btns = [
-        InlineKeyboardButton('今天', callback_data='apdate:' + today.strftime('%m-%d')),
-        InlineKeyboardButton('明天', callback_data='apdate:' + (today + timedelta(days=1)).strftime('%m-%d')),
-        InlineKeyboardButton('后天', callback_data='apdate:' + (today + timedelta(days=2)).strftime('%m-%d')),
+        InlineKeyboardButton('今天', callback_data='apdate:' + today.strftime('%Y-%m-%d')),
+        InlineKeyboardButton('明天', callback_data='apdate:' + (today + timedelta(days=1)).strftime('%Y-%m-%d')),
+        InlineKeyboardButton('后天', callback_data='apdate:' + (today + timedelta(days=2)).strftime('%Y-%m-%d')),
     ]
     rows = [
         btns[:2],

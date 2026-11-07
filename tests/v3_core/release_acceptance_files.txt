@@ -1,3 +1,6 @@
+tests/test_appointment_mobile_copy.py
+tests/test_appointment_public_id_display.py
+tests/test_appointment_simplified.py
 tests/v3_core/test_appointment_availability_service.py
 tests/v3_core/test_appointment_bookability_v3.py
 tests/v3_core/test_appointment_channel_alert_gate.py
@@ -19,6 +22,7 @@ tests/v3_core/test_publisher_broadcast_delivery.py
 tests/v3_core/test_publisher_operator_flow.py
 tests/v3_core/test_publisher_p0_manual_pending_dashboard.py
 tests/v3_core/test_publisher_status_confirmation_gate.py
+tests/v3_core/test_release_appointment_calendar.py
 tests/v3_core/test_release_confirmation_and_sync_races.py
 tests/v3_core/test_release_source_repair_pipeline.py
 tests/v3_core/test_status_sync_recovery.py
@@ -42,5 +46,12 @@ tests/v3_core/test_user_bot_telegram_search_navigation.py
 tests/v3_core/test_user_bot_telegram_search_results.py
 tests/v3_core/test_user_bot_telegram_search_submit.py
 tests/v3_core/test_user_bot_telegram_transition_action_handler.py
-tests/v3_core/test_v4_search_filters.py
+tests/v3_core/test_user_bot_telegram_transition_text_handler.py
+tests/v3_core/test_user_bot_telegram_transition_ui.py
+tests/v3_core/test_user_bot_transition_actions.py
+tests/v3_core/test_user_bot_transition_callbacks.py
+tests/v3_core/test_user_bot_transition_text_actions.py
+tests/v3_core/test_user_bot_transition_views.py
 tests/v3_core/test_userbot_ui_route_cleanup.py
+tests/v3_core/test_v4_search_filters.py
+tests/v3_core/test_runtime_readonly_audit_contract.py
