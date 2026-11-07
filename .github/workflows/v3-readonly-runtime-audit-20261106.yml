@@ -56,7 +56,7 @@ jobs:
               try:
                   with Path("/opt/qiaolian_v3/runtime.env").open(encoding="utf-8") as source:
                       for line in source:
-                          match = re.match(r"^(?:export\s+)?([A-Z_]+)=(.*)$", line.strip())
+                          match = re.match(r"^(?:export\s+)?([A-Z][A-Z0-9_]*)=(.*)$", line.strip())
                           if not match or match[1] not in PUBLIC_CONFIG_KEYS:
                               continue
                           parts = shlex.split(match[2], comments=True)

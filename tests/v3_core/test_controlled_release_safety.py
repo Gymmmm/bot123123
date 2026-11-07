@@ -61,6 +61,9 @@ def test_deploy_shell_parses_and_gate_is_not_narrowed():
     assert "inputs.confirm == 'DEPLOY'" in text
     assert "git merge" not in text and "git push" not in text
     assert "raw_output_suppressed=true" in text
+    assert (
+        '--since "$ACTIVATED_AT" --no-pager);' in text
+    )  # Preserve the complete original health-log gate.
     assert "printf '%s\\n' \"$LOGS\"\n" not in text
 
 
@@ -157,12 +160,13 @@ def test_fixed_settings_only_reads_allowlist_never_sources_or_expands(monkeypatc
     def open_config(path, *args, **kwargs):
         assert str(path) == "/opt/qiaolian_v3/runtime.env"
         return io.StringIO(
-            'PUBLISHER_BOT_TOKEN="HOST_ONLY_CANARY"\nCHANNEL_ID=-10012345678\nUNRELATED_SECRET=DO_NOT_READ\nCHANNEL_URL=$(touch /tmp/never)\n'
+            'PUBLISHER_BOT_TOKEN="HOST_ONLY_CANARY"\nCHANNEL_ID=-10012345678\nUNRELATED_SECRET=DO_NOT_READ\nV3_COVER_OUTPUT_DIR=/opt/qiaolian_dual_bots/media/covers_v3\nCHANNEL_URL=$(touch /tmp/never)\n'
         )
 
     monkeypatch.setattr(Path, "open", open_config)
     values = ns["fixed_settings"]()
-    assert set(values) == {"CHANNEL_ID", "PUBLISHER_BOT_TOKEN"}
+    assert set(values) == {"CHANNEL_ID", "PUBLISHER_BOT_TOKEN", "V3_COVER_OUTPUT_DIR"}
+    assert values["V3_COVER_OUTPUT_DIR"] == "/opt/qiaolian_dual_bots/media/covers_v3"
     assert values["PUBLISHER_BOT_TOKEN"] == "HOST_ONLY_CANARY"
 
 

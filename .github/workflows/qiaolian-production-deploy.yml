@@ -311,7 +311,7 @@ jobs:
             test "$(systemctl show "$PUBLISHER" -p MainPID --value)" = 0
             write_hold_marker "$EXPECTED_SHA"
           fi
-          LOGS=$(journalctl -u qiaolian-v3@collector.service -u qiaolian-v3@canonical.service -u qiaolian-v3@publisher.service -u qiaolian-v3@user.service --since "$ACTIVATED_AT" --no-pager -n 1000); echo "SERVICE_LOGS_CHECKED raw_output_suppressed=true"
+          LOGS=$(journalctl -u qiaolian-v3@collector.service -u qiaolian-v3@canonical.service -u qiaolian-v3@publisher.service -u qiaolian-v3@user.service --since "$ACTIVATED_AT" --no-pager); echo "SERVICE_LOGS_CHECKED raw_output_suppressed=true"
           if [ "$HEALTH_FAILED" -ne 0 ] || printf '%s\n' "$LOGS" | grep -Eqi 'Traceback|ModuleNotFoundError|Main process exited|Failed with result|database is locked|sqlite.*error|409.*conflict|Conflict: terminated by other getUpdates request|polling error|callback.*exception|publication.*(error|failed)|appointment.*(error|failed)|lead.*(error|failed)'; then echo 'DEPLOY_HEALTH_FAILED'; false; fi
           "$PYTHON_BOOTSTRAP" - "$DB" <<'PY'
           import sqlite3,sys
