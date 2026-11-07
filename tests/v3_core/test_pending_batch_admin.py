@@ -372,3 +372,55 @@ def test_pending_batch_requires_second_confirmation_and_rejects_old_buttons(tmp_
     assert asyncio.run(invoke(f"v3smp|pbcommit|{token}"))
     with sqlite3.connect(db) as conn:
         assert conn.execute("SELECT COUNT(*) FROM listings_v3 WHERE inventory_status='offline'").fetchone()[0] == 2
+
+
+def test_batch_cancel_return_revokes_old_button(tmp_path):
+    from types import SimpleNamespace
+    from v3_core.publishing.pending_batch_admin import PENDING_BATCH_CONFIRM_KEY
+    db = tmp_path / "cancel.sqlite3"
+    _build_db(db, pending_count=2)
+    controller = _controller(db)
+    message = _Message()
+    context = SimpleNamespace(user_data={})
+
+    async def invoke(data):
+        return await controller.handle_callback(
+            SimpleNamespace(callback_query=SimpleNamespace(data=data, message=message)),
+            context,
+        )
+
+    assert asyncio.run(invoke("v3smp|pbconfirm|active|0"))
+    token = context.user_data[PENDING_BATCH_CONFIRM_KEY]["token"]
+    assert asyncio.run(invoke("v3smp|pbat|0"))
+    assert PENDING_BATCH_CONFIRM_KEY not in context.user_data
+    assert asyncio.run(invoke(f"v3smp|pbcommit|{token}"))
+    with sqlite3.connect(db) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM listings_v3 WHERE inventory_status='pending'").fetchone()[0] == 2
+
+
+def test_batch_confirmation_expires_and_rejects_wrong_admin(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from v3_core.publishing.pending_batch_admin import PENDING_BATCH_CONFIRM_KEY
+    db = tmp_path / "expiry.sqlite3"
+    _build_db(db, pending_count=1)
+    controller = _controller(db)
+    message = _Message()
+    context = SimpleNamespace(user_data={})
+
+    async def invoke(data, admin=123):
+        return await controller.handle_callback(
+            SimpleNamespace(
+                callback_query=SimpleNamespace(data=data, message=message),
+                effective_user=SimpleNamespace(id=admin),
+            ), context,
+        )
+
+    assert asyncio.run(invoke("v3smp|pbconfirm|active|0"))
+    token = context.user_data[PENDING_BATCH_CONFIRM_KEY]["token"]
+    assert asyncio.run(invoke(f"v3smp|pbcommit|{token}", admin=999))
+    with sqlite3.connect(db) as conn:
+        assert conn.execute("SELECT inventory_status FROM listings_v3").fetchone()[0] == "pending"
+    monkeypatch.setattr("v3_core.publishing.pending_batch_admin.time.time", lambda: 99999999999)
+    assert asyncio.run(invoke(f"v3smp|pbcommit|{token}"))
+    with sqlite3.connect(db) as conn:
+        assert conn.execute("SELECT inventory_status FROM listings_v3").fetchone()[0] == "pending"
