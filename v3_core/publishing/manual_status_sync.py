@@ -212,7 +212,8 @@ class PublisherManualStatusSynchronizer:
                 JOIN publication_packages_v3 p ON p.package_id=pi.package_id
                 JOIN listings_v3 l ON l.listing_id=pi.listing_id
                 WHERE pi.listing_id=? AND pi.platform='telegram' AND pi.publish_status='published'
-                AND CAST(COALESCE(pi.channel_message_id,'0') AS INTEGER)>0 ORDER BY pi.id""", (listing_id,)).fetchall()
+                AND CAST(COALESCE(pi.channel_message_id,'0') AS INTEGER)>0
+                ORDER BY pi.updated_at DESC,pi.id DESC LIMIT 1""", (listing_id,)).fetchall()
         status = str(listing[0]) if listing else ""
         result = ManualStatusSyncResult(listing_id, status, False, False, error="published_instance_not_found")
         try:
