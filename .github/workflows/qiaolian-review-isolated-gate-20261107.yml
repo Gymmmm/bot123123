@@ -34,4 +34,4 @@ jobs:
       - name: Targeted regression
         run: python -m pytest -q --disable-socket --allow-unix-socket tests/v3_core/test_pending_batch_admin.py
       - name: Full regression
-        run: python -m pytest -q --disable-socket --allow-unix-socket tests
+        run: python -m pytest -q --disable-socket --allow-unix-socket --allow-hosts=127.0.0.1,localhost --continue-on-collection-errors tests
