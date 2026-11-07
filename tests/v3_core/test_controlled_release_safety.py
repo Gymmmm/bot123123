@@ -356,3 +356,43 @@ def test_live_preflight_uses_absolute_privilege_dropper_and_omits_private_detail
     )
     assert result["ok"] is False and result["exit_code"] == 2
     assert "CANARY" not in json.dumps(result)
+
+
+@pytest.mark.parametrize("event_sha,passed", [("a" * 40, True), ("b" * 40, False)])
+def test_manual_deploy_pins_workflow_revision_to_immutable_application_sha(
+    tmp_path, event_sha, passed
+):
+    text = DEPLOY.read_text()
+    validation = (
+        text.split("- name: Validate requested immutable SHA\n", 1)[1]
+        .split("- name: Checkout requested immutable SHA", 1)[0]
+        .split("run: |\n", 1)[1]
+    )
+    output = tmp_path / "github-env"
+    env = {
+        "PATH": "/usr/bin:/bin",
+        "EVENT_NAME": "workflow_dispatch",
+        "MANUAL_CONFIRM": "DEPLOY",
+        "MANUAL_SHA": "a" * 40,
+        "MANUAL_HOLD": "true",
+        "GITHUB_SHA": event_sha,
+        "GITHUB_ENV": str(output),
+    }
+    result = subprocess.run(
+        ["bash"],
+        input=textwrap.dedent(validation),
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    assert (result.returncode == 0) is passed, result.stderr
+    if passed:
+        assert (
+            "DEPLOY_SHA=" + "a" * 40 in output.read_text()
+            and "HOLD_PUBLISHER=true" in output.read_text()
+        )
+    else:
+        assert (
+            not output.exists()
+            and "workflow_revision_must_match_deploy_sha" in result.stdout
+        )

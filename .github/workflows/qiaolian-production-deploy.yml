@@ -103,6 +103,9 @@ jobs:
             exit 1
           fi
           [[ "$REQUESTED_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo 'DEPLOY_BLOCKED deploy_sha_must_be_full_40_hex_commit'; exit 1; }
+          if [ "$EVENT_NAME" = workflow_dispatch ] && [ "$GITHUB_SHA" != "$REQUESTED_SHA" ]; then
+            echo 'DEPLOY_BLOCKED workflow_revision_must_match_deploy_sha'; exit 1
+          fi
           echo "DEPLOY_SHA=$REQUESTED_SHA" >> "$GITHUB_ENV"
           echo "HOLD_PUBLISHER=$HOLD_PUBLISHER" >> "$GITHUB_ENV"
 

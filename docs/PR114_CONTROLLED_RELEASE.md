@@ -5,7 +5,10 @@
 `.github/workflows/qiaolian-production-deploy.yml` accepts a full 40-hex
 `deploy_sha` from a feature commit; it does not merge, push, require master
 ancestry, or deploy a moving branch HEAD. `--ref` selects the reviewed workflow
-revision; `deploy_sha` selects the exact tested application release. No GitHub
+branch/tag; `deploy_sha` selects the exact tested application release. Manual
+dispatch additionally requires the event workflow SHA to equal deploy_sha, failing
+closed before SSH if the branch moved. gh --ref accepts a branch/tag, not a raw
+commit SHA. No GitHub
 `environment:` is currently bound to this job. Do not invent a bypass if repository
 protection changes. Concurrency remains `qiaolian-v3-production`, no cancellation.
 
@@ -19,9 +22,9 @@ All dispatch inputs:
 After the parent separately approves a release and checks that exact SHA's checks:
 
 ```sh
-# Replace BOTH placeholders with the same reviewed final 40-character SHA.
+# Replace the placeholder with the reviewed final 40-character SHA.
 gh workflow run qiaolian-production-deploy.yml -R Gymmmm/bot123123 \
-  --ref <FINAL_SHA> -f confirm=DEPLOY -f deploy_sha=<FINAL_SHA> \
+  --ref feature/prod-final-gate-20261107 -f confirm=DEPLOY -f deploy_sha=<FINAL_SHA> \
   -F hold_publisher=true
 ```
 
@@ -78,7 +81,7 @@ Never improvise secret extraction or a generic remote-command workflow.
 
 ```sh
 gh workflow run v3-readonly-runtime-audit-20261106.yml \
-  -R Gymmmm/bot123123 --ref <FINAL_SHA>
+  -R Gymmmm/bot123123 --ref feature/prod-final-gate-20261107
 ```
 
 This existing fixed-host audit uses the original host pin and secret only on the
