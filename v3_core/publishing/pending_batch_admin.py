@@ -438,6 +438,7 @@ class PendingBatchOperatorPublisherAdminController(OperatorPublisherAdminControl
                     ]),
                 )
                 return True
+            # Consume confirmation before any side effect; a second click is inert.
             context.user_data.pop(PENDING_BATCH_CONFIRM_KEY, None)
             status = str(saved["status"])
             page = int(saved["page"])
