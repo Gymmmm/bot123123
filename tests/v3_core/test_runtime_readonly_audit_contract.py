@@ -111,7 +111,7 @@ def test_fixed_audit_executes_only_whitelisted_reads_and_emits_no_row_data(
     def run(args, **kwargs):
         calls.append(args)
         assert kwargs.get("capture_output")
-        if args[0] == "runuser":
+        if args[0] == "/usr/sbin/runuser":
             assert (
                 kwargs["check"] is False and "-B" in args and "--initialize" not in args
             )

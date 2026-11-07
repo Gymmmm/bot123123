@@ -319,3 +319,36 @@ def test_real_service_selection_never_restarts_publisher_while_held(held, expect
     services = result.stdout.splitlines()
     assert len(services) == expected
     assert ("qiaolian-v3@publisher.service" in services) is (held == "false")
+
+
+def test_live_preflight_uses_absolute_privilege_dropper_and_omits_private_details(
+    monkeypatch,
+):
+    ns = audit_functions()
+
+    def run(args, **kwargs):
+        assert args[0] == "/usr/sbin/runuser"
+        assert kwargs["env"]["PATH"] == "/usr/bin:/bin"
+        assert "--initialize" not in args and "-B" in args
+        return SimpleNamespace(
+            returncode=2,
+            stdout=json.dumps(
+                {
+                    "ok": False,
+                    "checks": [
+                        {
+                            "name": "storage:tables",
+                            "ok": False,
+                            "detail": "PRIVATE_CANARY",
+                        }
+                    ],
+                }
+            ),
+        )
+
+    monkeypatch.setattr(subprocess, "run", run)
+    result = ns["live_preflight"](
+        {"PUBLISHER_BOT_TOKEN": "HOST_ONLY_CANARY"}, Path("/opt/qiaolian_v3/current")
+    )
+    assert result["ok"] is False and result["exit_code"] == 2
+    assert "CANARY" not in json.dumps(result)

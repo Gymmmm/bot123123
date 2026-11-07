@@ -155,7 +155,7 @@ jobs:
               child_env = dict(values)
               child_env.update(PATH="/usr/bin:/bin", PYTHONDONTWRITEBYTECODE="1")
               try:
-                  process=subprocess.run(["runuser","-u","qiaolianbot","--","/opt/qiaolian_v3/.venv/bin/python","-B",str(current/"run_v3_preflight.py"),"--component","all","--db","/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db"],capture_output=True,text=True,check=False,timeout=30,env=child_env)
+                  process=subprocess.run(["/usr/sbin/runuser","-u","qiaolianbot","--","/opt/qiaolian_v3/.venv/bin/python","-B",str(current/"run_v3_preflight.py"),"--component","all","--db","/opt/qiaolian_dual_bots/data/qiaolian_dual_bot.db"],capture_output=True,text=True,check=False,timeout=30,env=child_env)
                   payload=json.loads(process.stdout)
                   return {"source":"current_deployed_sha_not_candidate","exit_code":process.returncode,"ok":payload.get("ok") is True,"checks":[{"name":str(c.get("name","")),"ok":c.get("ok") is True} for c in payload.get("checks",[])]}
               except Exception as exc:
