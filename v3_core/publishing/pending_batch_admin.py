@@ -440,10 +440,11 @@ class PendingBatchOperatorPublisherAdminController(OperatorPublisherAdminControl
                     ]),
                 )
                 return True
-            # Consume confirmation before any side effect; a second click is inert.
-            context.user_data.pop(PENDING_BATCH_CONFIRM_KEY, None)
             status = str(saved["status"])
             page = int(saved["page"])
+            # Invalidate before the durable write. Duplicate delivery must not
+            # act on a different page or reuse the same confirmation.
+            context.user_data.pop(PENDING_BATCH_CONFIRM_KEY, None)
             updated, skipped = self._apply_pending_ids(status, list(saved["listing_ids"]))
             if updated:
                 queue = context.user_data.setdefault(BATCH_STATUS_SYNC_KEY, [])
