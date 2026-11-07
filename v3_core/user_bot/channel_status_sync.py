@@ -153,6 +153,42 @@ class V3AppointmentChannelSynchronizer:
         conn.execute("PRAGMA busy_timeout=30000")
         return conn
 
+    def _queue_retry(self, listing_id: str, error: str) -> None:
+        """Persist an appointment-origin retry in the Publisher's existing outbox.
+
+        Publisher's periodic sync re-reads *current* inventory_status, verifies
+        the frozen message identity, and edits the bound post idempotently.
+        Never persist a Telegram caption, a stale status, or a send operation.
+        """
+        with self._connect() as conn:
+            conn.execute(
+                """CREATE TABLE IF NOT EXISTS publisher_status_sync_outbox_v3 (
+                    listing_id TEXT PRIMARY KEY,
+                    revision INTEGER NOT NULL DEFAULT 1,
+                    attempts INTEGER NOT NULL DEFAULT 0,
+                    next_attempt REAL NOT NULL DEFAULT 0,
+                    last_error TEXT NOT NULL DEFAULT ''
+                )"""
+            )
+            conn.execute(
+                """INSERT INTO publisher_status_sync_outbox_v3
+                       (listing_id,revision,attempts,next_attempt,last_error)
+                   VALUES (?,1,0,0,?)
+                   ON CONFLICT(listing_id) DO UPDATE SET
+                       revision=revision+1,attempts=0,next_attempt=0,
+                       last_error=excluded.last_error""",
+                (str(listing_id), str(error or "channel_sync_failed")[:240]),
+            )
+            conn.commit()
+
+    def _failed(self, listing_id: str, error: str, *, attempted: bool) -> ChannelStatusSyncResult:
+        try:
+            self._queue_retry(listing_id, error)
+        except Exception:
+            logger.exception("V3 appointment channel sync retry could not be persisted: %s", listing_id)
+            error = f"{error};retry_queue_failed"
+        return ChannelStatusSyncResult(listing_id, attempted=attempted, synced=False, error=error)
+
     def _snapshot(self, listing_id: str) -> tuple[dict[str, Any] | None, int]:
         statuses = tuple(sorted(ACTIVE_APPOINTMENT_STATUSES))
         placeholders = ",".join("?" for _ in statuses)
@@ -184,11 +220,11 @@ class V3AppointmentChannelSynchronizer:
         if not clean:
             return ChannelStatusSyncResult(clean, attempted=False, synced=False, error="listing_id_required")
         if not self.publisher_bot_token or not self.user_bot_username or not self.advisor_url:
-            return ChannelStatusSyncResult(clean, attempted=False, synced=False, error="channel_sync_not_configured")
+            return self._failed(clean, "channel_sync_not_configured", attempted=False)
         try:
             row, active_count = self._snapshot(clean)
             if row is None:
-                return ChannelStatusSyncResult(clean, attempted=False, synced=False, error="published_instance_not_found")
+                return self._failed(clean, "published_instance_not_found", attempted=False)
             previous = str(row.get("inventory_status") or "").strip().lower()
             snapshot = json.loads(str(row.get("snapshot_json") or "{}"))
             public_id = str(snapshot.get("public_listing_id") or "").strip()
@@ -254,7 +290,7 @@ class V3AppointmentChannelSynchronizer:
             )
         except Exception as exc:
             logger.exception("V3 channel appointment status sync failed: listing_id=%s", clean)
-            return ChannelStatusSyncResult(clean, attempted=True, synced=False, error=str(exc))
+            return self._failed(clean, str(exc), attempted=True)
 
 
 __all__ = [
