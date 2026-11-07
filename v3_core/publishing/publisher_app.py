@@ -12,7 +12,7 @@ from .broadcast import BroadcastService, BroadcastSettingsRepository
 from .broadcast_admin import BROADCAST_EDIT_STATE_KEY
 from .marketing_broadcast import MarketingBroadcastService
 from .manual_status_sync import PublisherManualStatusSynchronizer
-from .pending_batch_admin import BATCH_STATUS_SYNC_KEY
+from .pending_batch_admin import BATCH_STATUS_SYNC_KEY, PENDING_BATCH_CONFIRM_KEY
 from .publisher_adviser_ui import PublisherAdviserAdminController
 from .publisher_center_ui import PublisherCenterAdminController
 from .simple_admin import NEW_LISTING_STATE_KEY, SIMPLE_EDIT_STATE_KEY
@@ -74,8 +74,14 @@ class V3PublisherApplication(PublisherAdminBot):
             await query.answer()
             try:
                 handled=await self.simple.handle_callback(update,context); parts=raw.split("|")
-                if handled and len(parts)==5 and parts[1]=="status_apply":
-                    status,listing_id=parts[2],parts[3]; result=await self.manual_status_sync.sync(context.bot,listing_id=listing_id,status=status)
+                if handled and len(parts)==3 and parts[1]=="status_apply":
+                    # The consumed token is the only authorization; sync current inventory, never callback status.
+                    token=parts[2]
+                    with __import__("sqlite3").connect(self.simple.db_path) as conn:
+                        row=conn.execute("SELECT listing_id,target FROM publisher_status_confirmations_v3 WHERE token=? AND consumed=1",(token,)).fetchone()
+                    if row is None: return
+                    listing_id,status=row
+                    result=await self.manual_status_sync.sync(context.bot,listing_id=listing_id,status=status)
                     if result.attempted and not result.synced: await query.message.reply_text("⚠️ 频道房态正在自动重试，无需重复操作。",reply_markup=InlineKeyboardMarkup([self._home_button()]))
                 if handled:
                     await self._sync_batch_statuses(context, query.message)
@@ -115,7 +121,7 @@ class V3PublisherApplication(PublisherAdminBot):
         if isinstance(state,dict):
             task=state.get("_album_task")
             if task and not task.done(): task.cancel()
-        context.user_data.pop("v3_publisher_edit",None); context.user_data.pop(BROADCAST_EDIT_STATE_KEY,None); context.user_data.pop(SIMPLE_EDIT_STATE_KEY,None); context.user_data.pop(BATCH_STATUS_SYNC_KEY,None); context.user_data.pop("v3_inventory_batch_selection",None)
+        context.user_data.pop("v3_publisher_edit",None); context.user_data.pop(BROADCAST_EDIT_STATE_KEY,None); context.user_data.pop(SIMPLE_EDIT_STATE_KEY,None); context.user_data.pop(BATCH_STATUS_SYNC_KEY,None); context.user_data.pop("v3_inventory_batch_selection",None); context.user_data.pop(PENDING_BATCH_CONFIRM_KEY,None)
         await update.effective_message.reply_text("已取消当前操作。",reply_markup=InlineKeyboardMarkup([self._home_button()]))
 
     def build_application(self):
