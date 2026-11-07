@@ -329,6 +329,7 @@ class PendingBatchOperatorPublisherAdminController(OperatorPublisherAdminControl
                 cur = conn.execute(
                     f"""UPDATE listings_v3 SET inventory_status=?,updated_at=CURRENT_TIMESTAMP
                          WHERE listing_id=?
+                           AND inventory_status='pending'
                            AND EXISTS (
                                SELECT 1 FROM listings_v3 l
                                 WHERE l.listing_id=listings_v3.listing_id
