@@ -295,8 +295,11 @@ async def test_failed_appointment_channel_edit_queues_durable_latest_status_retr
         advisor_url="https://t.me/qiaolian_advisor",
     )
     await publisher.scheduled_tick(SimpleNamespace(bot=fake))
-    assert {call["message_id"] for call in fake.calls} == {111, 222}
+    assert {call["message_id"] for call in fake.calls} == {222}
     assert all("已租出" in call["caption"] for call in fake.calls)
+    with sqlite3.connect(db_path) as conn:
+        old_post = conn.execute("SELECT post_text FROM publication_instances WHERE instance_id='PUB_OLD'").fetchone()[0]
+    assert "已有预约" in old_post
     with sqlite3.connect(db_path) as conn:
         remaining = conn.execute(
             "SELECT COUNT(*) FROM publisher_status_sync_outbox_v3 WHERE listing_id='l_1'"
