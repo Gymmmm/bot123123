@@ -35,3 +35,24 @@ jobs:
         run: python -m pytest -q --disable-socket --allow-unix-socket tests/v3_core/test_pending_batch_admin.py tests/v3_core/test_publisher_status_confirmation_gate.py tests/v3_core/test_user_bot_channel_status_sync.py tests/v3_core/test_appointment_channel_alert_gate.py tests/v3_core/test_status_sync_recovery.py
       - name: Full regression
         run: python -m pytest -q --disable-socket --allow-unix-socket --allow-hosts=127.0.0.1,localhost --continue-on-collection-errors tests
+
+      - name: Baseline and PR same-environment comparison
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          git fetch --no-tags --depth=1 origin 1a7c4c44cb47478aaf9d30aa89aa5ee012eafacf
+          git worktree add --detach /tmp/qiaolian-pr114-baseline 1a7c4c44cb47478aaf9d30aa89aa5ee012eafacf
+          mkdir -p /tmp/qiaolian-pr114-comparison
+          for version in baseline candidate; do
+            if [ "$version" = baseline ]; then cd /tmp/qiaolian-pr114-baseline; else cd "$GITHUB_WORKSPACE"; fi
+            python -m pytest -q --disable-socket --allow-unix-socket --allow-hosts=127.0.0.1,localhost --continue-on-collection-errors tests > "/tmp/qiaolian-pr114-comparison/$version.log" 2>&1
+            echo "$version exit=$?" | tee -a /tmp/qiaolian-pr114-comparison/summary.txt
+            tail -n 24 "/tmp/qiaolian-pr114-comparison/$version.log" | tee -a /tmp/qiaolian-pr114-comparison/summary.txt
+          done
+      - name: Upload baseline comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr114-baseline-candidate-comparison
+          path: /tmp/qiaolian-pr114-comparison/
