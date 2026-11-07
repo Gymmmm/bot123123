@@ -305,3 +305,69 @@ def test_eleven_eligible_pending_split_into_ten_and_one(tmp_path: Path):
 
     assert len(controller._pending_batch_rows(0)) == 10
     assert [row["listing_id"] for row in controller._pending_batch_rows(1)] == ["l_11"]
+
+
+def test_pending_batch_confirm_binds_exact_ids_when_page_changes(tmp_path: Path):
+    from types import SimpleNamespace
+    from v3_core.publishing.pending_batch_admin import PENDING_BATCH_CONFIRM_KEY
+
+    db = tmp_path / "qiaolian.db"
+    _build_db(db, pending_count=12)
+    controller = _controller(db)
+    message = _Message()
+    context = SimpleNamespace(user_data={})
+    asyncio.run(controller._confirm_pending_batch(message, context, "offline", 0))
+    original = context.user_data[PENDING_BATCH_CONFIRM_KEY]["listing_ids"]
+    assert original == [f"l_{i:02d}" for i in range(1, 11)]
+
+    with sqlite3.connect(db) as conn:
+        conn.execute("UPDATE listings_v3 SET inventory_status='rented' WHERE listing_id='l_01'")
+        conn.commit()
+    # The original first page now starts with l_02 and includes l_11.
+    assert "l_11" in [r["listing_id"] for r in controller._pending_batch_rows(0)]
+    updated, skipped = controller._apply_pending_ids("offline", original)
+    assert updated == [f"l_{i:02d}" for i in range(2, 11)]
+    assert skipped == ["l_01"]
+    with sqlite3.connect(db) as conn:
+        assert conn.execute("SELECT inventory_status FROM listings_v3 WHERE listing_id='l_11'").fetchone()[0] == "pending"
+
+
+def test_pending_batch_commit_rechecks_publication_eligibility(tmp_path: Path):
+    db = tmp_path / "qiaolian.db"
+    _build_db(db, pending_count=2)
+    controller = _controller(db)
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            "INSERT INTO publication_instances(listing_id,offer_id,platform,publish_status) VALUES ('l_02','off_02','telegram','published')"
+        )
+        conn.commit()
+    updated, skipped = controller._apply_pending_ids("active", ["l_01", "l_02"])
+    assert updated == ["l_01"]
+    assert skipped == ["l_02"]
+
+
+def test_pending_batch_requires_second_confirmation_and_rejects_old_buttons(tmp_path: Path):
+    from types import SimpleNamespace
+    from v3_core.publishing.pending_batch_admin import PENDING_BATCH_CONFIRM_KEY
+
+    db = tmp_path / "qiaolian.db"
+    _build_db(db, pending_count=2)
+    controller = _controller(db)
+    context = SimpleNamespace(user_data={})
+    message = _Message()
+
+    async def invoke(callback):
+        update = SimpleNamespace(callback_query=SimpleNamespace(data=callback, message=message))
+        return await controller.handle_callback(update, context)
+
+    assert asyncio.run(invoke("v3smp|pbapply|offline|0"))
+    with sqlite3.connect(db) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM listings_v3 WHERE inventory_status='pending'").fetchone()[0] == 2
+    assert asyncio.run(invoke("v3smp|pbconfirm|offline|0"))
+    token = context.user_data[PENDING_BATCH_CONFIRM_KEY]["token"]
+    assert asyncio.run(invoke(f"v3smp|pbcommit|{token}"))
+    with sqlite3.connect(db) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM listings_v3 WHERE inventory_status='offline'").fetchone()[0] == 2
+    assert asyncio.run(invoke(f"v3smp|pbcommit|{token}"))
+    with sqlite3.connect(db) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM listings_v3 WHERE inventory_status='offline'").fetchone()[0] == 2
