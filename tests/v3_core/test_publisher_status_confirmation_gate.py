@@ -53,7 +53,7 @@ def _status(path):
 
 
 def _callback(controller, message, data):
-    update = SimpleNamespace(callback_query=SimpleNamespace(data=data, message=message))
+    update = SimpleNamespace(callback_query=SimpleNamespace(data=data, message=message), effective_user=SimpleNamespace(id=123))
     return asyncio.run(controller.handle_callback(update, SimpleNamespace(user_data={})))
 
 
@@ -66,7 +66,7 @@ def test_restore_requires_confirmation_and_rechecks_original_status(tmp_path):
     assert _status(path) == "offline"
     keyboard = message.calls[-1][1]["reply_markup"]
     confirmation = keyboard.inline_keyboard[0][0].callback_data
-    assert confirmation == "v3smp|status_apply|active|l_01|offline"
+    assert confirmation.startswith("v3smp|status_apply|") and len(confirmation.split("|")) == 3
 
     with sqlite3.connect(path) as conn:
         conn.execute("UPDATE listings_v3 SET inventory_status='rented' WHERE listing_id='l_01'")
@@ -90,7 +90,8 @@ def test_confirmed_status_updates_once_and_replay_is_safe(tmp_path):
     _db(path)
     controller = _controller(path)
     message = _Message()
-    callback = "v3smp|status_apply|active|l_01|offline"
+    assert _callback(controller, message, "v3smp|status|active|l_01")
+    callback = message.calls[-1][1]["reply_markup"].inline_keyboard[0][0].callback_data
     assert _callback(controller, message, callback)
     assert _status(path) == "active"
     assert not _callback(controller, message, callback)
@@ -116,3 +117,30 @@ def test_villa_exterior_exception_exposes_safe_add_photo_exit():
     }
     assert actions["补充别墅外观图"] == "v3smp|addmedia|offer_9"
     assert "重新检查并发布" in actions
+
+
+def test_status_roundtrip_rejects_old_unconsumed_confirmation(tmp_path):
+    path = tmp_path / "roundtrip.sqlite3"
+    _db(path)
+    controller = _controller(path)
+    message = _Message()
+    assert _callback(controller, message, "v3smp|status|active|l_01")
+    old = message.calls[-1][1]["reply_markup"].inline_keyboard[0][0].callback_data
+    with sqlite3.connect(path) as conn:
+        conn.execute("UPDATE listings_v3 SET inventory_status='rented' WHERE listing_id='l_01'")
+        conn.execute("UPDATE listings_v3 SET inventory_status='offline' WHERE listing_id='l_01'")
+    assert not _callback(controller, message, old)
+    assert _status(path) == "offline"
+
+
+def test_status_token_wrong_admin_and_expiry(tmp_path, monkeypatch):
+    path = tmp_path / "token.sqlite3"
+    _db(path)
+    controller = _controller(path)
+    message = _Message()
+    assert _callback(controller, message, "v3smp|status|active|l_01")
+    token = message.calls[-1][1]["reply_markup"].inline_keyboard[0][0].callback_data.split("|")[2]
+    assert not controller._apply_confirmed_status(token, "wrong-admin")
+    monkeypatch.setattr("v3_core.publishing.simple_admin.time.time", lambda: 99999999999)
+    assert not controller._apply_confirmed_status(token, "123")
+    assert _status(path) == "offline"
