@@ -1,7 +1,8 @@
 name: qiaolian-review-isolated-gate
 on:
   push:
-    branches: [feature/prod-final-gate-20261107]
+    branches:
+      - feature/prod-final-gate-20261107
 
 permissions:
   contents: read
@@ -48,47 +49,3 @@ jobs:
         run: |
           python -m pytest -q -p pytest_socket --disable-socket --allow-hosts=127.0.0.1,localhost,::1 tests
 
-  production-readonly:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Verify current runtime without changing production
-        env:
-          PROD_SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
-        run: |
-          set -Eeuo pipefail
-          test -n "$PROD_SSH_PRIVATE_KEY"
-          install -d -m 700 "$HOME/.ssh"
-          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_ro"
-          chmod 600 "$HOME/.ssh/qiaolian_ro"
-          trap 'rm -f "$HOME/.ssh/qiaolian_ro"' EXIT
-          ssh-keyscan -T 10 -t ed25519 50.114.74.120 2>/dev/null | grep -v '^#' > "$HOME/.ssh/known_hosts"
-          ssh-keygen -lf "$HOME/.ssh/known_hosts" | grep -F 'SHA256:fuufBlFaqRpQhlkio0vuLsuv8w8x3zUb3VFQsnUny/o'
-          ssh -i "$HOME/.ssh/qiaolian_ro" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 root@50.114.74.120 'bash -s' <<'REMOTE'
-          set -Eeuo pipefail
-          echo LIVE_RELEASE="$(readlink -f /opt/qiaolian_v3/current)"
-          cd /opt/qiaolian_v3/current
-          echo LIVE_SHA="$(git rev-parse HEAD)"
-          echo LIVE_DEPLOYED_SHA="$(cat /opt/qiaolian_v3/.deployed_sha 2>/dev/null || echo unavailable)"
-          for component in collector canonical publisher user; do
-            unit="qiaolian-v3@${component}.service"
-            echo "UNIT=${unit}"
-            systemctl show "$unit" -p ActiveState -p MainPID -p FragmentPath -p WorkingDirectory -p ExecStart --no-pager
-          done
-          echo "CRON_ROOT_START"
-          crontab -l -u root 2>/dev/null || true
-          echo "CRON_ROOT_END"
-          echo "CRON_QIAOLIANBOT_START"
-          crontab -l -u qiaolianbot 2>/dev/null || true
-          echo "CRON_QIAOLIANBOT_END"
-          echo "SYSTEM_TIMERS"
-          systemctl list-timers --all --no-pager --no-legend | grep -i qiaolian || true
-          echo "LEGACY_SYSTEM_CONFIG_REFERENCES"
-          grep -REn 'one_source_group_once|publish_qc0002_two_step|rebuild_and_publish_qc_batch|rebuild_publish_qc0002_10|prepare_test_package|run_user_bot[.]py' /etc/systemd/system /etc/cron.d /etc/crontab /etc/cron.daily /etc/cron.hourly /etc/cron.weekly 2>/dev/null || true
-          echo "OCR_EXECUTABLE"
-          command -v tesseract || true
-          if command -v tesseract >/dev/null 2>&1; then
-            tesseract --version 2>&1 | head -n 2
-            tesseract --list-langs 2>&1
-          fi
-          REMOTE
