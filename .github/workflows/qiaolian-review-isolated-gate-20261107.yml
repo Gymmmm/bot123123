@@ -1,0 +1,94 @@
+name: qiaolian-review-isolated-gate
+on:
+  push:
+    branches: [feature/prod-final-gate-20261107]
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      USER_BOT_TOKEN: "123456:OFFLINE_TEST_TOKEN"
+      PUBLISHER_BOT_TOKEN: "123456:OFFLINE_TEST_TOKEN"
+      DB_PATH: "${{ runner.temp }}/qiaolian-review-isolated.sqlite3"
+      COLLECTOR_DOWNLOAD_DIR: "${{ runner.temp }}/collector-files"
+      TELETHON_SESSION_PATH: "${{ runner.temp }}/collector.session"
+      PYTHONPATH: "${{ github.workspace }}"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install OCR and test dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y tesseract-ocr tesseract-ocr-eng tesseract-ocr-chi-sim
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pytest pytest-asyncio pytest-socket
+      - name: Verify executable and OCR languages
+        run: |
+          command -v tesseract
+          tesseract --version
+          tesseract --list-langs
+          tesseract --list-langs 2>&1 | grep -Fx 'eng'
+          tesseract --list-langs 2>&1 | grep -Fx 'chi_sim'
+      - name: Compile V3 and targeted tests
+        run: |
+          python -m compileall -q v3_core qiaolian_dual tests
+      - name: Targeted isolated publisher regression
+        run: |
+          python -m pytest -q -p pytest_socket --disable-socket --allow-hosts=127.0.0.1,localhost,::1 tests/v3_core/test_pending_batch_admin.py
+      - name: Full isolated tests directory
+        if: always()
+        run: |
+          python -m pytest -q -p pytest_socket --disable-socket --allow-hosts=127.0.0.1,localhost,::1 tests
+
+  production-readonly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify current runtime without changing production
+        env:
+          PROD_SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+        run: |
+          set -Eeuo pipefail
+          test -n "$PROD_SSH_PRIVATE_KEY"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/qiaolian_ro"
+          chmod 600 "$HOME/.ssh/qiaolian_ro"
+          trap 'rm -f "$HOME/.ssh/qiaolian_ro"' EXIT
+          ssh-keyscan -T 10 -t ed25519 50.114.74.120 2>/dev/null | grep -v '^#' > "$HOME/.ssh/known_hosts"
+          ssh-keygen -lf "$HOME/.ssh/known_hosts" | grep -F 'SHA256:fuufBlFaqRpQhlkio0vuLsuv8w8x3zUb3VFQsnUny/o'
+          ssh -i "$HOME/.ssh/qiaolian_ro" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 root@50.114.74.120 'bash -s' <<'REMOTE'
+          set -Eeuo pipefail
+          echo LIVE_RELEASE="$(readlink -f /opt/qiaolian_v3/current)"
+          cd /opt/qiaolian_v3/current
+          echo LIVE_SHA="$(git rev-parse HEAD)"
+          echo LIVE_DEPLOYED_SHA="$(cat /opt/qiaolian_v3/.deployed_sha 2>/dev/null || echo unavailable)"
+          for component in collector canonical publisher user; do
+            unit="qiaolian-v3@${component}.service"
+            echo "UNIT=${unit}"
+            systemctl show "$unit" -p ActiveState -p MainPID -p FragmentPath -p WorkingDirectory -p ExecStart --no-pager
+          done
+          echo "CRON_ROOT_START"
+          crontab -l -u root 2>/dev/null || true
+          echo "CRON_ROOT_END"
+          echo "CRON_QIAOLIANBOT_START"
+          crontab -l -u qiaolianbot 2>/dev/null || true
+          echo "CRON_QIAOLIANBOT_END"
+          echo "SYSTEM_TIMERS"
+          systemctl list-timers --all --no-pager --no-legend | grep -i qiaolian || true
+          echo "LEGACY_SYSTEM_CONFIG_REFERENCES"
+          grep -REn 'one_source_group_once|publish_qc0002_two_step|rebuild_and_publish_qc_batch|rebuild_publish_qc0002_10|prepare_test_package|run_user_bot[.]py' /etc/systemd/system /etc/cron.d /etc/crontab /etc/cron.daily /etc/cron.hourly /etc/cron.weekly 2>/dev/null || true
+          echo "OCR_EXECUTABLE"
+          command -v tesseract || true
+          if command -v tesseract >/dev/null 2>&1; then
+            tesseract --version 2>&1 | head -n 2
+            tesseract --list-langs 2>&1
+          fi
+          REMOTE
