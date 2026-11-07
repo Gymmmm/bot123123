@@ -11,6 +11,7 @@ from __future__ import annotations
 from html import escape
 import secrets
 import sqlite3
+import time
 from typing import Any
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -300,9 +301,11 @@ class PendingBatchOperatorPublisherAdminController(OperatorPublisherAdminControl
         if not listing_ids:
             await self.show_pending_batch(message, page)
             return
-        token = secrets.token_hex(6)
+        token = secrets.token_hex(12)
         context.user_data[PENDING_BATCH_CONFIRM_KEY] = {
             "token": token,
+            "admin_id": str(getattr(getattr(context, "user_data", None), "get", lambda *_: "")("_admin_id", "")),
+            "expires_at": time.time() + 300,
             "status": status,
             "page": page,
             "listing_ids": listing_ids,
@@ -406,12 +409,15 @@ class PendingBatchOperatorPublisherAdminController(OperatorPublisherAdminControl
         action = parts[1] if len(parts) > 1 else ""
 
         if action == "pbat" and len(parts) == 3:
+            context.user_data.pop(PENDING_BATCH_CONFIRM_KEY, None)
             await self.show_pending_batch(query.message, int(parts[2]))
             return True
         if action == "pbpick" and len(parts) == 3:
+            context.user_data.pop(PENDING_BATCH_CONFIRM_KEY, None)
             await self.show_pending_pick(query.message, int(parts[2]))
             return True
         if action == "pbone" and len(parts) == 4:
+            context.user_data.pop(PENDING_BATCH_CONFIRM_KEY, None)
             await self.show_pending_one(query.message, parts[2], int(parts[3]))
             return True
         if action == "pbapply" and len(parts) == 4:
@@ -431,7 +437,7 @@ class PendingBatchOperatorPublisherAdminController(OperatorPublisherAdminControl
             saved = context.user_data.get(PENDING_BATCH_CONFIRM_KEY)
             if not isinstance(saved, dict) or not secrets.compare_digest(
                 str(saved.get("token") or ""), parts[2]
-            ):
+            ) or float(saved.get("expires_at") or 0) <= time.time():
                 await query.message.reply_text(
                     "确认已失效，请重新选择房源。",
                     reply_markup=InlineKeyboardMarkup([
@@ -464,6 +470,8 @@ class PendingBatchOperatorPublisherAdminController(OperatorPublisherAdminControl
             await self.show_pending_batch(query.message, page)
             return True
 
+        if action != "pbcommit":
+            context.user_data.pop(PENDING_BATCH_CONFIRM_KEY, None)
         return await super().handle_callback(update, context)
 
 
