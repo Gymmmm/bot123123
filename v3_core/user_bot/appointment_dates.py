@@ -78,7 +78,9 @@ def booking_date(value: object, *, now: datetime | None = None) -> str:
         raise ValueError("appointment_date_invalid") from exc
 
 
-def legacy_date(value: object, created_at: str) -> date | None:
+def legacy_date(
+    value: object, created_at: str, *, viewing_date: date | None = None
+) -> date | None:
     parts = _parts(value)
     if parts and parts[0] is not None:
         try:
@@ -95,13 +97,15 @@ def legacy_date(value: object, created_at: str) -> date | None:
         return None
     _, month, day = parts
     try:
-        target = date(anchor.year, month, day)
-        if 0 <= (target - anchor).days <= 2:
+        year = anchor.year + (1 if anchor.month == 12 and month == 1 else 0)
+        target = date(year, month, day)
+        # Creation context can show a nearby upcoming old booking. It cannot
+        # prove completion once a yearless row is past: old edits lost their
+        # selection timestamp/year. Keep that row visible for confirmation.
+        if 0 <= (target - anchor).days <= 2 and (
+            viewing_date is None or target >= viewing_date
+        ):
             return target
-        if anchor.month == 12 and month == 1:
-            rolled = date(anchor.year + 1, month, day)
-            if 0 <= (rolled - anchor).days <= 2:
-                return rolled
     except ValueError:
         pass
     return None

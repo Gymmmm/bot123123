@@ -164,7 +164,7 @@ def test_v4_status_mapping_only_shows_completed_when_derivable():
 
 def test_past_confirmed_booking_is_listed_as_completed(tmp_path):
     db, service = _service(tmp_path)
-    _insert_appointment(db, appointment_id=1, date="09-01", time="am", status="confirmed", created_at="2026-08-30 10:00:00")
+    _insert_appointment(db, appointment_id=1, date="2026-09-01", time="am", status="confirmed", created_at="2026-08-30 10:00:00")
     view = service.build(123, now=datetime(2026, 9, 9, 12, 0, tzinfo=ZoneInfo("Asia/Phnom_Penh")))
     assert view.items == ()
     assert "最近记录" in view.text

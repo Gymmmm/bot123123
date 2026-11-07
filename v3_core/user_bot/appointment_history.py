@@ -131,7 +131,7 @@ _OPEN_STATUSES = frozenset({"pending", "assigned", "contacted", "confirmed"})
 
 
 def _record_date(record: AppointmentHistoryRecord, *, now: datetime):
-    return legacy_date(record.appointment_date, record.created_at)
+    return legacy_date(record.appointment_date, record.created_at, viewing_date=now.date())
 
 
 def _is_upcoming(record: AppointmentHistoryRecord, *, now: datetime) -> bool:

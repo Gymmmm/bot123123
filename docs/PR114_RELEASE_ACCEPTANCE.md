@@ -60,12 +60,13 @@ Comparison artifacts contain complete logs, not a historical-failure assumption.
 
 * Appointment-history calendar gap is now repaired without schema migration or
   bulk rewrites. New date selection/confirmation stores ISO calendar dates with
-  Phnom Penh date/time interpretation (existing created_at storage stays unchanged); relative input is frozen before midnight
-  can move it. Existing slots retain their fixed time windows; custom times are
+  Phnom Penh date/time interpretation (existing created_at storage stays unchanged);
+  relative input is frozen before midnight can move it. Existing slots retain their fixed time windows; custom times are
   concrete clock values. Both legacy and V3 repositories reconcile known date/
   time aliases for duplicate checks. Cancellation and rescheduling stay intact.
   Legacy yearless dates use the creation context only inside the existing quick
-  picker's 0/1/2-day horizon, including Dec/Jan rollover. Other unknown years,
+  picker's 0/1/2-day horizon, including Dec/Jan rollover. Once a yearless row is
+  past, its lost selection/year context must also be confirmed: creation proximity is not proof of completion. Other unknown years,
   invalid dates and old relative strings remain visible as date-needs-confirmation,
   never guessed completed. Known ISO past dates retain completed semantics.
 * The existing V3 readonly runtime audit workflow has been narrowed to fixed
@@ -73,11 +74,16 @@ Comparison artifacts contain complete logs, not a historical-failure assumption.
   switches and aggregate queue counts. It has no command inputs, repository code
   execution, runtime/proc environment reads, raw logs or user/source identifiers.
   It reuses only its original host pin and original Actions-held SSH secret.
-  Production execution evidence must be checked before claiming today's facts.
-* Last authenticated production fact remains the 2026-11-06 audit. Deployment
-  references two DB paths; same-inode/symlink identity must be proved first.
+  Successful real audit: https://github.com/Gymmmm/bot123123/actions/runs/42360408689
+  Snapshot 2026-11-07 16:35:53 Phnom Penh UTC+7: current
+  `1a7c4c44cb47478aaf9d30aa89aa5ee012eafacf`; four services active, expected
+  run_component entrypoints; both fixed DB paths resolve to the same file and
+  device/inode (2049/390582). All three auto-publish/broadcast switches are present
+  and true. Queued/sending/sync-outbox counts are zero; unknown_delivery is 21
+  (untouched). The feature's in-flight table is absent on this old production SHA.
 * Publisher restart schedules autopilot; deployment can publish backlog. The
-  production switch, backup/integrity and rollback readiness need real inspection.
+  switches are now verified enabled; backup/integrity and rollback readiness
+  still need release-time inspection. Restart must not be presumed message-free.
   Unknown sends require individual reconciliation, never automatic replay.
 * Test-channel business closure, physical phone and production behavior are not
   accepted by this offline collection. No real messages or production DB writes
@@ -92,3 +98,13 @@ release-path collection 317 passed, no skips; full 1657 passed, 113 failed,
 One inherited search-card mock failure was fixed, no tests removed. Current date
 and readonly-audit changes must pass their own latest-SHA CI; this is not a waiver
 of remaining legacy/UI failures or a production release approval.
+
+Run https://github.com/Gymmmm/bot123123/actions/runs/42360408687 on
+`8987c039fa3c7563ecbd095a4a9d1df1019d1081` completed: targeted 56 passed;
+release-path collection 433 passed with real OCR and no skips; full 1712 passed,
+110 failed, 9 collection errors. Same environment/base remained 1623 passed,
+114 failed, 9 errors. Full failing-node comparison finds no newly failing IDs.
+The four resolved IDs are the search-card fixture plus three legacy simplified
+appointment tests whose mocks missed the real inventory adapter. All product
+assertions remain. The conservative past-yearless guard added afterward must
+pass its own latest-SHA CI; remaining failures are not waived.

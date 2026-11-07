@@ -120,7 +120,7 @@ def test_ambiguous_or_invalid_legacy_open_booking_remains_visible(raw, created):
 
 def test_provable_past_and_terminal_rows_keep_original_semantics():
     assert "已完成" in _history("2026-11-06", "").text
-    assert "已完成" in _history("06-02", "2025-06-01").text
+    assert "日期待确认" in _history("06-02", "2025-06-01").text
     assert "已取消" in _history("不明", "", status="cancelled").text
 
 
@@ -305,3 +305,11 @@ def test_relative_selection_does_not_move_when_confirmation_crosses_midnight(
     assert (
         repo.get_for_user(saved.appointment_id, 7)["appointment_date"] == "2027-01-01"
     )
+
+
+def test_yearless_booking_cannot_be_guessed_completed_after_rollover():
+    view = _history(
+        "01-01", "2026-12-31 12:00:00", now=datetime(2027, 1, 2, 12, tzinfo=TZ)
+    )
+    assert len(view.items) == 1
+    assert "日期待确认" in view.text and "已完成" not in view.text
