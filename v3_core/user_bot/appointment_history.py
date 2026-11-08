@@ -19,6 +19,7 @@ from v3_core.publishing.public_ids import normalize_public_id
 from v3_core.status_labels import APPOINTMENT_STATUS_LABELS
 
 from .appointments import APPOINTMENT_MODE_LABELS, APPOINTMENT_TIME_LABELS
+from .appointment_dates import legacy_date, PHNOM_PENH
 from .listing_presenter import build_public_listing_details
 from .public_inventory import PublicInventoryReader
 
@@ -43,6 +44,7 @@ class AppointmentHistoryItem:
     appointment_date: str
     appointment_time: str
     status: str
+    date_confirmation_required: bool = False
 
 
 @dataclass(frozen=True)
@@ -129,24 +131,14 @@ _OPEN_STATUSES = frozenset({"pending", "assigned", "contacted", "confirmed"})
 
 
 def _record_date(record: AppointmentHistoryRecord, *, now: datetime):
-    bits = record.appointment_date.replace("/", "-").split("-")
-    try:
-        nums = [int(part) for part in bits if part.isdigit()]
-        if len(nums) >= 3:
-            year, month, day = nums[-3], nums[-2], nums[-1]
-        else:
-            month, day = nums[-2], nums[-1]
-            year = now.year
-        return datetime(year, month, day, tzinfo=now.tzinfo).date()
-    except (ValueError, IndexError):
-        return None
+    return legacy_date(record.appointment_date, record.created_at, viewing_date=now.date())
 
 
 def _is_upcoming(record: AppointmentHistoryRecord, *, now: datetime) -> bool:
     if record.status not in _OPEN_STATUSES:
         return False
     when = _record_date(record, now=now)
-    return when is not None and when >= now.date()
+    return when is None or when >= now.date()
 
 
 def display_status(status: str, *, past: bool = False) -> tuple[str, str]:
@@ -183,7 +175,7 @@ def _subject(record: AppointmentHistoryRecord, inventory: PublicInventoryReader)
     return details.subject or details.location or "这套房"
 
 
-def _item(record: AppointmentHistoryRecord, inventory: PublicInventoryReader) -> AppointmentHistoryItem:
+def _item(record: AppointmentHistoryRecord, inventory: PublicInventoryReader, *, needs_confirmation: bool = False) -> AppointmentHistoryItem:
     return AppointmentHistoryItem(
         appointment_id=record.appointment_id,
         public_listing_id=record.public_listing_id,
@@ -192,6 +184,7 @@ def _item(record: AppointmentHistoryRecord, inventory: PublicInventoryReader) ->
         appointment_date=record.appointment_date,
         appointment_time=record.appointment_time,
         status=record.status,
+        date_confirmation_required=needs_confirmation,
     )
 
 
@@ -201,6 +194,8 @@ _USER_MODE_LABELS = {"video": "视频带看"}
 
 def _lines(item: AppointmentHistoryItem, *, past: bool = False) -> list[str]:
     status_icon, status_label = display_status(item.status, past=past)
+    if item.date_confirmation_required:
+        status_icon, status_label = "🟡", "日期待确认（请联系顾问）"
     mode = _USER_MODE_LABELS.get(item.viewing_mode) or APPOINTMENT_MODE_LABELS.get(
         item.viewing_mode, item.viewing_mode or "待确认"
     )
@@ -234,7 +229,7 @@ class AppointmentHistoryService:
         if not records:
             return AppointmentHistoryView(text=EMPTY_HISTORY_TEXT, items=(), history_count=0)
 
-        local_now = now or datetime.now(ZoneInfo("Asia/Phnom_Penh"))
+        local_now = now.astimezone(PHNOM_PENH) if now and now.tzinfo else (now.replace(tzinfo=PHNOM_PENH) if now else datetime.now(PHNOM_PENH))
         upcoming_records = tuple(record for record in records if _is_upcoming(record, now=local_now))
         history_records = tuple(record for record in records if record not in upcoming_records)
         recent_records = tuple(r for r in history_records if _is_recent_history(r, now=local_now))[:2]
@@ -244,7 +239,7 @@ class AppointmentHistoryService:
                 items=(),
                 history_count=len(history_records),
             )
-        items = tuple(_item(record, self.inventory) for record in upcoming_records[:2])
+        items = tuple(_item(record, self.inventory, needs_confirmation=_record_date(record, now=local_now) is None) for record in upcoming_records[:2])
 
         parts = ["📋 <b>我的看房预约</b>"]
         for item in items:
@@ -252,6 +247,9 @@ class AppointmentHistoryService:
             parts.extend(_lines(item))
         if len(upcoming_records) > 2:
             parts.extend(["", "更多预约记录请联系中文顾问。"])
+        hidden_uncertain = sum(_record_date(r, now=local_now) is None for r in upcoming_records[2:])
+        if hidden_uncertain:
+            parts.extend(["", f"另有 {hidden_uncertain} 条预约日期待确认，请联系顾问。"])
         if recent_records:
             parts.extend(["", "<b>最近记录</b>"])
             for record in recent_records:

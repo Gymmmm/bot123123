@@ -197,7 +197,10 @@ async def test_channel_details_deeplink_end_to_end_opens_detail_with_photos(tmp_
     assert "富力城" in detail["caption"]
     assert len(detail["caption"]) <= 1024
     labels = _buttons(detail["reply_markup"])
-    assert labels[0] == ["1/2", "下一组 ➡️"]
+    assert labels[0] == ["下一组 ➡️"]
+    # Range is already in the photo caption; no inert pager button in P20.
+    assert detail["reply_markup"].inline_keyboard[0][0].callback_data == f"v3u:detailphoto:{PUBLIC_ID}:1"
+    assert ["📸 全部实拍"] in labels
     assert ["📅 在线预约", "💬 咨询这套"] in labels
     assert PUBLIC_ID not in _all_text(bot)
     state = context.user_data[PHOTOS_ALBUM_KEY][f"1001::{PUBLIC_ID}"]

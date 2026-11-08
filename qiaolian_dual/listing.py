@@ -233,6 +233,8 @@ def listing_action_allowed(listing_id: str, action: str) -> tuple[bool, str]:
 
 def listing_unavailable_text(reason: str='', listing_id: str='') -> str:
     normalized = str(reason or '').strip().lower()
+    if normalized == 'missing':
+        return '未找到该房源'
     if normalized == 'rented':
         return '🔴 <b>这套房已经租出</b>\n\n类似的房子可能还有。\n\n我们可以继续帮您找同区域、相近预算和户型的房源。'
     if normalized == 'offline':

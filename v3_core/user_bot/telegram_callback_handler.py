@@ -868,29 +868,50 @@ async def handle_v3_callback(
     await query.answer()
 
     if response.kind == "details":
-        # Returning to listing details from the paged album: keep the action
-        # bar in place and delete only the 4 photo frames so we can edit the
-        # action bar to the details body.
+        # Open every original photo directly, retaining the full details and actions.
         public_id_for_exit = _callback_public_listing_id(dispatched)
-        if response.media_groups and getattr(context, "bot", None) is not None and public_id_for_exit:
-            # V4.1: detail = curated real photos + text/buttons right below.
-            await send_listing_details(
-                update,
-                context,
-                public_listing_id=public_id_for_exit,
-                media_groups=response.media_groups,
-                photo_paths=response.photo_paths,
-                media_caption=response.media_caption,
+        listings = getattr(router, "listings", None)
+        resolved = listings.resolve_action(public_id_for_exit, "details") if listings and public_id_for_exit else None
+        details = getattr(resolved, "details", None) if getattr(resolved, "ok", False) else None
+        full_paths = tuple(p for p in getattr(details, "photo_paths", ()) if Path(p).is_file())
+        if full_paths and getattr(context, "bot", None) is not None:
+            from .telegram_photos_render import send_listing_photos_album
+            # The complete album makes paging/expand controls redundant.
+            action_rows = []
+            for buttons in (getattr(response.keyboard, "inline_keyboard", None) or ()):
+                kept = [
+                    button for button in buttons
+                    if "下一组实拍" not in str(getattr(button, "text", "") or "")
+                    and "全部实拍" not in str(getattr(button, "text", "") or "")
+                    and not str(getattr(button, "callback_data", "") or "").startswith("v3u:listing:photos:")
+                ]
+                if kept:
+                    action_rows.append(kept)
+            actions = InlineKeyboardMarkup(action_rows) if action_rows else None
+            groups = tuple(tuple(full_paths[n:n + 10]) for n in range(0, len(full_paths), 10))
+            sent_ids = await send_listing_photos_album(
+                context.bot,
+                chat_id=_chat_id(update),
+                media_groups=groups,
+                media_caption=f"📸 {public_id_for_exit}｜共 {len(full_paths)} 张实拍",
                 text=response.text,
-                reply_markup=response.keyboard,
-                replace_message=getattr(query, "message", None),
+                reply_markup=actions,
+                separate_details=True,
             )
+            if sent_ids:
+                state = _album_state(update, context, public_id_for_exit)
+                old_ids = tuple(state.get("full_detail_ids") or ())
+                state["full_detail_ids"] = sent_ids
+                for old_id in old_ids:
+                    if int(old_id) in sent_ids:
+                        continue
+                    try:
+                        await context.bot.delete_message(chat_id=_chat_id(update), message_id=int(old_id))
+                    except Exception:
+                        pass
         else:
             await _exit_album_to_other_surface(
-                update,
-                context,
-                public_id_for_exit,
-                keep_action_bar=True,
+                update, context, public_id_for_exit, keep_action_bar=True,
             )
             await _render_details(query, response)
         _set_listing_touchpoint(context, "listing_details")

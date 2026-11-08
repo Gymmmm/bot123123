@@ -9,7 +9,9 @@ cannot be accidentally reopened by a stale batch screen.
 from __future__ import annotations
 
 from html import escape
+import secrets
 import sqlite3
+import time
 from typing import Any
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -20,6 +22,7 @@ from .operator_flow import OperatorPublisherAdminController
 
 PENDING_BATCH_SIZE = 10
 BATCH_STATUS_SYNC_KEY = "v3_pending_batch_status_sync"
+PENDING_BATCH_CONFIRM_KEY = "v3_pending_batch_confirm"
 
 _PENDING_ELIGIBLE_WHERE = """
 l.inventory_status='pending'
@@ -195,13 +198,13 @@ class PendingBatchOperatorPublisherAdminController(OperatorPublisherAdminControl
             [
                 InlineKeyboardButton(
                     f"✅ 这{current_count}套全部设为可预约",
-                    callback_data=f"v3smp|pbapply|active|{clean_page}",
+                    callback_data=f"v3smp|pbconfirm|active|{clean_page}",
                 )
             ],
             [
                 InlineKeyboardButton(
                     f"⚫ 这{current_count}套全部下架",
-                    callback_data=f"v3smp|pbapply|offline|{clean_page}",
+                    callback_data=f"v3smp|pbconfirm|offline|{clean_page}",
                 )
             ],
             [InlineKeyboardButton("🔎 单独处理本组", callback_data=f"v3smp|pbpick|{clean_page}")],
@@ -290,25 +293,65 @@ class PendingBatchOperatorPublisherAdminController(OperatorPublisherAdminControl
             ),
         )
 
-    def _apply_pending_batch(self, status: str, page: int = 0) -> tuple[list[str], list[str]]:
+    async def _confirm_pending_batch(self, message: Any, context: Any, status: str, page: int, admin_id: str = "") -> None:
+        if status not in {"active", "offline"}:
+            raise ValueError("unsupported pending batch status")
+        rows = self._pending_batch_rows(page)
+        listing_ids = [str(row["listing_id"]) for row in rows]
+        if not listing_ids:
+            await self.show_pending_batch(message, page)
+            return
+        token = secrets.token_hex(12)
+        context.user_data[PENDING_BATCH_CONFIRM_KEY] = {
+            "token": token,
+            "admin_id": str(admin_id),
+            "expires_at": time.time() + 300,
+            "status": status,
+            "page": page,
+            "listing_ids": listing_ids,
+        }
+        label = "可预约" if status == "active" else "已下架"
+        await message.reply_text(
+            f"确认将以下 {len(listing_ids)} 套房源设为「{label}」？" + chr(10)
+            + "本次只处理这些房源，列表变化不会替换目标。" + chr(10) * 2
+            + chr(10).join(str(row.get("public_listing_id") or row["listing_id"]) for row in rows),
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton(f"✅ 确认处理这 {len(listing_ids)} 套", callback_data=f"v3smp|pbcommit|{token}")],
+                [InlineKeyboardButton("取消，返回本组", callback_data=f"v3smp|pbat|{page}")],
+            ]),
+        )
+
+    def _apply_pending_ids(self, status: str, listing_ids: list[str]) -> tuple[list[str], list[str]]:
         clean_status = str(status or "").strip().lower()
         if clean_status not in {"active", "offline"}:
             raise ValueError("unsupported pending batch status")
-        rows = self._pending_batch_rows(max(0, int(page or 0)))
         updated: list[str] = []
         skipped: list[str] = []
         with sqlite3.connect(self.db_path) as conn:
-            for row in rows:
-                listing_id = str(row["listing_id"])
+            for listing_id in dict.fromkeys(str(value) for value in listing_ids):
                 cur = conn.execute(
-                    """UPDATE listings_v3
-                          SET inventory_status=?,updated_at=CURRENT_TIMESTAMP
-                        WHERE listing_id=? AND inventory_status='pending'""",
+                    f"""UPDATE listings_v3 SET inventory_status=?,updated_at=CURRENT_TIMESTAMP
+                         WHERE listing_id=?
+                           AND inventory_status='pending'
+                           AND EXISTS (
+                               SELECT 1 FROM listings_v3 l
+                                WHERE l.listing_id=listings_v3.listing_id
+                                  AND {_PENDING_ELIGIBLE_WHERE}
+                           )""",
                     (clean_status, listing_id),
                 )
                 (updated if cur.rowcount == 1 else skipped).append(listing_id)
             conn.commit()
         return updated, skipped
+
+    def _apply_pending_batch(self, status: str, page: int = 0) -> tuple[list[str], list[str]]:
+        # Private legacy helper used by isolated regression fixtures. Telegram
+        # callbacks must use _confirm_pending_batch -> _apply_pending_ids.
+        clean_status = str(status or "").strip().lower()
+        if clean_status not in {"active", "offline"}:
+            raise ValueError("unsupported pending batch status")
+        rows = self._pending_batch_rows(max(0, int(page or 0)))
+        return self._apply_pending_ids(clean_status, [str(row["listing_id"]) for row in rows])
 
     def _apply_pending_one(self, listing_id: str, status: str) -> bool:
         clean_status = str(status or "").strip().lower()
@@ -366,17 +409,48 @@ class PendingBatchOperatorPublisherAdminController(OperatorPublisherAdminControl
         action = parts[1] if len(parts) > 1 else ""
 
         if action == "pbat" and len(parts) == 3:
+            context.user_data.pop(PENDING_BATCH_CONFIRM_KEY, None)
             await self.show_pending_batch(query.message, int(parts[2]))
             return True
         if action == "pbpick" and len(parts) == 3:
+            context.user_data.pop(PENDING_BATCH_CONFIRM_KEY, None)
             await self.show_pending_pick(query.message, int(parts[2]))
             return True
         if action == "pbone" and len(parts) == 4:
+            context.user_data.pop(PENDING_BATCH_CONFIRM_KEY, None)
             await self.show_pending_one(query.message, parts[2], int(parts[3]))
             return True
         if action == "pbapply" and len(parts) == 4:
-            status, page = parts[2], int(parts[3])
-            updated, skipped = self._apply_pending_batch(status, page)
+            # Legacy buttons have only a page number. Never execute against a
+            # refreshed page: it might now contain entirely different listings.
+            await query.message.reply_text(
+                "这组操作入口已更新，请重新打开待确认房源并核对具体房源。",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("查看待确认房源", callback_data="v3smp|pbat|0")]
+                ]),
+            )
+            return True
+        if action == "pbconfirm" and len(parts) == 4:
+            await self._confirm_pending_batch(query.message, context, parts[2], int(parts[3]), str(getattr(getattr(update, "effective_user", None), "id", "")))
+            return True
+        if action == "pbcommit" and len(parts) == 3:
+            saved = context.user_data.get(PENDING_BATCH_CONFIRM_KEY)
+            if not isinstance(saved, dict) or not secrets.compare_digest(
+                str(saved.get("token") or ""), parts[2]
+            ) or float(saved.get("expires_at") or 0) <= time.time() or str(saved.get("admin_id") or "") != str(getattr(getattr(update, "effective_user", None), "id", "")):
+                await query.message.reply_text(
+                    "确认已失效，请重新选择房源。",
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("查看待确认房源", callback_data="v3smp|pbat|0")]
+                    ]),
+                )
+                return True
+            status = str(saved["status"])
+            page = int(saved["page"])
+            # Invalidate before the durable write. Duplicate delivery must not
+            # act on a different page or reuse the same confirmation.
+            context.user_data.pop(PENDING_BATCH_CONFIRM_KEY, None)
+            updated, skipped = self._apply_pending_ids(status, list(saved["listing_ids"]))
             if updated:
                 queue = context.user_data.setdefault(BATCH_STATUS_SYNC_KEY, [])
                 queue.extend({"listing_id": listing_id, "status": status} for listing_id in updated)
@@ -396,11 +470,14 @@ class PendingBatchOperatorPublisherAdminController(OperatorPublisherAdminControl
             await self.show_pending_batch(query.message, page)
             return True
 
+        if action != "pbcommit":
+            context.user_data.pop(PENDING_BATCH_CONFIRM_KEY, None)
         return await super().handle_callback(update, context)
 
 
 __all__ = [
     "BATCH_STATUS_SYNC_KEY",
+    "PENDING_BATCH_CONFIRM_KEY",
     "PENDING_BATCH_SIZE",
     "PendingBatchOperatorPublisherAdminController",
 ]

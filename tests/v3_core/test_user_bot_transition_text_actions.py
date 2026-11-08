@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from v3_core.user_bot.transition_actions import (
     APPOINTMENT_AWAITING_DATE_KEY,
     APPOINTMENT_AWAITING_TIME_KEY,
@@ -33,7 +35,7 @@ def _appt_session(*, awaiting_date=False, awaiting_time=False, date=""):
 
 def test_custom_date_normalizes_fixed_sha_formats_and_advances_to_time():
     service = TransitionTextActionService()
-    for raw, expected in (("0905", "9月5日"), ("9月5日", "9月5日"), ("下周三", "下周三")):
+    for raw, expected in (("0905", "2026-09-05"), ("9月5日", "2026-09-05"), ("下周三", "2026-09-09")):
         result = service.apply(raw, _appt_session(awaiting_date=True))
         assert result.ok and result.next_step == "appointment_time"
         assert result.appointment is not None
@@ -61,7 +63,7 @@ def test_custom_time_validates_then_stops_at_submit_executor_boundary():
         result = service.apply(raw, _appt_session(awaiting_time=True, date="9月5日"))
         assert result.ok and result.next_step == "appointment_submit"
         assert result.appointment is not None and result.appointment.ready
-        assert result.appointment.time == raw
+        assert result.appointment.time == "20:00"
         assert result.mutation is not None
         assert APPOINTMENT_AWAITING_TIME_KEY in result.mutation.delete_keys
 
@@ -203,3 +205,13 @@ def test_missing_backing_session_expires_and_plain_text_is_not_claimed():
     assert expired_area.status == "expired"
     assert expired_budget.status == "expired"
     assert plain.status == "not_applicable"
+
+
+@pytest.fixture(autouse=True)
+def fixed_confirmation_clock(monkeypatch):
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    from v3_core.user_bot import appointment_dates, appointment_service
+    clock = lambda: datetime(2026, 9, 2, 12, tzinfo=ZoneInfo("Asia/Phnom_Penh"))
+    monkeypatch.setattr(appointment_dates, "local_now", clock)
+    monkeypatch.setattr(appointment_service, "local_now", clock)

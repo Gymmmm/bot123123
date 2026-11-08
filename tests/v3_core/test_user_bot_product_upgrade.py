@@ -22,7 +22,7 @@ def _button_labels(markup):
 
 
 def test_v3_home_uses_final_conversion_navigation():
-    view = build_home_view(channel_url="https://t.me/qiaolian")
+    view = build_home_view(channel_url="https://t.me/qiaolian", show_appointments=True)
     labels = _labels(view)
     assert labels == [
         "🔍 开始找房", "📢 最新房源", "💬 中文顾问", "📋 我的预约", "🛎️ 侨联服务",
@@ -30,7 +30,7 @@ def test_v3_home_uses_final_conversion_navigation():
 
 
 def test_home_without_channel_keeps_core_conversion_actions():
-    labels = _labels(build_home_view())
+    labels = _labels(build_home_view(show_appointments=True))
     assert labels == [
         "🔍 开始找房", "💬 中文顾问", "📋 我的预约", "🛎️ 侨联服务",
     ]
@@ -83,9 +83,14 @@ def test_listing_attribution_sources_have_chinese_admin_labels():
 
 
 def test_repair_page_exposes_every_supported_core_issue():
-    callbacks = set(_callbacks(repair_home_view()))
-    for issue in ("repair_ac", "repair_water", "repair_power", "repair_door", "repair_washer", "repair_fridge", "repair_network", "repair_furniture", "repair_other"):
-        assert f"v3u:service:issue:{issue}" in callbacks
+    # P20 uses four unified categories, not the retired nine-button menu.
+    # Detailed legacy issue callbacks remain covered through actual SQLite
+    # submissions in test_user_bot_service_flow (including idempotent replay).
+    assert _callbacks(repair_home_view()) == [
+        "v3u:service:issue:repair_other", "v3u:service:issue:aftercare_property",
+        "v3u:service:issue:aftercare_bill", "v3u:service:issue:aftercare_other",
+        "v3u:service:concierge",
+    ]
 
 
 def test_public_static_page_callbacks_use_registered_v3_namespaces():
